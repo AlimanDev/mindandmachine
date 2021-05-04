@@ -177,7 +177,8 @@ class TestUserViewSet(TestsHelperMixin, APITestCase):
                 "username": username,
                 "by_code": True,
             }
-            resp = self.client.put(self.get_url('User-detail', pk=username), data=data)
+            resp = self.client.put(
+                self.get_url('User-detail', pk=username), data=self.dump_data(data), content_type='application/json')
             self.assertEqual(resp.status_code, 201)
 
             user = User.objects.get(username=username)
@@ -196,7 +197,26 @@ class TestUserViewSet(TestsHelperMixin, APITestCase):
             "email": 'invalid@email',
             "by_code": True,
         }
-        resp = self.client.put(self.get_url('User-detail', pk=username), data=data)
+        resp = self.client.put(
+            self.get_url('User-detail', pk=username), data=self.dump_data(data), content_type='application/json')
+        self.assertEqual(resp.status_code, 201)
+
+        user = User.objects.get(username=username)
+        self.assertEqual(user.email, '')
+
+    def test_create_user_with_empty_email(self):
+        username = 'НМ00-123456'
+        data = {
+            'username': username,
+            'last_name': 'Иванов',
+            'first_name': 'Иван',
+            'middle_name': 'Иванович',
+            'email': '',
+            'phone_number': 'string',
+            'by_code': True,
+        }
+        resp = self.client.put(
+            self.get_url('User-detail', pk=username), data=self.dump_data(data), content_type='application/json')
         self.assertEqual(resp.status_code, 201)
 
         user = User.objects.get(username=username)
