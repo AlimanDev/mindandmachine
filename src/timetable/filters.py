@@ -157,13 +157,18 @@ class VacancyFilter(FilterSetWithInitial):
                 is_fact=False,
                 type__in=WorkerDay.TYPES_PAID,
             )
+            worker_day_outsource_network_subq = WorkerDay.objects.filter(
+                pk=OuterRef('pk'),
+                outsources__id=self.request.user.network_id,
+            )
             return queryset.annotate(
                 approved_exists=Exists(approved_subq),
                 active_employment_exists=Exists(active_employment_subq),
                 worker_day_type_paid=Exists(worker_day_paid_subq),
+                worker_day_outsource_network_exitst=Exists(worker_day_outsource_network_subq),
             ).filter(
-                # Q(shop__network_id=self.request.user.network_id) | Q(is_outsource=True), # аутсорс фильтр
-                approved_exists=True,
+                Q(shop__network_id=self.request.user.network_id, approved_exists=True) | 
+                Q(is_outsource=True, worker_day_outsource_network_exitst=True), # аутсорс фильтр
                 active_employment_exists=True,
                 worker_day_type_paid=False,
             )

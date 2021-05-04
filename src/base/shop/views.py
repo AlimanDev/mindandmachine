@@ -11,9 +11,10 @@ from rest_framework.response import Response
 from rest_framework import serializers
 
 from src.base.filters import BaseActiveNamedModelFilter
-from src.base.models import Employment, Shop, Region
+from src.base.models import Employment, Shop, Region, NetworkConnect
 from src.base.permissions import Permission
 from src.base.shop.serializers import ShopSerializer, ShopStatSerializer, serialize_shop
+from src.base.shop.utils import get_tree
 from src.base.views_abstract import UpdateorCreateViewSet
 from src.util.openapi.responses import shop_tree_response_schema_dict as tree_response_schema_dict
 
@@ -162,63 +163,20 @@ class ShopViewSet(UpdateorCreateViewSet):
                 Q(dt_closed__gte=now.today() - datetime.timedelta(days=30)),
             ).order_by('level', 'name')
 
-        tree = []
-        parent_indexes = {}
-        for shop in shops:
-            if not shop.parent_id in parent_indexes:
-                tree.append({
-                    "id": shop.id,
-                    "label": shop.name,
-                    "tm_open_dict": shop.open_times,
-                    "tm_close_dict" :shop.close_times,
-                    "address": shop.address,
-                    "forecast_step_minutes":shop.forecast_step_minutes,
-                    "children": []
-                })
-                parent_indexes[shop.id] = [len(tree) - 1,]
-            else:
-                root = tree[parent_indexes[shop.parent_id][0]]
-                parent = root
-                for i in parent_indexes[shop.parent_id][1:]:
-                    parent = parent['children'][i]
-                parent['children'].append({
-                    "id": shop.id,
-                    "label": shop.name,
-                    "tm_open_dict": shop.open_times,
-                    "tm_close_dict" :shop.close_times,
-                    "address": shop.address,
-                    "forecast_step_minutes":shop.forecast_step_minutes,
-                    "children": []
-                })
-                parent_indexes[shop.id] = parent_indexes[shop.parent_id].copy()
-                parent_indexes[shop.id].append(len(parent['children']) - 1)
-        # tree = []
-        # ids = []
-        # elems = []
-        # for shop in shops:
-        #     parent_id = shop.parent_id
-        #     if parent_id in ids:
-        #         for i, elem in enumerate(elems):
-        #             if elem['id'] == parent_id:
-        #                 ids = ids[0:i+1]
-        #                 elems = elems[0:i+1]
-        #                 child_list = elem["children"]
-        #     else:
-        #         ids = []
-        #         elems = []
-        #         child_list = tree
+        return Response(get_tree(shops))
 
-        #     child_list.append({
-        #         "id": shop.id,
-        #         "label": shop.name,
-        #         "tm_open_dict": shop.open_times,
-        #         "tm_close_dict" :shop.close_times,
-        #         "address": shop.address,
-        #         "forecast_step_minutes":shop.forecast_step_minutes,
-        #         "children": []
-        #     })
+    @swagger_auto_schema(responses=tree_response_schema_dict)
+    @action(detail=False, methods=['get'])
+    def outsource_tree(self, request):
+        """
+        Дерево магазинов клиентов для аутсорсинговой компании в формате для Quasar
+        :param request:
+        :return:
+        """
+        user = self.request.user
+        clients = NetworkConnect.objects.filter(outsourcing_id=user.network_id).values_list('client_id', flat=True)
+        shops = self.filter_queryset(
+            Shop.objects.filter(network_id__in=clients).order_by('level', 'name')
+        )
 
-        #     elems.append(child_list[-1])
-        #     ids.append(shop.id)
-
-        return Response(tree)
+        return Response(get_tree(shops))

@@ -205,6 +205,9 @@ class AuthUserView(UserDetailsView):
         rotate_token(request)
         return super().check_permissions(request, *args, **kwargs)
 
+    def get_queryset(self):
+        return User.objects.select_related('network').prefetch_related('network__outsourcings', 'network__clients').all()
+
 
 class FunctionGroupView(BaseModelViewSet):
     permission_classes = [Permission]

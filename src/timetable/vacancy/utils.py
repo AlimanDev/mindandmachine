@@ -490,20 +490,20 @@ def confirm_vacancy(vacancy_id, user, exchange=False):
             'shop',
         ).first()
 
+        # на даем откликнуться на вакансию, если нет активного трудоустройства в день вакансии
+        if not active_employment:
+            res['code'] = 'cant_apply_vacancy_no_active_employement'
+            res['status_code'] = 400
+            return res
+
         employee_worker_day = WorkerDay.objects.get_plan_approved(
             employee_id=active_employment.employee_id,
             dt=vacancy.dt,
         ).select_related('shop').first()
 
         # нельзя откликнуться на вакансию если для сотрудника не составлен график на этот день
-        if not employee_worker_day:
+        if not employee_worker_day and not (vacancy.is_outsource and vacancy_shop.network_id != active_employment.shop.network_id):
             res['code'] = 'no_timetable'
-            res['status_code'] = 400
-            return res
-
-        # на даем откликнуться на вакансию, если нет активного трудоустройства в день вакансии
-        if not active_employment:
-            res['code'] = 'cant_apply_vacancy_no_active_employement'
             res['status_code'] = 400
             return res
 
@@ -514,7 +514,7 @@ def confirm_vacancy(vacancy_id, user, exchange=False):
             return res
 
         # откликаться на вакансию можно только в нерабочие/неоплачиваемые дни
-        update_condition = employee_worker_day.type not in WorkerDay.TYPES_PAID
+        update_condition = employee_worker_day.type not in WorkerDay.TYPES_PAID if employee_worker_day else True
         if active_employment.shop_id != vacancy_shop.id and not exchange:
             try:
                 tt = ShopMonthStat.objects.get(shop=vacancy_shop, dt=vacancy.dt.replace(day=1))
@@ -527,7 +527,8 @@ def confirm_vacancy(vacancy_id, user, exchange=False):
                 update_condition = False
 
         if update_condition or exchange:
-            employee_worker_day.delete()
+            if employee_worker_day:
+                employee_worker_day.delete()
 
             # TODO: добавить проверку на пересечение с рабочими днями у этого же пользователя
             vacancy.employee = active_employment.employee

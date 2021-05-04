@@ -5,9 +5,9 @@ from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError, NotFound
 
-from src.base.models import Employment, User, Shop, Employee
+from src.base.models import Employment, User, Shop, Employee, Network
 from src.base.shop.serializers import ShopSerializer
-from src.base.serializers import UserShorSerializer
+from src.base.serializers import UserShorSerializer, NetworkSerializer
 from src.conf.djconfig import QOS_DATE_FORMAT
 from src.timetable.models import (
     WorkerDay,
@@ -63,6 +63,7 @@ class WorkerDayListSerializer(serializers.Serializer):
     comment = serializers.CharField()
     is_approved = serializers.BooleanField()
     worker_day_details = WorkerDayCashboxDetailsListSerializer(many=True)
+    outsources = NetworkSerializer(many=True, required=False)
     is_fact = serializers.BooleanField()
     work_hours = serializers.SerializerMethodField()
     parent_worker_day_id = serializers.IntegerField()
@@ -91,6 +92,8 @@ class WorkerDaySerializer(serializers.ModelSerializer):
         "user_mismatch": _("User in employment and in worker day must match."),
         "no_active_employments": _(
             "Can't create a working day in the schedule, since the user is not employed during this period"),
+        "outsource_only_vacancy": _("Only vacancy can be outsource."),
+        "outsources_not_specified": _("Outsources does not specified for outsource vacancy.")
     }
 
     worker_day_details = WorkerDayCashboxDetailsSerializer(many=True, required=False)
@@ -107,6 +110,8 @@ class WorkerDaySerializer(serializers.ModelSerializer):
     username = serializers.CharField(required=False, write_only=True)
     created_by = serializers.HiddenField(default=serializers.CurrentUserDefault())
     last_edited_by = serializers.HiddenField(default=serializers.CurrentUserDefault())
+    outsources = NetworkSerializer(many=True, read_only=True)
+    outsources_ids = serializers.ListField(required=False, child=serializers.IntegerField())
 
     class Meta:
         model = WorkerDay
@@ -114,7 +119,7 @@ class WorkerDaySerializer(serializers.ModelSerializer):
                   'comment', 'is_approved', 'worker_day_details', 'is_fact', 'work_hours', 'parent_worker_day_id',
                   'is_outsource', 'is_vacancy', 'shop_code', 'user_login', 'username', 'created_by', 'last_edited_by',
                   'crop_work_hours_by_shop_schedule', 'dttm_work_start_tabel', 'dttm_work_end_tabel', 'is_blocked',
-                  'employment_tabel_code']
+                  'employment_tabel_code', 'outsources', 'outsources_ids']
         read_only_fields = ['work_hours', 'parent_worker_day_id', 'is_blocked']
         create_only_fields = ['is_fact']
         ref_name = 'WorkerDaySerializer'
@@ -175,6 +180,8 @@ class WorkerDaySerializer(serializers.ModelSerializer):
 
         if not wd_type == WorkerDay.TYPE_WORKDAY:
             attrs.pop('worker_day_details', None)
+            attrs['is_vacancy'] = False
+            attrs['is_outsource'] = False
         elif not (attrs.get('worker_day_details')):
             raise ValidationError({
                 "worker_day_details": self.error_messages['required']
@@ -192,6 +199,21 @@ class WorkerDaySerializer(serializers.ModelSerializer):
                 raise ValidationError({
                     "employment": self.error_messages['user_mismatch']
                 })
+
+        if attrs.get('is_outsource'):
+            if not attrs.get('is_vacancy'):
+                raise ValidationError(self.error_messages['outsource_only_vacancy'])
+            outsources_ids = attrs.pop('outsources_ids', [])
+            outsources = Network.objects.filter(
+                id__in=outsources_ids,
+                clients__id=self.context['request'].user.network_id,
+            )
+            print(outsources)
+            if len(outsources) == 0:
+                raise ValidationError(self.error_messages['outsources_not_specified'])
+            attrs['outsources'] = outsources
+        else:
+            attrs['outsources'] = []
 
         return attrs
 
@@ -232,6 +254,7 @@ class WorkerDaySerializer(serializers.ModelSerializer):
             self._create_update_clean(validated_data)
 
             details = validated_data.pop('worker_day_details', None)
+            outsources = validated_data.pop('outsources', None)
             worker_day, _created = WorkerDay.objects.update_or_create(
                 dt=validated_data.get('dt'),
                 employee_id=validated_data.get('employee_id'),
@@ -244,14 +267,21 @@ class WorkerDaySerializer(serializers.ModelSerializer):
                 WorkerDayCashboxDetails.objects.filter(worker_day=worker_day).delete()
                 for wd_detail in details:
                     WorkerDayCashboxDetails.objects.create(worker_day=worker_day, **wd_detail)
+            
+            if outsources:
+                worker_day.outsources.clear()
+                worker_day.outsources.add(*outsources)
 
             return worker_day
 
     def update(self, instance, validated_data):
         with transaction.atomic():
             details = validated_data.pop('worker_day_details', [])
+            outsources = validated_data.pop('outsources', [])
             validated_data.pop('created_by', None)
             WorkerDayCashboxDetails.objects.filter(worker_day=instance).delete()
+            instance.outsources.clear()
+            instance.outsources.add(*outsources)
             for wd_detail in details:
                 WorkerDayCashboxDetails.objects.create(worker_day=instance, **wd_detail)
 

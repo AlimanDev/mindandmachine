@@ -142,6 +142,7 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
             'work_hours': '10:45:00',
             'worker_day_details': [],
             'is_outsource': False,
+            'outsources': [],
             'is_vacancy': False,
             'crop_work_hours_by_shop_schedule': True,
         }
@@ -2043,14 +2044,6 @@ class TestVacancy(TestsHelperMixin, APITestCase):
         cls.work_type_name1 = WorkTypeName.objects.create(
             name='Кассы',
         )
-        cls.network = Network.objects.create(
-            primary_color='#BDF82',
-            secondary_color='#390AC',
-        )
-        cls.shop.network = cls.network
-        cls.shop.save()
-        cls.user2.network = cls.network
-        cls.user2.save()
         cls.work_type1 = WorkType.objects.create(shop=cls.shop, work_type_name=cls.work_type_name1)
         cls.vacancy = WorkerDay.objects.create(
             shop=cls.shop,
