@@ -624,7 +624,6 @@ class TestGetWorkersStatAndTabel(MultipleActiveEmploymentsSupportMixin, APITestC
         )
         employee1_2_data = resp_data.get(str(self.employee1_2.id))
         employee1_2_data.pop('employments', None)
-        self.pp_dict(employee1_2_data)
         self.assertDictEqual(
             employee1_2_data,
             {
@@ -838,12 +837,15 @@ class TestEmployeeAPI(MultipleActiveEmploymentsSupportMixin, APITestCase):
 
     def test_get_employee_with_employments(self):
         self.client.force_authenticate(user=self.user1)
-        resp = self.client.get(self.get_url('Employee-list'), data={'include_employments': True})
+        resp = self.client.get(
+            self.get_url('Employee-list'), data={'include_employments': True, 'show_constraints': True})
         self.assertEqual(resp.status_code, 200)
         resp_data = resp.json()
         self.assertEqual(len(resp_data), 4)
         employee_data = resp_data[0]
         self.assertIn('employments', employee_data)
+        employment_data = employee_data['employments'][0]
+        self.assertIn('worker_constraints', employment_data)
 
     def test_get_employee_without_employments(self):
         self.client.force_authenticate(user=self.user1)
@@ -862,6 +864,5 @@ class TestEmployeeAPI(MultipleActiveEmploymentsSupportMixin, APITestCase):
             data=self.dump_data({'tabel_code': new_tabel_code}),
             content_type='application/json',
         )
-        self.print_resp(resp)
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(Employee.objects.get(id=self.employee1_1.id).tabel_code, new_tabel_code)

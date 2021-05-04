@@ -198,9 +198,10 @@ class EmployeeViewSet(UpdateorCreateViewSet):
         )
 
         if self.request.query_params.get('include_employments'):
-            qs = qs.prefetch_related(
-                'employments',
-            )
+            prefetch = 'employments'
+            if self.request.query_params.get('show_constraints'):
+                prefetch = 'employments__worker_constraints'
+            qs = qs.prefetch_related(prefetch)
 
         return qs.distinct()
 
