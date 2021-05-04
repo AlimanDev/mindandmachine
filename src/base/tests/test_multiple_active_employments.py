@@ -477,7 +477,7 @@ class TestGetWorkersStatAndTabel(MultipleActiveEmploymentsSupportMixin, APITestC
                 'dt_from': date(2021, 3, 1),
                 'dt_to': date(2021, 3, 31),
                 'shop_id': self.shop1.id,
-                'worker_id': self.user1.id,
+                'employee_id__in': f'{self.employee1_1.id},{self.employee1_2.id}',
             },
         )
         resp_data = resp.json()

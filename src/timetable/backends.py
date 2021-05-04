@@ -36,7 +36,7 @@ class MultiShopsFilterBackend(DjangoFilterBackend):
         dt = form.get('dt')  # | request.data.get('dt')
         dt_from = form.get('dt__gte')  # | request.data.get('dt_from')
         dt_to = form.get('dt__lte')  # | request.data.get('dt_to')
-        worker_id__in = form.get('worker_id__in')
+        employee_id__in = form.get('employee_id__in')
         worker__username__in = form.get('worker__username__in')
 
         if not dt_from:
@@ -52,9 +52,9 @@ class MultiShopsFilterBackend(DjangoFilterBackend):
             **shop_filter,
         ).values('employee__user_id')
 
-        if worker_id__in:
+        if employee_id__in:
             ids = ids.filter(
-                employee__user__id__in=worker_id__in
+                employee_id__in=employee_id__in
             )
         if worker__username__in:
             ids = ids.filter(

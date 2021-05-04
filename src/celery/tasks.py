@@ -1,10 +1,11 @@
-import json
 import logging
 import os
 import time as time_in_secs
 from datetime import date, timedelta, datetime
 
+import requests
 from dateutil.relativedelta import relativedelta
+from django.conf import settings
 from django.core.mail import EmailMultiAlternatives
 from django.db.models import Q
 from django.utils.timezone import now
@@ -25,13 +26,13 @@ from src.conf.djconfig import EMAIL_HOST_USER, URV_DELETE_BIOMETRICS_DAYS_AFTER_
 from src.forecast.models import OperationTemplate
 from src.notifications.models import EventEmailNotification
 from src.notifications.tasks import send_event_email_notifications
+from src.recognition.events import EMPLOYEE_NOT_CHECKED_IN
+from src.recognition.utils import get_worker_days_with_no_ticks
 from src.timetable.models import (
     WorkType,
     WorkerDayCashboxDetails,
     EmploymentWorkType,
 )
-from src.recognition.utils import get_worker_days_with_no_ticks
-from src.recognition.events import EMPLOYEE_NOT_CHECKED_IN
 
 
 @app.task

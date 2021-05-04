@@ -2101,7 +2101,7 @@ class TestVacancy(TestsHelperMixin, APITestCase):
                     'work_type_id': self.work_type1.id
                 },
             ],
-            'worker_id': None
+            'employee_id': None
         }
 
         resp = self.client.post(reverse('WorkerDay-list'), data=data, format='json')
