@@ -171,6 +171,8 @@ class VacancyFilter(FilterSetWithInitial):
                 Q(is_outsource=True, worker_day_outsource_network_exitst=True), # аутсорс фильтр
                 active_employment_exists=True,
                 worker_day_type_paid=False,
+                is_approved=True,
+                employee__isnull=True,
             )
         return queryset
 

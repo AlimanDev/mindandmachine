@@ -123,5 +123,8 @@ class TestOutsource(TestsHelperMixin, APITestCase):
         self._create_vacancy(dt_now, datetime.combine(dt_now, time(8)), datetime.combine(dt_now, time(20)), outsources=[self.outsource_network.id,])
         self._create_vacancy(dt_now, datetime.combine(dt_now, time(8)), datetime.combine(dt_now, time(20)), outsources=[self.outsource_network.id, self.outsource_network2.id])
         self._create_vacancy(dt_now, datetime.combine(dt_now, time(8)), datetime.combine(dt_now, time(20)), outsources=[self.outsource_network2.id,])
+        self._create_vacancy(dt_now, datetime.combine(dt_now, time(8)), datetime.combine(dt_now, time(20)), is_outsource=False)
         self.client.force_authenticate(user=self.user1)
+        WorkerDay.objects.all().update(is_approved=True)
         response = self.client.get('/rest_api/worker_day/vacancy/?only_available=True&limit=10&offset=0')
+        self.assertEqual(response.json()['count'], 2)

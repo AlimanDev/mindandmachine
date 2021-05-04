@@ -200,15 +200,14 @@ class WorkerDaySerializer(serializers.ModelSerializer):
                     "employment": self.error_messages['user_mismatch']
                 })
 
+        outsources_ids = attrs.pop('outsources_ids', [])
         if attrs.get('is_outsource'):
             if not attrs.get('is_vacancy'):
                 raise ValidationError(self.error_messages['outsource_only_vacancy'])
-            outsources_ids = attrs.pop('outsources_ids', [])
             outsources = Network.objects.filter(
                 id__in=outsources_ids,
                 clients__id=self.context['request'].user.network_id,
             )
-            print(outsources)
             if len(outsources) == 0:
                 raise ValidationError(self.error_messages['outsources_not_specified'])
             attrs['outsources'] = outsources
@@ -255,14 +254,19 @@ class WorkerDaySerializer(serializers.ModelSerializer):
 
             details = validated_data.pop('worker_day_details', None)
             outsources = validated_data.pop('outsources', None)
-            worker_day, _created = WorkerDay.objects.update_or_create(
-                dt=validated_data.get('dt'),
-                employee_id=validated_data.get('employee_id'),
-                employment_id=validated_data.get('employment_id'),
-                is_fact=validated_data.get('is_fact'),
-                is_approved=validated_data.get('is_approved'),
-                defaults=validated_data,
-            )
+            if not validated_data.get('is_vacancy', False):
+                worker_day, _created = WorkerDay.objects.update_or_create(
+                    dt=validated_data.get('dt'),
+                    employee_id=validated_data.get('employee_id'),
+                    employment_id=validated_data.get('employment_id'),
+                    is_fact=validated_data.get('is_fact'),
+                    is_approved=validated_data.get('is_approved'),
+                    defaults=validated_data,
+                )
+            else:
+                worker_day = WorkerDay.objects.create(
+                    **validated_data,
+                )
             if details:
                 WorkerDayCashboxDetails.objects.filter(worker_day=worker_day).delete()
                 for wd_detail in details:
