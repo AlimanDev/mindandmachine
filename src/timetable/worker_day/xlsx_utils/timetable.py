@@ -199,7 +199,7 @@ class Timetable_xlsx(Tabel_xlsx):
                 format_text
             )
 
-            norm_hours = int(round(stat.get(employment.user_id, {}).get('plan', {}).get(stat_type, {}).get('norm_hours_curr_month', {}).get('value', 0)))
+            norm_hours = int(round(stat.get(employment.user_id, {}).get('plan', {}).get(stat_type, {}).get('norm_hours', {}).get('curr_month', 0)))
 
             self.worksheet.write_string(
                 row_s + row_shift, col_s + day + 3,
