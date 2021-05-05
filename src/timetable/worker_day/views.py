@@ -93,7 +93,7 @@ class WorkerDayViewSet(BaseModelViewSet):
     openapi_tags = ['WorkerDay',]
 
     def get_queryset(self):
-        queryset = WorkerDay.objects.all()
+        queryset = WorkerDay.objects.all().prefetch_related('outsources')
 
         if self.request.query_params.get('by_code', False):
             return queryset.annotate(
