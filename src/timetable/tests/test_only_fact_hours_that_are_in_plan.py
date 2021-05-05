@@ -209,3 +209,17 @@ class TestOnlyFactHoursThatInApprovedPlan(TestsHelperMixin, APITestCase):
         self.assertGreaterEqual(wd_plan.work_hours, wd_fact.work_hours)
         work_hours = ((wd_fact.dttm_work_end_tabel - wd_fact.dttm_work_start_tabel).total_seconds() / 60) - 72
         self.assertEqual(wd_fact.work_hours, timedelta(minutes=work_hours))
+
+    def test_work_hours_not_negative_if_break_time_greater_than_work_time(self):
+        wd = WorkerDay.objects.create(
+            worker=self.user,
+            employment=self.employment,
+            is_fact=False,
+            is_approved=True,
+            shop=self.shop,
+            type=WorkerDay.TYPE_WORKDAY,
+            dt=self.dt,
+            dttm_work_start=datetime.combine(self.dt, time(13, 30)),
+            dttm_work_end=datetime.combine(self.dt, time(13, 35)),
+        )
+        self.assertEqual(wd.work_hours.total_seconds(), 0)

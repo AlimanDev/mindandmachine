@@ -641,6 +641,10 @@ class WorkerDay(AbstractModel):
             if work_hours >= break_triplet[0] and work_hours <= break_triplet[1]:
                 work_hours = work_hours - sum(break_triplet[2])
                 break
+
+        if work_hours < 0:
+            return datetime.timedelta(0)
+
         return datetime.timedelta(minutes=work_hours)
 
     def get_department(self):
@@ -681,7 +685,7 @@ class WorkerDay(AbstractModel):
         return self.get_type_display()
 
     def save(self, *args, **kwargs): # todo: aa: частая модель для сохранения, отправлять запросы при сохранении накладно
-        self.dttm_work_start_tabel, self.dttm_work_end_tabel, self.work_hours  = self._calc_wh()
+        self.dttm_work_start_tabel, self.dttm_work_end_tabel, self.work_hours = self._calc_wh()
 
         if self.last_edited_by is None:
             self.last_edited_by = self.created_by
