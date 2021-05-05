@@ -12,7 +12,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Django REST framework\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2021-05-04 08:06+0000\n"
+"POT-Creation-Date: 2021-05-04 10:05+0000\n"
 "PO-Revision-Date: 2017-08-03 14:58+0000\n"
 "Last-Translator: Grigory Mishchenko <grishkokot@gmail.com>\n"
 "Language-Team: Russian (http://www.transifex.com/django-rest-framework-1/"
@@ -106,9 +106,10 @@ msgstr ""
 "Существует {amount} моделей пользователя с именем пользователя: {username}."
 
 #: src/base/serializers.py:226
+#, fuzzy, python-brace-format
+#| msgid "There is {amount} models of user with user_id: {user_id}."
 msgid "There is {amount} models of user with user_id: {user_id}."
-msgstr ""
-"Существует {amount} моделей пользователя с user_id: {username}."
+msgstr "Существует {amount} моделей пользователя с user_id: {username}."
 
 #: src/base/serializers.py:227
 #, python-brace-format
@@ -294,7 +295,7 @@ msgstr "Факт черновик"
 
 #: src/timetable/auto_settings/serializers.py:7
 #: src/timetable/worker_day/serializers.py:87
-#: src/timetable/worker_day/serializers.py:443
+#: src/timetable/worker_day/serializers.py:451
 msgid "Date start should be less then date end"
 msgstr "Дата начала должна быть меньше чем дата окончания."
 
@@ -342,6 +343,41 @@ msgstr "Необходимо выбрать шаблон смен."
 msgid "You need to select an interval within a single accounting period."
 msgstr "Небходимо выбрать интервал в рамках одного учетного периода."
 
+#: src/timetable/vacancy/utils.py:458
+msgid ""
+"The data for the exchange of shifts is not entered. Contact the director."
+msgstr "Данные для биржи смен не внесены. Обратитесь к директору."
+
+#: src/timetable/vacancy/utils.py:459
+msgid "You cannot enter this vacancy."
+msgstr "Вы не можете выйти на эту смену."
+
+#: src/timetable/vacancy/utils.py:460
+msgid ""
+"You can't apply for this vacancy because you don't have an active employment "
+"as of the date of the vacancy."
+msgstr "Вы не можете выйти на эту смену, так как у вас нет активного трудоустройства на дату смены."
+
+#: src/timetable/vacancy/utils.py:461
+msgid ""
+"You can not enter this vacancy because this vacancy is located in another "
+"network and does not imply the possibility of outsourcing."
+msgstr "Вы не можете выйти на эту смену, так как данная вакансия находится в другой сети и не подразумевает возможность аутсорсинга."
+
+#: src/timetable/vacancy/utils.py:463
+msgid ""
+"You cannot apply for this vacancy because this vacancy is located on another "
+"network and your network is not allowed to respond to this vacancy."
+msgstr "Вы не можете выйти на эту вакансию так как данная вакансия находится в другой сети и вашей сети не разрешено откликаться на данную вакансию."
+
+#: src/timetable/vacancy/utils.py:464
+msgid "The timetable for this period has not yet been created."
+msgstr "График на этот период еще не составлен."
+
+#: src/timetable/vacancy/utils.py:465
+msgid "The vacancy was successfully accepted."
+msgstr "Вакансия успешно принята."
+
 #: src/timetable/worker_day/serializers.py:88
 msgid "Worker day already exist."
 msgstr "У сотрудника уже существует рабочий день."
@@ -379,19 +415,20 @@ msgstr "Только вакансия может быть аутсорс."
 
 #: src/timetable/worker_day/serializers.py:96
 msgid "Outsources does not specified for outsource vacancy."
-msgstr "Не переданы аутсорс сети, которые могут откликнуться на аутсорс вакансию."
+msgstr ""
+"Не переданы аутсорс сети, которые могут откликнуться на аутсорс вакансию."
 
-#: src/timetable/worker_day/serializers.py:335
+#: src/timetable/worker_day/serializers.py:343
 msgid "Wrong dates format."
 msgstr "Неправильный формат дат."
 
-#: src/timetable/worker_day/serializers.py:405
-#: src/timetable/worker_day/serializers.py:427
+#: src/timetable/worker_day/serializers.py:413
+#: src/timetable/worker_day/serializers.py:435
 #, python-brace-format
 msgid "Invalid pk \"{pk_value}\" - object does not exist."
 msgstr "Недопустимый первичный ключ \"{pk_value}\" - объект не существует."
 
-#: src/timetable/worker_day/serializers.py:444
+#: src/timetable/worker_day/serializers.py:452
 msgid "Start of first period can't be greater than start of second period"
 msgstr ""
 "Начало периода с которого копируются дни не может быть больше начала периода "
@@ -460,6 +497,7 @@ msgstr ""
 msgid "This vacancy does not exist or has already been approved."
 msgstr "Такой вакансии не существует или она уже подтверждена."
 
+#: src/timetable/vacancy/utils.py:457
 #: src/timetable/worker_day/views.py:705
 msgid "There is no such vacancy."
 msgstr "Такой вакансии не существует"

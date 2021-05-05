@@ -30,6 +30,7 @@ from datetime import timedelta, datetime, time
 import pandas
 from dateutil.relativedelta import relativedelta
 from django.conf import settings
+from django.utils.translation import gettext as _
 from django.core.mail import EmailMultiAlternatives
 from django.db import transaction
 from django.db.models import Q, Exists, OuterRef, Sum, Subquery, DurationField
@@ -452,6 +453,16 @@ def confirm_vacancy(vacancy_id, user, exchange=False):
     :param user: пользователь, откликнувшийся на вакансию
     :param exchange:
     """
+    messages = {
+        'no_vacancy': _('There is no such vacancy'),
+        'need_symbol_for_vacancy': _('The data for the exchange of shifts is not entered. Contact the director.'),
+        'cant_apply_vacancy': _('You cannot enter this vacancy.'),
+        'cant_apply_vacancy_no_active_employement': _("You can't apply for this vacancy because you don't have an active employment as of the date of the vacancy."),
+        'cant_apply_vacancy_not_outsource': _('You can not enter this vacancy because this vacancy is located in another network and does not imply the possibility of outsourcing.'),
+        'cant_apply_vacancy_outsource_no_network': _('You cannot apply for this vacancy because this vacancy is located on another network and your network is not allowed to respond to this vacancy.'),
+        'no_timetable': _('The timetable for this period has not yet been created.'),
+        'vacancy_success': _('The vacancy was successfully accepted.'),
+    }
     with transaction.atomic():
         vacancy = WorkerDay.objects.get_plan_approved(
             id=vacancy_id,
@@ -462,21 +473,21 @@ def confirm_vacancy(vacancy_id, user, exchange=False):
             'status_code': 200,
         }
         if not vacancy:
-            res['code'] = 'no_vacancy'
+            res['text'] = messages['no_vacancy']
             res['status_code'] = 404
             return res
 
         vacancy_shop = vacancy.shop
 
         if user.black_list_symbol is None and vacancy_shop.network.need_symbol_for_vacancy:
-            res['code'] = 'need_symbol_for_vacancy'
+            res['text'] = messages['need_symbol_for_vacancy']
             res['status_code'] = 400
             return res
 
         shops_for_black_list = vacancy_shop.get_ancestors(include_self=True)
 
         if VacancyBlackList.objects.filter(symbol=user.black_list_symbol, shop__in=shops_for_black_list).exists():
-            res['code'] = 'cant_apply_vacancy'
+            res['text'] = messages['cant_apply_vacancy']
             res['status_code'] = 400
             return res
 
@@ -492,7 +503,18 @@ def confirm_vacancy(vacancy_id, user, exchange=False):
 
         # на даем откликнуться на вакансию, если нет активного трудоустройства в день вакансии
         if not active_employment:
-            res['code'] = 'cant_apply_vacancy_no_active_employement'
+            res['text'] = messages['cant_apply_vacancy_no_active_employement']
+            res['status_code'] = 400
+            return res
+
+        # сотрудник из другой сети не может принять вакансию если это не аутсорс вакансия
+        if not vacancy.is_outsource and active_employment.shop.network_id != vacancy_shop.network_id:
+            res['text'] = messages['cant_apply_vacancy_not_outsource']
+            res['status_code'] = 400
+            return res
+        # сотрудник из другой сети не может принять вакансию если это аутсорс вакансия, но его сеть не в списке доступных
+        elif vacancy.is_outsource and not vacancy.outsources.filter(id=active_employment.shop.network_id).exists():
+            res['text'] = messages['cant_apply_vacancy_outsource_no_network']
             res['status_code'] = 400
             return res
 
@@ -503,15 +525,10 @@ def confirm_vacancy(vacancy_id, user, exchange=False):
 
         # нельзя откликнуться на вакансию если для сотрудника не составлен график на этот день
         if not employee_worker_day and not (vacancy.is_outsource and vacancy_shop.network_id != active_employment.shop.network_id):
-            res['code'] = 'no_timetable'
+            res['text'] = messages['no_timetable']
             res['status_code'] = 400
             return res
 
-        # сотрудник из другой сети не может принять вакансию если это не аутсорс вакансия
-        if not vacancy.is_outsource and active_employment.shop.network_id != vacancy_shop.network_id:
-            res['code'] = 'cant_apply_vacancy_not_outsource'
-            res['status_code'] = 400
-            return res
 
         # откликаться на вакансию можно только в нерабочие/неоплачиваемые дни
         update_condition = employee_worker_day.type not in WorkerDay.TYPES_PAID if employee_worker_day else True
@@ -519,7 +536,7 @@ def confirm_vacancy(vacancy_id, user, exchange=False):
             try:
                 tt = ShopMonthStat.objects.get(shop=vacancy_shop, dt=vacancy.dt.replace(day=1))
             except ShopMonthStat.DoesNotExist:
-                res['code'] = 'no_timetable'
+                res['text'] = messages['no_timetable']
                 res['status_code'] = 400
                 return res
 
@@ -565,9 +582,9 @@ def confirm_vacancy(vacancy_id, user, exchange=False):
             # TODO: создать событие об отклике на вакансию
 
             Event.objects.filter(worker_day=vacancy).delete()
-            res['code'] = 'vacancy_success'
+            res['text'] = messages['vacancy_success']
         else:
-            res['code'] = 'cant_apply_vacancy'
+            res['text'] = messages['cant_apply_vacancy']
             res['status_code'] = 400
 
     return res
