@@ -1305,6 +1305,11 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
         response = self.client.put(self.url + f'{wd.id}/', data, format='json')
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(response.json(), {'non_field_errors': ['Дата начала должна быть меньше чем дата окончания.']})
+        data['dt'] = self.dt + timedelta(1)
+        data['dttm_work_end'] = datetime.combine(self.dt, time(22))
+        response = self.client.post(self.url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.json(), {'non_field_errors': ['Дата начала должна быть меньше чем дата окончания.']})
 
 
 
