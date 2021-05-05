@@ -575,7 +575,6 @@ class TestAutoWorkerExchange(TestCase):
         result = confirm_vacancy(vacancy.id, user)
         self.assertEqual(result, {'status_code': 200, 'text': 'Вакансия успешно принята.'})
 
-    @expectedFailure
     def test_shift_elongation(self):
         self.create_users(1)
         user = User.objects.first()

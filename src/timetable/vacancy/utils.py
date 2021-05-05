@@ -42,6 +42,7 @@ from src.base.models import (
     Shop,
     Event,
     Notification,
+    Employee,
 )
 from src.conf.djconfig import (
     QOS_DATETIME_FORMAT,
@@ -134,16 +135,17 @@ def search_holiday_candidate(vacancy, max_working_hours, constraints, exclude_po
     vacancy_dt = vacancy.dt
     work_hours = vacancy.work_hours
     work_types = vacancy.work_types.all().values_list('work_type_name_id', flat=True)
-    workers = User.objects.filter(
-        Q(employees__employments__dt_fired__isnull=True) | Q(employees__employments__dt_fired__gt=vacancy_dt),
-        Q(employees__employments__dt_hired__isnull=True) | Q(employees__employments__dt_hired__lte=vacancy_dt),
-        employees__employments__shop__in=shop.exchange_shops.filter(dttm_deleted__isnull=True),
-    ).exclude(
-        employees__employments__position__in=exclude_positions,
-    ).annotate(
+    active_employment_subq = Employment.objects.filter(
+        Q(dt_fired__isnull=True) | Q(dt_fired__gt=vacancy_dt),
+        Q(dt_hired__isnull=True) | Q(dt_hired__lte=vacancy_dt),
+        employee_id=OuterRef('pk'),
+        shop__in=shop.exchange_shops.filter(dttm_deleted__isnull=True),
+    ).exclude(position__in=exclude_positions)
+    employees = Employee.objects.annotate(
+        active_empl=Exists(active_employment_subq),
         workerdays_exists=Exists(
             WorkerDay.objects.filter(
-                employee__user_id=OuterRef('pk'),
+                employee_id=OuterRef('pk'),
                 type=WorkerDay.TYPE_HOLIDAY,
                 dt=vacancy_dt,
                 is_fact=False,
@@ -153,16 +155,17 @@ def search_holiday_candidate(vacancy, max_working_hours, constraints, exclude_po
         ),
         work_types_exists=Exists(
             EmploymentWorkType.objects.filter(
-                employment=OuterRef('employees__employments'),
+                employment__in=OuterRef('employments'),
                 work_type__work_type_name_id__in=work_types,
             )
         ),
     ).filter(
+        active_empl=True,
         workerdays_exists=True,
         work_types_exists=True,
     ).annotate(
         work_hours=Subquery(WorkerDay.objects.filter(
-            employee__user_id=OuterRef('pk'),
+            employee_id=OuterRef('pk'),
             dt__gte=vacancy_dt.replace(day=1),
             dt__lte=vacancy_dt.replace(day=1) + relativedelta(months=+1) - timedelta(days=1),
             type__in=WorkerDay.TYPES_PAID,
@@ -171,23 +174,23 @@ def search_holiday_candidate(vacancy, max_working_hours, constraints, exclude_po
         ).order_by().values('employee__user_id').annotate(wh=Sum('work_hours')).values('wh'), output_field=DurationField()) + work_hours,
     ).filter(
         work_hours__lte=max_working_hours,
-    ).order_by('work_hours')
+    ).select_related('user').order_by('work_hours')
     count_of_holidays = {
         3: [],
         2: [],
         1: [],
     }
-    for worker in workers:
+    for employee in employees:
         max_holidays = 0
         holidays_in_a_row = []
         tmp_obj = {
-            'worker': worker,
+            'employee': employee,
             'work_days': [],
         }
         for worker_day in WorkerDay.objects.filter(
             dt__gte=vacancy_dt - timedelta(days=2),
             dt__lte=vacancy_dt + timedelta(days=2),
-            employee__user_id=worker.id,
+            employee_id=employee.id,
         ).order_by('dt'):
             if worker_day.type == WorkerDay.TYPE_HOLIDAY:
                 max_holidays += 1
@@ -199,28 +202,28 @@ def search_holiday_candidate(vacancy, max_working_hours, constraints, exclude_po
         holidays_in_a_row.append(max_holidays)
         max_holidays = max(holidays_in_a_row)
         if (max_holidays == 4 or max_holidays == 5):
-            return worker
+            return employee
         count_of_holidays[max_holidays].append(tmp_obj)
-    for worker in count_of_holidays[3]:
-        if all(worker['work_days'][:3]) or all(worker['work_days'][2:]):
-            return worker['worker']
+    for employee in count_of_holidays[3]:
+        if all(employee['work_days'][:3]) or all(employee['work_days'][2:]):
+            return employee['employee']
 
-    for worker in count_of_holidays[2]:
+    for employee in count_of_holidays[2]:
         hours_before = 0
         hours_after = 0
         tmp_hours = 0
         for worker_day in WorkerDay.objects.qos_current_version().filter(
             dt__gte=vacancy_dt - timedelta(days=7),
             dt__lte=vacancy_dt + timedelta(days=7),
-            employee__user_id=worker['worker'].id,
+            employee_id=employee['employee'].id,
         ).order_by('dt'):
             if worker_day.type in WorkerDay.TYPES_PAID:
                 tmp_hours += worker_day.work_hours.seconds // 3600
             else:
-                if all(worker['work_days'][1:3]) and worker_day.dt + timedelta(days=1) == vacancy_dt:
+                if all(employee['work_days'][1:3]) and worker_day.dt + timedelta(days=1) == vacancy_dt:
                     hours_before = tmp_hours
                     tmp_hours = 0
-                elif all(worker['work_days'][1:3]) and worker_day.dt == vacancy_dt:
+                elif all(employee['work_days'][1:3]) and worker_day.dt == vacancy_dt:
                     continue
                 elif worker_day.dt == vacancy_dt:
                     hours_before = tmp_hours
@@ -234,18 +237,18 @@ def search_holiday_candidate(vacancy, max_working_hours, constraints, exclude_po
                     tmp_hours = 0
         if tmp_hours == 0:
             hours_after = tmp_hours
-        if all(worker['work_days'][1:3]) and hours_before <= constraints.get('second_day_before', 40) and hours_after <= constraints.get('second_day_after', 32) or\
-            all(worker['work_days'][2:4]) and hours_before <= constraints.get('first_day_after', 32) and hours_after <= constraints.get('first_day_before', 40):
-            return worker['worker']
+        if all(employee['work_days'][1:3]) and hours_before <= constraints.get('second_day_before', 40) and hours_after <= constraints.get('second_day_after', 32) or\
+            all(employee['work_days'][2:4]) and hours_before <= constraints.get('first_day_after', 32) and hours_after <= constraints.get('first_day_before', 40):
+            return employee['employee']
 
-    for worker in count_of_holidays[1]:
+    for employee in count_of_holidays[1]:
         hours_before = 0
         hours_after = 0
         tmp_hours = 0
         for worker_day in WorkerDay.objects.qos_current_version().filter(
             dt__gte=vacancy_dt - timedelta(days=7),
             dt__lte=vacancy_dt + timedelta(days=7),
-            employee__user_id=worker['worker'].id,
+            employee_id=employee['employee'].id,
         ).order_by('dt'):
             if worker_day.type in WorkerDay.TYPES_PAID:
                 tmp_hours += worker_day.work_hours.seconds // 3600
@@ -260,7 +263,7 @@ def search_holiday_candidate(vacancy, max_working_hours, constraints, exclude_po
                 else:
                     tmp_hours = 0
         if hours_before <= constraints.get('1day_before', 40) and hours_after <= constraints.get('1day_after', 40):
-            return worker['worker']
+            return employee['employee']
 
     return None
 
@@ -277,7 +280,7 @@ def do_shift_elongation(vacancy, max_working_hours):
            смены меньше окончания смены вакансии
         3. Тип работы этого дня совпадает с типом работы вакансии
         4. Длина смены этого рабочего дня меньше максимальной длины смены в этом магазине
-        5. Количество рабочих часов в месяц не превыщает максимальноого количества
+        5. Количество рабочих часов в месяц не превышает максимальноого количества
            рабочих часов с учетом смены
         Выбирается самый менее загруженный работник
         Далее выбирается его рабочий день в день вакансии
@@ -297,16 +300,19 @@ def do_shift_elongation(vacancy, max_working_hours):
     work_hours = vacancy.work_hours
     max_shift_len = time(shop.settings.shift_end)
     work_types = vacancy.work_types.all().values_list('work_type_name_id', flat=True)
-    workers = list(User.objects.filter(
-        Q(employments__dt_fired__isnull=True) | Q(employments__dt_fired__gt=vacancy_dt),
-        Q(employments__dt_hired__isnull=True) | Q(employments__dt_hired__lte=vacancy_dt),
-        employments__shop=shop,
-    ).annotate(
+    active_employment_subq = Employment.objects.filter(
+        Q(dt_fired__isnull=True) | Q(dt_fired__gt=vacancy_dt),
+        Q(dt_hired__isnull=True) | Q(dt_hired__lte=vacancy_dt),
+        employee_id=OuterRef('pk'),
+        shop=shop,
+    )
+    employee = Employee.objects.annotate(
+        active_empl=Exists(active_employment_subq),
         workerdays_exists=Exists(
             WorkerDay.objects.filter(
                 Q(dttm_work_start__gt=vacancy.dttm_work_start) | 
                 Q(dttm_work_end__lt=vacancy.dttm_work_end),
-                worker=OuterRef('pk'), 
+                employee=OuterRef('pk'), 
                 type=WorkerDay.TYPE_WORKDAY,
                 shop=shop,
                 dt=vacancy_dt,
@@ -317,25 +323,26 @@ def do_shift_elongation(vacancy, max_working_hours):
             )
         ),
     ).filter(
+        active_empl=True,
         workerdays_exists=True,
     ).annotate(
         work_hours=Subquery(WorkerDay.objects.filter(
-            worker_id=OuterRef('pk'),
+            employee_id=OuterRef('pk'),
             dt__gte=vacancy_dt.replace(day=1),
             dt__lte=vacancy_dt.replace(day=1) + relativedelta(months=+1) - timedelta(days=1),
             type__in=WorkerDay.TYPES_PAID,
             is_fact=False,
             is_approved=True,
-        ).order_by().values('worker_id').annotate(wh=Sum('work_hours')).values('wh'), output_field=DurationField()) + work_hours,
+        ).order_by().values('employee__user_id').annotate(wh=Sum('work_hours')).values('wh'), output_field=DurationField()) + work_hours,
     ).filter(
         work_hours__lte=max_working_hours,
-    ).order_by('work_hours'))
+    ).select_related('user').order_by('work_hours').first()
 
-    if len(workers):
-        candidate = workers[0]
+    if employee:
+        candidate = employee
         worker_day = WorkerDay.objects.filter(
             dt=vacancy_dt,
-            worker_id=candidate.id,
+            employee_id=candidate.id,
             is_approved=True,
             is_fact=False,
         ).first()
@@ -343,7 +350,7 @@ def do_shift_elongation(vacancy, max_working_hours):
         dttm_work_end = vacancy.dttm_work_end if worker_day.dttm_work_end < vacancy.dttm_work_end else worker_day.dttm_work_end
         wd, created = WorkerDay.objects.update_or_create(
             dt=vacancy_dt,
-            worker_id=candidate.id,
+            employee_id=candidate.id,
             is_approved=False,
             is_fact=False,
             defaults={
@@ -352,7 +359,6 @@ def do_shift_elongation(vacancy, max_working_hours):
                 'shop_id': worker_day.shop_id,
                 'type': worker_day.type,
                 'employment': worker_day.employment,
-                'parent_worker_day': worker_day,
             }
         )
         if created:
@@ -373,17 +379,17 @@ def do_shift_elongation(vacancy, max_working_hours):
             f'shift elongation: vacancy {vacancy}, '
             f'{worker_day.dt}, prev {prev_dttm_start}-{prev_dttm_end}, '
             f'new {wd.dttm_work_start}-{wd.dttm_work_end}, '
-            f'worker {candidate.first_name} {candidate.last_name} '
+            f'worker {candidate.user.first_name} {candidate.user.last_name} '
         )
         create_event_and_notify(
-            [candidate], 
+            [candidate.user], 
             shop=shop,
             type='shift_elongation',
             params={'worker_day':wd},
         )
         if (worker_day.shop.email):
             message = f'Это автоматическое уведомление для {worker_day.shop.name} об изменениях в графике:\n\n' + \
-                    f'У сотрудника {candidate.last_name} {candidate.first_name} изменено время работы. ' +\
+                    f'У сотрудника {candidate.user.last_name} {candidate.user.first_name} изменено время работы. ' +\
                     f'Новое время работы с {wd.dttm_work_start} до {wd.dttm_work_end}, дата {wd.dt}.\n\n' +\
                     f'Посмотреть детали можно по ссылке: http://{settings.DOMAIN}'
             msg = EmailMultiAlternatives(
@@ -447,7 +453,7 @@ def cancel_vacancy(vacancy_id):
         vacancy.delete()
 
 
-def confirm_vacancy(vacancy_id, user, exchange=False):
+def confirm_vacancy(vacancy_id, user, employee=None, exchange=False):
     """
     :param vacancy_id:
     :param user: пользователь, откликнувшийся на вакансию
@@ -493,10 +499,16 @@ def confirm_vacancy(vacancy_id, user, exchange=False):
 
         # TODO: добавить возврат ошибки если невозможно однозначно определить активное трудоустройство
         # TODO: на клиенте должен быть явный выбор и передача сотрудника или трудоустройства
+        employee_filter = {}
+        if employee:
+            employee_filter['employee_id'] = employee.id
+        else:
+            employee_filter['employee__user_id'] = user.id
         active_employment = Employment.objects.get_active_empl_by_priority(
-            network_id=user.network_id, employee__user_id=user.id, dt=vacancy.dt,
+            network_id=user.network_id, dt=vacancy.dt,
             priority_shop_id=vacancy.shop_id,
             priority_work_type_id=vacancy.work_types.values_list('id', flat=True).first(),
+            **employee_filter,
         ).select_related(
             'shop',
         ).first()
@@ -810,7 +822,7 @@ def cancel_vacancies(shop_id, work_type_id, dt_from=None, dt_to=None, approved=F
 
 
     vacancies = WorkerDay.objects.filter(
-        (Q(employee__user__id__isnull=False) & Q(dttm_work_start__gte=min_dttm)) | Q(employee__user__id__isnull=True),
+        (Q(employee__isnull=False) & Q(dttm_work_start__gte=min_dttm)) | Q(employee__isnull=True),
         dt__gte=from_dt,
         dt__lte=to_dt,
         work_types__id=work_type_id,
@@ -867,11 +879,11 @@ def holiday_workers_exchange():
                     f'holiday exchange: to_shop {shop.name}, '
                     f'vacancy {vacancy.work_types.first().work_type_name.name}, '
                     f'{vacancy.dt}, {vacancy.dttm_work_start}-{vacancy.dttm_work_end}, '
-                    f'worker {candidate.first_name} {candidate.last_name}, '
+                    f'worker {candidate.user.first_name} {candidate.user.last_name}, '
                 )
-                confirm_vacancy(vacancy.id, candidate)
+                confirm_vacancy(vacancy.id, candidate.user, employee=candidate)
                 create_event_and_notify(
-                    [candidate], 
+                    [candidate.user], 
                     type='holiday_exchange', 
                     shop=shop, 
                     params={'worker_day': vacancy, 'shop': shop}
@@ -991,8 +1003,8 @@ def workers_exchange():
                         work_type__work_type_name=work_type.work_type_name,
                         worker_day__canceled=False,
                     ).exclude(
-                        work_type_id=work_type.id,
-                        worker_day__employment__position__in=exclude_positions,
+                        Q(work_type_id=work_type.id) |
+                        Q(worker_day__employment__position__in=exclude_positions),
                     ).select_related('worker_day').order_by('worker_day__dt'))
                     if not len(worker_days):
                         continue
@@ -1019,7 +1031,7 @@ def workers_exchange():
                             for detail in WorkerDayCashboxDetails.objects.filter(worker_day=candidate_worker_day)
                         }
                         #не удаляем candidate_to_change потому что создаем неподтвержденную вакансию
-                        print(confirm_vacancy(vacancy.id, user, exchange=True))
+                        print(confirm_vacancy(vacancy.id, user, employee=candidate_to_change.worker_day.employee, exchange=True))
                         create_event_and_notify(
                             [user],
                             type='auto_vacancy', 
