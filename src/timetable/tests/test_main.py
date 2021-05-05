@@ -1282,6 +1282,35 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
         )
         self.assertEqual(wd.work_hours, timedelta(hours=10, minutes=45))
 
+    def test_create_and_update_with_bad_dates(self):
+        data = {
+            "shop_id": self.shop.id,
+            "worker_id": self.user2.id,
+            "dt": self.dt,
+            "is_fact": False,
+            "is_approved": False,
+            "type": WorkerDay.TYPE_WORKDAY,
+            "dttm_work_start": datetime.combine(self.dt, time(18)),
+            "dttm_work_end": datetime.combine(self.dt, time(2)),
+            "worker_day_details": [{
+                "work_part": 1.0,
+                "work_type_id": self.work_type.id}
+            ]
+        }
+
+        response = self.client.post(self.url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.json(), {'non_field_errors': ['Дата начала должна быть меньше чем дата окончания.']})
+        wd = WorkerDay.objects.get(dt=self.dt, shop=self.shop, worker_id=self.user2.id, is_approved=False, is_fact=False)
+        response = self.client.put(self.url + f'{wd.id}/', data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.json(), {'non_field_errors': ['Дата начала должна быть меньше чем дата окончания.']})
+        data['dt'] = self.dt + timedelta(1)
+        data['dttm_work_end'] = datetime.combine(self.dt, time(22))
+        response = self.client.post(self.url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.json(), {'non_field_errors': ['Дата начала должна быть меньше чем дата окончания.']})
+
 
 
 class TestCropSchedule(TestsHelperMixin, APITestCase):
