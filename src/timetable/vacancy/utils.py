@@ -937,7 +937,7 @@ def workers_exchange():
             'from_dt': from_dt,
             'to_dt': to_dt,
         }
-        for work_type in shop.worktype_set.all():
+        for work_type in shop.work_types.all():
             params['work_type_ids'] = [work_type.id]
 
             shop_stat = get_shop_stats(

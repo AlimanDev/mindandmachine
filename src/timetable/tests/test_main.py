@@ -1040,12 +1040,8 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
             response.json()['employment'][0], 'Сотрудник в трудоустройстве и в рабочем дне должны совпадать.')
 
     def test_change_range(self):
-        self.user2.tabel_code = None
-        self.user2.save()
         self.employee2.tabel_code = 'empl_2'
         self.employee2.save()
-        self.employment2.tabel_code = 'empl_2'
-        self.employment2.save()
 
         data = {
           "ranges": [
@@ -1075,7 +1071,7 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertDictEqual(
             response.json(),
-            {self.employment2.tabel_code: {'created_count': 0, 'deleted_count': 0, 'existing_count': 21}}
+            {self.employee2.tabel_code: {'created_count': 0, 'deleted_count': 0, 'existing_count': 21}}
         )
 
         wd = WorkerDay.objects.filter(
@@ -1273,7 +1269,6 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
             type=WorkerDay.TYPE_WORKDAY,
         )
         self.assertEqual(wd.work_hours, timedelta(hours=10, minutes=45))
-
 
 
 class TestCropSchedule(TestsHelperMixin, APITestCase):
@@ -2099,7 +2094,7 @@ class TestVacancy(TestsHelperMixin, APITestCase):
                     'work_type_id': self.work_type1.id
                 },
             ],
-            'worker_id': None
+            'employee_id': None
         }
 
         resp = self.client.post(reverse('WorkerDay-list'), data=data, format='json')

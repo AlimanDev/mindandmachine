@@ -212,6 +212,7 @@ class TestDepartment(TestsHelperMixin, APITestCase):
         data['longitude'] = None
         data['distance'] = None
         data['email'] = None
+        data.pop('director_code')
         data.pop('nonstandard_schedule')
         self.assertDictEqual(shop, data)
 
@@ -259,13 +260,13 @@ class TestDepartment(TestsHelperMixin, APITestCase):
         shop = response.json()
         data['id'] = shop['id']
         data['director_id'] = None
-        data['director_code'] = None
         data['area'] = 0.0
         data['load_template_id'] = None
         data['exchange_settings_id'] = None
         data['distance'] = None
         data['load_template_status'] = 'R'
         data.pop('nonstandard_schedule')
+        data.pop('director_code')
         self.assertEqual(shop, data)
         self.assertIsNotNone(Shop.objects.get(id=shop['id']).dttm_deleted)
 

@@ -37,7 +37,7 @@ def copy_approved(dt_from, dt_to=None):
         wds = [
             WorkerDay(
                 shop=wd.shop,
-                worker_id=wd.worker_id,
+                employee_id=wd.employee_id,
                 employment=wd.employment,
                 dttm_work_start=wd.dttm_work_start,
                 dttm_work_end=wd.dttm_work_end,
@@ -58,14 +58,14 @@ def copy_approved(dt_from, dt_to=None):
         wds = WorkerDay.objects.bulk_create(wds)
         search_wds = {}
         for wd in wds:
-            key_worker = wd.worker_id
-            search_wds.setdefault(key_worker, {}).setdefault(wd.dt, {})[wd.is_fact] = wd
+            key_employee = wd.employee_id
+            search_wds.setdefault(key_employee, {}).setdefault(wd.dt, {})[wd.is_fact] = wd
 
         WorkerDayCashboxDetails.objects.bulk_create(
             [
                 WorkerDayCashboxDetails(
                     work_part=details.work_part,
-                    worker_day=search_wds[wd.worker_id][wd.dt][wd.is_fact],
+                    worker_day=search_wds[wd.employee_id][wd.dt][wd.is_fact],
                     work_type_id=details.work_type_id,
                 )
                 for wd in worker_days_to_copy

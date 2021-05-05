@@ -12,9 +12,10 @@ from django_filters.rest_framework import (
     OrderingFilter,
 )
 
+from src.base.filters import BaseActiveNamedModelFilter
 from src.base.models import Employment
-from src.timetable.models import WorkerDay, EmploymentWorkType, WorkerConstraint
-from src.base.models import Employment
+from src.timetable.models import WorkerDay, EmploymentWorkType, WorkerConstraint, WorkTypeName
+from src.util.drf.filters import ListFilter
 
 
 class WorkerDayFilter(FilterSet):
@@ -23,21 +24,14 @@ class WorkerDayFilter(FilterSet):
     fact_tabel = BooleanFilter(method='filter_fact_tabel', label="Выгрузка табеля")
 
     # параметры для совместимости с существующими интеграциями, не удалять
-    worker_id = NumberFilter(field_name='employee__user_id')
-    worker__username__in = CharFilter(field_name='employee__user__username', method='field_in')
-    employment__tabel_code__in = CharFilter(field_name='employee__tabel_code', method='field_in')
+    worker__username__in = ListFilter(field_name='employee__user__username', lookup_expr='in')
+    employment__tabel_code__in = ListFilter(field_name='employee__tabel_code', lookup_expr='in')
 
     def filter_fact_tabel(self, queryset, name, value):
         if value:
             return queryset.get_tabel()
 
         return queryset
-
-    def field_in(self, queryset, name, value):
-        filt = {
-            f'{name}__in': value.split(',')
-        }
-        return queryset.filter(**filt)
 
     class Meta:
         model = WorkerDay
@@ -48,7 +42,7 @@ class WorkerDayFilter(FilterSet):
             'dt': ['gte', 'lte', 'exact', 'range'],
             'is_approved': ['exact'],
             'is_fact': ['exact'],
-            'type': ['exact'],
+            'type': ['in', 'exact'],
         }
 
 
@@ -56,12 +50,18 @@ class WorkerDayStatFilter(FilterSet):
     shop_id = NumberFilter(required=True)
     dt_from = DateFilter(field_name='dt', lookup_expr='gte', label="Начало периода", required=True)
     dt_to = DateFilter(field_name='dt', lookup_expr='lte', label='Окончание периода', required=True)
+    employee_id = NumberFilter(field_name='employee_id')
+    employee_id__in = ListFilter(field_name='employee_id', lookup_expr='in')
 
     class Meta:
         model = WorkerDay
-        fields = {
-            'employee_id': ['exact', 'in'],
-        }
+        fields = (
+            'shop_id',
+            'dt_from',
+            'dt_to',
+            'employee_id',
+            'employee_id__in',
+        )
 
 
 class FilterSetWithInitial(FilterSet):
@@ -99,18 +99,18 @@ class VacancyFilter(FilterSetWithInitial):
     shift_length_max = TimeFilter(field_name='work_hours', lookup_expr='lte')
     shop_id = CharFilter(field_name='shop_id', method='filter_include_outsource')
     work_type_name = CharFilter(field_name='work_types', method='filter_by_name')
-    ordering = OrderingFilter(fields=('dt', 'id', 'dttm_work_start', 'dttm_work_end'), initial='dttm_work_start')
+    ordering = OrderingFilter(fields=('dt', 'id', 'dttm_work_start', 'dttm_work_end'), initial='dt,dttm_work_start')
     approved_first = BooleanFilter(method='filter_approved_first')
     only_available = BooleanFilter(method='filter_only_available')
 
     def filter_include_outsource(self, queryset, name, value):
         if value:
             shops = value.split(',')
-            if not self.data.get('include_outsource', False):
-                return queryset.filter(shop_id__in=shops)
-            return queryset.filter(
-                Q(shop_id__in=shops) | Q(is_outsource=True),
-            )
+            if self.data.get('include_outsource', 'false') == 'true':
+                return queryset.filter(
+                    Q(shop_id__in=shops) | Q(is_outsource=True),
+                )
+            return queryset.filter(shop_id__in=shops)
         return queryset
 
     def filter_by_name(self, queryset, name, value):
@@ -205,3 +205,12 @@ class WorkerConstraintFilter(FilterSet):
         fields = {
             'employment_id': ['exact'],
         }
+
+
+class WorkTypeNameFilter(BaseActiveNamedModelFilter):
+    shop_id = NumberFilter(field_name='work_types__shop_id')
+    shop_id__in = ListFilter(field_name='work_types__shop_id', lookup_expr='in')
+
+    class Meta:
+        model = WorkTypeName
+        fields = []

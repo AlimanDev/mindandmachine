@@ -3,6 +3,7 @@ import random
 from calendar import Calendar
 from datetime import datetime, timedelta, time
 
+from django.core.serializers.json import DjangoJSONEncoder
 from django.urls import reverse
 
 from src.base.models import Employment, FunctionGroup
@@ -49,7 +50,7 @@ class TestsHelperMixin:
 
     @staticmethod
     def dump_data(data):
-        return json.dumps(data)
+        return json.dumps(data, cls=DjangoJSONEncoder)
 
     @classmethod
     def _generate_plan_and_fact_worker_days_for_shop_employments(cls, shop, work_type, dt_from, dt_to):
@@ -104,23 +105,24 @@ class TestsHelperMixin:
                             kwargs['is_fact'] = True
                             kwargs['dttm_work_start'] = datetime.combine(
                                 day, plan_start_time) + timedelta(minutes=start_minutes)
-                            kwargs['dttm_work_end'] = datetime.combine(day, plan_end_time) + timedelta(minutes=end_minutes)
+                            kwargs['dttm_work_end'] = datetime.combine(day, plan_end_time) + timedelta(
+                                minutes=end_minutes)
                             wd = WorkerDay.objects.create(**kwargs)
                             WorkerDayCashboxDetails.objects.create(
                                 worker_day=wd,
                                 work_type=work_type,
                             )
                 else:
-                    change_empl = random.randint(0,1) == 1
+                    change_empl = random.randint(0, 1) == 1
                     if change_empl:
                         wd.employment = empl
                         wd.save()
-                        fact = WorkerDay.objects.filter(employee_id=wd.employee_id, dt=wd.dt, is_fact=True, is_approved=True).first()
+                        fact = WorkerDay.objects.filter(employee_id=wd.employee_id, dt=wd.dt, is_fact=True,
+                                                        is_approved=True).first()
                         change_fact = random.randint(0, 100) < 90
                         if change_fact and fact:
                             fact.employment = empl
                             fact.save()
-
 
     def clean_cached_props(self, cached_props=None):
         cached_props = cached_props or (

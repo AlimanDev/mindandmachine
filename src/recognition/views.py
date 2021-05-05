@@ -142,7 +142,7 @@ class TickPointAuthTickViewStrategy(TickViewStrategy):
     def get_user_id_employee_id_and_tick_point(self, data):
         tick_point = self.view.request.user
         user_id = data['user_id']
-        return user_id, data['employee_id'], tick_point
+        return user_id, data.get('employee_id'), tick_point
 
 
 class TickViewSet(BaseModelViewSet):

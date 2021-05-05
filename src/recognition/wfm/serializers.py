@@ -28,16 +28,16 @@ class WorkerDayListSerializer(serializers.Serializer):
         return obj.employment.position.name if obj.employment and obj.employment.position else ''
 
 
-class EmployeeSerializer(serializers.Serializer):
+class WfmEmployeeSerializer(serializers.Serializer):
     id = serializers.IntegerField()
     tabel_code = serializers.CharField()
     worker_days = WorkerDayListSerializer(many=True)
 
 
-class WorkerDaySerializer(serializers.ModelSerializer):
+class WfmWorkerDaySerializer(serializers.ModelSerializer):
     user_id = serializers.SerializerMethodField()
     avatar = serializers.SerializerMethodField()
-    employees = EmployeeSerializer(many=True)
+    employees = WfmEmployeeSerializer(many=True)
 
     class Meta:
         model = User

@@ -175,7 +175,6 @@ class UserViewSet(UpdateorCreateViewSet):
             
         return Response({"detail": "Биометрия сотрудника успешно удалена"}, status=status.HTTP_200_OK)
 
-
     def get_serializer_class(self):
         if self.action == 'list':
             return UserListSerializer
@@ -192,9 +191,19 @@ class EmployeeViewSet(UpdateorCreateViewSet):
     openapi_tags = ['Employee', ]
 
     def get_queryset(self):
-        return Employee.objects.filter(
+        qs = Employee.objects.filter(
             user__network_id=self.request.user.network_id
-        ).distinct()
+        ).select_related(
+            'user',
+        )
+
+        if self.request.query_params.get('include_employments'):
+            prefetch = 'employments'
+            if self.request.query_params.get('show_constraints'):
+                prefetch = 'employments__worker_constraints'
+            qs = qs.prefetch_related(prefetch)
+
+        return qs.distinct()
 
 
 class AuthUserView(UserDetailsView):

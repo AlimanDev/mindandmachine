@@ -95,7 +95,7 @@ class ShopSerializer(serializers.ModelSerializer):
     load_template_status = serializers.CharField(read_only=True)
     timezone = TimeZoneField(required=False)
     is_active = serializers.BooleanField(required=False, default=True)
-    director_code = serializers.CharField(required=False)
+    director_code = serializers.CharField(required=False, write_only=True)
     distance = serializers.SerializerMethodField(label='Расстояние до магазина (км)')
     latitude = RoundingDecimalField(decimal_places=8, max_digits=12, allow_null=True, required=False)
     longitude = RoundingDecimalField(decimal_places=8, max_digits=12, allow_null=True, required=False)

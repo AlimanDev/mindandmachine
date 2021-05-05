@@ -2,6 +2,8 @@ from datetime import timedelta
 
 from django.conf import settings
 from django.contrib.auth.forms import SetPasswordForm
+from django.core.exceptions import ValidationError as DjangoValidationError
+from django.core.validators import EmailValidator
 from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
@@ -124,11 +126,23 @@ class UserSerializer(BaseNetworkSerializer):
     username = serializers.CharField(required=False, validators=[UniqueValidator(queryset=User.objects.all())])
     network_id = serializers.HiddenField(default=CurrentUserNetwork())
     avatar = serializers.SerializerMethodField('get_avatar_url')
+    email = serializers.CharField(required=False)
 
     class Meta:
         model = User
         fields = ['id', 'first_name', 'last_name', 'middle_name', 'network_id',
                   'birthday', 'sex', 'avatar', 'email', 'phone_number', 'username' ]
+
+    def validate(self, attrs):
+        email = attrs.get('email')
+        if email:
+            try:
+                EmailValidator()(email)
+            except DjangoValidationError:
+                # TODO: добавить запись в лог?
+                attrs['email'] = ''
+
+        return attrs
 
     def get_avatar_url(self, obj) -> str:
         if obj.avatar:
@@ -138,11 +152,18 @@ class UserSerializer(BaseNetworkSerializer):
 
 class EmployeeSerializer(BaseNetworkSerializer):
     user = UserSerializer(read_only=True)
-    user_id = serializers.IntegerField(write_only=True)
+    user_id = serializers.IntegerField(required=False, write_only=True)
 
     class Meta:
         model = Employee
         fields = ['id', 'user', 'user_id', 'tabel_code', ]
+
+    def __init__(self, *args, **kwargs):
+        super(EmployeeSerializer, self).__init__(*args, **kwargs)
+        request = self.context.get('request')
+        if request and request.query_params.get('include_employments'):
+            self.fields['employments'] = EmploymentSerializer(
+                required=False, many=True, read_only=True, context=self.context)
 
 
 class AuthUserSerializer(UserSerializer):
@@ -197,7 +218,6 @@ class AutoTimetableSerializer(serializers.Serializer):
 class EmploymentListSerializer(serializers.Serializer):
     id = serializers.IntegerField()
     employee_id = serializers.IntegerField(required=False)
-    employee = EmployeeSerializer(required=False, read_only=True)
     user_id = serializers.IntegerField(source='employee.user_id')
     shop_id = serializers.IntegerField(required=False)
     position_id = serializers.IntegerField()
@@ -218,6 +238,12 @@ class EmploymentListSerializer(serializers.Serializer):
     worker_constraints = WorkerConstraintListSerializer(many=True)
     work_types = EmploymentWorkTypeListSerializer(many=True)
 
+    def __init__(self, *args, **kwargs):
+        super(EmploymentListSerializer, self).__init__(*args, **kwargs)
+
+        request = self.context.get('request')
+        if request and request.query_params.get('include_employee'):
+            self.fields['employee'] = EmployeeSerializer(required=False, read_only=True)
 
 class EmploymentSerializer(serializers.ModelSerializer):
     default_error_messages = {
@@ -234,7 +260,6 @@ class EmploymentSerializer(serializers.ModelSerializer):
     shop_code = serializers.CharField(required=False, source='shop.code')
     user_id = serializers.IntegerField(required=False, source='employee.user_id')
     employee_id = serializers.IntegerField(required=False)
-    employee = EmployeeSerializer(required=False, read_only=True)
     function_group_id = serializers.IntegerField(required=False, allow_null=True)
     work_types = EmploymentWorkTypeSerializer(many=True, read_only=True)
     worker_constraints = WorkerConstraintSerializer(many=True)
@@ -242,6 +267,7 @@ class EmploymentSerializer(serializers.ModelSerializer):
     dt_hired = serializers.DateField(required=True)
     dt_fired = serializers.DateField(required=False, default=None)
     tabel_code = serializers.CharField(required=False, source='employee.tabel_code')
+    is_active = serializers.BooleanField(read_only=True)
 
     class Meta:
         model = Employment
@@ -250,10 +276,10 @@ class EmploymentSerializer(serializers.ModelSerializer):
                   'shift_hours_length_min', 'shift_hours_length_max', 'auto_timetable', 'tabel_code', 'is_ready_for_overworkings',
                   'dt_new_week_availability_from', 'is_visible',  'worker_constraints', 'work_types',
                   'shop_code', 'position_code', 'username', 'code', 'function_group_id', 'dt_to_function_group',
-                  'employee', 'employee_id',
+                  'employee_id', 'is_active',
         ]
-        create_only_fields = ['employee_id', 'employee']
-        read_only_fields = ['employee']
+        create_only_fields = ['employee_id']
+        read_only_fields = []
         extra_kwargs = {
             'auto_timetable': {
                 'default': True,
@@ -268,12 +294,12 @@ class EmploymentSerializer(serializers.ModelSerializer):
         ]
 
     def validate(self, attrs):
+        employee = attrs.pop('employee', {})
         if self.instance:
             # Нельзя обновить пользователя по коду
             attrs['employee_id'] = self.instance.employee_id  # TODO: правильно?
         else:
             if not attrs.get('employee_id'):
-                employee = attrs.pop('employee', {})
                 user = employee.pop('user', None)
                 tabel_code = employee.pop('tabel_code', None)
                 user_id = employee.pop('user_id', None)
@@ -321,6 +347,10 @@ class EmploymentSerializer(serializers.ModelSerializer):
 
     def __init__(self, *args, **kwargs):
         super(EmploymentSerializer, self).__init__(*args, **kwargs)
+
+        request = self.context.get('request')
+        if request and request.query_params.get('include_employee'):
+            self.fields['employee'] = EmployeeSerializer(required=False, read_only=True)
 
         show_constraints = None
         if self.context.get('request'):

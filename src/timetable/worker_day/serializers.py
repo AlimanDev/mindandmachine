@@ -248,6 +248,9 @@ class WorkerDaySerializer(serializers.ModelSerializer):
             validated_data['is_vacancy'] = validated_data.get('is_vacancy') \
                 or not employee_active_empl.is_equal_shops
 
+    def _check_overlap(self, employee_id, dt):
+        WorkerDay.check_work_time_overlap(employee_id=employee_id, dt=dt, exc_cls=ValidationError)
+
     def create(self, validated_data):
         with transaction.atomic():
             self._create_update_clean(validated_data)
@@ -276,6 +279,8 @@ class WorkerDaySerializer(serializers.ModelSerializer):
                 worker_day.outsources.clear()
                 worker_day.outsources.add(*outsources)
 
+            self._check_overlap(employee_id=worker_day.employee_id, dt=worker_day.dt)
+
             return worker_day
 
     def update(self, instance, validated_data):
@@ -291,7 +296,11 @@ class WorkerDaySerializer(serializers.ModelSerializer):
 
             self._create_update_clean(validated_data, instance=instance)
 
-            return super().update(instance, validated_data)
+            res = super().update(instance, validated_data)
+
+            self._check_overlap(employee_id=instance.employee_id, dt=instance.dt)
+
+            return res
 
     def to_internal_value(self, data):
         data = super(WorkerDaySerializer, self).to_internal_value(data)
@@ -333,7 +342,7 @@ class VacancySerializer(serializers.Serializer):
         self.fields['shop'] = ShopSerializer(context=self.context)
 
     def get_avatar_url(self, obj) -> str:
-        if obj.employee_id and obj.employee.user and obj.employee.user.avatar:
+        if obj.employee_id and obj.employee.user_id and obj.employee.user.avatar:
             return obj.employee.user.avatar.url
         return None
 

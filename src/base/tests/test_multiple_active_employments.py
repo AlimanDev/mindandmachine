@@ -8,6 +8,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from etc.scripts import fill_calendar
+from src.base.models import Employee
 from src.base.tests.factories import (
     ShopFactory,
     UserFactory,
@@ -17,7 +18,7 @@ from src.base.tests.factories import (
     EmployeeFactory,
 )
 from src.recognition.models import Tick
-from src.timetable.models import WorkerDay
+from src.timetable.models import WorkerDay, WorkerDayPermission, GroupWorkerDayPermission
 from src.timetable.tests.factories import WorkerDayFactory, WorkTypeFactory
 from src.util.mixins.tests import TestsHelperMixin
 
@@ -167,7 +168,11 @@ class TestURVTicks(MultipleActiveEmploymentsSupportMixin, APITestCase):
             dttm_work_start=datetime.combine(self.dt, time(8, 0, 0)),
             dttm_work_end=datetime.combine(self.dt, time(20, 0, 0)),
         )
-        fact_approved_list = self._make_tick_requests(self.user1, self.shop1)
+        fact_approved_list = self._make_tick_requests(
+            self.user1, self.shop1,
+            dttm_coming=datetime.combine(self.dt, time(8, 53, 0)),
+            dttm_leaving=datetime.combine(self.dt, time(21, 15, 0)),
+        )
         self.assertEqual(len(fact_approved_list), 1)
         fact_approved = fact_approved_list[0]
         self.assertEqual(fact_approved.employment_id, self.employment1_2_1.id)
@@ -472,7 +477,7 @@ class TestGetWorkersStatAndTabel(MultipleActiveEmploymentsSupportMixin, APITestC
                 'dt_from': date(2021, 3, 1),
                 'dt_to': date(2021, 3, 31),
                 'shop_id': self.shop1.id,
-                'worker_id': self.user1.id,
+                'employee_id__in': f'{self.employee1_1.id},{self.employee1_2.id}',
             },
         )
         resp_data = resp.json()
@@ -619,7 +624,6 @@ class TestGetWorkersStatAndTabel(MultipleActiveEmploymentsSupportMixin, APITestC
         )
         employee1_2_data = resp_data.get(str(self.employee1_2.id))
         employee1_2_data.pop('employments', None)
-        self.pp_dict(employee1_2_data)
         self.assertDictEqual(
             employee1_2_data,
             {
@@ -759,3 +763,106 @@ class TestGetWorkersStatAndTabel(MultipleActiveEmploymentsSupportMixin, APITestC
                 }
             }
         )
+
+
+class TestWorkTimeOverlap(MultipleActiveEmploymentsSupportMixin, APITestCase):
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.add_group_perm(cls.group1, 'WorkerDay', 'POST')
+        GroupWorkerDayPermission.objects.bulk_create(
+            GroupWorkerDayPermission(
+                group=cls.group1,
+                worker_day_permission=wdp,
+            ) for wdp in WorkerDayPermission.objects.all()
+        )
+
+    def test_time_of_workdays_for_one_user_should_not_overlap(self):
+        """
+        При создании/изменении рабочего дня должна происходить проверка пересечения времени сотрудника
+        """
+        WorkerDayFactory(
+            is_fact=False,
+            is_approved=False,
+            dt=self.dt,
+            employee=self.employee1_1,
+            employment=self.employment1_2_1,
+            shop=self.shop1,
+            type=WorkerDay.TYPE_WORKDAY,
+            dttm_work_start=datetime.combine(self.dt, time(8, 0, 0)),
+            dttm_work_end=datetime.combine(self.dt, time(17, 0, 0)),
+        )
+
+        new_wd_data = {
+            "shop_id": self.shop1.id,
+            "employee_id": self.employee1_2.id,
+            "dt": self.dt,
+            "is_fact": False,
+            "is_approved": False,
+            "type": WorkerDay.TYPE_WORKDAY,
+            "dttm_work_start": datetime.combine(self.dt, time(16, 0, 0)),
+            "dttm_work_end": datetime.combine(self.dt, time(22, 0, 0)),
+            "worker_day_details": [{
+                "work_part": 1.0,
+                "work_type_id": self.work_type1_cleaner.id}
+            ]
+        }
+
+        self.client.force_authenticate(user=self.user1)
+        resp = self.client.post(
+            self.get_url('WorkerDay-list'),
+            data=self.dump_data(new_wd_data),
+            content_type='application/json',
+        )
+        self.assertContains(
+            resp, 'Операция не может быть выполнена. Недопустимое пересечение времени работы.', status_code=400)
+
+        new_wd_data['dttm_work_start'] = datetime.combine(self.dt, time(17, 0, 0))
+
+        resp = self.client.post(
+            self.get_url('WorkerDay-list'),
+            data=self.dump_data(new_wd_data),
+            content_type='application/json',
+        )
+
+        self.assertEqual(resp.status_code, 201)
+
+
+class TestEmployeeAPI(MultipleActiveEmploymentsSupportMixin, APITestCase):
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.add_group_perm(cls.group1, 'Employee', 'GET')
+        cls.add_group_perm(cls.group1, 'Employee', 'PUT')
+
+    def test_get_employee_with_employments(self):
+        self.client.force_authenticate(user=self.user1)
+        resp = self.client.get(
+            self.get_url('Employee-list'), data={'include_employments': True, 'show_constraints': True})
+        self.assertEqual(resp.status_code, 200)
+        resp_data = resp.json()
+        self.assertEqual(len(resp_data), 4)
+        employee_data = resp_data[0]
+        self.assertIn('employments', employee_data)
+        employment_data = employee_data['employments'][0]
+        self.assertIn('worker_constraints', employment_data)
+
+    def test_get_employee_without_employments(self):
+        self.client.force_authenticate(user=self.user1)
+        resp = self.client.get(self.get_url('Employee-list'))
+        self.assertEqual(resp.status_code, 200)
+        resp_data = resp.json()
+        self.assertEqual(len(resp_data), 4)
+        employee_data = resp_data[0]
+        self.assertNotIn('employments', employee_data)
+
+    def test_can_update_tabel_code_by_employee_id(self):
+        self.client.force_authenticate(user=self.user1)
+        new_tabel_code = 'new_tabel_code'
+        resp = self.client.put(
+            self.get_url('Employee-detail', pk=self.employee1_1.id),
+            data=self.dump_data({'tabel_code': new_tabel_code}),
+            content_type='application/json',
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(Employee.objects.get(id=self.employee1_1.id).tabel_code, new_tabel_code)

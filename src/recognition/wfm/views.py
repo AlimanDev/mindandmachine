@@ -20,7 +20,7 @@ from src.base.models import (
     User as WFMUser
 )
 from src.recognition.authentication import TickPointTokenAuthentication
-from src.recognition.wfm.serializers import WorkerDaySerializer, WorkShiftSerializer
+from src.recognition.wfm.serializers import WfmWorkerDaySerializer, WorkShiftSerializer
 from src.timetable.models import WorkerDay
 from .filters import WorkShiftFilter
 logger = logging.getLogger('django')
@@ -46,7 +46,7 @@ class WorkerDayViewSet(viewsets.ReadOnlyModelViewSet):
     basename = ''
     openapi_tags = ['RecognitionWorkerDay',]
 
-    serializer_class = WorkerDaySerializer
+    serializer_class = WfmWorkerDaySerializer
     # search_fields = ['first_name', 'last_name']
     filter_backends = [DjangoFilterBackend, filters.SearchFilter]
 
@@ -64,7 +64,9 @@ class WorkerDayViewSet(viewsets.ReadOnlyModelViewSet):
             shop_id=tick_point.shop_id,
             dttm_work_start__gte=dt_from,
             dttm_work_end__lte=dt_to,
-            child__id__isnull=True
+            child__id__isnull=True,
+            is_fact=False,
+            is_approved=True,
         )
         emp_cond = Employment.objects.get_active(
             self.request.user.network_id,
