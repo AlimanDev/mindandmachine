@@ -106,10 +106,8 @@ msgstr ""
 "Существует {amount} моделей пользователя с именем пользователя: {username}."
 
 #: src/base/serializers.py:226
-#, fuzzy, python-brace-format
-#| msgid "There is {amount} models of user with user_id: {user_id}."
 msgid "There is {amount} models of user with user_id: {user_id}."
-msgstr "Существует {amount} моделей пользователя с user_id: {username}."
+msgstr "Существует {amount} моделей пользователя с user_id: {user_id}."
 
 #: src/base/serializers.py:227
 #, python-brace-format
