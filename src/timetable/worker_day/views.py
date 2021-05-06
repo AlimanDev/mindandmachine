@@ -22,7 +22,6 @@ from rest_framework.response import Response
 from rest_framework.serializers import ValidationError
 
 from src.base.exceptions import FieldError
-from src.base.message import Message
 from src.base.models import Employment, Shop, ProductionDay, Group
 from src.base.permissions import WdPermission
 from src.base.views_abstract import BaseModelViewSet
@@ -94,7 +93,7 @@ class WorkerDayViewSet(BaseModelViewSet):
     openapi_tags = ['WorkerDay',]
 
     def get_queryset(self):
-        queryset = WorkerDay.objects.all()
+        queryset = WorkerDay.objects.all().prefetch_related('outsources')
 
         if self.request.query_params.get('by_code', False):
             return queryset.annotate(
@@ -284,12 +283,15 @@ class WorkerDayViewSet(BaseModelViewSet):
                                 dt_interval=dt_interval,
                             )
                         )
-
+            employee_filter = {}
+            if serializer.data.get('employee_ids'):
+                employee_filter['employee_id__in'] = serializer.data['employee_ids']
             employee_ids = Employment.objects.get_active(
                 Shop.objects.get(id=serializer.data['shop_id']).network_id,
                 dt_from=serializer.data['dt_from'],
                 dt_to=serializer.data['dt_to'],
                 shop_id=serializer.data['shop_id'],
+                **employee_filter,
             ).values_list('employee_id', flat=True)
 
             wd_types_grouped_by_limit = {}
@@ -315,6 +317,7 @@ class WorkerDayViewSet(BaseModelViewSet):
                 dt__gte=serializer.data['dt_from'],
                 is_fact=serializer.data['is_fact'],
                 is_approved=False,
+                **employee_filter,
             )
 
             wdays_to_approve = WorkerDay.objects.filter(
@@ -650,11 +653,8 @@ class WorkerDayViewSet(BaseModelViewSet):
     @action(detail=True, methods=['post'], serializer_class=None)
     def confirm_vacancy(self, request, pk=None):
         result = confirm_vacancy(pk, request.user)
-
-        message = Message(lang=request.user.lang)
-
         status_code = result['status_code']
-        result = message.get_message(result['code'])
+        result = result['text']
 
         return Response({'result': result}, status=status_code)
 

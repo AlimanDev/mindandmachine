@@ -603,6 +603,7 @@ class WorkerDay(AbstractModel):
     dttm_added = models.DateTimeField(default=timezone.now)
     canceled = models.BooleanField(default=False)
     is_outsource = models.BooleanField(default=False, db_index=True)
+    outsources = models.ManyToManyField(Network, help_text='Аутсорс компании, которые могут откликнуться на данную вакансию')
     crop_work_hours_by_shop_schedule = models.BooleanField(
         default=True, verbose_name='Обрезать рабочие часы по времени работы магазина')
     is_blocked = models.BooleanField(
@@ -1162,11 +1163,11 @@ class AttendanceRecords(AbstractModel):
         return 'UserId: {}, type: {}, dttm: {}'.format(self.user_id, self.type, self.dttm)
 
     @staticmethod
-    def get_day_data(dttm: datetime.datetime, user_id, shop, initial_record_type=None):
+    def get_day_data(dttm: datetime.datetime, user, shop, initial_record_type=None):
         dt = dttm.date()
 
         closest_plan_approved, calculated_record_type = WorkerDay.get_closest_plan_approved(
-            user_id=user_id,
+            user_id=user.id,
             shop_id=shop.id,
             dttm=dttm,
             record_type=initial_record_type,
@@ -1174,7 +1175,7 @@ class AttendanceRecords(AbstractModel):
 
         if closest_plan_approved is None:
             employment = Employment.objects.get_active_empl_by_priority(
-                network_id=shop.network_id, employee__user_id=user_id,
+                network_id=user.network_id, employee__user=user,
                 dt=dt,
                 priority_shop_id=shop.id,
             ).first()
@@ -1183,7 +1184,7 @@ class AttendanceRecords(AbstractModel):
                 record_type = AttendanceRecords.TYPE_COMING
                 record = AttendanceRecords.objects.filter(
                     shop=shop,
-                    user_id=user_id,
+                    user=user,
                     dt=dt,
                     employee_id=employee_id,
                 ).order_by('dttm').first()
@@ -1302,7 +1303,7 @@ class AttendanceRecords(AbstractModel):
         Если подтвержденного факта нет - создаем новый подтвержденный факт.
         """
         employee_id, active_user_empl, dt, record_type, plan_exists = self.get_day_data(
-            self.dttm, self.user_id, self.shop, self.type)
+            self.dttm, self.user, self.shop, self.type)
         self.dt = self.dt or dt
         self.type = self.type or record_type
         self.employee_id = self.employee_id or employee_id

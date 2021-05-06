@@ -557,7 +557,7 @@ class TestAutoWorkerExchange(TestCase):
             worker_day=vacancy,
         )
         result = confirm_vacancy(vacancy.id, user)
-        self.assertEqual(result, {'status_code': 400, 'code': 'cant_apply_vacancy'})
+        self.assertEqual(result, {'status_code': 400, 'text': 'Вы не можете выйти на эту смену.'})
 
     def test_worker_exchange_change_vacancy_to_own_shop_vacancy(self):
         self.create_users(1)
@@ -573,9 +573,8 @@ class TestAutoWorkerExchange(TestCase):
             worker_day=vacancy,
         )
         result = confirm_vacancy(vacancy.id, user)
-        self.assertEqual(result, {'status_code': 200, 'code': 'vacancy_success'})
+        self.assertEqual(result, {'status_code': 200, 'text': 'Вакансия успешно принята.'})
 
-    @expectedFailure
     def test_shift_elongation(self):
         self.create_users(1)
         user = User.objects.first()

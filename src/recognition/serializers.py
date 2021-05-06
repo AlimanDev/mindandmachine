@@ -1,8 +1,9 @@
 import geopy.distance
 from django.utils.translation import gettext_lazy as _
+from django.db.models import Q
 from rest_framework import serializers
 
-from src.base.models import Shop
+from src.base.models import Shop, NetworkConnect
 from src.recognition.models import TickPoint, Tick, TickPhoto
 from src.timetable.models import User as WFMUser
 from src.util.drf.fields import RoundingDecimalField
@@ -101,8 +102,9 @@ class PostTickSerializer_user(serializers.ModelSerializer):
 
     def __init__(self, *args, **kwargs):
         super(PostTickSerializer_user, self).__init__(*args, **kwargs)
+        clients = NetworkConnect.objects.filter(outsourcing=self.context['request'].user.network).values_list('client_id', flat=True)
         self.fields['shop_code'] = serializers.SlugRelatedField(
-            slug_field='code', queryset=Shop.objects.filter(network=self.context['request'].user.network))
+            slug_field='code', queryset=Shop.objects.filter(Q(network=self.context['request'].user.network) | Q(network_id__in=clients)))
         if self.context['request'].user.network.allowed_geo_distance_km:
             self.fields['lat'] = RoundingDecimalField(decimal_places=8, max_digits=12)
             self.fields['lon'] = RoundingDecimalField(decimal_places=8, max_digits=12)

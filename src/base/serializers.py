@@ -36,6 +36,12 @@ class BaseNetworkSerializer(serializers.ModelSerializer):
     network_id = serializers.HiddenField(default=CurrentUserNetwork())
 
 
+class OutsourceClientNetworkSerializer(serializers.Serializer):
+    name = serializers.CharField()
+    code = serializers.CharField()
+    id = serializers.IntegerField()
+
+
 class NetworkSerializer(serializers.ModelSerializer):
     logo = serializers.SerializerMethodField('get_logo_url')
 
@@ -60,6 +66,24 @@ class NetworkSerializer(serializers.ModelSerializer):
             'allowed_interval_for_early_departure',
         ]
 
+
+class NetworkWithOutsourcingsAndClientsSerializer(NetworkSerializer):
+    outsourcings = OutsourceClientNetworkSerializer(many=True)
+    clients = OutsourceClientNetworkSerializer(many=True)
+    class Meta(NetworkSerializer.Meta):
+        fields = [
+            'id',
+            'name',
+            'logo',
+            'url',
+            'primary_color',
+            'secondary_color',
+            'allowed_geo_distance_km',
+            'enable_camera_ticks',
+            'show_worker_day_additional_info',
+            'outsourcings',
+            'clients',
+        ]
 
 class UserListSerializer(serializers.Serializer):
     id = serializers.IntegerField()
@@ -145,7 +169,7 @@ class EmployeeSerializer(BaseNetworkSerializer):
 
 
 class AuthUserSerializer(UserSerializer):
-    network = NetworkSerializer()
+    network = NetworkWithOutsourcingsAndClientsSerializer()
     shop_id = serializers.CharField(default=UserworkShop())
 
     class Meta(UserSerializer.Meta):
