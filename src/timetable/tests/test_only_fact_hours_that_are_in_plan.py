@@ -214,7 +214,7 @@ class TestOnlyFactHoursThatInApprovedPlan(TestsHelperMixin, APITestCase):
 
     def test_work_hours_not_negative_if_break_time_greater_than_work_time(self):
         wd = WorkerDay.objects.create(
-            worker=self.user,
+            employee=self.employee,
             employment=self.employment,
             is_fact=False,
             is_approved=True,

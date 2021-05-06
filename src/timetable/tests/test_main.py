@@ -1273,7 +1273,7 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
     def test_create_and_update_with_bad_dates(self):
         data = {
             "shop_id": self.shop.id,
-            "worker_id": self.user2.id,
+            "employee_id": self.employee2.id,
             "dt": self.dt,
             "is_fact": False,
             "is_approved": False,
@@ -1289,7 +1289,7 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
         response = self.client.post(self.url, data, format='json')
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(response.json(), {'non_field_errors': ['Дата начала должна быть меньше чем дата окончания.']})
-        wd = WorkerDay.objects.get(dt=self.dt, shop=self.shop, worker_id=self.user2.id, is_approved=False, is_fact=False)
+        wd = WorkerDay.objects.get(dt=self.dt, shop=self.shop, employee_id=self.employee2.id, is_approved=False, is_fact=False)
         response = self.client.put(self.url + f'{wd.id}/', data, format='json')
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(response.json(), {'non_field_errors': ['Дата начала должна быть меньше чем дата окончания.']})
