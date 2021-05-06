@@ -127,6 +127,7 @@ class Network(AbstractActiveModel):
     consider_remaining_hours_in_prev_months_when_calc_norm_hours = models.BooleanField(
         default=False, verbose_name='Учитывать неотработанные часы за предыдущие месяца при расчете нормы часов',
     )
+    outsourcings = models.ManyToManyField('self', through='base.NetworkConnect', through_fields=('client', 'outsourcing'), symmetrical=False, related_name='clients')
 
     def get_department(self):
         return None
@@ -165,6 +166,11 @@ class Network(AbstractActiveModel):
 
     def __str__(self):
         return f'name: {self.name}, code: {self.code}'
+
+
+class NetworkConnect(AbstractActiveModel):
+    client = models.ForeignKey(Network, related_name='outsourcing_connections', on_delete=models.PROTECT)
+    outsourcing = models.ForeignKey(Network, related_name='outsourcing_clients', on_delete=models.PROTECT)
 
 
 class Region(AbstractActiveNetworkSpecificCodeNamedModel):
@@ -1195,6 +1201,7 @@ class FunctionGroup(AbstractModel):
         'Shop',
         'Shop_stat',
         'Shop_tree',
+        'Shop_outsource_tree',
         'Subscribe',
         'TickPoint',
         'User',

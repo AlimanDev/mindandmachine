@@ -22,7 +22,6 @@ from rest_framework.response import Response
 from rest_framework.serializers import ValidationError
 
 from src.base.exceptions import FieldError
-from src.base.message import Message
 from src.base.models import Employment, Shop, ProductionDay, Group
 from src.base.permissions import WdPermission
 from src.base.views_abstract import BaseModelViewSet
@@ -94,7 +93,7 @@ class WorkerDayViewSet(BaseModelViewSet):
     openapi_tags = ['WorkerDay',]
 
     def get_queryset(self):
-        queryset = WorkerDay.objects.all()
+        queryset = WorkerDay.objects.all().prefetch_related('outsources')
 
         if self.request.query_params.get('by_code', False):
             return queryset.annotate(
@@ -650,11 +649,8 @@ class WorkerDayViewSet(BaseModelViewSet):
     @action(detail=True, methods=['post'], serializer_class=None)
     def confirm_vacancy(self, request, pk=None):
         result = confirm_vacancy(pk, request.user)
-
-        message = Message(lang=request.user.lang)
-
         status_code = result['status_code']
-        result = message.get_message(result['code'])
+        result = result['text']
 
         return Response({'result': result}, status=status_code)
 
