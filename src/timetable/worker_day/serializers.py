@@ -32,6 +32,10 @@ class WorkerDayApproveSerializer(serializers.Serializer):
         # required=True,
         default=WorkerDay.TYPES_USED,  # временно для Ортеки
     )
+    employee_ids = serializers.ListField(
+        child=serializers.IntegerField(),
+        required=False,
+    )
 
 
 class WorkerDayCashboxDetailsSerializer(serializers.ModelSerializer):

@@ -283,12 +283,15 @@ class WorkerDayViewSet(BaseModelViewSet):
                                 dt_interval=dt_interval,
                             )
                         )
-
+            employee_filter = {}
+            if serializer.data.get('employee_ids'):
+                employee_filter['employee_id__in'] = serializer.data['employee_ids']
             employee_ids = Employment.objects.get_active(
                 Shop.objects.get(id=serializer.data['shop_id']).network_id,
                 dt_from=serializer.data['dt_from'],
                 dt_to=serializer.data['dt_to'],
                 shop_id=serializer.data['shop_id'],
+                **employee_filter,
             ).values_list('employee_id', flat=True)
 
             wd_types_grouped_by_limit = {}
@@ -314,6 +317,7 @@ class WorkerDayViewSet(BaseModelViewSet):
                 dt__gte=serializer.data['dt_from'],
                 is_fact=serializer.data['is_fact'],
                 is_approved=False,
+                **employee_filter,
             )
 
             wdays_to_approve = WorkerDay.objects.filter(
