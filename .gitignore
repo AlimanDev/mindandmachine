@@ -18,8 +18,7 @@ etc/report/
 
 db.sqlite3
 
-qos_backend.log*
-clean_wdays.log*
+logs/*.log*
 
 venv/*
 venv3.6/*
