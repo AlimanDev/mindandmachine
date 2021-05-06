@@ -70,20 +70,10 @@ class NetworkSerializer(serializers.ModelSerializer):
 class NetworkWithOutsourcingsAndClientsSerializer(NetworkSerializer):
     outsourcings = OutsourceClientNetworkSerializer(many=True)
     clients = OutsourceClientNetworkSerializer(many=True)
+
     class Meta(NetworkSerializer.Meta):
-        fields = [
-            'id',
-            'name',
-            'logo',
-            'url',
-            'primary_color',
-            'secondary_color',
-            'allowed_geo_distance_km',
-            'enable_camera_ticks',
-            'show_worker_day_additional_info',
-            'outsourcings',
-            'clients',
-        ]
+        fields = NetworkSerializer.Meta.fields + ['outsourcings', 'clients']
+
 
 class UserListSerializer(serializers.Serializer):
     id = serializers.IntegerField()

@@ -229,7 +229,7 @@ LOGGING = {
         'django_request': {
             'level': 'ERROR',
             'class': 'logging.handlers.RotatingFileHandler',
-            'filename': os.path.join(BASE_DIR, 'django_request.log'),  # directory with logs must be already created
+            'filename': os.path.join(BASE_DIR, 'logs/django_request.log'),  # directory with logs must be already created
             'maxBytes': 5 * 1024 * 1024,
             'backupCount': 10,
             'formatter': 'simple',
