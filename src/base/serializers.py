@@ -56,6 +56,8 @@ class NetworkSerializer(serializers.ModelSerializer):
             'allowed_geo_distance_km',
             'enable_camera_ticks',
             'show_worker_day_additional_info',
+            'allowed_interval_for_late_arrival',
+            'allowed_interval_for_early_departure',
         ]
 
 
