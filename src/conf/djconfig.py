@@ -203,34 +203,35 @@ LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
     'formatters': {
+        'verbose': {
+            'format': '{asctime} [{levelname} {module} {process:d} {thread:d}]: {message}',
+            'style': '{',
+        },
         'simple': {
             'format': '%(levelname)s %(process)d %(asctime)s %(message)s'
         },
     },
     'filters': {
+        'require_debug_true': {
+            '()': 'django.utils.log.RequireDebugTrue',
+        },
         'require_debug_false': {
             '()': 'django.utils.log.RequireDebugFalse'
         }
     },
     'handlers': {
-        'file': {
-            'level': 'INFO',  # use INFO for not logging sql queries
+        'console': {
+            'level': 'DEBUG',
+            'filters': ['require_debug_true'],
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose'
+        },
+        'django_request': {
+            'level': 'ERROR',
             'class': 'logging.handlers.RotatingFileHandler',
-            'filename': 'logs/qos_backend.log',  # directory with logs must be already created
+            'filename': os.path.join(BASE_DIR, 'django_request.log'),  # directory with logs must be already created
             'maxBytes': 5 * 1024 * 1024,
             'backupCount': 10,
-            'formatter': 'simple',
-        },
-        'clean_wdays': {
-            'level': 'DEBUG',
-            'class': 'logging.handlers.WatchedFileHandler',
-            'filename': 'logs/clean_wdays.log',
-            'formatter': 'simple',
-        },
-        'send_doctors_schedule_to_mis': {
-            'level': 'DEBUG',
-            'class': 'logging.handlers.WatchedFileHandler',
-            'filename': 'clean_wdays.log',
             'formatter': 'simple',
         },
         'mail_admins': {
@@ -244,31 +245,36 @@ LOGGING = {
     },
     'loggers': {
         'django': {
-            'handlers': ['file'],
-            'level': 'DEBUG',
-            'propagate': True,
+          'handlers': ['console'],
+          'level': 'INFO',
         },
         'django.request': {
-            'handlers': ['mail_admins'],
+            'handlers': ['django_request', 'mail_admins'],
             'level': 'ERROR',
             'propagate': True,
         },
-        'clean_wdays': {
-            'handlers': ['clean_wdays'],
-            'level': 'DEBUG',
-            'propagate': True,
-        },
-        'send_doctors_schedule_to_mis': {
-            'handlers': ['send_doctors_schedule_to_mis'],
-            'level': 'DEBUG',
-            'propagate': True,
-        },
-        # 'django.db.backends': {
-        #     'level': 'DEBUG',
-        #     'handlers': ['console'],
-        # }
+        #'django.db.backends': {
+        #    'handlers': ['console'],
+        #    'level': 'DEBUG',
+        #}
     },
 }
+
+def add_logger(name, level='DEBUG', formatter='simple'):
+    LOGGING['handlers'][name] = {
+        'level': level,
+        'class': 'logging.handlers.WatchedFileHandler',
+        'filename': os.path.join(BASE_DIR, 'logs', name + '.log'),
+        'formatter': formatter,
+    }
+    LOGGING['loggers'][name] = {
+        'handlers': [name],
+        'level': level,
+        'propagate': True,
+    }
+
+add_logger('clean_wdays')
+add_logger('send_doctors_schedule_to_mis')
 
 # LOGGING USAGE:
 # import logging
