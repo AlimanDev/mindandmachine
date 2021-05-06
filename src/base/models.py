@@ -128,7 +128,6 @@ class Network(AbstractActiveModel):
         default=False, verbose_name='Учитывать неотработанные часы за предыдущие месяца при расчете нормы часов',
     )
     outsourcings = models.ManyToManyField('self', through='base.NetworkConnect', through_fields=('client', 'outsourcing'), symmetrical=False, related_name='clients')
-    # clients = models.ManyToManyField('self', through='base.NetworkConnect', through_fields=('outsourcing', 'client'), symmetrical=False)
 
     def get_department(self):
         return None

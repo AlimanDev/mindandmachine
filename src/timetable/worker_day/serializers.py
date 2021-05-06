@@ -204,10 +204,10 @@ class WorkerDaySerializer(serializers.ModelSerializer):
         if attrs.get('is_outsource'):
             if not attrs.get('is_vacancy'):
                 raise ValidationError(self.error_messages['outsource_only_vacancy'])
-            outsources = Network.objects.filter(
+            outsources = list(Network.objects.filter(
                 id__in=outsources_ids,
                 clients__id=self.context['request'].user.network_id,
-            )
+            ))
             if len(outsources) == 0:
                 raise ValidationError(self.error_messages['outsources_not_specified'])
             attrs['outsources'] = outsources
@@ -257,7 +257,7 @@ class WorkerDaySerializer(serializers.ModelSerializer):
 
             details = validated_data.pop('worker_day_details', None)
             outsources = validated_data.pop('outsources', None)
-            if not validated_data.get('is_vacancy', False):
+            if validated_data.get('employee_id'):
                 worker_day, _created = WorkerDay.objects.update_or_create(
                     dt=validated_data.get('dt'),
                     employee_id=validated_data.get('employee_id'),
@@ -276,8 +276,7 @@ class WorkerDaySerializer(serializers.ModelSerializer):
                     WorkerDayCashboxDetails.objects.create(worker_day=worker_day, **wd_detail)
             
             if outsources:
-                worker_day.outsources.clear()
-                worker_day.outsources.add(*outsources)
+                worker_day.outsources.set(outsources)
 
             self._check_overlap(employee_id=worker_day.employee_id, dt=worker_day.dt)
 
@@ -289,8 +288,7 @@ class WorkerDaySerializer(serializers.ModelSerializer):
             outsources = validated_data.pop('outsources', [])
             validated_data.pop('created_by', None)
             WorkerDayCashboxDetails.objects.filter(worker_day=instance).delete()
-            instance.outsources.clear()
-            instance.outsources.add(*outsources)
+            instance.outsources.set(outsources)
             for wd_detail in details:
                 WorkerDayCashboxDetails.objects.create(worker_day=instance, **wd_detail)
 
