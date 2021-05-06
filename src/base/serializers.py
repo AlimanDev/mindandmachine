@@ -104,7 +104,7 @@ class UserSerializer(BaseNetworkSerializer):
     username = serializers.CharField(required=False, validators=[UniqueValidator(queryset=User.objects.all())])
     network_id = serializers.HiddenField(default=CurrentUserNetwork())
     avatar = serializers.SerializerMethodField('get_avatar_url')
-    email = serializers.CharField(required=False)
+    email = serializers.CharField(required=False, allow_blank=True)
 
     class Meta:
         model = User

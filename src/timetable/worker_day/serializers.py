@@ -152,8 +152,7 @@ class WorkerDaySerializer(serializers.ModelSerializer):
                 if not attrs.get(k):
                     messages[k] = self.error_messages['required']
             raise ValidationError(messages)
-        elif attrs['dttm_work_start'] > attrs['dttm_work_end'] or attrs['dt'] != attrs['dttm_work_start'].date() or \
-                attrs['dt'] != attrs['dttm_work_start'].date():
+        elif attrs['dttm_work_start'] > attrs['dttm_work_end'] or attrs['dt'] != attrs['dttm_work_start'].date():
             self.fail('check_dates')
 
         if (attrs.get('shop_id') is None) and ('shop_code' in attrs):
