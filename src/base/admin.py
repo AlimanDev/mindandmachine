@@ -161,11 +161,13 @@ class SAWHSettingsMappingInline(admin.StackedInline):
 
     filter_horizontal = ('shops', 'positions', 'exclude_positions')
 
+
 @admin.register(SAWHSettings)
 class SAWHSettingsAdmin(admin.ModelAdmin):
     list_display = (
         'name',
         'code',
+        'type',
     )
 
     inlines = (
