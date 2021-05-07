@@ -62,10 +62,8 @@ def check_duplicate_biometrics(image, user: User, shop_id):
         try:
             user_connecter = UserConnecter.objects.get(partner_id=person_id)
         except UserConnecter.DoesNotExist:
-            print('Other')
             return 'User from other system'
         if user.id == user_connecter.user_id:
-            print('same')
             return
         user2 = user_connecter.user
         active_employments = Employment.objects.get_active(
