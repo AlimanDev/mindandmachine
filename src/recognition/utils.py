@@ -55,7 +55,6 @@ def get_worker_days_with_no_ticks(dttm: datetime):
 
 
 def check_duplicate_biometrics(image, user: User, shop_id):
-    from src.celery.tasks import send_event_email_notifications
     r = Recognition()
     person_id = r.identify(image)
     if person_id:
