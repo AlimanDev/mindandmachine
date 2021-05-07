@@ -301,6 +301,30 @@ class TestSAWHSettingsQuarterAccPeriod(SawhSettingsHelperMixin, TestCase):
         )
         self.assertEqual(res + res2 + res3, 383.0)
 
+    def test_fixed_sawh_settings_type(self):
+        self.sawh_settings.work_hours_by_months = {
+            'm1': 170,
+            'm2': 180,
+        }
+        self.sawh_settings.type = SAWHSettings.FIXED_HOURS
+        self.sawh_settings.save()
+        res = self._test_hours_for_period(
+            dt_from=date(2021, 1, 1),
+            dt_to=date(2021, 1, 31),
+            expected_norm_hours=170,
+        )
+        res2 = self._test_hours_for_period(
+            dt_from=date(2021, 2, 1),
+            dt_to=date(2021, 2, 28),
+            expected_norm_hours=180,
+        )
+        res3 = self._test_hours_for_period(
+            dt_from=date(2021, 3, 1),
+            dt_to=date(2021, 3, 31),
+            expected_norm_hours=176,  # по умолчанию часы из произв. календаря
+        )
+        self.assertEqual(res + res2 + res3, 526)
+
 
 @override_settings(CELERY_TASK_ALWAYS_EAGER=True)
 class TestSAWHSettingsHalfYearAccPeriod(SawhSettingsHelperMixin, TestCase):
