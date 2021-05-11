@@ -453,7 +453,7 @@ def cancel_vacancy(vacancy_id):
         vacancy.delete()
 
 
-def confirm_vacancy(vacancy_id, user, employee=None, exchange=False):
+def confirm_vacancy(vacancy_id, user, employee_id=None, exchange=False):
     """
     :param vacancy_id:
     :param user: пользователь, откликнувшийся на вакансию
@@ -497,11 +497,9 @@ def confirm_vacancy(vacancy_id, user, employee=None, exchange=False):
             res['status_code'] = 400
             return res
 
-        # TODO: добавить возврат ошибки если невозможно однозначно определить активное трудоустройство
-        # TODO: на клиенте должен быть явный выбор и передача сотрудника или трудоустройства
         employee_filter = {}
-        if employee:
-            employee_filter['employee_id'] = employee.id
+        if employee_id:
+            employee_filter['employee_id'] = employee_id
         else:
             employee_filter['employee__user_id'] = user.id
         active_employment = Employment.objects.get_active_empl_by_priority(
@@ -881,7 +879,7 @@ def holiday_workers_exchange():
                     f'{vacancy.dt}, {vacancy.dttm_work_start}-{vacancy.dttm_work_end}, '
                     f'worker {candidate.user.first_name} {candidate.user.last_name}, '
                 )
-                confirm_vacancy(vacancy.id, candidate.user, employee=candidate)
+                confirm_vacancy(vacancy.id, candidate.user, employee_id=candidate.id)
                 create_event_and_notify(
                     [candidate.user], 
                     type='holiday_exchange', 
@@ -1031,7 +1029,7 @@ def workers_exchange():
                             for detail in WorkerDayCashboxDetails.objects.filter(worker_day=candidate_worker_day)
                         }
                         #не удаляем candidate_to_change потому что создаем неподтвержденную вакансию
-                        print(confirm_vacancy(vacancy.id, user, employee=candidate_to_change.worker_day.employee, exchange=True))
+                        print(confirm_vacancy(vacancy.id, user, employee_id=candidate_to_change.worker_day.employee_id, exchange=True))
                         create_event_and_notify(
                             [user],
                             type='auto_vacancy', 

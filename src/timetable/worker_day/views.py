@@ -653,7 +653,7 @@ class WorkerDayViewSet(BaseModelViewSet):
     )
     @action(detail=True, methods=['post'], serializer_class=None)
     def confirm_vacancy(self, request, pk=None):
-        result = confirm_vacancy(pk, request.user)
+        result = confirm_vacancy(pk, request.user, employee_id=self.request.data.get('employee_id', None))
         status_code = result['status_code']
         result = result['text']
 
