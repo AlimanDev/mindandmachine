@@ -637,6 +637,7 @@ class WorkerDayViewSet(BaseModelViewSet):
                         employee_id=OuterRef('employee_id')
                     ).values('shop_id')[:1]
                 ),
+                user_network_id=F('employee__user__network_id'),
             ),
         )
         data = paginator.paginate_queryset(queryset, request)

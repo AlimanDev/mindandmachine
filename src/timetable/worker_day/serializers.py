@@ -337,6 +337,7 @@ class VacancySerializer(serializers.Serializer):
     is_outsource = serializers.BooleanField()
     avatar = serializers.SerializerMethodField('get_avatar_url')
     worker_shop = serializers.IntegerField(required=False, default=None)
+    user_network_id = serializers.IntegerField(required=False)
 
     def __init__(self, *args, **kwargs):
         super(VacancySerializer, self).__init__(*args, **kwargs)
