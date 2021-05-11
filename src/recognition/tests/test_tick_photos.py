@@ -45,7 +45,7 @@ class TestTickPhotos(TestsHelperMixin, APITestCase):
         event_email_notification.users.add(self.user2)
         with mock.patch.object(Tevian, 'identify', lambda x, y: 1) as identify:
             with override_settings(CELERY_TASK_ALWAYS_EAGER=True):
-                check_duplicate_biometrics(None, self.user3)
+                check_duplicate_biometrics(None, self.user3, shop_id=self.shop2.id)
         self.assertEqual(len(mail.outbox), 1)
         body = f'Здравствуйте, {self.user2.first_name}!\n\nОдинаковые биометрические параметры сотрудников.\n' +\
         f'Первый сотрудник: {self.user3.last_name} {self.user3.first_name}\nТабельный номер: {self.employee3.tabel_code}\nСсылка на биошаблон: {settings.HOST}/_i/media/photo/3\n' +\
