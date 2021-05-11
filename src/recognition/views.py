@@ -375,6 +375,8 @@ class TickPhotoViewSet(BaseModelViewSet):
         except UserConnecter.DoesNotExist:
             if type == TickPhoto.TYPE_SELF:
                 try:
+                    tick.user.avatar = image
+                    tick.user.save()
                     check_duplicate_biometrics(image, tick.user, tick.tick_point.shop_id)
                     partner_id = recognition.create_person({"id": tick.user_id})
                     photo_id = recognition.upload_photo(partner_id, image)
@@ -385,8 +387,6 @@ class TickPhotoViewSet(BaseModelViewSet):
                     user_id=tick.user_id,
                     partner_id=partner_id,
                 )
-                tick.user.avatar = image
-                tick.user.save()
 
         if user_connecter:
             try:
