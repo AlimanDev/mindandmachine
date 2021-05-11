@@ -24,6 +24,7 @@ class WorkerDayFilter(FilterSet):
     fact_tabel = BooleanFilter(method='filter_fact_tabel', label="Выгрузка табеля")
 
     # параметры для совместимости с существующими интеграциями, не удалять
+    worker_id = NumberFilter(field_name='employee__user_id')
     worker__username__in = ListFilter(field_name='employee__user__username', lookup_expr='in')
     employment__tabel_code__in = ListFilter(field_name='employee__tabel_code', lookup_expr='in')
 
