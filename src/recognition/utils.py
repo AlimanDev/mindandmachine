@@ -71,8 +71,6 @@ def check_duplicate_biometrics(image, user: User, shop_id):
         )
         employment1 = active_employments.filter(user=user).first() or Employment.objects.filter(user=user).order_by('-dttm_fired').first()
         employment2 = active_employments.filter(user=user2).first() or Employment.objects.filter(user=user2).order_by('-dttm_fired').first()
-        user.avatar = image
-        user.save()
         event_signal.send(
             sender=None,
             network_id=user.network_id,
