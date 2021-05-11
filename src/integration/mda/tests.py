@@ -121,8 +121,7 @@ class TestMdaIntegration(TestsHelperMixin, TestCase):
 
 
 class TestCaseInsensitiveAuth(TestsHelperMixin, APITestCase):
-    url = '/api/v1/auth/'
-    username = 'efimenkomv'
+    lowered_username = 'efimenkomv'
 
     @classmethod
     def setUpTestData(cls):
@@ -131,9 +130,9 @@ class TestCaseInsensitiveAuth(TestsHelperMixin, APITestCase):
         cls.employment = EmploymentFactory(shop=cls.shop, user=cls.user)
 
     def test_case_sensitive_login_by_default(self):
-        resp = self.client.post(self.url, data=self.dump_data({
-            'username': self.username,
-            'token': generate_user_token(self.username),
+        resp = self.client.post('/api/v1/auth/', data=self.dump_data({
+            'username': self.lowered_username,
+            'token': generate_user_token(self.lowered_username),
         }), content_type='application/json')
         self.assertContains(
             response=resp,
@@ -142,13 +141,36 @@ class TestCaseInsensitiveAuth(TestsHelperMixin, APITestCase):
         )
 
     def test_case_insensitive_login_with_specified_settings(self):
-        with self.settings(CASE_INSENSITIVE_V1_AUTH=True):
-            resp = self.client.post(self.url, data=self.dump_data({
-                'username': self.username,
-                'token': generate_user_token(self.username),
+        with self.settings(CASE_INSENSITIVE_AUTH=True):
+            resp = self.client.post('/api/v1/auth/', data=self.dump_data({
+                'username': self.lowered_username,
+                'token': generate_user_token(self.lowered_username),
             }), content_type='application/json')
             self.assertContains(
                 response=resp,
                 text='token',
+                status_code=200,
+            )
+
+    def test_signin_token_case_sensitive_by_default(self):
+            resp = self.client.post('/rest_api/auth/signin_token/', data=self.dump_data({
+                'username': self.lowered_username,
+                'token': generate_user_token(self.lowered_username),
+            }), content_type='application/json')
+            self.assertContains(
+                response=resp,
+                text='Нет такого пользователя',
+                status_code=400,
+            )
+
+    def test_signin_token_case_insensitive_with_specified_settings(self):
+        with self.settings(CASE_INSENSITIVE_AUTH=True):
+            resp = self.client.post('/rest_api/auth/signin_token/', data=self.dump_data({
+                'username': self.lowered_username,
+                'token': generate_user_token(self.lowered_username),
+            }), content_type='application/json')
+            self.assertContains(
+                response=resp,
+                text='data',
                 status_code=200,
             )

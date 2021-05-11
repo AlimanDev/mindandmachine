@@ -1,4 +1,4 @@
-
+from django.conf import settings
 from django.contrib.auth import login
 from django.db.models import Q
 from django.utils import timezone
@@ -88,12 +88,17 @@ class WFMTokenLoginView(GenericAPIView):
         if not request.user.is_authenticated:
             self.serializer.is_valid(raise_exception=True)
 
-            token = generate_user_token(self.serializer.data['username'])
-            user = None
+            username = self.serializer.data['username']
+            if settings.CASE_INSENSITIVE_AUTH:
+                username = username.lower()
+            token = generate_user_token(username)
 
             if token == self.serializer.data['token']:
                 try:
-                    user = User.objects.get(username=self.serializer.data['username'])
+                    lookup_str = 'username'
+                    if settings.CASE_INSENSITIVE_AUTH:
+                        lookup_str = 'username__iexact'
+                    user = User.objects.get(**{lookup_str: username})
                 except User.DoesNotExist:
                     raise FieldError(self.error_messages['no_user'])
             else:

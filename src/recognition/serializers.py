@@ -19,7 +19,7 @@ class HashSigninSerializer(serializers.Serializer):
 
     def validate(self, attrs):
         username = attrs.get('username', '')
-        if settings.CASE_INSENSITIVE_V1_AUTH:
+        if settings.CASE_INSENSITIVE_AUTH:
             username = username.lower()
         token = attrs.get('token')
 
@@ -27,7 +27,7 @@ class HashSigninSerializer(serializers.Serializer):
             user = None
             if token == self.get_token(username):
                 lookup_str = 'username'
-                if settings.CASE_INSENSITIVE_V1_AUTH:
+                if settings.CASE_INSENSITIVE_AUTH:
                     lookup_str = 'username__iexact'
                 user = WFMUser.objects.filter(**{lookup_str: username}).first()
 
