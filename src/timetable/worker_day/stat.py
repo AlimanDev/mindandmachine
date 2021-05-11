@@ -14,11 +14,12 @@ from django.db.models import (
     Value,
     FloatField
 )
+from django.db.models.expressions import RawSQL
 from django.db.models.functions import Cast, TruncDate
 from django.db.models.functions import Extract, Coalesce, Greatest, Least
 from django.utils.functional import cached_property
 
-from src.base.models import Employment, Shop, ProductionDay, SAWHSettingsMapping
+from src.base.models import Employment, Shop, ProductionDay, SAWHSettings
 from src.forecast.models import PeriodClients
 from src.timetable.models import WorkerDay, ProdCal
 
@@ -292,8 +293,8 @@ class WorkersStatsGetter:
             'position'
         ).order_by(
             'dt_hired'
-        ).extra(
-            select={'sawh_hours_by_months': """SELECT V5."work_hours_by_months"
+        ).annotate(
+            sawh_hours_by_months=RawSQL("""SELECT V5."work_hours_by_months"
                  FROM "base_sawhsettingsmapping" V0
                           LEFT OUTER JOIN "base_sawhsettingsmapping_positions" V1
                                           ON (V0."id" = V1."sawhsettingsmapping_id")
@@ -306,8 +307,21 @@ class WorkersStatsGetter:
                                          WHERE U1."workerposition_id" = "base_employment"."position_id")) AND
                         V0."year" = %s)
                  ORDER BY V0."priority" DESC
-                 LIMIT 1"""},
-            select_params=(self.year,),
+                 LIMIT 1""", (self.year,)),
+            sawh_settings_type=RawSQL("""SELECT V5."type"
+                 FROM "base_sawhsettingsmapping" V0
+                          LEFT OUTER JOIN "base_sawhsettingsmapping_positions" V1
+                                          ON (V0."id" = V1."sawhsettingsmapping_id")
+                          LEFT OUTER JOIN "base_sawhsettingsmapping_shops" V3 ON (V0."id" = V3."sawhsettingsmapping_id")
+                          INNER JOIN "base_sawhsettings" V5 ON (V0."sawh_settings_id" = V5."id")
+                 WHERE ((V1."workerposition_id" = "base_employment"."position_id" OR
+                         V3."shop_id" = "base_employment"."shop_id") AND
+                        NOT (V0."id" IN (SELECT U1."sawhsettingsmapping_id"
+                                         FROM "base_sawhsettingsmapping_exclude_positions" U1
+                                         WHERE U1."workerposition_id" = "base_employment"."position_id")) AND
+                        V0."year" = %s)
+                 ORDER BY V0."priority" DESC
+                 LIMIT 1""", (self.year,))
         ).distinct()
         # в django 2 есть баг, при переходе на django 3 можно будет использовать следующий annotate
         # ).annotate(
@@ -703,7 +717,7 @@ class WorkersStatsGetter:
                 empl_dict = res.setdefault(
                     employee_id, {}).setdefault('employments', {}).setdefault(empl.id, {})
                 norm_hours_by_months = empl_dict.get('norm_hours_by_months', {})
-                if empl.sawh_hours_by_months:
+                if empl.sawh_hours_by_months and empl.sawh_settings_type == SAWHSettings.PART_OF_PROD_CAL_SUMM:
                     sawh_hours_sum = sum(
                         v for k, v in empl.sawh_hours_by_months.items() if int(k[1:]) in acc_period_months)
                     sawh_settings_base = {
@@ -723,6 +737,14 @@ class WorkersStatsGetter:
                         empl_dict.setdefault('sawh_settings_empl_normalized', {})[month_num] = empl_dict['sawh_settings_empl'][month_num] / sawh_settings_empl_sum
                         empl_dict.setdefault('sawh_hours_by_months', {})[month_num] = \
                             empl_dict['sawh_settings_empl_normalized'][month_num] * empl_dict['norm_hours_total']
+                elif empl.sawh_hours_by_months and empl.sawh_settings_type == SAWHSettings.FIXED_HOURS:
+                    for month_num, prod_cal_norm_hours in norm_hours_by_months.items():
+                        _month_start, _month_end, days_in_month = get_month_range(
+                            self.year, month_num, return_days_in_month=True)
+                        empl_days_count = empl_dict.get('empl_days_count').get(month_num, 0)
+                        empl_dict.setdefault('sawh_hours_by_months', {})[
+                            month_num] = empl_days_count / days_in_month * empl.sawh_hours_by_months.get(
+                            f'm{month_num}', prod_cal_norm_hours)
                 else:
                     empl_dict['sawh_hours_by_months'] = norm_hours_by_months
 

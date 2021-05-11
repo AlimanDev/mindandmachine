@@ -1434,12 +1434,22 @@ def current_year():
 class SAWHSettings(AbstractActiveNetworkSpecificCodeNamedModel):
     """
     Настройки суммированного учета рабочего времени.
-    Модель нужна для распределения часов по месяцам в рамках учетного периода при автосоставлении.
+    Модель нужна для распределения часов по месяцам в рамках учетного периода.
     """
+
+    PART_OF_PROD_CAL_SUMM = 1
+    FIXED_HOURS = 2
+
+    SAWH_SETTINGS_TYPES = (
+        (PART_OF_PROD_CAL_SUMM, 'Доля от суммы часов по произв. календарю в рамках уч. периода'),
+        (FIXED_HOURS, 'Фикс. кол-во часов в месяц'),
+    )
 
     work_hours_by_months = JSONField(
         verbose_name='Настройки по распределению часов в рамках уч. периода',
     )  # Название ключей должно начинаться с m (например январь -- m1), чтобы можно было фильтровать через django orm
+    type = models.PositiveSmallIntegerField(
+        default=PART_OF_PROD_CAL_SUMM, choices=SAWH_SETTINGS_TYPES, verbose_name='Тип расчета')
 
     class Meta:
         verbose_name = 'Настройки суммированного учета рабочего времени'
