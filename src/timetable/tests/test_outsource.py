@@ -204,6 +204,7 @@ class TestOutsource(TestsHelperMixin, APITestCase):
             'is_outsource': True, 
             'avatar': None, 
             'worker_shop': self.employment1.shop_id, 
+            'user_network_id': self.user1.network_id,
         }
         response = response.json()['results'][0]
         assert_response = {
@@ -213,6 +214,7 @@ class TestOutsource(TestsHelperMixin, APITestCase):
             'is_outsource': response['is_outsource'], 
             'avatar': response['avatar'], 
             'worker_shop': response['worker_shop'], 
+            'user_network_id': response['user_network_id'], 
         }
         self.assertEqual(assert_response, data)
         # получаем список отделов с аутсорс организациями
