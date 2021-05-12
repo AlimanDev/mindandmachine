@@ -7,6 +7,7 @@ from src.base.tests.factories import (
     EmploymentFactory,
     ShopFactory,
     UserFactory,
+    EmployeeFactory,
 )
 from src.integration.mda.integration import MdaIntegrationHelper
 from src.util.mixins.tests import TestsHelperMixin
@@ -127,7 +128,8 @@ class TestCaseInsensitiveAuth(TestsHelperMixin, APITestCase):
     def setUpTestData(cls):
         cls.shop = ShopFactory(code='shop')
         cls.user = UserFactory(username='EfimenkoMV')
-        cls.employment = EmploymentFactory(shop=cls.shop, user=cls.user)
+        cls.employee = EmployeeFactory(user=cls.user, tabel_code='0000-0001')
+        cls.employment = EmploymentFactory(shop=cls.shop, employee=cls.employee)
 
     def test_case_sensitive_login_by_default(self):
         resp = self.client.post('/api/v1/auth/', data=self.dump_data({

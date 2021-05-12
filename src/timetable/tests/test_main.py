@@ -2839,16 +2839,16 @@ class TestAditionalFunctions(APITestCase):
         self.create_worker_days(self.employment3, dt_from, 4, 9, 21, False)
         self.update_or_create_holidays(self.employment3, dt_from + timedelta(4), 1, False)
         data = {
-            'from_workerday_ids': list(WorkerDay.objects.filter(worker=self.user2).values_list('id', flat=True)),
-            'to_worker_id': self.user3.id,
+            'from_workerday_ids': list(WorkerDay.objects.filter(employee=self.employee2).values_list('id', flat=True)),
+            'to_employee_id': self.employee3.id,
             'to_dates': [Converter.convert_date(dt_from + timedelta(i)) for i in range(5)],
         }
         url = f'{self.url}duplicate/'
         response = self.client.post(url, data, format='json')
         self.assertEqual(len(response.json()), 5)
-        self.assertEqual(WorkerDay.objects.filter(worker=self.user3, is_approved=False).count(), 5)
-        self.assertEqual(WorkerDay.objects.filter(worker=self.user3, is_approved=False, work_hours__gt=timedelta(0)).count(), 5)
-        wd = WorkerDay.objects.filter(worker=self.user3, is_approved=False).order_by('dt').first()
+        self.assertEqual(WorkerDay.objects.filter(employee=self.employee3, is_approved=False).count(), 5)
+        self.assertEqual(WorkerDay.objects.filter(employee=self.employee3, is_approved=False, work_hours__gt=timedelta(0)).count(), 5)
+        wd = WorkerDay.objects.filter(employee=self.employee3, is_approved=False).order_by('dt').first()
         self.assertEqual(wd.dttm_work_start, datetime.combine(dt_from, time(20)))
         self.assertEqual(wd.dttm_work_end, datetime.combine(dt_from + timedelta(1), time(10)))
 
