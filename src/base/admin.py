@@ -16,6 +16,7 @@ from src.base.models import (
     SAWHSettingsMapping,
     ShopSchedule,
     Employee,
+    NetworkConnect,
 )
 from src.timetable.models import GroupWorkerDayPermission
 from src.base.forms import NetworkAdminForm, ShopAdminForm, ShopSettingsAdminForm, BreakAdminForm
@@ -24,6 +25,11 @@ from src.base.forms import NetworkAdminForm, ShopAdminForm, ShopSettingsAdminFor
 class NetworkAdmin(admin.ModelAdmin):
     list_display = ('id', 'name', 'code', 'logo')
     form = NetworkAdminForm
+
+@admin.register(NetworkConnect)
+class NetworkConnectAdmin(admin.ModelAdmin):
+    list_display = ('id', 'outsourcing', 'client')
+    list_select_related = ('outsourcing', 'client')
 
 
 @admin.register(Region)

@@ -169,6 +169,10 @@ class Network(AbstractActiveModel):
 
 
 class NetworkConnect(AbstractActiveModel):
+    class Meta:
+        verbose_name = 'Связь сетей'
+        verbose_name_plural = 'Связи сетей'
+
     client = models.ForeignKey(Network, related_name='outsourcing_connections', on_delete=models.PROTECT)
     outsourcing = models.ForeignKey(Network, related_name='outsourcing_clients', on_delete=models.PROTECT)
 
