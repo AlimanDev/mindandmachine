@@ -740,7 +740,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
                     'general_info': EmploymentConverter.convert(e),
                     'constraints_info': [{
                         'id': obj.id,
-                        'worker': obj.employee_id,
+                        'worker': obj.employment.employee_id,
                         'week_length': obj.employment.week_availability,
                         'weekday': obj.weekday,
                         'tm': Converter.convert_time(obj.tm),
