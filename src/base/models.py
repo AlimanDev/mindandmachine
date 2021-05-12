@@ -909,12 +909,12 @@ class WorkerPosition(AbstractActiveNetworkSpecificCodeNamedModel):
                 self.default_work_type_names.set(
                     WorkTypeName.objects.filter(network=self.network, code__in=default_work_type_names_codes))
 
-    def save(self, *args, **kwargs):
+    def save(self, *args, force_set_defaults=False, **kwargs):
         is_new = self.id is None
-        if is_new:
+        if is_new or force_set_defaults:
             self._set_plain_defaults()
         res = super(WorkerPosition, self).save(*args, **kwargs)
-        if is_new:
+        if is_new or force_set_defaults:
             self._set_m2m_defaults()
         return res
 
