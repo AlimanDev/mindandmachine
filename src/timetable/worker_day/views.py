@@ -529,7 +529,7 @@ class WorkerDayViewSet(BaseModelViewSet):
                             worker_day=search_wds[wd.employee_id][wd.dt],
                             work_type_id=details.work_type_id,
                         )
-                        for wd in list_wd
+                        for wd in list_wd if wd.employee_id  # TODO: написать тест
                         for details in wd.worker_day_details.all()
                     ]
                 )
