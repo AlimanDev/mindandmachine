@@ -477,6 +477,8 @@ class WorkerDayViewSet(BaseModelViewSet):
                     employee_days_q, is_fact=serializer.data['is_fact'],
                 ).exclude(
                     id__in=wdays_to_approve.values_list('id', flat=True)
+                ).exclude(
+                    employee_id__isnull=True,
                 ).delete()
                 list_wd = list(
                     wdays_to_approve.select_related(
