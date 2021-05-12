@@ -1,4 +1,5 @@
 from django.contrib import admin
+from django.urls import resolve
 
 from src.base.models import (
     Employment,
@@ -121,6 +122,27 @@ class GroupAdmin(admin.ModelAdmin):
         actions = super().get_actions(request)
         actions.update(WdPermsHelper.get_preset_actions())
         return actions
+
+    def save_model(self, request, obj, form, change):
+        obj.save()
+        # Django always sends this when "Save as new is clicked"
+        if '_saveasnew' in request.POST:
+            # Get the ID from the admin URL
+            original_pk = resolve(request.path).kwargs['object_id']
+            funcs = FunctionGroup.objects.filter(group_id=original_pk)
+            FunctionGroup.objects.bulk_create(
+                [
+                    FunctionGroup(
+                        group=obj,
+                        func=f.func,
+                        method=f.method,
+                        access_type=f.access_type,
+                        level_down=f.level_down,
+                        level_up=f.level_up,
+                    )
+                    for f in funcs
+                ]
+            )
 
 
 @admin.register(FunctionGroup)

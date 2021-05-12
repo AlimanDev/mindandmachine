@@ -461,6 +461,8 @@ SEND_DOCTORS_MIS_SCHEDULE_ON_CHANGE = False  # посылать в МИС соб
 MIS_USERNAME = None
 MIS_PASSWORD = None
 
+CASE_INSENSITIVE_AUTH = False
+
 # Eсли у пользователя пароль пустой, то при сохранении устанавливать пароль как логин
 SET_USER_PASSWORD_AS_LOGIN = False
 

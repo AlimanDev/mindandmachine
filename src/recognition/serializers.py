@@ -1,4 +1,5 @@
 import geopy.distance
+from django.conf import settings
 from django.utils.translation import gettext_lazy as _
 from django.db.models import Q
 from rest_framework import serializers
@@ -18,13 +19,18 @@ class HashSigninSerializer(serializers.Serializer):
         return generate_user_token(login)
 
     def validate(self, attrs):
-        username = attrs.get('username')
+        username = attrs.get('username', '')
+        if settings.CASE_INSENSITIVE_AUTH:
+            username = username.lower()
         token = attrs.get('token')
 
         if username and token:
             user = None
             if token == self.get_token(username):
-                user = WFMUser.objects.filter(username=username).first()
+                lookup_str = 'username'
+                if settings.CASE_INSENSITIVE_AUTH:
+                    lookup_str = 'username__iexact'
+                user = WFMUser.objects.filter(**{lookup_str: username}).first()
 
             if not user:
                 msg = _('Unable to log in with provided credentials.')

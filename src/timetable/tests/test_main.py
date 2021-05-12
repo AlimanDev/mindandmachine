@@ -2384,11 +2384,12 @@ class TestAditionalFunctions(APITestCase):
             )
         return result
 
-    def create_worker_days(self, employment, dt_from, count, from_tm, to_tm, approved, wds={}, is_blocked=False):
+    def create_worker_days(self, employment, dt_from, count, from_tm, to_tm, approved, wds={}, is_blocked=False, night_shift=False):
         result = {}
         for day in range(count):
             date = dt_from + timedelta(days=day)
             parent_worker_day = None if approved else wds.get(date, None)
+            date_to = date + timedelta(1) if night_shift else date
             wd = WorkerDay.objects.create(
                 employment=employment,
                 employee=employment.employee,
@@ -2396,7 +2397,7 @@ class TestAditionalFunctions(APITestCase):
                 dt=date,
                 type=WorkerDay.TYPE_WORKDAY,
                 dttm_work_start=datetime.combine(date, time(from_tm)),
-                dttm_work_end=datetime.combine(date, time(to_tm)),
+                dttm_work_end=datetime.combine(date_to, time(to_tm)),
                 is_approved=approved,
                 parent_worker_day=parent_worker_day,
                 is_blocked=is_blocked,
@@ -2831,6 +2832,25 @@ class TestAditionalFunctions(APITestCase):
             'проверьте наличие активного трудоустройства у сотрудника.'
         )
         self.assertEqual(WorkerDay.objects.filter(employee=self.employee3, is_approved=False).count(), 0)
+
+    def test_duplicate_night_shifts(self):
+        dt_from = date.today()
+        self.create_worker_days(self.employment2, dt_from, 5, 20, 10, True, night_shift=True)
+        self.create_worker_days(self.employment3, dt_from, 4, 9, 21, False)
+        self.update_or_create_holidays(self.employment3, dt_from + timedelta(4), 1, False)
+        data = {
+            'from_workerday_ids': list(WorkerDay.objects.filter(worker=self.user2).values_list('id', flat=True)),
+            'to_worker_id': self.user3.id,
+            'to_dates': [Converter.convert_date(dt_from + timedelta(i)) for i in range(5)],
+        }
+        url = f'{self.url}duplicate/'
+        response = self.client.post(url, data, format='json')
+        self.assertEqual(len(response.json()), 5)
+        self.assertEqual(WorkerDay.objects.filter(worker=self.user3, is_approved=False).count(), 5)
+        self.assertEqual(WorkerDay.objects.filter(worker=self.user3, is_approved=False, work_hours__gt=timedelta(0)).count(), 5)
+        wd = WorkerDay.objects.filter(worker=self.user3, is_approved=False).order_by('dt').first()
+        self.assertEqual(wd.dttm_work_start, datetime.combine(dt_from, time(20)))
+        self.assertEqual(wd.dttm_work_end, datetime.combine(dt_from + timedelta(1), time(10)))
 
     def test_the_order_of_days_is_determined_by_day_date_not_by_the_date_of_creation(self):
         dt_now = date.today()
