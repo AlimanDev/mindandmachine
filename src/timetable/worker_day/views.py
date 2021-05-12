@@ -512,7 +512,7 @@ class WorkerDayViewSet(BaseModelViewSet):
                             need_count_wh=True,
                             is_blocked=wd.is_blocked,
                         )
-                        for wd in list_wd
+                        for wd in list_wd if wd.employee_id  # не копируем день без сотрудника (вакансию) в неподтв. версию
                     ]
                 )
                 search_wds = {}
