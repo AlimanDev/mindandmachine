@@ -612,6 +612,9 @@ def copy_as_excel_cells(main_worker_days, to_worker_id, to_dates, created_by=Non
                 'Невозможно создать дни в выбранные даты. '
                 'Пожалуйста, проверьте наличие активного трудоустройства у сотрудника.'
             )
+        dt_to = dt
+        if blank_day.dttm_work_end and blank_day.dttm_work_start and blank_day.dttm_work_end.date() > blank_day.dttm_work_start.date():
+            dt_to = dt + datetime.timedelta(days=1)
 
         new_wd = WorkerDay.objects.create(
             worker_id=to_worker_id,
@@ -622,7 +625,7 @@ def copy_as_excel_cells(main_worker_days, to_worker_id, to_dates, created_by=Non
             dttm_work_start=datetime.datetime.combine(
                 dt, blank_day.dttm_work_start.timetz()) if blank_day.dttm_work_start else None,
             dttm_work_end=datetime.datetime.combine(
-                dt, blank_day.dttm_work_end.timetz()) if blank_day.dttm_work_end else None,
+                dt_to, blank_day.dttm_work_end.timetz()) if blank_day.dttm_work_end else None,
             is_approved=False,
             is_fact=False,
             created_by_id=created_by,
