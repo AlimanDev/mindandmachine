@@ -531,7 +531,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
         constraints = {}
         for worker_constraint in list(WorkerConstraint.objects.select_related('employment').filter(
                 employment__in=employments)):
-            key = worker_constraint.employee_id
+            key = worker_constraint.worker_id
             if key not in constraints:
                 constraints[key] = []
             constraints[key].append(worker_constraint)
