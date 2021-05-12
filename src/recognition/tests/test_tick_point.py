@@ -1,6 +1,6 @@
 from rest_framework.test import APITestCase
 
-from src.base.tests.factories import NetworkFactory, ShopFactory, UserFactory, GroupFactory, EmploymentFactory
+from src.base.tests.factories import NetworkFactory, ShopFactory, UserFactory, GroupFactory, EmploymentFactory, EmployeeFactory
 from src.recognition.models import TickPoint
 from src.util.mixins.tests import TestsHelperMixin
 from .factories import TickPointFactory
@@ -11,9 +11,10 @@ class TestTickPointViewSet(TestsHelperMixin, APITestCase):
     def setUpTestData(cls):
         cls.network = NetworkFactory()
         cls.user = UserFactory(network=cls.network)
+        cls.employee = EmployeeFactory(user=cls.user)
         cls.shop = ShopFactory(network=cls.network)
         cls.group = GroupFactory(network=cls.network)
-        cls.employment = EmploymentFactory(network=cls.network, user=cls.user, shop=cls.shop, function_group=cls.group)
+        cls.employment = EmploymentFactory(employee=cls.employee, shop=cls.shop, function_group=cls.group)
         cls.tick_point = TickPointFactory(shop=cls.shop)
 
     def setUp(self):

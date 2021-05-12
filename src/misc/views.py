@@ -14,7 +14,7 @@ class MetabaseURLSerialzier(Serializer):
 
 class MetabaseResponseSerializer(Serializer):
     url = URLField(
-        default='https://metabase.example.com/embed/dashboard/{token}#bordered=false&titled=false&hide_parameters=shop_id,vacancy,dt,worker_id',
+        default='https://metabase.example.com/embed/dashboard/{token}#bordered=false&titled=false&hide_parameters=shop_id,vacancy,dt,worker_id,employee_id',
         help_text='Ссылка с токеном для доступа к metabase',
     )
 
@@ -44,5 +44,5 @@ def metabase_url(request):
     }
     token = jwt.encode(payload, settings.METABASE_SECRET_KEY, algorithm="HS256")
 
-    iframeUrl = settings.METABASE_SITE_URL + "/embed/dashboard/" + token.decode("utf8") + "#bordered=false&titled=false&hide_parameters=shop_id,vacancy,dt,worker_id"
+    iframeUrl = settings.METABASE_SITE_URL + "/embed/dashboard/" + token.decode("utf8") + "#bordered=false&titled=false&hide_parameters=shop_id,vacancy,dt,worker_id,employee_id"
     return Response({"url": iframeUrl})

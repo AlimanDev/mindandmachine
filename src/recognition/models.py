@@ -10,7 +10,7 @@ from django.utils.timezone import now
 from django.utils.translation import gettext_lazy
 
 from src.base.models_abstract import AbstractActiveModel, AbstractActiveNetworkSpecificCodeNamedModel
-from src.timetable.models import User, Shop, Employment
+from src.timetable.models import User, Shop, Employment, Employee
 
 
 def user_directory_path(instance, filename):
@@ -68,6 +68,7 @@ class Tick(AbstractActiveModel):
     id = models.AutoField(primary_key=True)
     dttm = models.DateTimeField()
     user = models.ForeignKey(User, on_delete=models.PROTECT, null=False, )  # todo: make immutable
+    employee = models.ForeignKey(Employee, on_delete=models.PROTECT, null=True, blank=True)
     tick_point = models.ForeignKey(TickPoint, null=False, blank=False, on_delete=models.PROTECT,
                                    related_query_name="ticks")
     # worker_day = models.ForeignKey(WorkerDay, null=True, blank=True, on_delete=models.SET_NULL, related_query_name="ticks")

@@ -9,7 +9,14 @@ from rest_framework.test import APITestCase
 from django_celery_beat.models import CrontabSchedule
 
 from src.base.models import FunctionGroup
-from src.base.tests.factories import ShopFactory, UserFactory, GroupFactory, EmploymentFactory, NetworkFactory
+from src.base.tests.factories import (
+    ShopFactory,
+    UserFactory,
+    GroupFactory,
+    EmploymentFactory,
+    NetworkFactory,
+    EmployeeFactory,
+)
 from src.events.models import EventType
 from src.notifications.models import EventEmailNotification
 from src.recognition.events import (
@@ -17,7 +24,7 @@ from src.recognition.events import (
     EMPLOYEE_WORKING_NOT_ACCORDING_TO_PLAN,
 )
 from src.reports.events import (
-    URV_STAT, 
+    URV_STAT,
     URV_STAT_TODAY, 
     URV_VIOLATORS_REPORT, 
     URV_STAT_V2,
@@ -49,23 +56,27 @@ class TestSendUrvStatEventNotifications(TestsHelperMixin, APITestCase):
             email=None,
         )
         cls.user_dir = UserFactory(email='dir@example.com', network=cls.network)
+        cls.employee_dir = EmployeeFactory(user=cls.user_dir)
         cls.user_urs = UserFactory(email='urs@example.com', network=cls.network)
+        cls.employee_urs = EmployeeFactory(user=cls.user_urs)
         cls.user_worker = UserFactory(email='worker@example.com', network=cls.network)
         cls.user_worker2 = UserFactory(email='worker2@example.com', network=cls.network)
+        cls.employee_worker = EmployeeFactory(user=cls.user_worker)
+        cls.employee_worker2 = EmployeeFactory(user=cls.user_worker2)
         cls.group_dir = GroupFactory(name='Директор', network=cls.network)
         cls.group_urs = GroupFactory(name='УРС', network=cls.network)
         cls.group_worker = GroupFactory(name='Сотрудник', network=cls.network)
         cls.employment_dir = EmploymentFactory(
-            user=cls.user_dir, shop=cls.shop, function_group=cls.group_dir, network=cls.network
+            employee=cls.employee_dir, shop=cls.shop, function_group=cls.group_dir,
         )
         cls.employment_urs = EmploymentFactory(
-            user=cls.user_urs, shop=cls.root_shop, function_group=cls.group_urs, network=cls.network
+            employee=cls.employee_urs, shop=cls.root_shop, function_group=cls.group_urs,
         )
         cls.employment_worker = EmploymentFactory(
-            user=cls.user_worker, shop=cls.shop, function_group=cls.group_worker, network=cls.network
+            employee=cls.employee_worker, shop=cls.shop, function_group=cls.group_worker,
         )
         cls.employment_worker2 = EmploymentFactory(
-            user=cls.user_worker2, shop=cls.shop2, function_group=cls.group_worker, network=cls.network
+            employee=cls.employee_worker2, shop=cls.shop2, function_group=cls.group_worker,
         )
         cls.urv_stat_event, _created = EventType.objects.get_or_create(
             code=URV_STAT, network=cls.network)
@@ -81,7 +92,7 @@ class TestSendUrvStatEventNotifications(TestsHelperMixin, APITestCase):
             is_fact=False,
             shop=cls.shop,
             employment=cls.employment_worker,
-            worker=cls.user_worker,
+            employee=cls.employee_worker,
             dt=cls.dt,
             type=WorkerDay.TYPE_WORKDAY,
         )
@@ -90,7 +101,7 @@ class TestSendUrvStatEventNotifications(TestsHelperMixin, APITestCase):
             is_fact=False,
             shop=cls.shop2,
             employment=cls.employment_worker2,
-            worker=cls.user_worker2,
+            employee=cls.employee_worker2,
             dt=cls.dt,
             type=WorkerDay.TYPE_WORKDAY,
         )
@@ -126,34 +137,34 @@ class TestSendUrvStatEventNotifications(TestsHelperMixin, APITestCase):
             df = pd.read_excel(data, engine='xlrd')
             data = [
                 {
-                    'Магазин': 'SHOP_NAME', 
-                    'Дата': self.dt.strftime('%d.%m.%Y'), 
-                    'Кол-во отметок план, ПРИХОД': 1, 
+                    'Магазин': 'SHOP_NAME',
+                    'Дата': self.dt.strftime('%d.%m.%Y'),
+                    'Кол-во отметок план, ПРИХОД': 1,
                     'Опоздания': 0,
                     'Ранний уход': 0,
-                    'Кол-во отметок факт, ПРИХОД': 0, 
-                    'Разница, ПРИХОД': 1, 
-                    'Кол-во отметок план, УХОД': 1, 
-                    'Кол-во отметок факт, УХОД': 0, 
-                    'Разница, УХОД': 1, 
-                    'Кол-во часов план': '08:45:00', 
-                    'Кол-во часов факт': '00:00:00', 
+                    'Кол-во отметок факт, ПРИХОД': 0,
+                    'Разница, ПРИХОД': 1,
+                    'Кол-во отметок план, УХОД': 1,
+                    'Кол-во отметок факт, УХОД': 0,
+                    'Разница, УХОД': 1,
+                    'Кол-во часов план': '08:45:00',
+                    'Кол-во часов факт': '00:00:00',
                     'Разница, ЧАСЫ': '08:45:00',
                     'Разница, ПРОЦЕНТЫ': '0%',
                 },
                 {
-                    'Магазин': 'SHOP_NAME2', 
-                    'Дата': self.dt.strftime('%d.%m.%Y'), 
-                    'Кол-во отметок план, ПРИХОД': 1, 
+                    'Магазин': 'SHOP_NAME2',
+                    'Дата': self.dt.strftime('%d.%m.%Y'),
+                    'Кол-во отметок план, ПРИХОД': 1,
                     'Опоздания': 0,
                     'Ранний уход': 0,
-                    'Кол-во отметок факт, ПРИХОД': 0, 
-                    'Разница, ПРИХОД': 1, 
-                    'Кол-во отметок план, УХОД': 1, 
-                    'Кол-во отметок факт, УХОД': 0, 
-                    'Разница, УХОД': 1, 
-                    'Кол-во часов план': '08:45:00', 
-                    'Кол-во часов факт': '00:00:00', 
+                    'Кол-во отметок факт, ПРИХОД': 0,
+                    'Разница, ПРИХОД': 1,
+                    'Кол-во отметок план, УХОД': 1,
+                    'Кол-во отметок факт, УХОД': 0,
+                    'Разница, УХОД': 1,
+                    'Кол-во часов план': '08:45:00',
+                    'Кол-во часов факт': '00:00:00',
                     'Разница, ЧАСЫ': '08:45:00',
                     'Разница, ПРОЦЕНТЫ': '0%',
                 },
@@ -171,8 +182,8 @@ class TestSendUrvStatEventNotifications(TestsHelperMixin, APITestCase):
                 report_config=self.report_config,
             )
             event_email_notification.users.add(self.user_dir)
-            
-            
+
+
             cron_event()
             self.assertEqual(len(mail.outbox), 1)
             self.assertEqual(mail.outbox[0].subject, subject)
@@ -181,18 +192,18 @@ class TestSendUrvStatEventNotifications(TestsHelperMixin, APITestCase):
             df = pd.read_excel(data, engine='xlrd')
             data = [
                 {
-                    'Магазин': 'SHOP_NAME2', 
-                    'Дата': self.dt.strftime('%d.%m.%Y'), 
-                    'Кол-во отметок план, ПРИХОД': 1, 
+                    'Магазин': 'SHOP_NAME2',
+                    'Дата': self.dt.strftime('%d.%m.%Y'),
+                    'Кол-во отметок план, ПРИХОД': 1,
                     'Опоздания': 0,
                     'Ранний уход': 0,
-                    'Кол-во отметок факт, ПРИХОД': 0, 
-                    'Разница, ПРИХОД': 1, 
-                    'Кол-во отметок план, УХОД': 1, 
-                    'Кол-во отметок факт, УХОД': 0, 
-                    'Разница, УХОД': 1, 
-                    'Кол-во часов план': '08:45:00', 
-                    'Кол-во часов факт': '00:00:00', 
+                    'Кол-во отметок факт, ПРИХОД': 0,
+                    'Разница, ПРИХОД': 1,
+                    'Кол-во отметок план, УХОД': 1,
+                    'Кол-во отметок факт, УХОД': 0,
+                    'Разница, УХОД': 1,
+                    'Кол-во часов план': '08:45:00',
+                    'Кол-во часов факт': '00:00:00',
                     'Разница, ЧАСЫ': '08:45:00',
                     'Разница, ПРОЦЕНТЫ': '0%',
                 },
@@ -218,23 +229,27 @@ class TestSendUrvStatTodayEventNotifications(TestsHelperMixin, APITestCase):
             email=None,
         )
         cls.user_dir = UserFactory(email='dir@example.com', network=cls.network)
+        cls.employee_dir = EmployeeFactory(user=cls.user_dir)
         cls.user_urs = UserFactory(email='urs@example.com', network=cls.network)
+        cls.employee_urs = EmployeeFactory(user=cls.user_urs)
         cls.user_worker = UserFactory(email='worker@example.com', network=cls.network)
         cls.user_worker2 = UserFactory(email='worker2@example.com', network=cls.network)
+        cls.employee_worker = EmployeeFactory(user=cls.user_worker)
+        cls.employee_worker2 = EmployeeFactory(user=cls.user_worker2)
         cls.group_dir = GroupFactory(name='Директор', network=cls.network)
         cls.group_urs = GroupFactory(name='УРС', network=cls.network)
         cls.group_worker = GroupFactory(name='Сотрудник', network=cls.network)
         cls.employment_dir = EmploymentFactory(
-            user=cls.user_dir, shop=cls.shop, function_group=cls.group_dir, network=cls.network
+            employee=cls.employee_dir, shop=cls.shop, function_group=cls.group_dir,
         )
         cls.employment_urs = EmploymentFactory(
-            user=cls.user_urs, shop=cls.root_shop, function_group=cls.group_urs, network=cls.network
+            employee=cls.employee_urs, shop=cls.root_shop, function_group=cls.group_urs,
         )
         cls.employment_worker = EmploymentFactory(
-            user=cls.user_worker, shop=cls.shop, function_group=cls.group_worker, network=cls.network
+            employee=cls.employee_worker, shop=cls.shop, function_group=cls.group_worker,
         )
         cls.employment_worker2 = EmploymentFactory(
-            user=cls.user_worker2, shop=cls.shop2, function_group=cls.group_worker, network=cls.network
+            employee=cls.employee_worker2, shop=cls.shop2, function_group=cls.group_worker,
         )
         cls.urv_stat_event, _created = EventType.objects.get_or_create(
             code=URV_STAT_TODAY, network=cls.network)
@@ -250,7 +265,7 @@ class TestSendUrvStatTodayEventNotifications(TestsHelperMixin, APITestCase):
             is_fact=False,
             shop=cls.shop,
             employment=cls.employment_worker,
-            worker=cls.user_worker,
+            employee=cls.employee_worker,
             dt=cls.dt,
             type=WorkerDay.TYPE_WORKDAY,
         )
@@ -259,7 +274,7 @@ class TestSendUrvStatTodayEventNotifications(TestsHelperMixin, APITestCase):
             is_fact=False,
             shop=cls.shop2,
             employment=cls.employment_worker2,
-            worker=cls.user_worker2,
+            employee=cls.employee_worker2,
             dt=cls.dt,
             type=WorkerDay.TYPE_WORKDAY,
         )
@@ -295,18 +310,18 @@ class TestSendUrvStatTodayEventNotifications(TestsHelperMixin, APITestCase):
             df = pd.read_excel(data, engine='xlrd')
             data = [
                 {
-                    'Магазин': 'SHOP_NAME', 
-                    'Дата': self.dt.strftime('%d.%m.%Y'), 
-                    'Кол-во отметок план, ПРИХОД': 1, 
-                    'Кол-во отметок факт, ПРИХОД': 0, 
-                    'Разница, ПРИХОД': 1, 
+                    'Магазин': 'SHOP_NAME',
+                    'Дата': self.dt.strftime('%d.%m.%Y'),
+                    'Кол-во отметок план, ПРИХОД': 1,
+                    'Кол-во отметок факт, ПРИХОД': 0,
+                    'Разница, ПРИХОД': 1,
                 },
                 {
-                    'Магазин': 'SHOP_NAME2', 
-                    'Дата': self.dt.strftime('%d.%m.%Y'), 
-                    'Кол-во отметок план, ПРИХОД': 1, 
-                    'Кол-во отметок факт, ПРИХОД': 0, 
-                    'Разница, ПРИХОД': 1, 
+                    'Магазин': 'SHOP_NAME2',
+                    'Дата': self.dt.strftime('%d.%m.%Y'),
+                    'Кол-во отметок план, ПРИХОД': 1,
+                    'Кол-во отметок факт, ПРИХОД': 0,
+                    'Разница, ПРИХОД': 1,
                 },
             ]
             self.assertEqual(df.to_dict('records'), data)
@@ -322,9 +337,9 @@ class TestSendUrvStatTodayEventNotifications(TestsHelperMixin, APITestCase):
                 report_config=self.report_config,
             )
             event_email_notification.users.add(self.user_dir)
-            
+
             cron_event()
-            
+
             self.assertEqual(len(mail.outbox), 1)
             self.assertEqual(mail.outbox[0].subject, subject)
             self.assertEqual(mail.outbox[0].to[0], self.user_dir.email)
@@ -332,11 +347,11 @@ class TestSendUrvStatTodayEventNotifications(TestsHelperMixin, APITestCase):
             df = pd.read_excel(data, engine='xlrd')
             data = [
                 {
-                    'Магазин': 'SHOP_NAME2', 
-                    'Дата': self.dt.strftime('%d.%m.%Y'), 
-                    'Кол-во отметок план, ПРИХОД': 1, 
-                    'Кол-во отметок факт, ПРИХОД': 0, 
-                    'Разница, ПРИХОД': 1, 
+                    'Магазин': 'SHOP_NAME2',
+                    'Дата': self.dt.strftime('%d.%m.%Y'),
+                    'Кол-во отметок план, ПРИХОД': 1,
+                    'Кол-во отметок факт, ПРИХОД': 0,
+                    'Разница, ПРИХОД': 1,
                 },
             ]
             self.assertEqual(df.to_dict('records'), data)
@@ -361,23 +376,27 @@ class TestSendUrvViolatorsEventNotifications(TestsHelperMixin, APITestCase):
             email=None,
         )
         cls.user_dir = UserFactory(email='dir@example.com', network=cls.network)
+        cls.employee_dir = EmployeeFactory(user=cls.user_dir)
         cls.user_urs = UserFactory(email='urs@example.com', network=cls.network)
+        cls.employee_urs = EmployeeFactory(user=cls.user_urs)
         cls.user_worker = UserFactory(email='worker@example.com', network=cls.network)
         cls.user_worker2 = UserFactory(email='worker2@example.com', network=cls.network)
+        cls.employee_worker = EmployeeFactory(user=cls.user_worker)
+        cls.employee_worker2 = EmployeeFactory(user=cls.user_worker2)
         cls.group_dir = GroupFactory(name='Директор', network=cls.network)
         cls.group_urs = GroupFactory(name='УРС', network=cls.network)
         cls.group_worker = GroupFactory(name='Сотрудник', network=cls.network)
         cls.employment_dir = EmploymentFactory(
-            user=cls.user_dir, shop=cls.shop, function_group=cls.group_dir, network=cls.network
+            employee=cls.employee_dir, shop=cls.shop, function_group=cls.group_dir,
         )
         cls.employment_urs = EmploymentFactory(
-            user=cls.user_urs, shop=cls.root_shop, function_group=cls.group_urs, network=cls.network
+            employee=cls.employee_urs, shop=cls.root_shop, function_group=cls.group_urs,
         )
         cls.employment_worker = EmploymentFactory(
-            user=cls.user_worker, shop=cls.shop, function_group=cls.group_worker, network=cls.network
+            employee=cls.employee_worker, shop=cls.shop, function_group=cls.group_worker,
         )
         cls.employment_worker2 = EmploymentFactory(
-            user=cls.user_worker2, shop=cls.shop2, function_group=cls.group_worker, network=cls.network
+            employee=cls.employee_worker2, shop=cls.shop2, function_group=cls.group_worker,
         )
         cls.urv_violators_event, _created = EventType.objects.get_or_create(
             code=URV_VIOLATORS_REPORT, network=cls.network)
@@ -393,7 +412,7 @@ class TestSendUrvViolatorsEventNotifications(TestsHelperMixin, APITestCase):
             is_fact=False,
             shop=cls.shop,
             employment=cls.employment_worker,
-            worker=cls.user_worker,
+            employee=cls.employee_worker,
             dt=cls.dt,
             type=WorkerDay.TYPE_WORKDAY,
         )
@@ -402,7 +421,7 @@ class TestSendUrvViolatorsEventNotifications(TestsHelperMixin, APITestCase):
             is_fact=False,
             shop=cls.shop,
             employment=cls.employment_dir,
-            worker=cls.user_dir,
+            employee=cls.employee_dir,
             dt=cls.dt,
             type=WorkerDay.TYPE_WORKDAY,
         )
@@ -411,11 +430,11 @@ class TestSendUrvViolatorsEventNotifications(TestsHelperMixin, APITestCase):
             is_fact=False,
             shop=cls.shop2,
             employment=cls.employment_worker2,
-            worker=cls.user_worker2,
+            employee=cls.employee_worker2,
             dt=cls.dt,
             type=WorkerDay.TYPE_WORKDAY,
         )
-        
+
         AttendanceRecords.objects.create(
             shop=cls.shop,
             type=AttendanceRecords.TYPE_COMING,
@@ -469,9 +488,9 @@ class TestSendUrvViolatorsEventNotifications(TestsHelperMixin, APITestCase):
                 },
                 {
                     'Код объекта': self.shop2.code,
-                    'Название объекта': self.shop2.name, 
+                    'Название объекта': self.shop2.name,
                     'Табельный номер': '',
-                    'ФИО': f'{self.user_worker2.last_name} {self.user_worker2.first_name} {self.user_worker2.middle_name}', 
+                    'ФИО': f'{self.user_worker2.last_name} {self.user_worker2.first_name} {self.user_worker2.middle_name}',
                     'Нарушение': 'Нет отметок',
                 },
             ]
@@ -488,9 +507,9 @@ class TestSendUrvViolatorsEventNotifications(TestsHelperMixin, APITestCase):
                 report_config=self.report_config,
             )
             event_email_notification.users.add(self.user_dir)
-            
+
             cron_event()
-            
+
             self.assertEqual(len(mail.outbox), 1)
             self.assertEqual(mail.outbox[0].subject, subject)
             self.assertEqual(mail.outbox[0].to[0], self.user_dir.email)
@@ -499,9 +518,9 @@ class TestSendUrvViolatorsEventNotifications(TestsHelperMixin, APITestCase):
             data = [
                 {
                     'Код объекта': self.shop2.code,
-                    'Название объекта': self.shop2.name, 
+                    'Название объекта': self.shop2.name,
                     'Табельный номер': '',
-                    'ФИО': f'{self.user_worker2.last_name} {self.user_worker2.first_name} {self.user_worker2.middle_name}', 
+                    'ФИО': f'{self.user_worker2.last_name} {self.user_worker2.first_name} {self.user_worker2.middle_name}',
                     'Нарушение': 'Нет отметок',
                 },
             ]
@@ -526,23 +545,27 @@ class TestSendUrvStatV2EventNotifications(TestsHelperMixin, APITestCase):
             email=None,
         )
         cls.user_dir = UserFactory(email='dir@example.com', network=cls.network)
+        cls.employee_dir = EmployeeFactory(user=cls.user_dir)
         cls.user_urs = UserFactory(email='urs@example.com', network=cls.network)
+        cls.employee_urs = EmployeeFactory(user=cls.user_urs)
         cls.user_worker = UserFactory(email='worker@example.com', network=cls.network)
         cls.user_worker2 = UserFactory(email='worker2@example.com', network=cls.network)
+        cls.employee_worker = EmployeeFactory(user=cls.user_worker)
+        cls.employee_worker2 = EmployeeFactory(user=cls.user_worker2)
         cls.group_dir = GroupFactory(name='Директор', network=cls.network)
         cls.group_urs = GroupFactory(name='УРС', network=cls.network)
         cls.group_worker = GroupFactory(name='Сотрудник', network=cls.network)
         cls.employment_dir = EmploymentFactory(
-            user=cls.user_dir, shop=cls.shop, function_group=cls.group_dir, network=cls.network
+            employee=cls.employee_dir, shop=cls.shop, function_group=cls.group_dir,
         )
         cls.employment_urs = EmploymentFactory(
-            user=cls.user_urs, shop=cls.root_shop, function_group=cls.group_urs, network=cls.network
+            employee=cls.employee_urs, shop=cls.root_shop, function_group=cls.group_urs,
         )
         cls.employment_worker = EmploymentFactory(
-            user=cls.user_worker, shop=cls.shop, function_group=cls.group_worker, network=cls.network
+            employee=cls.employee_worker, shop=cls.shop, function_group=cls.group_worker,
         )
         cls.employment_worker2 = EmploymentFactory(
-            user=cls.user_worker2, shop=cls.shop2, function_group=cls.group_worker, network=cls.network
+            employee=cls.employee_worker2, shop=cls.shop2, function_group=cls.group_worker,
         )
         cls.urv_stat_event, _created = EventType.objects.get_or_create(
             code=URV_STAT_V2, network=cls.network)
@@ -605,7 +628,8 @@ class TestSendUrvStatV2EventNotifications(TestsHelperMixin, APITestCase):
                 ]
             )
             self.assertEqual(emails, [self.user_dir.email, self.shop.email, self.user_urs.email])
-            df = pd.read_excel(mail.outbox[0].attachments[0][1])
+            data = open_workbook(file_contents=mail.outbox[0].attachments[0][1])
+            df = pd.read_excel(data, engine='xlrd')
             data = [
                 {
                     'Код магазина': self.shop.code, 
@@ -632,13 +656,13 @@ class TestSendUrvStatV2EventNotifications(TestsHelperMixin, APITestCase):
                     'Тип события': 'Уход',
                 }, 
                 {
-                    'Код магазина': self.shop2.code, 
-                    'Магазин': 'SHOP_NAME2', 
-                    'Время события': datetime.combine(self.dt, time(10, 28)).strftime('%Y-%m-%d %H:%M:%S'), 
-                    'Табельный номер сотрудника': 'Без табельного номера', 
-                    'ФИО сотрудника': f'{self.user_worker2.last_name} {self.user_worker2.first_name} {self.user_worker2.middle_name}', 
+                    'Код магазина': self.shop2.code,
+                    'Магазин': 'SHOP_NAME2',
+                    'Время события': datetime.combine(self.dt, time(10, 28)).strftime('%Y-%m-%d %H:%M:%S'),
+                    'Табельный номер сотрудника': 'Без табельного номера',
+                    'ФИО сотрудника': f'{self.user_worker2.last_name} {self.user_worker2.first_name} {self.user_worker2.middle_name}',
                     'Тип события': 'Приход',
-                }, 
+                },
             ]
             self.assertEqual(df.to_dict('records'), data)
 
@@ -653,22 +677,23 @@ class TestSendUrvStatV2EventNotifications(TestsHelperMixin, APITestCase):
                 report_config=self.report_config,
             )
             event_email_notification.users.add(self.user_dir)
-            
+
             cron_event()
-            
+
             self.assertEqual(len(mail.outbox), 1)
             self.assertEqual(mail.outbox[0].subject, subject)
             self.assertEqual(mail.outbox[0].to[0], self.user_dir.email)
-            df = pd.read_excel(mail.outbox[0].attachments[0][1])
+            data = open_workbook(file_contents=mail.outbox[0].attachments[0][1])
+            df = pd.read_excel(data, engine='xlrd')
             data = [
                 {
-                    'Код магазина': self.shop2.code, 
-                    'Магазин': 'SHOP_NAME2', 
-                    'Время события': datetime.combine(self.dt, time(10, 28)).strftime('%Y-%m-%d %H:%M:%S'), 
-                    'Табельный номер сотрудника': 'Без табельного номера', 
-                    'ФИО сотрудника': f'{self.user_worker2.last_name} {self.user_worker2.first_name} {self.user_worker2.middle_name}', 
+                    'Код магазина': self.shop2.code,
+                    'Магазин': 'SHOP_NAME2',
+                    'Время события': datetime.combine(self.dt, time(10, 28)).strftime('%Y-%m-%d %H:%M:%S'),
+                    'Табельный номер сотрудника': 'Без табельного номера',
+                    'ФИО сотрудника': f'{self.user_worker2.last_name} {self.user_worker2.first_name} {self.user_worker2.middle_name}',
                     'Тип события': 'Приход',
-                }, 
+                },
             ]
             self.assertEqual(df.to_dict('records'), data)
 
@@ -687,18 +712,21 @@ class TestEmployeeNotCheckedInEventNotifications(TestsHelperMixin, APITestCase):
             director=cls.user_dir,
         )
         cls.group_dir = GroupFactory(name='Директор', network=cls.network)
+        cls.employee_dir = EmployeeFactory(user=cls.user_dir)
         cls.user_urs = UserFactory(email='urs@example.com', network=cls.network)
+        cls.employee_urs = EmployeeFactory(user=cls.user_urs)
         cls.user_worker = UserFactory(email='worker@example.com', network=cls.network)
+        cls.employee_worker = EmployeeFactory(user=cls.user_worker)
         cls.group_urs = GroupFactory(name='УРС', network=cls.network)
         cls.group_worker = GroupFactory(name='Сотрудник', network=cls.network)
         cls.employment_dir = EmploymentFactory(
-            user=cls.user_dir, shop=cls.shop, function_group=cls.group_dir, network=cls.network
+            employee=cls.employee_dir, shop=cls.shop, function_group=cls.group_dir,
         )
         cls.employment_urs = EmploymentFactory(
-            user=cls.user_urs, shop=cls.root_shop, function_group=cls.group_urs, network=cls.network
+            employee=cls.employee_urs, shop=cls.root_shop, function_group=cls.group_urs,
         )
         cls.employment_worker = EmploymentFactory(
-            user=cls.user_worker, shop=cls.shop, function_group=cls.group_worker, network=cls.network
+            employee=cls.employee_worker, shop=cls.shop, function_group=cls.group_worker,
         )
         cls.event, _created = EventType.objects.get_or_create(
             code=EMPLOYEE_NOT_CHECKED_IN, network=cls.network)
@@ -710,7 +738,7 @@ class TestEmployeeNotCheckedInEventNotifications(TestsHelperMixin, APITestCase):
             is_fact=False,
             shop=cls.shop,
             employment=cls.employment_worker,
-            worker=cls.user_worker,
+            employee=cls.employee_worker,
             dt=cls.dt,
             type=WorkerDay.TYPE_WORKDAY,
             dttm_work_start=cls.now - timedelta(minutes=1),
@@ -721,7 +749,7 @@ class TestEmployeeNotCheckedInEventNotifications(TestsHelperMixin, APITestCase):
             is_fact=False,
             shop=cls.shop,
             employment=cls.employment_dir,
-            worker=cls.user_dir,
+            employee=cls.employee_dir,
             dt=cls.dt,
             type=WorkerDay.TYPE_WORKDAY,
             dttm_work_start=cls.now - timedelta(hours=6),
@@ -740,7 +768,7 @@ class TestEmployeeNotCheckedInEventNotifications(TestsHelperMixin, APITestCase):
     def test_employee_not_checked_in_notification_sent(self):
         with self.settings(CELERY_TASK_ALWAYS_EAGER=True):
             subject = 'Сотрудник не отметился'
-            event_email_notification = EventEmailNotification.objects.create(
+            EventEmailNotification.objects.create(
                 event_type=self.event,
                 subject=subject,
                 system_email_template='notifications/email/employee_not_checked_in.html',
@@ -798,19 +826,22 @@ class TestEmployeeWorkingNotAccordingToPlanEventNotifications(TestsHelperMixin, 
             email='shop@example.com',
             director=cls.user_dir,
         )
-        cls.group_dir = GroupFactory(name='Директор', network=cls.network)
+        cls.employee_dir = EmployeeFactory(user=cls.user_dir)
         cls.user_urs = UserFactory(email='urs@example.com', network=cls.network)
+        cls.employee_urs = EmployeeFactory(user=cls.user_urs)
         cls.user_worker = UserFactory(email='worker@example.com', network=cls.network)
+        cls.employee_worker = EmployeeFactory(user=cls.user_worker)
+        cls.group_dir = GroupFactory(name='Директор', network=cls.network)
         cls.group_urs = GroupFactory(name='УРС', network=cls.network)
         cls.group_worker = GroupFactory(name='Сотрудник', network=cls.network)
         cls.employment_dir = EmploymentFactory(
-            user=cls.user_dir, shop=cls.shop, function_group=cls.group_dir, network=cls.network
+            employee=cls.employee_dir, shop=cls.shop, function_group=cls.group_dir,
         )
         cls.employment_urs = EmploymentFactory(
-            user=cls.user_urs, shop=cls.root_shop, function_group=cls.group_urs, network=cls.network
+            employee=cls.employee_urs, shop=cls.root_shop, function_group=cls.group_urs,
         )
         cls.employment_worker = EmploymentFactory(
-            user=cls.user_worker, shop=cls.shop, function_group=cls.group_worker, network=cls.network
+            employee=cls.employee_worker, shop=cls.shop, function_group=cls.group_worker,
         )
         cls.event, _created = EventType.objects.get_or_create(
             code=EMPLOYEE_WORKING_NOT_ACCORDING_TO_PLAN, network=cls.network)
@@ -822,7 +853,7 @@ class TestEmployeeWorkingNotAccordingToPlanEventNotifications(TestsHelperMixin, 
             is_fact=False,
             shop=cls.shop,
             employment=cls.employment_dir,
-            worker=cls.user_dir,
+            employee=cls.employee_dir,
             dt=cls.dt,
             type=WorkerDay.TYPE_WORKDAY,
             dttm_work_start=datetime.combine(cls.dt, time(8)),

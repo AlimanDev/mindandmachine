@@ -4,6 +4,7 @@ from dateutil.relativedelta import relativedelta
 from django.test import TestCase
 from django.utils.timezone import now
 
+from unittest import expectedFailure
 from etc.scripts import fill_calendar
 from src.base.models import (
     Shop,
@@ -14,6 +15,9 @@ from src.base.models import (
     ShopSettings,
     Network,
     Break,
+)
+from src.base.tests.factories import (
+    EmployeeFactory,
 )
 from src.forecast.models import (
     OperationType,
@@ -212,10 +216,10 @@ class TestAutoWorkerExchange(TestCase):
                 last_name='Имя{}'.format(number),
                 first_name='Фамилия{}'.format(number)
             )
+            employee = EmployeeFactory(user=user)
             emp = Employment.objects.create(
-                network=self.network,
                 shop=self.shop2,
-                user=user,
+                employee=employee,
                 dt_hired=self.dt_now - datetime.timedelta(days=1),
             )
             EmploymentWorkType.objects.create(
@@ -227,7 +231,7 @@ class TestAutoWorkerExchange(TestCase):
         for employment in Employment.objects.all():
             wd = WorkerDay.objects.create(
                 employment=employment,
-                worker=employment.user,
+                employee_id=employment.employee_id,
                 shop=employment.shop,
                 dt=self.dt_now,
                 type=WorkerDay.TYPE_WORKDAY,
@@ -246,7 +250,7 @@ class TestAutoWorkerExchange(TestCase):
             date = dt_from + datetime.timedelta(days=day)
             WorkerDay.objects.update_or_create(
                 dt=date,
-                worker=employment.user,
+                employee_id=employment.employee_id,
                 is_fact=False,
                 is_approved=True,
                 defaults=dict(
@@ -261,7 +265,7 @@ class TestAutoWorkerExchange(TestCase):
             date = dt_from + datetime.timedelta(days=day)
             wd = WorkerDay.objects.create(
                 employment=employment,
-                worker=employment.user,
+                employee_id=employment.employee_id,
                 shop=employment.shop,
                 dt=date,
                 type=WorkerDay.TYPE_WORKDAY,
@@ -408,7 +412,7 @@ class TestAutoWorkerExchange(TestCase):
 
         worker_days = WorkerDay.objects.filter(is_approved=True)
         self.assertEqual(len(worker_days), 4)
-        self.assertIsNotNone(worker_days.filter(is_vacancy=True).first().worker_id)
+        self.assertIsNotNone(worker_days.filter(is_vacancy=True).first().employee_id)
 
     # Предикшн в 4 человека -> 4 человека в работе -> никого не перекидывает.
     def test_workers_hard_exchange2(self):
@@ -432,7 +436,7 @@ class TestAutoWorkerExchange(TestCase):
 
         worker_days = WorkerDay.objects.all()
         self.assertEqual(len(worker_days), 5)
-        self.assertIsNone(worker_days.filter(is_vacancy=True).first().worker_id)
+        self.assertIsNone(worker_days.filter(is_vacancy=True).first().employee_id)
 
     def test_workers_hard_exchange_holidays_3days(self):
         self.create_users(1)
@@ -545,7 +549,7 @@ class TestAutoWorkerExchange(TestCase):
         self.create_users(1)
         user = User.objects.first()
         vacancy = self.create_vacancy(9, 21, self.work_type1)
-        self.update_or_create_holidays(Employment.objects.get(user=user), self.dt_now, 1)
+        self.update_or_create_holidays(Employment.objects.get(employee__user=user), self.dt_now, 1)
         tt = ShopMonthStat.objects.get(shop_id=self.shop.id)
         tt.dttm_status_change = self.dt_now + relativedelta(months=1)
         tt.save()
@@ -553,13 +557,13 @@ class TestAutoWorkerExchange(TestCase):
             worker_day=vacancy,
         )
         result = confirm_vacancy(vacancy.id, user)
-        self.assertEqual(result, {'status_code': 400, 'code': 'cant_apply_vacancy'})
+        self.assertEqual(result, {'status_code': 400, 'text': 'Вы не можете выйти на эту смену.'})
 
     def test_worker_exchange_change_vacancy_to_own_shop_vacancy(self):
         self.create_users(1)
         user = User.objects.first()
         vacancy = self.create_vacancy(9, 21, self.work_type1)
-        self.update_or_create_holidays(Employment.objects.get(user=user), self.dt_now, 1)
+        self.update_or_create_holidays(Employment.objects.get(employee__user=user), self.dt_now, 1)
         Event.objects.create(
             worker_day=vacancy,
         )
@@ -569,14 +573,14 @@ class TestAutoWorkerExchange(TestCase):
             worker_day=vacancy,
         )
         result = confirm_vacancy(vacancy.id, user)
-        self.assertEqual(result, {'status_code': 200, 'code': 'vacancy_success'})
+        self.assertEqual(result, {'status_code': 200, 'text': 'Вакансия успешно принята.'})
 
     def test_shift_elongation(self):
         self.create_users(1)
         user = User.objects.first()
         self.create_vacancy(9, 21, self.work_type2)
-        self.create_worker_days(Employment.objects.get(user=user), self.dt_now, 1, 10, 18)
+        self.create_worker_days(Employment.objects.get(employee__user=user), self.dt_now, 1, 10, 18)
         worker_shift_elongation()
-        wd = WorkerDay.objects.get(worker=user, is_approved=False)
+        wd = WorkerDay.objects.get(employee__user=user, is_approved=False)  # FIXME: почему падает?
         self.assertEqual(wd.dttm_work_start, datetime.datetime.combine(self.dt_now, datetime.time(9)))
         self.assertEqual(wd.dttm_work_end, datetime.datetime.combine(self.dt_now, datetime.time(21)))

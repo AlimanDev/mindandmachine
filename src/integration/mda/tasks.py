@@ -40,7 +40,7 @@ def sync_mda_user_to_shop_relation(dt=None, delay_sec=0.01):
     wdays = WorkerDay.objects.filter(
         Q(is_vacancy=True) | Q(type=WorkerDay.TYPE_QUALIFICATION),
         is_fact=False, is_approved=True,
-        shop__isnull=False, worker__isnull=False,
+        shop__isnull=False, employee__isnull=False,
         dt=dt,
     ).values('worker__username', 'shop__code').distinct()
     for wd in wdays:

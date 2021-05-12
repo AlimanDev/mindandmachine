@@ -15,18 +15,19 @@ class TestCleanWdays(TestsHelperMixin, TestCase):
     def setUpTestData(cls):
         cls.dt_now = timezone.now().today()
         cls.user = UserFactory()
+        cls.employee = UserFactory(user=cls.user)
         cls.shop = ShopFactory()
 
     def test_empl_cleaned_when_there_is_no_other_active_empl(self):
         empl = EmploymentFactory(
-            user=self.user, shop=self.shop,
+            employee=self.employee, shop=self.shop,
             dt_hired=self.dt_now - timedelta(days=30), dt_fired=self.dt_now - timedelta(days=1),
         )
         wd = WorkerDayFactory(
             is_fact=False,
             is_approved=True,
             dt=self.dt_now,
-            worker=self.user,
+            employee=self.employee,
             shop=self.shop,
             employment=empl,
             type=WorkerDay.TYPE_WORKDAY,

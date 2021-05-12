@@ -8,7 +8,7 @@ from src.conf.djconfig import (
 
 from src.base.models import (
     Employment,
-    User
+    Employee,
 )
 from src.timetable.models import (
     WorkerDay,
@@ -114,8 +114,7 @@ class Converter:
 class EmploymentConverter(Converter):
     @classmethod
     def convert_function(cls, obj: Employment):
-        user = obj.user
-        res = UserConverter.convert(user)
+        res = UserConverter.convert(obj.employee)
         res.update({
             'shop_id': obj.shop_id,
             'dt_hired': cls.convert_date(obj.dt_hired),
@@ -124,7 +123,6 @@ class EmploymentConverter(Converter):
             'salary': float(obj.salary),
             'is_fixed_hours': obj.is_fixed_hours,
             'is_ready_for_overworkings': obj.is_ready_for_overworkings,
-            'tabel_code': obj.tabel_code,
             'position': obj.position.name if obj.position_id is not None else '',
             'position_id': obj.position_id if obj.position_id is not None else '',
         })
@@ -134,22 +132,22 @@ class EmploymentConverter(Converter):
 
 class UserConverter(Converter):
     @classmethod
-    def convert_function(cls, obj: User):
+    def convert_function(cls, obj: Employee):
         return {
             'id': obj.id,
-            'username': obj.username,
-            'first_name': obj.first_name,
-            'last_name': obj.last_name,
-            'middle_name': obj.middle_name,
-            'avatar_url': obj.avatar.url if obj.avatar else None,
-            'sex': obj.sex,
-            'phone_number': obj.phone_number,
-            'email': obj.email,
+            'username': obj.user.username,
+            'first_name': obj.user.first_name,
+            'last_name': obj.user.last_name,
+            'middle_name': obj.user.middle_name,
+            'avatar_url': obj.user.avatar.url if obj.user.avatar else None,
+            'sex': obj.user.sex,
+            'phone_number': obj.user.phone_number,
+            'email': obj.user.email,
+            'tabel_code': obj.tabel_code,
         }
 
 
 class WorkerDayConverter(Converter):
-
     @classmethod
     def convert_function(cls, obj, need_percentage=False):
         with_tm_range = list(WorkerDay.TYPES_WITH_TM_RANGE)
@@ -161,7 +159,7 @@ class WorkerDayConverter(Converter):
             'id': obj.id,
             'dttm_added': cls.convert_datetime(obj.dttm_added),
             'dt': cls.convert_date(obj.dt),
-            'worker': obj.worker_id,
+            'worker': obj.employee_id,
             'type': obj.type,
             'dttm_work_start': __work_tm(obj.dttm_work_start),
             'dttm_work_end': __work_tm(obj.dttm_work_end),

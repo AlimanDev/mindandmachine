@@ -77,17 +77,17 @@ def import_urv_zkteco():
             users[user.id].append((dttm, shop))
 
     wds = WorkerDay.objects.filter(
-        worker_id__in=users.keys(),
+        employee__user__in=users.keys(),
         dt__gte=max_date - timedelta(1),
         dt__lte=date.today() + timedelta(1),
         is_fact=False,
         is_approved=True,
         type__in=WorkerDay.TYPES_WITH_TM_RANGE,
-    )
+    ).select_related('employee')
 
     worker_days = {}
     for wd in wds:
-        worker_days.setdefault(wd.worker_id, {})[wd.dt] = wd
+        worker_days.setdefault(wd.employee.user_id, {})[wd.dt] = wd
 
     attrs = AttendanceRecords.objects.filter(
         user_id__in=users.keys(),
@@ -104,100 +104,105 @@ def import_urv_zkteco():
             record = attendance_records.get(user_id, {}).get(shop.id, {}).get(dttm)
             if record: # если отметка уже внесена игнорируем
                 continue
-            prev_worker_day = worker_days.get(user_id, {}).get(dttm.date() - timedelta(1))
-            worker_day = worker_days.get(user_id, {}).get(dttm.date())
-            next_worker_day = worker_days.get(user_id, {}).get(dttm.date() + timedelta(1))
-            prev_dttm_work_start = prev_worker_day.dttm_work_start if prev_worker_day else datetime.min
-            prev_dttm_work_end = prev_worker_day.dttm_work_end if prev_worker_day else datetime.min
-            prev_dttm_start_diff = abs((dttm - prev_dttm_work_start).total_seconds())
-            prev_dttm_end_diff = abs((dttm - prev_dttm_work_end).total_seconds())
-            dttm_work_start = worker_day.dttm_work_start if worker_day else datetime.min
-            dttm_work_end = worker_day.dttm_work_end if worker_day else datetime.min
-            dttm_start_diff = abs((dttm - dttm_work_start).total_seconds())
-            dttm_end_diff = abs((dttm - dttm_work_end).total_seconds())
-            next_dttm_work_start = next_worker_day.dttm_work_start if next_worker_day else datetime.min
-            next_dttm_work_end = next_worker_day.dttm_work_end if next_worker_day else datetime.min
-            next_dttm_start_diff = abs((dttm - next_dttm_work_start).total_seconds())
-            next_dttm_end_diff = abs((dttm - next_dttm_work_end).total_seconds())
+            AttendanceRecords.objects.create(
+                user_id=user_id,
+                dttm=dttm,
+                shop=shop,
+            )
+            # prev_worker_day = worker_days.get(user_id, {}).get(dttm.date() - timedelta(1))
+            # worker_day = worker_days.get(user_id, {}).get(dttm.date())
+            # next_worker_day = worker_days.get(user_id, {}).get(dttm.date() + timedelta(1))
+            # prev_dttm_work_start = prev_worker_day.dttm_work_start if prev_worker_day else datetime.min
+            # prev_dttm_work_end = prev_worker_day.dttm_work_end if prev_worker_day else datetime.min
+            # prev_dttm_start_diff = abs((dttm - prev_dttm_work_start).total_seconds())
+            # prev_dttm_end_diff = abs((dttm - prev_dttm_work_end).total_seconds())
+            # dttm_work_start = worker_day.dttm_work_start if worker_day else datetime.min
+            # dttm_work_end = worker_day.dttm_work_end if worker_day else datetime.min
+            # dttm_start_diff = abs((dttm - dttm_work_start).total_seconds())
+            # dttm_end_diff = abs((dttm - dttm_work_end).total_seconds())
+            # next_dttm_work_start = next_worker_day.dttm_work_start if next_worker_day else datetime.min
+            # next_dttm_work_end = next_worker_day.dttm_work_end if next_worker_day else datetime.min
+            # next_dttm_start_diff = abs((dttm - next_dttm_work_start).total_seconds())
+            # next_dttm_end_diff = abs((dttm - next_dttm_work_end).total_seconds())
 
-            min_diff = min((prev_dttm_start_diff, prev_dttm_end_diff, dttm_start_diff, dttm_end_diff,
-                            next_dttm_start_diff, next_dttm_end_diff))
+            # min_diff = min((prev_dttm_start_diff, prev_dttm_end_diff, dttm_start_diff, dttm_end_diff,
+            #                 next_dttm_start_diff, next_dttm_end_diff))
 
-            diff_to_wd_mapping = {
-                prev_dttm_start_diff: prev_worker_day,
-                prev_dttm_end_diff: prev_worker_day,
-                dttm_start_diff: worker_day,
-                dttm_end_diff: worker_day,
-                next_dttm_start_diff: next_worker_day,
-                next_dttm_end_diff: next_worker_day,
-            }
+            # diff_to_wd_mapping = {
+            #     prev_dttm_start_diff: prev_worker_day,
+            #     prev_dttm_end_diff: prev_worker_day,
+            #     dttm_start_diff: worker_day,
+            #     dttm_end_diff: worker_day,
+            #     next_dttm_start_diff: next_worker_day,
+            #     next_dttm_end_diff: next_worker_day,
+            # }
 
-            if min_diff > settings.ZKTECO_MAX_DIFF_IN_SECONDS:
-                # нет смены или она слишком "далеко" от отметки, тут можно создать отметку за сегодня
-                if not settings.ZKTECO_IGNORE_TICKS_WITHOUT_WORKER_DAY:
-                    comming = AttendanceRecords.objects.filter(
-                        dttm__date=dttm.date(),
-                        shop=shop,
-                        user_id=user_id,
-                        type=AttendanceRecords.TYPE_COMING,
-                    ).first()
-                    if comming and comming.dttm < dttm:
-                        AttendanceRecords.objects.create(
-                            dttm=dttm,
-                            shop=shop,
-                            user_id=user_id,
-                            type=AttendanceRecords.TYPE_LEAVING,
-                        )
-                        print(f"create leaving record {dttm} for {user_id} {shop} without worker day")
-                    else:
-                        AttendanceRecords.objects.create(
-                            dttm=dttm,
-                            shop=shop,
-                            user_id=user_id,
-                            type=AttendanceRecords.TYPE_COMING,
-                        )
-                        print(f"create comming record {dttm} for {user_id} {shop} without worker day")
-                continue
+            # if min_diff > settings.ZKTECO_MAX_DIFF_IN_SECONDS:
+            #     # нет смены или она слишком "далеко" от отметки, тут можно создать отметку за сегодня
+            #     if not settings.ZKTECO_IGNORE_TICKS_WITHOUT_WORKER_DAY:
+            #         comming = AttendanceRecords.objects.filter(
+            #             dttm__date=dttm.date(),
+            #             shop=shop,
+            #             user_id=user_id,
+            #             type=AttendanceRecords.TYPE_COMING,
+            #         ).first()
+            #         if comming and comming.dttm < dttm:
+            #             AttendanceRecords.objects.create(
+            #                 dttm=dttm,
+            #                 shop=shop,
+            #                 user_id=user_id,
+            #                 type=AttendanceRecords.TYPE_LEAVING,
+            #             )
+            #             print(f"create leaving record {dttm} for {user_id} {shop} without worker day")
+            #         else:
+            #             AttendanceRecords.objects.create(
+            #                 dttm=dttm,
+            #                 shop=shop,
+            #                 user_id=user_id,
+            #                 type=AttendanceRecords.TYPE_COMING,
+            #             )
+            #             print(f"create comming record {dttm} for {user_id} {shop} without worker day")
+            #     continue
 
-            if min_diff == prev_dttm_start_diff or min_diff == dttm_start_diff or min_diff == next_dttm_start_diff:
-                wd = diff_to_wd_mapping.get(min_diff)
-                dt = wd.dt or dttm.date()
-                comming = AttendanceRecords.objects.filter(
-                    dt=dt,
-                    shop=shop,
-                    user_id=user_id,
-                    type=AttendanceRecords.TYPE_COMING,
-                ).first()
-                if comming and comming.dttm < dttm:  # отметка о приходе уже есть, возможно следующая об уходе
-                    # TODO: нужна ли она в этом случае?
-                    AttendanceRecords.objects.create(
-                        dt=dt,
-                        dttm=dttm,
-                        shop=shop,
-                        user_id=user_id,
-                        type=AttendanceRecords.TYPE_LEAVING,
-                    )
-                    print(f"create leaving record {dttm} for {user_id} {shop}")
-                    continue
-                AttendanceRecords.objects.create(
-                    dt=dt,
-                    dttm=dttm,
-                    shop=shop,
-                    user_id=user_id,
-                    type=AttendanceRecords.TYPE_COMING,
-                )
-                print(f"create coming record {dttm} for {user_id} {shop}")
-            elif min_diff == prev_dttm_end_diff or min_diff == dttm_end_diff or min_diff == next_dttm_end_diff:
-                wd = diff_to_wd_mapping.get(min_diff)
-                dt = wd.dt or dttm.date()
-                print(f"create leaving record {dttm} for {user_id} {shop}")
-                AttendanceRecords.objects.create(
-                    dt=dt,
-                    dttm=dttm,
-                    shop=shop,
-                    user_id=user_id,
-                    type=AttendanceRecords.TYPE_LEAVING,
-                )
+            # if min_diff == prev_dttm_start_diff or min_diff == dttm_start_diff or min_diff == next_dttm_start_diff:
+            #     wd = diff_to_wd_mapping.get(min_diff)
+            #     dt = wd.dt or dttm.date()
+            #     comming = AttendanceRecords.objects.filter(
+            #         dt=dt,
+            #         shop=shop,
+            #         user_id=user_id,
+            #         type=AttendanceRecords.TYPE_COMING,
+            #     ).first()
+            #     if comming and comming.dttm < dttm:  # отметка о приходе уже есть, возможно следующая об уходе
+            #         # TODO: нужна ли она в этом случае?
+            #         AttendanceRecords.objects.create(
+            #             dt=dt,
+            #             dttm=dttm,
+            #             shop=shop,
+            #             user_id=user_id,
+            #             type=AttendanceRecords.TYPE_LEAVING,
+            #         )
+            #         print(f"create leaving record {dttm} for {user_id} {shop}")
+            #         continue
+            #     AttendanceRecords.objects.create(
+            #         dt=dt,
+            #         dttm=dttm,
+            #         shop=shop,
+            #         user_id=user_id,
+            #         type=AttendanceRecords.TYPE_COMING,
+            #     )
+            #     print(f"create coming record {dttm} for {user_id} {shop}")
+            # elif min_diff == prev_dttm_end_diff or min_diff == dttm_end_diff or min_diff == next_dttm_end_diff:
+            #     wd = diff_to_wd_mapping.get(min_diff)
+            #     dt = wd.dt or dttm.date()
+            #     print(f"create leaving record {dttm} for {user_id} {shop}")
+            #     AttendanceRecords.objects.create(
+            #         dt=dt,
+            #         dttm=dttm,
+            #         shop=shop,
+            #         user_id=user_id,
+            #         type=AttendanceRecords.TYPE_LEAVING,
+            #     )
 
 
 @app.task()
@@ -212,7 +217,7 @@ def export_workers_zkteco():
     for user in users:
         employments = Employment.objects.get_active(
             user.network_id,
-            user=user,
+            employee__user=user,
             position__isnull=False,
         )
         if not employments:
@@ -263,7 +268,7 @@ def delete_workers_zkteco():
     for user in users:
         employments = Employment.objects.get_active(
             user.network_id,
-            user=user,
+            employee__user=user,
             position__isnull=False
         )
         if employments:
@@ -275,7 +280,7 @@ def delete_workers_zkteco():
         )
 
         employments = Employment.objects.filter(
-            user=user,
+            employee__user=user,
             dt_fired__lt=dt_max,
         )
 

@@ -135,8 +135,8 @@ class CleanWdaysHelper:
     def _log_wd(self, wd, log_title, log_level='debug', extra=None):
         getattr(self.logger, log_level)(
             f'clean_wdays {log_title}: '
-            'id=%s, dt=%s, type=%s, is_fact=%s, is_approved=%s, worker=%s, shop_id=%s, employment_id=%s, extra=%s',
-            wd.id, wd.dt, wd.type, wd.is_fact, wd.is_approved, wd.worker.username, wd.shop_id, wd.employment_id, extra
+            'id=%s, dt=%s, type=%s, is_fact=%s, is_approved=%s, user=%s, shop_id=%s, employment_id=%s, extra=%s',
+            wd.id, wd.dt, wd.type, wd.is_fact, wd.is_approved, wd.employee.user.username, wd.shop_id, wd.employment_id, extra
         )
 
     def run(self):
@@ -146,10 +146,10 @@ class CleanWdaysHelper:
         )
 
         wdays_qs = WorkerDay.objects_with_excluded.exclude(
-            worker__isnull=True,
+            employee__isnull=True,
         ).exclude(
             type=WorkerDay.TYPE_EMPTY,
-        ).order_by('dt', 'worker', 'shop')
+        ).order_by('dt', 'employee', 'shop')
         if self.filter_kwargs:
             wdays_qs = wdays_qs.filter(**self.filter_kwargs)
         if self.exclude_kwargs:
@@ -173,12 +173,12 @@ class CleanWdaysHelper:
 
                 changes = {}
 
-                worker_active_empl = Employment.objects.get_active_empl_for_user(
-                    network_id=wd.worker.network_id, user_id=wd.worker_id, dt=wd.dt,
+                employee_active_empl = Employment.objects.get_active_empl_by_priority(
+                    network_id=wd.employee.user.network_id, employee_id=wd.employee_id, dt=wd.dt,
                     priority_shop_id=wd.shop_id, priority_employment_id=wd.employment_id,
                 ).first()
 
-                if not worker_active_empl:
+                if not employee_active_empl:
                     if wd.type in [WorkerDay.TYPE_MATERNITY, WorkerDay.TYPE_VACATION, WorkerDay.TYPE_SICK]:
                         continue
 
@@ -190,9 +190,9 @@ class CleanWdaysHelper:
 
                     continue
 
-                if wd.employment_id != worker_active_empl.id:
+                if wd.employment_id != employee_active_empl.id:
                     if self.clean_plan_empl and wd.is_fact is False and wd.shop_id \
-                            and wd.shop_id != worker_active_empl.shop_id and wd.is_vacancy is False:
+                            and wd.shop_id != employee_active_empl.shop_id and wd.is_vacancy is False:
                         self._log_wd(wd, 'plan empl_cleaned')
                         empl_cleaned += 1
                         if not self.only_logging:
@@ -202,17 +202,17 @@ class CleanWdaysHelper:
 
                     changes.update({'employment_id': {
                         'from': wd.employment_id,
-                        'to': worker_active_empl.id,
+                        'to': employee_active_empl.id,
                     }})
-                    wd.employment_id = worker_active_empl.id
+                    wd.employment_id = employee_active_empl.id
 
                 # if wd.type == WorkerDay.TYPE_WORKDAY:
-                #     if wd.is_vacancy != (not worker_active_empl.is_equal_shops):
+                #     if wd.is_vacancy != (not employee_active_empl.is_equal_shops):
                 #         changes.update({'is_vacancy': {
                 #             'from': wd.is_vacancy,
-                #             'to': not worker_active_empl.is_equal_shops,
+                #             'to': not employee_active_empl.is_equal_shops,
                 #         }})
-                #         wd.is_vacancy = not worker_active_empl.is_equal_shops
+                #         wd.is_vacancy = not employee_active_empl.is_equal_shops
                 #
                 # if wd.type not in WorkerDay.TYPES_WITH_TM_RANGE:
                 #     if wd.shop_id is not None:

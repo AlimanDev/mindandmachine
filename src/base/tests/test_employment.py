@@ -30,7 +30,7 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
 
     def setUp(self):
         self.client.force_authenticate(user=self.user1)
-        self.employment2.network.refresh_from_db()
+        self.employment2.shop.network.refresh_from_db()
         self.user1.network.refresh_from_db()
 
     def _create_employment(self):
@@ -38,7 +38,7 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
             'position_id': self.worker_position.id,
             'dt_hired': (timezone.now() - timedelta(days=500)).strftime('%Y-%m-%d'),
             'shop_id': self.shop.id,
-            'user_id': self.user2.id,
+            'employee_id': self.employee2.id,
         }
 
         resp = self.client.post(
@@ -65,7 +65,7 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
         put_data = {
             'position_id': another_worker_position.id,
             'shop_id': self.shop.id,
-            'user_id': self.user2.id,
+            'employee_id': self.employee2.id,
             'dt_hired': (timezone.now() - timedelta(days=200)).strftime('%Y-%m-%d'),
         }
         self.assertFalse(EmploymentWorkType.objects.filter(employment=self.employment2).exists())
@@ -89,7 +89,7 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
             'position_id': self.worker_position.id,
             'dt_hired': (timezone.now() - timedelta(days=300)).strftime('%Y-%m-%d'),
             'shop_id': self.shop2.id,
-            'user_id': self.user2.id,
+            'employee_id': self.employee2.id,
         }
 
         resp = self.client.put(
@@ -101,7 +101,7 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
         self.assertTrue(Employment.objects.filter(
             shop_id=put_data['shop_id'],
             dt_hired=put_data['dt_hired'],
-            user_id=put_data['user_id'],
+            employee_id=put_data['employee_id'],
             position_id=put_data['position_id'],
         ).count() == 1)
 
@@ -133,11 +133,10 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
             shop_id=self.shop2.id,
             dt_hired=put_data['dt_hired'],
             dt_fired=put_data['dt_fired'],
-            user_id=self.user2.id,
+            employee_id=self.employee2.id,
             position_id=self.worker_position.id
         ).first()
         self.assertIsNotNone(e)
-        self.assertEqual(e.network, self.user2.network)
 
         put_data['dt_fired'] = timezone.now().strftime('%Y-%m-%d')
         resp = self.client.put(
@@ -151,11 +150,10 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
             shop_id=self.shop2.id,
             dt_hired=put_data['dt_hired'],
             dt_fired=put_data['dt_fired'],
-            user_id=self.user2.id,
+            employee_id=self.employee2.id,
             position_id=self.worker_position.id,
         ).first()
         self.assertIsNotNone(e)
-        self.assertEqual(e.network, self.user2.network)
 
         self.shop3.code = str(self.shop3.id)
         self.shop3.save()
@@ -167,9 +165,9 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
             content_type='application/json',
         )
         self.assertEqual(resp.status_code, 200)  # updated
-        e.refresh_from_db(fields=['shop', 'tabel_code'])
+        e.refresh_from_db(fields=['shop', 'employee'])
         self.assertEqual(e.shop.id, self.shop3.id)
-        self.assertEqual(e.tabel_code, 'new_tabel_code')
+        self.assertEqual(e.employee.tabel_code, None)  # cant change tabel_code for existing employment
 
     def test_auto_timetable(self):
         employment_ids = list(Employment.objects.filter(shop=self.shop).values_list('id', flat=True))
@@ -212,7 +210,7 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
         for i in range(3):
             WorkerDay.objects.create(
                 employment_id=resp['id'],
-                worker=self.user2,
+                employee=self.employee2,
                 type=WorkerDay.TYPE_WORKDAY,
                 dttm_work_start=datetime.combine(dt + timedelta(i), time(10)),
                 dttm_work_end=datetime.combine(dt + timedelta(i), time(20)),
@@ -222,7 +220,7 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
         for i in range(2):
             WorkerDay.objects.create(
                 employment_id=resp['id'],
-                worker=self.user2,
+                employee=self.employee2,
                 dt=dt + timedelta(i + 3),
             )
         self.assertEqual(WorkerDay.objects.get(employment_id=resp['id'], dt=dt).work_hours, timedelta(hours=9))
@@ -268,12 +266,12 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
     def test_empls_cleaned_in_wdays_without_active_employment(self):
         with self.settings(CELERY_TASK_ALWAYS_EAGER=True):
             dt = datetime.now().date()
-            self.network.clean_wdays_on_employment_dt_change = True
-            self.network.save()
+            self.employment2.employee.user.network.clean_wdays_on_employment_dt_change = True
+            self.employment2.employee.user.network.save()
 
             wd1 = WorkerDay.objects.create(
                 shop=self.shop,
-                worker=self.user2,
+                employee=self.employee2,
                 employment=self.employment2,
                 dt=dt + timedelta(days=50),
                 is_fact=False,
@@ -284,7 +282,7 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
             )
             wd2 = WorkerDay.objects.create(
                 shop=self.shop,
-                worker=self.user2,
+                employee=self.employee2,
                 employment=self.employment2,
                 dt=dt + timedelta(days=25),
                 is_fact=False,
@@ -295,7 +293,7 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
             )
             wd_holiday = WorkerDay.objects.create(
                 shop=self.shop,
-                worker=self.user2,
+                employee=self.employee2,
                 employment=self.employment2,
                 dt=dt + timedelta(days=20),
                 is_fact=False,
@@ -316,6 +314,7 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
     def test_change_function_group_tmp(self):
         self.admin_group.subordinates.add(self.chief_group)
         self.admin_group.subordinates.add(self.employee_group)
+
         put_data = {
             'function_group_id': self.chief_group.id,
             'dt_to_function_group': (date.today() + timedelta(days=5)).strftime('%Y-%m-%d'),
@@ -407,7 +406,6 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
             'min_time_btw_shifts': None,
             'shift_hours_length_min': None,
             'shift_hours_length_max': None,
-            'tabel_code': None,
             'is_ready_for_overworkings': False,
             'is_visible': False,
             'function_group_id': self.employee_group.id,
@@ -426,7 +424,7 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
             'dt_hired': date(2021, 1, 1).strftime('%Y-%m-%d'),
             'dt_fired': date(2021, 5, 25).strftime('%Y-%m-%d'),
             'shop_id': self.shop2.id,
-            'user_id': self.user2.id,
+            'employee_id': self.employee2.id,
         }
 
         resp = self.client.put(
@@ -439,14 +437,14 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
             shop_id=put_data['shop_id'],
             dt_hired=put_data['dt_hired'],
             dt_fired=put_data['dt_fired'],
-            user_id=put_data['user_id'],
+            employee_id=put_data['employee_id'],
             position_id=put_data['position_id'],
         ).count() == 0)
         self.assertTrue(Employment.objects.filter(
             shop_id=put_data['shop_id'],
             dt_hired=put_data['dt_hired'],
             dt_fired=date(2021, 5, 24).strftime('%Y-%m-%d'),
-            user_id=put_data['user_id'],
+            employee_id=put_data['employee_id'],
             position_id=put_data['position_id'],
         ).count() == 1)
 
@@ -467,7 +465,7 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
                     'dt_hired': date(2021, 1, 1).strftime('%Y-%m-%d'),
                     'dt_fired': date(2021, 5, 25).strftime('%Y-%m-%d'),
                     'shop_id': self.shop2.id,
-                    'user_id': self.user2.id,
+            'employee_id': self.employee2.id,
                     'code': 'code1',
                     'by_code': True,
                 }
@@ -484,7 +482,7 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
                     'dt_hired': date(2021, 1, 1).strftime('%Y-%m-%d'),
                     'dt_fired': date(2021, 5, 25).strftime('%Y-%m-%d'),
                     'shop_id': self.shop2.id,
-                    'user_id': self.user2.id,
+            'employee_id': self.employee2.id,
                     'code': 'code2',
                     'by_code': True,
                 }
@@ -499,7 +497,7 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
 
                 wd = WorkerDayFactory(
                     dt=date(2021, 1, 1),
-                    worker=self.user2,
+                    employee=self.employee2,
                     employment=empl1,
                     shop=self.shop2,
                     type=WorkerDay.TYPE_WORKDAY,
@@ -535,7 +533,7 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
             'dt_hired': date(2021, 1, 1).strftime('%Y-%m-%d'),
             'dt_fired': date(2021, 5, 25).strftime('%Y-%m-%d'),
             'shop_id': self.shop2.id,
-            'user_id': self.user2.id,
+            'employee_id': self.employee2.id,
             'code': 'code1',
             'by_code': True,
         }
@@ -548,7 +546,7 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
         empl1 = Employment.objects.get(id=resp1_put.json()['id'])
         wd = WorkerDayFactory(
             dt=date(2021, 1, 1),
-            worker=self.user2,
+            employee=self.employee2,
             employment=empl1,
             shop=self.shop2,
             type=WorkerDay.TYPE_WORKDAY,
@@ -605,7 +603,7 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
             (self.user7.id, self.wp5.id),
             (self.user4.id, self.wp3.id),
         ]
-        self.assertSequenceEqual(list(map(lambda x: (x['user']['id'], x['position_id']), data.json())), assert_data)
+        self.assertSequenceEqual(list(map(lambda x: (x['user_id'], x['position_id']), data.json())), assert_data)
 
     def test_get_employment_ordered_by_position_desc(self):
         data = self._test_get_employment_ordered_by_position(ordering='-position__ordering,position__name')
@@ -616,4 +614,4 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
             (self.user3.id, self.wp2.id),
             (self.user2.id, self.wp1.id),
         ]
-        self.assertSequenceEqual(list(map(lambda x: (x['user']['id'], x['position_id']), data.json())), assert_data)
+        self.assertSequenceEqual(list(map(lambda x: (x['user_id'], x['position_id']), data.json())), assert_data)

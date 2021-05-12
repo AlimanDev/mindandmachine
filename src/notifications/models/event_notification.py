@@ -86,7 +86,7 @@ class AbstractEventNotificationWithRecipients(AbstractEventNotification):
                 list(User.objects.filter(
                     id__in=Employment.objects.get_active().filter(
                         Q(function_group__in=groups) | Q(position__group__in=groups),
-                    ).values_list('user_id', flat=True),
+                    ).values_list('employee__user_id', flat=True),
                     email__isnull=False,
                 ))
             )
@@ -104,7 +104,7 @@ class AbstractEventNotificationWithRecipients(AbstractEventNotification):
                     id__in=Employment.objects.get_active().filter(
                         Q(function_group__in=self.shop_groups.all()) | Q(position__group__in=self.shop_groups.all()),
                         shop_q,
-                    ).values_list('user_id', flat=True),
+                    ).values_list('employee__user_id', flat=True),
                     email__isnull=False,
                 ))
             )

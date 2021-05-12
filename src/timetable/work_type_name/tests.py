@@ -1,9 +1,8 @@
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from src.base.models import Network
-from src.timetable.models import WorkTypeName, WorkType
 from src.forecast.models import OperationTypeName
+from src.timetable.models import WorkTypeName, WorkType
 from src.util.test import create_departments_and_users
 
 
@@ -25,6 +24,7 @@ class TestWorkTypeName(APITestCase):
             name='Тип_кассы_2',
             network=self.network,
         )
+        self.wt2 = WorkType.objects.create(shop=self.shop2, work_type_name=self.work_type_name2)
         self.work_type_name3 = WorkTypeName.objects.create(
             name='Тип_кассы_3',
             network=self.network,
@@ -96,3 +96,11 @@ class TestWorkTypeName(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         self.assertIsNotNone(WorkTypeName.objects.get(id=self.work_type_name1.id).dttm_deleted)
         self.assertEqual(WorkType.objects.filter(dttm_deleted__isnull=False).count(), 1)
+
+    def test_get_worktype_by_shops(self):
+        response = self.client.get(self.url, data={'shop_id__in': f'{self.shop2.id}'})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        resp_data = response.json()
+        self.assertEqual(len(resp_data), 1)
+
+        self.assertEqual(resp_data[0]['id'], self.work_type_name2.id)

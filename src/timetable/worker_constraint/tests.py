@@ -20,7 +20,6 @@ class TestWorkerConstraint(TestsHelperMixin, APITestCase):
         wc = WorkerConstraint.objects.create(
             shop=self.shop,
             employment=self.employment1,
-            worker=self.employment1.user,
             weekday=3,
             is_lite=True,
             tm=Converter.parse_time("09:00:00")

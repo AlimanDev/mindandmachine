@@ -22,6 +22,7 @@ from src.base.models import (
     User,
     Network,
     Break,
+    Employee,
 )
 from src.forecast.models import (
     OperationType,
@@ -538,10 +539,10 @@ def create_departments_and_users(self, dt=None):
         first_name='Иван',
         network=self.network,
     )
+    self.employee1 = Employee.objects.create(user=self.user1)
     self.employment1 = Employment.objects.create(
-        network=self.network,
         code=f'{self.user1.username}:{uuid.uuid4()}:{uuid.uuid4()}',
-        user=self.user1,
+        employee=self.employee1,
         shop=self.root_shop,
         function_group=self.admin_group,
     )
@@ -553,10 +554,10 @@ def create_departments_and_users(self, dt=None):
         last_name='Иванов',
         network=self.network,
     )
+    self.employee2 = Employee.objects.create(user=self.user2)
     self.employment2 = Employment.objects.create(
-        network=self.network,
         code=f'{self.user2.username}:{uuid.uuid4()}:{uuid.uuid4()}',
-        user=self.user2,
+        employee=self.employee2,
         shop=self.shop,
         function_group=self.employee_group,
         salary=100,
@@ -569,10 +570,10 @@ def create_departments_and_users(self, dt=None):
         last_name='Сидоров',
         network=self.network,
     )
+    self.employee3 = Employee.objects.create(user=self.user3)
     self.employment3 = Employment.objects.create(
-        network=self.network,
         code=f'{self.user3.username}:{uuid.uuid4()}:{uuid.uuid4()}',
-        user=self.user3,
+        employee=self.employee3,
         shop=self.shop,
         auto_timetable=False,
         function_group=self.employee_group,
@@ -587,10 +588,10 @@ def create_departments_and_users(self, dt=None):
         first_name='Иван4',
         network=self.network,
     )
+    self.employee4 = Employee.objects.create(user=self.user4)
     self.employment4 = Employment.objects.create(
-        network=self.network,
         code=f'{self.user4.username}:{uuid.uuid4()}:{uuid.uuid4()}',
-        user=self.user4,
+        employee=self.employee4,
         shop=self.shop,
         function_group=self.admin_group,
     )
@@ -603,10 +604,10 @@ def create_departments_and_users(self, dt=None):
         first_name='Иван5',
         network=self.network,
     )
+    self.employee5 = Employee.objects.create(user=self.user5)
     self.employment5 = Employment.objects.create(
-        network=self.network,
         code=f'{self.user5.username}:{uuid.uuid4()}:{uuid.uuid4()}',
-        user=self.user5,
+        employee=self.employee5,
         shop=self.reg_shop1,
         function_group=self.chief_group,
     )
@@ -619,10 +620,10 @@ def create_departments_and_users(self, dt=None):
         first_name='Иван6',
         network=self.network,
     )
+    self.employee6 = Employee.objects.create(user=self.user6)
     self.employment6 = Employment.objects.create(
-        network=self.network,
         code=f'{self.user6.username}:{uuid.uuid4()}:{uuid.uuid4()}',
-        user=self.user6,
+        employee=self.employee6,
         shop=self.shop,
         function_group=self.chief_group,
     )
@@ -635,10 +636,10 @@ def create_departments_and_users(self, dt=None):
         first_name='Иван7',
         network=self.network,
     )
+    self.employee7 = Employee.objects.create(user=self.user7)
     self.employment7 = Employment.objects.create(
-        network=self.network,
         code=f'{self.user7.username}:{uuid.uuid4()}:{uuid.uuid4()}',
-        user=self.user7,
+        employee=self.employee7,
         shop=self.shop,
         function_group=self.employee_group,
     )
@@ -650,34 +651,24 @@ def create_departments_and_users(self, dt=None):
         first_name='Иван8',
         network=self.network,
     )
+    self.employee8 = Employee.objects.create(user=self.user8)
     self.employment8 = Employment.objects.create(
-        network=self.network,
         code=f'{self.user8.username}:{uuid.uuid4()}:{uuid.uuid4()}',
-        user=self.user8,
+        employee=self.employee8,
         shop=self.shop2,
         function_group=self.employee_group,
     )
     self.employment8_old = Employment.objects.create(
         dt_hired=dt - datetime.timedelta(days=900),
         dt_fired=dt - datetime.timedelta(days=700),
-        network=self.network,
         code=f'{self.user8.username}:{uuid.uuid4()}:{uuid.uuid4()}',
-        user=self.user8,
+        employee=self.employee8,
         shop=self.shop2,
         function_group=self.employee_group,
     )
     Shop.objects.all().update(code=Concat(Value('code-', output_field=CharField()), F('id')), network=self.network)
-    User.objects.all().update(tabel_code=F('username'))
-    Employment.objects.all().update(
-        tabel_code=Subquery(User.objects.filter(id=OuterRef('user_id')).values('tabel_code')[:1])
-    )
     for s in [self.root_shop, self.shop, self.shop2, self.shop3, self.reg_shop1, self.reg_shop2]:
         s.refresh_from_db()
-    for u in [self.user1, self.user2, self.user3, self.user4, self.user5, self.user6, self.user7, self.user8]:
-        u.refresh_from_db()
-    for e in [self.employment1, self.employment2, self.employment3, self.employment4, self.employment5,
-              self.employment6, self.employment7, self.employment8]:
-        e.refresh_from_db()
 
 # def create_camera_cashbox_stat(camera_cashbox_obj, dttm, queue):
 #     CameraCashboxStat.objects.create(

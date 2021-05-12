@@ -5,7 +5,7 @@ from src.forecast.models import OperationTypeName
 from src.timetable.models import WorkTypeName
 from src.base.serializers import BaseNetworkSerializer
 from src.base.views import BaseActiveNamedModelViewSet
-from src.base.filters import BaseActiveNamedModelFilter
+from src.timetable.filters import WorkTypeNameFilter
 
 
 class WorkTypeNameSerializer(BaseNetworkSerializer):
@@ -57,7 +57,7 @@ class WorkTypeNameViewSet(BaseActiveNamedModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
     serializer_class = WorkTypeNameSerializer
     pagination_class = LimitOffsetPagination
-    filterset_class = BaseActiveNamedModelFilter
+    filterset_class = WorkTypeNameFilter
     openapi_tags = ['WorkTypeName',]
 
     def get_queryset(self):
