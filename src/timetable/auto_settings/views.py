@@ -531,7 +531,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
         constraints = {}
         for worker_constraint in list(WorkerConstraint.objects.select_related('employment').filter(
                 employment__in=employments)):
-            key = worker_constraint.worker_id
+            key = worker_constraint.employment_id  # TODO: покрыть тестами
             if key not in constraints:
                 constraints[key] = []
             constraints[key].append(worker_constraint)
@@ -745,7 +745,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
                         'weekday': obj.weekday,
                         'tm': Converter.convert_time(obj.tm),
                         'is_lite': obj.is_lite,
-                    } for obj in constraints.get(e.employee_id, [])],
+                    } for obj in constraints.get(e.id, [])],
                     #     Converter.convert(
                     #     constraints.get(e.employee_id, []),
                     #     WorkerConstraint,
