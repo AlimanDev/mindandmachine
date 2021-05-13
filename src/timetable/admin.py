@@ -132,7 +132,7 @@ class WorkerDayAdmin(admin.ModelAdmin):
         'created_by_last_name',
         'id', 
     )
-    search_fields = ('worker__last_name', 'shop__name', 'shop__parent__name', 'id', 'dt')
+    search_fields = ('employee__user__last_name', 'shop__name', 'shop__parent__name', 'id', 'dt')
     list_filter = (
         ('dt', DateRangeFilter), 
         'is_fact', 
@@ -142,14 +142,14 @@ class WorkerDayAdmin(admin.ModelAdmin):
         ('dttm_modified', DateTimeRangeFilter), 
         ('created_by', RelatedOnlyDropdownFilter),
     )
-    raw_id_fields = ('parent_worker_day', 'employment', 'created_by', 'last_edited_by', 'worker', 'shop')
-    list_select_related = ('worker', 'shop', 'created_by')
+    raw_id_fields = ('parent_worker_day', 'employment', 'created_by', 'last_edited_by', 'employee', 'shop')
+    list_select_related = ('employee__user', 'shop', 'created_by')
     readonly_fields = ('dttm_modified',)
     change_list_template = 'worker_day_change_list.html'
 
     @staticmethod
     def worker_last_name(instance: WorkerDay):
-        return instance.worker.last_name if instance.worker else 'Нет работника'
+        return instance.employee.user.last_name if getattr(instance.employee, 'user', None) else 'Нет работника'
 
     @staticmethod
     def shop_title(instance: WorkerDay):
@@ -188,7 +188,7 @@ class WorkerDayAdmin(admin.ModelAdmin):
 class WorkerDayCashboxDetailsAdmin(admin.ModelAdmin):
     # todo: нет нормального отображения для конкретного pk(скорее всего из-за harakiri time в настройках uwsgi)
     list_display = ('worker_last_name', 'shop_title', 'worker_day_dt', 'on_work_type', 'id')
-    search_fields = ('worker_day__worker__last_name', 'worker_day__shop__name', 'id')
+    search_fields = ('worker_day__employee__user__last_name', 'worker_day__shop__name', 'id')
     list_filter = ('worker_day__shop',)
     raw_id_fields = ('worker_day', 'work_type')
     list_select_related = (

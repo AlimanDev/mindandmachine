@@ -3,6 +3,7 @@ from django.forms import Form
 from import_export import resources
 from import_export.admin import ExportActionMixin, ImportMixin
 from import_export.fields import Field
+from django.urls import resolve
 
 from src.base.models import (
     Employment,
@@ -19,6 +20,8 @@ from src.base.models import (
     SAWHSettings,
     SAWHSettingsMapping,
     ShopSchedule,
+    Employee,
+    NetworkConnect,
 )
 from src.timetable.models import GroupWorkerDayPermission
 from src.base.forms import (
@@ -52,6 +55,11 @@ class NetworkAdmin(admin.ModelAdmin):
     list_display = ('id', 'name', 'code', 'logo')
     form = NetworkAdminForm
 
+@admin.register(NetworkConnect)
+class NetworkConnectAdmin(admin.ModelAdmin):
+    list_display = ('id', 'outsourcing', 'client')
+    list_select_related = ('outsourcing', 'client')
+
 
 @admin.register(Region)
 class RegionAdmin(admin.ModelAdmin):
@@ -82,7 +90,8 @@ class QsUserAdmin(admin.ModelAdmin):
 
     @staticmethod
     def shop_name(instance: User):
-        res = ', '.join(i.shop.name for i in instance.employments.all().select_related('shop'))
+        res = ', '.join(
+            list(Employment.objects.get_active(employee__user=instance).values_list('shop__name', flat=True).distinct()))
         return res
 
     '''
@@ -91,6 +100,13 @@ class QsUserAdmin(admin.ModelAdmin):
         cashboxinfo_set = instance.workercashboxinfo_set.all().select_related('work_type')
         return ' '.join(['"{}"'.format(cbi.work_type.name) for cbi in cashboxinfo_set])
     '''
+
+
+@admin.register(Employee)
+class EmployeeAdmin(admin.ModelAdmin):
+    list_display = ('user', 'tabel_code')
+    search_fields = ('id', 'user__last_name', 'user__first_name', 'user__username', 'tabel_code')
+    raw_id_fields = ('user',)
 
 
 @admin.register(Shop)
@@ -135,6 +151,27 @@ class GroupAdmin(admin.ModelAdmin):
         actions.update(WdPermsHelper.get_preset_actions())
         return actions
 
+    def save_model(self, request, obj, form, change):
+        obj.save()
+        # Django always sends this when "Save as new is clicked"
+        if '_saveasnew' in request.POST:
+            # Get the ID from the admin URL
+            original_pk = resolve(request.path).kwargs['object_id']
+            funcs = FunctionGroup.objects.filter(group_id=original_pk)
+            FunctionGroup.objects.bulk_create(
+                [
+                    FunctionGroup(
+                        group=obj,
+                        func=f.func,
+                        method=f.method,
+                        access_type=f.access_type,
+                        level_down=f.level_down,
+                        level_up=f.level_up,
+                    )
+                    for f in funcs
+                ]
+            )
+
 
 @admin.register(FunctionGroup)
 class FunctionGroupAdmin(ImportMixin, ExportActionMixin, admin.ModelAdmin):
@@ -166,11 +203,12 @@ class FunctionGroupAdmin(ImportMixin, ExportActionMixin, admin.ModelAdmin):
 
 @admin.register(Employment)
 class EmploymentAdmin(admin.ModelAdmin):
-    list_display = ('id', 'shop', 'user', 'function_group', 'dt_hired_formated', 'dt_fired_formated')
-    list_select_related = ('user', 'shop', 'function_group')
-    list_filter = ('shop', 'user')
-    search_fields = ('user__first_name', 'user__last_name', 'shop__name', 'shop__parent__name', 'tabel_code')
-    raw_id_fields = ('shop', 'user', 'position')
+    list_display = ('id', 'shop', 'employee', 'function_group', 'dt_hired_formated', 'dt_fired_formated')
+    list_select_related = ('employee', 'employee__user', 'shop', 'function_group')
+    list_filter = ('shop', 'employee')
+    search_fields = ('employee__user__first_name', 'employee__user__last_name', 'shop__name', 'shop__parent__name', 'employee__tabel_code')
+    raw_id_fields = ('shop', 'employee', 'position')
+
     def dt_hired_formated(self, obj):
         return obj.dt_hired.strftime('%d.%m.%Y') if obj.dt_hired else '-'
     
@@ -200,11 +238,13 @@ class SAWHSettingsMappingInline(admin.StackedInline):
 
     filter_horizontal = ('shops', 'positions', 'exclude_positions')
 
+
 @admin.register(SAWHSettings)
 class SAWHSettingsAdmin(admin.ModelAdmin):
     list_display = (
         'name',
         'code',
+        'type',
     )
 
     inlines = (

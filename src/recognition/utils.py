@@ -68,9 +68,11 @@ def check_duplicate_biometrics(image, user: User, shop_id):
         active_employments = Employment.objects.get_active(
             dt_from=date.today(), 
             dt_to=date.today(),
-        )
-        employment1 = active_employments.filter(user=user).first() or Employment.objects.filter(user=user).order_by('-dttm_fired').first()
-        employment2 = active_employments.filter(user=user2).first() or Employment.objects.filter(user=user2).order_by('-dttm_fired').first()
+        ).select_related('employee')
+        employment1 = active_employments.filter(employee__user=user).first()\
+        or Employment.objects.filter(employee__user=user).select_related('employee').order_by('-dt_fired').first()
+        employment2 = active_employments.filter(employee__user=user2).first()\
+        or Employment.objects.filter(employee__user=user2).select_related('employee').order_by('-dt_fired').first()
         event_signal.send(
             sender=None,
             network_id=user.network_id,
@@ -82,7 +84,7 @@ def check_duplicate_biometrics(image, user: User, shop_id):
                 'fio2': f"{user2.last_name} {user2.first_name}",
                 'url1': settings.HOST + user.avatar.url,
                 'url2': settings.HOST + user2.avatar.url,
-                'tabel_code1': (employment1.tabel_code if employment1 else user.tabel_code) or user.username,
-                'tabel_code2': (employment2.tabel_code if employment2 else user2.tabel_code) or user2.username,
+                'tabel_code1': employment1.employee.tabel_code if employment1 else user.username,
+                'tabel_code2': employment2.employee.tabel_code if employment2 else user2.username,
             },
         )

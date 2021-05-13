@@ -58,7 +58,7 @@ class ZKTeco:
 
         url = 'person/add'
 
-        user = employment.user
+        user = employment.employee.user
 
         if not pin:
             if userexternalcode:

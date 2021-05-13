@@ -14,7 +14,7 @@ def fill_data_test(shop_ids, work_type_name, dt_start, dt_end, is_fact=False, is
     curr_data = WorkerDay.objects.filter(
         dt__gte=dt_start,
         dt__lte=dt_end,
-        worker_id__in=[e.user_id for e in employments],
+        employee_id__in=[e.employee_id for e in employments],
         is_fact=is_fact,
         is_approved=is_approved,
     )
@@ -38,7 +38,7 @@ def fill_data_test(shop_ids, work_type_name, dt_start, dt_end, is_fact=False, is
                 if not is_fact:
                     wd = WorkerDay.objects.create(
                         dt=empl_dt,
-                        worker_id=empl.user_id,
+                        employee_id=empl.employee_id,
                         employment=empl,
                         type=WorkerDay.TYPE_HOLIDAY,
                         shop_id=empl.shop_id,
@@ -50,7 +50,7 @@ def fill_data_test(shop_ids, work_type_name, dt_start, dt_end, is_fact=False, is
                     dt=empl_dt,
                     dttm_work_start=datetime.datetime.combine(empl_dt, datetime.time(10)),
                     dttm_work_end=datetime.datetime.combine(empl_dt, datetime.time(20)),
-                    worker_id=empl.user_id,
+                    employee_id=empl.employee_id,
                     employment=empl,
                     type=WorkerDay.TYPE_WORKDAY,
                     shop_id=empl.shop_id,

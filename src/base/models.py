@@ -127,6 +127,7 @@ class Network(AbstractActiveModel):
     consider_remaining_hours_in_prev_months_when_calc_norm_hours = models.BooleanField(
         default=False, verbose_name='Учитывать неотработанные часы за предыдущие месяца при расчете нормы часов',
     )
+    outsourcings = models.ManyToManyField('self', through='base.NetworkConnect', through_fields=('client', 'outsourcing'), symmetrical=False, related_name='clients')
 
     def get_department(self):
         return None
@@ -165,6 +166,15 @@ class Network(AbstractActiveModel):
 
     def __str__(self):
         return f'name: {self.name}, code: {self.code}'
+
+
+class NetworkConnect(AbstractActiveModel):
+    class Meta:
+        verbose_name = 'Связь сетей'
+        verbose_name_plural = 'Связи сетей'
+
+    client = models.ForeignKey(Network, related_name='outsourcing_connections', on_delete=models.PROTECT)
+    outsourcing = models.ForeignKey(Network, related_name='outsourcing_clients', on_delete=models.PROTECT)
 
 
 class Region(AbstractActiveNetworkSpecificCodeNamedModel):
@@ -401,11 +411,11 @@ class Shop(MPTTModel, AbstractActiveNetworkSpecificCodeNamedModel):
 
     @property
     def director_code(self):
-        return getattr(self.director, 'tabel_code', None)
+        return getattr(self.director, 'username', None)
 
     @director_code.setter
     def director_code(self, val):
-        self.director = User.objects.filter(tabel_code=val).first()
+        self.director = User.objects.filter(username=val).first()
 
     def _parse_times(self, attr):
         return {
@@ -624,15 +634,15 @@ class EmploymentManager(models.Manager):
         if network_id:
             q &= models.Q(
                 shop__network_id=network_id,
-                user__network_id=network_id,
+                employee__user__network_id=network_id,
             )
         qs = self.filter(q)
         return qs.filter(*args, **kwargs)
 
-    def get_active_empl_for_user(
-            self, network_id, user_id, dt=None, priority_shop_id=None, priority_employment_id=None,
-            priority_work_type_id=None):
-        qs = self.get_active(network_id, dt_from=dt, dt_to=dt, user_id=user_id)
+    def get_active_empl_by_priority(
+            self, network_id, dt=None, priority_shop_id=None, priority_employment_id=None,
+            priority_work_type_id=None, **kwargs):
+        qs = self.get_active(network_id, dt_from=dt, dt_to=dt, **kwargs)
 
         order_by = []
 
@@ -657,6 +667,7 @@ class EmploymentManager(models.Manager):
         order_by.append('-norm_work_hours')
 
         return qs.order_by(*order_by)
+
 
 
 class Group(AbstractActiveNetworkSpecificCodeNamedModel):
@@ -792,7 +803,7 @@ class User(DjangoAbstractUser, AbstractModel):
     avatar = models.ImageField(null=True, blank=True, upload_to='user_avatar/%Y/%m')
     phone_number = models.CharField(max_length=32, null=True, blank=True)
     access_token = models.CharField(max_length=64, blank=True, null=True)
-    tabel_code = models.CharField(blank=True, max_length=64, null=True, unique=True)
+    code = models.CharField(blank=True, max_length=64, null=True, unique=True)
     lang = models.CharField(max_length=2, default='ru')
     network = models.ForeignKey(Network, on_delete=models.PROTECT, null=True)
     black_list_symbol = models.CharField(max_length=128, null=True, blank=True)
@@ -823,14 +834,20 @@ class User(DjangoAbstractUser, AbstractModel):
     def fio(self):
         return self.get_fio()
 
-    def get_active_employments(self, network, shop=None):
-        kwargs = {'network_id': network.id}
+    def get_active_employments(self, shop=None):
+        kwargs = {
+            'employee__user__network_id': self.network_id,
+            'shop__network_id': self.network_id,
+        }
         if shop:
             kwargs['shop__in'] = shop.get_ancestors(include_self=True)
-        return self.employments.get_active(**kwargs)
+        return Employment.objects.filter(
+            employee__user=self,
+            **kwargs,
+        )
 
-    def get_group_ids(self, network, shop=None):
-        return self.get_active_employments(network, shop).annotate(
+    def get_group_ids(self, shop=None):
+        return self.get_active_employments(shop=shop).annotate(
             group_id=Coalesce(F('function_group_id'), F('position__group_id')),
         ).values_list('group_id', flat=True)
 
@@ -892,12 +909,12 @@ class WorkerPosition(AbstractActiveNetworkSpecificCodeNamedModel):
                 self.default_work_type_names.set(
                     WorkTypeName.objects.filter(network=self.network, code__in=default_work_type_names_codes))
 
-    def save(self, *args, **kwargs):
+    def save(self, *args, force_set_defaults=False, **kwargs):
         is_new = self.id is None
-        if is_new:
+        if is_new or force_set_defaults:
             self._set_plain_defaults()
         res = super(WorkerPosition, self).save(*args, **kwargs)
-        if is_new:
+        if is_new or force_set_defaults:
             self._set_m2m_defaults()
         return res
 
@@ -933,21 +950,37 @@ class EmploymentQuerySet(QuerySet):
             ))
 
 
+class Employee(AbstractModel):
+    code = models.CharField(max_length=128, null=True, blank=True, unique=True)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="employees")
+    tabel_code = models.CharField(max_length=64, null=True, blank=True)
+
+    class Meta:
+        verbose_name = 'Сотрудник'
+        verbose_name_plural = 'Сотрудники'
+        unique_together = (
+            ('tabel_code', 'user'),
+        )
+
+    def __str__(self):
+        s = self.user.fio
+        if self.tabel_code:
+            s += f' ({self.tabel_code})'
+        return s
+
+
 class Employment(AbstractActiveModel):
     class Meta:
         verbose_name = 'Трудоустройство'
         verbose_name_plural = 'Трудоустройства'
-        unique_together = (
-            ('code', 'network'),
-        )
 
     def __str__(self):
-        return '{}, {}, {}'.format(self.id, self.shop, self.user)
+        return '{}, {}, {}'.format(self.id, self.shop, self.employee)
 
     id = models.BigAutoField(primary_key=True)
-    code = models.CharField(max_length=128, null=True, blank=True)
-    network = models.ForeignKey('base.Network', on_delete=models.PROTECT, null=True)
-    user = models.ForeignKey(User, on_delete=models.PROTECT, related_name="employments")
+    code = models.CharField(max_length=128, null=True, blank=True, unique=True)
+    employee = models.ForeignKey(
+        'base.Employee', on_delete=models.CASCADE, related_name="employments")
     shop = models.ForeignKey(Shop, on_delete=models.PROTECT, related_name="employments")
     function_group = models.ForeignKey(Group, on_delete=models.PROTECT, blank=True, null=True, related_name="employments")
     dt_to_function_group = models.DateField(verbose_name='Дата до которой действуют права function_group', null=True, blank=True)
@@ -969,7 +1002,6 @@ class Employment(AbstractActiveModel):
 
     auto_timetable = models.BooleanField(default=True)
 
-    tabel_code = models.CharField(max_length=64, null=True, blank=True)
     is_ready_for_overworkings = models.BooleanField(default=False)
 
     dt_new_week_availability_from = models.DateField(null=True, blank=True)
@@ -993,7 +1025,7 @@ class Employment(AbstractActiveModel):
         return self.shop
 
     def get_short_fio_and_position(self):
-        short_fio_and_position = f'{self.user.get_short_fio()}'
+        short_fio_and_position = f'{self.employee.user.get_short_fio()}'
         if self.position and self.position.name:
             short_fio_and_position += f', {self.position.name}'
 
@@ -1005,7 +1037,7 @@ class Employment(AbstractActiveModel):
         with transaction.atomic():
             wdays_ids = list(WorkerDay.objects.filter(employment=self).values_list('id', flat=True))
             WorkerDay.objects.filter(employment=self).update(employment_id=None)
-            if self.user.network.clean_wdays_on_employment_dt_change:
+            if self.employee.user.network.clean_wdays_on_employment_dt_change:
                 transaction.on_commit(lambda: clean_wdays.delay(
                     only_logging=False,
                     filter_kwargs=dict(
@@ -1033,7 +1065,8 @@ class Employment(AbstractActiveModel):
         if hasattr(self, 'shop_code'):
             self.shop = Shop.objects.get(code=self.shop_code)
         if hasattr(self, 'username'):
-            self.user = User.objects.get(username=self.username)
+            self.employee, _employee_created = Employee.objects.get_or_create(
+                user=User.objects.get(username=self.username), tabel_code=self.tabel_code)
         if hasattr(self, 'position_code'):
             self.position = WorkerPosition.objects.get(code=self.position_code)
 
@@ -1080,7 +1113,7 @@ class Employment(AbstractActiveModel):
                 wd.save()
 
         if (is_new or (self.tracker.has_changed('dt_hired') or self.tracker.has_changed('dt_fired'))) and \
-                self.network and self.network.clean_wdays_on_employment_dt_change:
+                self.employee.user.network and self.employee.user.network.clean_wdays_on_employment_dt_change:
             from src.timetable.worker_day.tasks import clean_wdays
             from src.timetable.models import WorkerDay
             from src.util.models_converter import Converter
@@ -1091,7 +1124,7 @@ class Employment(AbstractActiveModel):
             if is_new:
                 kwargs['filter_kwargs'] = {
                     'type': WorkerDay.TYPE_WORKDAY,
-                    'worker_id': self.user_id,
+                    'employee_id': self.employee_id,
                 }
                 if self.dt_hired:
                     kwargs['filter_kwargs']['dt__gte'] = Converter.convert_date(self.dt_hired)
@@ -1105,13 +1138,17 @@ class Employment(AbstractActiveModel):
                     dt__gte = self.dt_hired
                 kwargs['filter_kwargs'] = {
                     'type': WorkerDay.TYPE_WORKDAY,
-                    'worker_id': self.user_id,
+                    'employee_id': self.employee_id,
                     'dt__gte': Converter.convert_date(dt__gte),
                 }
 
             clean_wdays.apply_async(kwargs=kwargs)
 
         return res
+
+    def is_active(self, dt=None):
+        dt = dt or timezone.now().date()
+        return (self.dt_hired is None or self.dt_hired <= dt) and (self.dt_fired is None or self.dt_fired >= dt)
 
 
 class FunctionGroup(AbstractModel):
@@ -1138,6 +1175,7 @@ class FunctionGroup(AbstractModel):
         'AuthUserView',
         'Break',
         'Employment',
+        'Employee',
         'Employment_auto_timetable',
         'Employment_timetable',
         'EmploymentWorkType',
@@ -1167,6 +1205,7 @@ class FunctionGroup(AbstractModel):
         'Shop',
         'Shop_stat',
         'Shop_tree',
+        'Shop_outsource_tree',
         'Subscribe',
         'TickPoint',
         'User',
@@ -1399,12 +1438,22 @@ def current_year():
 class SAWHSettings(AbstractActiveNetworkSpecificCodeNamedModel):
     """
     Настройки суммированного учета рабочего времени.
-    Модель нужна для распределения часов по месяцам в рамках учетного периода при автосоставлении.
+    Модель нужна для распределения часов по месяцам в рамках учетного периода.
     """
+
+    PART_OF_PROD_CAL_SUMM = 1
+    FIXED_HOURS = 2
+
+    SAWH_SETTINGS_TYPES = (
+        (PART_OF_PROD_CAL_SUMM, 'Доля от суммы часов по произв. календарю в рамках уч. периода'),
+        (FIXED_HOURS, 'Фикс. кол-во часов в месяц'),
+    )
 
     work_hours_by_months = JSONField(
         verbose_name='Настройки по распределению часов в рамках уч. периода',
     )  # Название ключей должно начинаться с m (например январь -- m1), чтобы можно было фильтровать через django orm
+    type = models.PositiveSmallIntegerField(
+        default=PART_OF_PROD_CAL_SUMM, choices=SAWH_SETTINGS_TYPES, verbose_name='Тип расчета')
 
     class Meta:
         verbose_name = 'Настройки суммированного учета рабочего времени'

@@ -5,7 +5,7 @@ from rest_framework.test import APITestCase
 from src.recognition.models import Tick
 from src.util.mixins.tests import TestsHelperMixin
 from src.timetable.models import WorkerDay, AttendanceRecords
-from datetime import date, timedelta
+from datetime import date, timedelta, datetime, time
 
 
 @override_settings(TRUST_TICK_REQUEST=True)
@@ -16,11 +16,13 @@ class TestTicksViewSet(TestsHelperMixin, APITestCase):
         WorkerDay.objects.create(
             dt=date.today(),
             type=WorkerDay.TYPE_WORKDAY,
-            worker=cls.user2,
+            employee=cls.employee2,
             employment=cls.employment2,
             shop=cls.shop2,
             is_approved=True,
             is_vacancy=True,
+            dttm_work_start=datetime.combine(date.today(), time(10)),
+            dttm_work_end=datetime.combine(date.today(), time(20)),
         )
 
     def setUp(self):
@@ -29,14 +31,14 @@ class TestTicksViewSet(TestsHelperMixin, APITestCase):
     def test_create_and_update_and_list_ticks(self):
         resp_coming = self.client.post(
             self.get_url('Tick-list'),
-            data=self.dump_data({'type': Tick.TYPE_COMING, 'shop_code': self.shop2.code}),
+            data=self.dump_data({'type': Tick.TYPE_COMING, 'shop_code': self.shop2.code, 'employee_id': self.employee2.id}),
             content_type='application/json',
         )
         self.assertEqual(resp_coming.status_code, status.HTTP_200_OK)
 
         resp_leaving = self.client.post(
             self.get_url('Tick-list'),
-            data=self.dump_data({'type': Tick.TYPE_LEAVING, 'shop_code': self.shop2.code}),
+            data=self.dump_data({'type': Tick.TYPE_LEAVING, 'shop_code': self.shop2.code, 'employee_id': self.employee2.id}),
             content_type='application/json',
         )
         self.assertEqual(resp_leaving.status_code, status.HTTP_200_OK)
@@ -60,6 +62,7 @@ class TestTicksViewSet(TestsHelperMixin, APITestCase):
                 'shop_code': self.shop2.code,
                 'lat': user_lat,
                 'lon': user_lon,
+                'employee_id': self.employee2.id,
             }),
             content_type='application/json',
         )
@@ -83,7 +86,7 @@ class TestTicksViewSet(TestsHelperMixin, APITestCase):
         with override_settings(USERS_WITH_ACTIVE_EMPLOYEE_OR_VACANCY_ONLY=True):
             resp_coming = self.client.post(
                 self.get_url('Tick-list'),
-                data=self.dump_data({'type': Tick.TYPE_COMING, 'shop_code': self.shop.code}),
+                data=self.dump_data({'type': Tick.TYPE_COMING, 'shop_code': self.shop.code, 'employee_id': self.employee2.id}),
                 content_type='application/json',
             )
         self.assertEqual(resp_coming.status_code, status.HTTP_400_BAD_REQUEST)
@@ -102,7 +105,7 @@ class TestTicksViewSet(TestsHelperMixin, APITestCase):
         with override_settings(USERS_WITH_ACTIVE_EMPLOYEE_OR_VACANCY_ONLY=True):
             resp_coming = self.client.post(
                 self.get_url('Tick-list'),
-                data=self.dump_data({'type': Tick.TYPE_COMING, 'shop_code': self.shop.code}),
+                data=self.dump_data({'type': Tick.TYPE_COMING, 'shop_code': self.shop.code, 'employee_id': self.employee2.id}),
                 content_type='application/json',
             )
         self.assertEqual(resp_coming.status_code, status.HTTP_400_BAD_REQUEST)
@@ -118,7 +121,7 @@ class TestTicksViewSet(TestsHelperMixin, APITestCase):
     def test_create_and_update_tick_no_type(self):
         resp_no_type = self.client.post(
             self.get_url('Tick-list'),
-            data=self.dump_data({'type': Tick.TYPE_NO_TYPE, 'shop_code': self.shop.code}),
+            data=self.dump_data({'type': Tick.TYPE_NO_TYPE, 'shop_code': self.shop.code, 'employee_id': self.employee2.id}),
             content_type='application/json',
         )
 
@@ -131,7 +134,7 @@ class TestTicksViewSet(TestsHelperMixin, APITestCase):
 
         resp_comming = self.client.put(
             self.get_url('Tick-detail', pk=resp_no_type.json()['id']),
-            data=self.dump_data({'type': Tick.TYPE_COMING, 'shop_code': self.shop2.code}),
+            data=self.dump_data({'type': Tick.TYPE_COMING, 'shop_code': self.shop2.code, 'employee_id': self.employee2.id}),
             content_type='application/json',
         )
 
@@ -147,7 +150,7 @@ class TestTicksViewSet(TestsHelperMixin, APITestCase):
 
         resp_leaving = self.client.put(
             self.get_url('Tick-detail', pk=resp_no_type.json()['id']),
-            data=self.dump_data({'type': Tick.TYPE_LEAVING, 'shop_code': self.shop2.code}),
+            data=self.dump_data({'type': Tick.TYPE_LEAVING, 'shop_code': self.shop2.code, 'employee_id': self.employee2.id}),
             content_type='application/json',
         )
 

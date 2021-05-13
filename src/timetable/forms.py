@@ -1,14 +1,14 @@
 from django import forms
 from django.db.models import Q
 from datetime import date, timedelta
-from src.base.models import User, Shop, Employment
+from src.base.models import User, Shop, Employment, Employee
 from src.timetable.worker_day.tasks import recalc_wdays
 from django.contrib.admin.widgets import AdminDateWidget, FilteredSelectMultiple
 
 
 
 def get_users():
-    user_ids = Employment.objects.get_active().values_list('user_id', flat=True)
+    user_ids = Employment.objects.get_active().values_list('employee__user_id', flat=True)
     return User.objects.filter(id__in=user_ids)
 
 def get_shops():

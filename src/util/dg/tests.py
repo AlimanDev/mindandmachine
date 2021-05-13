@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 from django.test import TestCase
 from django.db.models import Q
 
-from src.base.models import Employment
+from src.base.models import Employment, Employee
 from src.timetable.models import WorkTypeName, WorkType, WorkerDay
 from src.util.dg.tabel import T13TabelDataGetter, MtsTabelDataGetter
 from src.util.mixins.tests import TestsHelperMixin
@@ -20,18 +20,23 @@ class TestGenerateTabel(TestsHelperMixin, TestCase):
         for e in Employment.objects.all():
             e.tabel_code = f'A000{e.id}'
             e.save()
-        cls.second_empl = Employment.objects.create(
-            network=cls.network,
-            code=f'{cls.user2.username}:{uuid.uuid4()}:{uuid.uuid4()}',
+        for e in Employee.objects.all():
+            e.tabel_code = f'A000{e.id}'
+            e.save()
+        cls.seconds_employee = Employee.objects.create(
+            tabel_code='A00001234',
             user=cls.user2,
+        )
+        cls.dt_from = cls.dt_now.replace(day=1)
+        cls.second_empl = Employment.objects.create(
+            code=f'{cls.user2.username}:{uuid.uuid4()}:{uuid.uuid4()}',
+            employee=cls.seconds_employee,
             shop=cls.shop,
             function_group=cls.employee_group,
-            dt_hired=cls.dt_now,
+            dt_hired=cls.dt_from,
             salary=100,
-            tabel_code='A00001234',
         )
         _weekday, days_in_month = monthrange(cls.dt_now.year, cls.dt_now.month)
-        cls.dt_from = cls.dt_now.replace(day=1)
         cls.dt_to = cls.dt_now.replace(day=days_in_month)
         cls.work_type_name = WorkTypeName.objects.create(name='Консультант')
         cls.work_type_name2 = WorkTypeName.objects.create(name='Кассир')
@@ -57,7 +62,7 @@ class TestGenerateTabel(TestsHelperMixin, TestCase):
             wdays = WorkerDay.objects.filter(
                 shop__code=shop_code,
                 dt=dt,
-                employment__tabel_code=tabel_code,
+                employee__tabel_code=tabel_code,
                 is_approved=True,
             )
             fact = wdays.filter(is_fact=True).first()
@@ -72,17 +77,15 @@ class TestGenerateTabel(TestsHelperMixin, TestCase):
             else:
                 self.assertIsNotNone(plan)
                 self.assertEqual(plan.work_hours, timedelta(seconds=plan_h * 3600))
-        self.second_empl.dt_fired = self.dt_from + timedelta(10)
+        self.second_empl.dt_fired = self.dt_from + timedelta(1)
         self.second_empl.save()
         Employment.objects.create(
-            network=self.network,
             code=f'{self.user2.username}:{uuid.uuid4()}:{uuid.uuid4()}',
-            user=self.user2,
+            employee=self.seconds_employee,
             shop=self.shop,
             function_group=self.employee_group,
-            dt_hired=self.dt_from + timedelta(12),
+            dt_hired=self.dt_from + timedelta(2),
             salary=100,
-            tabel_code='A00001234',
         )
         g = MtsTabelDataGetter(shop=self.shop, dt_from=self.dt_from, dt_to=self.dt_to)
         second_data = g.get_data()
@@ -100,7 +103,7 @@ class TestGenerateTabel(TestsHelperMixin, TestCase):
             first_half_month_whours = 0
             second_half_month_wdays = 0
             second_half_month_whours = 0
-            worker = Employment.objects.get(tabel_code=tabel_code).user
+            employee = Employee.objects.get(tabel_code=tabel_code)
             for day_code, values in user['days'].items():
                 dt = dt_first + timedelta(int(day_code.replace('d', '')))
                 if dt > self.dt_to:
@@ -109,7 +112,7 @@ class TestGenerateTabel(TestsHelperMixin, TestCase):
                     self.assertIsNone(
                         WorkerDay.objects.filter(
                             Q(is_fact=True) | Q(type=WorkerDay.TYPE_HOLIDAY),
-                            Q(worker=worker) & (Q(employment__tabel_code=tabel_code) | Q(employment__isnull=True)),
+                            Q(employee=employee),
                             dt=dt, 
                             is_approved=True,
                         ).first()
@@ -119,7 +122,7 @@ class TestGenerateTabel(TestsHelperMixin, TestCase):
                 fact_filter = {}
                 if type == WorkerDay.TYPE_WORKDAY:
                     fact_filter['is_fact'] = True
-                wd = WorkerDay.objects.filter(dt=dt, type=type, worker=worker, is_approved=True, **fact_filter).first()
+                wd = WorkerDay.objects.filter(dt=dt, type=type, employee=employee, is_approved=True, **fact_filter).first()
                 self.assertIsNotNone(wd)
                 if wd.type == WorkerDay.TYPE_WORKDAY:
                     self.assertEqual(wd.rounded_work_hours, values['value'])
@@ -144,14 +147,12 @@ class TestGenerateTabel(TestsHelperMixin, TestCase):
         self.second_empl.dt_fired = self.dt_from + timedelta(10)
         self.second_empl.save()
         Employment.objects.create(
-            network=self.network,
             code=f'{self.user2.username}:{uuid.uuid4()}:{uuid.uuid4()}',
-            user=self.user2,
+            employee=self.seconds_employee,
             shop=self.shop,
             function_group=self.employee_group,
             dt_hired=self.dt_from + timedelta(12),
             salary=100,
-            tabel_code='A00001234',
         )
         g = T13TabelDataGetter(shop=self.shop, dt_from=self.dt_from, dt_to=self.dt_to)
         data = g.get_data()

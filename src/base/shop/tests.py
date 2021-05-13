@@ -8,7 +8,7 @@ from django.db import transaction
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from src.base.models import Shop, ShopSchedule
+from src.base.models import Shop, ShopSchedule, NetworkConnect, Network
 from src.forecast.tests.factories import LoadTemplateFactory
 from src.timetable.models import ShopMonthStat
 from src.util.mixins.tests import TestsHelperMixin
@@ -212,6 +212,7 @@ class TestDepartment(TestsHelperMixin, APITestCase):
         data['longitude'] = None
         data['distance'] = None
         data['email'] = None
+        data.pop('director_code')
         data.pop('nonstandard_schedule')
         self.assertDictEqual(shop, data)
 
@@ -259,13 +260,13 @@ class TestDepartment(TestsHelperMixin, APITestCase):
         shop = response.json()
         data['id'] = shop['id']
         data['director_id'] = None
-        data['director_code'] = None
         data['area'] = 0.0
         data['load_template_id'] = None
         data['exchange_settings_id'] = None
         data['distance'] = None
         data['load_template_status'] = 'R'
         data.pop('nonstandard_schedule')
+        data.pop('director_code')
         self.assertEqual(shop, data)
         self.assertIsNotNone(Shop.objects.get(id=shop['id']).dttm_deleted)
 
@@ -553,3 +554,34 @@ class TestDepartment(TestsHelperMixin, APITestCase):
         self.assertEqual(shop.longitude, Decimal('82.9102479'))
         self.assertEqual(shop.address, 'г Новосибирск, ул Ленина, д 15')
         self.assertEqual(shop.timezone.zone, 'Asia/Novosibirsk')
+
+    def test_get_outsource_shops_tree(self):
+        def _create_shop(name, network, parent=None):
+            return Shop.objects.create(
+                name=name,
+                region=self.region,
+                network=network,
+                parent=parent,
+            )
+        def _create_network_and_shops(name, count_of_shops):
+            network = Network.objects.create(
+                name=name,
+            )
+            root_shop = _create_shop(name, network)
+            shops = []
+            for i in range(count_of_shops):
+                shops.append(_create_shop(f'{name}_магазин{i+1}', network, root_shop))
+            return network, root_shop, shops
+        client_network1, client1_root_shop, client1_shops = _create_network_and_shops('Клиент1', 2)
+        client_network2, client2_root_shop, client2_shops = _create_network_and_shops('Клиент2', 1)
+        client_network3, client3_root_shop, client3_shops = _create_network_and_shops('Клиент3', 3)
+        NetworkConnect.objects.create(client=client_network1, outsourcing=self.network)
+        NetworkConnect.objects.create(client=client_network2, outsourcing=self.network)
+
+        response = self.client.get(self.url + 'outsource_tree/')
+        response = response.json()
+        self.assertEqual(len(response), 2)
+        self.assertEqual(response[0]['label'], 'Клиент1')
+        self.assertEqual(len(response[0]['children']), 2)
+        self.assertEqual(response[1]['label'], 'Клиент2')
+        self.assertEqual(len(response[1]['children']), 1)

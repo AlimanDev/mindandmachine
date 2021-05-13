@@ -84,7 +84,7 @@ class TickMinLivenessFilter(RangeNumericFilter):
 
 @admin.register(Tick)
 class TickAdmin(admin.ModelAdmin):
-    raw_id_fields = ("user", "tick_point")
+    raw_id_fields = ("user", "tick_point", 'employee')
     list_display = [
         'id',
         'type',

@@ -9,7 +9,7 @@ from django.http.response import HttpResponse
 
 
 def get_users():
-    user_ids = Employment.objects.get_active().values_list('user_id', flat=True)
+    user_ids = Employment.objects.get_active().values_list('employee__user_id', flat=True)
     return User.objects.filter(id__in=user_ids)
 
 def get_shops():

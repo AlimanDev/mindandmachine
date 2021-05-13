@@ -42,7 +42,7 @@ class WorkerDayFactory(factory.django.DjangoModelFactory):
     dttm_work_end = factory.LazyAttribute(
         lambda wd: datetime.combine(wd.dt, time(20, 0, 0)) if WorkerDay.is_type_with_tm_range(wd.type) else None
     )
-    worker = factory.SubFactory('src.base.tests.factories.UserFactory')
+    employee = factory.SubFactory('src.base.tests.factories.EmployeeFactory')
     type = factory.LazyFunction(lambda: random.choice(WorkerDay.TYPES_USED))
 
     class Meta:

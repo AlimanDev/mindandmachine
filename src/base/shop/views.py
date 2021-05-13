@@ -11,9 +11,10 @@ from rest_framework.response import Response
 from rest_framework import serializers
 
 from src.base.filters import BaseActiveNamedModelFilter
-from src.base.models import Employment, Shop, Region
+from src.base.models import Employment, Shop, Region, NetworkConnect
 from src.base.permissions import Permission
 from src.base.shop.serializers import ShopSerializer, ShopStatSerializer, serialize_shop
+from src.base.shop.utils import get_tree
 from src.base.views_abstract import UpdateorCreateViewSet
 from src.util.openapi.responses import shop_tree_response_schema_dict as tree_response_schema_dict
 
@@ -21,10 +22,11 @@ from src.util.openapi.responses import shop_tree_response_schema_dict as tree_re
 class ShopFilter(BaseActiveNamedModelFilter):
     id = NumberFilter(field_name='id', lookup_expr='exact')
     ordering = OrderingFilter(fields=('name', 'code'))
+
     class Meta:
         model = Shop
         fields = {
-            'load_template_id': ['exact',],
+            'load_template_id': ['exact'],
             'load_template_status': ['exact'],
         }
 
@@ -91,6 +93,8 @@ class ShopViewSet(UpdateorCreateViewSet):
         """
         user = self.request.user
         only_top = self.request.query_params.get('only_top')
+        include_clients = self.request.query_params.get('include_clients')
+        include_outsources = self.request.query_params.get('include_outsources')
 
         # aa: fixme: refactor code
         # employments = Employment.objects.get_active(
@@ -99,8 +103,17 @@ class ShopViewSet(UpdateorCreateViewSet):
         # shops = Shop.objects.filter(id__in=employments.values('shop_id'))
         # if not only_top:
         #     shops = Shop.objects.get_queryset_descendants(shops, include_self=True)
+        shops = Shop.objects.all()
+        if include_clients:
+            clients = NetworkConnect.objects.filter(outsourcing_id=user.network_id).values_list('client_id', flat=True)
+            shops = shops.filter(Q(network_id__in=clients) | Q(network_id=user.network_id))
+        if include_outsources:
+            outsources = NetworkConnect.objects.filter(client_id=user.network_id).values_list('outsourcing_id', flat=True)
+            shops = shops.filter(Q(network_id__in=outsources) | Q(network_id=user.network_id))
+        if not (include_outsources or include_clients):
+            shops = shops.filter(network_id=user.network_id)
 
-        return Shop.objects.filter(network_id=user.network_id).order_by('level', 'name')
+        return shops.order_by('level', 'name')
 
     @action(detail=False, methods=['get'], serializer_class=ShopStatSerializer)#, permission_classes=[IsAdminOrIsSelf])
     def stat(self, request):
@@ -148,7 +161,7 @@ class ShopViewSet(UpdateorCreateViewSet):
         # aa: fixme: refactor code
         employments = Employment.objects.get_active(
             network_id=user.network_id,
-            user=user,
+            employee__user=user,
         )
 
         shops = self.filter_queryset(self.get_queryset())
@@ -161,63 +174,20 @@ class ShopViewSet(UpdateorCreateViewSet):
                 Q(dt_closed__gte=now.today() - datetime.timedelta(days=30)),
             ).order_by('level', 'name')
 
-        tree = []
-        parent_indexes = {}
-        for shop in shops:
-            if not shop.parent_id in parent_indexes:
-                tree.append({
-                    "id": shop.id,
-                    "label": shop.name,
-                    "tm_open_dict": shop.open_times,
-                    "tm_close_dict" :shop.close_times,
-                    "address": shop.address,
-                    "forecast_step_minutes":shop.forecast_step_minutes,
-                    "children": []
-                })
-                parent_indexes[shop.id] = [len(tree) - 1,]
-            else:
-                root = tree[parent_indexes[shop.parent_id][0]]
-                parent = root
-                for i in parent_indexes[shop.parent_id][1:]:
-                    parent = parent['children'][i]
-                parent['children'].append({
-                    "id": shop.id,
-                    "label": shop.name,
-                    "tm_open_dict": shop.open_times,
-                    "tm_close_dict" :shop.close_times,
-                    "address": shop.address,
-                    "forecast_step_minutes":shop.forecast_step_minutes,
-                    "children": []
-                })
-                parent_indexes[shop.id] = parent_indexes[shop.parent_id].copy()
-                parent_indexes[shop.id].append(len(parent['children']) - 1)
-        # tree = []
-        # ids = []
-        # elems = []
-        # for shop in shops:
-        #     parent_id = shop.parent_id
-        #     if parent_id in ids:
-        #         for i, elem in enumerate(elems):
-        #             if elem['id'] == parent_id:
-        #                 ids = ids[0:i+1]
-        #                 elems = elems[0:i+1]
-        #                 child_list = elem["children"]
-        #     else:
-        #         ids = []
-        #         elems = []
-        #         child_list = tree
+        return Response(get_tree(shops))
 
-        #     child_list.append({
-        #         "id": shop.id,
-        #         "label": shop.name,
-        #         "tm_open_dict": shop.open_times,
-        #         "tm_close_dict" :shop.close_times,
-        #         "address": shop.address,
-        #         "forecast_step_minutes":shop.forecast_step_minutes,
-        #         "children": []
-        #     })
+    @swagger_auto_schema(responses=tree_response_schema_dict)
+    @action(detail=False, methods=['get'])
+    def outsource_tree(self, request):
+        """
+        Дерево магазинов клиентов для аутсорсинговой компании в формате для Quasar
+        :param request:
+        :return:
+        """
+        user = self.request.user
+        clients = NetworkConnect.objects.filter(outsourcing_id=user.network_id).values_list('client_id', flat=True)
+        shops = self.filter_queryset(
+            Shop.objects.filter(network_id__in=clients).order_by('level', 'name')
+        )
 
-        #     elems.append(child_list[-1])
-        #     ids.append(shop.id)
-
-        return Response(tree)
+        return Response(get_tree(shops))

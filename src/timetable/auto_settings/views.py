@@ -18,7 +18,7 @@ from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError, AuthenticationFailed
 from rest_framework.response import Response
 
-from src.base.models import Shop, Employment, User, ProductionDay, ShopSettings, WorkerPosition
+from src.base.models import Shop, Employment, User, ProductionDay, ShopSettings, WorkerPosition, Employee
 from src.base.permissions import Permission
 from src.timetable.vacancy.tasks import create_shop_vacancies_and_notify, cancel_shop_vacancies
 from src.forecast.models import PeriodClients
@@ -308,21 +308,20 @@ class AutoSettingsViewSet(viewsets.ViewSet):
             dt_to=dt_to,
             shop_id=shop_id,
             # auto_timetable=True, чтобы все сотрудники были, так как пересоставляем иногда для 1
-        ).select_related('user', 'position')
+        ).select_related('employee__user', 'position')
 
-        user_ids = employments.values_list('user_id', flat=True)
+        employee_ids = employments.values_list('employee_id', flat=True)
 
         worker_stats_cls = WorkersStatsGetter(
             shop_id=shop_id,
             dt_from=dt_from,
             dt_to=dt_to,
-            worker_id__in=list(user_ids),
+            employee_id__in=list(employee_ids),
         )
         stats = worker_stats_cls.run()
 
-        users = User.objects.filter(id__in=user_ids)
-        user_dict = {u.id: u for u in users}
-
+        employees = Employee.objects.filter(id__in=employee_ids)
+        employees_dict = {e.id: e for e in employees}
 
         period_step = shop.forecast_step_minutes.hour * 60 + shop.forecast_step_minutes.minute
 
@@ -392,17 +391,17 @@ class AutoSettingsViewSet(viewsets.ViewSet):
         availabilities = {}
         for user_weekday_slot in list(UserWeekdaySlot.objects.select_related('worker', 'employment').filter(
                 employment__shop_id=shop_id)):
-            key = user_weekday_slot.worker_id
+            key = user_weekday_slot.employee_id
             if key not in availabilities:
                 availabilities[key] = []
             availabilities[key].append(user_weekday_slot)
         for employment in employments:
-            user_id = employment.user_id
-            user = user_dict[user_id]
+            employee_id = employment.employee_id
+            employee = employees_dict[employee_id]
             if employment.is_fixed_hours:
-                availability_info = availabilities.get(user_id, [])
+                availability_info = availabilities.get(employee_id, [])
                 if not (len(availability_info)):
-                    print(f'Warning! User {user_id} {user.last_name} {user.first_name} with fixed hours, '
+                    print(f'Warning! User {employee.user_id} {employee.user.last_name} {employee.user.first_name} with fixed hours, '
                           f'but he does not have a set of shifts he can work on!'.encode('utf-8'))
                 mask = [0 for _ in range(len(availability_info))]
                 for info_day in availability_info:
@@ -410,7 +409,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
                 if mask.count(1) != len(mask):
                     tt.delete()
                     raise ValidationError(self.error_messages['tt_user_extra_shifts'].format(
-                        id=user.id,last_name=user.last_name,first_name=user.first_name))
+                        id=employee.user.id, last_name=employee.user.last_name, first_name=employee.user.first_name))
 
 
         ##################################################################
@@ -430,7 +429,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
                     type=wd['type'],
                     dttm_added=wd['dttm_added'],
                     dt=wd['dt'],
-                    worker_id=wd['worker_id'],
+                    employee_id=wd['employee_id'],
                     dttm_work_start=wd['dttm_work_start'],
                     dttm_work_end=wd['dttm_work_end'],
                     created_by_id=wd['created_by_id'],
@@ -444,20 +443,20 @@ class AutoSettingsViewSet(viewsets.ViewSet):
         if form['use_not_approved']:
             new_worker_days_filter['is_approved'] = False
         worker_days_db = WorkerDay.objects.get_last_plan(
-            worker_id__in=user_ids,
+            employee_id__in=employee_ids,
             dt__gte=dt_from,
             dt__lte=dt_to,
             **new_worker_days_filter,
         ).exclude(
             type=WorkerDay.TYPE_EMPTY,
         ).order_by(
-            'dt', 'worker_id'
+            'dt', 'employee_id'
         ).values(
             'id',
             'type',
             'dttm_added',
             'dt',
-            'worker_id',
+            'employee_id',
             'dttm_work_start',
             'dttm_work_end',
             'work_types__id',
@@ -468,7 +467,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
 
         prev_worker_days = []
         worker_days_db = WorkerDay.objects.get_last_plan(
-            worker_id__in=user_ids,
+            employee_id__in=employee_ids,
             dt__gte=dt_from - timedelta(days=7),
             dt__lt=dt_from, # не должны попадать дни за начало периода
             **new_worker_days_filter,
@@ -481,7 +480,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
             'type',
             'dttm_added',
             'dt',
-            'worker_id',
+            'employee_id',
             'dttm_work_start',
             'dttm_work_end',
             'work_types__id',
@@ -532,7 +531,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
         constraints = {}
         for worker_constraint in list(WorkerConstraint.objects.select_related('employment').filter(
                 employment__in=employments)):
-            key = worker_constraint.worker_id
+            key = worker_constraint.employment_id  # TODO: покрыть тестами
             if key not in constraints:
                 constraints[key] = []
             constraints[key].append(worker_constraint)
@@ -557,7 +556,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
                     (EmploymentWorkType.objects.select_related('employment').filter(work_type_id__in=need_work_types,
                                                                                     employment__in=employments,
                                                                                     is_active=True)):
-            key = worker_cashbox_inf.employment.user_id
+            key = worker_cashbox_inf.employment.employee_id
             if key not in worker_cashbox_info:
                 worker_cashbox_info[key] = []
             worker_cashbox_info[key].append(worker_cashbox_inf)
@@ -565,7 +564,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
         # Уже составленное расписание
         worker_day = {}
         for worker_d in new_worker_days:
-            key = worker_d.worker_id
+            key = worker_d.employee_id
             if key not in worker_day:
                 worker_day[key] = []
             # дни отработанные в других отделах
@@ -576,7 +575,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
         # Расписание за прошлую неделю от даты составления
         prev_data = {}
         for worker_d in prev_worker_days:
-            key = worker_d.worker_id
+            key = worker_d.employee_id
             if key not in prev_data:
                 prev_data[key] = []
             prev_data[key].append(worker_d)
@@ -592,7 +591,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
         if shop.settings.paired_weekday:
             for employment in employments:
                 coupled_weekdays = 0
-                month_info = prev_data.get(employment.user_id, [])
+                month_info = prev_data.get(employment.employee_id, [])
                 for day in range(len(month_info) - 1):
                     day_info = month_info[day]
                     if day_info.dt.weekday() == 5 and day_info.type in resting_states_list:
@@ -607,7 +606,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
         for employment in employments:
             # Для уволенных сотрудников
             if employment.dt_fired:
-                workers_month_days = worker_day.get(employment.user_id,
+                workers_month_days = worker_day.get(employment.employee_id,
                                                     [])  # Может случиться так что для этого работника еще никаким образом расписание не составлялось
                 workers_month_days.sort(key=lambda wd: wd.dt)
                 workers_month_days_new = []
@@ -624,16 +623,16 @@ class AutoSettingsViewSet(viewsets.ViewSet):
                         workers_month_days_new.append(WorkerDay(
                             type=WorkerDay.TYPE_HOLIDAY,
                             dt=dt,
-                            worker_id=employment.user_id,
+                            employee_id=employment.employee_id,
                         )
                         )
-                worker_day[employment.user_id] = workers_month_days_new
+                worker_day[employment.employee_id] = workers_month_days_new
                 # Если для сотрудника не составляем расписание, его все равно нужно учитывать, так как он покрывает спрос
             # Реализация через фиксированных сотрудников, чтобы не повторять функционал
             elif not employment.auto_timetable:
                 employment.is_fixed_hours = True
                 # Может случиться так что для этого работника еще никаким образом расписание не составлялось
-                workers_month_days = worker_day.get(employment.user_id, [])
+                workers_month_days = worker_day.get(employment.employee_id, [])
                 workers_month_days.sort(key=lambda wd: wd.dt)
                 workers_month_days_new = []
                 wd_index = 0
@@ -646,11 +645,11 @@ class AutoSettingsViewSet(viewsets.ViewSet):
                         workers_month_days_new.append(WorkerDay(
                             type=WorkerDay.TYPE_HOLIDAY,
                             dt=dt,
-                            worker_id=employment.user_id,
+                            employee_id=employment.employee_id,
                         ))
-                worker_day[employment.user_id] = workers_month_days_new
+                worker_day[employment.employee_id] = workers_month_days_new
             if employment.dt_hired > dt_from:
-                workers_month_days = worker_day.get(employment.user_id, [])
+                workers_month_days = worker_day.get(employment.employee_id, [])
                 workers_month_days.sort(key=lambda wd: wd.dt)
                 workers_month_days_new = []
                 wd_index = 0
@@ -659,7 +658,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
                     workers_month_days_new.append(WorkerDay(
                         type=WorkerDay.TYPE_HOLIDAY,
                         dt=user_dt,
-                        worker_id=employment.user_id,
+                        employee_id=employment.employee_id,
                     ))
                     user_dt = user_dt + timedelta(days=1)
                 user_dt = employment.dt_hired
@@ -670,7 +669,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
                         wd_index += 1
                     user_dt = user_dt + timedelta(days=1)
 
-                worker_day[employment.user_id] = workers_month_days_new
+                worker_day[employment.employee_id] = workers_month_days_new
         ##################################################################
 
         ########### Выборки из базы данных ###########
@@ -715,7 +714,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
         days_in_month = ((dt_first + relativedelta(day=31)) - dt_first).days + 1
 
         for e in employments:
-            norm_work_amount = shop.settings.norm_hours_coeff * stats[e.user_id]['employments'][e.id][
+            norm_work_amount = shop.settings.norm_hours_coeff * stats[e.employee_id]['employments'][e.id][
                 'sawh_hours_plan_not_approved_selected_period' if form[
                     'use_not_approved'] else 'sawh_hours_plan_approved_selected_period']
             employment_stat_dict[e.id]['norm_work_amount'] = norm_work_amount
@@ -741,23 +740,23 @@ class AutoSettingsViewSet(viewsets.ViewSet):
                     'general_info': EmploymentConverter.convert(e),
                     'constraints_info': [{
                         'id': obj.id,
-                        'worker': obj.worker_id,
+                        'worker': obj.employment.employee_id,
                         'week_length': obj.employment.week_availability,
                         'weekday': obj.weekday,
                         'tm': Converter.convert_time(obj.tm),
                         'is_lite': obj.is_lite,
-                    } for obj in constraints.get(e.user_id, [])],
+                    } for obj in constraints.get(e.id, [])],
                     #     Converter.convert(
-                    #     constraints.get(e.user_id, []),
+                    #     constraints.get(e.employee_id, []),
                     #     WorkerConstraint,
-                    #     fields=['id', 'worker_id', 'employment__week_availability', 'weekday', 'tm', 'is_lite'], #change algo worker -> worker_id
+                    #     fields=['id', 'employee_id', 'employment__week_availability', 'weekday', 'tm', 'is_lite'], #change algo worker -> employee_id
                     #     out_array=True,
                     # ),
                     'availability_info': Converter.convert(
-                        availabilities.get(e.user_id, []),
+                        availabilities.get(e.employee_id, []),
                         UserWeekdaySlot,
-                        fields=['id', 'worker_id', 'employment__week_availability', 'weekday', 'slot', 'is_sutable'],
-                        # change algo worker -> worker_id
+                        fields=['id', 'employee_id', 'employment__week_availability', 'weekday', 'slot', 'is_sutable'],
+                        # change algo worker -> employee_id
                         custom_converters={
                             'slot': lambda obj: {
                                 'id': obj.id,
@@ -771,23 +770,23 @@ class AutoSettingsViewSet(viewsets.ViewSet):
                     ),
                     'worker_cashbox_info': [{
                         'id': obj.id,
-                        'worker': obj.employment.user_id,
+                        'worker': obj.employment.employee_id,
                         'work_type': obj.work_type_id,
                         'mean_speed': obj.mean_speed,
                         'bills_amount': obj.bills_amount,
                         'period': obj.period,
                         'priority': obj.priority,
                         'duration': obj.duration
-                    } for obj in worker_cashbox_info.get(e.user_id, [])
+                    } for obj in worker_cashbox_info.get(e.employee_id, [])
                     ],
                     # Converter.convert(
-                    #     worker_cashbox_info.get(e.user_id, []),
+                    #     worker_cashbox_info.get(e.employee_id, []),
                     #     WorkerCashboxInfo,
-                    #     fields=['id', 'employment__user_id', 'work_type', 'mean_speed', 'bills_amount', 'priority', 'duration'],  # change algo worker -> employment__user_id work_type -> work_type_id
+                    #     fields=['id', 'employment__employee_id', 'work_type', 'mean_speed', 'bills_amount', 'priority', 'duration'],  # change algo worker -> employment__employee_id work_type -> work_type_id
                     #     out_array=True,
                     # ),
-                    'workdays': WorkerDayConverter.convert(worker_day.get(e.user_id, []), out_array=True),
-                    'prev_data': WorkerDayConverter.convert(prev_data.get(e.user_id, []), out_array=True),
+                    'workdays': WorkerDayConverter.convert(worker_day.get(e.employee_id, []), out_array=True),
+                    'prev_data': WorkerDayConverter.convert(prev_data.get(e.employee_id, []), out_array=True),
                     'overworking_hours': employment_stat_dict[e.id].get('diff_prev_paid_hours', 0),  # не учитывается
                     'overworking_days': employment_stat_dict[e.id].get('diff_prev_paid_days', 0),  # не учитывается
                     'norm_work_amount': employment_stat_dict[e.id]['norm_work_amount'],
@@ -876,7 +875,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
                     dt_to = dt if dt > dt_to else dt_to
 
                 employments = {
-                    e.user_id: e
+                    e.employee_id: e
                     for e in Employment.objects.get_active(
                         shop.network_id,
                         dt_from=dt_from,
@@ -895,13 +894,13 @@ class AutoSettingsViewSet(viewsets.ViewSet):
                             is_approved=False,
                             is_fact=False,
                             dt=dt,
-                            worker_id=uid,
+                            employee_id=uid,
                             type=wd['type']
                         )
 
                         wdays = {w.is_approved: w for w in WorkerDay.objects.filter(
                             is_fact=False,
-                            worker_id=uid,
+                            employee_id=uid,
                             dt=dt,
                         )}
 
@@ -933,7 +932,8 @@ class AutoSettingsViewSet(viewsets.ViewSet):
                                         is_approved=False,
                                         is_fact=False,
                                         dt=wd_obj.dt,
-                                        worker_id=wd_obj.worker_id,
+                                        employee_id=wd_obj.employee_id,
+                                        employment_id=wd_obj.employment_id,
                                     ).delete()
                                 wd_obj.save()
 
@@ -964,11 +964,11 @@ class AutoSettingsViewSet(viewsets.ViewSet):
                                         is_approved=False,
                                         is_fact=False,
                                         dt=wd_obj.dt,
-                                        worker_id=wd_obj.worker_id,
+                                        employee_id=wd_obj.employee_id,
                                     ).delete()
                                 wd_obj.save()
 
-                for work_type in shop.worktype_set.all():
+                for work_type in shop.work_types.all():
                     cancel_shop_vacancies.apply_async((shop.id, work_type.id))
                     create_shop_vacancies_and_notify.apply_async((shop.id, work_type.id))
 
@@ -1018,13 +1018,13 @@ class AutoSettingsViewSet(viewsets.ViewSet):
         tts.update(status=ShopMonthStat.NOT_DONE)
         shop = Shop.objects.get(id=shop_id)
 
-        user_ids=Employment.objects.get_active(
+        employee_ids = Employment.objects.get_active(
             shop.network_id,
             dt_from=dt_from,
             dt_to=dt_to,
             shop_id=shop_id,
             auto_timetable=True
-        ).values('user_id')
+        ).values('employee_id')
 
         created_by_filter = {}
         if not form['delete_created_by']:
@@ -1035,7 +1035,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
             Q(shop_id=shop_id) | Q(shop_id__isnull=True),
             dt__gte=dt_from,
             dt__lte=dt_to,
-            worker_id__in=user_ids,
+            employee_id__in=employee_ids,
             is_approved=False,
             # is_vacancy=False,
             **created_by_filter,
@@ -1053,7 +1053,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
         # wdays.update(
         #     dttm_work_start=None,
         #     dttm_work_end=None,
-        #     #worker_id=None, TODO: ???
+        #     #employee_id=None, TODO: ???
         #     type=WorkerDay.TYPE_EMPTY
 
         # )
@@ -1063,7 +1063,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
             Q(shop_id=shop_id) | Q(shop_id__isnull=True),
             dt__gte=dt_from,
             dt__lte=dt_to,
-            worker_id__in=user_ids,
+            employee_id__in=employee_ids,
             is_approved=True,
             # is_vacancy=False,
             child__isnull=True,
@@ -1071,7 +1071,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
         )
         # WorkerDay.objects.bulk_create(
         #     [WorkerDay(
-        #         # worker_id=w.worker_id, TODO: ???
+        #         # employee_id=w.employee_id, TODO: ???
         #         type=WorkerDay.TYPE_EMPTY,
         #         dt=w.dt,
         #         parent_worker_day=w
@@ -1114,21 +1114,21 @@ def count_prev_paid_days(dt_end, employments, region_id, dt_start=None, is_appro
 
     prev_info = list(Employment.objects.filter(
         Q(
-        #   Q(user__worker_day__type__in=WorkerDay.TYPES_PAID)|
-        #   Q(user__worker_day__type__in=[WorkerDay.TYPE_SELF_VACATION, WorkerDay.TYPE_VACATION, WorkerDay.TYPE_SICK, WorkerDay.TYPE_EMPTY]),
-          Q(dt_fired__isnull=False) & Q(user__worker_day__dt__lte=F('dt_fired')) | Q(dt_fired__isnull=True), #чтобы не попали рабочие дни после увольнения
-          user__worker_day__dt__gte=dt_start,
-          user__worker_day__dt__lt=dt_end,
-          user__worker_day__is_fact=False,
-          user__worker_day__is_approved=is_approved) |
-        Q(user__worker_day=None),  # for doing left join
+        #   Q(employee__worker_days__type__in=WorkerDay.TYPES_PAID)|
+        #   Q(employee__worker_days__type__in=[WorkerDay.TYPE_SELF_VACATION, WorkerDay.TYPE_VACATION, WorkerDay.TYPE_SICK, WorkerDay.TYPE_EMPTY]),
+          Q(dt_fired__isnull=False) & Q(employee__worker_days__dt__lte=F('dt_fired')) | Q(dt_fired__isnull=True), #чтобы не попали рабочие дни после увольнения
+          employee__worker_days__dt__gte=dt_start,
+          employee__worker_days__dt__lt=dt_end,
+          employee__worker_days__is_fact=False,
+          employee__worker_days__is_approved=is_approved) |
+        Q(employee__worker_days=None),  # for doing left join
         id__in=ids,
     ).values('id').annotate(
-        paid_days=Coalesce(Count('user__worker_day', filter=Q(user__worker_day__type__in=WorkerDay.TYPES_PAID)), 0),
-        paid_hours=Coalesce(Sum(Extract(F('user__worker_day__work_hours'),'epoch') / 3600, filter=Q(user__worker_day__type__in=WorkerDay.TYPES_PAID)), 0),
-        vacations=Coalesce(Count('user__worker_day', filter=Q(user__worker_day__type__in=[WorkerDay.TYPE_SELF_VACATION, WorkerDay.TYPE_VACATION, WorkerDay.TYPE_SICK])), 0),
-        no_data=Coalesce(Count('user__worker_day', filter=Q(user__worker_day__type=WorkerDay.TYPE_EMPTY)), 0),
-        all_days=Coalesce(Count('user__worker_day'), 0),
+        paid_days=Coalesce(Count('employee__worker_days', filter=Q(employee__worker_days__type__in=WorkerDay.TYPES_PAID)), 0),
+        paid_hours=Coalesce(Sum(Extract(F('employee__worker_days__work_hours'),'epoch') / 3600, filter=Q(employee__worker_days__type__in=WorkerDay.TYPES_PAID)), 0),
+        vacations=Coalesce(Count('employee__worker_days', filter=Q(employee__worker_days__type__in=[WorkerDay.TYPE_SELF_VACATION, WorkerDay.TYPE_VACATION, WorkerDay.TYPE_SICK])), 0),
+        no_data=Coalesce(Count('employee__worker_days', filter=Q(employee__worker_days__type=WorkerDay.TYPE_EMPTY)), 0),
+        all_days=Coalesce(Count('employee__worker_days'), 0),
     ).order_by('id'))
     prev_info = {e['id']: e for e in prev_info}
     employment_stat_dict = {}

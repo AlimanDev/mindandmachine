@@ -6,7 +6,7 @@ from unittest import mock
 
 from src.recognition.api import recognition
 from src.recognition.models import UserConnecter
-from src.base.models import WorkerPosition, Employment, User
+from src.base.models import WorkerPosition, Employment, User, Network, NetworkConnect
 from src.timetable.models import WorkTypeName
 from src.util.mixins.tests import TestsHelperMixin
 from src.util.models_converter import Converter
@@ -38,7 +38,6 @@ class TestUserViewSet(TestsHelperMixin, APITestCase):
             "birthday": "2000-07-20",
             "avatar": "string",
             "phone_number": "string",
-            "tabel_code": username,
             "username": username,
             "by_code": True,
         }
@@ -63,7 +62,6 @@ class TestUserViewSet(TestsHelperMixin, APITestCase):
             "birthday": "2000-07-20",
             "avatar": "string",
             "phone_number": "string",
-            "tabel_code": username,
             "username": username,
             "by_code": True,
         }
@@ -79,7 +77,7 @@ class TestUserViewSet(TestsHelperMixin, APITestCase):
         self.assertEqual(len(resp.json()), 8)
 
     def test_get_users_only_with_active_employment(self):
-        Employment.objects.exclude(user=self.user1).update(
+        Employment.objects.exclude(employee=self.employee1).update(
             dt_hired=self.dt_now, dt_fired=self.dt_now + timedelta(days=60))
         params = {
             'employments__dt_from': Converter.convert_date(self.dt_now - timedelta(days=1)),
@@ -97,7 +95,7 @@ class TestUserViewSet(TestsHelperMixin, APITestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(len(resp.json()), 8)
 
-        Employment.objects.filter(user=self.user2).update(
+        Employment.objects.filter(employee=self.employee2).update(
             dt_hired=self.dt_now + timedelta(days=60), dt_fired=self.dt_now + timedelta(days=90))
 
         params = {
@@ -162,6 +160,46 @@ class TestUserViewSet(TestsHelperMixin, APITestCase):
         data = response.json()
         self.assertEqual(response.status_code, 400)
         self.assertEqual(data, {'detail': 'У сотрудника нет биометрии'})
+
+    def test_get_user_with_network_outsourcings(self):
+        outsourcing = Network.objects.create(
+            name='Аутсорсинг сеть',
+            code='1234',
+        )
+        NetworkConnect.objects.create(
+            client=self.network,
+            outsourcing=outsourcing,
+        )
+        resp = self.client.get('/rest_api/auth/user/')
+        data = [
+            {
+                'name': 'Аутсорсинг сеть', 
+                'code': '1234', 
+                'id': outsourcing.id,
+            }
+        ]
+        self.assertEqual(resp.json()['network']['outsourcings'], data)
+        self.assertEqual(resp.json()['network']['clients'], [])
+    
+    def test_get_user_with_network_clients(self):
+        client = Network.objects.create(
+            name='Сеть клиента',
+            code='1234',
+        )
+        NetworkConnect.objects.create(
+            client=client,
+            outsourcing=self.network,
+        )
+        resp = self.client.get('/rest_api/auth/user/')
+        data = [
+            {
+                'name': 'Сеть клиента', 
+                'code': '1234', 
+                'id': client.id,
+            }
+        ]
+        self.assertEqual(resp.json()['network']['outsourcings'], [])
+        self.assertEqual(resp.json()['network']['clients'], data)
 
     def test_set_password_as_username_on_user_create(self):
         with self.settings(SET_USER_PASSWORD_AS_LOGIN=True):

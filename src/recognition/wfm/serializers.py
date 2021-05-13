@@ -18,16 +18,30 @@ class WorkerDayCashboxDetailsSerializer(serializers.ModelSerializer):
             return obj.work_type.work_type_name.name
 
 
-class WorkerDaySerializer(serializers.ModelSerializer):
+class WorkerDayListSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    dttm_work_start = serializers.DateTimeField()
+    dttm_work_end = serializers.DateTimeField()
+    position = serializers.SerializerMethodField()
+
+    def get_position(self, obj):
+        return obj.employment.position.name if obj.employment and obj.employment.position else ''
+
+
+class WfmEmployeeSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    tabel_code = serializers.CharField()
+    worker_days = WorkerDayListSerializer(many=True)
+
+
+class WfmWorkerDaySerializer(serializers.ModelSerializer):
     user_id = serializers.SerializerMethodField()
-    dttm_work_start = serializers.SerializerMethodField()
-    dttm_work_end = serializers.SerializerMethodField()
-    worker_day_id = serializers.SerializerMethodField()
     avatar = serializers.SerializerMethodField()
+    employees = WfmEmployeeSerializer(many=True)
 
     class Meta:
         model = User
-        fields = ['worker_day_id', 'user_id', 'first_name', 'last_name', 'dttm_work_start', 'dttm_work_end', 'avatar']
+        fields = ['user_id', 'employees', 'first_name', 'last_name', 'avatar']
 
     def get_user_id(self, obj) -> int:
         return obj.id
@@ -36,19 +50,6 @@ class WorkerDaySerializer(serializers.ModelSerializer):
         if obj.avatar:
             return obj.avatar.url
         return None
-
-    def get_worker_day_id(self, obj) -> int:
-        # method all() uses prefetch_related, but first() doesn't
-        wd = obj.worker_day.all()
-        return wd[0].id if wd else None
-
-    def get_dttm_work_start(self, obj) -> datetime:
-        wd = obj.worker_day.all()
-        return wd[0].dttm_work_start if wd else None
-
-    def get_dttm_work_end(self, obj) -> datetime:
-        wd = list(obj.worker_day.all())
-        return wd[0].dttm_work_end if wd else None
 
 
 class ShopSerializer(serializers.ModelSerializer):
@@ -59,19 +60,12 @@ class ShopSerializer(serializers.ModelSerializer):
 
 class WorkShiftSerializer(serializers.ModelSerializer):
     dt = serializers.DateField()
-    worker = serializers.SlugRelatedField(slug_field='tabel_code', queryset=User.objects)
-    shop = serializers.SlugRelatedField(
-        slug_field='code', queryset=Shop.objects, required=False, allow_null=False, allow_empty=False)
+    worker = serializers.CharField(source='employee.user.username')
+    shop = serializers.CharField(source='shop.code')
 
     # переопределение нужно, чтобы возвращать время в реальном utc
     dttm_work_start = serializers.SerializerMethodField()
     dttm_work_end = serializers.SerializerMethodField()
-
-    def validate(self, attrs):
-        if attrs['worker'].id != self.context['request'].user.id:
-            raise PermissionDenied()
-
-        return attrs
 
     def get_dttm_work_start(self, wd) -> datetime:
         return (wd.dttm_work_start - timedelta(

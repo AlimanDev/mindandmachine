@@ -6,6 +6,7 @@ import factory
 from src.base.models import (
     Shop,
     Employment,
+    Employee,
     User,
     Region,
     Network,
@@ -81,9 +82,15 @@ class ShopFactory(AbstractActiveNamedModelFactory):
         model = Shop
 
 
-class EmploymentFactory(factory.django.DjangoModelFactory):
-    network = factory.SubFactory('src.base.tests.factories.NetworkFactory')
+class EmployeeFactory(factory.django.DjangoModelFactory):
     user = factory.SubFactory('src.base.tests.factories.UserFactory')
+
+    class Meta:
+        model = Employee
+
+
+class EmploymentFactory(factory.django.DjangoModelFactory):
+    employee = factory.SubFactory('src.base.tests.factories.EmployeeFactory')
     shop = factory.SubFactory('src.base.tests.factories.ShopFactory')
     function_group = factory.SubFactory('src.base.tests.factories.GroupFactory')
     position = factory.SubFactory('src.base.tests.factories.WorkerPositionFactory')
@@ -111,7 +118,6 @@ class UserFactory(factory.django.DjangoModelFactory):
     middle_name = factory.Faker('middle_name', locale='ru_RU')
     last_name = factory.Faker('last_name', locale='ru_RU')
     phone_number = factory.Faker('phone_number')
-    tabel_code = factory.LazyAttribute(lambda u: u.username)
 
     class Meta:
         model = User

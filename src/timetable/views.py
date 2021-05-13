@@ -39,7 +39,7 @@ class RecalcWhAdminView(SuperuserRequiredMixin, FormView):
         }
 
         if users:
-            kwargs['worker_id__in'] = list(users.values_list('id', flat=True))
+            kwargs['employee__user_id__in'] = list(users.values_list('id', flat=True))
         if shops:
             kwargs['shop_id__in'] = list(shops.values_list('id', flat=True))
         

@@ -7,6 +7,7 @@ from src.base.tests.factories import (
     EmploymentFactory,
     ShopFactory,
     UserFactory,
+    EmployeeFactory,
 )
 from src.integration.mda.integration import MdaIntegrationHelper
 from src.util.mixins.tests import TestsHelperMixin
@@ -104,12 +105,12 @@ class TestMdaIntegration(TestsHelperMixin, TestCase):
     def test_correct_director_login_in_data(self):
         shop = ShopFactory(parent=self.region1, code='shop')
         director = EmploymentFactory(shop=shop)
-        shop.director = director.user
+        shop.director = director.employee.user
         shop.save()
         mda_integration_helper = MdaIntegrationHelper()
         data = mda_integration_helper._get_data()
         s_data = list(filter(lambda s: shop.id == s['id'], data['shops']))[0]
-        self.assertEqual(s_data['directorLogin'], director.user.username)
+        self.assertEqual(s_data['directorLogin'], director.employee.user.username)
 
     def test_correct_regionId_in_data(self):
         shop = ShopFactory(parent=self.region1, code='shop')
@@ -127,7 +128,8 @@ class TestCaseInsensitiveAuth(TestsHelperMixin, APITestCase):
     def setUpTestData(cls):
         cls.shop = ShopFactory(code='shop')
         cls.user = UserFactory(username='EfimenkoMV')
-        cls.employment = EmploymentFactory(shop=cls.shop, user=cls.user)
+        cls.employee = EmployeeFactory(user=cls.user, tabel_code='0000-0001')
+        cls.employment = EmploymentFactory(shop=cls.shop, employee=cls.employee)
 
     def test_case_sensitive_login_by_default(self):
         resp = self.client.post('/api/v1/auth/', data=self.dump_data({

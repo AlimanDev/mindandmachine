@@ -28,7 +28,7 @@ def vacancies_create_and_cancel():
         if exchange_settings == None or not exchange_settings.automatic_check_lack:
             continue
 
-        for work_type in shop.worktype_set.all():
+        for work_type in shop.work_types.all():
             cancel_shop_vacancies.apply_async((shop.id, work_type.id))
             create_shop_vacancies_and_notify.apply_async((shop.id, work_type.id))
 

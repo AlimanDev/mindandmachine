@@ -19,6 +19,7 @@ from src.base.models import (
     Employment,
     WorkerPosition,
     Group,
+    Employee,
 )
 from src.conf.djconfig import UPLOAD_TT_MATCH_EMPLOYMENT
 from src.timetable.models import (
@@ -67,18 +68,18 @@ def upload_timetable_util(form, timetable_file, is_fact=False):
         p.name.lower(): p
         for p in WorkerPosition.objects.all()
     }
-    number_cloumn = df.columns[0]
+    number_column = df.columns[0]
     name_column = df.columns[1]
     position_column = df.columns[2]
-    users_df[number_cloumn] = users_df[number_cloumn].astype(str)
+    users_df[number_column] = users_df[number_column].astype(str)
     users_df[name_column] = users_df[name_column].astype(str)
     users_df[position_column] = users_df[position_column].astype(str)
     error_users = []
 
     for index, data in users_df.iterrows():
-        if data[number_cloumn].startswith('*') or data[name_column].startswith('*') or data[position_column].startswith('*'):
+        if data[number_column].startswith('*') or data[name_column].startswith('*') or data[position_column].startswith('*'):
             continue
-        number_cond = data[number_cloumn] != 'nan'
+        number_cond = data[number_column] != 'nan'
         name_cond = data[name_column] != 'nan'
         position_cond = data[position_column] != 'nan'
         if number_cond and (not position_cond or not name_cond):
@@ -100,7 +101,7 @@ def upload_timetable_util(form, timetable_file, is_fact=False):
             # Нет такой должности {position}
             raise ValidationError(_('There is no such position {position}.').format(position=data[position_column]))
         names = data[name_column].split()
-        tabel_code = str(data[number_cloumn]).split('.')[0]
+        tabel_code = str(data[number_column]).split('.')[0]
         created = False
         user_data = {
             'first_name': names[1] if len(names) > 1 else '',
@@ -110,9 +111,9 @@ def upload_timetable_util(form, timetable_file, is_fact=False):
         }
         user = None
         if UPLOAD_TT_MATCH_EMPLOYMENT:
-            employment = Employment.objects.filter(tabel_code=tabel_code, shop=shop)
+            employment = Employment.objects.filter(employee__tabel_code=tabel_code, shop=shop)
             if number_cond and employment.exists():
-                user = employment.first().user
+                user = employment.first().employee.user
                 if user.last_name != names[0]:
                     error_users.append(f"У сотрудника на строке {index} с табельным номером {tabel_code} в системе фамилия {user.last_name}, а в файле {names[0]}.") #Change error
                     continue
@@ -123,48 +124,46 @@ def upload_timetable_util(form, timetable_file, is_fact=False):
             else:
                 employment = Employment.objects.filter(
                     shop=shop,
-                    user__first_name=names[1] if len(names) > 1 else '',
-                    user__last_name=names[0],
-                    user__middle_name=names[2] if len(names) > 2 else None
+                    employee__user__first_name=names[1] if len(names) > 1 else '',
+                    employee__user__last_name=names[0],
+                    employee__user__middle_name=names[2] if len(names) > 2 else None
                 )
                 if employment.exists():
                     if number_cond:
                         employment.update(tabel_code=tabel_code,)
-                    user = employment.first().user
+                    employee = employment.first().employee
                 else:
                     user_data['username'] = str(time.time() * 1000000)[:-2],
                     user = User.objects.create(**user_data)
+                    employee = Employee.objects.create(user=user, tabel_code=tabel_code)
                     created = True
         else:
-            if number_cond and User.objects.filter(tabel_code=tabel_code,).exists():
-                user = User.objects.filter(
-                    tabel_code=tabel_code,
-                )
-                user.update(
-                **user_data,
-                )
-                user = user.first()
+            employees_qs = Employee.objects.filter(tabel_code=tabel_code)
+            if number_cond and employees_qs.exists():
+                User.objects.filter(employees__in=employees_qs).update(**user_data)
+                employee = employees_qs.first()
             else:
-                user = User.objects.filter(
-                    **user_data
+                employee = Employee.objects.filter(
+                    **{'user__' + k: v for k,v in user_data.items()}
                 )
-                if user.exists():
+                if employee.exists():
                     if number_cond:
-                        user.update(tabel_code=tabel_code,)
-                    user = user.first()
+                        employee.update(tabel_code=tabel_code,)
+                    employee = employee.first()
                 else:
                     user_data['username'] = str(time.time() * 1000000)[:-2]
                     if number_cond:
                         user_data['tabel_code'] = tabel_code
                     user = User.objects.create(**user_data)
+                    employee = Employee.objects.create(user=user, tabel_code=tabel_code)
                     created = True
         func_group = groups.get(data[position_column].lower().strip(), groups['сотрудник'])
         if created:
-            user.username = f'u{user.id}'
-            user.save()
+            employee.user.username = f'u{user.id}'
+            employee.user.save()
             employment = Employment.objects.create(
                 shop_id=shop_id,
-                user=user,
+                employee=employee,
                 function_group=func_group,
                 position=position,
             )
@@ -174,12 +173,12 @@ def upload_timetable_util(form, timetable_file, is_fact=False):
         else:
             employment = Employment.objects.get_active(
                 network_id=user.network_id,
-                user=user,
+                employee=employee,
             ).first()
             if not employment:
                 employment = Employment.objects.create(
                     shop_id=shop_id,
-                    user=user,
+                    employee=employee,
                     position=position,
                     function_group=func_group,
                 )
@@ -187,7 +186,7 @@ def upload_timetable_util(form, timetable_file, is_fact=False):
                 employment.position = position
                 employment.save()
         users.append([
-            user,
+            employee,
             employment,
         ])
     if len(error_users):
@@ -210,23 +209,23 @@ def upload_timetable_util(form, timetable_file, is_fact=False):
     first_type = next(iter(work_types.values()))
     timetable_df = df[df.columns[:3 + len(dates)]]
 
-    timetable_df[number_cloumn] = timetable_df[number_cloumn].astype(str)
+    timetable_df[number_column] = timetable_df[number_column].astype(str)
     timetable_df[name_column] = timetable_df[name_column].astype(str)
     timetable_df[position_column] = timetable_df[position_column].astype(str)
     index_shift = 0
 
     for index, data in timetable_df.iterrows():
-        if data[number_cloumn].startswith('*') or data[name_column].startswith('*') \
+        if data[number_column].startswith('*') or data[name_column].startswith('*') \
             or data[position_column].startswith('*'):
             index_shift += 1
             continue
-        number_cond = data[number_cloumn] != 'nan'
+        number_cond = data[number_column] != 'nan'
         name_cond = data[name_column] != 'nan'
         position_cond = data[position_column] != 'nan'
         if not number_cond and (not name_cond or not position_cond):
             index_shift += 1
             continue
-        user, employment = users[index - index_shift]
+        employee, employment = users[index - index_shift]
         for i, dt in enumerate(dates):
             dttm_work_start = None
             dttm_work_end = None
@@ -252,12 +251,12 @@ def upload_timetable_util(form, timetable_file, is_fact=False):
                 else:
                     continue
             except:
-                raise ValidationError(_('The employee {user.first_name} {user.last_name} in the cell for {dt} has the wrong value: {value}.').format(user=user, dt=dt, value=str(data[i + 3])))
+                raise ValidationError(_('The employee {user.first_name} {user.last_name} in the cell for {dt} has the wrong value: {value}.').format(user=employee.user, dt=dt, value=str(data[i + 3])))
 
-            WorkerDay.objects.filter(dt=dt, worker=user, is_fact=is_fact, is_approved=False).delete()
+            WorkerDay.objects.filter(dt=dt, employee=employee, is_fact=is_fact, is_approved=False).delete()
           
             new_wd = WorkerDay.objects.create(
-                worker=user,
+                employee=employee,
                 shop_id=shop_id,
                 dt=dt,
                 is_fact=is_fact,
@@ -293,25 +292,29 @@ def download_timetable_util(request, workbook, form):
         dt_from=timetable.prod_days[0].dt,
         dt_to=timetable.prod_days[-1].dt,
         shop=shop,
-    ).order_by('user__last_name', 'user__first_name', 'user__middle_name', 'user_id')
-    users = employments.values_list('user_id', flat=True)
+    ).select_related(
+        'employee', 
+        'employee__user', 
+        'position',
+    ).order_by('employee__user__last_name', 'employee__user__first_name', 'employee__user__middle_name', 'employee_id')
+    employee_ids = employments.values_list('employee_id', flat=True)
     stat = WorkersStatsGetter(
         dt_from=timetable.prod_days[0].dt,
         dt_to=timetable.prod_days[-1].dt,
         shop_id=shop.id,
-        worker_id__in=users,
+        employee_id__in=employee_ids,
     ).run()
     stat_type = 'approved' if form['is_approved'] else 'not_approved'
 
-    workdays = WorkerDay.objects.select_related('worker', 'shop').filter(
+    workdays = WorkerDay.objects.select_related('employee', 'employee__user', 'shop').filter(
         Q(dt__lt=F('employment__dt_fired')) | Q(employment__dt_fired__isnull=True) | Q(employment__isnull=True),
         (Q(dt__gte=F('employment__dt_hired')) | Q(employment__isnull=True)) & Q(dt__gte=timetable.prod_days[0].dt),
-        worker__in=users,
+        employee_id__in=employee_ids,
         dt__lte=timetable.prod_days[-1].dt,
         is_approved=form['is_approved'],
         is_fact=False,
     ).order_by(
-        'worker__last_name', 'worker__first_name', 'worker__middle_name', 'worker_id', 'dt')
+        'employee__user__last_name', 'employee__user__first_name', 'employee__user__middle_name', 'employee_id', 'dt')
 
     workdays = workdays.get_last_ordered(
         is_fact=False,
@@ -326,7 +329,6 @@ def download_timetable_util(request, workbook, form):
         timetable.change_for_inspection(timetable.prod_month.get('norm_work_hours', 0), workdays)
 
     timetable.format_cells(len(employments))
-    
 
     # construct weekday
     timetable.construct_dates('%w', 8, 4)
@@ -389,7 +391,7 @@ def download_tabel_util(request, workbook, form):
         dt__lte=to_dt,
         is_approved=form['is_approved'],
         is_fact=False,
-    ).order_by('employment__position_id', 'worker__last_name', 'worker__first_name', 'employment__tabel_code', 'employment__id', 'dt')
+    ).order_by('employment__position_id', 'employee__user__last_name', 'employee__user__first_name', 'employment__tabel_code', 'employment__id', 'dt')
 
     wd_stat = wd_stat_count(workdays, shop)
     working_hours = {}
@@ -435,8 +437,8 @@ def exchange(data, error_messages):
     def create_worker_day(wd_target, wd_source):
         employment = wd_target.employment
         if (wd_source.type == WorkerDay.TYPE_WORKDAY and employment is None):
-            employment = Employment.objects.get_active_empl_for_user(
-                network_id=wd_source.worker.network_id, user_id=wd_target.worker_id,
+            employment = Employment.objects.get_active_empl_by_priority(
+                network_id=wd_source.worker.network_id, employee_id=wd_target.employee_id,
                 dt=wd_source.dt,
                 priority_shop_id=wd_source.shop_id,
             ).select_related(
@@ -446,7 +448,7 @@ def exchange(data, error_messages):
             type=wd_source.type,
             dttm_work_start=wd_source.dttm_work_start,
             dttm_work_end=wd_source.dttm_work_end,
-            worker_id=wd_target.worker_id,
+            employee_id=wd_target.employee_id,
             employment=employment if wd_source.employment_id else None,
             dt=wd_target.dt,
             created_by=data['user'],
@@ -468,11 +470,16 @@ def exchange(data, error_messages):
     days = len(data['dates'])
     with transaction.atomic():
         wd_list = list(WorkerDay.objects.filter(
-            worker_id__in=(data['worker1_id'], data['worker2_id']),
+            employee_id__in=(data['employee1_id'], data['employee2_id']),
             dt__in=data['dates'],
             is_approved=data['is_approved'],
             is_fact=False,
-        ).prefetch_related('worker_day_details__work_type__work_type_name').select_related('worker', 'employment').order_by('dt'))
+        ).prefetch_related(
+            'worker_day_details__work_type__work_type_name',
+        ).select_related(
+            'employee__user',
+            'employment',
+        ).order_by('dt'))
 
         if len(wd_list) != days * 2:
             raise ValidationError(error_messages['no_timetable'])
@@ -487,22 +494,21 @@ def exchange(data, error_messages):
         # если у пользователя нет группы с наличием прав на изменение защищенных дней, то проверяем,
         # что в списке изменяемых дней нету защищенных дней, если есть, то выдаем ошибку
         has_permission_to_change_protected_wdays = Group.objects.filter(
-            id__in=data['user'].get_group_ids(
-                data['user'].network, day_pairs[0][0].shop),
+            id__in=data['user'].get_group_ids(day_pairs[0][0].shop),
             has_perm_to_change_protected_wdays=True,
         ).exists()
         if not has_permission_to_change_protected_wdays:
             protected_wdays = list(WorkerDay.objects.filter(
-                worker_id__in=(data['worker1_id'], data['worker2_id']),
+                employee_id__in=(data['employee1_id'], data['employee2_id']),
                 dt__in=data['dates'],
                 is_approved=data['is_approved'],
                 is_fact=False,
                 is_blocked=True,
             ).annotate(
                 worker_fio=Concat(
-                    F('worker__last_name'), Value(' '),
-                    F('worker__first_name'), Value(' ('),
-                    F('worker__username'), Value(')'),
+                    F('employee__user__last_name'), Value(' '),
+                    F('employee__user__first_name'), Value(' ('),
+                    F('employee__user__username'), Value(')'),
                 ),
             ).values(
                 'worker_fio',
@@ -542,7 +548,7 @@ def exchange(data, error_messages):
                 if action:
                     mis_data.append({
                         'dt': wd_target.dt,
-                        'worker__username': wd_target.worker.username,
+                        'employee__user__username': wd_target.employee.user.username,
                         'shop__code': wd_target.shop.code if wd_target.shop else wd_source.shop.code,
                         'dttm_work_start': wd_target.dttm_work_start if action == 'delete' else wd_source.dttm_work_start,
                         'dttm_work_end': wd_target.dttm_work_end if action == 'delete' else wd_source.dttm_work_end,
@@ -559,7 +565,7 @@ def exchange(data, error_messages):
                 send_doctors_schedule_to_mis.delay(json_data=json_data)
 
         WorkerDay.objects_with_excluded.filter(
-            worker_id__in=(data['worker1_id'], data['worker2_id']),
+            employee_id__in=(data['employee1_id'], data['employee2_id']),
             dt__in=data['dates'],
             is_approved=data['is_approved'],
             is_fact=False,
@@ -571,7 +577,7 @@ def exchange(data, error_messages):
     return new_wds
 
 
-def copy_as_excel_cells(main_worker_days, to_worker_id, to_dates, created_by=None):
+def copy_as_excel_cells(main_worker_days, to_employee_id, to_dates, created_by=None):
     main_worker_days_details_set = list(WorkerDayCashboxDetails.objects.filter(
         worker_day__in=main_worker_days,
     ).select_related('work_type'))
@@ -584,7 +590,7 @@ def copy_as_excel_cells(main_worker_days, to_worker_id, to_dates, created_by=Non
         main_worker_days_details[key].append(detail)
 
     trainee_worker_days = WorkerDay.objects_with_excluded.filter(
-        worker_id=to_worker_id,
+        employee_id=to_employee_id,
         dt__in=to_dates,
         is_approved=False,
         is_fact=False,
@@ -598,8 +604,8 @@ def copy_as_excel_cells(main_worker_days, to_worker_id, to_dates, created_by=Non
         i = i % length_main_wds
         blank_day = main_worker_days[i]
 
-        worker_active_empl = Employment.objects.get_active_empl_for_user(
-            network_id=blank_day.worker.network_id, user_id=to_worker_id,
+        worker_active_empl = Employment.objects.get_active_empl_by_priority(
+            network_id=blank_day.employee.user.network_id, employee_id=to_employee_id,
             dt=dt,
             priority_shop_id=blank_day.shop_id,
         ).select_related(
@@ -612,9 +618,12 @@ def copy_as_excel_cells(main_worker_days, to_worker_id, to_dates, created_by=Non
                 'Невозможно создать дни в выбранные даты. '
                 'Пожалуйста, проверьте наличие активного трудоустройства у сотрудника.'
             )
+        dt_to = dt
+        if blank_day.dttm_work_end and blank_day.dttm_work_start and blank_day.dttm_work_end.date() > blank_day.dttm_work_start.date():
+            dt_to = dt + datetime.timedelta(days=1)
 
         new_wd = WorkerDay.objects.create(
-            worker_id=to_worker_id,
+            employee_id=worker_active_empl.employee_id,
             employment=worker_active_empl,
             dt=dt,
             shop=blank_day.shop,
@@ -622,7 +631,7 @@ def copy_as_excel_cells(main_worker_days, to_worker_id, to_dates, created_by=Non
             dttm_work_start=datetime.datetime.combine(
                 dt, blank_day.dttm_work_start.timetz()) if blank_day.dttm_work_start else None,
             dttm_work_end=datetime.datetime.combine(
-                dt, blank_day.dttm_work_end.timetz()) if blank_day.dttm_work_end else None,
+                dt_to, blank_day.dttm_work_end.timetz()) if blank_day.dttm_work_end else None,
             is_approved=False,
             is_fact=False,
             created_by_id=created_by,

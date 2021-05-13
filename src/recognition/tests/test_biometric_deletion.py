@@ -8,7 +8,7 @@ from src.util.mixins.tests import TestsHelperMixin
 from src.recognition.api.recognition import Tevian
 
 
-class TestTicksViewSet(TestsHelperMixin, APITestCase):
+class TestBiometricDeletion(TestsHelperMixin, APITestCase):
     @classmethod
     def setUpTestData(cls):
         cls.create_departments_and_users()
@@ -25,9 +25,6 @@ class TestTicksViewSet(TestsHelperMixin, APITestCase):
         self._set_authorization_token(self.user2.username)
 
     def test_delete_biometrics_after_3_years(self):
-        class TevianMock:
-            def delete_person(self, person_id):
-                return 200
         with mock.patch.object(Tevian, 'delete_person') as delete_person:
             auto_delete_biometrics()
             delete_person.assert_called_once()
