@@ -1,4 +1,5 @@
 from datetime import timedelta
+import json
 
 from django.utils import timezone
 from rest_framework.test import APITestCase
@@ -200,6 +201,36 @@ class TestUserViewSet(TestsHelperMixin, APITestCase):
         ]
         self.assertEqual(resp.json()['network']['outsourcings'], [])
         self.assertEqual(resp.json()['network']['clients'], data)
+
+    def test_get_user_with_network_default_stats(self):
+        resp = self.client.get('/rest_api/auth/user/')
+        data = {
+            'employee_top': 'work_hours_total',
+            'employee_bottom': 'sawh_hours_curr_month',
+            'day_top': 'covering',
+            'day_bottom': 'deadtime',
+        }
+        self.assertEqual(resp.json()['network']['default_stats'], data)
+        data = {
+            'employee_top': 'work_days_selected_shop',
+            'employee_bottom': 'norm_hours_acc_period',
+            'day_top': 'predict_hours',
+            'day_bottom': 'graph_hours',
+        }
+        network = Network.objects.create(
+            name='Defaults test',
+            settings_values=json.dumps(
+                { 
+                    'default_stats': data,
+                }
+            )
+        )
+        self.user1.network = network
+        self.user1.save()
+        resp = self.client.get('/rest_api/auth/user/')
+        self.assertEqual(resp.json()['network']['default_stats'], data)
+        self.user1.network = self.network
+        self.user1.save()
 
     def test_set_password_as_username_on_user_create(self):
         with self.settings(SET_USER_PASSWORD_AS_LOGIN=True):

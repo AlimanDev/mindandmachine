@@ -1,4 +1,5 @@
 from datetime import timedelta
+import json
 
 from django.conf import settings
 from django.contrib.auth.forms import SetPasswordForm
@@ -44,6 +45,16 @@ class OutsourceClientNetworkSerializer(serializers.Serializer):
 
 class NetworkSerializer(serializers.ModelSerializer):
     logo = serializers.SerializerMethodField('get_logo_url')
+    default_stats = serializers.SerializerMethodField()
+
+    def get_default_stats(self, obj: Network):
+        default_stats = json.loads(obj.settings_values).get('default_stats', {})
+        return {
+            'employee_top': default_stats.get('employee_top', 'work_hours_total'),
+            'employee_bottom': default_stats.get('employee_bottom', 'sawh_hours_curr_month'),
+            'day_top': default_stats.get('day_top', 'covering'),
+            'day_bottom': default_stats.get('day_bottom', 'deadtime'),
+        }
 
     def get_logo_url(self, obj) -> str:
         if obj.logo:
@@ -64,6 +75,7 @@ class NetworkSerializer(serializers.ModelSerializer):
             'show_worker_day_additional_info',
             'allowed_interval_for_late_arrival',
             'allowed_interval_for_early_departure',
+            'default_stats',
         ]
 
 
