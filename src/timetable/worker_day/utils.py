@@ -307,7 +307,7 @@ def download_timetable_util(request, workbook, form):
     stat_type = 'approved' if form['is_approved'] else 'not_approved'
 
     workdays = WorkerDay.objects.select_related('employee', 'employee__user', 'shop').filter(
-        Q(dt__lt=F('employment__dt_fired')) | Q(employment__dt_fired__isnull=True) | Q(employment__isnull=True),
+        Q(dt__lte=F('employment__dt_fired')) | Q(employment__dt_fired__isnull=True) | Q(employment__isnull=True),
         (Q(dt__gte=F('employment__dt_hired')) | Q(employment__isnull=True)) & Q(dt__gte=timetable.prod_days[0].dt),
         employee_id__in=employee_ids,
         dt__lte=timetable.prod_days[-1].dt,
