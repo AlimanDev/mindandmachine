@@ -51,7 +51,7 @@ class NetworkSerializer(serializers.ModelSerializer):
         default_stats = json.loads(obj.settings_values).get('default_stats', {})
         return {
             'employee_top': default_stats.get('employee_top', 'work_hours_total'),
-            'employee_bottom': default_stats.get('employee_bottom', 'sawh_hours_curr_month'),
+            'employee_bottom': default_stats.get('employee_bottom', 'norm_hours_curr_month'),
             'day_top': default_stats.get('day_top', 'covering'),
             'day_bottom': default_stats.get('day_bottom', 'deadtime'),
         }
