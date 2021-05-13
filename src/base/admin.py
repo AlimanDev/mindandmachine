@@ -1,4 +1,8 @@
 from django.contrib import admin
+from django.forms import Form
+from import_export import resources
+from import_export.admin import ExportActionMixin, ImportMixin
+from import_export.fields import Field
 
 from src.base.models import (
     Employment,
@@ -17,7 +21,31 @@ from src.base.models import (
     ShopSchedule,
 )
 from src.timetable.models import GroupWorkerDayPermission
-from src.base.forms import NetworkAdminForm, ShopAdminForm, ShopSettingsAdminForm, BreakAdminForm
+from src.base.forms import (
+    NetworkAdminForm, 
+    ShopAdminForm, 
+    ShopSettingsAdminForm, 
+    BreakAdminForm, 
+    CustomImportFunctionGroupForm,
+    CustomConfirmImportFunctionGroupForm,
+)
+
+
+class FunctionGroupResource(resources.ModelResource):
+    group = Field(attribute='group_id')
+    class Meta:
+        model = FunctionGroup
+        import_id_fields = ('func', 'method', 'group',)
+        fields = ('func', 'method', 'access_type', 'level_up', 'level_down',)
+
+    def get_export_fields(self):
+        return [self.fields[f] for f in self.Meta.fields]
+
+    def import_row(self, row, *args, **kwargs):
+        row['group'] = kwargs.get('group', '')
+        row['access_type'] = row['access_type'] or ''
+        return super().import_row(row, *args, **kwargs)
+
 
 @admin.register(Network)
 class NetworkAdmin(admin.ModelAdmin):
@@ -109,10 +137,31 @@ class GroupAdmin(admin.ModelAdmin):
 
 
 @admin.register(FunctionGroup)
-class FunctionGroupAdmin(admin.ModelAdmin):
+class FunctionGroupAdmin(ImportMixin, ExportActionMixin, admin.ModelAdmin):
     list_display = ('id', 'access_type', 'group', 'func', 'method', 'level_down', 'level_up')
     list_filter = ('access_type', 'group', 'func')
     search_fields = ('id',)
+    resource_class = FunctionGroupResource
+
+    def get_import_form(self):
+        return CustomImportFunctionGroupForm
+
+    def get_confirm_import_form(self):
+        return CustomConfirmImportFunctionGroupForm
+
+    def get_form_kwargs(self, form, *args, **kwargs):
+        if isinstance(form, Form) and form.is_valid():
+            group = form.cleaned_data['group']
+            kwargs.update({'group': group.id})
+        return kwargs
+
+    def get_import_data_kwargs(self, request, *args, **kwargs):
+        form = kwargs.get('form')
+        if form and form.is_valid():
+            group = form.cleaned_data.get('group')
+            kwargs.update({'group': group.id if group else None})
+        return super().get_import_data_kwargs(request, *args, **kwargs)
+
 
 
 @admin.register(Employment)
