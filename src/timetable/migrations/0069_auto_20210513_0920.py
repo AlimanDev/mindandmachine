@@ -48,8 +48,7 @@ def update_plan_and_fact_hours(apps, schema_editor):
                            and tt_pf.wd_type = 'W'
         where True
             and pc.dt >= '2020-01-01'
-            and pc.dt < (now() + interval '1 years')
-        order by pc.dt;
+            and pc.dt < (now() + interval '1 years');
 """)
 
 
