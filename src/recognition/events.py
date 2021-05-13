@@ -8,7 +8,7 @@ DUPLICATE_BIOMETRICS = 'duplicate_biometrics'
 
 
 class EmployeeNotCheckedInEvent(BaseRegisteredEvent):
-    name = 'Уведомление об отсутствии отметки у работника.'
+    name = 'Отсутствие отметки у работника.'
     code = EMPLOYEE_NOT_CHECKED_IN
     write_history = False
 
@@ -18,7 +18,7 @@ class EmployeeNotCheckedInEvent(BaseRegisteredEvent):
 
 
 class EmployeeWorkingNotAccordingToPlanEvent(BaseRegisteredEvent):
-    name = 'Уведомление о выходе сотрудника не по плану'
+    name = 'Сотрудник вышел не по плану'
     code = EMPLOYEE_WORKING_NOT_ACCORDING_TO_PLAN
     write_history = False
 
@@ -28,6 +28,6 @@ class EmployeeWorkingNotAccordingToPlanEvent(BaseRegisteredEvent):
 
 
 class DuplicateBiometricsEvent(BaseRegisteredEvent):
-    name = 'Уведомление об одинаковых биометрических параметрах'
+    name = 'Обнаружен дубликат биометрических параметров'
     code = DUPLICATE_BIOMETRICS
     write_history = True
