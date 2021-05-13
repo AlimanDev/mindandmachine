@@ -83,6 +83,7 @@ INSTALLED_APPS = [
     'src.events',
     'src.notifications',
     'src.reports',
+    'import_export',
 ]
 
 REST_FRAMEWORK = {
@@ -462,6 +463,8 @@ MIS_USERNAME = None
 MIS_PASSWORD = None
 
 CASE_INSENSITIVE_AUTH = False
+
+IMPORT_EXPORT_USE_TRANSACTIONS = True
 
 # Eсли у пользователя пароль пустой, то при сохранении устанавливать пароль как логин
 SET_USER_PASSWORD_AS_LOGIN = False
