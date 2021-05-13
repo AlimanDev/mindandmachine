@@ -206,7 +206,7 @@ class TestUserViewSet(TestsHelperMixin, APITestCase):
         resp = self.client.get('/rest_api/auth/user/')
         data = {
             'employee_top': 'work_hours_total',
-            'employee_bottom': 'sawh_hours_curr_month',
+            'employee_bottom': 'norm_hours_curr_month',
             'day_top': 'covering',
             'day_bottom': 'deadtime',
         }
