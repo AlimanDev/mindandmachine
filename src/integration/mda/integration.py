@@ -70,14 +70,23 @@ class MdaIntegrationHelper:
             'shops': ShopDTOSerializer(self._get_shops_queryset(threshold_seconds), many=True).data,
         }
 
-    def export_data(self, export_path, threshold_seconds=None):
+    def export_data(self, export_path, threshold_seconds=None, plain_shops=False):
         """
         from src.integration.mda.integration import MdaIntegrationHelper
-        MdaIntegrationHelper().export_data(export_path='orgstruct.xlsx')
+        MdaIntegrationHelper().export_data(export_path='orgstruct.xlsx', plain_shops=True)
         """
         data = self._get_data(threshold_seconds=threshold_seconds)
         divisions_df = pd.DataFrame(data['divisions'])
         regions_df = pd.DataFrame(data['regions'])
+
+        if plain_shops:
+            divisions_dict = {d['id']: d for d in data['divisions']}
+            regions_dict = {d['id']: d for d in data['regions']}
+            for shop_data in data['shops']:
+                region_data = regions_dict[shop_data['regionId']]
+                division_data = divisions_dict[region_data['divisionId']]
+                shop_data['regionName'] = region_data['name']
+                shop_data['divisionName'] = division_data['name']
         shops_df = pd.DataFrame(data['shops'])
 
         writer = pd.ExcelWriter(export_path, engine='xlsxwriter')
