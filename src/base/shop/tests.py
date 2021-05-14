@@ -585,3 +585,41 @@ class TestDepartment(TestsHelperMixin, APITestCase):
         self.assertEqual(len(response[0]['children']), 2)
         self.assertEqual(response[1]['label'], 'Клиент2')
         self.assertEqual(len(response[1]['children']), 1)
+
+    def test_ignore_parent_code_when_updating_department_via_api_parameter(self):
+        shop_data = self._get_shop_data()
+        put_url = f'{self.url}{shop_data["code"]}/'
+
+        response = self.client.put(put_url, shop_data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        shop = Shop.objects.get(code=shop_data['code'])
+        self.assertEqual(shop.parent_id, self.root_shop.id)
+
+        shop.parent = self.reg_shop1
+        shop.save()
+
+        response = self.client.put(put_url, shop_data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        shop.refresh_from_db()
+        # при выключенной настройке родитель должен обновиться
+        self.assertEqual(
+            shop.parent_id,
+            self.root_shop.id
+        )
+
+        shop.parent = self.reg_shop1
+        shop.save()
+
+        shop.network.ignore_parent_code_when_updating_department_via_api = True
+        shop.network.save()
+
+        response = self.client.put(put_url, shop_data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        shop.refresh_from_db()
+        # при включенной настройке родитель не должен обновиться
+        self.assertEqual(
+            shop.parent_id,
+            self.reg_shop1.id
+        )

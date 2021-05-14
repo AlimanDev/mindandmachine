@@ -128,6 +128,10 @@ class Network(AbstractActiveModel):
         default=False, verbose_name='Учитывать неотработанные часы за предыдущие месяца при расчете нормы часов',
     )
     outsourcings = models.ManyToManyField('self', through='base.NetworkConnect', through_fields=('client', 'outsourcing'), symmetrical=False, related_name='clients')
+    ignore_parent_code_when_updating_department_via_api = models.BooleanField(
+        default=False, verbose_name='Не учитывать parent_code при изменении подразделения через api',
+        help_text='Необходимо включить для случаев, когда оргструктура поддерживается вручную',
+    )
 
     def get_department(self):
         return None
