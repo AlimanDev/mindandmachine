@@ -115,7 +115,7 @@ class WorkerDaySerializer(serializers.ModelSerializer):
     created_by = serializers.HiddenField(default=serializers.CurrentUserDefault())
     last_edited_by = serializers.HiddenField(default=serializers.CurrentUserDefault())
     outsources = NetworkSerializer(many=True, read_only=True)
-    outsources_ids = serializers.ListField(required=False, child=serializers.IntegerField())
+    outsources_ids = serializers.ListField(required=False, child=serializers.IntegerField(), allow_null=True, allow_empty=True)
 
     class Meta:
         model = WorkerDay
@@ -203,7 +203,7 @@ class WorkerDaySerializer(serializers.ModelSerializer):
                     "employment": self.error_messages['user_mismatch']
                 })
 
-        outsources_ids = attrs.pop('outsources_ids', [])
+        outsources_ids = attrs.pop('outsources_ids', []) or []
         if attrs.get('is_outsource'):
             if not attrs.get('is_vacancy'):
                 raise ValidationError(self.error_messages['outsource_only_vacancy'])
