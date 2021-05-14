@@ -212,6 +212,8 @@ class ShopSerializer(serializers.ModelSerializer):
 
     def update(self, instance, validated_data):
         nonstandard_schedule = validated_data.pop('nonstandard_schedule', [])
+        if instance.network.ignore_parent_code_when_updating_department_via_api:
+            validated_data.pop('parent_code', None)
         shop = super(ShopSerializer, self).update(instance, validated_data)
         self._update_or_create_nested_data(shop, nonstandard_schedule)
         return shop
