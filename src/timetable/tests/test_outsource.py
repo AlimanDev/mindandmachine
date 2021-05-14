@@ -157,6 +157,12 @@ class TestOutsource(TestsHelperMixin, APITestCase):
         not_created = self._create_vacancy(dt_now, datetime.combine(dt_now, time(8)), datetime.combine(dt_now, time(20)), outsources=[self.outsource_network.id,])
         self.assertEqual(not_created.json(), {'non_field_errors': ['Не переданы аутсорс сети, которые могут откликнуться на аутсорс вакансию.']})
 
+    def test_vacancy_creation_with_null_or_empty_outsourcings_ids(self):
+        dt_now = self.dt_now
+        created = self._create_vacancy(dt_now, datetime.combine(dt_now, time(8)), datetime.combine(dt_now, time(20)), is_outsource=False)
+        self.assertEqual(created.status_code, 201)
+        created = self._create_vacancy(dt_now, datetime.combine(dt_now, time(8)), datetime.combine(dt_now, time(20)), is_outsource=False, outsources=None)
+        self.assertEqual(created.status_code, 201)
 
     def test_vacancy_get(self):
         dt_now = self.dt_now
