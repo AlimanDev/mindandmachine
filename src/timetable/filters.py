@@ -98,20 +98,16 @@ class VacancyFilter(FilterSetWithInitial):
     is_vacant = BooleanFilter(field_name='employee', lookup_expr='isnull')
     shift_length_min = TimeFilter(field_name='work_hours', lookup_expr='gte')
     shift_length_max = TimeFilter(field_name='work_hours', lookup_expr='lte')
-    shop_id = CharFilter(field_name='shop_id', method='filter_include_outsource')
+    shop_id = CharFilter(field_name='shop_id', method='filter_shops')
+    is_outsource = BooleanFilter(field_name='is_outsource')
     work_type_name = CharFilter(field_name='work_types', method='filter_by_name')
     ordering = OrderingFilter(fields=('dt', 'id', 'dttm_work_start', 'dttm_work_end'), initial='dt,dttm_work_start')
     approved_first = BooleanFilter(method='filter_approved_first')
     only_available = BooleanFilter(method='filter_only_available')
 
-    def filter_include_outsource(self, queryset, name, value):
+    def filter_shops(self, queryset, name, value):
         if value:
-            shops = value.split(',')
-            if self.data.get('include_outsource', 'false') == 'true':
-                return queryset.filter(
-                    Q(shop_id__in=shops) | Q(is_outsource=True),
-                )
-            return queryset.filter(shop_id__in=shops)
+            return queryset.filter(shop_id__in=value.split(','))
         return queryset
 
     def filter_by_name(self, queryset, name, value):
