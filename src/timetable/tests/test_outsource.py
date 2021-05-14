@@ -128,7 +128,7 @@ class TestOutsource(TestsHelperMixin, APITestCase):
 
     def _authorize_tick_point(self):
         t = TickPoint.objects.create(
-            network=self.network,
+            network=self.client_network,
             name='test',
             shop=self.client_shop,
         )

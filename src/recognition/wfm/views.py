@@ -69,8 +69,8 @@ class WorkerDayViewSet(viewsets.ReadOnlyModelViewSet):
             is_approved=True,
         )
         emp_cond = Employment.objects.get_active(
-            self.request.user.network_id,
-            dt_from, dt_from, # чтобы не попались трудоустройства с завтрашнего дня
+            # self.request.user.network_id,
+            dt_from=dt_from, dt_to=dt_from, # чтобы не попались трудоустройства с завтрашнего дня
         )
         shop_emp_cond = Employment.objects.get_active(
             self.request.user.network_id,

@@ -2205,6 +2205,22 @@ class TestVacancy(TestsHelperMixin, APITestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.json()['results']), 1)
 
+    def test_get_outsource_list(self):
+        response = self.client.get(f'{self.url}?shop_id={self.shop.id}&limit=100')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.json()['results']), 2)
+        response = self.client.get(f'{self.url}?shop_id={self.shop.id}&is_outsource=true&limit=100')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.json()['results']), 0)
+        self.vacancy2.is_outsource = True
+        self.vacancy2.save()
+        response = self.client.get(f'{self.url}?shop_id={self.shop.id}&is_outsource=true&limit=100')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.json()['results']), 1)
+        response = self.client.get(f'{self.url}?shop_id={self.shop.id}&is_outsource=false&limit=100')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.json()['results']), 1)
+
     def test_confirm_vacancy(self):
         self.shop.__class__.objects.filter(id=self.shop.id).update(email=True)
         pnawd = WorkerDay.objects.create(
