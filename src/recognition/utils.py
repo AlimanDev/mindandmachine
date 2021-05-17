@@ -1,10 +1,10 @@
+import json
 from src.timetable.models import PlanAndFactHours, WorkerDay
 from datetime import timedelta, datetime, date
 from src.base.models import Shop, User, Employment
 from src.recognition.api.recognition import Recognition
 from src.recognition.models import UserConnecter
 from src.recognition.events import DUPLICATE_BIOMETRICS
-from src.notifications.models.event_notification import EventEmailNotification
 from src.events.signals import event_signal
 from django.conf import settings
 
@@ -18,14 +18,15 @@ def get_worker_days_with_no_ticks(dttm: datetime):
     no_comming = []
     no_leaving = []
 
-    for shop in Shop.objects.all():
+    for shop in Shop.objects.select_related('network').all():
         dttm_to = dttm + timedelta(hours=shop.get_tz_offset())
-        dttm_from = dttm_to - timedelta(minutes=5)
+        dttm_from_comming = dttm_to - timedelta(seconds=json.loads(shop.network.settings_values).get('delta_for_comming_in_secs', 300))
+        dttm_from_leaving = dttm_to - timedelta(seconds=json.loads(shop.network.settings_values).get('delta_for_leaving_in_secs', 300))
         no_comming.extend(
             list(
                 PlanAndFactHours.objects.filter(
-                    dttm_work_start_plan__gte=dttm_from, 
-                    dttm_work_start_plan__lt=dttm_to, 
+                    dttm_work_start_plan__gte=dttm_from_comming, 
+                    dttm_work_start_plan__lt=dttm_from_comming + timedelta(minutes=1), 
                     ticks_comming_fact_count=0,
                     wd_type=WorkerDay.TYPE_WORKDAY,
                     shop=shop,
@@ -39,8 +40,8 @@ def get_worker_days_with_no_ticks(dttm: datetime):
         no_leaving.extend(
             list(
                 PlanAndFactHours.objects.filter(
-                    dttm_work_end_plan__gte=dttm_from, 
-                    dttm_work_end_plan__lt=dttm_to, 
+                    dttm_work_end_plan__gte=dttm_from_leaving, 
+                    dttm_work_end_plan__lt=dttm_from_leaving + timedelta(minutes=1), 
                     ticks_leaving_fact_count=0,
                     wd_type=WorkerDay.TYPE_WORKDAY,
                     shop=shop,
