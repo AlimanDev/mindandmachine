@@ -48,7 +48,7 @@ class TestTickPhotos(TestsHelperMixin, APITestCase):
                 check_duplicate_biometrics(None, self.user3, shop_id=self.shop2.id)
         self.assertEqual(len(mail.outbox), 1)
         body = f'Здравствуйте, {self.user2.first_name}!\n\nОдинаковые биометрические параметры сотрудников.\n' +\
-        f'Первый сотрудник: {self.user3.last_name} {self.user3.first_name}\nТабельный номер: {self.employee3.tabel_code}\nСсылка на биошаблон: {settings.HOST}/_i/media/photo/3\n' +\
-        f'Второй сотрудник: {self.user1.last_name} {self.user1.first_name}\nТабельный номер: {self.employee1.tabel_code}\nСсылка на биошаблон: {settings.HOST}/_i/media/photo/1' +\
+        f'Первый сотрудник: {self.user3.last_name} {self.user3.first_name}\nТабельный номер: {self.employee3.tabel_code}\nСсылка на биошаблон: {settings.EXTERNAL_HOST}/_i/media/photo/3\n' +\
+        f'Второй сотрудник: {self.user1.last_name} {self.user1.first_name}\nТабельный номер: {self.employee1.tabel_code}\nСсылка на биошаблон: {settings.EXTERNAL_HOST}/_i/media/photo/1' +\
         '\n\nПисьмо отправлено роботом.'
         self.assertEqual(mail.outbox[0].body, body)
