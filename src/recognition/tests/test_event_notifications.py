@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta, time
+import json
 import pandas as pd
 from unittest import mock
 
@@ -21,6 +22,7 @@ from src.events.models import EventType
 from src.notifications.models import EventEmailNotification
 from src.recognition.events import (
     EMPLOYEE_NOT_CHECKED_IN,
+    EMPLOYEE_NOT_CHECKED_OUT,
     EMPLOYEE_WORKING_NOT_ACCORDING_TO_PLAN,
 )
 from src.reports.events import (
@@ -34,7 +36,7 @@ from src.timetable.models import WorkerDay, AttendanceRecords
 from src.timetable.tests.factories import WorkerDayFactory
 from src.util.mixins.tests import TestsHelperMixin
 from src.events.tasks import cron_event
-from src.celery.tasks import employee_not_checked_in
+from src.celery.tasks import employee_not_checked
 from xlrd import open_workbook
 
 
@@ -698,7 +700,7 @@ class TestSendUrvStatV2EventNotifications(TestsHelperMixin, APITestCase):
             self.assertEqual(df.to_dict('records'), data)
 
 
-class TestEmployeeNotCheckedInEventNotifications(TestsHelperMixin, APITestCase):
+class TestEmployeeNotCheckedEventNotifications(TestsHelperMixin, APITestCase):
     @classmethod
     def setUpTestData(cls):
         cls.network = NetworkFactory()
@@ -728,8 +730,11 @@ class TestEmployeeNotCheckedInEventNotifications(TestsHelperMixin, APITestCase):
         cls.employment_worker = EmploymentFactory(
             employee=cls.employee_worker, shop=cls.shop, function_group=cls.group_worker,
         )
-        cls.event, _created = EventType.objects.get_or_create(
+        cls.event_in, _created = EventType.objects.get_or_create(
             code=EMPLOYEE_NOT_CHECKED_IN, network=cls.network)
+
+        cls.event_out, _created = EventType.objects.get_or_create(
+            code=EMPLOYEE_NOT_CHECKED_OUT, network=cls.network)
         
         cls.dt = datetime.now().date()
         cls.now = datetime.now() + timedelta(hours=cls.shop.get_tz_offset())
@@ -741,7 +746,7 @@ class TestEmployeeNotCheckedInEventNotifications(TestsHelperMixin, APITestCase):
             employee=cls.employee_worker,
             dt=cls.dt,
             type=WorkerDay.TYPE_WORKDAY,
-            dttm_work_start=cls.now - timedelta(minutes=1),
+            dttm_work_start=cls.now - timedelta(minutes=5),
             dttm_work_end=cls.now + timedelta(hours=6),
         )
         WorkerDayFactory(
@@ -753,7 +758,7 @@ class TestEmployeeNotCheckedInEventNotifications(TestsHelperMixin, APITestCase):
             dt=cls.dt,
             type=WorkerDay.TYPE_WORKDAY,
             dttm_work_start=cls.now - timedelta(hours=6),
-            dttm_work_end=cls.now - timedelta(minutes=1),
+            dttm_work_end=cls.now - timedelta(minutes=5),
         )
         AttendanceRecords.objects.create(
             shop=cls.shop,
@@ -765,29 +770,37 @@ class TestEmployeeNotCheckedInEventNotifications(TestsHelperMixin, APITestCase):
     def setUp(self):
         self.client.force_authenticate(user=self.user_dir)
 
-    def test_employee_not_checked_in_notification_sent(self):
+    def test_employee_not_checked_notification_sent(self):
         with self.settings(CELERY_TASK_ALWAYS_EAGER=True):
-            subject = 'Сотрудник не отметился'
+            subject_in = 'Сотрудник не отметился на приход'
             EventEmailNotification.objects.create(
-                event_type=self.event,
-                subject=subject,
-                system_email_template='notifications/email/employee_not_checked_in.html',
+                event_type=self.event_in,
+                subject=subject_in,
+                system_email_template='notifications/email/employee_not_checked.html',
+                get_recipients_from_event_type=True,
+            )
+            subject_out = 'Сотрудник не отметился на уход'
+            EventEmailNotification.objects.create(
+                event_type=self.event_out,
+                subject=subject_out,
+                system_email_template='notifications/email/employee_not_checked.html',
                 get_recipients_from_event_type=True,
             )
             
-            employee_not_checked_in()
+            employee_not_checked()
             
             self.assertEqual(len(mail.outbox), 2)
-            self.assertEqual(mail.outbox[0].subject, subject)
+            self.assertEqual(mail.outbox[0].subject, subject_in)
+            self.assertEqual(mail.outbox[1].subject, subject_out)
             self.assertEqual(mail.outbox[0].to[0], self.user_dir.email)
-            dttm = (self.now - timedelta(minutes=1)).replace(second=0).strftime('%Y-%m-%dT%H:%M:%S')
+            dttm = (self.now - timedelta(minutes=5)).replace(second=0).strftime('%Y-%m-%dT%H:%M:%S')
             body1 = f'Здравствуйте, {self.user_dir.first_name}!\n\nСотрудник {self.user_worker.last_name} {self.user_worker.first_name} не отметился на приход в {dttm}.\n\nПисьмо отправлено роботом.'
             self.assertEqual(mail.outbox[0].body, body1)
             body2 = f'Здравствуйте, {self.user_dir.first_name}!\n\nСотрудник {self.user_dir.last_name} {self.user_dir.first_name} не отметился на уход в {dttm}.\n\nПисьмо отправлено роботом.'
             self.assertEqual(mail.outbox[1].body, body2)
 
     
-    def test_employee_not_checked_in_notification_sent_only_one(self):
+    def test_employee_not_checked_notification_sent_only_one(self):
         AttendanceRecords.objects.create(
             shop=self.shop,
             type=AttendanceRecords.TYPE_LEAVING,
@@ -795,20 +808,65 @@ class TestEmployeeNotCheckedInEventNotifications(TestsHelperMixin, APITestCase):
             dttm=self.now,
         )
         with self.settings(CELERY_TASK_ALWAYS_EAGER=True):
-            subject = 'Сотрудник не отметился'
-            event_email_notification = EventEmailNotification.objects.create(
-                event_type=self.event,
-                subject=subject,
-                system_email_template='notifications/email/employee_not_checked_in.html',
+            subject_in = 'Сотрудник не отметился на приход'
+            EventEmailNotification.objects.create(
+                event_type=self.event_in,
+                subject=subject_in,
+                system_email_template='notifications/email/employee_not_checked.html',
+                get_recipients_from_event_type=True,
+            )
+            subject_out = 'Сотрудник не отметился на уход'
+            EventEmailNotification.objects.create(
+                event_type=self.event_out,
+                subject=subject_out,
+                system_email_template='notifications/email/employee_not_checked.html',
                 get_recipients_from_event_type=True,
             )
             
-            employee_not_checked_in()
+            employee_not_checked()
             
             self.assertEqual(len(mail.outbox), 1)
-            self.assertEqual(mail.outbox[0].subject, subject)
+            self.assertEqual(mail.outbox[0].subject, subject_in)
             self.assertEqual(mail.outbox[0].to[0], self.user_dir.email)
-            dttm = (self.now - timedelta(minutes=1)).replace(second=0).strftime('%Y-%m-%dT%H:%M:%S')
+            dttm = (self.now - timedelta(minutes=5)).replace(second=0).strftime('%Y-%m-%dT%H:%M:%S')
+            body1 = f'Здравствуйте, {self.user_dir.first_name}!\n\nСотрудник {self.user_worker.last_name} {self.user_worker.first_name} не отметился на приход в {dttm}.\n\nПисьмо отправлено роботом.'
+            self.assertEqual(mail.outbox[0].body, body1)
+
+    def test_employee_not_checked_notification_sent_custom_deltas(self):
+        self.network.settings_values = json.dumps(
+            {
+                'delta_for_comming_in_secs': 120,
+                'delta_for_leaving_in_secs': 240,
+            }
+        )
+        self.network.save()
+        WorkerDay.objects.filter(
+            employee=self.employee_worker,
+        ).update(
+            dttm_work_start=self.now - timedelta(minutes=2),
+        )
+        with self.settings(CELERY_TASK_ALWAYS_EAGER=True):
+            subject_in = 'Сотрудник не отметился на приход'
+            EventEmailNotification.objects.create(
+                event_type=self.event_in,
+                subject=subject_in,
+                system_email_template='notifications/email/employee_not_checked.html',
+                get_recipients_from_event_type=True,
+            )
+            subject_out = 'Сотрудник не отметился на уход'
+            EventEmailNotification.objects.create(
+                event_type=self.event_out,
+                subject=subject_out,
+                system_email_template='notifications/email/employee_not_checked.html',
+                get_recipients_from_event_type=True,
+            )
+            
+            employee_not_checked()
+            
+            self.assertEqual(len(mail.outbox), 1)
+            self.assertEqual(mail.outbox[0].subject, subject_in)
+            self.assertEqual(mail.outbox[0].to[0], self.user_dir.email)
+            dttm = (self.now - timedelta(minutes=2)).replace(second=0).strftime('%Y-%m-%dT%H:%M:%S')
             body1 = f'Здравствуйте, {self.user_dir.first_name}!\n\nСотрудник {self.user_worker.last_name} {self.user_worker.first_name} не отметился на приход в {dttm}.\n\nПисьмо отправлено роботом.'
             self.assertEqual(mail.outbox[0].body, body1)
 
@@ -863,7 +921,7 @@ class TestEmployeeWorkingNotAccordingToPlanEventNotifications(TestsHelperMixin, 
     def setUp(self):
         self.client.force_authenticate(user=self.user_dir)
 
-    def test_employee_not_checked_in_notification_sent(self):
+    def test_employee_working_not_according_to_plan_notification_sent(self):
         with self.settings(CELERY_TASK_ALWAYS_EAGER=True):
             with mock.patch.object(transaction, 'on_commit', lambda t: t()): 
                 subject = 'Сотрудник вышел не по плану'

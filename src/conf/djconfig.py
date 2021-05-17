@@ -571,7 +571,7 @@ CELERY_BEAT_SCHEDULE = {
         'options': {'queue': BACKEND_QUEUE}
     },
     'task-send-employee-not-checked-in-notification': {
-        'task': 'src.celery.tasks.employee_not_checked_in',
+        'task': 'src.celery.tasks.employee_not_checked',
         'schedule': crontab(minute='*/5'),
         'options': {'queue': BACKEND_QUEUE}
     },

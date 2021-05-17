@@ -115,7 +115,7 @@ class WorkerDaySerializer(serializers.ModelSerializer):
     created_by = serializers.HiddenField(default=serializers.CurrentUserDefault())
     last_edited_by = serializers.HiddenField(default=serializers.CurrentUserDefault())
     outsources = NetworkSerializer(many=True, read_only=True)
-    outsources_ids = serializers.ListField(required=False, child=serializers.IntegerField(), allow_null=True, allow_empty=True)
+    outsources_ids = serializers.ListField(required=False, child=serializers.IntegerField(), allow_null=True, allow_empty=True, write_only=True)
 
     class Meta:
         model = WorkerDay
