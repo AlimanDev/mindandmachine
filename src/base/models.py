@@ -507,7 +507,7 @@ class Shop(MPTTModel, AbstractActiveNetworkSpecificCodeNamedModel):
                     defaults=dict(
                         function_group=role,
                         dt_hired=timezone.now().date(),
-                        dt_fired='3999-12-31',
+                        dt_fired='3999-01-01',
                     )
                 )
 
@@ -566,8 +566,10 @@ class Shop(MPTTModel, AbstractActiveNetworkSpecificCodeNamedModel):
                     if self.tracker.has_changed('director_id') and prev_director_id_value:
                         empls_to_delete_qs = Employment.objects.filter(
                             employee__user_id=prev_director_id_value,
+                            employee__tabel_code__isnull=True,
+                            shop=self,
                             is_visible=False,
-                            dt_fired='3999-12-31',
+                            dt_fired='3999-01-01',
                         )
                         empls_to_delete_qs.update(dt_fired=timezone.now().date())
                         empls_to_delete_qs.delete()
