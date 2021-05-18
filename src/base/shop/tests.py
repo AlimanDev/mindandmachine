@@ -645,7 +645,7 @@ class TestDepartment(TestsHelperMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         employment = Employment.objects.filter(
             employee__user_id=director_user.id,
-            is_visible=False, dt_hired=timezone.now(), dt_fired='3999-12-31',
+            is_visible=False, dt_hired=timezone.now(), dt_fired='3999-01-01',
         ).first()
         self.assertIsNotNone(employment)
         self.assertEqual(employment.function_group_id, self.chief_group.id)
@@ -658,13 +658,13 @@ class TestDepartment(TestsHelperMixin, APITestCase):
         employment = Employment.objects.filter(
             employee__user_id=director_user.id,
             function_group=self.chief_group,
-            is_visible=False, dt_hired=timezone.now(), dt_fired='3999-12-31',
+            is_visible=False, dt_hired=timezone.now(), dt_fired='3999-01-01',
         ).first()
         self.assertIsNone(employment)
         employment2 = Employment.objects.filter(
             employee__user_id=director_user2.id,
             function_group=self.chief_group,
-            is_visible=False, dt_hired=timezone.now(), dt_fired='3999-12-31',
+            is_visible=False, dt_hired=timezone.now(), dt_fired='3999-01-01',
         ).first()
         self.assertIsNotNone(employment2)
 
@@ -679,7 +679,7 @@ class TestDepartment(TestsHelperMixin, APITestCase):
         employment = Employment.objects.filter(
             employee__user_id=director_user.id,
             function_group=urs_group,
-            is_visible=False, dt_hired=timezone.now(), dt_fired='3999-12-31',
+            is_visible=False, dt_hired=timezone.now(), dt_fired='3999-01-01',
         ).first()
         self.assertIsNotNone(employment)
         self.assertEqual(employment.function_group_id, urs_group.id)
@@ -692,7 +692,7 @@ class TestDepartment(TestsHelperMixin, APITestCase):
         employment_qs = Employment.objects.filter(
             employee__user_id=director_user.id,
             function_group=self.chief_group,
-            is_visible=False, dt_hired=timezone.now(), dt_fired='3999-12-31',
+            is_visible=False, dt_hired=timezone.now(), dt_fired='3999-01-01',
         )
         employment = employment_qs.first()
         self.assertIsNone(employment)
