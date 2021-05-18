@@ -132,6 +132,14 @@ class Network(AbstractActiveModel):
         default=False, verbose_name='Не учитывать parent_code при изменении подразделения через api',
         help_text='Необходимо включить для случаев, когда оргструктура поддерживается вручную',
     )
+    create_employment_on_set_or_update_director_code = models.BooleanField(
+        default=False,
+        verbose_name='Создавать скрытое трудоустройство при проставлении/изменении director_code в подразделении',
+    )
+
+    @property
+    def settings_values_prop(self):
+        return json.loads(self.settings_values)
 
     def get_department(self):
         return None
@@ -140,14 +148,13 @@ class Network(AbstractActiveModel):
     def position_default_values(self):
         return json.loads(self.worker_position_default_values)
 
-
     @cached_property
     def night_edges(self):
         default_night_edges = (
             '22:00:00',
             '06:00:00',
         )
-        return json.loads(self.settings_values).get('night_edges', default_night_edges)
+        return self.settings_values_prop.get('night_edges', default_night_edges)
 
     @cached_property
     def accounting_periods_count(self):
@@ -350,7 +357,7 @@ class Shop(MPTTModel, AbstractActiveNetworkSpecificCodeNamedModel):
     city = models.CharField(max_length=128, null=True, blank=True, verbose_name='Город')
 
     tracker = FieldTracker(
-        fields=['tm_open_dict', 'tm_close_dict', 'load_template', 'latitude', 'longitude', 'fias_code'])
+        fields=['tm_open_dict', 'tm_close_dict', 'load_template', 'latitude', 'longitude', 'fias_code', 'director_id'])
 
     def __str__(self):
         return '{}, {}, {}, {}'.format(
@@ -419,7 +426,10 @@ class Shop(MPTTModel, AbstractActiveNetworkSpecificCodeNamedModel):
 
     @director_code.setter
     def director_code(self, val):
-        self.director = User.objects.filter(username=val).first()
+        if val:
+            director = User.objects.filter(username=val).first()
+            if director:
+                self.director = director
 
     def _parse_times(self, attr):
         return {
@@ -479,7 +489,29 @@ class Shop(MPTTModel, AbstractActiveNetworkSpecificCodeNamedModel):
         )
         ch.apply_async()
 
-    def save(self, *args, **kwargs):
+    def _create_director_employment(self):
+        employee, _employee_created = Employee.objects.get_or_create(
+            user_id=self.director_id,
+            tabel_code=None,
+        )
+        shop_lvl_to_role_code_mapping = self.network.settings_values_prop.get(
+            'shop_lvl_to_role_code_mapping', {})
+        role_code = shop_lvl_to_role_code_mapping.get(str(self.get_level()))
+        if role_code:
+            role = Group.objects.filter(code=role_code, network_id=self.network_id).first()
+            if role:
+                Employment.objects.update_or_create(
+                    employee=employee,
+                    shop=self,
+                    is_visible=False,
+                    defaults=dict(
+                        function_group=role,
+                        dt_hired=timezone.now().date(),
+                        dt_fired='3999-01-01',
+                    )
+                )
+
+    def save(self, *args, force_create_director_employment=False, **kwargs):
         is_new = self.id is None
         if self.open_times.keys() != self.close_times.keys():
             raise ValidationError(_('Keys of open times and close times are different.'))
@@ -520,6 +552,27 @@ class Shop(MPTTModel, AbstractActiveNetworkSpecificCodeNamedModel):
 
         if is_new or self.tracker.has_changed('fias_code') and settings.FILL_SHOP_CITY_COORDS_ADDRESS_TIMEZONE_FROM_FIAS_CODE:
             transaction.on_commit(self._fill_city_coords_address_timezone_from_fias_code)
+
+        if self.network.create_employment_on_set_or_update_director_code or force_create_director_employment:
+            if is_new:
+                if self.director_id:
+                    self._create_director_employment()
+            else:
+                if self.tracker.has_changed('director_id') or force_create_director_employment:
+                    if self.director_id:
+                        self._create_director_employment()
+
+                    prev_director_id_value = self.tracker.previous('director_id')
+                    if self.tracker.has_changed('director_id') and prev_director_id_value:
+                        empls_to_delete_qs = Employment.objects.filter(
+                            employee__user_id=prev_director_id_value,
+                            employee__tabel_code__isnull=True,
+                            shop=self,
+                            is_visible=False,
+                            dt_fired='3999-01-01',
+                        )
+                        empls_to_delete_qs.update(dt_fired=timezone.now().date())
+                        empls_to_delete_qs.delete()
 
         return res
 

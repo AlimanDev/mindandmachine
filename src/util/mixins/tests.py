@@ -151,3 +151,9 @@ class TestsHelperMixin:
             level_up=1,
             level_down=99,
         )
+
+    @staticmethod
+    def _add_network_settings_value(network, key, value):
+        network_settings = json.loads(network.settings_values)
+        network_settings[key] = value
+        network.settings_values = json.dumps(network_settings)
