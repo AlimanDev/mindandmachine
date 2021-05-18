@@ -630,6 +630,7 @@ class WorkerDayViewSet(BaseModelViewSet):
                 'employee__user',
             ).prefetch_related(
                 'worker_day_details',
+                'outsources',
             ).annotate(
                 first_name=F('employee__user__first_name'),
                 last_name=F('employee__user__last_name'),
