@@ -523,7 +523,8 @@ def confirm_vacancy(vacancy_id, user, employee_id=None, exchange=False):
             res['status_code'] = 400
             return res
         # сотрудник из другой сети не может принять вакансию если это аутсорс вакансия, но его сеть не в списке доступных
-        elif vacancy.is_outsource and not vacancy.outsources.filter(id=active_employment.shop.network_id).exists():
+        elif vacancy.is_outsource and active_employment.shop.network_id != vacancy_shop.network_id\
+            and not vacancy.outsources.filter(id=active_employment.shop.network_id).exists():
             res['text'] = messages['cant_apply_vacancy_outsource_no_network']
             res['status_code'] = 400
             return res

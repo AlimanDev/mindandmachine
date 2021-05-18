@@ -176,7 +176,6 @@ class TestOutsource(TestsHelperMixin, APITestCase):
         self.assertEqual(response.json()['count'], 2)
         self.assertEqual(len(response.json()['results'][0]['outsources']), 1)
 
-
     def test_confirm_vacancy(self):
         dt_now = self.dt_now
         vacancy_without_outsource = self._create_vacancy(dt_now, datetime.combine(dt_now, time(8)), datetime.combine(dt_now, time(20)), is_outsource=False).json()
@@ -193,6 +192,19 @@ class TestOutsource(TestsHelperMixin, APITestCase):
         vacancy = WorkerDay.objects.get(id=vacancy['id'])
         self.assertEqual(vacancy.employee_id, self.employee1.id)
         self.assertEqual(vacancy.employment_id, self.employment1.id)
+
+    def test_confirm_outsource_vacancy_from_client_network(self):
+        dt_now = self.dt_now
+        vacancy = self._create_vacancy(dt_now, datetime.combine(dt_now, time(8)), datetime.combine(dt_now, time(20)), outsources=[self.outsource_network.id,]).json()
+        WorkerDay.objects.all().update(is_approved=True)
+        WorkerDay.objects.create(
+            dt=dt_now,
+            type=WorkerDay.TYPE_HOLIDAY,
+            employee=self.client_employee,
+            is_approved=True,
+        )
+        response = self.client.post(f'/rest_api/worker_day/{vacancy["id"]}/confirm_vacancy/')
+        self.assertEqual(response.json(), {'result': 'Вакансия успешно принята.'})
 
     def test_get_vacancy_with_worker(self):
         vacancy = self._create_and_apply_vacancy()
