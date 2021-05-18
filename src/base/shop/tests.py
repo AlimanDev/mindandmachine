@@ -5,10 +5,12 @@ from unittest import mock
 from dadata import Dadata
 from dateutil.relativedelta import relativedelta
 from django.db import transaction
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from src.base.models import Shop, ShopSchedule, NetworkConnect, Network
+from src.base.models import Shop, ShopSchedule, NetworkConnect, Network, Employment, Group
+from src.base.tests.factories import UserFactory, ShopFactory
 from src.forecast.tests.factories import LoadTemplateFactory
 from src.timetable.models import ShopMonthStat
 from src.util.mixins.tests import TestsHelperMixin
@@ -31,6 +33,7 @@ class TestDepartment(TestsHelperMixin, APITestCase):
 
     def setUp(self):
         self.client.force_authenticate(user=self.user1)
+        self.network.refresh_from_db()
 
     @staticmethod
     def _get_shop_data():
@@ -623,3 +626,87 @@ class TestDepartment(TestsHelperMixin, APITestCase):
             shop.parent_id,
             self.reg_shop1.id
         )
+
+    def test_create_employment_on_set_or_update_director_code(self):
+        urs_group, _urs_group_created = Group.objects.get_or_create(name='УРС', code='urs', network=self.network)
+        self.network.create_employment_on_set_or_update_director_code = True
+        self._add_network_settings_value(self.network, 'shop_lvl_to_role_code_mapping', {
+            0: 'urs',
+            1: 'director',
+        })
+        self.network.save()
+
+        director_code = 'IvanovII'
+        director_user = UserFactory(username=director_code)
+        shop_data = self._get_shop_data()
+        shop_data['director_code'] = director_code
+        put_url = f'{self.url}{shop_data["code"]}/'
+        response = self.client.put(put_url, shop_data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        employment = Employment.objects.filter(
+            employee__user_id=director_user.id,
+            is_visible=False, dt_hired=timezone.now(), dt_fired='3999-01-01',
+        ).first()
+        self.assertIsNotNone(employment)
+        self.assertEqual(employment.function_group_id, self.chief_group.id)
+
+        director_code2 = 'PetrovPP'
+        director_user2 = UserFactory(username=director_code2)
+        shop_data['director_code'] = director_code2
+        response = self.client.put(put_url, shop_data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        employment = Employment.objects.filter(
+            employee__user_id=director_user.id,
+            function_group=self.chief_group,
+            is_visible=False, dt_hired=timezone.now(), dt_fired='3999-01-01',
+        ).first()
+        self.assertIsNone(employment)
+        employment2 = Employment.objects.filter(
+            employee__user_id=director_user2.id,
+            function_group=self.chief_group,
+            is_visible=False, dt_hired=timezone.now(), dt_fired='3999-01-01',
+        ).first()
+        self.assertIsNotNone(employment2)
+
+        shop_data = self._get_shop_data()
+        shop_data['director_code'] = director_code
+        shop_data['code'] = self.root_shop.code
+        shop_data.pop('parent_code')
+        put_url = f'{self.url}{shop_data["code"]}/'
+        response = self.client.put(put_url, shop_data, format='json')
+        self.print_resp(response)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        employment = Employment.objects.filter(
+            employee__user_id=director_user.id,
+            function_group=urs_group,
+            is_visible=False, dt_hired=timezone.now(), dt_fired='3999-01-01',
+        ).first()
+        self.assertIsNotNone(employment)
+        self.assertEqual(employment.function_group_id, urs_group.id)
+
+    def test_force_create_director_employment(self):
+        director_code = 'IvanovII'
+        director_user = UserFactory(username=director_code)
+
+        shop = ShopFactory(director=director_user)
+        employment_qs = Employment.objects.filter(
+            employee__user_id=director_user.id,
+            function_group=self.chief_group,
+            is_visible=False, dt_hired=timezone.now(), dt_fired='3999-01-01',
+        )
+        employment = employment_qs.first()
+        self.assertIsNone(employment)
+
+        shop.network.create_employment_on_set_or_update_director_code = True
+        self._add_network_settings_value(shop.network, 'shop_lvl_to_role_code_mapping', {
+            0: 'director',
+        })
+        shop.network.save()
+
+        shop.save(force_create_director_employment=True)
+        employment = employment_qs.first()
+        self.assertIsNotNone(employment)
+
+        shop.save(force_create_director_employment=True)
+        employment_count = employment_qs.count()
+        self.assertEqual(employment_count, 1)
