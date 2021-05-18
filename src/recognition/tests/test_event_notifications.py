@@ -5,11 +5,9 @@ from unittest import mock
 
 from django.core import mail
 from django.db import transaction
-from rest_framework import status
 from rest_framework.test import APITestCase
 from django_celery_beat.models import CrontabSchedule
 
-from src.base.models import FunctionGroup
 from src.base.tests.factories import (
     ShopFactory,
     UserFactory,
@@ -793,7 +791,7 @@ class TestEmployeeNotCheckedEventNotifications(TestsHelperMixin, APITestCase):
             self.assertEqual(mail.outbox[0].subject, subject_in)
             self.assertEqual(mail.outbox[1].subject, subject_out)
             self.assertEqual(mail.outbox[0].to[0], self.user_dir.email)
-            dttm = (self.now - timedelta(minutes=5)).replace(second=0).strftime('%Y-%m-%dT%H:%M:%S')
+            dttm = (self.now - timedelta(minutes=5)).replace(second=0).strftime('%Y-%m-%d %H:%M:%S')
             body1 = f'Здравствуйте, {self.user_dir.first_name}!\n\nСотрудник {self.user_worker.last_name} {self.user_worker.first_name} не отметился на приход в {dttm}.\n\nПисьмо отправлено роботом.'
             self.assertEqual(mail.outbox[0].body, body1)
             body2 = f'Здравствуйте, {self.user_dir.first_name}!\n\nСотрудник {self.user_dir.last_name} {self.user_dir.first_name} не отметился на уход в {dttm}.\n\nПисьмо отправлено роботом.'
@@ -828,7 +826,7 @@ class TestEmployeeNotCheckedEventNotifications(TestsHelperMixin, APITestCase):
             self.assertEqual(len(mail.outbox), 1)
             self.assertEqual(mail.outbox[0].subject, subject_in)
             self.assertEqual(mail.outbox[0].to[0], self.user_dir.email)
-            dttm = (self.now - timedelta(minutes=5)).replace(second=0).strftime('%Y-%m-%dT%H:%M:%S')
+            dttm = (self.now - timedelta(minutes=5)).replace(second=0).strftime('%Y-%m-%d %H:%M:%S')
             body1 = f'Здравствуйте, {self.user_dir.first_name}!\n\nСотрудник {self.user_worker.last_name} {self.user_worker.first_name} не отметился на приход в {dttm}.\n\nПисьмо отправлено роботом.'
             self.assertEqual(mail.outbox[0].body, body1)
 
@@ -866,7 +864,7 @@ class TestEmployeeNotCheckedEventNotifications(TestsHelperMixin, APITestCase):
             self.assertEqual(len(mail.outbox), 1)
             self.assertEqual(mail.outbox[0].subject, subject_in)
             self.assertEqual(mail.outbox[0].to[0], self.user_dir.email)
-            dttm = (self.now - timedelta(minutes=2)).replace(second=0).strftime('%Y-%m-%dT%H:%M:%S')
+            dttm = (self.now - timedelta(minutes=2)).replace(second=0).strftime('%Y-%m-%d %H:%M:%S')
             body1 = f'Здравствуйте, {self.user_dir.first_name}!\n\nСотрудник {self.user_worker.last_name} {self.user_worker.first_name} не отметился на приход в {dttm}.\n\nПисьмо отправлено роботом.'
             self.assertEqual(mail.outbox[0].body, body1)
 

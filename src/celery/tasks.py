@@ -25,8 +25,6 @@ from src.celery.celery import app
 from src.conf.djconfig import EMAIL_HOST_USER, URV_DELETE_BIOMETRICS_DAYS_AFTER_FIRED
 from src.forecast.models import OperationTemplate
 from src.events.signals import event_signal
-from src.notifications.models import EventEmailNotification
-from src.notifications.tasks import send_event_email_notifications
 from src.recognition.events import EMPLOYEE_NOT_CHECKED_IN, EMPLOYEE_NOT_CHECKED_OUT
 from src.recognition.utils import get_worker_days_with_no_ticks
 from src.timetable.models import (
@@ -316,7 +314,7 @@ def employee_not_checked():
                     'email': no_comming_record.shop.director.email if no_comming_record.shop.director else no_comming_record.shop.email,
                     'name': no_comming_record.shop.director.first_name if no_comming_record.shop.director else no_comming_record.shop.name,
                 },
-                'dttm': no_comming_record.dttm_work_start_plan.strftime('%Y-%m-%dT%H:%M:%S'),
+                'dttm': no_comming_record.dttm_work_start_plan.strftime('%Y-%m-%d %H:%M:%S'),
                 'type': 'приход',
                 'shop_id': no_comming_record.shop_id,
             },
@@ -338,7 +336,7 @@ def employee_not_checked():
                     'email': no_leaving_record.shop.director.email if no_leaving_record.shop.director else no_leaving_record.shop.email,
                     'name': no_leaving_record.shop.director.first_name if no_leaving_record.shop.director else no_leaving_record.shop.name,
                 },
-                'dttm': no_leaving_record.dttm_work_end_plan.strftime('%Y-%m-%dT%H:%M:%S'),
+                'dttm': no_leaving_record.dttm_work_end_plan.strftime('%Y-%m-%d %H:%M:%S'),
                 'type': 'уход',
                 'shop_id': no_leaving_record.shop_id,
             },
