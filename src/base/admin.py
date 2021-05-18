@@ -44,10 +44,17 @@ class FunctionGroupResource(resources.ModelResource):
     def get_export_fields(self):
         return [self.fields[f] for f in self.Meta.fields]
 
-    def import_row(self, row, *args, **kwargs):
-        row['group'] = kwargs.get('group', '')
-        row['access_type'] = row['access_type'] or ''
-        return super().import_row(row, *args, **kwargs)
+    def before_import(self, dataset, using_transactions, dry_run, **kwargs):
+        data = dataset.dict
+        for row in data:
+            row['access_type'] = row['access_type'] or ''
+        new_data = []
+        for gid in kwargs.get('groups', []):
+            for row in data:
+                row = row.copy()
+                row['group'] = gid
+                new_data.append(row)
+        dataset.dict = new_data
 
 
 @admin.register(Network)
@@ -188,15 +195,15 @@ class FunctionGroupAdmin(ImportMixin, ExportActionMixin, admin.ModelAdmin):
 
     def get_form_kwargs(self, form, *args, **kwargs):
         if isinstance(form, Form) and form.is_valid():
-            group = form.cleaned_data['group']
-            kwargs.update({'group': group.id})
+            groups = form.cleaned_data['groups']
+            kwargs.update({'groups': groups.values_list('id', flat=True)})
         return kwargs
 
     def get_import_data_kwargs(self, request, *args, **kwargs):
         form = kwargs.get('form')
         if form and form.is_valid():
-            group = form.cleaned_data.get('group')
-            kwargs.update({'group': group.id if group else None})
+            groups = form.cleaned_data['groups']
+            kwargs.update({'groups': groups.values_list('id', flat=True)})
         return super().get_import_data_kwargs(request, *args, **kwargs)
 
 
