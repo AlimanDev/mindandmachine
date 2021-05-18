@@ -174,6 +174,7 @@ class TestOutsource(TestsHelperMixin, APITestCase):
         WorkerDay.objects.all().update(is_approved=True)
         response = self.client.get('/rest_api/worker_day/vacancy/?only_available=True&limit=10&offset=0')
         self.assertEqual(response.json()['count'], 2)
+        self.assertEqual(len(response.json()['results'][0]['outsources']), 1)
 
 
     def test_confirm_vacancy(self):
