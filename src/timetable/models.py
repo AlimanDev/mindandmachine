@@ -1156,6 +1156,7 @@ class AttendanceRecords(AbstractModel):
     user = models.ForeignKey(User, on_delete=models.PROTECT)
     employee = models.ForeignKey(Employee, on_delete=models.PROTECT, null=True)
     verified = models.BooleanField(default=True)
+    terminal = models.BooleanField(default=False, help_text='Отметка с теримнала')
 
     shop = models.ForeignKey(Shop, on_delete=models.PROTECT) # todo: or should be to shop? fucking logic
 

@@ -2,6 +2,7 @@ import io
 import json
 from copy import deepcopy
 from datetime import timedelta, time, datetime, date
+from src.timetable.worker_day.utils import create_fact_from_attendance_records
 from unittest import skip, mock
 from src.util.models_converter import Converter
 import pandas
@@ -12,7 +13,7 @@ from rest_framework.test import APITestCase
 from etc.scripts.fill_calendar import main as fill_calendar
 from src.base.models import WorkerPosition
 from src.forecast.models import PeriodClients, OperationType, OperationTypeName
-from src.timetable.models import WorkerDay, WorkType, WorkTypeName
+from src.timetable.models import AttendanceRecords, WorkerDay, WorkType, WorkTypeName
 from src.timetable.tests.factories import WorkerDayFactory
 from src.util.mixins.tests import TestsHelperMixin
 from src.util.test import create_departments_and_users
@@ -587,3 +588,66 @@ class TestUploadDownload(APITestCase):
         self.assertEqual(tabel[tabel.columns[1]][0], 'Магазин: Shop1') #fails with python > 3.6
         self.assertEqual(tabel[tabel.columns[1]][12], 'Иванов Иван Иванович')
         self.assertEqual(tabel[tabel.columns[27]][15], 'В')
+
+class TestCreateFactFromAttendanceRecords(TestsHelperMixin, APITestCase):
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.create_departments_and_users()
+
+    def create_att_record(self, type, dttm, user_id, shop_id, employee_id, terminal=True):
+        return AttendanceRecords.objects.create(
+            dttm=dttm,
+            shop_id=shop_id,
+            user_id=user_id,
+            employee_id=employee_id,
+            type=type,
+            terminal=terminal,
+        )
+
+    def create_worker_day(self, employment, shop_id, dttm_work_start, dttm_work_end, dt, is_fact=False, is_approved=False):
+        return WorkerDay.objects.create(
+            employee_id=employment.employee_id,
+            employment=employment,
+            shop_id=shop_id,
+            dttm_work_start=dttm_work_start,
+            dttm_work_end=dttm_work_end,
+            dt=dt,
+            is_fact=is_fact,
+            is_approved=is_approved,
+            type=WorkerDay.TYPE_WORKDAY,
+        )
+
+    def test_fact_create(self): 
+        dt = date.today()
+        self.create_att_record(AttendanceRecords.TYPE_COMING, datetime.combine(dt, time(20, 56)), self.user1.id, self.employment1.shop_id, self.employment1.employee_id, terminal=False)
+        self.create_att_record(AttendanceRecords.TYPE_COMING, datetime.combine(dt + timedelta(1), time(0, 56)), self.user1.id, self.employment1.shop_id, self.employment1.employee_id, terminal=False)
+        self.create_att_record(AttendanceRecords.TYPE_COMING, datetime.combine(dt, time(20, 56)), self.user2.id, self.employment2.shop_id, self.employment2.employee_id,)
+        self.create_att_record(AttendanceRecords.TYPE_COMING, datetime.combine(dt + timedelta(1), time(0, 56)), self.user2.id, self.employment2.shop_id, self.employment2.employee_id,)
+        self.assertEqual(WorkerDay.objects.filter(is_fact=True).count(), 8)
+
+        self.create_worker_day(
+            self.employment2,
+            self.employment2.shop_id,
+            datetime.combine(dt, time(21)),
+            datetime.combine(dt + timedelta(1), time(0)),
+            dt,
+            is_approved=True,
+        )
+        self.create_worker_day(
+            self.employment1,
+            self.employment1.shop_id,
+            datetime.combine(dt, time(21)),
+            datetime.combine(dt + timedelta(1), time(0)),
+            dt,
+            is_approved=True,
+        )
+
+        create_fact_from_attendance_records(dt, dt)
+
+        self.assertEqual(WorkerDay.objects.filter(is_fact=True, is_approved=True).count(), 3) # два факта не пересчиталось, так как отметки не с терминалов
+        self.assertEqual(WorkerDay.objects.filter(is_fact=True, is_approved=False).count(), 3)
+        wd_night_shift = WorkerDay.objects.get(is_fact=True, is_approved=True, employee_id=self.employment2.employee_id)
+        self.assertEqual(wd_night_shift.dt, dt)
+        self.assertEqual(wd_night_shift.dttm_work_start, datetime.combine(dt, time(20, 56)))
+        self.assertEqual(wd_night_shift.dttm_work_end, datetime.combine(dt + timedelta(1), time(0, 56)))

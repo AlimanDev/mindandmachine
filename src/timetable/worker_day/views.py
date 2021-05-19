@@ -57,7 +57,7 @@ from src.timetable.worker_day.serializers import (
     BlockOrUnblockWorkerDayWrapperSerializer,
 )
 from src.timetable.worker_day.stat import count_daily_stat
-from src.timetable.worker_day.tasks import recalc_wdays
+from src.timetable.worker_day.tasks import recalc_wdays, recalc_fact_from_records
 from src.timetable.worker_day.utils import download_timetable_util, upload_timetable_util, exchange, copy_as_excel_cells
 from src.util.dg.tabel import get_tabel_generator_cls
 from src.util.models_converter import Converter
@@ -554,6 +554,14 @@ class WorkerDayViewSet(BaseModelViewSet):
                         ).values_list('id', flat=True))
                         if wd_ids:
                             transaction.on_commit(lambda wd_ids=wd_ids: recalc_wdays.delay(id__in=wd_ids))
+                    if settings.ZKTECO_INTEGRATION: # если используем терминалы
+                            transaction.on_commit(
+                                lambda: recalc_fact_from_records.delay(
+                                    serializer.validated_data['dt_from'], 
+                                    serializer.validated_data['dt_to'], 
+                                    shop_ids=[serializer.data['shop_id']]
+                                )
+                            )
 
                 # TODO: нужно ли как-то разделять события подтверждения факта и плана?
                 event_context = serializer.data.copy()
@@ -951,6 +959,36 @@ class WorkerDayViewSet(BaseModelViewSet):
                 is_approved=False,
                 **fact_filter,
             ).delete()
+
+            if data['type'] == CopyApprovedSerializer.TYPE_PLAN_TO_FACT and request.user.network.copy_plan_to_fact_crossing:
+                grouped_wds = {}
+                for wd in list_wd:
+                    grouped_wds.setdefault(wd.employee_id, {})[wd.dt] = wd
+                wds_approved =  WorkerDay.objects_with_excluded.filter(
+                    dt__in=data['dates'],
+                    employee_id__in=data['employee_ids'],
+                    is_approved=True,
+                    is_fact=True,
+                )
+                for wd in wds_approved:
+                    grouped_wds.setdefault(wd.employee_id, {})[wd.dt] = WorkerDay(
+                        shop=wd.shop,
+                        employee_id=wd.employee_id,
+                        employment=wd.employment,
+                        dttm_work_start=wd.dttm_work_start,
+                        dttm_work_end=wd.dttm_work_end,
+                        dt=wd.dt,
+                        is_fact=wd.is_fact,
+                        is_approved=wd.is_approved,
+                        type=wd.type,
+                        created_by_id=wd.created_by_id,
+                        is_vacancy=wd.is_vacancy,
+                        is_outsource=wd.is_outsource,
+                        comment=wd.comment,
+                        canceled=wd.canceled,
+                        need_count_wh=True,
+                    )
+                list_wd = [wd for user_data in grouped_wds.values() for wd in user_data.values()]
 
             WorkerDay.objects.bulk_create(
                 [
