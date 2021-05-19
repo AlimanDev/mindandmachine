@@ -466,6 +466,7 @@ def confirm_vacancy(vacancy_id, user, employee_id=None, exchange=False):
         'cant_apply_vacancy_no_active_employement': _("You can't apply for this vacancy because you don't have an active employment as of the date of the vacancy."),
         'cant_apply_vacancy_not_outsource': _('You can not enter this vacancy because this vacancy is located in another network and does not imply the possibility of outsourcing.'),
         'cant_apply_vacancy_outsource_no_network': _('You cannot apply for this vacancy because this vacancy is located on another network and your network is not allowed to respond to this vacancy.'),
+        'cant_apply_vacancy_outsource_not_allowed': _('You cannot apply for this vacancy because your network does not allow you to apply for an outsourced vacancy in your network.'),
         'no_timetable': _('The timetable for this period has not yet been created.'),
         'vacancy_success': _('The vacancy was successfully accepted.'),
     }
@@ -520,6 +521,11 @@ def confirm_vacancy(vacancy_id, user, employee_id=None, exchange=False):
         # сотрудник из другой сети не может принять вакансию если это не аутсорс вакансия
         if not vacancy.is_outsource and active_employment.shop.network_id != vacancy_shop.network_id:
             res['text'] = messages['cant_apply_vacancy_not_outsource']
+            res['status_code'] = 400
+            return res
+        # сотрудник из текущей сети не может принять аутсорс вакансию если это запрещено в сети
+        elif vacancy.is_outsource and active_employment.shop.network_id == vacancy_shop.network_id and not vacancy_shop.network.allow_workers_confirm_outsource_vacancy:
+            res['text'] = messages['cant_apply_vacancy_outsource_not_allowed']
             res['status_code'] = 400
             return res
         # сотрудник из другой сети не может принять вакансию если это аутсорс вакансия, но его сеть не в списке доступных

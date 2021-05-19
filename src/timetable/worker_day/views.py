@@ -22,7 +22,7 @@ from rest_framework.response import Response
 from rest_framework.serializers import ValidationError
 
 from src.base.exceptions import FieldError
-from src.base.models import Employment, Shop, ProductionDay, Group
+from src.base.models import Employment, Shop, ProductionDay, Group, User
 from src.base.permissions import WdPermission
 from src.base.views_abstract import BaseModelViewSet
 from src.events.signals import event_signal
@@ -84,6 +84,7 @@ class WorkerDayViewSet(BaseModelViewSet):
                                                'Allowed inteval for approve: {dt_interval}'),
         'has_no_perm_to_approve_protected_wdays': _('You do not have rights to approve protected worker days ({protected_wdays}). '
                                                    'Please contact your system administrator.'),
+        "no_such_user_in_network": _("There is no such user in your network."),
     }
 
     permission_classes = [WdPermission]  # временно из-за биржи смен vacancy  [FilteredListPermission]
@@ -622,9 +623,18 @@ class WorkerDayViewSet(BaseModelViewSet):
             raise utils.translate_validation(filterset_class.errors)
         
         paginator = LimitOffsetPagination()
+        worker_day_outsource_network_subq = WorkerDay.objects.filter(
+            pk=OuterRef('pk'),
+            outsources__id=self.request.user.network_id,
+        )
         queryset = filterset_class.filter_queryset(
             self.get_queryset().filter(
                 is_vacancy=True,
+            ).annotate(
+                worker_day_outsource_network_exitst=Exists(worker_day_outsource_network_subq),
+            ).filter(
+                Q(shop__network_id=request.user.network_id) | 
+                Q(is_outsource=True, worker_day_outsource_network_exitst=True), # аутсорс фильтр
             ).select_related(
                 'shop',
                 'employee__user',
@@ -657,6 +667,23 @@ class WorkerDayViewSet(BaseModelViewSet):
     @action(detail=True, methods=['post'], serializer_class=None)
     def confirm_vacancy(self, request, pk=None):
         result = confirm_vacancy(pk, request.user, employee_id=self.request.data.get('employee_id', None))
+        status_code = result['status_code']
+        result = result['text']
+
+        return Response({'result': result}, status=status_code)
+
+    @swagger_auto_schema(
+        operation_description='''
+        Метод для вывывода на вакансию сотрудника
+        ''',
+        responses=confirm_vacancy_response_schema_dictionary,
+    )
+    @action(detail=True, methods=['post'], serializer_class=None)
+    def confirm_vacancy_to_worker(self, request, pk=None):
+        user = User.objects.filter(id=request.data.get('user_id'), network_id=request.user.network_id).first()
+        if not user:
+            raise ValidationError(self.error_messages["no_such_user_in_network"])
+        result = confirm_vacancy(pk, user, employee_id=request.data.get('employee_id', None))
         status_code = result['status_code']
         result = result['text']
 

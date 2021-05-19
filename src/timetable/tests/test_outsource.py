@@ -157,6 +157,12 @@ class TestOutsource(TestsHelperMixin, APITestCase):
         not_created = self._create_vacancy(dt_now, datetime.combine(dt_now, time(8)), datetime.combine(dt_now, time(20)), outsources=[self.outsource_network.id,])
         self.assertEqual(not_created.json(), {'non_field_errors': ['Не переданы аутсорс сети, которые могут откликнуться на аутсорс вакансию.']})
 
+    def test_create_vacancy_with_shop_from_other_network(self):
+        dt_now = self.dt_now
+        self.client.force_authenticate(user=self.user1)
+        not_created = self._create_vacancy(dt_now, datetime.combine(dt_now, time(8)), datetime.combine(dt_now, time(20)), is_outsource=False)
+        self.assertEqual(not_created.json(), {'non_field_errors': ['В вашей сети нет такого магазина.']})
+
     def test_vacancy_creation_with_null_or_empty_outsourcings_ids(self):
         dt_now = self.dt_now
         created = self._create_vacancy(dt_now, datetime.combine(dt_now, time(8)), datetime.combine(dt_now, time(20)), is_outsource=False)
@@ -175,6 +181,8 @@ class TestOutsource(TestsHelperMixin, APITestCase):
         response = self.client.get('/rest_api/worker_day/vacancy/?only_available=True&limit=10&offset=0')
         self.assertEqual(response.json()['count'], 2)
         self.assertEqual(len(response.json()['results'][0]['outsources']), 1)
+        response = self.client.get('/rest_api/worker_day/vacancy/?limit=10&offset=0')
+        self.assertEqual(response.json()['count'], 2)
 
     def test_confirm_vacancy(self):
         dt_now = self.dt_now
@@ -193,6 +201,29 @@ class TestOutsource(TestsHelperMixin, APITestCase):
         self.assertEqual(vacancy.employee_id, self.employee1.id)
         self.assertEqual(vacancy.employment_id, self.employment1.id)
 
+    def test_confirm_vacancy_to_worker(self):
+        dt_now = self.dt_now
+        vacancy = self._create_vacancy(dt_now, datetime.combine(dt_now, time(8)), datetime.combine(dt_now, time(20)), outsources=[self.outsource_network.id,]).json()
+        WorkerDay.objects.all().update(is_approved=True)
+        response = self.client.post(
+            f'/rest_api/worker_day/{vacancy["id"]}/confirm_vacancy_to_worker/',
+            data={
+                'user_id': self.user1.id,
+            }
+        )
+        self.assertEqual(response.json(), ['В вашей сети нет такого пользователя.'])
+        self.client.force_authenticate(user=self.user1)
+        response = self.client.post(
+            f'/rest_api/worker_day/{vacancy["id"]}/confirm_vacancy_to_worker/',
+            data={
+                'user_id': self.user2.id,
+            }
+        )
+        self.assertEqual(response.json(), {'result': 'Вакансия успешно принята.'})
+        vacancy = WorkerDay.objects.get(id=vacancy['id'])
+        self.assertEqual(vacancy.employee_id, self.employee2.id)
+        self.assertEqual(vacancy.employment_id, self.employment2.id)
+
     def test_confirm_outsource_vacancy_from_client_network(self):
         dt_now = self.dt_now
         vacancy = self._create_vacancy(dt_now, datetime.combine(dt_now, time(8)), datetime.combine(dt_now, time(20)), outsources=[self.outsource_network.id,]).json()
@@ -203,6 +234,10 @@ class TestOutsource(TestsHelperMixin, APITestCase):
             employee=self.client_employee,
             is_approved=True,
         )
+        response = self.client.post(f'/rest_api/worker_day/{vacancy["id"]}/confirm_vacancy/')
+        self.assertEqual(response.json(), {'result': 'Вы не можете откликнуться на данную вакансию, так как в вашей сети запрещено откликаться на аутсорс вакансии вашей сети.'})
+        self.client_network.allow_workers_confirm_outsource_vacancy = True
+        self.client_network.save()
         response = self.client.post(f'/rest_api/worker_day/{vacancy["id"]}/confirm_vacancy/')
         self.assertEqual(response.json(), {'result': 'Вакансия успешно принята.'})
 
