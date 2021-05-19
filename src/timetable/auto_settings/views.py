@@ -303,10 +303,11 @@ class AutoSettingsViewSet(viewsets.ViewSet):
             raise ValidationError(self.error_messages["settings_not_exists"])
 
         employments = Employment.objects.get_active(
-            shop.network_id,    
+            shop.network_id,
             dt_from=dt_from,
             dt_to=dt_to,
             shop_id=shop_id,
+            is_visible=True,
             # auto_timetable=True, чтобы все сотрудники были, так как пересоставляем иногда для 1
         ).select_related('employee__user', 'position')
 
@@ -881,6 +882,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
                         dt_from=dt_from,
                         dt_to=dt_to,
                         shop=shop,
+                        is_visible=True,
                     )
                 }
                 for uid, v in data['users'].items():
