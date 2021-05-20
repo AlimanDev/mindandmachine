@@ -92,8 +92,9 @@ class EmployeeFactory(factory.django.DjangoModelFactory):
 class EmploymentFactory(factory.django.DjangoModelFactory):
     employee = factory.SubFactory('src.base.tests.factories.EmployeeFactory')
     shop = factory.SubFactory('src.base.tests.factories.ShopFactory')
-    function_group = factory.SubFactory('src.base.tests.factories.GroupFactory')
-    position = factory.SubFactory('src.base.tests.factories.WorkerPositionFactory')
+    function_group = None
+    position = None
+    code = factory.Faker('uuid4')
 
     class Meta:
         model = Employment
