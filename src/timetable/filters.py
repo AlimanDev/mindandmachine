@@ -160,7 +160,7 @@ class VacancyFilter(FilterSetWithInitial):
                 worker_day_type_paid=Exists(worker_day_paid_subq),
             ).filter(
                 Q(shop__network_id=self.request.user.network_id, approved_exists=True) | 
-                Q(is_outsource=True), # аутсорс фильтр
+                Q(is_outsource=True) & ~Q(shop__network_id=self.request.user.network_id), # аутсорс фильтр
                 active_employment_exists=True,
                 worker_day_type_paid=False,
                 is_approved=True,

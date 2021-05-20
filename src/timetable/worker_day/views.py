@@ -634,7 +634,7 @@ class WorkerDayViewSet(BaseModelViewSet):
                 worker_day_outsource_network_exitst=Exists(worker_day_outsource_network_subq),
             ).filter(
                 Q(shop__network_id=request.user.network_id) | 
-                Q(is_outsource=True, worker_day_outsource_network_exitst=True), # аутсорс фильтр
+                Q(is_outsource=True, worker_day_outsource_network_exitst=True, is_approved=True), # аутсорс фильтр
             ).select_related(
                 'shop',
                 'employee__user',
@@ -700,6 +700,9 @@ class WorkerDayViewSet(BaseModelViewSet):
             vacancy = WorkerDay.objects.filter(pk=pk, is_vacancy=True, is_approved=False).select_for_update().first()
             if vacancy is None:
                 raise ValidationError(_('This vacancy does not exist or has already been approved.'))
+
+            if vacancy.shop.network_id != request.user.network_id:
+                raise ValidationError(_('You can not approve vacancy from other network.'))
 
             if vacancy.employee_id:
                 WorkerDay.objects_with_excluded.filter(

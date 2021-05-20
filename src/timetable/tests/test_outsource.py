@@ -1,13 +1,10 @@
 from datetime import datetime, date, timedelta, time
-import json
 
-from dateutil.relativedelta import relativedelta
 from django.test import override_settings
 from rest_framework.test import APITestCase
 
 from src.timetable.models import (
     WorkerDay, 
-    WorkerDayCashboxDetails, 
     WorkType, 
     WorkTypeName, 
     GroupWorkerDayPermission, 
@@ -183,6 +180,11 @@ class TestOutsource(TestsHelperMixin, APITestCase):
         self.assertEqual(len(response.json()['results'][0]['outsources']), 1)
         response = self.client.get('/rest_api/worker_day/vacancy/?limit=10&offset=0')
         self.assertEqual(response.json()['count'], 2)
+        self.client.force_authenticate(user=self.client_user)
+        self._create_vacancy(dt_now, datetime.combine(dt_now, time(8)), datetime.combine(dt_now, time(20)), outsources=[self.outsource_network.id, self.outsource_network2.id])
+        self.client.force_authenticate(user=self.user1)
+        response = self.client.get('/rest_api/worker_day/vacancy/?limit=10&offset=0')
+        self.assertEqual(response.json()['count'], 2)
 
     def test_confirm_vacancy(self):
         dt_now = self.dt_now
@@ -345,3 +347,11 @@ class TestOutsource(TestsHelperMixin, APITestCase):
         self.assertEqual(WorkerDay.objects.filter(is_fact=True, is_approved=True).count(), 1)
         self.assertEqual(wd.dttm_work_end, datetime.combine(self.dt_now, time(19, 45)))
         self.assertNotEqual(wd.work_hours, timedelta(0))
+
+    def test_cant_approve_vacancy_from_other_network(self):
+        dt_now = self.dt_now
+        vacancy = self._create_vacancy(dt_now, datetime.combine(dt_now, time(8)), datetime.combine(dt_now, time(20)), outsources=[self.outsource_network.id,]).json()
+        self.client.force_authenticate(user=self.user1)
+        response = self.client.post(f"/rest_api/worker_day/{vacancy['id']}/approve_vacancy/")
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json(), ['Вы не можете подтвердить вакансию из другой сети.'])

@@ -12,7 +12,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Django REST framework\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2021-05-19 07:20+0000\n"
+"POT-Creation-Date: 2021-05-20 05:56+0000\n"
 "PO-Revision-Date: 2017-08-03 14:58+0000\n"
 "Last-Translator: Grigory Mishchenko <grishkokot@gmail.com>\n"
 "Language-Team: Russian (http://www.transifex.com/django-rest-framework-1/"
@@ -531,11 +531,15 @@ msgstr "В вашей сети нет такого пользователя."
 msgid "This vacancy does not exist or has already been approved."
 msgstr "Такой вакансии не существует или она уже подтверждена."
 
-#: src/timetable/worker_day/views.py:743
+#: src/timetable/worker_day/views.py:705
+msgid "You can not approve vacancy from other network."
+msgstr "Вы не можете подтвердить вакансию из другой сети."
+
+#: src/timetable/worker_day/views.py:746
 msgid "There is no such vacancy."
 msgstr "Такой вакансии не существует"
 
-#: src/timetable/worker_day/views.py:747
+#: src/timetable/worker_day/views.py:750
 msgid "The vacancy cannot be edited because it has already been responded."
 msgstr "Невозможно отредактировать вакансию, так как на неё уже откликнулись."
 
