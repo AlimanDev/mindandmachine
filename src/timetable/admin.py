@@ -184,6 +184,7 @@ class WorkerDayAdmin(admin.ModelAdmin):
     
     created_by_last_name.short_description = 'created by'
 
+
 @admin.register(WorkerDayCashboxDetails)
 class WorkerDayCashboxDetailsAdmin(admin.ModelAdmin):
     # todo: нет нормального отображения для конкретного pk(скорее всего из-за harakiri time в настройках uwsgi)
@@ -192,11 +193,11 @@ class WorkerDayCashboxDetailsAdmin(admin.ModelAdmin):
     list_filter = ('worker_day__shop',)
     raw_id_fields = ('worker_day', 'work_type')
     list_select_related = (
-        'worker_day__worker', 'worker_day__shop', 'work_type')
+        'worker_day__employee__user', 'worker_day__shop', 'work_type')
 
     @staticmethod
     def worker_last_name(instance: WorkerDayCashboxDetails):
-        return instance.worker_day.worker.last_name if instance.worker_day and instance.worker_day.worker else ''
+        return instance.worker_day.employee.user.last_name if instance.worker_day and instance.worker_day.employee.user else ''
 
     @staticmethod
     def shop_title(instance: WorkerDayCashboxDetails):

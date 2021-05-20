@@ -83,7 +83,17 @@ class BaseTabelDataGetter:
             dt__lte=self.dt_to,
         )
 
-        return tabel_wdays.select_related('employee__user', 'shop', 'employment').order_by('employee__user__last_name', 'employee__user__first_name', 'employee_id', 'dt')
+        return tabel_wdays.select_related(
+            'employee__user',
+            'shop',
+            'employment',
+        ).order_by(
+            'employee__user__last_name',
+            'employee__user__first_name',
+            'employee_id',
+            'dt',
+        )
+
 
     def get_data(self):
         raise NotImplementedError
@@ -98,11 +108,12 @@ class T13TabelDataGetter(BaseTabelDataGetter):
             (wday and wday.type in WorkerDay.TYPES_WITH_TM_RANGE) else ''
 
     def get_data(self):
-        
+
         def _get_active_empl(wd, empls):
             if not wd.employment:
                 return list(filter(
-                    lambda e: (e.dt_hired is None or e.dt_hired <= wd.dt) and (e.dt_fired is None or wd.dt <= e.dt_fired),
+                    lambda e: (e.dt_hired is None or e.dt_hired <= wd.dt) and (
+                                e.dt_fired is None or wd.dt <= e.dt_fired),
                     empls.get(wd.employee_id, []),
                 ))[0]
             return wd.employment
@@ -111,7 +122,6 @@ class T13TabelDataGetter(BaseTabelDataGetter):
 
         empls = {}
         empls_qs = Employment.objects.get_active(
-            network_id=self.shop.network_id,
             dt_from=self.dt_from,
             dt_to=self.dt_to,
             employee__id__in=tabel_wdays.values_list('employee', flat=True),
@@ -126,14 +136,8 @@ class T13TabelDataGetter(BaseTabelDataGetter):
             empls.setdefault(e.employee_id, []).append(e)
 
         num = 1
-        first_half_month_wdays = 0
-        first_half_month_whours = 0
-        second_half_month_wdays = 0
-        second_half_month_whours = 0
 
         users = []
-        days = {}
-        wdays_to_all_rows = []
         grouped_worker_days = {}
         for wd in tabel_wdays:
             if wd.type in WorkerDay.TYPES_WITH_TM_RANGE and not _get_active_empl(wd, empls):
