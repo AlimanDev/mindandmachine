@@ -71,7 +71,8 @@ class BaseTabelDataGetter:
                 shop=self.shop,
             ) |
             Q(
-                ~Q(type__in=WorkerDay.TYPES_WITH_TM_RANGE),
+                ((~Q(shop=self.shop) & Q(type=WorkerDay.TYPE_WORKDAY)) # чтобы попали вакансии из других отделов
+                | ~Q(type__in=WorkerDay.TYPES_WITH_TM_RANGE)),
                 Q(employee__in=Employment.objects.get_active(
                     network_id=self.network.id,
                     dt_from=self.dt_from,
@@ -93,7 +94,10 @@ class T13TabelDataGetter(BaseTabelDataGetter):
     wd_type_mapper_cls = T13WdTypeMapper
 
     def set_day_data(self, day_data, wday):
-        day_data['code'] = self._get_tabel_type(wday.type) if wday else ''
+        if wday and wday.shop_id != self.shop.id:
+            day_data['code'] = 'В'
+        else:
+            day_data['code'] = self._get_tabel_type(wday.type) if wday else ''
         day_data['value'] = wday.rounded_work_hours if \
             (wday and wday.type in WorkerDay.TYPES_WITH_TM_RANGE) else ''
 
@@ -111,7 +115,6 @@ class T13TabelDataGetter(BaseTabelDataGetter):
 
         empls = {}
         empls_qs = Employment.objects.get_active(
-            network_id=self.shop.network_id,
             dt_from=self.dt_from,
             dt_to=self.dt_to,
             employee__id__in=tabel_wdays.values_list('employee', flat=True),
@@ -133,7 +136,6 @@ class T13TabelDataGetter(BaseTabelDataGetter):
 
         users = []
         days = {}
-        wdays_to_all_rows = []
         grouped_worker_days = {}
         for wd in tabel_wdays:
             if wd.type in WorkerDay.TYPES_WITH_TM_RANGE and not _get_active_empl(wd, empls):
