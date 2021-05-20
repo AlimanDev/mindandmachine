@@ -184,6 +184,7 @@ class WorkerDayAdmin(admin.ModelAdmin):
     
     created_by_last_name.short_description = 'created by'
 
+
 @admin.register(WorkerDayCashboxDetails)
 class WorkerDayCashboxDetailsAdmin(admin.ModelAdmin):
     # todo: нет нормального отображения для конкретного pk(скорее всего из-за harakiri time в настройках uwsgi)
