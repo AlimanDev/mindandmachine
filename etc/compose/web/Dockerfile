@@ -72,7 +72,7 @@ RUN chmod +x -R /commands
 COPY ./etc/compose/web/uwsgi.ini /webapp/uwsgi.ini
 
 ENV UWSGI_WORKERS 4
-ENV UWSGI_THREADS 4
+ENV UWSGI_THREADS 1
 
 # copy application code to WORKDIR
 COPY . ${APP_HOME}
