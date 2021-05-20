@@ -1,11 +1,12 @@
-import pandas as pd
-from tzwhere import tzwhere
 from datetime import datetime, timedelta
 
+import pandas as pd
 from django.conf import settings
+from django.db.models import Q
+from tzwhere import tzwhere
 
-from src.celery.celery import app
 from src.base.models import ShopSchedule, Shop
+from src.celery.celery import app
 from src.util.models_converter import Converter
 
 
