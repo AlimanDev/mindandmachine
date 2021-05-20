@@ -212,7 +212,7 @@ class EmploymentWorkType(AbstractModel):
         unique_together = (('employment', 'work_type'),)
 
     def __str__(self):
-        return '{}, {}, {}'.format(self.employment.user.last_name, self.work_type.work_type_name.name, self.id)
+        return '{}, {}, {}'.format(self.employment.employee.user.last_name, self.work_type.work_type_name.name, self.id)
 
     id = models.BigAutoField(primary_key=True)
 

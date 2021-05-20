@@ -336,7 +336,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
                 is_active=True
             )
             if not employment_work_type.exists():
-                users_without_spec.append(employment.user.first_name + ' ' + employment.user.last_name)
+                users_without_spec.append(employment.employee.user.first_name + ' ' + employment.employee.user.last_name)
         if users_without_spec:
             tt.status = ShopMonthStat.NOT_DONE
             tt.save()
