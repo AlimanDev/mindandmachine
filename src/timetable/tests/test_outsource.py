@@ -1,5 +1,10 @@
 from datetime import datetime, date, timedelta, time
 
+from django.core import mail
+from src.notifications.models.event_notification import EventEmailNotification
+from src.timetable.events import VACANCY_CONFIRMED_TYPE
+from src.events.models import EventType
+
 from django.test import override_settings
 from rest_framework.test import APITestCase
 
@@ -186,7 +191,21 @@ class TestOutsource(TestsHelperMixin, APITestCase):
         response = self.client.get('/rest_api/worker_day/vacancy/?limit=10&offset=0')
         self.assertEqual(response.json()['count'], 2)
 
+    @override_settings(CELERY_TASK_ALWAYS_EAGER=True)
     def test_confirm_vacancy(self):
+        event, _ = EventType.objects.get_or_create(
+            code=VACANCY_CONFIRMED_TYPE,
+            network=self.client_network,
+        )
+        subject = 'Сотрудник откликнулся на вакансию.'
+        event_notification = EventEmailNotification.objects.create(
+            event_type=event,
+            subject=subject,
+            system_email_template='notifications/email/vacancy_confirmed.html',
+        )
+        self.client_user.email = 'test@mail.mm'
+        self.client_user.save()
+        event_notification.users.add(self.client_user)
         dt_now = self.dt_now
         vacancy_without_outsource = self._create_vacancy(dt_now, datetime.combine(dt_now, time(8)), datetime.combine(dt_now, time(20)), is_outsource=False).json()
         vacancy_without_outsources = self._create_vacancy(dt_now, datetime.combine(dt_now, time(8)), datetime.combine(dt_now, time(20)), outsources=[self.outsource_network2.id,]).json()
@@ -199,6 +218,11 @@ class TestOutsource(TestsHelperMixin, APITestCase):
         self.assertEqual(response.json(), {'result': 'Вы не можете выйти на эту вакансию так как данная вакансия находится в другой сети и вашей сети не разрешено откликаться на данную вакансию.'})
         response = self.client.post(f'/rest_api/worker_day/{vacancy["id"]}/confirm_vacancy/')
         self.assertEqual(response.json(), {'result': 'Вакансия успешно принята.'})
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].subject, subject)
+        self.assertEqual(mail.outbox[0].to[0], self.client_user.email)
+        body = f'Здравствуйте, {self.client_user.first_name}!\n\nСотрудник {self.user1.last_name} {self.user1.first_name} откликнулся на вакансию {vacancy["dt"]} с типом работ {self.client_work_type_name.name}\n\nПисьмо отправлено роботом.'
+        self.assertEqual(mail.outbox[0].body, body)
         vacancy = WorkerDay.objects.get(id=vacancy['id'])
         self.assertEqual(vacancy.employee_id, self.employee1.id)
         self.assertEqual(vacancy.employment_id, self.employment1.id)
