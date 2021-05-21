@@ -222,6 +222,7 @@ class TestUserViewSet(TestsHelperMixin, APITestCase):
             settings_values=json.dumps(
                 { 
                     'default_stats': data,
+                    'show_tabel_graph': False,
                 }
             )
         )
@@ -229,6 +230,7 @@ class TestUserViewSet(TestsHelperMixin, APITestCase):
         self.user1.save()
         resp = self.client.get('/rest_api/auth/user/')
         self.assertEqual(resp.json()['network']['default_stats'], data)
+        self.assertEqual(resp.json()['network']['show_tabel_graph'], False)
         self.user1.network = self.network
         self.user1.save()
 
