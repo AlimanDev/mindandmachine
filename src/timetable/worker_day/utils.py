@@ -170,8 +170,8 @@ def upload_timetable_util(form, timetable_file, is_fact=False):
                 position=position,
             )
             if UPLOAD_TT_MATCH_EMPLOYMENT and number_cond:
-                employment.tabel_code = tabel_code
-                employment.save()
+                employee.tabel_code = tabel_code
+                employee.save(update_fields=('tabel_code',))
         else:
             employment = Employment.objects.get_active(
                 network_id=user.network_id,
