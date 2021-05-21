@@ -113,7 +113,8 @@ def upload_timetable_util(form, timetable_file, is_fact=False):
         if UPLOAD_TT_MATCH_EMPLOYMENT:
             employment = Employment.objects.filter(employee__tabel_code=tabel_code, shop=shop)
             if number_cond and employment.exists():
-                user = employment.first().employee.user
+                employee = employment.first().employee  # TODO: покрыть тестами
+                user = employee.user
                 if user.last_name != names[0]:
                     error_users.append(f"У сотрудника на строке {index} с табельным номером {tabel_code} в системе фамилия {user.last_name}, а в файле {names[0]}.") #Change error
                     continue
