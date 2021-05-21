@@ -685,6 +685,7 @@ class WorkerDayViewSet(BaseModelViewSet):
                     },
                     'dt': str(vacancy.dt),
                     'work_type': work_type.work_type_name.name if work_type else 'Без типа работ',
+                    'shop_id': vacancy.shop_id,
                 },
             )
 
