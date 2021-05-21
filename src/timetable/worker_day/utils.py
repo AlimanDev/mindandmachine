@@ -130,9 +130,10 @@ def upload_timetable_util(form, timetable_file, is_fact=False):
                     employee__user__middle_name=names[2] if len(names) > 2 else None
                 )
                 if employment.exists():
-                    if number_cond:
-                        employment.update(tabel_code=tabel_code,)
                     employee = employment.first().employee
+                    if number_cond:
+                        employee.tabel_code = tabel_code
+                        employee.save(update_fields=('tabel_code',))
                 else:
                     user_data['username'] = str(time.time() * 1000000)[:-2],
                     user = User.objects.create(**user_data)
