@@ -47,6 +47,7 @@ from src.timetable.models import (
     Employment,
 )
 from src.recognition.forms import DownloadViolatorsReportForm
+from src.recognition.utils import check_duplicate_biometrics
 from src.timetable.mixins import SuperuserRequiredMixin
 from django.views.generic.edit import FormView
 
@@ -117,14 +118,14 @@ class UserAuthTickViewStrategy(TickViewStrategy):
         )
         return queryset
 
-    def get_user_id_and_tick_point(self, data):
+    def get_user_id_employee_id_and_tick_point(self, data):
         user_id = self.view.request.user.id
         shop = data['shop_code']
         tick_point = TickPoint.objects.filter(shop=shop, dttm_deleted__isnull=True).first()
         if tick_point is None:
             tick_point = TickPoint.objects.create(name=f'autocreate tickpoint {shop.id}', shop=shop)
 
-        return user_id, tick_point
+        return user_id, data.get('employee_id'), tick_point
 
 
 class TickPointAuthTickViewStrategy(TickViewStrategy):
@@ -138,10 +139,10 @@ class TickPointAuthTickViewStrategy(TickViewStrategy):
         )
         return queryset
 
-    def get_user_id_and_tick_point(self, data):
+    def get_user_id_employee_id_and_tick_point(self, data):
         tick_point = self.view.request.user
         user_id = data['user_id']
-        return user_id, tick_point
+        return user_id, data.get('employee_id'), tick_point
 
 
 class TickViewSet(BaseModelViewSet):
@@ -202,7 +203,7 @@ class TickViewSet(BaseModelViewSet):
         serializer.is_valid(raise_exception=True)
 
         data = serializer.validated_data
-        user_id, tick_point = self.strategy.get_user_id_and_tick_point(data)
+        user_id, employee_id, tick_point = self.strategy.get_user_id_employee_id_and_tick_point(data)
         check_time = now() + timedelta(hours=tick_point.shop.get_tz_offset())
 
         is_front = False
@@ -212,18 +213,23 @@ class TickViewSet(BaseModelViewSet):
         dttm_from = check_time.replace(hour=0, minute=0, second=0)
         dttm_to = dttm_from + timedelta(days=1)
 
+        employee_lookup = {}
+        if employee_id:
+            employee_lookup['employee_id'] = employee_id
+        else:
+            employee_lookup['employee__user_id'] = user_id
+
         # Проверка на принадлежность пользователя правильному магазину
         employment = Employment.objects.get_active(
             request.user.network.id,
             dttm_from.date(), dttm_from.date(),
-            user_id=user_id,
-            shop_id=tick_point.shop_id
+            shop_id=tick_point.shop_id,
+            **employee_lookup,
         ).first()
 
         if (not employment) and settings.USERS_WITH_ACTIVE_EMPLOYEE_OR_VACANCY_ONLY:
             # есть ли вакансия в этом магазине
             wd = WorkerDay.objects.filter(
-                worker_id=user_id,
                 shop_id=tick_point.shop_id,
                 dt__gte=dttm_from - timedelta(1),
                 dt__lte=dttm_to.date(),
@@ -231,6 +237,7 @@ class TickViewSet(BaseModelViewSet):
                 is_approved=True,
                 is_fact=False,
                 is_vacancy=True,
+                **employee_lookup,
             ).first()
             if not wd:
                 return Response(
@@ -242,7 +249,7 @@ class TickViewSet(BaseModelViewSet):
                 )
 
         wd = WorkerDay.objects.all().filter(
-            worker_id=user_id,
+            **employee_lookup,
             shop_id=tick_point.shop_id,
             employment=employment,
             dttm_work_start__gte=dttm_from,
@@ -255,9 +262,9 @@ class TickViewSet(BaseModelViewSet):
 
         tick = Tick.objects.create(
             user_id=user_id,
+            employee_id=employee_id,
             tick_point_id=tick_point.id,
-            # worker_day=wd,
-            lateness=check_time - wd.dttm_work_start if wd else timedelta(seconds=0),
+            lateness=check_time - wd.dttm_work_start if wd else timedelta(seconds=0),  # TODO: при 2 днях на 1 дату может некорректно рассчитываться? Нужно ли вообще это поле?
             dttm=check_time,
             type=data['type'],
             is_front=is_front
@@ -266,6 +273,7 @@ class TickViewSet(BaseModelViewSet):
         if settings.TRUST_TICK_REQUEST:
             AttendanceRecords.objects.create(
                 user_id=tick.user_id,
+                employee_id=employee_id,
                 dttm=check_time,
                 verified=True,
                 shop_id=tick.tick_point.shop_id,
@@ -291,6 +299,7 @@ class TickViewSet(BaseModelViewSet):
             if settings.TRUST_TICK_REQUEST:
                 record, _ = AttendanceRecords.objects.get_or_create(
                     user_id=tick.user_id,
+                    employee_id=tick.employee_id,
                     dttm=tick.dttm,
                     verified=True,
                     shop_id=tick.tick_point.shop_id,
@@ -374,6 +383,9 @@ class TickPhotoViewSet(BaseModelViewSet):
         except UserConnecter.DoesNotExist:
             if type == TickPhoto.TYPE_SELF:
                 try:
+                    tick.user.avatar = image
+                    tick.user.save()
+                    check_duplicate_biometrics(image, tick.user, tick.tick_point.shop_id)
                     partner_id = recognition.create_person({"id": tick.user_id})
                     photo_id = recognition.upload_photo(partner_id, image)
                 except HTTPError as e:
@@ -383,8 +395,6 @@ class TickPhotoViewSet(BaseModelViewSet):
                     user_id=tick.user_id,
                     partner_id=partner_id,
                 )
-                tick.user.avatar = image
-                tick.user.save()
 
         if user_connecter:
             try:
@@ -404,6 +414,7 @@ class TickPhotoViewSet(BaseModelViewSet):
         if (type == TickPhoto.TYPE_SELF) and (tick_photo.verified_score > 0):
             AttendanceRecords.objects.create(
                 user_id=tick.user_id,
+                employee_id=tick.employee_id,
                 dttm=tick.dttm,
                 verified=True,
                 shop_id=tick.tick_point.shop_id,
@@ -498,8 +509,11 @@ class DownloadViolatorsReportAdminView(SuperuserRequiredMixin, FormView):
         network = form.cleaned_data['network']
         dt_from = form.cleaned_data['dt_from']
         dt_to = form.cleaned_data['dt_to']
+        exclude_created_by = form.cleaned_data['exclude_created_by']
+        users = [u.id for u in form.cleaned_data['users']]
+        shops = [s.id for s in form.cleaned_data['shops']]
         
-        return form.get_file(network=network, dt_from=dt_from, dt_to=dt_to)
+        return form.get_file(network=network, dt_from=dt_from, dt_to=dt_to, exclude_created_by=exclude_created_by, user_ids=users, shop_ids=shops)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)

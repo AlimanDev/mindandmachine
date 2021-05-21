@@ -8,18 +8,17 @@ __pycache__/
 src/conf/djconfig_local.py
 src/conf/qosconfig_local.py
 static/
+media/
 
 src/templates/test.html
 src/db/works/printer/test.xlsx
 
 etc/test.py
 etc/report/
-etc/docker/requirements.txt
 
 db.sqlite3
 
-qos_backend.log*
-clean_wdays.log*
+logs/*.log*
 
 venv/*
 venv3.6/*
@@ -31,3 +30,4 @@ docs/qos*
 
 update.sh
 tmp/
+etc/compose/build-custom.sh

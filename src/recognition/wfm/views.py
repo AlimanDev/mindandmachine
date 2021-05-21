@@ -1,6 +1,6 @@
 import logging
 from datetime import timedelta
-
+from django_filters import utils
 from django.conf import settings
 from django.db.models import Prefetch, Q, Exists, OuterRef
 from django.utils.timezone import now
@@ -13,15 +13,16 @@ from rest_framework import (
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.decorators import action
 from rest_framework.response import Response
-
+from rest_framework.exceptions import PermissionDenied
 from src.base.models import (
     Employment,
+    Employee,
     User as WFMUser
 )
 from src.recognition.authentication import TickPointTokenAuthentication
-from src.recognition.wfm.serializers import WorkerDaySerializer, WorkShiftSerializer
+from src.recognition.wfm.serializers import WfmWorkerDaySerializer, WorkShiftSerializer
 from src.timetable.models import WorkerDay
-
+from .filters import WorkShiftFilter
 logger = logging.getLogger('django')
 USERS_WITH_SCHEDULE_ONLY = getattr(settings, 'USERS_WITH_SCHEDULE_ONLY', True)
 
@@ -45,7 +46,7 @@ class WorkerDayViewSet(viewsets.ReadOnlyModelViewSet):
     basename = ''
     openapi_tags = ['RecognitionWorkerDay',]
 
-    serializer_class = WorkerDaySerializer
+    serializer_class = WfmWorkerDaySerializer
     # search_fields = ['first_name', 'last_name']
     filter_backends = [DjangoFilterBackend, filters.SearchFilter]
 
@@ -60,54 +61,71 @@ class WorkerDayViewSet(viewsets.ReadOnlyModelViewSet):
         dt_to = dt_from + timedelta(days=1)
 
         wd_cond = WorkerDay.objects.filter(
-            worker_id=OuterRef('pk'),
             shop_id=tick_point.shop_id,
             dttm_work_start__gte=dt_from,
             dttm_work_end__lte=dt_to,
-            child__id__isnull=True
+            child__id__isnull=True,
+            is_fact=False,
+            is_approved=True,
         )
         emp_cond = Employment.objects.get_active(
-            self.request.user.network_id,
-            dt_from, dt_from, # чтобы не попались трудоустройства с завтрашнего дня
-            user_id=OuterRef('pk'),
+            # self.request.user.network_id,
+            dt_from=dt_from, dt_to=dt_from, # чтобы не попались трудоустройства с завтрашнего дня
         )
         shop_emp_cond = Employment.objects.get_active(
             self.request.user.network_id,
             dt_from, dt_from, # чтобы не попались трудоустройства с завтрашнего дня
-            user_id=OuterRef('pk'),
             shop_id=tick_point.shop_id,
-        )
-
-        queryset = WFMUser.objects.all().prefetch_related(
-            Prefetch('worker_day',
-                     queryset=WorkerDay.objects.filter(
-                         shop_id=tick_point.shop_id,
-                         dttm_work_start__gte=dt_from,
-                         dttm_work_end__lte=dt_to,
-                         child__id__isnull=True,
-                     )
-                     )
-        ).annotate(
-            has_wdays=Exists(wd_cond),
-            has_employments=Exists(emp_cond),
-            has_shop_employments=Exists(shop_emp_cond)
         )
         q = Q(has_wdays=True, has_employments=True)
         if not USERS_WITH_SCHEDULE_ONLY:
             q = q | Q(has_shop_employments=True)
+        queryset = WFMUser.objects.all().prefetch_related(
+            Prefetch(
+                'employees',
+                queryset=Employee.objects.annotate(
+                    has_wdays=Exists(wd_cond.filter(employee_id=OuterRef('pk'))),
+                    has_employments=Exists(emp_cond.filter(employee_id=OuterRef('pk'))),
+                    has_shop_employments=Exists(shop_emp_cond.filter(employee_id=OuterRef('pk'))),
+                ).filter(q)
+            ),
+            Prefetch(
+                'employees__worker_days',
+                queryset=WorkerDay.objects.filter(
+                    shop_id=tick_point.shop_id,
+                    dttm_work_start__gte=dt_from,
+                    dttm_work_end__lte=dt_to,
+                    is_fact=False,
+                    is_approved=True,
+                ).select_related('employment__position')
+            )
+        ).annotate(
+            has_wdays=Exists(wd_cond.filter(employee__user_id=OuterRef('pk'))),
+            has_employments=Exists(emp_cond.filter(employee__user_id=OuterRef('pk'))),
+            has_shop_employments=Exists(shop_emp_cond.filter(employee__user_id=OuterRef('pk')))
+        )
         queryset = queryset.filter(q)
 
         return queryset
 
     @action(detail=False, methods=['get'])
     def work_shift(self, request, *args, **kwargs):
-        query_params_serializer = WorkShiftSerializer(
-            data=self.request.query_params, context=self.get_serializer_context())
-        query_params_serializer.is_valid(raise_exception=True)
-        work_shift = WorkerDay.objects.filter(
-            **query_params_serializer.validated_data,
-            is_fact=True, is_approved=True,
-        ).last()
+        filterset = WorkShiftFilter(request.query_params)
+        if filterset.form.is_valid():
+            data = filterset.form.cleaned_data
+        else:
+            raise utils.translate_validation(filterset.errors)
+
+        if not Employee.objects.filter(user__username=data.get('worker'), user_id=self.request.user.id).exists():
+            raise PermissionDenied()
+
+        wd_kwargs = dict(
+            employee__user__username=data.get('worker'),
+            dt=data.get('dt'),
+        )
+        if data.get('shop'):
+            wd_kwargs['shop__code'] = data.get('shop')
+        work_shift = WorkerDay.objects.filter(**wd_kwargs, is_fact=True, is_approved=True).last()
         if work_shift is None:
             resp_dict = self.request.query_params.dict()
             resp_dict['dttm_work_start'] = None

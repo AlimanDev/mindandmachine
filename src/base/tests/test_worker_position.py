@@ -133,6 +133,12 @@ class TestSetWorkerPositionDefaultsModel(TestsHelperMixin, TestCase):
                     'group_code': 'worker',
                     'breaks_code': 'doctor'
                 },
+               r'(.*)?старший программист|менеджер по кадрам(.*)?': {
+                   'default_work_type_names_codes': [],
+                   'hours_in_a_week': 40,
+                   'group_code': 'worker',
+                   'breaks_code': None
+               },
                 r'(.*)?продавец|кассир|менеджер|консультант(.*)?': {
                     'default_work_type_names_codes': ('consult',),
                     'hours_in_a_week': 40,
@@ -211,4 +217,14 @@ class TestSetWorkerPositionDefaultsModel(TestsHelperMixin, TestCase):
         self.assertListEqual(
             [self.work_type_name_other.id],
             list(wp4.default_work_type_names.values_list('id', flat=True))
+        )
+
+        wp5 = WorkerPosition(network=self.network, name='Менеджер по кадрам')
+        wp5.save()
+        self.assertEqual(wp5.group_id, self.group_worker.id)
+        self.assertEqual(wp5.breaks_id, None)
+        self.assertEqual(wp5.hours_in_a_week, 40)
+        self.assertListEqual(
+            [],
+            list(wp5.default_work_type_names.values_list('id', flat=True))
         )

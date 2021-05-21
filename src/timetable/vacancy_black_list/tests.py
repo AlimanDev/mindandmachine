@@ -118,6 +118,6 @@ class TestVacancyBlackList(APITestCase):
         result = confirm_vacancy(wd.id, self.user1)
 
         self.assertEqual(
-            {'status_code': 400, 'code': 'cant_apply_vacancy'},
+            {'status_code': 400, 'text': 'Вы не можете выйти на эту смену.'},
             result,
         )

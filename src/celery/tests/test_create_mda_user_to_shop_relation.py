@@ -70,7 +70,7 @@ class TestCreateMDAUserToShopRelation(TestsHelperMixin, TestCase):
 
         # обучение факт подтв.
         WorkerDay.objects.create(
-            worker=self.user2,
+            employee=self.employee2,
             employment=self.employment2,
             dt=self.dt_now,
             type=WorkerDay.TYPE_QUALIFICATION,
@@ -84,7 +84,7 @@ class TestCreateMDAUserToShopRelation(TestsHelperMixin, TestCase):
 
         # обучение в опред. магазине
         WorkerDay.objects.create(
-            worker=self.user3,
+            employee=self.employee3,
             employment=self.employment3,
             dt=self.dt_now,
             type=WorkerDay.TYPE_QUALIFICATION,
@@ -98,7 +98,7 @@ class TestCreateMDAUserToShopRelation(TestsHelperMixin, TestCase):
 
         # обучение без магазина
         WorkerDay.objects.create(
-            worker=self.user4,
+            employee=self.employee4,
             employment=self.employment4,
             dt=self.dt_now,
             type=WorkerDay.TYPE_QUALIFICATION,

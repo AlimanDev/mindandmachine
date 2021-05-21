@@ -1,10 +1,12 @@
 import random
 from datetime import datetime, timedelta, time
+
 import factory
 
 from src.base.models import (
     Shop,
     Employment,
+    Employee,
     User,
     Region,
     Network,
@@ -14,6 +16,7 @@ from src.base.models import (
     ShopSettings,
     ShopSchedule,
 )
+from src.timetable.tests.factories import EmploymentWorkTypeFactory
 from .factories_abstract import AbstractActiveNamedModelFactory
 
 
@@ -79,15 +82,33 @@ class ShopFactory(AbstractActiveNamedModelFactory):
         model = Shop
 
 
-class EmploymentFactory(factory.django.DjangoModelFactory):
-    network = factory.SubFactory('src.base.tests.factories.NetworkFactory')
+class EmployeeFactory(factory.django.DjangoModelFactory):
     user = factory.SubFactory('src.base.tests.factories.UserFactory')
+
+    class Meta:
+        model = Employee
+
+
+class EmploymentFactory(factory.django.DjangoModelFactory):
+    employee = factory.SubFactory('src.base.tests.factories.EmployeeFactory')
     shop = factory.SubFactory('src.base.tests.factories.ShopFactory')
-    function_group = factory.SubFactory('src.base.tests.factories.GroupFactory')
-    position = factory.SubFactory('src.base.tests.factories.WorkerPositionFactory')
+    function_group = None
+    position = None
+    code = factory.Faker('uuid4')
 
     class Meta:
         model = Employment
+
+    @factory.post_generation
+    def work_types(self, create, *args, **kwargs):
+        if not create:
+            return
+
+        EmploymentWorkTypeFactory(
+            employment=self,
+            work_type__shop=self.shop,
+            **kwargs,
+        )
 
 
 class UserFactory(factory.django.DjangoModelFactory):
@@ -98,7 +119,6 @@ class UserFactory(factory.django.DjangoModelFactory):
     middle_name = factory.Faker('middle_name', locale='ru_RU')
     last_name = factory.Faker('last_name', locale='ru_RU')
     phone_number = factory.Faker('phone_number')
-    tabel_code = factory.LazyAttribute(lambda u: u.username)
 
     class Meta:
         model = User

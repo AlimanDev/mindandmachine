@@ -258,7 +258,8 @@ def api_method(
                         request.user.network_id,
                         dt, dt,
                         shop__in=shop.get_ancestors(include_self=True, ascending=True),
-                        user=request.user)
+                        employee__user=request.user,
+                    )
 
                     if not len(employments):
                         return JsonResponse.access_forbidden(

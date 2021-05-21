@@ -36,7 +36,7 @@ from src.timetable.models import (
     ExchangeSettings,
 )
 from etc.scripts import fill_calendar
-from etc.scripts.create_access_groups import password_generator, create_group_functions
+from etc.scripts.create_access_groups import password_generator, update_group_functions
 from dateutil.relativedelta import relativedelta
 from src.util.models_converter import Converter
 
@@ -92,7 +92,7 @@ def main(lang='ru', need_test_shop=False):
     super_shop.name = 'Корневой магазин'
     super_shop.save()
     network = Network.objects.first()
-    create_group_functions(network=network, path='../scripts/function_group_default.xlsx')
+    update_group_functions(network=network, path='../scripts/function_group_default.xlsx')
     admin = User.objects.create(
         is_staff=True,
         is_superuser=True,

@@ -5,10 +5,12 @@ from unittest import mock
 from dadata import Dadata
 from dateutil.relativedelta import relativedelta
 from django.db import transaction
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from src.base.models import Shop, ShopSchedule
+from src.base.models import Shop, ShopSchedule, NetworkConnect, Network, Employment, Group
+from src.base.tests.factories import UserFactory, ShopFactory
 from src.forecast.tests.factories import LoadTemplateFactory
 from src.timetable.models import ShopMonthStat
 from src.util.mixins.tests import TestsHelperMixin
@@ -31,6 +33,7 @@ class TestDepartment(TestsHelperMixin, APITestCase):
 
     def setUp(self):
         self.client.force_authenticate(user=self.user1)
+        self.network.refresh_from_db()
 
     @staticmethod
     def _get_shop_data():
@@ -212,6 +215,7 @@ class TestDepartment(TestsHelperMixin, APITestCase):
         data['longitude'] = None
         data['distance'] = None
         data['email'] = None
+        data.pop('director_code')
         data.pop('nonstandard_schedule')
         self.assertDictEqual(shop, data)
 
@@ -259,17 +263,17 @@ class TestDepartment(TestsHelperMixin, APITestCase):
         shop = response.json()
         data['id'] = shop['id']
         data['director_id'] = None
-        data['director_code'] = None
         data['area'] = 0.0
         data['load_template_id'] = None
         data['exchange_settings_id'] = None
         data['distance'] = None
         data['load_template_status'] = 'R'
         data.pop('nonstandard_schedule')
+        data.pop('director_code')
         self.assertEqual(shop, data)
         self.assertIsNotNone(Shop.objects.get(id=shop['id']).dttm_deleted)
 
-    def test_404_resp_for_unexistent_parent_code(self):
+    def test_400_resp_for_unexistent_parent_code(self):
         data = {
             "parent_code": 'nonexistent',
             "name": 'Title 2',
@@ -292,7 +296,8 @@ class TestDepartment(TestsHelperMixin, APITestCase):
             'director_code': 'nonexistent',
         }
         response = self.client.put(self.shop_url, data, format='json')
-        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.json(), ["Подразделение с parent_code=nonexistent не найдено"])
 
     def test_cant_save_with_invalid_restricted_times(self):
         data = {
@@ -552,3 +557,156 @@ class TestDepartment(TestsHelperMixin, APITestCase):
         self.assertEqual(shop.longitude, Decimal('82.9102479'))
         self.assertEqual(shop.address, 'г Новосибирск, ул Ленина, д 15')
         self.assertEqual(shop.timezone.zone, 'Asia/Novosibirsk')
+
+    def test_get_outsource_shops_tree(self):
+        def _create_shop(name, network, parent=None):
+            return Shop.objects.create(
+                name=name,
+                region=self.region,
+                network=network,
+                parent=parent,
+            )
+        def _create_network_and_shops(name, count_of_shops):
+            network = Network.objects.create(
+                name=name,
+            )
+            root_shop = _create_shop(name, network)
+            shops = []
+            for i in range(count_of_shops):
+                shops.append(_create_shop(f'{name}_магазин{i+1}', network, root_shop))
+            return network, root_shop, shops
+        client_network1, client1_root_shop, client1_shops = _create_network_and_shops('Клиент1', 2)
+        client_network2, client2_root_shop, client2_shops = _create_network_and_shops('Клиент2', 1)
+        client_network3, client3_root_shop, client3_shops = _create_network_and_shops('Клиент3', 3)
+        NetworkConnect.objects.create(client=client_network1, outsourcing=self.network)
+        NetworkConnect.objects.create(client=client_network2, outsourcing=self.network)
+
+        response = self.client.get(self.url + 'outsource_tree/')
+        response = response.json()
+        self.assertEqual(len(response), 2)
+        self.assertEqual(response[0]['label'], 'Клиент1')
+        self.assertEqual(len(response[0]['children']), 2)
+        self.assertEqual(response[1]['label'], 'Клиент2')
+        self.assertEqual(len(response[1]['children']), 1)
+
+    def test_ignore_parent_code_when_updating_department_via_api_parameter(self):
+        shop_data = self._get_shop_data()
+        put_url = f'{self.url}{shop_data["code"]}/'
+
+        response = self.client.put(put_url, shop_data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        shop = Shop.objects.get(code=shop_data['code'])
+        self.assertEqual(shop.parent_id, self.root_shop.id)
+
+        shop.parent = self.reg_shop1
+        shop.save()
+
+        response = self.client.put(put_url, shop_data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        shop.refresh_from_db()
+        # при выключенной настройке родитель должен обновиться
+        self.assertEqual(
+            shop.parent_id,
+            self.root_shop.id
+        )
+
+        shop.parent = self.reg_shop1
+        shop.save()
+
+        shop.network.ignore_parent_code_when_updating_department_via_api = True
+        shop.network.save()
+
+        response = self.client.put(put_url, shop_data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        shop.refresh_from_db()
+        # при включенной настройке родитель не должен обновиться
+        self.assertEqual(
+            shop.parent_id,
+            self.reg_shop1.id
+        )
+
+    def test_create_employment_on_set_or_update_director_code(self):
+        urs_group, _urs_group_created = Group.objects.get_or_create(name='УРС', code='urs', network=self.network)
+        self.network.create_employment_on_set_or_update_director_code = True
+        self._add_network_settings_value(self.network, 'shop_lvl_to_role_code_mapping', {
+            0: 'urs',
+            1: 'director',
+        })
+        self.network.save()
+
+        director_code = 'IvanovII'
+        director_user = UserFactory(username=director_code)
+        shop_data = self._get_shop_data()
+        shop_data['director_code'] = director_code
+        put_url = f'{self.url}{shop_data["code"]}/'
+        response = self.client.put(put_url, shop_data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        employment = Employment.objects.filter(
+            employee__user_id=director_user.id,
+            is_visible=False, dt_hired=timezone.now(), dt_fired='3999-01-01',
+        ).first()
+        self.assertIsNotNone(employment)
+        self.assertEqual(employment.function_group_id, self.chief_group.id)
+
+        director_code2 = 'PetrovPP'
+        director_user2 = UserFactory(username=director_code2)
+        shop_data['director_code'] = director_code2
+        response = self.client.put(put_url, shop_data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        employment = Employment.objects.filter(
+            employee__user_id=director_user.id,
+            function_group=self.chief_group,
+            is_visible=False, dt_hired=timezone.now(), dt_fired='3999-01-01',
+        ).first()
+        self.assertIsNone(employment)
+        employment2 = Employment.objects.filter(
+            employee__user_id=director_user2.id,
+            function_group=self.chief_group,
+            is_visible=False, dt_hired=timezone.now(), dt_fired='3999-01-01',
+        ).first()
+        self.assertIsNotNone(employment2)
+
+        shop_data = self._get_shop_data()
+        shop_data['director_code'] = director_code
+        shop_data['code'] = self.root_shop.code
+        shop_data.pop('parent_code')
+        put_url = f'{self.url}{shop_data["code"]}/'
+        response = self.client.put(put_url, shop_data, format='json')
+        self.print_resp(response)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        employment = Employment.objects.filter(
+            employee__user_id=director_user.id,
+            function_group=urs_group,
+            is_visible=False, dt_hired=timezone.now(), dt_fired='3999-01-01',
+        ).first()
+        self.assertIsNotNone(employment)
+        self.assertEqual(employment.function_group_id, urs_group.id)
+
+    def test_force_create_director_employment(self):
+        director_code = 'IvanovII'
+        director_user = UserFactory(username=director_code)
+
+        shop = ShopFactory(director=director_user)
+        employment_qs = Employment.objects.filter(
+            employee__user_id=director_user.id,
+            function_group=self.chief_group,
+            is_visible=False, dt_hired=timezone.now(), dt_fired='3999-01-01',
+        )
+        employment = employment_qs.first()
+        self.assertIsNone(employment)
+
+        shop.network.create_employment_on_set_or_update_director_code = True
+        self._add_network_settings_value(shop.network, 'shop_lvl_to_role_code_mapping', {
+            0: 'director',
+        })
+        shop.network.save()
+
+        shop.save(force_create_director_employment=True)
+        employment = employment_qs.first()
+        self.assertIsNotNone(employment)
+
+        shop.save(force_create_director_employment=True)
+        employment_count = employment_qs.count()
+        self.assertEqual(employment_count, 1)

@@ -1,3 +1,4 @@
+from rest_framework import serializers
 from src.forecast.models import (
     OperationTypeTemplate, 
     OperationType, 
@@ -8,7 +9,7 @@ from src.forecast.models import (
 )
 from src.base.models import Shop, ShopSchedule
 from src.timetable.models import WorkType
-from src.main.demand.utils import create_predbills_request_function
+# from src.main.demand.utils import create_predbills_request_function
 import numpy as np
 from django.utils import timezone
 import datetime
@@ -260,6 +261,8 @@ def apply_load_template(load_template_id, shop_id, dt_from=None):
                 shop_id=shop_id,
                 work_type_name_id=operation_type_template.operation_type_name.work_type_name_id,
             )
+            work_type.dttm_deleted = None
+            work_type.save()
         '''
         Создаём или обновляем тип операций в соответсвии с шаблоном.
         '''
@@ -283,8 +286,8 @@ def apply_load_template(load_template_id, shop_id, dt_from=None):
         dttm_deleted=timezone.now(),
     )
     Shop.objects.filter(pk=shop_id).update(load_template_id=load_template_id)
-    if OperationType.objects.filter(operation_type_name__do_forecast=OperationTypeName.FORECAST, dttm_deleted__isnull=True).exists() and dt_from:
-        create_predbills_request_function(shop_id, dt=dt_from)
+    # if OperationType.objects.filter(operation_type_name__do_forecast=OperationTypeName.FORECAST, dttm_deleted__isnull=True).exists() and dt_from:
+    #     create_predbills_request_function(shop_id, dt=dt_from)
 
 
 def calculate_shop_load(shop, load_template, dt_from, dt_to, lang='ru'):

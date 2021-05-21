@@ -1,5 +1,5 @@
 from src.timetable.models import WorkerDay, AttendanceRecords
-from src.base.models import Shop, User, Employment
+from src.base.models import Shop, User, Employment, Employee
 import xlsxwriter
 import io
 from datetime import date, datetime, timedelta
@@ -11,6 +11,9 @@ NO_RECORDS = 'R'
 NO_COMMING = 'C'
 NO_LEAVING = 'L'
 NO_COMING_PROBABLY = 'CP'
+BAD_FACT = 'BF'
+BAD_FACT_NO_COMMING = 'BFC'
+BAD_FACT_NO_LEAVING = 'BFL'
 
 NO_COMMING_HOURS = 4
 
@@ -19,35 +22,77 @@ text = {
     NO_COMMING: 'Нет прихода',
     NO_LEAVING: 'Нет ухода',
     NO_COMING_PROBABLY: 'Предположительно нет отметки о приходе',
+    BAD_FACT: 'Выход не по плану',
+    BAD_FACT_NO_COMMING: 'Выход не по плану\nНет прихода',
+    BAD_FACT_NO_LEAVING: 'Выход не по плану\nНет ухода',
 }
 
 
-def urv_violators_report(network_id, dt_from=None, dt_to=None):
+def urv_violators_report(network_id, dt_from=None, dt_to=None, exclude_created_by=False, shop_ids=None, user_ids=None):
+    filter_values = {}
+    if shop_ids:
+        filter_values['shop_id__in'] = shop_ids
+    if user_ids:
+        filter_values['employee__user_id__in'] = user_ids
     if not dt_from or not dt_to:
         dt_from = date.today() - timedelta(1)
         dt_to = date.today() - timedelta(1)
     data = {}
-    user_ids = Employment.objects.get_active(
+    employee_ids = Employment.objects.get_active(
         network_id,
         dt_from=dt_from,
         dt_to=dt_to,
-    ).values_list('user_id', flat=True)
-    no_comming =  bad_records = WorkerDay.objects.filter(
-        worker_id__in=user_ids,
+        **filter_values,
+    ).values_list('employee_id', flat=True)
+    filter_values.pop('employee__user_id__in', None)
+    no_comming = WorkerDay.objects.filter(
+        employee_id__in=employee_ids,
         dt__gte=dt_from,
         dt__lte=dt_to,
         is_fact=True,
         is_approved=True,
-        dttm_work_start__isnull=True,
+        **filter_values,
     )
-    no_leaving =  bad_records = WorkerDay.objects.filter(
-        worker_id__in=user_ids,
+    if exclude_created_by:
+        no_comming = no_comming.annotate(
+            exist_records=Exists(
+            AttendanceRecords.objects.filter(
+                    employee_id=OuterRef('employee_id'),
+                    dt=OuterRef('dt'),
+                    type=AttendanceRecords.TYPE_COMING,
+                )
+            )
+        ).filter(
+            exist_records=False,
+        )
+    else:
+        no_comming = no_comming.filter(
+            dttm_work_start__isnull=True,
+        )
+    no_leaving = WorkerDay.objects.filter(
+        employee_id__in=employee_ids,
         dt__gte=dt_from,
         dt__lte=dt_to,
         is_fact=True,
         is_approved=True,
-        dttm_work_end__isnull=True,
+        **filter_values,
     )
+    if exclude_created_by:
+        no_leaving = no_leaving.annotate(
+            exist_records=Exists(
+            AttendanceRecords.objects.filter(
+                    employee_id=OuterRef('employee_id'),
+                    dt=OuterRef('dt'),
+                    type=AttendanceRecords.TYPE_LEAVING,
+                )
+            )
+        ).filter(
+            exist_records=False,
+        )
+    else:
+        no_leaving = no_leaving.filter(
+            dttm_work_end__isnull=True,
+        )
     worker_days = WorkerDay.objects.filter(
         dt__gte=dt_from,
         dt__lte=dt_to,
@@ -55,33 +100,80 @@ def urv_violators_report(network_id, dt_from=None, dt_to=None):
         type=WorkerDay.TYPE_WORKDAY,
         is_approved=True,
         is_fact=False,
-        worker_id__in=user_ids,
+        employee_id__in=employee_ids,
+        **filter_values,
     )
     
     for record in no_comming:
-        data.setdefault(record.worker_id, {})[record.dt] = {
+        data.setdefault(record.employee_id, {})[record.dt] = {
             'shop_id': record.shop_id,
             'type': NO_COMMING,
         }
 
     for record in no_leaving:
-        data.setdefault(record.worker_id, {})[record.dt] = {
+        data.setdefault(record.employee_id, {})[record.dt] = {
             'shop_id': record.shop_id,
             'type': NO_LEAVING,
         }
     
-    no_records = worker_days.annotate(
-        exist_records=Exists(
-            AttendanceRecords.objects.filter(
-                user_id=OuterRef('worker_id'),
-                dttm__date=OuterRef('dt'),
+    fact_without_plan = WorkerDay.objects.filter(
+        dt__gte=dt_from,
+        dt__lte=dt_to,
+        shop__network_id=network_id,
+        type=WorkerDay.TYPE_WORKDAY,
+        is_approved=True,
+        is_fact=True,
+        employee_id__in=employee_ids,
+        **filter_values,
+    ).annotate(
+        exist_plan=Exists(
+            WorkerDay.objects.filter(
+                employee_id=OuterRef('employee_id'),
+                dt=OuterRef('dt'),
+                is_fact=False,
+                is_approved=True
             )
         )
     ).filter(
-        exist_records=False,
+        exist_plan=False,
     )
+    for record in fact_without_plan:
+        type = data.get(record.employee_id, {}).get(record.dt, {}).get('type', BAD_FACT)
+        if type == NO_COMMING:
+            type = BAD_FACT_NO_COMMING
+        elif type == NO_LEAVING:
+            type = BAD_FACT_NO_LEAVING
+        data.setdefault(record.employee_id, {})[record.dt] = {
+            'shop_id': record.shop_id,
+            'type': type,
+        }
+
+    if exclude_created_by:
+        no_records = worker_days.annotate(
+            exist_records=Exists(
+                AttendanceRecords.objects.filter(
+                    employee_id=OuterRef('employee_id'),
+                    dt=OuterRef('dt'),
+                )
+            )
+        ).filter(
+            exist_records=False,
+        )
+    else:
+        no_records = worker_days.annotate(
+            exist_fact=Exists(
+                WorkerDay.objects.filter(
+                    employee_id=OuterRef('employee_id'),
+                    dt=OuterRef('dt'),
+                    is_fact=True,
+                    is_approved=True
+                )
+            )
+        ).filter(
+            exist_fact=False,
+        )
     for record in no_records:
-        first_key = record.worker_id
+        first_key = record.employee_id
         second_key = record.dt
         data.setdefault(first_key, {})[second_key] = {
             'shop_id': record.shop_id,
@@ -91,7 +183,7 @@ def urv_violators_report(network_id, dt_from=None, dt_to=None):
     return data
 
 
-def urv_violators_report_xlsx(network_id, dt=None, title=None, in_memory=False):
+def urv_violators_report_xlsx(network_id, dt=None, title=None, shop_ids=None, in_memory=False):
     if not dt:
         dt = date.today() - timedelta(1)
     if not title:
@@ -101,22 +193,16 @@ def urv_violators_report_xlsx(network_id, dt=None, title=None, in_memory=False):
     TABEL_CODE = 2
     FIO = 3
     REASON = 4
+    shop_filter = {}
+    if shop_ids:
+        shop_filter['id__in'] = shop_ids
     shops = { 
-        s.id: s for s in Shop.objects.all()
+        s.id: s for s in Shop.objects.filter(**shop_filter)
     }
-    data = urv_violators_report(network_id, dt_from=dt, dt_to=dt)
-    users = {
-        u.id: f"{u.last_name} {u.first_name} {u.middle_name if u.middle_name else ''}" for u in User.objects.filter(
+    data = urv_violators_report(network_id, dt_from=dt, dt_to=dt, shop_ids=shop_ids, exclude_created_by=True)
+    employees = {
+        e.id: e for e in Employee.objects.select_related('user').filter(
             id__in=data.keys(),
-        )
-    }
-    employments = {
-        e.user_id: e for e in Employment.objects.get_active(
-            network_id, 
-            dt_from=dt, 
-            dt_to=dt,
-        ).filter(
-            user_id__in=users.keys(),
         )
     }
 
@@ -130,11 +216,11 @@ def urv_violators_report_xlsx(network_id, dt=None, title=None, in_memory=False):
         {
             'shop': shops.get(reason['shop_id'], Shop()).name or '',
             'shop_code': shops.get(reason['shop_id'], Shop()).code or '',
-            'tabel': employments.get(user_id, Employment()).tabel_code or '',
-            'fio': users.get(user_id),
+            'tabel': employees.get(employee_id).tabel_code or '',
+            'fio': employees.get(employee_id).user.fio,
             'reason': text.get(reason['type']),
         }
-        for user_id, record in data.items()
+        for employee_id, record in data.items()
         for dt, reason in record.items()
     ]
     rows = sorted(rows, key=lambda x: x['shop'])
@@ -182,7 +268,7 @@ def urv_violators_report_xlsx(network_id, dt=None, title=None, in_memory=False):
         }
     
 
-def urv_violators_report_xlsx_v2(network_id, dt_from=None, dt_to=None, title=None, in_memory=False):
+def urv_violators_report_xlsx_v2(network_id, dt_from=None, dt_to=None, title=None, in_memory=False, exclude_created_by=False, user_ids=None, shop_ids=None):
     if not dt_from:
         dt_from = date.today().replace(day=1)
     if not dt_to:
@@ -197,10 +283,10 @@ def urv_violators_report_xlsx_v2(network_id, dt_from=None, dt_to=None, title=Non
     shops = { 
         s.id: s for s in Shop.objects.all()
     }
-    data = urv_violators_report(network_id, dt_from=dt_from, dt_to=dt_to)
+    data = urv_violators_report(network_id, dt_from=dt_from, dt_to=dt_to, exclude_created_by=exclude_created_by, user_ids=user_ids, shop_ids=shop_ids)
 
-    users = {
-        u.id: f"{u.last_name} {u.first_name} {u.middle_name if u.middle_name else ''}" for u in User.objects.filter(
+    employees = {
+        e.id: e for e in Employee.objects.select_related('user').filter(
             id__in=data.keys(),
         )
     }
@@ -213,19 +299,20 @@ def urv_violators_report_xlsx_v2(network_id, dt_from=None, dt_to=None, title=Non
     
     rows = []
 
-    for user_id, records in data.items():
+    for employee_id, records in data.items():
         empl = Employment.objects.get_active(
             network_id,
             dt_from,
             dt_to,
-            user_id=user_id,
+            employee_id=employee_id,
         ).select_related('position').first()
         rows.append(
             {
                 'shop': shops.get(empl.shop_id if empl else None, Shop()).name or '',
                 'shop_code': shops.get(empl.shop_id if empl else None, Shop()).code or '',
                 'empl': empl,
-                'fio': users.get(user_id),
+                'fio': employees.get(employee_id).user.fio,
+                'employee': employees.get(employee_id),
                 'records': records, 
             }
         ) 
@@ -267,7 +354,7 @@ def urv_violators_report_xlsx_v2(network_id, dt_from=None, dt_to=None, title=Non
     for record in rows:
         worksheet.write_string(row, SHOP_CODE, record['shop_code'] or '', workbook.add_format(def_format))
         worksheet.write_string(row, SHOP, record['shop'], workbook.add_format(def_format))
-        worksheet.write_string(row, TABEL_CODE, record['empl'].tabel_code or '' if record['empl'] else '', workbook.add_format(def_format))
+        worksheet.write_string(row, TABEL_CODE, record['employee'].tabel_code or '', workbook.add_format(def_format))
         worksheet.write_string(row, FIO, record['fio'], workbook.add_format(def_format))
         worksheet.write_string(row, POSITION, record['empl'].position.name if record['empl'] and record['empl'].position else '', workbook.add_format(def_format))
         col = POSITION

@@ -13,6 +13,7 @@ from src.base.models import Shop, ShopSchedule
 from src.conf.djconfig import QOS_TIME_FORMAT
 from src.util.drf.fields import RoundingDecimalField
 from src.util.models_converter import Converter
+from src.timetable.worker_day.tasks import recalc_wdays
 
 POSSIBLE_KEYS = [
     '0', '1', '2', '3', '4', '5', '6', 'all',
@@ -54,6 +55,31 @@ class NonstandardShopScheduleSerializer(serializers.ModelSerializer):
         )
 
 
+def serialize_shop(shop: Shop, request):
+    distance = None
+    if request:
+        lat = request.META.get('X-LAT')
+        lon = request.META.get('X-LON')
+        if lat and lon and shop.latitude and shop.longitude:
+            distance = round(geopy.distance.distance((lat, lon), (shop.latitude, shop.longitude)).km, 2)
+    return {
+        'id': shop.id,
+        'name': shop.name,
+        'forecast_step_minutes': shop.forecast_step_minutes,
+        'tm_open_dict': shop.open_times,
+        'tm_close_dict': shop.close_times,
+        'address': shop.address,
+        'timezone': str(six.text_type(shop.timezone)),
+        'code': shop.code,
+        'longitude': shop.longitude,
+        'latitude': shop.latitude,
+        'settings_id': shop.settings_id,
+        'load_template_id': shop.load_template_id,
+        'parent_id': shop.parent_id,
+        'distance': distance,
+    }
+
+
 class ShopSerializer(serializers.ModelSerializer):
     parent_id = serializers.IntegerField(required=False)
     parent_code = serializers.CharField(required=False)
@@ -69,7 +95,7 @@ class ShopSerializer(serializers.ModelSerializer):
     load_template_status = serializers.CharField(read_only=True)
     timezone = TimeZoneField(required=False)
     is_active = serializers.BooleanField(required=False, default=True)
-    director_code = serializers.CharField(required=False)
+    director_code = serializers.CharField(required=False, write_only=True)
     distance = serializers.SerializerMethodField(label='Расстояние до магазина (км)')
     latitude = RoundingDecimalField(decimal_places=8, max_digits=12, allow_null=True, required=False)
     longitude = RoundingDecimalField(decimal_places=8, max_digits=12, allow_null=True, required=False)
@@ -139,8 +165,6 @@ class ShopSerializer(serializers.ModelSerializer):
 
     def _update_or_create_nested_data(self, instance, nonstandard_schedule):
         if nonstandard_schedule:
-            from src.celery.tasks import recalc_wdays
-            from src.util.models_converter import Converter
             user = getattr(self.context.get('request', {}), 'user', None)
             dates = [sch['dt'] for sch in nonstandard_schedule]
             ss_dict = {}
@@ -188,6 +212,8 @@ class ShopSerializer(serializers.ModelSerializer):
 
     def update(self, instance, validated_data):
         nonstandard_schedule = validated_data.pop('nonstandard_schedule', [])
+        if instance.network.ignore_parent_code_when_updating_department_via_api:
+            validated_data.pop('parent_code', None)
         shop = super(ShopSerializer, self).update(instance, validated_data)
         self._update_or_create_nested_data(shop, nonstandard_schedule)
         return shop

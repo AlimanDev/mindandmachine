@@ -108,12 +108,12 @@ def urv_stat_v1(dt_from, dt_to, title=None, shop_codes=None, shop_ids=None, comm
     row = 1
     for shop in shops:
         for date in dates:
-            user_ids = list(Employment.objects.get_active(shop.network_id, dt_from=date, dt_to=date).values_list('user_id', flat=True))
+            employee_ids = list(Employment.objects.get_active(shop.network_id, dt_from=date, dt_to=date).values_list('employee_id', flat=True))
             worksheet.write_string(row, SHOP, shop.name, def_format)
             worker_days_stat = PlanAndFactHours.objects.filter(
                 shop=shop, 
                 dt=date,
-                worker_id__in=user_ids,
+                employee_id__in=employee_ids,
                 wd_type=WorkerDay.TYPE_WORKDAY,
             ).aggregate(
                 plan_ticks=Sum('ticks_plan_count'),
@@ -168,7 +168,7 @@ def urv_stat_v1(dt_from, dt_to, title=None, shop_codes=None, shop_ids=None, comm
         }
 
 
-def urv_stat_v2(dt_from, dt_to, title=None, network_id=None, in_memory=False):
+def urv_stat_v2(dt_from, dt_to, title=None, shop_ids=None, network_id=None, in_memory=False):
     DTTM = 0
     SHOP_CODE = 1
     SHOP = 2
@@ -202,28 +202,30 @@ def urv_stat_v2(dt_from, dt_to, title=None, network_id=None, in_memory=False):
     worksheet.write_string(0, TYPE, 'Тип события', workbook.add_format(def_format))
     worksheet.set_column(TYPE, TYPE, 11)
     
+    shop_filter = {}
+    if shop_ids:
+        shop_filter['shop_id__in'] = shop_ids
+
     records = AttendanceRecords.objects.select_related(
         'shop',
         'user',
+        'employee',
     ).filter(
         dt__gte=dt_from,
         dt__lte=dt_to,
         shop__network_id=network_id,
+        **shop_filter,
     ).order_by(
         'shop_id',
         'dttm',
     )
-
-    employments = {}
-    for e in Employment.objects.get_active(network_id, dt_from=dt_from, dt_to=dt_to):
-        employments.setdefault(e.user_id, {})[e.shop_id] = e
 
     row = 1
     for record in records:
         worksheet.write(row, SHOP_CODE, record.shop.code or 'Без кода')
         worksheet.write(row, SHOP, record.shop.name)
         worksheet.write(row, DTTM, str(record.dttm.replace(microsecond=0)))
-        worksheet.write(row, USER_CODE, employments.get(record.user_id, {}).get(record.shop_id, Employment()).tabel_code or 'Без табельного номера')
+        worksheet.write(row, USER_CODE, record.employee.tabel_code or 'Без табельного номера')
         worksheet.write(row, USER, f'{record.user.last_name} {record.user.first_name} {record.user.middle_name or ""}')
         worksheet.write(row, TYPE, RECORD_TYPES.get(record.type, 'Неизвестно'))
         row += 1

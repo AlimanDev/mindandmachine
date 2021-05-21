@@ -3,8 +3,7 @@ from django.db import models
 from django.db.models import Q
 from django.template import loader as template_loader, Template
 
-from django_celery_beat.models import CrontabSchedule
-
+from src.reports.models import ReportConfig
 from src.base.models import User, Employment, Shop
 from src.base.models_abstract import AbstractModel
 from src.events.registry import EventRegistryHolder
@@ -17,6 +16,9 @@ class AbstractEventNotification(AbstractModel):
 
     class Meta:
         abstract = True
+    
+    def __str__(self):
+        return self.event_type.name
 
 
 class AbstractEventNotificationWithRecipients(AbstractEventNotification):
@@ -84,7 +86,7 @@ class AbstractEventNotificationWithRecipients(AbstractEventNotification):
                 list(User.objects.filter(
                     id__in=Employment.objects.get_active().filter(
                         Q(function_group__in=groups) | Q(position__group__in=groups),
-                    ).values_list('user_id', flat=True),
+                    ).values_list('employee__user_id', flat=True),
                     email__isnull=False,
                 ))
             )
@@ -102,7 +104,7 @@ class AbstractEventNotificationWithRecipients(AbstractEventNotification):
                     id__in=Employment.objects.get_active().filter(
                         Q(function_group__in=self.shop_groups.all()) | Q(position__group__in=self.shop_groups.all()),
                         shop_q,
-                    ).values_list('user_id', flat=True),
+                    ).values_list('employee__user_id', flat=True),
                     email__isnull=False,
                 ))
             )
@@ -121,6 +123,12 @@ class AbstractEventNotificationWithRecipients(AbstractEventNotification):
     
         return recipients
 
+    def __str__(self):
+        return '{}, {} получателей'.format(
+            self.event_type.name,
+            self.shops.count() + self.users.count(),
+        )
+
 
 class EventEmailNotification(AbstractEventNotificationWithRecipients):
     email_addresses = models.CharField(
@@ -137,10 +145,7 @@ class EventEmailNotification(AbstractEventNotificationWithRecipients):
         help_text='По умолчанию берется из названия "Системный E-mail шаблон"'
     )
 
-    cron = models.ForeignKey(
-        CrontabSchedule, null=True, blank=True,
-        verbose_name='Расписание для отправки', on_delete=models.PROTECT,
-    )
+    report_config = models.ForeignKey(ReportConfig, on_delete=models.PROTECT, null=True, blank=True, verbose_name='Конфигурация отчета')
 
     class Meta:
         verbose_name = 'Email оповещение о событиях'
@@ -168,6 +173,17 @@ class EventEmailNotification(AbstractEventNotificationWithRecipients):
             subject = self.get_system_email_template_display()
 
         return subject
+
+    def __str__(self):
+        cron_str = ''
+        if self.report_config:
+            cron_str = f', расписание {self.report_config.cron}'
+        return '{}, {} получателей{}'.format(
+            self.event_type.name,
+            self.shops.count() + self.users.count()\
+            + (len(self.email_addresses.split(',')) if self.email_addresses else 0),
+            cron_str,
+        )
 
 
 class EventOnlineNotification(AbstractEventNotificationWithRecipients):

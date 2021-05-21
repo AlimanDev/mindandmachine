@@ -21,6 +21,7 @@ from src.base.views import (
     GroupViewSet,
     BreakViewSet,
     ShopScheduleViewSet,
+    EmployeeViewSet,
 )
 
 rest_auth_urls = [
@@ -39,6 +40,7 @@ router = routers.DefaultRouter()
 router.register(r'department', ShopViewSet, basename='Shop')
 router.register(r'employment', EmploymentViewSet, basename='Employment')
 router.register(r'user', UserViewSet, basename='User')
+router.register(r'employee', EmployeeViewSet, basename='Employee')
 router.register(r'worker_position', WorkerPositionViewSet, basename='WorkerPosition')
 router.register(r'subscribe', SubscribeViewSet, basename='Subscribe')
 router.register(r'notification', NotificationViewSet, basename='Notification')

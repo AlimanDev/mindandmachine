@@ -1,9 +1,10 @@
 import geopy.distance
 from django.conf import settings
 from django.utils.translation import gettext_lazy as _
+from django.db.models import Q
 from rest_framework import serializers
 
-from src.base.models import Shop
+from src.base.models import Shop, NetworkConnect
 from src.recognition.models import TickPoint, Tick, TickPhoto
 from src.timetable.models import User as WFMUser
 from src.util.drf.fields import RoundingDecimalField
@@ -43,6 +44,8 @@ class HashSigninSerializer(serializers.Serializer):
 
 
 class TickPointSerializer(serializers.ModelSerializer):
+    shop_id = serializers.IntegerField()
+
     class Meta:
         model = TickPoint
         fields = ['id', 'shop_id', 'name', 'code', 'key']
@@ -68,6 +71,7 @@ class TickSerializer(serializers.ModelSerializer):
             'is_verified',
             'type',
             'user_id',
+            'employee_id',
             'tick_point_id',
         ]
         fields = read_only_fields
@@ -86,24 +90,27 @@ class TickSerializer(serializers.ModelSerializer):
 
 class PostTickSerializer_point(serializers.ModelSerializer):
     user_id = serializers.IntegerField()
+    employee_id = serializers.IntegerField(required=False)
     dttm = serializers.DateTimeField(required=False)
 
     class Meta:
         model = Tick
-        fields = ['user_id', 'type', 'dttm']
+        fields = ['user_id', 'employee_id', 'type', 'dttm']
 
 
 class PostTickSerializer_user(serializers.ModelSerializer):
     dttm = serializers.DateTimeField(required=False)
+    employee_id = serializers.IntegerField(required=False)
 
     class Meta:
         model = Tick
-        fields = ['type', 'dttm']
+        fields = ['type', 'dttm', 'employee_id']
 
     def __init__(self, *args, **kwargs):
         super(PostTickSerializer_user, self).__init__(*args, **kwargs)
+        clients = NetworkConnect.objects.filter(outsourcing=self.context['request'].user.network).values_list('client_id', flat=True)
         self.fields['shop_code'] = serializers.SlugRelatedField(
-            slug_field='code', queryset=Shop.objects.filter(network=self.context['request'].user.network))
+            slug_field='code', queryset=Shop.objects.filter(Q(network=self.context['request'].user.network) | Q(network_id__in=clients)))
         if self.context['request'].user.network.allowed_geo_distance_km:
             self.fields['lat'] = RoundingDecimalField(decimal_places=8, max_digits=12)
             self.fields['lon'] = RoundingDecimalField(decimal_places=8, max_digits=12)

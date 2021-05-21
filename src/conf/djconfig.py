@@ -9,7 +9,10 @@ config importance
 import os
 import sys
 
+import environ
 from celery.schedules import crontab
+
+env = environ.Env()
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -28,8 +31,9 @@ UPLOAD_TT_MATCH_EMPLOYMENT = True
 
 QOS_CAMERA_KEY = '1'
 
-HOST = 'http://127.0.0.1:8000' # dev
-TIMETABLE_IP = "127.0.0.1:5000"
+HOST = env.str('HOST', default='http://127.0.0.1:8000')
+EXTERNAL_HOST = env.str('EXTERNAL_HOST', default=HOST)
+TIMETABLE_IP = env.str('TIMETABLE_IP', default='127.0.0.1:5000')
 
 # доменное имя проекта, используется в src.timetable.vacancy в письмах
 DOMAIN = '' 
@@ -45,7 +49,7 @@ MDA_SYNC_DEPARTMENTS_THRESHOLD_SECONDS = (60 * 60) + 10  # 1 час + 10 сек
 MDA_PUBLIC_API_HOST = 'https://example.com'
 MDA_PUBLIC_API_AUTH_TOKEN = 'dummy'
 
-DEBUG = True
+DEBUG = env.bool('DJANGO_DEBUG', default=True)
 
 ALLOWED_HOSTS = ['*']
 
@@ -78,6 +82,8 @@ INSTALLED_APPS = [
     'src.integration',
     'src.events',
     'src.notifications',
+    'src.reports',
+    'import_export',
 ]
 
 REST_FRAMEWORK = {
@@ -139,8 +145,12 @@ WSGI_APPLICATION = 'wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': env.str('DB_NAME', default='qos'),
+        'USER': env.str('DB_USER', default='root'),
+        'PASSWORD': env.str('DB_PASSWORD', default='root'),
+        'HOST': env.str('DB_HOST', default='localhost'),
+        'PORT': '5432',
     }
 }
 
@@ -194,34 +204,35 @@ LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
     'formatters': {
+        'verbose': {
+            'format': '{asctime} [{levelname} {module} {process:d} {thread:d}]: {message}',
+            'style': '{',
+        },
         'simple': {
             'format': '%(levelname)s %(process)d %(asctime)s %(message)s'
         },
     },
     'filters': {
+        'require_debug_true': {
+            '()': 'django.utils.log.RequireDebugTrue',
+        },
         'require_debug_false': {
             '()': 'django.utils.log.RequireDebugFalse'
         }
     },
     'handlers': {
-        'file': {
-            'level': 'INFO',  # use INFO for not logging sql queries
+        'console': {
+            'level': 'DEBUG',
+            'filters': ['require_debug_true'],
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose'
+        },
+        'django_request': {
+            'level': 'ERROR',
             'class': 'logging.handlers.RotatingFileHandler',
-            'filename': 'qos_backend.log',  # directory with logs must be already created
+            'filename': os.path.join(BASE_DIR, 'logs/django_request.log'),  # directory with logs must be already created
             'maxBytes': 5 * 1024 * 1024,
             'backupCount': 10,
-            'formatter': 'simple',
-        },
-        'clean_wdays': {
-            'level': 'DEBUG',
-            'class': 'logging.handlers.WatchedFileHandler',
-            'filename': 'clean_wdays.log',
-            'formatter': 'simple',
-        },
-        'send_doctors_schedule_to_mis': {
-            'level': 'DEBUG',
-            'class': 'logging.handlers.WatchedFileHandler',
-            'filename': 'clean_wdays.log',
             'formatter': 'simple',
         },
         'mail_admins': {
@@ -235,31 +246,36 @@ LOGGING = {
     },
     'loggers': {
         'django': {
-            'handlers': ['file'],
-            'level': 'DEBUG',
-            'propagate': True,
+          'handlers': ['console'],
+          'level': 'INFO',
         },
         'django.request': {
-            'handlers': ['mail_admins'],
+            'handlers': ['django_request', 'mail_admins'],
             'level': 'ERROR',
             'propagate': True,
         },
-        'clean_wdays': {
-            'handlers': ['clean_wdays'],
-            'level': 'DEBUG',
-            'propagate': True,
-        },
-        'send_doctors_schedule_to_mis': {
-            'handlers': ['send_doctors_schedule_to_mis'],
-            'level': 'DEBUG',
-            'propagate': True,
-        },
-        # 'django.db.backends': {
-        #     'level': 'DEBUG',
-        #     'handlers': ['console'],
-        # }
+        #'django.db.backends': {
+        #    'handlers': ['console'],
+        #    'level': 'DEBUG',
+        #}
     },
 }
+
+def add_logger(name, level='DEBUG', formatter='simple'):
+    LOGGING['handlers'][name] = {
+        'level': level,
+        'class': 'logging.handlers.WatchedFileHandler',
+        'filename': os.path.join(BASE_DIR, 'logs', name + '.log'),
+        'formatter': formatter,
+    }
+    LOGGING['loggers'][name] = {
+        'handlers': [name],
+        'level': level,
+        'propagate': True,
+    }
+
+add_logger('clean_wdays')
+add_logger('send_doctors_schedule_to_mis')
 
 # LOGGING USAGE:
 # import logging
@@ -285,10 +301,13 @@ LOCALE_PATHS = [
     os.path.join(BASE_DIR,  'data/locale')
 ]
 
-STATIC_URL = '/static/'
+STATIC_ROOT = os.path.join(BASE_DIR, 'static/')
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media/')
 
+STATIC_URL = '/static/'
 MEDIA_URL = '/_i/media/'
 
+FILE_UPLOAD_PERMISSIONS = 0o644
 
 SESSION_COOKIE_SECURE = True
 
@@ -301,7 +320,33 @@ SWAGGER_SETTINGS = {
     'TAGS_SORTER': 'alpha',
     'OPERATIONS_SORTER': 'alpha',
     'DEFAULT_AUTO_SCHEMA_CLASS': "src.util.openapi.auto_schema.WFMAutoSchema",
+    'DEFAULT_FIELD_INSPECTORS': [
+        'src.util.openapi.inspectors.OverrideExampleInspector',
+        'drf_yasg.inspectors.CamelCaseJSONFilter',
+        'drf_yasg.inspectors.ReferencingSerializerInspector',
+        'drf_yasg.inspectors.RelatedFieldInspector',
+        'drf_yasg.inspectors.ChoiceFieldInspector',
+        'drf_yasg.inspectors.FileFieldInspector',
+        'drf_yasg.inspectors.DictFieldInspector',
+        'drf_yasg.inspectors.JSONFieldInspector',
+        'drf_yasg.inspectors.HiddenFieldInspector',
+        'drf_yasg.inspectors.RecursiveFieldInspector',
+        'drf_yasg.inspectors.SerializerMethodFieldInspector',
+        'drf_yasg.inspectors.SimpleFieldInspector',
+        'drf_yasg.inspectors.StringDefaultFieldInspector',
+    ],
 }
+
+# какие методы и модели могут попасть в описание интеграции
+OPENAPI_INTEGRATION_MODELS_METHODS = [
+    ('user', 'update'),
+    ('department', 'update'),
+    ('employment', 'update'),
+    ('worker_position', 'update'),
+    ('worker_day', 'list'),
+    ('timeserie_value', 'create'),
+    ('receipt', 'update'),
+]
 
 # DCS_SESSION_COOKIE_SAMESITE = 'none'  # for md audit
 
@@ -316,19 +361,32 @@ ALLOWED_UPLOAD_EXTENSIONS = ['xlsx', 'xls']
 
 MOBILE_USER_AGENTS = ('QoS_mobile_app', 'okhttp',)
 
-METABASE_SITE_URL = 'metabase-url'
-METABASE_SECRET_KEY = 'secret-key'
+METABASE_SITE_URL = env.str('METABASE_SITE_URL', default='metabase-url')
+METABASE_SECRET_KEY = env.str('METABASE_SECRET_KEY', default='secret-key')
 
-CELERY_IMPORTS = ('src.celery.tasks', 'src.integration.tasks', 'src.integration.mda.tasks')
-CELERY_BROKER_URL = 'redis://localhost:6379'
-CELERY_RESULT_BACKEND = 'redis://localhost:6379'
+CELERY_IMPORTS = (
+    'src.celery.tasks',
+    'src.integration.tasks',
+    'src.integration.mda.tasks',
+    'src.base.shop.tasks',
+    'src.events.tasks',
+    'src.forecast.load_template.tasks',
+    'src.forecast.receipt.tasks',
+    'src.timetable.shop_month_stat.tasks',
+    'src.timetable.vacancy.tasks',
+    'src.timetable.worker_day.tasks',
+)
+
+REDIS_HOST = env.str('REDIS_HOST', default='localhost')
+CELERY_BROKER_URL = 'redis://' + REDIS_HOST + ':6379'
+CELERY_RESULT_BACKEND = 'redis://' + REDIS_HOST + ':6379'
 CELERY_ACCEPT_CONTENT = ['application/json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = TIME_ZONE
 CELERYD_CONCURRENCY = 2
 CELERYD_PREFETCH_MULTIPLIER = 1
-BACKEND_QUEUE = 'backend_queue'
+BACKEND_QUEUE = env.str('BACKEND_QUEUE', default='backend_queue')
 
 # for change celery configs must be before (for BACKEND_QUEUE)
 # todo: do normal parameters changer
@@ -354,10 +412,10 @@ MDA_SKIP_LEAVING_TICK = False
 # 	-p 8030:8080 \
 #   -d \
 # 	eugenmayer/kontextwork-converter:production
-JOD_CONVERTER_URL = 'http://localhost:8030'
+JOD_CONVERTER_URL = env.str('JOD_CONVERTER_URL', default='http://localhost:8030')
 
 # docker run --restart unless-stopped -p 3001:3000 -d thecodingmachine/gotenberg:6
-GOTENBERG_URL = 'http://localhost:3001'
+GOTENBERG_URL = env.str('GOTENBERG_URL', default='http://localhost:3001')
 
 ZKTECO_HOST = ''
 ZKTECO_KEY = ''
@@ -382,6 +440,9 @@ TEVIAN_DATABASE_ID = 26  # TESTURV database
 TEVIAN_FD_THRESHOLD = 0.8
 TEVIAN_FR_THRESHOLD = 0.8
 
+# после какого времени (в днях) удалять биометрию уволенных сотрудников
+URV_DELETE_BIOMETRICS_DAYS_AFTER_FIRED = 365 * 3
+
 TRUST_TICK_REQUEST = False
 USERS_WITH_SCHEDULE_ONLY = False
 # игнорировать отметку без активного трудоустройства или вакансии
@@ -402,6 +463,8 @@ MIS_USERNAME = None
 MIS_PASSWORD = None
 
 CASE_INSENSITIVE_AUTH = False
+
+IMPORT_EXPORT_USE_TRANSACTIONS = True
 
 # Eсли у пользователя пароль пустой, то при сохранении устанавливать пароль как логин
 SET_USER_PASSWORD_AS_LOGIN = False
@@ -444,23 +507,18 @@ CELERY_BEAT_SCHEDULE = {
     # },
 
     'task-vacancies_create_and_cancel': {
-        'task': 'src.celery.tasks.vacancies_create_and_cancel',
+        'task': 'src.timetable.vacancy.tasks.vacancies_create_and_cancel',
         'schedule': crontab(minute='*/30'),
         'options': {'queue': BACKEND_QUEUE}
     },
     'task-workers_hard_exchange': {
-        'task': 'src.celery.tasks.workers_hard_exchange',
+        'task': 'src.timetable.vacancy.tasks.workers_hard_exchange',
         'schedule': crontab(hour=1, minute=0),
         'options': {'queue': BACKEND_QUEUE}
     },
     'task-allocation-of-time-for-work-on-cashbox': {
         'task': 'src.celery.tasks.allocation_of_time_for_work_on_cashbox',
         'schedule': crontab(day_of_month='1', hour=4, minute=0)
-    },
-    'task-create-pred-bills': {
-        'task': 'src.celery.tasks.create_pred_bills',
-        'schedule': crontab(hour=23, minute=0, day_of_month='1'),
-        'options': {'queue': BACKEND_QUEUE}
     },
     'task-clean-camera-stats': {
         'task': 'src.celery.tasks.clean_camera_stats',
@@ -473,7 +531,7 @@ CELERY_BEAT_SCHEDULE = {
         'options': {'queue': BACKEND_QUEUE}
     },
     'task-update-shop-stats': {
-        'task': 'src.celery.tasks.update_shop_stats_2_months',
+        'task': 'src.timetable.shop_month_stat.tasks.update_shop_stats_2_months',
         'schedule': crontab(hour=3, minute=0),
         'options': {'queue': BACKEND_QUEUE}
     },
@@ -483,17 +541,17 @@ CELERY_BEAT_SCHEDULE = {
         'options': {'queue': BACKEND_QUEUE}
     },
     'task-aggregate-receipts': {
-        'task': 'src.celery.tasks.aggregate_timeserie_value',
+        'task': 'src.forecast.receipt.tasks.aggregate_timeserie_value',
         'schedule': crontab(hour=0, minute=0),
         'options': {'queue': BACKEND_QUEUE}
     },
-    'task-delete-old=receipts': {
-        'task': 'src.celery.tasks.clean_timeserie_actions',
+    'task-delete-old-receipts': {
+        'task': 'src.forecast.receipt.tasks.clean_timeserie_actions',
         'schedule': crontab(hour=1, minute=0),
         'options': {'queue': BACKEND_QUEUE}
     },
     'task-trigger-cron-event': {
-        'task': 'src.celery.tasks.cron_event',
+        'task': 'src.events.tasks.cron_event',
         'schedule': crontab(minute='*/1'),
         'options': {'queue': BACKEND_QUEUE}
     },
@@ -503,12 +561,22 @@ CELERY_BEAT_SCHEDULE = {
         'options': {'queue': BACKEND_QUEUE}
     },
     'task-fill-active-shops-schedule': {
-        'task': 'src.celery.tasks.fill_active_shops_schedule',
+        'task': 'src.base.shop.tasks.fill_active_shops_schedule',
         'schedule': crontab(hour=1, minute=30),
         'options': {'queue': BACKEND_QUEUE}
     },
     'task-calculate-shop-load-at-night': {
-        'task': 'src.celery.tasks.calculate_shop_load_at_night',
+        'task': 'src.forecast.load_template.tasks.calculate_shop_load_at_night',
+        'schedule': crontab(hour=0, minute=0),
+        'options': {'queue': BACKEND_QUEUE}
+    },
+    'task-send-employee-not-checked-in-notification': {
+        'task': 'src.celery.tasks.employee_not_checked',
+        'schedule': crontab(minute='*/5'),
+        'options': {'queue': BACKEND_QUEUE}
+    },
+    'task-auto-delete-biometrics': {
+        'task': 'src.celery.tasks.auto_delete_biometrics',
         'schedule': crontab(hour=0, minute=0),
         'options': {'queue': BACKEND_QUEUE}
     },

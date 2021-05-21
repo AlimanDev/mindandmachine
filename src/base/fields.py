@@ -18,7 +18,7 @@ class UserworkShop:
         now_day = timezone.now().date()
         employment =  Employment.objects.filter(
             Q(dt_fired__gte=now_day) | Q(dt_fired__isnull=True),
-            user_id=serializer_field.context['request'].user.id,
+            employee__user_id=serializer_field.context['request'].user.id,
         ).first()
         return employment.shop_id if employment else None
 

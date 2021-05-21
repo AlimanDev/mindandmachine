@@ -102,13 +102,13 @@ def get_efficiency(shop_id, form, consider_vacancies=False,):
         dt__lte=to_dt,
     )
     if not consider_vacancies:
-        base_wd_q &= Q(worker__isnull=False)
+        base_wd_q &= Q(employee__isnull=False)
 
     qs_for_covering = WorkerDay.objects.filter(base_wd_q)
 
     graph_type = form.get('graph_type', 'plan_approved')
     if graph_type == 'plan_edit':
-        qs_for_covering = qs_for_covering.get_plan_edit()
+        qs_for_covering = qs_for_covering.get_plan_not_approved()
     elif graph_type == 'fact_approved':
         qs_for_covering = qs_for_covering.get_fact_approved()
     elif graph_type == 'fact_edit':

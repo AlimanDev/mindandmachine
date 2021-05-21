@@ -31,6 +31,7 @@ from src.base.serializers import (
     AutoTimetableSerializer,
     BreakSerializer,
     ShopScheduleSerializer,
+    EmployeeSerializer,
 )
 from src.base.filters import (
     NotificationFilter,
@@ -51,16 +52,19 @@ from src.base.models import (
     Group,
     Break,
     ShopSchedule,
+    Employee,
 )
 from src.recognition.models import UserConnecter
+from src.recognition.api.recognition import Recognition
 
-from src.base.filters import UserFilter
+from src.base.filters import UserFilter, EmployeeFilter
 from src.base.views_abstract import (
     BaseActiveNamedModelViewSet,
     UpdateorCreateViewSet,
     BaseModelViewSet,
 )
 from django.middleware.csrf import rotate_token
+from src.timetable.worker_day.tasks import recalc_wdays
 
 
 class EmploymentViewSet(UpdateorCreateViewSet):
@@ -77,13 +81,10 @@ class EmploymentViewSet(UpdateorCreateViewSet):
     permission_classes = [Permission]
     serializer_class = EmploymentSerializer
     filterset_class = EmploymentFilter
-    openapi_tags = ['Employment',]
-
-    def perform_create(self, serializer):
-        serializer.save(network=self.request.user.network)
+    openapi_tags = ['Employment', 'Integration',]
 
     def perform_update(self, serializer):
-        serializer.save(dttm_deleted=None, network=self.request.user.network)
+        serializer.save(dttm_deleted=None)
 
     def get_queryset(self):
         manager = Employment.objects
@@ -94,7 +95,7 @@ class EmploymentViewSet(UpdateorCreateViewSet):
             shop__network_id=self.request.user.network_id
         ).order_by('-dt_hired')
         if self.action in ['list', 'retrieve']:
-            qs = qs.select_related('user', 'shop').prefetch_related('work_types', 'worker_constraints')
+            qs = qs.select_related('employee', 'employee__user', 'shop').prefetch_related('work_types', 'worker_constraints')
         return qs
 
     def get_serializer_class(self):
@@ -128,19 +129,19 @@ class UserViewSet(UpdateorCreateViewSet):
     serializer_class = UserSerializer
     filterset_class = UserFilter
     get_object_field = 'username'
-    openapi_tags = ['User',]
+    openapi_tags = ['User', 'Integration',]
 
     def get_queryset(self):
         user = self.request.user
         return User.objects.filter(
-            network_id=user.network_id
+            network_id=user.network_id,
         ).annotate(
             userconnecter_id=F('userconnecter'),
         ).distinct()
 
     def perform_create(self, serializer):
         if 'username' not in serializer.validated_data:
-            instance = serializer.save(username = timezone.now())
+            instance = serializer.save(username=timezone.now())
             instance.username = 'user_' + str(instance.id)
             instance.save()
         else:
@@ -166,16 +167,43 @@ class UserViewSet(UpdateorCreateViewSet):
         except:
             return Response({"detail": "У сотрудника нет биометрии"}, status=status.HTTP_400_BAD_REQUEST)
 
+        recognition = Recognition()
+        recognition.delete_person(user.userconnecter.partner_id)
         UserConnecter.objects.filter(user_id=user.id).delete()
+        user.avatar = None
+        user.save()
             
         return Response({"detail": "Биометрия сотрудника успешно удалена"}, status=status.HTTP_200_OK)
-
 
     def get_serializer_class(self):
         if self.action == 'list':
             return UserListSerializer
         else:
             return UserSerializer
+
+
+class EmployeeViewSet(UpdateorCreateViewSet):
+    page_size = 10
+    pagination_class = LimitOffsetPagination
+    permission_classes = [Permission]
+    serializer_class = EmployeeSerializer
+    filterset_class = EmployeeFilter
+    openapi_tags = ['Employee', ]
+
+    def get_queryset(self):
+        qs = Employee.objects.filter(
+            user__network_id=self.request.user.network_id
+        ).select_related(
+            'user',
+        )
+
+        if self.request.query_params.get('include_employments'):
+            prefetch = 'employments'
+            if self.request.query_params.get('show_constraints'):
+                prefetch = 'employments__worker_constraints'
+            qs = qs.prefetch_related(prefetch)
+
+        return qs.distinct()
 
 
 class AuthUserView(UserDetailsView):
@@ -185,6 +213,9 @@ class AuthUserView(UserDetailsView):
     def check_permissions(self, request, *args, **kwargs):
         rotate_token(request)
         return super().check_permissions(request, *args, **kwargs)
+
+    def get_queryset(self):
+        return User.objects.select_related('network').prefetch_related('network__outsourcings', 'network__clients').all()
 
 
 class FunctionGroupView(BaseModelViewSet):
@@ -198,7 +229,8 @@ class FunctionGroupView(BaseModelViewSet):
 
         groups = Employment.objects.get_active(
             network_id=user.network_id,
-            user=user).annotate(
+            employee__user=user,
+        ).annotate(
             group_id=Coalesce(F('function_group_id'),F('position__group_id'))
         ).values_list("group_id", flat=True)
         return FunctionGroup.objects.filter(group__in=groups).distinct('func')
@@ -213,7 +245,7 @@ class WorkerPositionViewSet(UpdateorCreateViewSet):
     serializer_class = WorkerPositionSerializer
     pagination_class = LimitOffsetPagination
     filterset_class = BaseActiveNamedModelFilter
-    openapi_tags = ['WorkerPosition',]
+    openapi_tags = ['WorkerPosition', 'Integration',]
 
     def get_queryset(self):
         return WorkerPosition.objects.filter(
@@ -314,7 +346,6 @@ class ShopScheduleViewSet(UpdateorCreateViewSet):
             shop_id=self.kwargs.get('department_pk'), shop__network_id=self.request.user.network_id)
 
     def _perform_create_or_update(self, serializer):
-        from src.celery.tasks import recalc_wdays
         serializer.save(
             modified_by=self.request.user,
             shop_id=self.kwargs.get('department_pk'),

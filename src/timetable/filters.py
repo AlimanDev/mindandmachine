@@ -1,7 +1,7 @@
 import datetime
 
 from dateutil.relativedelta import relativedelta
-from django.db.models import Subquery, OuterRef, Q
+from django.db.models import Subquery, OuterRef, Q, Exists
 from django_filters.rest_framework import (
     FilterSet,
     BooleanFilter,
@@ -12,13 +12,21 @@ from django_filters.rest_framework import (
     OrderingFilter,
 )
 
-from src.timetable.models import WorkerDay, EmploymentWorkType, WorkerConstraint
+from src.base.filters import BaseActiveNamedModelFilter
+from src.base.models import Employment
+from src.timetable.models import WorkerDay, EmploymentWorkType, WorkerConstraint, WorkTypeName
+from src.util.drf.filters import ListFilter
 
 
 class WorkerDayFilter(FilterSet):
     dt_from = DateFilter(field_name='dt', lookup_expr='gte', label="Начало периода")  # aa: fixme: delete
     dt_to = DateFilter(field_name='dt', lookup_expr='lte', label='Окончание периода') # aa: fixme: delete
     fact_tabel = BooleanFilter(method='filter_fact_tabel', label="Выгрузка табеля")
+
+    # параметры для совместимости с существующими интеграциями, не удалять
+    worker_id = NumberFilter(field_name='employee__user_id')
+    worker__username__in = ListFilter(field_name='employee__user__username', lookup_expr='in')
+    employment__tabel_code__in = ListFilter(field_name='employee__tabel_code', lookup_expr='in')
 
     def filter_fact_tabel(self, queryset, name, value):
         if value:
@@ -30,12 +38,12 @@ class WorkerDayFilter(FilterSet):
         model = WorkerDay
         fields = {
             # 'shop_id':['exact'],
-            'worker_id': ['in', 'exact'],
-            'worker__username': ['in', 'exact'],
+            'employee_id': ['in', 'exact'],
+            'employee__tabel_code': ['in', 'exact'],
             'dt': ['gte', 'lte', 'exact', 'range'],
             'is_approved': ['exact'],
             'is_fact': ['exact'],
-            'type': ['exact'],
+            'type': ['in', 'exact'],
         }
 
 
@@ -43,12 +51,18 @@ class WorkerDayStatFilter(FilterSet):
     shop_id = NumberFilter(required=True)
     dt_from = DateFilter(field_name='dt', lookup_expr='gte', label="Начало периода", required=True)
     dt_to = DateFilter(field_name='dt', lookup_expr='lte', label='Окончание периода', required=True)
+    employee_id = NumberFilter(field_name='employee_id')
+    employee_id__in = ListFilter(field_name='employee_id', lookup_expr='in')
 
     class Meta:
         model = WorkerDay
-        fields = {
-            'worker_id': ['exact', 'in'],
-        }
+        fields = (
+            'shop_id',
+            'dt_from',
+            'dt_to',
+            'employee_id',
+            'employee_id__in',
+        )
 
 
 class FilterSetWithInitial(FilterSet):
@@ -81,22 +95,19 @@ class VacancyFilter(FilterSetWithInitial):
     dt_from = DateFilter(field_name='dt', lookup_expr='gte', initial=datetime.datetime.today)
     dt_to = DateFilter(
         field_name='dt', lookup_expr='lte', initial=lambda: datetime.datetime.today() + relativedelta(months=1))
-    is_vacant = BooleanFilter(field_name='worker', lookup_expr='isnull')
+    is_vacant = BooleanFilter(field_name='employee', lookup_expr='isnull')
     shift_length_min = TimeFilter(field_name='work_hours', lookup_expr='gte')
     shift_length_max = TimeFilter(field_name='work_hours', lookup_expr='lte')
-    shop_id = CharFilter(field_name='shop_id', method='filter_include_outsource')
+    shop_id = CharFilter(field_name='shop_id', method='filter_shops')
+    is_outsource = BooleanFilter(field_name='is_outsource')
     work_type_name = CharFilter(field_name='work_types', method='filter_by_name')
-    ordering = OrderingFilter(fields=('dt', 'id', 'dttm_work_start', 'dttm_work_end'), initial='dttm_work_start')
+    ordering = OrderingFilter(fields=('dt', 'id', 'dttm_work_start', 'dttm_work_end'), initial='dt,dttm_work_start')
     approved_first = BooleanFilter(method='filter_approved_first')
+    only_available = BooleanFilter(method='filter_only_available')
 
-    def filter_include_outsource(self, queryset, name, value):
+    def filter_shops(self, queryset, name, value):
         if value:
-            shops = value.split(',')
-            if not self.data.get('include_outsource', False):
-                return queryset.filter(shop_id__in=shops)
-            return queryset.filter(
-                Q(shop_id__in=shops) | Q(is_outsource=True),
-            )
+            return queryset.filter(shop_id__in=value.split(','))
         return queryset
 
     def filter_by_name(self, queryset, name, value):
@@ -110,7 +121,7 @@ class VacancyFilter(FilterSetWithInitial):
             return queryset.filter(
                 id=Subquery(
                     WorkerDay.objects.filter(
-                        Q(Q(worker__isnull=True) & Q(id=OuterRef('id'))) | Q(worker_id=OuterRef('worker_id')),
+                        Q(Q(employee__isnull=True) & Q(id=OuterRef('id'))) | Q(employee_id=OuterRef('employee_id')),
                         dt=OuterRef('dt'),
                         is_fact=OuterRef('is_fact'),
                         is_vacancy=OuterRef('is_vacancy'),
@@ -120,6 +131,41 @@ class VacancyFilter(FilterSetWithInitial):
                 ),
             )
 
+        return queryset
+
+    def filter_only_available(self, queryset, name, value):
+        if value:
+            approved_subq = WorkerDay.objects.filter(
+                dt=OuterRef('dt'),
+                employee__user_id=self.request.user.id,
+                is_approved=True,
+                is_fact=False,
+            )
+            active_employment_subq = Employment.objects.filter(
+                Q(dt_hired__lte=OuterRef('dt')) | Q(dt_hired__isnull=True),
+                Q(dt_fired__gte=OuterRef('dt')) | Q(dt_fired__isnull=True),
+                employee__user_id=self.request.user.id,
+                employee__user__network_id=self.request.user.network_id,
+            )
+            worker_day_paid_subq = WorkerDay.objects.filter(
+                dt=OuterRef('dt'),
+                employee__user_id=self.request.user.id,
+                is_approved=True,
+                is_fact=False,
+                type__in=WorkerDay.TYPES_PAID,
+            )
+            return queryset.annotate(
+                approved_exists=Exists(approved_subq),
+                active_employment_exists=Exists(active_employment_subq),
+                worker_day_type_paid=Exists(worker_day_paid_subq),
+            ).filter(
+                Q(shop__network_id=self.request.user.network_id, approved_exists=True) | 
+                Q(is_outsource=True) & ~Q(shop__network_id=self.request.user.network_id), # аутсорс фильтр
+                active_employment_exists=True,
+                worker_day_type_paid=False,
+                is_approved=True,
+                employee__isnull=True,
+            )
         return queryset
 
     class Meta:
@@ -133,7 +179,8 @@ class VacancyFilter(FilterSetWithInitial):
 
 
 class EmploymentWorkTypeFilter(FilterSet):
-    shop_id=NumberFilter(field_name='work_type__shop_id')
+    shop_id = NumberFilter(field_name='work_type__shop_id')
+
     class Meta:
         model = EmploymentWorkType
         fields = {
@@ -150,3 +197,12 @@ class WorkerConstraintFilter(FilterSet):
         fields = {
             'employment_id': ['exact'],
         }
+
+
+class WorkTypeNameFilter(BaseActiveNamedModelFilter):
+    shop_id = NumberFilter(field_name='work_types__shop_id')
+    shop_id__in = ListFilter(field_name='work_types__shop_id', lookup_expr='in')
+
+    class Meta:
+        model = WorkTypeName
+        fields = []

@@ -10,7 +10,7 @@ from django.utils.timezone import now
 from django.utils.translation import gettext_lazy
 
 from src.base.models_abstract import AbstractActiveModel, AbstractActiveNetworkSpecificCodeNamedModel
-from src.timetable.models import User, Shop, Employment
+from src.timetable.models import User, Shop, Employment, Employee
 
 
 def user_directory_path(instance, filename):
@@ -68,6 +68,7 @@ class Tick(AbstractActiveModel):
     id = models.AutoField(primary_key=True)
     dttm = models.DateTimeField()
     user = models.ForeignKey(User, on_delete=models.PROTECT, null=False, )  # todo: make immutable
+    employee = models.ForeignKey(Employee, on_delete=models.PROTECT, null=True, blank=True)
     tick_point = models.ForeignKey(TickPoint, null=False, blank=False, on_delete=models.PROTECT,
                                    related_query_name="ticks")
     # worker_day = models.ForeignKey(WorkerDay, null=True, blank=True, on_delete=models.SET_NULL, related_query_name="ticks")
@@ -145,19 +146,19 @@ class Tick(AbstractActiveModel):
     def first_tick_photo_image_url(self):
         tick_photo = self.get_tick_photo(TickPhoto.TYPE_FIRST)
         if tick_photo:
-            return settings.HOST + tick_photo.image.url
+            return settings.EXTERNAL_HOST + tick_photo.image.url
 
     @property
     def last_tick_photo_image_url(self):
         tick_photo = self.get_tick_photo(TickPhoto.TYPE_LAST)
         if tick_photo:
-            return settings.HOST + tick_photo.image.url
+            return settings.EXTERNAL_HOST + tick_photo.image.url
 
     @property
     def self_tick_photo_image_url(self):
         tick_photo = self.get_tick_photo(TickPhoto.TYPE_SELF)
         if tick_photo:
-            return settings.HOST + tick_photo.image.url
+            return settings.EXTERNAL_HOST + tick_photo.image.url
 
 
 class TickPhoto(AbstractActiveModel):

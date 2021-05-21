@@ -39,20 +39,18 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
     def setUp(self):
         self.client.force_authenticate(user=self.user1)
 
-    def create_worker_day(self, type='W', shop=None, dt=None, user=None, employment=None, is_fact=False,
+    def create_worker_day(self, type='W', shop=None, dt=None, employee=None, employment=None, is_fact=False,
                           is_approved=False, parent_worker_day=None, is_vacancy=False, is_blocked=False, dttm_work_start=None,
                           dttm_work_end=None):
         shop = shop if shop else self.shop
-        if type == 'W':
-            employment = employment if employment else self.employment2
-        else:
-            employment = None
+        employment = employment if employment else self.employment2
+        if not type == 'W':
             shop = None
         dt = dt if dt else self.dt
-        user = user if user else self.user2
+        employee = employee if employee else self.employee2
 
         return WorkerDay.objects.create(
-            worker=user,
+            employee=employee,
             shop=shop,
             employment=employment,
             dt=dt,
@@ -119,12 +117,12 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
         # print(vna1wd3.__dict__)
 
         pnawd3 = self.create_worker_day(
-            user=self.user3,
+            employee=self.employee3,
             employment=self.employment3,
             is_vacancy=True,
             dt=self.dt + timedelta(days=2))
         fawd3 = self.create_worker_day(
-            user=self.user3,
+            employee=self.employee3,
             employment=self.employment3,
             is_approved=True, is_fact=True, dt=self.dt + timedelta(days=2), parent_worker_day=pnawd3)
 
@@ -262,7 +260,42 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
 
         for wd in wds4updating:
             wd_from_db = WorkerDay.objects.filter(id=wd.id).first()
-            wd_from_db_not_approved = WorkerDay.objects.filter(dt=wd.dt, worker_id=wd.worker_id, is_approved=False).first()
+            wd_from_db_not_approved = WorkerDay.objects.filter(dt=wd.dt, employee_id=wd.employee_id, is_approved=False).first()
+            self.assertEqual(wd_from_db.is_approved, True)
+            self.assertIsNotNone(wd_from_db_not_approved)
+            self.assertEqual(wd_from_db.work_hours, wd_from_db_not_approved.work_hours)
+
+    def test_approve_employee_ids(self):
+        data = {
+            'shop_id': self.shop.id,
+            'dt_from': self.dt,
+            'dt_to': self.dt + timedelta(days=4),
+            'employee_ids': [self.employee4.id, self.employee6.id],
+            'is_fact': False,
+        }
+
+        wds_not_changable = [
+            self.create_worker_day(type=WorkerDay.TYPE_HOLIDAY, shop=self.shop, employment=self.employment2, employee=self.employee2, dt=self.dt),
+            self.create_worker_day(type=WorkerDay.TYPE_HOLIDAY, shop=self.shop, employment=self.employment3, employee=self.employee3, dt=self.dt),
+        ]
+
+        wds4updating = [
+            self.create_worker_day(type=WorkerDay.TYPE_SICK, shop=self.shop, employment=self.employment4, employee=self.employee4, dt=self.dt + timedelta(days=1)),
+            self.create_worker_day(type=WorkerDay.TYPE_SICK, shop=self.shop, employment=self.employment6, employee=self.employee6, dt=self.dt + timedelta(days=1)),
+        ]
+
+        response = self.client.post(f"{self.url_approve}", data, format='json')
+
+        self.assertEqual(response.status_code, 200)
+        for wd in wds_not_changable:
+            wd_from_db = WorkerDay.objects.filter(id=wd.id).first()
+            self.assertIsNotNone(wd_from_db)
+            self.assertEqual(wd_from_db.is_approved, wd.is_approved)
+            self.assertEqual(wd_from_db.is_fact, wd.is_fact)
+
+        for wd in wds4updating:
+            wd_from_db = WorkerDay.objects.filter(id=wd.id).first()
+            wd_from_db_not_approved = WorkerDay.objects.filter(dt=wd.dt, employee_id=wd.employee_id, is_approved=False).first()
             self.assertEqual(wd_from_db.is_approved, True)
             self.assertIsNotNone(wd_from_db_not_approved)
             self.assertEqual(wd_from_db.work_hours, wd_from_db_not_approved.work_hours)
@@ -313,19 +346,22 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
         with self.settings(SEND_DOCTORS_MIS_SCHEDULE_ON_CHANGE=True, CELERY_TASK_ALWAYS_EAGER=True):
             # другой тип работ -- не отправляется
             WorkerDayFactory(
-                worker=self.user2,
+                employee=self.employee2,
+                employment=self.employment2,
                 type=WorkerDay.TYPE_WORKDAY, shop=self.shop, dt=self.dt - timedelta(days=3), is_approved=False,
                 cashbox_details__work_type__work_type_name__name='Продавец-кассир',
                 cashbox_details__work_type__work_type_name__code='consult',
             )
             WorkerDayFactory(
-                worker=self.user2,
+                employee=self.employee2,
+                employment=self.employment2,
                 type=WorkerDay.TYPE_HOLIDAY, shop=self.shop, dt=self.dt - timedelta(days=3), is_approved=True,
             )
 
             # создание рабочего дня (без дня в подтв. версии) -- отправляется
             wd_create1 = WorkerDayFactory(
-                worker=self.user2,
+                employee=self.employee2,
+                employment=self.employment2,
                 type=WorkerDay.TYPE_WORKDAY, shop=self.shop, dt=self.dt - timedelta(days=2), is_approved=False,
                 cashbox_details__work_type__work_type_name__name='Врач',
                 cashbox_details__work_type__work_type_name__code='doctor',
@@ -333,19 +369,22 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
 
             # создание рабочего дня (с днем в подтв. версии) -- отправляется
             wd_create2 = WorkerDayFactory(
-                worker=self.user2,
+                employee=self.employee2,
+                employment=self.employment2,
                 type=WorkerDay.TYPE_WORKDAY, shop=self.shop, dt=self.dt - timedelta(days=1), is_approved=False,
                 cashbox_details__work_type__work_type_name__name='Врач',
                 cashbox_details__work_type__work_type_name__code='doctor',
             )
             WorkerDayFactory(
-                worker=self.user2,
+                employee=self.employee2,
+                employment=self.employment2,
                 type=WorkerDay.TYPE_HOLIDAY, shop=self.shop, dt=self.dt - timedelta(days=1), is_approved=True,
             )
 
             # обновление рабочего дня -- отправляется
             wd_update = WorkerDayFactory(
-                worker=self.user2,
+                employee=self.employee2,
+                employment=self.employment2,
                 type=WorkerDay.TYPE_WORKDAY, shop=self.shop, dt=self.dt, is_approved=False,
                 dttm_work_start=datetime.combine(self.dt, time(8, 0, 0)),
                 dttm_work_end=datetime.combine(self.dt, time(21, 0, 0)),
@@ -353,7 +392,8 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
                 cashbox_details__work_type__work_type_name__code='doctor',
             )
             WorkerDayFactory(
-                worker=self.user2,
+                employee=self.employee2,
+                employment=self.employment2,
                 type=WorkerDay.TYPE_WORKDAY, shop=self.shop, dt=self.dt, is_approved=True,
                 dttm_work_start=datetime.combine(self.dt, time(8, 0, 0)),
                 dttm_work_end=datetime.combine(self.dt, time(20, 0, 0)),
@@ -363,11 +403,13 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
 
             # удаление рабочего дня -- отправляется
             WorkerDayFactory(
-                worker=self.user2,
+                employee=self.employee2,
+                employment=self.employment2,
                 type=WorkerDay.TYPE_HOLIDAY, shop=self.shop, dt=self.dt + timedelta(days=1), is_approved=False,
             )
             wd_delete1 = WorkerDayFactory(
-                worker=self.user2,
+                employee=self.employee2,
+                employment=self.employment2,
                 type=WorkerDay.TYPE_WORKDAY, shop=self.shop, dt=self.dt + timedelta(days=1), is_approved=True,
                 dttm_work_start=datetime.combine(self.dt, time(11, 0, 0)),
                 dttm_work_end=datetime.combine(self.dt, time(21, 0, 0)),
@@ -377,17 +419,18 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
 
             # не рабочие дни -- не отправляется
             WorkerDayFactory(
-                worker=self.user2,
+                employee=self.employee2,
                 type=WorkerDay.TYPE_HOLIDAY, shop=self.shop, dt=self.dt + timedelta(days=2), is_approved=False,
             )
             WorkerDayFactory(
-                worker=self.user2,
+                employee=self.employee2,
                 type=WorkerDay.TYPE_VACATION, shop=self.shop, dt=self.dt + timedelta(days=2), is_approved=True,
             )
 
             # разные work_type, тип врач в неподтв. версии -- отправляется создание
             wd_create3 = WorkerDayFactory(
-                worker=self.user2,
+                employee=self.employee2,
+                employment=self.employment2,
                 type=WorkerDay.TYPE_WORKDAY, shop=self.shop, dt=self.dt + timedelta(days=3), is_approved=False,
                 dttm_work_start=datetime.combine(self.dt + timedelta(days=3), time(8, 0, 0)),
                 dttm_work_end=datetime.combine(self.dt + timedelta(days=3), time(21, 0, 0)),
@@ -395,7 +438,8 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
                 cashbox_details__work_type__work_type_name__code='doctor',
             )
             WorkerDayFactory(
-                worker=self.user2,
+                employee=self.employee2,
+                employment=self.employment2,
                 type=WorkerDay.TYPE_WORKDAY, shop=self.shop, dt=self.dt + timedelta(days=3), is_approved=True,
                 dttm_work_start=datetime.combine(self.dt + timedelta(days=3), time(8, 0, 0)),
                 dttm_work_end=datetime.combine(self.dt + timedelta(days=3), time(20, 0, 0)),
@@ -405,7 +449,8 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
 
             # разные work_type, тип врач в подтв. версии -- отправляется удаление
             WorkerDayFactory(
-                worker=self.user2,
+                employee=self.employee2,
+                employment=self.employment2,
                 type=WorkerDay.TYPE_WORKDAY, shop=self.shop, dt=self.dt + timedelta(days=4), is_approved=False,
                 dttm_work_start=datetime.combine(self.dt + timedelta(days=4), time(8, 0, 0)),
                 dttm_work_end=datetime.combine(self.dt + timedelta(days=4), time(21, 0, 0)),
@@ -413,7 +458,8 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
                 cashbox_details__work_type__work_type_name__code='consult',
             )
             wd_delete2 = WorkerDayFactory(
-                worker=self.user2,
+                employee=self.employee2,
+                employment=self.employment2,
                 type=WorkerDay.TYPE_WORKDAY, shop=self.shop, dt=self.dt + timedelta(days=4), is_approved=True,
                 dttm_work_start=datetime.combine(self.dt + timedelta(days=4), time(8, 0, 0)),
                 dttm_work_end=datetime.combine(self.dt + timedelta(days=4), time(20, 0, 0)),
@@ -435,11 +481,11 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
                     send_doctors_schedule_to_mis_delay.assert_called_once()
                     json_data = json.loads(send_doctors_schedule_to_mis_delay.call_args[1]['json_data'])
                     self.assertListEqual(
-                        sorted(json_data, key=lambda i: (i['dt'], i['worker__username'])),
+                        sorted(json_data, key=lambda i: (i['dt'], i['employee__user__username'])),
                         sorted([
                             {
                                 "dt": Converter.convert_date(wd_create1.dt),
-                                "worker__username": self.user2.username,
+                                "employee__user__username": self.user2.username,
                                 "shop__code": self.shop.code,
                                 "dttm_work_start": Converter.convert_datetime(wd_create1.dttm_work_start),
                                 "dttm_work_end": Converter.convert_datetime(wd_create1.dttm_work_end),
@@ -447,7 +493,7 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
                             },
                             {
                                 "dt": Converter.convert_date(wd_create2.dt),
-                                "worker__username": self.user2.username,
+                                "employee__user__username": self.user2.username,
                                 "shop__code": self.shop.code,
                                 "dttm_work_start": Converter.convert_datetime(wd_create2.dttm_work_start),
                                 "dttm_work_end": Converter.convert_datetime(wd_create2.dttm_work_end),
@@ -455,7 +501,7 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
                             },
                             {
                                 "dt": Converter.convert_date(wd_update.dt),
-                                "worker__username": self.user2.username,
+                                "employee__user__username": self.user2.username,
                                 "shop__code": self.shop.code,
                                 "dttm_work_start": Converter.convert_datetime(wd_update.dttm_work_start),
                                 "dttm_work_end": Converter.convert_datetime(wd_update.dttm_work_end),
@@ -463,7 +509,7 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
                             },
                             {
                                 "dt": Converter.convert_date(wd_create3.dt),
-                                "worker__username": self.user2.username,
+                                "employee__user__username": self.user2.username,
                                 "shop__code": self.shop.code,
                                 "dttm_work_start": Converter.convert_datetime(wd_create3.dttm_work_start),
                                 "dttm_work_end": Converter.convert_datetime(wd_create3.dttm_work_end),
@@ -471,7 +517,7 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
                             },
                             {
                                 "dt": Converter.convert_date(wd_delete2.dt),
-                                "worker__username": self.user2.username,
+                                "employee__user__username": self.user2.username,
                                 "shop__code": self.shop.code,
                                 "dttm_work_start": Converter.convert_datetime(wd_delete2.dttm_work_start),
                                 "dttm_work_end": Converter.convert_datetime(wd_delete2.dttm_work_end),
@@ -479,13 +525,13 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
                             },
                             {
                                 "dt": Converter.convert_date(wd_delete1.dt),
-                                "worker__username": self.user2.username,
+                                "employee__user__username": self.user2.username,
                                 "shop__code": self.shop.code,
                                 "dttm_work_start": Converter.convert_datetime(wd_delete1.dttm_work_start),
                                 "dttm_work_end": Converter.convert_datetime(wd_delete1.dttm_work_end),
                                 "action": "delete"
                             },
-                        ], key=lambda i: (i['dt'], i['worker__username']))
+                        ], key=lambda i: (i['dt'], i['employee__user__username']))
                     )
 
 
@@ -540,4 +586,4 @@ class TestUploadDownload(APITestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(tabel[tabel.columns[1]][0], 'Магазин: Shop1') #fails with python > 3.6
         self.assertEqual(tabel[tabel.columns[1]][12], 'Иванов Иван Иванович')
-        self.assertEqual(tabel[tabel.columns[29]][15], 'В')
+        self.assertEqual(tabel[tabel.columns[27]][15], 'В')
