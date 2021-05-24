@@ -1,13 +1,11 @@
 import json
-from src.notifications.models.event_notification import EventEmailNotification
-from src.events.models import EventType
-from src.timetable.events import VACANCY_CONFIRMED_TYPE
-from django.core import mail
 import uuid
 from datetime import timedelta, time, datetime, date
-from dateutil.relativedelta import relativedelta
 from unittest import mock
 
+from dateutil.relativedelta import relativedelta
+from django.core import mail
+from django.db import transaction
 from django.test import override_settings
 from django.urls import reverse
 from django.utils.timezone import now
@@ -15,6 +13,9 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from src.base.models import FunctionGroup, Network, Employment, ShopSchedule, Shop, Employee
+from src.events.models import EventType
+from src.notifications.models.event_notification import EventEmailNotification
+from src.timetable.events import VACANCY_CONFIRMED_TYPE
 from src.timetable.models import (
     WorkerDay,
     AttendanceRecords,
@@ -2660,8 +2661,9 @@ class TestAditionalFunctions(APITestCase):
                     cashbox_details__work_type__work_type_name__code='consult',
                 )
 
-                url = f'{self.url}exchange_approved/'
-                response = self.client.post(url, data, format='json')
+                with mock.patch.object(transaction, 'on_commit', lambda t: t()):
+                    url = f'{self.url}exchange_approved/'
+                    response = self.client.post(url, data, format='json')
                 send_doctors_schedule_to_mis_delay.assert_called_once()
                 json_data = json.loads(send_doctors_schedule_to_mis_delay.call_args[1]['json_data'])
                 self.assertListEqual(
