@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 import time as time_in_secs
@@ -23,8 +24,8 @@ from src.base.models import (
 )
 from src.celery.celery import app
 from src.conf.djconfig import EMAIL_HOST_USER, URV_DELETE_BIOMETRICS_DAYS_AFTER_FIRED
-from src.forecast.models import OperationTemplate
 from src.events.signals import event_signal
+from src.forecast.models import OperationTemplate
 from src.recognition.events import EMPLOYEE_NOT_CHECKED_IN, EMPLOYEE_NOT_CHECKED_OUT
 from src.recognition.utils import get_worker_days_with_no_ticks
 from src.timetable.models import (
@@ -386,6 +387,9 @@ def send_doctors_schedule_to_mis(json_data, logger=logging.getLogger('send_docto
     """
     if settings.MIS_USERNAME is None or settings.MIS_PASSWORD is None:
         raise Exception('no auth settings')
+
+    if isinstance(json_data, str):
+        json_data = json.loads(json_data)
 
     for wd_data in json_data:
         mis_data = {
