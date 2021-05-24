@@ -1,17 +1,16 @@
 from datetime import datetime
 
 from django.conf import settings
+from django.http.response import Http404
 from rest_framework import status
 from rest_framework.pagination import LimitOffsetPagination
 from rest_framework.response import Response
-from rest_framework.exceptions import APIException
+
 from src.base.permissions import Permission
 from src.base.views_abstract import UpdateorCreateViewSet
 from .filters import TaskFilter
 from .models import Task
 from .serializers import TaskSerializer
-
-from django.http.response import Http404
 
 
 class TaskViewSet(UpdateorCreateViewSet):

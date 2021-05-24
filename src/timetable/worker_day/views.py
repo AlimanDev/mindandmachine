@@ -569,11 +569,16 @@ class WorkerDayViewSet(BaseModelViewSet):
                     context=event_context,
                 ))
 
-            WorkerDay.check_work_time_overlap(
-                employee_id__in=worker_dates_dict.keys(),
-                dt__in=list(set(chain.from_iterable(worker_dates_dict.values()))),
-                exc_cls=ValidationError,
-            )
+                WorkerDay.check_work_time_overlap(
+                    employee_days_q=employee_days_q,
+                    exc_cls=ValidationError,
+                )
+                WorkerDay.check_tasks_violations(
+                    employee_days_q=employee_days_q,
+                    is_approved=True,
+                    is_fact=serializer.data['is_fact'],
+                    exc_cls=ValidationError,
+                )
 
         return Response()
 
