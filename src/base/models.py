@@ -144,6 +144,11 @@ class Network(AbstractActiveModel):
     def settings_values_prop(self):
         return json.loads(self.settings_values)
 
+    def set_settings_value(self, k, v):
+        settings_values = json.loads(self.settings_values)
+        settings_values[k] = v
+        self.settings_values = json.dumps(settings_values)
+
     def get_department(self):
         return None
 

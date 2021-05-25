@@ -73,6 +73,9 @@ class TestGenerateTabel(TestsHelperMixin, TestCase):
             dttm_work_end=datetime.combine(cls.dt_now, time(19, 59, 1)),
         )
 
+    def setUp(self) -> None:
+        self.outsource_network.refresh_from_db()
+
     def test_generate_mts_tabel(self):
         g = MtsTabelDataGetter(shop=self.shop, dt_from=self.dt_from, dt_to=self.dt_to)
         data = g.get_data()
@@ -113,6 +116,18 @@ class TestGenerateTabel(TestsHelperMixin, TestCase):
         g = MtsTabelDataGetter(shop=self.shop, dt_from=self.dt_from, dt_to=self.dt_to)
         second_data = g.get_data()
         self.assertEqual(len(data['plan_and_fact_hours']), len(second_data['plan_and_fact_hours']))
+
+    def test_generate_mts_tabel_for_outsource_shop(self):
+        g = MtsTabelDataGetter(shop=self.outsource_shop, dt_from=self.dt_from, dt_to=self.dt_to)
+        data = g.get_data()
+        self.assertEqual(len(data['plan_and_fact_hours']), 0)
+
+        self.outsource_network.set_settings_value('tabel_include_other_shops_wdays', True)
+        self.outsource_network.save()
+
+        g = MtsTabelDataGetter(shop=self.outsource_shop, dt_from=self.dt_from, dt_to=self.dt_to)
+        data = g.get_data()
+        self.assertEqual(len(data['plan_and_fact_hours']), 1)
 
     def test_generate_custom_t13_tabel(self):
         g = T13TabelDataGetter(shop=self.shop, dt_from=self.dt_from, dt_to=self.dt_to)
@@ -163,6 +178,18 @@ class TestGenerateTabel(TestsHelperMixin, TestCase):
 
         self.assertEqual(data['users'][2]['fio'], data['users'][3]['fio'])
         self.assertNotEqual(data['users'][2]['tabel_code'], data['users'][3]['tabel_code'])
+
+    def test_generate_custom_t13_tabel_for_outsource_shop(self):
+        g = T13TabelDataGetter(shop=self.outsource_shop, dt_from=self.dt_from, dt_to=self.dt_to)
+        data = g.get_data()
+        self.assertEqual(len(data['users']), 0)
+
+        self.outsource_network.set_settings_value('tabel_include_other_shops_wdays', True)
+        self.outsource_network.save()
+
+        g = T13TabelDataGetter(shop=self.outsource_shop, dt_from=self.dt_from, dt_to=self.dt_to)
+        data = g.get_data()
+        self.assertEqual(len(data['users']), 1)
 
     def test_generate_custom_t13_tabel_fired_hired(self):
         self.second_empl.dt_fired = self.dt_from + timedelta(10)
