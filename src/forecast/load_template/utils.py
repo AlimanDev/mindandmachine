@@ -1,3 +1,4 @@
+from rest_framework import serializers
 from src.forecast.models import (
     OperationTypeTemplate, 
     OperationType, 

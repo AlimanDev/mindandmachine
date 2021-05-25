@@ -87,5 +87,7 @@ def check_duplicate_biometrics(image, user: User, shop_id):
                 'url2': settings.EXTERNAL_HOST + user2.avatar.url,
                 'tabel_code1': employment1.employee.tabel_code if employment1 else user.username,
                 'tabel_code2': employment2.employee.tabel_code if employment2 else user2.username,
+                'shop1': employment1.shop.name if employment1 else 'Без отдела',
+                'shop2': employment2.shop.name if employment2 else 'Без отдела',
             },
         )

@@ -1,4 +1,8 @@
 import json
+from src.notifications.models.event_notification import EventEmailNotification
+from src.events.models import EventType
+from src.timetable.events import VACANCY_CONFIRMED_TYPE
+from django.core import mail
 import uuid
 from datetime import timedelta, time, datetime, date
 from dateutil.relativedelta import relativedelta
@@ -2221,7 +2225,21 @@ class TestVacancy(TestsHelperMixin, APITestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.json()['results']), 1)
 
+    @override_settings(CELERY_TASK_ALWAYS_EAGER=True)
     def test_confirm_vacancy(self):
+        event, _ = EventType.objects.get_or_create(
+            code=VACANCY_CONFIRMED_TYPE,
+            network=self.network,
+        )
+        subject = 'Сотрудник откликнулся на вакансию.'
+        event_notification = EventEmailNotification.objects.create(
+            event_type=event,
+            subject=subject,
+            system_email_template='notifications/email/vacancy_confirmed.html',
+        )
+        self.user1.email = 'test@mail.mm'
+        self.user1.save()
+        event_notification.users.add(self.user1)
         self.shop.__class__.objects.filter(id=self.shop.id).update(email=True)
         pnawd = WorkerDay.objects.create(
             shop=self.shop,
@@ -2264,6 +2282,11 @@ class TestVacancy(TestsHelperMixin, APITestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(), {'result': 'Вакансия успешно принята.'})
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].subject, subject)
+        self.assertEqual(mail.outbox[0].to[0], self.user1.email)
+        body = f'Здравствуйте, {self.user1.first_name}!\n\nСотрудник {self.user2.last_name} {self.user2.first_name} откликнулся на вакансию {self.vacancy2.dt} с типом работ {self.work_type1.work_type_name.name}\n\nПисьмо отправлено роботом.'
+        self.assertEqual(mail.outbox[0].body, body)
 
         self.assertFalse(WorkerDay.objects.filter(id=pawd.id).exists())
 

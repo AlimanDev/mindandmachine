@@ -12,7 +12,7 @@ from django.db.models.functions import Concat, Cast
 from django.http import HttpResponse
 from django.utils import timezone
 from django.utils.encoding import escape_uri_path
-from django.utils.translation import gettext_lazy as _
+from django.utils.translation import gettext as _
 from django_filters import utils
 from drf_yasg.utils import swagger_auto_schema
 from rest_framework.decorators import action
@@ -27,7 +27,7 @@ from src.base.permissions import WdPermission
 from src.base.views_abstract import BaseModelViewSet
 from src.events.signals import event_signal
 from src.timetable.backends import MultiShopsFilterBackend
-from src.timetable.events import REQUEST_APPROVE_EVENT_TYPE, APPROVE_EVENT_TYPE
+from src.timetable.events import REQUEST_APPROVE_EVENT_TYPE, APPROVE_EVENT_TYPE, VACANCY_CONFIRMED_TYPE
 from src.timetable.exceptions import WorkTimeOverlap
 from src.timetable.filters import WorkerDayFilter, WorkerDayStatFilter, VacancyFilter
 from src.timetable.models import (
@@ -674,6 +674,25 @@ class WorkerDayViewSet(BaseModelViewSet):
         result = confirm_vacancy(pk, request.user, employee_id=self.request.data.get('employee_id', None))
         status_code = result['status_code']
         result = result['text']
+        if status_code == 200:
+            vacancy = WorkerDay.objects.get(pk=pk)
+            work_type = vacancy.work_types.first()
+            event_signal.send(
+                sender=None,
+                network_id=vacancy.shop.network_id,
+                event_code=VACANCY_CONFIRMED_TYPE,
+                user_author_id=None,
+                shop_id=vacancy.shop_id,
+                context={
+                    'user': {
+                        'last_name': request.user.last_name,
+                        'first_name': request.user.first_name,
+                    },
+                    'dt': str(vacancy.dt),
+                    'work_type': work_type.work_type_name.name if work_type else 'Без типа работ',
+                    'shop_id': vacancy.shop_id,
+                },
+            )
 
         return Response({'result': result}, status=status_code)
 

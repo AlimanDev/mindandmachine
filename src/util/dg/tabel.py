@@ -5,6 +5,7 @@ from datetime import datetime
 from django.conf import settings
 from django.db.models import Q
 from django.utils.functional import cached_property
+from django.utils.translation import gettext as _
 
 from src.base.models import Employment
 from src.timetable.models import WorkerDay, PlanAndFactHours
@@ -250,7 +251,7 @@ class BaseTabelGenerator(BaseDocGenerator):
             'doc_num': f'{self.dt_to.month + 1}',
             'month_name': month_name,
             'year': year,
-            'tabel_text': f'Табель учета рабочего времени за {month_name} {year}г',
+            'tabel_text': _('Tabel for {} {}y').format(month_name, year),
         }
         return data
 

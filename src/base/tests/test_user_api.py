@@ -40,6 +40,7 @@ class TestUserViewSet(TestsHelperMixin, APITestCase):
             "avatar": "string",
             "phone_number": "string",
             "username": username,
+            "auth_type": "local",
             "by_code": True,
         }
         resp = self.client.put(self.get_url('User-detail', pk=username), data=data)
@@ -47,12 +48,19 @@ class TestUserViewSet(TestsHelperMixin, APITestCase):
 
         user = User.objects.filter(username=username).first()
         self.assertEqual(user.email, '')
+        self.assertEqual(user.auth_type, 'local')
 
         data['email'] = 'email@example.com'
+        data['auth_type'] = 'ldap'
         resp = self.client.put(self.get_url('User-detail', pk=username), data=data)
         self.assertEqual(resp.status_code, 200)
         user.refresh_from_db()
         self.assertEqual(user.email, 'email@example.com')
+        self.assertEqual(user.auth_type, 'ldap')
+
+        data['auth_type'] = 'invalid'
+        resp = self.client.put(self.get_url('User-detail', pk=username), data=data)
+        self.assertEqual(resp.status_code, 400)
 
     def test_create_user_with_post(self):
         username = "НМ00-123456"
@@ -222,6 +230,7 @@ class TestUserViewSet(TestsHelperMixin, APITestCase):
             settings_values=json.dumps(
                 { 
                     'default_stats': data,
+                    'show_tabel_graph': False,
                 }
             )
         )
@@ -229,6 +238,7 @@ class TestUserViewSet(TestsHelperMixin, APITestCase):
         self.user1.save()
         resp = self.client.get('/rest_api/auth/user/')
         self.assertEqual(resp.json()['network']['default_stats'], data)
+        self.assertEqual(resp.json()['network']['show_tabel_graph'], False)
         self.user1.network = self.network
         self.user1.save()
 
