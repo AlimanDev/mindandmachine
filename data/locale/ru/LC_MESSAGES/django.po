@@ -12,7 +12,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Django REST framework\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2021-05-20 05:56+0000\n"
+"POT-Creation-Date: 2021-05-25 05:49+0000\n"
 "PO-Revision-Date: 2017-08-03 14:58+0000\n"
 "Last-Translator: Grigory Mishchenko <grishkokot@gmail.com>\n"
 "Language-Team: Russian (http://www.transifex.com/django-rest-framework-1/"
@@ -85,37 +85,37 @@ msgstr ""
 msgid "shop_id should be defined"
 msgstr "Произошла ошибка. Попробуйте перезагрузить страницу."
 
-#: src/base/serializers.py:183
+#: src/base/serializers.py:188
 msgid "Passwords are mismatched."
 msgstr "Пароли не совпадают."
 
-#: src/base/serializers.py:184
+#: src/base/serializers.py:189
 msgid "Password is wrong."
 msgstr "Неверный пароль."
 
-#: src/base/serializers.py:254
+#: src/base/serializers.py:259
 #, python-brace-format
 msgid "Employment from {dt_hired} to {dt_fired} already exists."
 msgstr ""
 "В этом магазине уже заведено трудоустройство с {dt_hired} по {dt_fired}."
 
-#: src/base/serializers.py:255 src/timetable/worker_day/serializers.py:94
+#: src/base/serializers.py:260 src/timetable/worker_day/serializers.py:94
 #, python-brace-format
 msgid "There is {amount} models of user with username: {username}."
 msgstr ""
 "Существует {amount} моделей пользователя с именем пользователя: {username}."
 
-#: src/base/serializers.py:256
+#: src/base/serializers.py:261
 #, python-brace-format
 msgid "There is {amount} models of user with user_id: {user_id}."
 msgstr "Существует {amount} моделей пользователя с user_id: {user_id}."
 
-#: src/base/serializers.py:257
+#: src/base/serializers.py:262
 #, python-brace-format
 msgid "There is {amount} models of shop with code: {code}."
 msgstr "Есть {amount} магазинов с кодом: {code}."
 
-#: src/base/serializers.py:258
+#: src/base/serializers.py:263
 #, python-brace-format
 msgid "There is {amount} models of position with code: {code}."
 msgstr "Есть {amount} должностей с кодом: {code}."
@@ -250,6 +250,16 @@ msgstr "Данные с уникальными полями уже сущест�
 #, python-brace-format
 msgid "There is no department with this identifier: {key}."
 msgstr "Нет департамента с таким идентификатором: {key}."
+
+#: src/recognition/api/recognition.py:293
+msgid "No faces found on the image."
+msgstr "На фото не было найдено лицо."
+
+#: src/recognition/api/recognition.py:296
+msgid ""
+"Recognition service is temporarily unavailable. Please contact your system "
+"administrator."
+msgstr "Сервис распознавания временно недоступен. Пожалуйста, обратитесь к администратору системы."
 
 #: src/recognition/models.py:191
 msgid "Key"
@@ -469,11 +479,11 @@ msgstr ""
 msgid "There is no such position {position}."
 msgstr "Нет такой должности {position}."
 
-#: src/timetable/worker_day/utils.py:207
+#: src/timetable/worker_day/utils.py:209
 msgid "There are no active work types in this shop."
 msgstr "В данном магазине нет активных типов работ"
 
-#: src/timetable/worker_day/utils.py:254
+#: src/timetable/worker_day/utils.py:256
 #, python-brace-format
 msgid ""
 "The employee {user.first_name} {user.last_name} in the cell for {dt} has the "
