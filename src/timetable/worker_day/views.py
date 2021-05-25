@@ -12,7 +12,7 @@ from django.db.models.functions import Concat, Cast
 from django.http import HttpResponse
 from django.utils import timezone
 from django.utils.encoding import escape_uri_path
-from django.utils.translation import gettext_lazy as _
+from django.utils.translation import gettext as _
 from django_filters import utils
 from drf_yasg.utils import swagger_auto_schema
 from rest_framework.decorators import action
