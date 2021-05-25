@@ -567,8 +567,8 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
 
         resp = self.client.post(f"{self.url_approve}", data, format='json')
         self.assertContains(resp,
-            text='Операция не может быть выполнена. Нарушены ограничения по запланированных задачам.'
-                 f' (Иванов Иван2: {self.dt}. Допустимый интервал времени работы: 07:00-21:00. '
+            text='Операция не может быть выполнена. Нарушены ограничения по запланированным задачам.'
+                 f' (Иванов Иван2: {self.dt}. Минимальный необходимый интервал работы: 07:00-21:00. '
                  'Текущий интервал: 08:00-20:00)', status_code=400)
 
     def test_can_approve_workday_if_there_are_no_tasks_violations(self):
@@ -598,8 +598,8 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
 
         resp = self.client.post(f"{self.url_approve}", data, format='json')
         self.assertContains(resp,
-            text='Операция не может быть выполнена. Нарушены ограничения по запланированных задачам.'
-                 f' (Иванов Иван2: {self.dt}. Допустимый интервал времени работы: 10:00-18:00. '
+            text='Операция не может быть выполнена. Нарушены ограничения по запланированным задачам.'
+                 f' (Иванов Иван2: {self.dt}. Минимальный необходимый интервал работы: 10:00-18:00. '
                  'Текущий интервал: None-None)', status_code=400)
 
     def test_can_approve_workday_if_there_are_no_tasks(self):

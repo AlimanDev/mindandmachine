@@ -22,10 +22,10 @@ class WorkDayTaskViolation(Exception):
     def __str__(self, *args, **kwargs):
         # TODO: перевести
         task_violation_str = ', '.join(
-            f'{task_violation["employee__user__last_name"]} {task_violation["employee__user__first_name"]}: {task_violation["dt"]}. Допустимый интервал времени работы: {task_violation["task_least_start_time"].strftime("%H:%M")}-{task_violation["task_greatest_end_time"].strftime("%H:%M")}. Текущий интервал: {task_violation["dttm_work_start"].strftime("%H:%M") if task_violation["dttm_work_start"] else None}-{task_violation["dttm_work_end"].strftime("%H:%M") if task_violation["dttm_work_end"] else None}'
+            f'{task_violation["employee__user__last_name"]} {task_violation["employee__user__first_name"]}: {task_violation["dt"]}. Минимальный необходимый интервал работы: {task_violation["task_least_start_time"].strftime("%H:%M")}-{task_violation["task_greatest_end_time"].strftime("%H:%M")}. Текущий интервал: {task_violation["dttm_work_start"].strftime("%H:%M") if task_violation["dttm_work_start"] else None}-{task_violation["dttm_work_end"].strftime("%H:%M") if task_violation["dttm_work_end"] else None}'
             for task_violation in self.task_violations
         )
         return gettext(
-            'Операция не может быть выполнена. Нарушены ограничения по запланированных задачам. ({task_violation_str})').format(
+            'Операция не может быть выполнена. Нарушены ограничения по запланированным задачам. ({task_violation_str})').format(
             task_violation_str=task_violation_str
         )
