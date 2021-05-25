@@ -1305,6 +1305,7 @@ class FunctionGroup(AbstractModel):
         'ShopSettings',
         'ShopSchedule',
         'VacancyBlackList',
+        'Task',
 
         'signout',
         'password_edit',
