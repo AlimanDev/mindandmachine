@@ -140,7 +140,7 @@ class UserSerializer(BaseNetworkSerializer):
     class Meta:
         model = User
         fields = ['id', 'first_name', 'last_name', 'middle_name', 'network_id',
-                  'birthday', 'sex', 'avatar', 'email', 'phone_number', 'username' ]
+                  'birthday', 'sex', 'avatar', 'email', 'phone_number', 'username', 'auth_type']
 
     def validate(self, attrs):
         email = attrs.get('email')
