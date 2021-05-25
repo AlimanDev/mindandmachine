@@ -245,6 +245,16 @@ msgstr "Данные с уникальными полями уже сущест�
 msgid "There is no department with this identifier: {key}."
 msgstr "Нет департамента с таким идентификатором: {key}."
 
+#: src/recognition/api/recognition.py:293
+msgid "No faces found on the image."
+msgstr "На фото не было найдено лицо."
+
+#: src/recognition/api/recognition.py:296
+msgid ""
+"Recognition service is temporarily unavailable. Please contact your system "
+"administrator."
+msgstr "Сервис распознавания временно недоступен. Пожалуйста, обратитесь к администратору системы."
+
 #: src/recognition/models.py:191
 msgid "Key"
 msgstr "Ключ"
