@@ -570,8 +570,9 @@ def exchange(data, error_messages):
                 append_mis_data(mis_data, day_pair[1], day_pair[0])
 
             if mis_data:
-                json_data = json.dumps(mis_data, indent=4, ensure_ascii=False, cls=DjangoJSONEncoder)
-                send_doctors_schedule_to_mis.delay(json_data=json_data)
+                json_data = json.dumps(mis_data, cls=DjangoJSONEncoder)
+                transaction.on_commit(
+                    lambda f_json_data=json_data: send_doctors_schedule_to_mis.delay(json_data=f_json_data))
 
         WorkerDay.objects_with_excluded.filter(
             employee_id__in=(data['employee1_id'], data['employee2_id']),
