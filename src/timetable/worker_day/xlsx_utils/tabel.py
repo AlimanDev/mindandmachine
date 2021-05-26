@@ -39,27 +39,6 @@ class Tabel_xlsx(Xlsx_base):
 
     }
 
-    WORKERDAY_TYPE_VALUE = {
-        WorkerDay.TYPE_BUSINESS_TRIP: _('BT'),
-        WorkerDay.TYPE_HOLIDAY: _('H'),
-        WorkerDay.TYPE_ABSENSE: _('ABS'),
-        WorkerDay.TYPE_REAL_ABSENCE: 'ПР', # пока что нет на фронте
-        WorkerDay.TYPE_QUALIFICATION: _('ST'),
-        WorkerDay.TYPE_SICK:  _('S'),
-        WorkerDay.TYPE_VACATION: _('V'),
-        WorkerDay.TYPE_EXTRA_VACATION: 'ОД', # пока что нет на фронте
-        WorkerDay.TYPE_STUDY_VACATION: 'У', # пока что нет на фронте
-        WorkerDay.TYPE_SELF_VACATION: _('VO'),
-        WorkerDay.TYPE_SELF_VACATION_TRUE: 'ОЗ', # пока что нет на фронте
-        WorkerDay.TYPE_GOVERNMENT: 'Г', # пока что нет на фронте
-        # WorkerDay.TYPE_MATERNITY: 'Р',
-        WorkerDay.TYPE_MATERNITY: _('MAT'),
-        WorkerDay.TYPE_MATERNITY_CARE: 'Р', # пока что нет на фронте
-        WorkerDay.TYPE_DONOR_OR_CARE_FOR_DISABLED_PEOPLE: 'ОВ', # пока что нет на фронте
-        WorkerDay.TYPE_ETC: '',
-        WorkerDay.TYPE_EMPTY: '',
-    }
-
     WORKERDAY_TYPE_CHANGE2HOLIDAY = [
         WorkerDay.TYPE_MATERNITY,
         WorkerDay.TYPE_MATERNITY_CARE,
@@ -341,10 +320,10 @@ class Tabel_xlsx(Xlsx_base):
                     elif (wd.type in self.WORKERDAY_TYPE_CHANGE2HOLIDAY) \
                             and (self.prod_days[day].type == ProductionDay.TYPE_HOLIDAY):
                         wd.type = WorkerDay.TYPE_HOLIDAY
-                        text = self.WORKERDAY_TYPE_VALUE[wd.type]
+                        text = WorkerDay.WD_TYPE_MAPPING[wd.type]
 
                     else:
-                        text = self.WORKERDAY_TYPE_VALUE[wd.type]
+                        text = WorkerDay.WD_TYPE_MAPPING[wd.type]
                     cell_format.update({
                         'font_color': self.WORKERDAY_TYPE_COLORS[wd.type][0],
                         'bg_color': self.WORKERDAY_TYPE_COLORS[wd.type][1],

@@ -1316,6 +1316,7 @@ class FunctionGroup(AbstractModel):
         'WorkerDay_request_approve',
         'WorkerDay_block',
         'WorkerDay_unblock',
+        'WorkerDay_generate_upload_example',
         'WorkerPosition',
         'WorkTypeName',
         'WorkType',
