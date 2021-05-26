@@ -28,6 +28,7 @@ from src.timetable import urls as timetable_api
 from src.timetable.views import RecalcWhAdminView
 from src.forecast.views import RecalcLoadAdminView
 from src.recognition.views import DownloadViolatorsReportAdminView
+from src.tasks import urls as task_urls
 
 api_urlpatterns = [
     path('auth/', include(auth_urls)),
@@ -56,7 +57,8 @@ urlpatterns = [
         base_api.urlpatterns +
         timetable_api.urlpatterns +
         forecast_api.urlpatterns +
-        misc_api.urlpatterns
+        misc_api.urlpatterns +
+        task_urls.urlpatterns,
     )),
 ]
 

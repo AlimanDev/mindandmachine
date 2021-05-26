@@ -81,6 +81,7 @@ class NetworkSerializer(serializers.ModelSerializer):
             'allowed_interval_for_early_departure',
             'default_stats',
             'show_tabel_graph',
+            'show_worker_day_tasks',
         ]
 
 

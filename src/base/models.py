@@ -89,6 +89,8 @@ class Network(AbstractActiveModel):
     show_worker_day_additional_info = models.BooleanField(
         default=False, verbose_name='Отображать доп. информацию в подтвержденных факте и плане', 
         help_text='Отображение при наведении на уголок информации о том, кто и когда последний раз редактировал рабочий день')
+    show_worker_day_tasks = models.BooleanField(
+        default=False, verbose_name='Отображать задачи в доп. информацию по рабочему дню')
     crop_work_hours_by_shop_schedule = models.BooleanField(
         default=False, verbose_name='Обрезать рабочие часы по времени работы магазина'
     )
@@ -1323,6 +1325,7 @@ class FunctionGroup(AbstractModel):
         'ShopSettings',
         'ShopSchedule',
         'VacancyBlackList',
+        'Task',
 
         'signout',
         'password_edit',
