@@ -12,7 +12,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Django REST framework\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2021-05-25 07:45+0000\n"
+"POT-Creation-Date: 2021-05-26 07:42+0000\n"
 "PO-Revision-Date: 2017-08-03 14:58+0000\n"
 "Last-Translator: Grigory Mishchenko <grishkokot@gmail.com>\n"
 "Language-Team: Russian (http://www.transifex.com/django-rest-framework-1/"
@@ -73,7 +73,7 @@ msgid ""
 msgstr ""
 "Невозможно изменить шаблон нагрузки, так как он находится в процессе расчета."
 
-#: src/base/models.py:1078
+#: src/base/models.py:1090
 msgid ""
 "Unable to define worker access group. Assign an access group to him or a "
 "position associated with an access group."
@@ -249,11 +249,13 @@ msgstr "Нет департамента с таким идентификатор
 msgid "No faces found on the image."
 msgstr "На фото не было найдено лицо."
 
-#: src/recognition/api/recognition.py:296
+#: src/recognition/api/recognition.py:295
 msgid ""
 "Recognition service is temporarily unavailable. Please contact your system "
 "administrator."
-msgstr "Сервис распознавания временно недоступен. Пожалуйста, обратитесь к администратору системы."
+msgstr ""
+"Сервис распознавания временно недоступен. Пожалуйста, обратитесь к "
+"администратору системы."
 
 #: src/recognition/models.py:191
 msgid "Key"
@@ -405,6 +407,13 @@ msgstr "График на этот период еще не составлен."
 #: src/timetable/vacancy/utils.py:471
 msgid "The vacancy was successfully accepted."
 msgstr "Вакансия успешно принята."
+
+#: src/timetable/vacancy/utils.py:472
+msgid ""
+"You can't reassign an employee to this vacancy, because the employee has "
+"already entered this vacancy."
+msgstr ""
+"Вы не можете переназначить сотрудника на данную вакансию, так как сотрудник уже вышел на данную вакансию."
 
 #: src/timetable/worker_day/serializers.py:92
 msgid "Worker day already exist."
@@ -562,19 +571,19 @@ msgstr ""
 msgid "There is no such user in your network."
 msgstr "В вашей сети нет такого пользователя."
 
-#: src/timetable/worker_day/views.py:721
+#: src/timetable/worker_day/views.py:738
 msgid "This vacancy does not exist or has already been approved."
 msgstr "Такой вакансии не существует или она уже подтверждена."
 
-#: src/timetable/worker_day/views.py:724
+#: src/timetable/worker_day/views.py:741
 msgid "You can not approve vacancy from other network."
 msgstr "Вы не можете подтвердить вакансию из другой сети."
 
-#: src/timetable/worker_day/views.py:765
+#: src/timetable/worker_day/views.py:782
 msgid "There is no such vacancy."
 msgstr "Такой вакансии не существует"
 
-#: src/timetable/worker_day/views.py:769
+#: src/timetable/worker_day/views.py:786
 msgid "The vacancy cannot be edited because it has already been responded."
 msgstr "Невозможно отредактировать вакансию, так как на неё уже откликнулись."
 

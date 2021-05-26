@@ -146,6 +146,11 @@ class Network(AbstractActiveModel):
     def settings_values_prop(self):
         return json.loads(self.settings_values)
 
+    def set_settings_value(self, k, v):
+        settings_values = json.loads(self.settings_values)
+        settings_values[k] = v
+        self.settings_values = json.dumps(settings_values)
+
     def get_department(self):
         return None
 
@@ -1300,6 +1305,7 @@ class FunctionGroup(AbstractModel):
         'WorkerDay_exchange_approved',
         'WorkerDay_confirm_vacancy',
         'WorkerDay_confirm_vacancy_to_worker',
+        'WorkerDay_reconfirm_vacancy_to_worker',
         'WorkerDay_upload',
         'WorkerDay_upload_fact',
         'WorkerDay_download_timetable',

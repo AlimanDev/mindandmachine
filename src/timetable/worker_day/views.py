@@ -715,6 +715,23 @@ class WorkerDayViewSet(BaseModelViewSet):
 
     @swagger_auto_schema(
         operation_description='''
+        Метод для переназначения сотрудника на вакансию
+        ''',
+        responses=confirm_vacancy_response_schema_dictionary,
+    )
+    @action(detail=True, methods=['post'], serializer_class=None)
+    def reconfirm_vacancy_to_worker(self, request, pk=None):
+        user = User.objects.filter(id=request.data.get('user_id'), network_id=request.user.network_id).first()
+        if not user:
+            raise ValidationError(self.error_messages["no_such_user_in_network"])
+        result = confirm_vacancy(pk, user, employee_id=request.data.get('employee_id', None), reconfirm=True)
+        status_code = result['status_code']
+        result = result['text']
+
+        return Response({'result': result}, status=status_code)
+
+    @swagger_auto_schema(
+        operation_description='''
         Метод для подтверждения вакансии
         ''',
     )

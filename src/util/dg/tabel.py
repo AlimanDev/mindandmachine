@@ -61,6 +61,10 @@ class BaseTabelDataGetter:
         return self.wd_type_mapper.get_tabel_type(wd_type)
 
     def _get_tabel_wdays_qs(self):
+        shop_employees_part_q = ~Q(type__in=WorkerDay.TYPES_WITH_TM_RANGE)
+        if self.shop.network.settings_values_prop.get('tabel_include_other_shops_wdays', False):  # TODO: сделать в виде параметра на фронте? Или так ок?
+            shop_employees_part_q |= Q(Q(type=WorkerDay.TYPE_WORKDAY) & ~Q(shop=self.shop))
+
         tabel_wdays = WorkerDay.objects.get_tabel().filter(
             Q(
                 type__in=WorkerDay.TYPE_WORKDAY,
@@ -72,7 +76,7 @@ class BaseTabelDataGetter:
                 shop=self.shop,
             ) |
             Q(
-                ~Q(type__in=WorkerDay.TYPES_WITH_TM_RANGE),
+                shop_employees_part_q,
                 Q(employee__in=Employment.objects.get_active(
                     network_id=self.network.id,
                     dt_from=self.dt_from,
@@ -109,7 +113,6 @@ class T13TabelDataGetter(BaseTabelDataGetter):
             (wday and wday.type in WorkerDay.TYPES_WITH_TM_RANGE) else ''
 
     def get_data(self):
-
         def _get_active_empl(wd, empls):
             if not wd.employment:
                 return list(filter(
@@ -194,9 +197,23 @@ class T13TabelDataGetter(BaseTabelDataGetter):
 
 class MtsTabelDataGetter(BaseTabelDataGetter):
     def get_data(self):
+        shop_q = Q(shop=self.shop)
+        if self.shop.network.settings_values_prop.get('tabel_include_other_shops_wdays', False):
+            shop_q |= Q(
+                Q(
+                    Q(wd_type=WorkerDay.TYPE_WORKDAY) & ~Q(shop=self.shop)
+                ) &
+                Q(employee__in=Employment.objects.get_active(
+                    network_id=self.network.id,
+                    dt_from=self.dt_from,
+                    dt_to=self.dt_to,
+                    shop=self.shop,
+                ).distinct().values_list('employee', flat=True))
+            )
+
         return {
             'plan_and_fact_hours': PlanAndFactHours.objects.filter(
-                shop=self.shop,
+                shop_q,
                 wd_type__in=WorkerDay.TYPES_WITH_TM_RANGE,
                 dt__gte=self.dt_from,
                 dt__lte=self.dt_to,
