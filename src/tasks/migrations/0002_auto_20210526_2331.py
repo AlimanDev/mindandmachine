@@ -12,7 +12,9 @@ def add_task_perms(apps, schema_editor):
                 group=group,
                 func='Task',
                 method='GET',
-                access_type='A',
+                defaults=dict(
+                    access_type='A',
+                ),
             )
 
 
