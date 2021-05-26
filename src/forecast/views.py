@@ -16,7 +16,7 @@ class RecalcLoadAdminView(SuperuserRequiredMixin, FormView):
         if not load_templates and not shops:
             return super().form_valid(form)
         
-        form.recalc_load(dt_from.strftime('%Y-%m-%d'), dt_to.strftime('%Y-%m-%d'), load_templates=load_templates, shops=shops)
+        form.recalc_load(dt_from.strftime('%Y-%m-%dT%H:%M:%S'), dt_to.strftime('%Y-%m-%dT%H:%M:%S'), load_templates=load_templates, shops=shops)
         return super().form_valid(form)
 
     def get_context_data(self, **kwargs):
