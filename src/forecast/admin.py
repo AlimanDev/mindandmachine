@@ -88,6 +88,7 @@ class LoadTemplateAdmin(admin.ModelAdmin):
     list_display = ('id', 'name')
     search_fields = ('name',)
     form = LoadTemplateAdminForm
+    change_list_template = 'load_template_change_list.html'
 
 
 @admin.register(OperationTypeTemplate)
