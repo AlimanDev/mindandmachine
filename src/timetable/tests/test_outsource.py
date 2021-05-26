@@ -250,6 +250,49 @@ class TestOutsource(TestsHelperMixin, APITestCase):
         self.assertEqual(vacancy.employee_id, self.employee2.id)
         self.assertEqual(vacancy.employment_id, self.employment2.id)
 
+    def test_reconfirm_vacancy_to_worker(self):
+        dt_now = self.dt_now
+        vacancy = self._create_vacancy(dt_now, datetime.combine(dt_now, time(8)), datetime.combine(dt_now, time(20)), outsources=[self.outsource_network.id,]).json()
+        WorkerDay.objects.all().update(is_approved=True)
+        self.client.force_authenticate(user=self.user1)
+        response = self.client.post(
+            f'/rest_api/worker_day/{vacancy["id"]}/confirm_vacancy_to_worker/',
+            data={
+                'user_id': self.user2.id,
+            }
+        )
+        self.assertEqual(response.json(), {'result': 'Вакансия успешно принята.'})
+        vacancy = WorkerDay.objects.get(id=vacancy['id'])
+        self.assertEqual(vacancy.employee_id, self.employee2.id)
+        self.assertEqual(vacancy.employment_id, self.employment2.id)
+        response = self.client.post(
+            f'/rest_api/worker_day/{vacancy.id}/reconfirm_vacancy_to_worker/',
+            data={
+                'user_id': self.user3.id,
+            }
+        )
+        self.assertEqual(response.json(), {'result': 'Вакансия успешно принята.'})
+        vacancy.refresh_from_db()
+        self.assertEqual(vacancy.employee_id, self.employee3.id)
+        self.assertEqual(vacancy.employment_id, self.employment3.id)
+        self.assertIsNone(WorkerDay.objects.filter(employee_id=self.employee2.id).first())
+        WorkerDay.objects.create(
+            dt=dt_now,
+            is_fact=True,
+            is_approved=True,
+            employee_id=self.employee3.id,
+        )
+        response = self.client.post(
+            f'/rest_api/worker_day/{vacancy.id}/reconfirm_vacancy_to_worker/',
+            data={
+                'user_id': self.user2.id,
+            }
+        )
+        self.assertEqual(response.json(), {'result': 'Вы не можете переназначить сотрудника на данную вакансию, так как сотрудник уже вышел на данную вакансию.'})
+        vacancy.refresh_from_db()
+        self.assertEqual(vacancy.employee_id, self.employee3.id)
+        self.assertEqual(vacancy.employment_id, self.employment3.id)
+
     def test_confirm_outsource_vacancy_from_client_network(self):
         dt_now = self.dt_now
         vacancy = self._create_vacancy(dt_now, datetime.combine(dt_now, time(8)), datetime.combine(dt_now, time(20)), outsources=[self.outsource_network.id,]).json()

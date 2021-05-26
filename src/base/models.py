@@ -1298,6 +1298,7 @@ class FunctionGroup(AbstractModel):
         'WorkerDay_exchange_approved',
         'WorkerDay_confirm_vacancy',
         'WorkerDay_confirm_vacancy_to_worker',
+        'WorkerDay_reconfirm_vacancy_to_worker',
         'WorkerDay_upload',
         'WorkerDay_upload_fact',
         'WorkerDay_download_timetable',
