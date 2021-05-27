@@ -81,6 +81,7 @@ class NetworkSerializer(serializers.ModelSerializer):
             'allowed_interval_for_early_departure',
             'default_stats',
             'show_tabel_graph',
+            'show_worker_day_tasks',
         ]
 
 
@@ -140,7 +141,7 @@ class UserSerializer(BaseNetworkSerializer):
     class Meta:
         model = User
         fields = ['id', 'first_name', 'last_name', 'middle_name', 'network_id',
-                  'birthday', 'sex', 'avatar', 'email', 'phone_number', 'username' ]
+                  'birthday', 'sex', 'avatar', 'email', 'phone_number', 'username', 'auth_type']
 
     def validate(self, attrs):
         email = attrs.get('email')

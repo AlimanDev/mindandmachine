@@ -2,6 +2,7 @@ import datetime
 import json
 from math import ceil
 
+from django.utils.translation import gettext as _
 from src.base.models import ProductionDay
 from src.timetable.models import (
     WorkerDay,
@@ -39,22 +40,22 @@ class Tabel_xlsx(Xlsx_base):
     }
 
     WORKERDAY_TYPE_VALUE = {
-        WorkerDay.TYPE_BUSINESS_TRIP: 'К',
-        WorkerDay.TYPE_HOLIDAY: 'В',
-        WorkerDay.TYPE_ABSENSE: 'Н',
-        WorkerDay.TYPE_REAL_ABSENCE: 'ПР',
-        WorkerDay.TYPE_QUALIFICATION: 'КВ',
-        WorkerDay.TYPE_SICK: 'Б',
-        WorkerDay.TYPE_VACATION: 'ОТ',
-        WorkerDay.TYPE_EXTRA_VACATION: 'ОД',
-        WorkerDay.TYPE_STUDY_VACATION: 'У',
-        WorkerDay.TYPE_SELF_VACATION: 'ДО',
-        WorkerDay.TYPE_SELF_VACATION_TRUE: 'ОЗ',
-        WorkerDay.TYPE_GOVERNMENT: 'Г',
+        WorkerDay.TYPE_BUSINESS_TRIP: _('BT'),
+        WorkerDay.TYPE_HOLIDAY: _('H'),
+        WorkerDay.TYPE_ABSENSE: _('ABS'),
+        WorkerDay.TYPE_REAL_ABSENCE: 'ПР', # пока что нет на фронте
+        WorkerDay.TYPE_QUALIFICATION: _('ST'),
+        WorkerDay.TYPE_SICK:  _('S'),
+        WorkerDay.TYPE_VACATION: _('V'),
+        WorkerDay.TYPE_EXTRA_VACATION: 'ОД', # пока что нет на фронте
+        WorkerDay.TYPE_STUDY_VACATION: 'У', # пока что нет на фронте
+        WorkerDay.TYPE_SELF_VACATION: _('VO'),
+        WorkerDay.TYPE_SELF_VACATION_TRUE: 'ОЗ', # пока что нет на фронте
+        WorkerDay.TYPE_GOVERNMENT: 'Г', # пока что нет на фронте
         # WorkerDay.TYPE_MATERNITY: 'Р',
-        WorkerDay.TYPE_MATERNITY: 'ОЖ',
-        WorkerDay.TYPE_MATERNITY_CARE: 'Р',
-        WorkerDay.TYPE_DONOR_OR_CARE_FOR_DISABLED_PEOPLE: 'ОВ',
+        WorkerDay.TYPE_MATERNITY: _('MAT'),
+        WorkerDay.TYPE_MATERNITY_CARE: 'Р', # пока что нет на фронте
+        WorkerDay.TYPE_DONOR_OR_CARE_FOR_DISABLED_PEOPLE: 'ОВ', # пока что нет на фронте
         WorkerDay.TYPE_ETC: '',
         WorkerDay.TYPE_EMPTY: '',
     }

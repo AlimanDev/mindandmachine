@@ -123,7 +123,6 @@ class EmploymentViewSet(UpdateorCreateViewSet):
 
 
 class UserViewSet(UpdateorCreateViewSet):
-    page_size = 10
     pagination_class = LimitOffsetPagination
     permission_classes = [Permission]
     serializer_class = UserSerializer
@@ -183,7 +182,6 @@ class UserViewSet(UpdateorCreateViewSet):
 
 
 class EmployeeViewSet(UpdateorCreateViewSet):
-    page_size = 10
     pagination_class = LimitOffsetPagination
     permission_classes = [Permission]
     serializer_class = EmployeeSerializer
@@ -286,7 +284,6 @@ class NotificationViewSet(
 
 
 class ShopSettingsViewSet(BaseActiveNamedModelViewSet):
-    page_size = 10
     pagination_class = LimitOffsetPagination
     permission_classes = [Permission]
     serializer_class = ShopSettingsSerializer

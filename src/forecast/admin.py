@@ -18,7 +18,7 @@ from src.forecast.forms import LoadTemplateAdminForm
 class OperationTypeAdmin(admin.ModelAdmin):
     list_display = ('id', 'work_type_name', 'operation_type_name', 'period_demand_params', 'shop')
     list_filter = ('shop',)
-    search_fields = ('shop', 'name')
+    search_fields = ('shop__name', 'shop__code', 'operation_type_name__name', 'operation_type_name__code')
     raw_id_fields = ('shop', 'work_type', 'operation_type_name')
     save_as = True
 
@@ -88,6 +88,7 @@ class LoadTemplateAdmin(admin.ModelAdmin):
     list_display = ('id', 'name')
     search_fields = ('name',)
     form = LoadTemplateAdminForm
+    change_list_template = 'load_template_change_list.html'
 
 
 @admin.register(OperationTypeTemplate)

@@ -84,6 +84,7 @@ INSTALLED_APPS = [
     'src.notifications',
     'src.reports',
     'import_export',
+    'src.tasks',
 ]
 
 REST_FRAMEWORK = {
@@ -94,7 +95,7 @@ REST_FRAMEWORK = {
     ],
     'DEFAULT_RENDERER_CLASSES': [
         'rest_framework.renderers.JSONRenderer',
-    ]
+    ],
 }
 OLD_PASSWORD_FIELD_ENABLED=True
 

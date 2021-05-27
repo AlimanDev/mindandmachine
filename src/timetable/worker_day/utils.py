@@ -38,6 +38,8 @@ from src.util.models_converter import Converter
 WORK_TYPES = {
     'в': WorkerDay.TYPE_HOLIDAY,
     'от': WorkerDay.TYPE_VACATION,
+    'v': WorkerDay.TYPE_VACATION,
+    'h': WorkerDay.TYPE_HOLIDAY,
     # 'nan': WorkerDay.TYPE_HOLIDAY,
     'b': WorkerDay.TYPE_HOLIDAY,
 }
@@ -83,13 +85,14 @@ def upload_timetable_util(form, timetable_file, is_fact=False):
         name_cond = data[name_column] != 'nan'
         position_cond = data[position_column] != 'nan'
         if number_cond and (not position_cond or not name_cond):
-            result = f"У сотрудника на строке {index} не распознаны или не указаны "
+            fields = ""
             if not number_cond:
-                result += "номер "
+                fields += _("tabel code ")
             if not name_cond:
-                result += "ФИО "
+                fields += _("full name ")
             if not position_cond:
-                result += "должность "
+                fields += _("position ")
+            result = _("The employee's {} are not recognized or specified on the line {}.").format(fields, index)
             error_users.append(result)
             continue
         elif not position_cond:
@@ -116,7 +119,11 @@ def upload_timetable_util(form, timetable_file, is_fact=False):
                 employee = employment.first().employee  # TODO: покрыть тестами
                 user = employee.user
                 if user.last_name != names[0]:
-                    error_users.append(f"У сотрудника на строке {index} с табельным номером {tabel_code} в системе фамилия {user.last_name}, а в файле {names[0]}.") #Change error
+                    error_users.append(
+                        _("The employee on the line {} with the table number {} has the last name {} in the system, but in the file {}.").format(
+                            index, tabel_code, user.last_name, names[0]
+                        )
+                    )
                     continue
                 user.first_name = names[1] if len(names) > 1 else ''
                 user.last_name = names[0]
@@ -278,7 +285,7 @@ def upload_timetable_util(form, timetable_file, is_fact=False):
 
 @xlsx_method
 def download_timetable_util(request, workbook, form):
-    ws = workbook.add_worksheet('Расписание на подпись')
+    ws = workbook.add_worksheet(_('Timetable for signature.'))
 
     shop = Shop.objects.get(pk=form['shop_id'])
     timetable = Timetable_xlsx(
@@ -618,8 +625,8 @@ def copy_as_excel_cells(main_worker_days, to_employee_id, to_dates, created_by=N
         # не создавать день, если нету активного трудоустройства на эту дату
         if not worker_active_empl:
             raise ValidationError(
-                'Невозможно создать дни в выбранные даты. '
-                'Пожалуйста, проверьте наличие активного трудоустройства у сотрудника.'
+                _('It is not possible to create days on the selected dates. '
+                'Please check whether the employee has active employment.')
             )
         dt_to = dt
         if blank_day.dttm_work_end and blank_day.dttm_work_start and blank_day.dttm_work_end.date() > blank_day.dttm_work_start.date():

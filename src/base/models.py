@@ -89,6 +89,8 @@ class Network(AbstractActiveModel):
     show_worker_day_additional_info = models.BooleanField(
         default=False, verbose_name='Отображать доп. информацию в подтвержденных факте и плане', 
         help_text='Отображение при наведении на уголок информации о том, кто и когда последний раз редактировал рабочий день')
+    show_worker_day_tasks = models.BooleanField(
+        default=False, verbose_name='Отображать задачи в доп. информацию по рабочему дню')
     crop_work_hours_by_shop_schedule = models.BooleanField(
         default=False, verbose_name='Обрезать рабочие часы по времени работы магазина'
     )
@@ -143,6 +145,11 @@ class Network(AbstractActiveModel):
     @property
     def settings_values_prop(self):
         return json.loads(self.settings_values)
+
+    def set_settings_value(self, k, v):
+        settings_values = json.loads(self.settings_values)
+        settings_values[k] = v
+        self.settings_values = json.dumps(settings_values)
 
     def get_department(self):
         return None
@@ -855,6 +862,13 @@ class User(DjangoAbstractUser, AbstractModel):
         (SEX_FEMALE, 'Female',),
         (SEX_MALE, 'Male',),
     )
+
+    LOCAL_AUTH = 'local'
+    LDAP_AUTH = 'ldap'
+    AUTH_TYPES = (
+        (LOCAL_AUTH, 'Локально'),
+        (LDAP_AUTH, 'LDAP'),
+    )
     sex = models.CharField(
         max_length=1,
         default=SEX_FEMALE,
@@ -867,6 +881,11 @@ class User(DjangoAbstractUser, AbstractModel):
     lang = models.CharField(max_length=2, default='ru')
     network = models.ForeignKey(Network, on_delete=models.PROTECT, null=True)
     black_list_symbol = models.CharField(max_length=128, null=True, blank=True)
+    auth_type = models.CharField(
+        max_length=10,
+        default=LOCAL_AUTH,
+        choices=AUTH_TYPES,
+    )
 
     def get_fio(self):
         """
@@ -1286,6 +1305,7 @@ class FunctionGroup(AbstractModel):
         'WorkerDay_exchange_approved',
         'WorkerDay_confirm_vacancy',
         'WorkerDay_confirm_vacancy_to_worker',
+        'WorkerDay_reconfirm_vacancy_to_worker',
         'WorkerDay_upload',
         'WorkerDay_upload_fact',
         'WorkerDay_download_timetable',
@@ -1305,6 +1325,7 @@ class FunctionGroup(AbstractModel):
         'ShopSettings',
         'ShopSchedule',
         'VacancyBlackList',
+        'Task',
 
         'signout',
         'password_edit',

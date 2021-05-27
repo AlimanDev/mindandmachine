@@ -20,7 +20,8 @@ from src.base.models_abstract import AbstractModel, AbstractActiveModel, Abstrac
     AbstractActiveModelManager
 from src.events.signals import event_signal
 from src.recognition.events import EMPLOYEE_WORKING_NOT_ACCORDING_TO_PLAN
-from src.timetable.exceptions import WorkTimeOverlap
+from src.tasks.models import Task
+from src.timetable.exceptions import WorkTimeOverlap, WorkDayTaskViolation
 
 
 class WorkerManager(UserManager):
@@ -772,7 +773,7 @@ class WorkerDay(AbstractModel):
         return closest_plan_approved, record_type
 
     @classmethod
-    def check_work_time_overlap(cls, employee_id=None, employee_id__in=None, user_id=None, user_id__in=None, dt=None,
+    def check_work_time_overlap(cls, employee_days_q=None, employee_id=None, employee_id__in=None, user_id=None, user_id__in=None, dt=None,
                               dt__in=None, raise_exc=True, exc_cls=None):
         """
         Проверка наличия пересечения рабочего времени
@@ -798,7 +799,11 @@ class WorkerDay(AbstractModel):
         if dt__in:
             lookup['dt__in'] = dt__in
 
-        overlaps_qs = cls.objects.filter(**lookup).annotate(
+        q = Q(**lookup)
+        if employee_days_q:
+            q &= employee_days_q
+
+        overlaps_qs = cls.objects.filter(q).annotate(
             has_overlap=Exists(
                 WorkerDay.objects.filter(
                     ~Q(id=OuterRef('id')),
@@ -837,6 +842,83 @@ class WorkerDay(AbstractModel):
             raise original_exc
 
         return overlaps
+
+    @classmethod
+    def check_tasks_violations(cls, is_fact, is_approved, employee_days_q=None, employee_id=None, employee_id__in=None, user_id=None, user_id__in=None, dt=None,
+                              dt__in=None, raise_exc=True, exc_cls=None):
+        """
+        Проверка наличия задач
+        """
+        lookup = {
+            'is_fact': is_fact,
+            'is_approved': is_approved,
+        }
+        if employee_id:
+            lookup['employee_id'] = employee_id
+
+        if employee_id__in:
+            lookup['employee__id__in'] = employee_id__in
+
+        if user_id:
+            lookup['employee__user_id'] = user_id
+
+        if user_id__in:
+            lookup['employee__user_id__in'] = user_id__in
+
+        if dt:
+            lookup['dt'] = dt
+
+        if dt__in:
+            lookup['dt__in'] = dt__in
+
+        q = Q(**lookup)
+        if employee_days_q:
+            q &= employee_days_q
+
+        tasks_subq = Task.objects.filter(
+            Q(dt=OuterRef('dt')),
+            Q(employee_id=OuterRef('employee_id')),
+            #Q(operation_type__shop_id=OuterRef('shop_id')),  # у выходных нету привязки к подразделению
+        )
+
+        wds_with_task_violation = WorkerDay.objects.filter(q).annotate(
+            task_least_start_time=Subquery(
+                tasks_subq.order_by('dttm_start_time').values('dttm_start_time')[:1]
+            ),
+            task_greatest_end_time=Subquery(
+                tasks_subq.order_by('-dttm_end_time').values('dttm_end_time')[:1]
+            ),
+        ).filter(
+            Q(
+                Q(type__in=WorkerDay.TYPES_WITH_TM_RANGE) &
+                Q(
+                    Q(dttm_work_start__gt=F('task_least_start_time')) |
+                    Q(dttm_work_end__lt=F('task_greatest_end_time'))
+                )
+            ) |
+            Q(
+                ~Q(type__in=WorkerDay.TYPES_WITH_TM_RANGE) &
+                Q(task_least_start_time__isnull=False)
+            )
+        ).values(
+            'employee__user__last_name',
+            'employee__user__first_name',
+            'dt',
+            'task_least_start_time',
+            'task_greatest_end_time',
+            'dttm_work_start',
+            'dttm_work_end',
+        ).distinct()
+
+        task_violations = list(wds_with_task_violation)
+
+        if task_violations and raise_exc:
+            original_exc = WorkDayTaskViolation(task_violations=task_violations)
+            if exc_cls:
+                raise exc_cls(str(original_exc))
+            raise original_exc
+
+        return task_violations
 
 
 class WorkerDayCashboxDetailsManager(models.Manager):

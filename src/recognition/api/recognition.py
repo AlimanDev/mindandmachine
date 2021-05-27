@@ -14,6 +14,7 @@ import logging
 
 import requests
 from django.conf import settings
+from django.utils.translation import gettext as _
 from requests.exceptions import HTTPError
 
 logger = logging.getLogger('django')
@@ -288,6 +289,10 @@ class Tevian:
             response.raise_for_status()
         except HTTPError as http_err:
             message = http_err.response.json()['message']
+            if message == 'no faces found on the image':
+                message = _('No faces found on the image.')
+            else:
+                message = _('Recognition service is temporarily unavailable. Please contact your system administrator.')
             logger.error(http_err, http_err.response.json()['message'])
             raise HTTPError(message, response=response)
         # except Exception as err:
