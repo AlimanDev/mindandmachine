@@ -782,6 +782,64 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
         self.assertIn('work_hours_details', resp_data[0])
         self.assertDictEqual({'D': 4.71, 'N': 4.38}, resp_data[0]['work_hours_details'])
 
+    def test_fill_empty_days_param_only_plan_exists_returns_zero_hours_workday(self):
+        WorkerDay.objects.filter(id=self.worker_day_fact_approved.id).delete()
+        get_params = {
+            'employment__tabel_code__in': self.employee2.tabel_code,
+            'dt__gte': self.dt,
+            'dt__lte': self.dt,
+            'fact_tabel': 'true',
+            'fill_empty_days': 'true',
+            'hours_details': 'true',
+        }
+        response = self.client.get('/rest_api/worker_day/', data=get_params)
+        self.assertEqual(response.status_code, 200)
+        resp_data = response.json()
+        self.assertEqual(len(resp_data), 1)
+        self.assertEqual(resp_data[0]['id'], None)
+        self.assertEqual(resp_data[0]['type'], WorkerDay.TYPE_WORKDAY)
+        self.assertEqual(resp_data[0]['work_hours'], 0)
+        self.assertEqual(resp_data[0]['work_hours_details']['D'], 0)
+
+    def test_fill_empty_days_param_only_plan_exists_returns_absense_in_past(self):
+        WorkerDay.objects.filter(id=self.worker_day_fact_approved.id).delete()
+        WorkerDay.objects.filter(id=self.worker_day_plan_approved.id).update(
+            dt=self.dt - timedelta(days=1),
+            dttm_work_start=self.worker_day_plan_approved.dttm_work_start - timedelta(days=1),
+            dttm_work_end=self.worker_day_plan_approved.dttm_work_end - timedelta(days=1),
+        )
+        get_params = {
+            'employment__tabel_code__in': self.employee2.tabel_code,
+            'dt__gte': self.dt - timedelta(days=1),
+            'dt__lte': self.dt - timedelta(days=1),
+            'fact_tabel': 'true',
+            'fill_empty_days': 'true',
+            'hours_details': 'true',
+        }
+        response = self.client.get('/rest_api/worker_day/', data=get_params)
+        self.assertEqual(response.status_code, 200)
+        resp_data = response.json()
+        self.assertEqual(len(resp_data), 1)
+        self.assertEqual(resp_data[0]['id'], None)
+        self.assertEqual(resp_data[0]['type'], WorkerDay.TYPE_ABSENSE)
+
+    def test_fill_empty_days_param_no_days_exists_returns_holiday(self):
+        WorkerDay.objects.filter(id=self.worker_day_fact_approved.id).delete()
+        WorkerDay.objects.filter(id=self.worker_day_plan_approved.id).delete()
+        get_params = {
+            'employment__tabel_code__in': self.employee2.tabel_code,
+            'dt__gte': self.dt,
+            'dt__lte': self.dt,
+            'fact_tabel': 'true',
+            'fill_empty_days': 'true',
+            'hours_details': 'true',
+        }
+        response = self.client.get('/rest_api/worker_day/', data=get_params)
+        self.assertEqual(response.status_code, 200)
+        resp_data = response.json()
+        self.assertEqual(len(resp_data), 1)
+        self.assertEqual(resp_data[0]['type'], WorkerDay.TYPE_HOLIDAY)
+
     def test_work_hours_as_decimal_for_plan_approved(self):
         get_params = {'shop_id': self.shop.id,
                       'dt__gte': self.worker_day_plan_approved.dt,

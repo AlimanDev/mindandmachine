@@ -119,6 +119,7 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
             'shop_code': self.shop2.code,
             'username': self.user2.username,
             'code': empl_code,
+            'tabel_code': self.employee2.tabel_code,
             'by_code': True,
         }
 
@@ -167,7 +168,7 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
         self.assertEqual(resp.status_code, 200)  # updated
         e.refresh_from_db(fields=['shop', 'employee'])
         self.assertEqual(e.shop.id, self.shop3.id)
-        self.assertEqual(e.employee.tabel_code, None)  # cant change tabel_code for existing employment
+        self.assertEqual(e.employee.tabel_code, self.employee2.tabel_code)  # cant change tabel_code for existing employment
 
     def test_auto_timetable(self):
         employment_ids = list(Employment.objects.filter(shop=self.shop).values_list('id', flat=True))
