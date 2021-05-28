@@ -491,6 +491,15 @@ class UploadTimetableSerializer(serializers.Serializer):
     file = serializers.FileField()
 
 
+class GenerateUploadTimetableExampleSerializer(serializers.Serializer):
+    shop_id = serializers.IntegerField()
+    dt_from = serializers.DateField(format=QOS_DATE_FORMAT)
+    dt_to = serializers.DateField(format=QOS_DATE_FORMAT)
+    employee_id__in = serializers.ListField(child=serializers.IntegerField(), required=False)
+    is_fact = serializers.BooleanField(default=False)
+    is_approved = serializers.BooleanField(default=False)
+
+
 class DownloadSerializer(serializers.Serializer):
     dt_from = serializers.DateField(format=QOS_DATE_FORMAT)
     is_approved = serializers.BooleanField(default=True)

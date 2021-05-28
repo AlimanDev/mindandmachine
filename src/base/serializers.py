@@ -255,6 +255,7 @@ class EmploymentListSerializer(serializers.Serializer):
         if request and request.query_params.get('include_employee'):
             self.fields['employee'] = EmployeeSerializer(required=False, read_only=True)
 
+
 class EmploymentSerializer(serializers.ModelSerializer):
     default_error_messages = {
         "emp_check_dates": _("Employment from {dt_hired} to {dt_fired} already exists."),

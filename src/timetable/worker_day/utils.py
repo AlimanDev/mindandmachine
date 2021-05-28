@@ -35,16 +35,9 @@ from src.util.dg.helpers import MONTH_NAMES
 from src.util.download import xlsx_method
 from src.util.models_converter import Converter
 
-WORK_TYPES = {
-    'в': WorkerDay.TYPE_HOLIDAY,
-    'от': WorkerDay.TYPE_VACATION,
-    'v': WorkerDay.TYPE_VACATION,
-    'h': WorkerDay.TYPE_HOLIDAY,
-    # 'nan': WorkerDay.TYPE_HOLIDAY,
-    'b': WorkerDay.TYPE_HOLIDAY,
-}
 
-SKIP_SYMBOLS = ['nan', '']
+SKIP_SYMBOLS = ['NAN', '']
+
 
 def upload_timetable_util(form, timetable_file, is_fact=False):
     """
@@ -239,12 +232,12 @@ def upload_timetable_util(form, timetable_file, is_fact=False):
             dttm_work_start = None
             dttm_work_end = None
             try:
-                cell_data = str(data[i + 3]).lower().strip()
+                cell_data = str(data[i + 3]).upper().strip()
                 if cell_data.replace(' ', '').replace('\n', '') in SKIP_SYMBOLS:
                     continue
-                if not (cell_data in WORK_TYPES):
+                if not (cell_data in WorkerDay.WD_TYPE_MAPPING_REVERSED):
                     splited_cell = data[i + 3].replace('\n', '').strip().split()
-                    work_type = work_types.get(data[position_column].lower(), first_type) if len(splited_cell) == 1 else work_types.get(splited_cell[1].lower(), first_type)
+                    work_type = work_types.get(data[position_column].upper(), first_type) if len(splited_cell) == 1 else work_types.get(splited_cell[1].upper(), first_type)
                     times = splited_cell[0].split('-')
                     type_of_work = WorkerDay.TYPE_WORKDAY
                     dttm_work_start = datetime.datetime.combine(
@@ -256,10 +249,10 @@ def upload_timetable_util(form, timetable_file, is_fact=False):
                     if dttm_work_end < dttm_work_start:
                         dttm_work_end += datetime.timedelta(days=1)
                 elif not is_fact:
-                    type_of_work = WORK_TYPES[cell_data]
+                    type_of_work = WorkerDay.WD_TYPE_MAPPING_REVERSED[cell_data]
                 else:
                     continue
-            except:
+            except Exception as e:
                 raise ValidationError(_('The employee {user.first_name} {user.last_name} in the cell for {dt} has the wrong value: {value}.').format(user=employee.user, dt=dt, value=str(data[i + 3])))
 
             WorkerDay.objects.filter(dt=dt, employee=employee, is_fact=is_fact, is_approved=False).delete()
