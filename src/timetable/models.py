@@ -741,11 +741,12 @@ class WorkerDay(AbstractModel):
             for fact in fact_qs:
                 fact.save()
 
+        # TODO: покрыть тестами
         if settings.MDA_SEND_USER_TO_SHOP_REL_ON_WD_SAVE and \
-                (self.is_vacancy or self.type == WorkerDay.TYPE_QUALIFICATION) and self.worker and self.shop:
+                (self.is_vacancy or self.type == WorkerDay.TYPE_QUALIFICATION) and self.employee and self.shop:
             from src.integration.mda.tasks import create_mda_user_to_shop_relation
             create_mda_user_to_shop_relation.delay(
-                username=self.worker.username,
+                username=self.employee.user.username,
                 shop_code=self.shop.code,
                 debug_info={
                     'wd_id': self.id,

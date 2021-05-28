@@ -1,7 +1,7 @@
 import datetime
-import json
-from itertools import groupby, chain
 import io
+import json
+from itertools import groupby
 
 import pandas as pd
 from django.conf import settings
@@ -29,7 +29,6 @@ from src.base.views_abstract import BaseModelViewSet
 from src.events.signals import event_signal
 from src.timetable.backends import MultiShopsFilterBackend
 from src.timetable.events import REQUEST_APPROVE_EVENT_TYPE, APPROVE_EVENT_TYPE, VACANCY_CONFIRMED_TYPE
-from src.timetable.exceptions import WorkTimeOverlap
 from src.timetable.filters import WorkerDayFilter, WorkerDayStatFilter, VacancyFilter
 from src.timetable.models import (
     WorkerDay,
@@ -213,6 +212,113 @@ class WorkerDayViewSet(BaseModelViewSet):
                 self.filter_queryset(self.get_queryset().prefetch_related('worker_day_details').select_related('last_edited_by')),
                 many=True, context=self.get_serializer_context()
             ).data
+
+        if request.query_params.get('fill_empty_days', False):
+            employment__tabel_code__in = [
+                i for i in request.query_params.get('employment__tabel_code__in', '').split(',') if i]
+            employee_id__in = [i for i in request.query_params.get('employee_id__in', '').split(',') if i]
+            dt__gte = request.query_params.get('dt__gte')
+            dt__lte = request.query_params.get('dt__lte')
+            if (employment__tabel_code__in or employee_id__in) and dt__gte and dt__lte:
+                response_wdays_dict = {f"{d['employee_id']}_{d['dt']}": d for d in data}
+
+                employees = Employee.objects
+                if employee_id__in:
+                    employees = employees.filter(id__in=employee_id__in)
+                elif employment__tabel_code__in:
+                    employees = employees.filter(tabel_code__in=employment__tabel_code__in)
+
+                plan_wdays_dict = {f'{wd.employee_id}_{wd.dt}': wd for wd in WorkerDay.objects.filter(
+                    employee__in=employees,
+                    dt__gte=dt__gte,
+                    dt__lte=dt__lte,
+                    is_approved=True,
+                    is_fact=False,
+                ).exclude(
+                    type=WorkerDay.TYPE_EMPTY,
+                ).select_related(
+                    'employee__user',
+                    'shop',
+                )}
+                for employee in employees:
+                    for dt in pd.date_range(dt__gte, dt__lte).date:
+                        empl_dt_key = f"{employee.id}_{dt}"
+                        resp_wd = response_wdays_dict.get(empl_dt_key)
+                        if resp_wd:  # если есть ответ для сотрудника на конкретный день, то пропускаем
+                            continue
+
+                        plan_wd = plan_wdays_dict.get(empl_dt_key)
+
+                        # Если нет ни плана ни факта, то добавляем выходной
+                        if not plan_wd:
+                            d = {
+                                "id": None,
+                                "worker_id": employee.user_id,
+                                "employee_id": employee.id,
+                                "shop_id": None,
+                                "employment_id": None,  # нужен?
+                                "type": "H",
+                                "dt": Converter.convert_date(dt),
+                                "dttm_work_start": None,
+                                "dttm_work_end": None,
+                                "dttm_work_start_tabel": None,
+                                "dttm_work_end_tabel": None,
+                                "comment": None,
+                                "is_approved": None,
+                                "worker_day_details": [],
+                                "outsources": [],
+                                "is_fact": None,
+                                "work_hours": 0,
+                                "parent_worker_day_id": None,
+                                "created_by_id": None,
+                                "last_edited_by": None,
+                                "dttm_modified": None,
+                                "is_blocked": None
+                            }
+                            if self.request.query_params.get('by_code', False):
+                                d['shop_code'] = None
+                                d['user_login'] = employee.user.username
+                                d['employment_tabel_code'] = employee.tabel_code
+                            data.append(d)
+                            continue
+
+                        dt_now = timezone.now().date()
+                        if plan_wd and plan_wd.type in WorkerDay.TYPES_WITH_TM_RANGE:
+                            day_in_past = dt < dt_now
+                            d = {
+                                "id": None,
+                                "worker_id": employee.user_id,
+                                "employee_id": employee.id,
+                                "shop_id": plan_wd.shop_id,
+                                "employment_id": plan_wd.employment_id,
+                                "type": WorkerDay.TYPE_ABSENSE if day_in_past else WorkerDay.TYPE_WORKDAY,
+                                "dt": Converter.convert_date(dt),
+                                "dttm_work_start": None,
+                                "dttm_work_end": None,
+                                "dttm_work_start_tabel": None,
+                                "dttm_work_end_tabel": None,
+                                "comment": None,
+                                "is_approved": None,
+                                "worker_day_details": None,
+                                "outsources": None,
+                                "is_fact": None,
+                                "work_hours": 0,
+                                "parent_worker_day_id": None,
+                                "created_by_id": None,
+                                "last_edited_by": None,
+                                "dttm_modified": None,
+                                "is_blocked": None,
+                            }
+                            if not day_in_past:
+                                d["work_hours_details"] = {
+                                  "D": 0
+                                }
+                            if self.request.query_params.get('by_code', False):
+                                d['shop_code'] = plan_wd.shop.code
+                                d['user_login'] = employee.user.username
+                                d['employment_tabel_code'] = employee.tabel_code
+                            data.append(d)
+
         return Response(data)
 
     @action(detail=False, methods=['post'])
@@ -472,7 +578,7 @@ class WorkerDayViewSet(BaseModelViewSet):
                         mis_data.append(d)
 
                     if mis_data:
-                        json_data = json.dumps(mis_data, indent=4, ensure_ascii=False, cls=DjangoJSONEncoder)
+                        json_data = json.dumps(mis_data, cls=DjangoJSONEncoder)
                         transaction.on_commit(
                             lambda f_json_data=json_data: send_doctors_schedule_to_mis.delay(json_data=f_json_data))
 
