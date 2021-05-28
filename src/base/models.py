@@ -336,7 +336,7 @@ class Shop(MPTTModel, AbstractActiveNetworkSpecificCodeNamedModel):
 
     demand_coef = models.FloatField(default=1)  # unknown trend for algorithm
 
-    forecast_step_minutes = models.TimeField(default=datetime.time(minute=30))
+    forecast_step_minutes = models.TimeField(default=datetime.time(hour=1))
     # man_presence = models.FloatField(default=0)
 
     count_lack = models.BooleanField(default=False)
