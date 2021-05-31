@@ -336,7 +336,7 @@ class Shop(MPTTModel, AbstractActiveNetworkSpecificCodeNamedModel):
 
     demand_coef = models.FloatField(default=1)  # unknown trend for algorithm
 
-    forecast_step_minutes = models.TimeField(default=datetime.time(minute=30))
+    forecast_step_minutes = models.TimeField(default=datetime.time(hour=1))
     # man_presence = models.FloatField(default=0)
 
     count_lack = models.BooleanField(default=False)
@@ -708,10 +708,13 @@ class EmploymentManager(models.Manager):
 
     def get_active_empl_by_priority(
             self, network_id, dt=None, priority_shop_id=None, priority_employment_id=None,
-            priority_work_type_id=None, **kwargs):
+            priority_work_type_id=None, priority_by_visible=True, **kwargs):
         qs = self.get_active(network_id, dt_from=dt, dt_to=dt, **kwargs)
 
         order_by = []
+
+        if priority_by_visible:
+            order_by.append('-is_visible')
 
         if priority_employment_id:
             qs = qs.annotate_value_equality(

@@ -58,7 +58,7 @@ class MultiShopsFilterBackend(DjangoFilterBackend):
             )
         if worker__username__in:
             ids = ids.filter(
-                employee__user__username__in=worker__username__in
+                employee__user__username__in=worker__username__in.split(',')  # TODO: покрыть тестами работу фильтра
             )
 
         # all_employments_for_users = Employment.objects.get_active(dt_from, dt_to).filter(user_id__in=ids)
