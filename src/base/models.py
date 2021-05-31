@@ -121,6 +121,14 @@ class Network(AbstractActiveModel):
         verbose_name='Перерывы по умолчанию',
         related_name='networks',
     )
+    load_template = models.ForeignKey(
+        'forecast.LoadTemplate',
+        on_delete=models.PROTECT,
+        blank=True,
+        null=True,
+        verbose_name='Шаблон нагрузки по умолчанию',
+        related_name='networks',
+    )
     # при создании новой должности будут проставляться соотв. значения
     # пример значения можно найти в src.base.tests.test_worker_position.TestSetWorkerPositionDefaultsModel
     worker_position_default_values = models.TextField(verbose_name='Параметры должностей по умолчанию', default='{}')
@@ -545,6 +553,10 @@ class Shop(MPTTModel, AbstractActiveNetworkSpecificCodeNamedModel):
             transaction.on_commit(self._handle_new_shop_created)
         elif self.tracker.has_changed('tm_open_dict') or self.tracker.has_changed('tm_close_dict'):
             transaction.on_commit(self._handle_schedule_change)
+        
+        if is_new and self.load_template_id is None:
+            self.load_template_id = self.network.load_template_id
+
         if load_template_changed and not (self.load_template_id is None):
             from src.forecast.load_template.utils import apply_load_template
             from src.forecast.load_template.tasks import calculate_shops_load
