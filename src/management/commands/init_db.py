@@ -1,5 +1,5 @@
 import os
-from django.core.management.base import BaseCommand, CommandError
+from django.core.management.base import BaseCommand
 from django.db import transaction
 from datetime import time, datetime, timedelta, date
 
@@ -54,14 +54,11 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument('--need_test_shop', help='Creates test shop', type=bool, default=False)
         parser.add_argument('--client_name', help='Name of client', type=str)
-        parser.add_argument('--work_types', help='Work types with , separator', type=str)
+        parser.add_argument('--work_types', help='Work types with space separator', type=str, nargs='*')
 
     def handle(self, *args, **options):
         if options.get('work_types'):
-            try:
-                work_types = options.get('work_types').split(',')
-            except:
-                raise CommandError('Bad work types format.')
+            work_types = options.get('work_types')
         else:
             work_types = ['Кассы', 'Торговый зал']
         with transaction.atomic():
