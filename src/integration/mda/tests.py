@@ -1,6 +1,7 @@
 from datetime import datetime, date, timedelta
 
 from django.test import TestCase
+from django.utils import timezone
 from rest_framework.test import APITestCase
 
 from src.base.tests.factories import (
@@ -8,8 +9,13 @@ from src.base.tests.factories import (
     ShopFactory,
     UserFactory,
     EmployeeFactory,
+    GroupFactory,
+    WorkerPositionFactory,
 )
 from src.integration.mda.integration import MdaIntegrationHelper
+from src.integration.models import VMdaUsers
+from src.timetable.models import WorkerDay
+from src.timetable.tests.factories import WorkerDayFactory
 from src.util.mixins.tests import TestsHelperMixin
 from src.util.utils import generate_user_token
 
@@ -119,6 +125,144 @@ class TestMdaIntegration(TestsHelperMixin, TestCase):
         data = mda_integration_helper._get_data()
         s_data = list(filter(lambda s: shop.id == s['id'], data['shops']))[0]
         self.assertEqual(s_data['regionId'], self.region1.id)
+
+
+class TestVMdaUsers(TestsHelperMixin, TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.base_shop = ShopFactory(code='base')
+        cls.division1 = ShopFactory(parent=cls.base_shop, code='division1', latitude=None, longitude=None)
+        cls.region1 = ShopFactory(parent=cls.division1, code='region1', latitude=None, longitude=None)
+        cls.shop1 = ShopFactory(parent=cls.region1, code='shop1')
+        cls.group_director = GroupFactory(code='director', name='Директор')
+        cls.group_worker = GroupFactory(code='worker', name='Сотрудник')
+        cls.position_director = WorkerPositionFactory(group=cls.group_director, name='Директор', code='director')
+        cls.position_seller = WorkerPositionFactory(group=cls.group_worker, name='Продавец-кассир', code='seller')
+        cls.dt_now = timezone.now()
+
+    def test_2_directors_and_1_of_them_has_vacation(self):
+        """
+        2 директора: 1 из них в отпуске
+        DIR должен проставляться директору, который не в отпуске
+        """
+        user_director1 = UserFactory()
+        employee_director1 = EmployeeFactory(user=user_director1)
+        employment_director1 = EmploymentFactory(
+            employee=employee_director1, shop=self.shop1, position=self.position_director)
+        user_director2 = UserFactory()
+        employee_director2 = EmployeeFactory(user=user_director2)
+        employment_director2 = EmploymentFactory(
+            employee=employee_director2, shop=self.shop1, position=self.position_director)
+        director1_vacation = WorkerDayFactory(
+            dt=self.dt_now,
+            employee=employee_director1,
+            employment=None,
+            shop=self.shop1,
+            type=WorkerDay.TYPE_VACATION,
+            is_fact=False,
+            is_approved=True,
+        )
+        users_dict = {u.code: u for u in VMdaUsers.objects.all()}
+        self.assertEqual(len(users_dict), 2)
+
+        director1 = users_dict[employment_director1.code]
+        self.assertEqual(director1.role, 'MANAGER')
+
+        director2 = users_dict[employment_director2.code]
+        self.assertEqual(director2.role, 'DIR')
+
+        director1_vacation.delete()
+
+        # director2 vacation
+        WorkerDayFactory(
+            dt=self.dt_now,
+            employee=employee_director2,
+            employment=None,
+            shop=self.shop1,
+            type=WorkerDay.TYPE_VACATION,
+            is_fact=False,
+            is_approved=True,
+        )
+        users_dict = {u.code: u for u in VMdaUsers.objects.all()}
+        self.assertEqual(len(users_dict), 2)
+
+        director1 = users_dict[employment_director1.code]
+        self.assertEqual(director1.role, 'DIR')
+
+        director2 = users_dict[employment_director2.code]
+        self.assertEqual(director2.role, 'MANAGER')
+
+    def test_add_tmp_director_employment_to_not_director_user(self):
+        """
+        Добавление временного скрытого трудоустройства директора сотруднику, который не являается директором
+        При этом основной директор на больничном
+        DIR должен проставиться сотруднику, который временно выполняет роль директора
+        """
+        user_director = UserFactory()
+        employee_director = EmployeeFactory(user=user_director)
+        employment_director = EmploymentFactory(
+            employee=employee_director, shop=self.shop1, position=self.position_director)
+        user_seller = UserFactory()
+        employee_seller = EmployeeFactory(user=user_seller)
+        EmploymentFactory(
+            employee=employee_seller, shop=self.shop1, position=self.position_seller)
+        employment_tmp_director = EmploymentFactory(
+            is_visible=False,
+            dt_hired=self.dt_now - timedelta(days=5), dt_fired=self.dt_now + timedelta(days=5),
+            employee=employee_seller, shop=self.shop1, position=self.position_director)
+        director_sickness = WorkerDayFactory(
+            dt=self.dt_now,
+            employee=employee_director,
+            employment=None,
+            shop=self.shop1,
+            type=WorkerDay.TYPE_SICK,
+            is_fact=False,
+            is_approved=True,
+        )
+        users_dict = {u.code: u for u in VMdaUsers.objects.all()}
+        self.assertEqual(len(users_dict), 3)
+
+        director = users_dict[employment_director.code]
+        self.assertEqual(director.role, 'MANAGER')
+
+        seller = users_dict[employment_tmp_director.code]
+        self.assertEqual(seller.role, 'DIR')
+
+        director_sickness.delete()
+
+        users_dict = {u.code: u for u in VMdaUsers.objects.all()}
+        self.assertEqual(len(users_dict), 3)
+
+        director = users_dict[employment_director.code]
+        self.assertEqual(director.role, 'DIR')
+
+        seller = users_dict[employment_tmp_director.code]
+        self.assertEqual(seller.role, 'MANAGER')
+
+    def test_2_directors_different_norm_work_hours_and_is_visible(self):
+        """
+        2 активных директора
+        Один видимый ставка 50, другой невидимый ставка 100
+        DIR проставляется с приоритетом по видимости TODO: правильно?
+        """
+
+        user_director1 = UserFactory()
+        employee_director1 = EmployeeFactory(user=user_director1)
+        employment_director1 = EmploymentFactory(
+            employee=employee_director1, shop=self.shop1, position=self.position_director, is_visible=False)
+        user_director2 = UserFactory()
+        employee_director2 = EmployeeFactory(user=user_director2)
+        employment_director2 = EmploymentFactory(
+            employee=employee_director2, shop=self.shop1, position=self.position_director, norm_work_hours=50)
+
+        users_dict = {u.code: u for u in VMdaUsers.objects.all()}
+        self.assertEqual(len(users_dict), 2)
+
+        director1 = users_dict[employment_director1.code]
+        self.assertEqual(director1.role, 'MANAGER')
+
+        director2 = users_dict[employment_director2.code]
+        self.assertEqual(director2.role, 'DIR')
 
 
 class TestCaseInsensitiveAuth(TestsHelperMixin, APITestCase):

@@ -1,12 +1,14 @@
 import uuid
 from calendar import monthrange
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, time
 
-from django.test import TestCase
 from django.db.models import Q
+from django.test import TestCase
 
-from src.base.models import Employment, Employee
+from src.base.models import Employment, Employee, NetworkConnect
+from src.base.tests.factories import NetworkFactory, ShopFactory, UserFactory, EmployeeFactory, EmploymentFactory
 from src.timetable.models import WorkTypeName, WorkType, WorkerDay
+from src.timetable.tests.factories import WorkerDayFactory
 from src.util.dg.tabel import T13TabelDataGetter, MtsTabelDataGetter
 from src.util.mixins.tests import TestsHelperMixin
 
@@ -14,6 +16,7 @@ from src.util.mixins.tests import TestsHelperMixin
 class TestGenerateTabel(TestsHelperMixin, TestCase):
     @classmethod
     def setUpTestData(cls):
+        cls.network = NetworkFactory()
         cls.create_departments_and_users()
         cls.dttm_now = datetime.now()
         cls.dt_now = cls.dttm_now.date()
@@ -49,6 +52,29 @@ class TestGenerateTabel(TestsHelperMixin, TestCase):
         cls._generate_plan_and_fact_worker_days_for_shop_employments(
             shop=cls.shop, work_type=cls.work_type, dt_from=cls.dt_from, dt_to=cls.dt_to)
         cls.network.okpo = '44412749'
+        cls.outsource_network = NetworkFactory(name='Аутсорс сеть', code='outsource')
+        cls.outsource_shop = ShopFactory(network=cls.outsource_network)
+        cls.outsource_user = UserFactory(network=cls.outsource_network)
+        cls.outsource_employee = EmployeeFactory(user=cls.outsource_user)
+        cls.outsource_employment = EmploymentFactory(employee=cls.outsource_employee, shop=cls.outsource_shop)
+        NetworkConnect.objects.create(
+            client=cls.network,
+            outsourcing=cls.outsource_network,
+        )
+        WorkerDayFactory(
+            is_fact=True,
+            is_approved=True,
+            dt=cls.dt_now,
+            employee=cls.outsource_employee,
+            shop=cls.shop,
+            employment=cls.outsource_employment,
+            type=WorkerDay.TYPE_WORKDAY,
+            dttm_work_start=datetime.combine(cls.dt_now, time(7, 58, 0)),
+            dttm_work_end=datetime.combine(cls.dt_now, time(19, 59, 1)),
+        )
+
+    def setUp(self) -> None:
+        self.outsource_network.refresh_from_db()
 
     def test_generate_mts_tabel(self):
         g = MtsTabelDataGetter(shop=self.shop, dt_from=self.dt_from, dt_to=self.dt_to)
@@ -91,11 +117,22 @@ class TestGenerateTabel(TestsHelperMixin, TestCase):
         second_data = g.get_data()
         self.assertEqual(len(data['plan_and_fact_hours']), len(second_data['plan_and_fact_hours']))
 
+    def test_generate_mts_tabel_for_outsource_shop(self):
+        g = MtsTabelDataGetter(shop=self.outsource_shop, dt_from=self.dt_from, dt_to=self.dt_to)
+        data = g.get_data()
+        self.assertEqual(len(data['plan_and_fact_hours']), 0)
+
+        self.outsource_network.set_settings_value('tabel_include_other_shops_wdays', True)
+        self.outsource_network.save()
+
+        g = MtsTabelDataGetter(shop=self.outsource_shop, dt_from=self.dt_from, dt_to=self.dt_to)
+        data = g.get_data()
+        self.assertEqual(len(data['plan_and_fact_hours']), 1)
 
     def test_generate_custom_t13_tabel(self):
         g = T13TabelDataGetter(shop=self.shop, dt_from=self.dt_from, dt_to=self.dt_to)
         data = g.get_data()
-        self.assertEqual(len(data['users']), 6)
+        self.assertEqual(len(data['users']), 7)
         for user in data['users']:
             dt_first = self.dt_from - timedelta(1)
             tabel_code = user['tabel_code']
@@ -142,6 +179,17 @@ class TestGenerateTabel(TestsHelperMixin, TestCase):
         self.assertEqual(data['users'][2]['fio'], data['users'][3]['fio'])
         self.assertNotEqual(data['users'][2]['tabel_code'], data['users'][3]['tabel_code'])
 
+    def test_generate_custom_t13_tabel_for_outsource_shop(self):
+        g = T13TabelDataGetter(shop=self.outsource_shop, dt_from=self.dt_from, dt_to=self.dt_to)
+        data = g.get_data()
+        self.assertEqual(len(data['users']), 0)
+
+        self.outsource_network.set_settings_value('tabel_include_other_shops_wdays', True)
+        self.outsource_network.save()
+
+        g = T13TabelDataGetter(shop=self.outsource_shop, dt_from=self.dt_from, dt_to=self.dt_to)
+        data = g.get_data()
+        self.assertEqual(len(data['users']), 1)
 
     def test_generate_custom_t13_tabel_fired_hired(self):
         self.second_empl.dt_fired = self.dt_from + timedelta(10)
@@ -156,4 +204,4 @@ class TestGenerateTabel(TestsHelperMixin, TestCase):
         )
         g = T13TabelDataGetter(shop=self.shop, dt_from=self.dt_from, dt_to=self.dt_to)
         data = g.get_data()
-        self.assertEqual(len(data['users']), 6)
+        self.assertEqual(len(data['users']), 7)

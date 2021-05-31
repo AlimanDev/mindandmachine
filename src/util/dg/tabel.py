@@ -5,6 +5,7 @@ from datetime import datetime
 from django.conf import settings
 from django.db.models import Q
 from django.utils.functional import cached_property
+from django.utils.translation import gettext as _
 
 from src.base.models import Employment
 from src.timetable.models import WorkerDay, PlanAndFactHours
@@ -60,6 +61,10 @@ class BaseTabelDataGetter:
         return self.wd_type_mapper.get_tabel_type(wd_type)
 
     def _get_tabel_wdays_qs(self):
+        shop_employees_part_q = ~Q(type__in=WorkerDay.TYPES_WITH_TM_RANGE)
+        if self.shop.network.settings_values_prop.get('tabel_include_other_shops_wdays', False):  # TODO: сделать в виде параметра на фронте? Или так ок?
+            shop_employees_part_q |= Q(Q(type=WorkerDay.TYPE_WORKDAY) & ~Q(shop=self.shop))
+
         tabel_wdays = WorkerDay.objects.get_tabel().filter(
             Q(
                 type__in=WorkerDay.TYPE_WORKDAY,
@@ -71,7 +76,7 @@ class BaseTabelDataGetter:
                 shop=self.shop,
             ) |
             Q(
-                ~Q(type__in=WorkerDay.TYPES_WITH_TM_RANGE),
+                shop_employees_part_q,
                 Q(employee__in=Employment.objects.get_active(
                     network_id=self.network.id,
                     dt_from=self.dt_from,
@@ -83,7 +88,17 @@ class BaseTabelDataGetter:
             dt__lte=self.dt_to,
         )
 
-        return tabel_wdays.select_related('employee__user', 'shop', 'employment').order_by('employee__user__last_name', 'employee__user__first_name', 'employee_id', 'dt')
+        return tabel_wdays.select_related(
+            'employee__user',
+            'shop',
+            'employment',
+        ).order_by(
+            'employee__user__last_name',
+            'employee__user__first_name',
+            'employee_id',
+            'dt',
+        )
+
 
     def get_data(self):
         raise NotImplementedError
@@ -98,11 +113,11 @@ class T13TabelDataGetter(BaseTabelDataGetter):
             (wday and wday.type in WorkerDay.TYPES_WITH_TM_RANGE) else ''
 
     def get_data(self):
-        
         def _get_active_empl(wd, empls):
             if not wd.employment:
                 return list(filter(
-                    lambda e: (e.dt_hired is None or e.dt_hired <= wd.dt) and (e.dt_fired is None or wd.dt <= e.dt_fired),
+                    lambda e: (e.dt_hired is None or e.dt_hired <= wd.dt) and (
+                                e.dt_fired is None or wd.dt <= e.dt_fired),
                     empls.get(wd.employee_id, []),
                 ))[0]
             return wd.employment
@@ -111,7 +126,6 @@ class T13TabelDataGetter(BaseTabelDataGetter):
 
         empls = {}
         empls_qs = Employment.objects.get_active(
-            network_id=self.shop.network_id,
             dt_from=self.dt_from,
             dt_to=self.dt_to,
             employee__id__in=tabel_wdays.values_list('employee', flat=True),
@@ -126,14 +140,8 @@ class T13TabelDataGetter(BaseTabelDataGetter):
             empls.setdefault(e.employee_id, []).append(e)
 
         num = 1
-        first_half_month_wdays = 0
-        first_half_month_whours = 0
-        second_half_month_wdays = 0
-        second_half_month_whours = 0
 
         users = []
-        days = {}
-        wdays_to_all_rows = []
         grouped_worker_days = {}
         for wd in tabel_wdays:
             if wd.type in WorkerDay.TYPES_WITH_TM_RANGE and not _get_active_empl(wd, empls):
@@ -189,9 +197,23 @@ class T13TabelDataGetter(BaseTabelDataGetter):
 
 class MtsTabelDataGetter(BaseTabelDataGetter):
     def get_data(self):
+        shop_q = Q(shop=self.shop)
+        if self.shop.network.settings_values_prop.get('tabel_include_other_shops_wdays', False):
+            shop_q |= Q(
+                Q(
+                    Q(wd_type=WorkerDay.TYPE_WORKDAY) & ~Q(shop=self.shop)
+                ) &
+                Q(employee__in=Employment.objects.get_active(
+                    network_id=self.network.id,
+                    dt_from=self.dt_from,
+                    dt_to=self.dt_to,
+                    shop=self.shop,
+                ).distinct().values_list('employee', flat=True))
+            )
+
         return {
             'plan_and_fact_hours': PlanAndFactHours.objects.filter(
-                shop=self.shop,
+                shop_q,
                 wd_type__in=WorkerDay.TYPES_WITH_TM_RANGE,
                 dt__gte=self.dt_from,
                 dt__lte=self.dt_to,
@@ -246,7 +268,7 @@ class BaseTabelGenerator(BaseDocGenerator):
             'doc_num': f'{self.dt_to.month + 1}',
             'month_name': month_name,
             'year': year,
-            'tabel_text': f'Табель учета рабочего времени за {month_name} {year}г',
+            'tabel_text': _('Tabel for {} {}y').format(month_name, year),
         }
         return data
 

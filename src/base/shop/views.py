@@ -55,7 +55,6 @@ class ShopViewSet(UpdateorCreateViewSet):
 
     GET /rest_api/department/stat?id=6
     """
-    page_size = 10
     pagination_class = LimitOffsetPagination
     permission_classes = [Permission]
     serializer_class = ShopSerializer

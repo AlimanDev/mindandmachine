@@ -303,10 +303,11 @@ class AutoSettingsViewSet(viewsets.ViewSet):
             raise ValidationError(self.error_messages["settings_not_exists"])
 
         employments = Employment.objects.get_active(
-            shop.network_id,    
+            shop.network_id,
             dt_from=dt_from,
             dt_to=dt_to,
             shop_id=shop_id,
+            is_visible=True,
             # auto_timetable=True, чтобы все сотрудники были, так как пересоставляем иногда для 1
         ).select_related('employee__user', 'position')
 
@@ -335,7 +336,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
                 is_active=True
             )
             if not employment_work_type.exists():
-                users_without_spec.append(employment.user.first_name + ' ' + employment.user.last_name)
+                users_without_spec.append(employment.employee.user.first_name + ' ' + employment.employee.user.last_name)
         if users_without_spec:
             tt.status = ShopMonthStat.NOT_DONE
             tt.save()
@@ -881,6 +882,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
                         dt_from=dt_from,
                         dt_to=dt_to,
                         shop=shop,
+                        is_visible=True,
                     )
                 }
                 for uid, v in data['users'].items():

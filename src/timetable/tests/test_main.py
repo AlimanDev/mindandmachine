@@ -1,10 +1,12 @@
 import json
 import uuid
 from datetime import timedelta, time, datetime, date
-from dateutil.relativedelta import relativedelta
 from unittest import mock
 from django.db import transaction
 
+from dateutil.relativedelta import relativedelta
+from django.core import mail
+from django.db import transaction
 from django.test import override_settings
 from django.urls import reverse
 from django.utils.timezone import now
@@ -12,6 +14,9 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from src.base.models import FunctionGroup, Network, Employment, ShopSchedule, Shop, Employee
+from src.events.models import EventType
+from src.notifications.models.event_notification import EventEmailNotification
+from src.timetable.events import VACANCY_CONFIRMED_TYPE
 from src.timetable.models import (
     WorkerDay,
     AttendanceRecords,
@@ -925,6 +930,64 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
 
         self.assertIn('work_hours_details', resp_data[0])
         self.assertDictEqual({'D': 4.71, 'N': 4.38}, resp_data[0]['work_hours_details'])
+
+    def test_fill_empty_days_param_only_plan_exists_returns_zero_hours_workday(self):
+        WorkerDay.objects.filter(id=self.worker_day_fact_approved.id).delete()
+        get_params = {
+            'employment__tabel_code__in': self.employee2.tabel_code,
+            'dt__gte': self.dt,
+            'dt__lte': self.dt,
+            'fact_tabel': 'true',
+            'fill_empty_days': 'true',
+            'hours_details': 'true',
+        }
+        response = self.client.get('/rest_api/worker_day/', data=get_params)
+        self.assertEqual(response.status_code, 200)
+        resp_data = response.json()
+        self.assertEqual(len(resp_data), 1)
+        self.assertEqual(resp_data[0]['id'], None)
+        self.assertEqual(resp_data[0]['type'], WorkerDay.TYPE_WORKDAY)
+        self.assertEqual(resp_data[0]['work_hours'], 0)
+        self.assertEqual(resp_data[0]['work_hours_details']['D'], 0)
+
+    def test_fill_empty_days_param_only_plan_exists_returns_absense_in_past(self):
+        WorkerDay.objects.filter(id=self.worker_day_fact_approved.id).delete()
+        WorkerDay.objects.filter(id=self.worker_day_plan_approved.id).update(
+            dt=self.dt - timedelta(days=1),
+            dttm_work_start=self.worker_day_plan_approved.dttm_work_start - timedelta(days=1),
+            dttm_work_end=self.worker_day_plan_approved.dttm_work_end - timedelta(days=1),
+        )
+        get_params = {
+            'employment__tabel_code__in': self.employee2.tabel_code,
+            'dt__gte': self.dt - timedelta(days=1),
+            'dt__lte': self.dt - timedelta(days=1),
+            'fact_tabel': 'true',
+            'fill_empty_days': 'true',
+            'hours_details': 'true',
+        }
+        response = self.client.get('/rest_api/worker_day/', data=get_params)
+        self.assertEqual(response.status_code, 200)
+        resp_data = response.json()
+        self.assertEqual(len(resp_data), 1)
+        self.assertEqual(resp_data[0]['id'], None)
+        self.assertEqual(resp_data[0]['type'], WorkerDay.TYPE_ABSENSE)
+
+    def test_fill_empty_days_param_no_days_exists_returns_holiday(self):
+        WorkerDay.objects.filter(id=self.worker_day_fact_approved.id).delete()
+        WorkerDay.objects.filter(id=self.worker_day_plan_approved.id).delete()
+        get_params = {
+            'employment__tabel_code__in': self.employee2.tabel_code,
+            'dt__gte': self.dt,
+            'dt__lte': self.dt,
+            'fact_tabel': 'true',
+            'fill_empty_days': 'true',
+            'hours_details': 'true',
+        }
+        response = self.client.get('/rest_api/worker_day/', data=get_params)
+        self.assertEqual(response.status_code, 200)
+        resp_data = response.json()
+        self.assertEqual(len(resp_data), 1)
+        self.assertEqual(resp_data[0]['type'], WorkerDay.TYPE_HOLIDAY)
 
     def test_work_hours_as_decimal_for_plan_approved(self):
         get_params = {'shop_id': self.shop.id,
@@ -2370,7 +2433,21 @@ class TestVacancy(TestsHelperMixin, APITestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.json()['results']), 1)
 
+    @override_settings(CELERY_TASK_ALWAYS_EAGER=True)
     def test_confirm_vacancy(self):
+        event, _ = EventType.objects.get_or_create(
+            code=VACANCY_CONFIRMED_TYPE,
+            network=self.network,
+        )
+        subject = 'Сотрудник откликнулся на вакансию.'
+        event_notification = EventEmailNotification.objects.create(
+            event_type=event,
+            subject=subject,
+            system_email_template='notifications/email/vacancy_confirmed.html',
+        )
+        self.user1.email = 'test@mail.mm'
+        self.user1.save()
+        event_notification.users.add(self.user1)
         self.shop.__class__.objects.filter(id=self.shop.id).update(email=True)
         pnawd = WorkerDay.objects.create(
             shop=self.shop,
@@ -2413,6 +2490,11 @@ class TestVacancy(TestsHelperMixin, APITestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(), {'result': 'Вакансия успешно принята.'})
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].subject, subject)
+        self.assertEqual(mail.outbox[0].to[0], self.user1.email)
+        body = f'Здравствуйте, {self.user1.first_name}!\n\nСотрудник {self.user2.last_name} {self.user2.first_name} откликнулся на вакансию {self.vacancy2.dt} с типом работ {self.work_type1.work_type_name.name}\n\nПисьмо отправлено роботом.'
+        self.assertEqual(mail.outbox[0].body, body)
 
         self.assertFalse(WorkerDay.objects.filter(id=pawd.id).exists())
 
@@ -2786,8 +2868,9 @@ class TestAditionalFunctions(APITestCase):
                     cashbox_details__work_type__work_type_name__code='consult',
                 )
 
-                url = f'{self.url}exchange_approved/'
-                response = self.client.post(url, data, format='json')
+                with mock.patch.object(transaction, 'on_commit', lambda t: t()):
+                    url = f'{self.url}exchange_approved/'
+                    response = self.client.post(url, data, format='json')
                 send_doctors_schedule_to_mis_delay.assert_called_once()
                 json_data = json.loads(send_doctors_schedule_to_mis_delay.call_args[1]['json_data'])
                 self.assertListEqual(

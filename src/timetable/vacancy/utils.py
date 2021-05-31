@@ -453,7 +453,7 @@ def cancel_vacancy(vacancy_id):
         vacancy.delete()
 
 
-def confirm_vacancy(vacancy_id, user, employee_id=None, exchange=False):
+def confirm_vacancy(vacancy_id, user, employee_id=None, exchange=False, reconfirm=False):
     """
     :param vacancy_id:
     :param user: пользователь, откликнувшийся на вакансию
@@ -466,14 +466,19 @@ def confirm_vacancy(vacancy_id, user, employee_id=None, exchange=False):
         'cant_apply_vacancy_no_active_employement': _("You can't apply for this vacancy because you don't have an active employment as of the date of the vacancy."),
         'cant_apply_vacancy_not_outsource': _('You can not enter this vacancy because this vacancy is located in another network and does not imply the possibility of outsourcing.'),
         'cant_apply_vacancy_outsource_no_network': _('You cannot apply for this vacancy because this vacancy is located on another network and your network is not allowed to respond to this vacancy.'),
+        'cant_apply_vacancy_outsource_not_allowed': _('You cannot apply for this vacancy because your network does not allow you to apply for an outsourced vacancy in your network.'),
         'no_timetable': _('The timetable for this period has not yet been created.'),
         'vacancy_success': _('The vacancy was successfully accepted.'),
+        'cant_reconfrm_fact_exists': _("You can't reassign an employee to this vacancy, because the employee has already entered this vacancy.")
     }
     with transaction.atomic():
+        no_employee_filter = {}
+        if not reconfirm:
+            no_employee_filter['employee__isnull'] = True
         vacancy = WorkerDay.objects.get_plan_approved(
             id=vacancy_id,
             is_vacancy=True,
-            employee__isnull=True,
+            **no_employee_filter,
         ).select_for_update().first()
         res = {
             'status_code': 200,
@@ -482,6 +487,18 @@ def confirm_vacancy(vacancy_id, user, employee_id=None, exchange=False):
             res['text'] = messages['no_vacancy']
             res['status_code'] = 404
             return res
+
+        if reconfirm:
+            fact = WorkerDay.objects.filter(
+                employee_id=vacancy.employee_id,
+                is_fact=True,
+                is_approved=True,
+                dt=vacancy.dt,
+            )
+            if fact.exists():
+                res['text'] = messages['cant_reconfrm_fact_exists']
+                res['status_code'] = 400
+                return res
 
         vacancy_shop = vacancy.shop
 
@@ -522,8 +539,14 @@ def confirm_vacancy(vacancy_id, user, employee_id=None, exchange=False):
             res['text'] = messages['cant_apply_vacancy_not_outsource']
             res['status_code'] = 400
             return res
+        # сотрудник из текущей сети не может принять аутсорс вакансию если это запрещено в сети
+        elif vacancy.is_outsource and active_employment.shop.network_id == vacancy_shop.network_id and not vacancy_shop.network.allow_workers_confirm_outsource_vacancy:
+            res['text'] = messages['cant_apply_vacancy_outsource_not_allowed']
+            res['status_code'] = 400
+            return res
         # сотрудник из другой сети не может принять вакансию если это аутсорс вакансия, но его сеть не в списке доступных
-        elif vacancy.is_outsource and not vacancy.outsources.filter(id=active_employment.shop.network_id).exists():
+        elif vacancy.is_outsource and active_employment.shop.network_id != vacancy_shop.network_id\
+            and not vacancy.outsources.filter(id=active_employment.shop.network_id).exists():
             res['text'] = messages['cant_apply_vacancy_outsource_no_network']
             res['status_code'] = 400
             return res
@@ -556,6 +579,14 @@ def confirm_vacancy(vacancy_id, user, employee_id=None, exchange=False):
         if update_condition or exchange:
             if employee_worker_day:
                 employee_worker_day.delete()
+            if reconfirm:
+                WorkerDay.objects.filter(
+                    is_fact=False,
+                    is_approved=False,
+                    dt=vacancy.dt,
+                    employee_id=vacancy.employee_id,
+                    is_vacancy=True,
+                ).delete()
 
             # TODO: добавить проверку на пересечение с рабочими днями у этого же пользователя
             vacancy.employee = active_employment.employee

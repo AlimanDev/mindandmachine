@@ -77,6 +77,8 @@ class Network(AbstractActiveModel):
         verbose_name='Допустимый интервал для опоздания', default=datetime.timedelta(seconds=0))
     allowed_interval_for_early_departure = models.DurationField(
         verbose_name='Допустимый интервал для раннего ухода', default=datetime.timedelta(seconds=0))
+    allow_workers_confirm_outsource_vacancy = models.BooleanField(
+        verbose_name='Разрешать работникам сети откликаться на аутсорс вакансии', default=False)
     okpo = models.CharField(blank=True, null=True, max_length=15, verbose_name='Код по ОКПО')
     allowed_geo_distance_km = models.DecimalField(
         max_digits=10, decimal_places=2, null=True, blank=True,
@@ -87,6 +89,8 @@ class Network(AbstractActiveModel):
     show_worker_day_additional_info = models.BooleanField(
         default=False, verbose_name='Отображать доп. информацию в подтвержденных факте и плане', 
         help_text='Отображение при наведении на уголок информации о том, кто и когда последний раз редактировал рабочий день')
+    show_worker_day_tasks = models.BooleanField(
+        default=False, verbose_name='Отображать задачи в доп. информацию по рабочему дню')
     crop_work_hours_by_shop_schedule = models.BooleanField(
         default=False, verbose_name='Обрезать рабочие часы по времени работы магазина'
     )
@@ -129,7 +133,8 @@ class Network(AbstractActiveModel):
     consider_remaining_hours_in_prev_months_when_calc_norm_hours = models.BooleanField(
         default=False, verbose_name='Учитывать неотработанные часы за предыдущие месяца при расчете нормы часов',
     )
-    outsourcings = models.ManyToManyField('self', through='base.NetworkConnect', through_fields=('client', 'outsourcing'), symmetrical=False, related_name='clients')
+    outsourcings = models.ManyToManyField(
+        'self', through='base.NetworkConnect', through_fields=('client', 'outsourcing'), symmetrical=False, related_name='clients')
     ignore_parent_code_when_updating_department_via_api = models.BooleanField(
         default=False, verbose_name='Не учитывать parent_code при изменении подразделения через api',
         help_text='Необходимо включить для случаев, когда оргструктура поддерживается вручную',
@@ -142,6 +147,11 @@ class Network(AbstractActiveModel):
     @property
     def settings_values_prop(self):
         return json.loads(self.settings_values)
+
+    def set_settings_value(self, k, v):
+        settings_values = json.loads(self.settings_values)
+        settings_values[k] = v
+        self.settings_values = json.dumps(settings_values)
 
     def get_department(self):
         return None
@@ -328,7 +338,7 @@ class Shop(MPTTModel, AbstractActiveNetworkSpecificCodeNamedModel):
 
     demand_coef = models.FloatField(default=1)  # unknown trend for algorithm
 
-    forecast_step_minutes = models.TimeField(default=datetime.time(minute=30))
+    forecast_step_minutes = models.TimeField(default=datetime.time(hour=1))
     # man_presence = models.FloatField(default=0)
 
     count_lack = models.BooleanField(default=False)
@@ -700,10 +710,13 @@ class EmploymentManager(models.Manager):
 
     def get_active_empl_by_priority(
             self, network_id, dt=None, priority_shop_id=None, priority_employment_id=None,
-            priority_work_type_id=None, **kwargs):
+            priority_work_type_id=None, priority_by_visible=True, **kwargs):
         qs = self.get_active(network_id, dt_from=dt, dt_to=dt, **kwargs)
 
         order_by = []
+
+        if priority_by_visible:
+            order_by.append('-is_visible')
 
         if priority_employment_id:
             qs = qs.annotate_value_equality(
@@ -854,6 +867,13 @@ class User(DjangoAbstractUser, AbstractModel):
         (SEX_FEMALE, 'Female',),
         (SEX_MALE, 'Male',),
     )
+
+    LOCAL_AUTH = 'local'
+    LDAP_AUTH = 'ldap'
+    AUTH_TYPES = (
+        (LOCAL_AUTH, 'Локально'),
+        (LDAP_AUTH, 'LDAP'),
+    )
     sex = models.CharField(
         max_length=1,
         default=SEX_FEMALE,
@@ -866,6 +886,11 @@ class User(DjangoAbstractUser, AbstractModel):
     lang = models.CharField(max_length=2, default='ru')
     network = models.ForeignKey(Network, on_delete=models.PROTECT, null=True)
     black_list_symbol = models.CharField(max_length=128, null=True, blank=True)
+    auth_type = models.CharField(
+        max_length=10,
+        default=LOCAL_AUTH,
+        choices=AUTH_TYPES,
+    )
 
     def get_fio(self):
         """
@@ -1284,6 +1309,8 @@ class FunctionGroup(AbstractModel):
         'WorkerDay_exchange',
         'WorkerDay_exchange_approved',
         'WorkerDay_confirm_vacancy',
+        'WorkerDay_confirm_vacancy_to_worker',
+        'WorkerDay_reconfirm_vacancy_to_worker',
         'WorkerDay_upload',
         'WorkerDay_upload_fact',
         'WorkerDay_download_timetable',
@@ -1294,6 +1321,7 @@ class FunctionGroup(AbstractModel):
         'WorkerDay_request_approve',
         'WorkerDay_block',
         'WorkerDay_unblock',
+        'WorkerDay_generate_upload_example',
         'WorkerPosition',
         'WorkTypeName',
         'WorkType',
@@ -1303,6 +1331,7 @@ class FunctionGroup(AbstractModel):
         'ShopSettings',
         'ShopSchedule',
         'VacancyBlackList',
+        'Task',
 
         'signout',
         'password_edit',

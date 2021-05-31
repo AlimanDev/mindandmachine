@@ -2,6 +2,7 @@ import datetime
 import json
 from math import ceil
 
+from django.utils.translation import gettext as _
 from src.base.models import ProductionDay
 from src.timetable.models import (
     WorkerDay,
@@ -36,27 +37,6 @@ class Tabel_xlsx(Xlsx_base):
 
         'night_work': (COLOR_BLACK, COLOR_PINK2),
 
-    }
-
-    WORKERDAY_TYPE_VALUE = {
-        WorkerDay.TYPE_BUSINESS_TRIP: 'К',
-        WorkerDay.TYPE_HOLIDAY: 'В',
-        WorkerDay.TYPE_ABSENSE: 'Н',
-        WorkerDay.TYPE_REAL_ABSENCE: 'ПР',
-        WorkerDay.TYPE_QUALIFICATION: 'КВ',
-        WorkerDay.TYPE_SICK: 'Б',
-        WorkerDay.TYPE_VACATION: 'ОТ',
-        WorkerDay.TYPE_EXTRA_VACATION: 'ОД',
-        WorkerDay.TYPE_STUDY_VACATION: 'У',
-        WorkerDay.TYPE_SELF_VACATION: 'ДО',
-        WorkerDay.TYPE_SELF_VACATION_TRUE: 'ОЗ',
-        WorkerDay.TYPE_GOVERNMENT: 'Г',
-        # WorkerDay.TYPE_MATERNITY: 'Р',
-        WorkerDay.TYPE_MATERNITY: 'ОЖ',
-        WorkerDay.TYPE_MATERNITY_CARE: 'Р',
-        WorkerDay.TYPE_DONOR_OR_CARE_FOR_DISABLED_PEOPLE: 'ОВ',
-        WorkerDay.TYPE_ETC: '',
-        WorkerDay.TYPE_EMPTY: '',
     }
 
     WORKERDAY_TYPE_CHANGE2HOLIDAY = [
@@ -340,10 +320,10 @@ class Tabel_xlsx(Xlsx_base):
                     elif (wd.type in self.WORKERDAY_TYPE_CHANGE2HOLIDAY) \
                             and (self.prod_days[day].type == ProductionDay.TYPE_HOLIDAY):
                         wd.type = WorkerDay.TYPE_HOLIDAY
-                        text = self.WORKERDAY_TYPE_VALUE[wd.type]
+                        text = WorkerDay.WD_TYPE_MAPPING[wd.type]
 
                     else:
-                        text = self.WORKERDAY_TYPE_VALUE[wd.type]
+                        text = WorkerDay.WD_TYPE_MAPPING[wd.type]
                     cell_format.update({
                         'font_color': self.WORKERDAY_TYPE_COLORS[wd.type][0],
                         'bg_color': self.WORKERDAY_TYPE_COLORS[wd.type][1],

@@ -36,14 +36,9 @@ from src.util.dg.helpers import MONTH_NAMES
 from src.util.download import xlsx_method
 from src.util.models_converter import Converter
 
-WORK_TYPES = {
-    'в': WorkerDay.TYPE_HOLIDAY,
-    'от': WorkerDay.TYPE_VACATION,
-    # 'nan': WorkerDay.TYPE_HOLIDAY,
-    'b': WorkerDay.TYPE_HOLIDAY,
-}
 
-SKIP_SYMBOLS = ['nan', '']
+SKIP_SYMBOLS = ['NAN', '']
+
 
 def upload_timetable_util(form, timetable_file, is_fact=False):
     """
@@ -84,13 +79,14 @@ def upload_timetable_util(form, timetable_file, is_fact=False):
         name_cond = data[name_column] != 'nan'
         position_cond = data[position_column] != 'nan'
         if number_cond and (not position_cond or not name_cond):
-            result = f"У сотрудника на строке {index} не распознаны или не указаны "
+            fields = ""
             if not number_cond:
-                result += "номер "
+                fields += _("tabel code ")
             if not name_cond:
-                result += "ФИО "
+                fields += _("full name ")
             if not position_cond:
-                result += "должность "
+                fields += _("position ")
+            result = _("The employee's {} are not recognized or specified on the line {}.").format(fields, index)
             error_users.append(result)
             continue
         elif not position_cond:
@@ -114,9 +110,14 @@ def upload_timetable_util(form, timetable_file, is_fact=False):
         if UPLOAD_TT_MATCH_EMPLOYMENT:
             employment = Employment.objects.filter(employee__tabel_code=tabel_code, shop=shop)
             if number_cond and employment.exists():
-                user = employment.first().employee.user
+                employee = employment.first().employee  # TODO: покрыть тестами
+                user = employee.user
                 if user.last_name != names[0]:
-                    error_users.append(f"У сотрудника на строке {index} с табельным номером {tabel_code} в системе фамилия {user.last_name}, а в файле {names[0]}.") #Change error
+                    error_users.append(
+                        _("The employee on the line {} with the table number {} has the last name {} in the system, but in the file {}.").format(
+                            index, tabel_code, user.last_name, names[0]
+                        )
+                    )
                     continue
                 user.first_name = names[1] if len(names) > 1 else ''
                 user.last_name = names[0]
@@ -130,9 +131,10 @@ def upload_timetable_util(form, timetable_file, is_fact=False):
                     employee__user__middle_name=names[2] if len(names) > 2 else None
                 )
                 if employment.exists():
-                    if number_cond:
-                        employment.update(tabel_code=tabel_code,)
                     employee = employment.first().employee
+                    if number_cond:
+                        employee.tabel_code = tabel_code
+                        employee.save(update_fields=('tabel_code',))
                 else:
                     user_data['username'] = str(time.time() * 1000000)[:-2],
                     user = User.objects.create(**user_data)
@@ -169,8 +171,8 @@ def upload_timetable_util(form, timetable_file, is_fact=False):
                 position=position,
             )
             if UPLOAD_TT_MATCH_EMPLOYMENT and number_cond:
-                employment.tabel_code = tabel_code
-                employment.save()
+                employee.tabel_code = tabel_code
+                employee.save(update_fields=('tabel_code',))
         else:
             employment = Employment.objects.get_active(
                 network_id=user.network_id,
@@ -231,12 +233,12 @@ def upload_timetable_util(form, timetable_file, is_fact=False):
             dttm_work_start = None
             dttm_work_end = None
             try:
-                cell_data = str(data[i + 3]).lower().strip()
+                cell_data = str(data[i + 3]).upper().strip()
                 if cell_data.replace(' ', '').replace('\n', '') in SKIP_SYMBOLS:
                     continue
-                if not (cell_data in WORK_TYPES):
+                if not (cell_data in WorkerDay.WD_TYPE_MAPPING_REVERSED):
                     splited_cell = data[i + 3].replace('\n', '').strip().split()
-                    work_type = work_types.get(data[position_column].lower(), first_type) if len(splited_cell) == 1 else work_types.get(splited_cell[1].lower(), first_type)
+                    work_type = work_types.get(data[position_column].upper(), first_type) if len(splited_cell) == 1 else work_types.get(splited_cell[1].upper(), first_type)
                     times = splited_cell[0].split('-')
                     type_of_work = WorkerDay.TYPE_WORKDAY
                     dttm_work_start = datetime.datetime.combine(
@@ -248,10 +250,10 @@ def upload_timetable_util(form, timetable_file, is_fact=False):
                     if dttm_work_end < dttm_work_start:
                         dttm_work_end += datetime.timedelta(days=1)
                 elif not is_fact:
-                    type_of_work = WORK_TYPES[cell_data]
+                    type_of_work = WorkerDay.WD_TYPE_MAPPING_REVERSED[cell_data]
                 else:
                     continue
-            except:
+            except Exception as e:
                 raise ValidationError(_('The employee {user.first_name} {user.last_name} in the cell for {dt} has the wrong value: {value}.').format(user=employee.user, dt=dt, value=str(data[i + 3])))
 
             WorkerDay.objects.filter(dt=dt, employee=employee, is_fact=is_fact, is_approved=False).delete()
@@ -277,7 +279,7 @@ def upload_timetable_util(form, timetable_file, is_fact=False):
 
 @xlsx_method
 def download_timetable_util(request, workbook, form):
-    ws = workbook.add_worksheet('Расписание на подпись')
+    ws = workbook.add_worksheet(_('Timetable for signature.'))
 
     shop = Shop.objects.get(pk=form['shop_id'])
     timetable = Timetable_xlsx(
@@ -562,8 +564,9 @@ def exchange(data, error_messages):
                 append_mis_data(mis_data, day_pair[1], day_pair[0])
 
             if mis_data:
-                json_data = json.dumps(mis_data, indent=4, ensure_ascii=False, cls=DjangoJSONEncoder)
-                send_doctors_schedule_to_mis.delay(json_data=json_data)
+                json_data = json.dumps(mis_data, cls=DjangoJSONEncoder)
+                transaction.on_commit(
+                    lambda f_json_data=json_data: send_doctors_schedule_to_mis.delay(json_data=f_json_data))
 
         WorkerDay.objects_with_excluded.filter(
             employee_id__in=(data['employee1_id'], data['employee2_id']),
@@ -616,8 +619,8 @@ def copy_as_excel_cells(main_worker_days, to_employee_id, to_dates, created_by=N
         # не создавать день, если нету активного трудоустройства на эту дату
         if not worker_active_empl:
             raise ValidationError(
-                'Невозможно создать дни в выбранные даты. '
-                'Пожалуйста, проверьте наличие активного трудоустройства у сотрудника.'
+                _('It is not possible to create days on the selected dates. '
+                'Please check whether the employee has active employment.')
             )
         dt_to = dt
         if blank_day.dttm_work_end and blank_day.dttm_work_start and blank_day.dttm_work_end.date() > blank_day.dttm_work_start.date():

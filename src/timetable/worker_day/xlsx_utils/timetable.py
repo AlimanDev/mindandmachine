@@ -2,6 +2,7 @@ from datetime import datetime, timedelta
 from math import ceil
 
 from dateutil.relativedelta import relativedelta
+from django.utils.translation import gettext as _
 
 from src.base.models import (
     Employment,
@@ -95,19 +96,19 @@ class Timetable_xlsx(Tabel_xlsx):
             fmt(font_size=9, bold=True, align='right', text_wrap=False))
 
         # top left info
-        self.worksheet.write_string(2, 1, 'Магазин: {}'.format(self.shop.name), format_meta_bold)
-        self.worksheet.write_rich_string(3, 1, 'График работы сотрудников', format_meta_bold_bottom_2)
+        self.worksheet.write_string(2, 1, _('Shop: {}').format(self.shop.name), format_meta_bold)
+        self.worksheet.write_rich_string(3, 1, _('Employee work timetable'), format_meta_bold_bottom_2)
         self.worksheet.write_rich_string(3, 2, format_meta_bold,
-                                         '{}  {}г.'.format(MONTH_NAMES[self.month.month].upper(), self.month.year))
+                                         _('{}  {}y.').format(MONTH_NAMES[self.month.month].upper(), self.month.year))
         self.worksheet.write_string(6, 2, '', format_meta_bold_bottom)
-        self.worksheet.write_string(6, 1, 'Составил: ', format_meta_bold_bottom)
-        self.worksheet.write_string(7, 1, 'подпись', format_meta_bold_right_small)
-        self.worksheet.write_string(7, 2, 'расшифровка', format_meta_bold_left_small)
+        self.worksheet.write_string(6, 1, _('Created by: '), format_meta_bold_bottom)
+        self.worksheet.write_string(7, 1, _('signature'), format_meta_bold_right_small)
+        self.worksheet.write_string(7, 2, _('transcript'), format_meta_bold_left_small)
 
         # user title
         self.worksheet.write_string(9, 0, '№', format_header_text)
-        self.worksheet.write_string(9, 1, 'ФИО', format_header_text)
-        self.worksheet.write_string(9, 2, 'ДОЛЖНОСТЬ', format_header_text)
+        self.worksheet.write_string(9, 1, _('full name'), format_header_text)
+        self.worksheet.write_string(9, 2, _('POSITION'), format_header_text)
         self.worksheet.write_string(9, 3, '', format_header_text)
         count_of_days = len(self.prod_days) + 4
         # right info
@@ -117,15 +118,15 @@ class Timetable_xlsx(Tabel_xlsx):
         self.worksheet.set_column(count_of_days + 3, count_of_days + 3, 75 / 6.23820623)
         self.worksheet.set_column(count_of_days + 4, count_of_days + 4, 75 / 6.23820623)
         self.worksheet.set_column(count_of_days + 5, count_of_days + 5, 150 / 6.23820623)
-        self.worksheet.write_string(9, count_of_days, 'плановые дни', format_header_text)
-        self.worksheet.write_string(9, count_of_days + 1, 'плановые часы', format_header_text)
-        self.worksheet.write_string(9, count_of_days + 2, 'норма часов на месяц', format_header_text)
-        self.worksheet.write_string(9, count_of_days + 3, 'переработка', format_header_text)
-        self.worksheet.write_string(9, count_of_days + 4, 'дата', format_header_text)
-        self.worksheet.write_string(9, count_of_days + 5, 'С графиком работы ознакомлен**. На работу в праздничные дни согласен',
+        self.worksheet.write_string(9, count_of_days, _('plan days'), format_header_text)
+        self.worksheet.write_string(9, count_of_days + 1, _('plan hours'), format_header_text)
+        self.worksheet.write_string(9, count_of_days + 2, _('the rate of hours per month'), format_header_text)
+        self.worksheet.write_string(9, count_of_days + 3, _('overtime'), format_header_text)
+        self.worksheet.write_string(9, count_of_days + 4, _('date'), format_header_text)
+        self.worksheet.write_string(9, count_of_days + 5, _('I have read the work schedule**. I agree to work on public holidays'),
                                     format_header_text)
-        self.worksheet.write_string(9, count_of_days + 6, 'В', format_header_text)
-        self.worksheet.write_string(9, count_of_days + 7, 'ОТ', format_header_text)
+        self.worksheet.write_string(9, count_of_days + 6, _('H'), format_header_text)
+        self.worksheet.write_string(9, count_of_days + 7, _('V'), format_header_text)
 
     def fill_table(self, workdays, employments, stat, row_s, col_s, stat_type='approved'):
         """
@@ -154,10 +155,10 @@ class Timetable_xlsx(Tabel_xlsx):
                     elif (wd.type in self.WORKERDAY_TYPE_CHANGE2HOLIDAY) \
                             and (self.prod_days[day].type == ProductionDay.TYPE_HOLIDAY):
                         wd.type = WorkerDay.TYPE_HOLIDAY
-                        text = self.WORKERDAY_TYPE_VALUE[wd.type]
+                        text = WorkerDay.WD_TYPE_MAPPING[wd.type]
 
                     else:
-                        text = self.WORKERDAY_TYPE_VALUE[wd.type]
+                        text = WorkerDay.WD_TYPE_MAPPING[wd.type]
                     cell_format.update({
                         'font_color': self.WORKERDAY_TYPE_COLORS[wd.type][0],
                         'bg_color': self.WORKERDAY_TYPE_COLORS[wd.type][1],
@@ -245,7 +246,7 @@ class Timetable_xlsx(Tabel_xlsx):
         dt_from = datetime(year=dt_from.year, month=dt_from.month, day=1)
         dt_to = dt_from + relativedelta(months=1) - timedelta(days=1)
 
-        self.worksheet = self.workbook.add_worksheet('На печать')
+        self.worksheet = self.workbook.add_worksheet(_('On print'))
         format_fio = self.workbook.add_format(fmt2(font_size=10, bold=True, text_wrap=False, align='left', top=2))
 
         format_common = self.workbook.add_format(fmt2(font_size=7, bold=True))
@@ -263,8 +264,8 @@ class Timetable_xlsx(Tabel_xlsx):
         format_time = self.workbook.add_format(fmt2(font_size=7, bold=True, num_format='hh:mm'))
         format_time_bottom = self.workbook.add_format(fmt2(font_size=7, bold=True, num_format='hh:mm', bottom=2))
 
-        weekdays = [Cell(x, format_common_left if x != 'Вс' else format_common_bottom_left) for x in
-                    ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс']]
+        weekdays = [Cell(x, format_common_left if x != _('Sun') else format_common_bottom_left) for x in
+                    [_('Mon'), _('Tue'), _('Wed'), _('Thu'), _('Fri'), _('Sat'), _('Sun')]]
 
         data = []
         data_size = {
@@ -305,9 +306,9 @@ class Timetable_xlsx(Tabel_xlsx):
                         continue
 
                     mapping = {
-                        WorkerDay.TYPE_HOLIDAY: 'В',
-                        WorkerDay.TYPE_VACATION: 'ОТ',
-                        WorkerDay.TYPE_MATERNITY: 'ОЖ'
+                        WorkerDay.TYPE_HOLIDAY: _('H'),
+                        WorkerDay.TYPE_VACATION: _('V'),
+                        WorkerDay.TYPE_MATERNITY: _('MAT'),
                     }
 
                     text = mapping.get(wd.type)

@@ -97,7 +97,8 @@ class WorkerDaySerializer(serializers.ModelSerializer):
         "no_active_employments": _(
             "Can't create a working day in the schedule, since the user is not employed during this period"),
         "outsource_only_vacancy": _("Only vacancy can be outsource."),
-        "outsources_not_specified": _("Outsources does not specified for outsource vacancy.")
+        "outsources_not_specified": _("Outsources does not specified for outsource vacancy."),
+        "no_such_shop_in_network": _("There is no such shop in your network."),
     }
 
     worker_day_details = WorkerDayCashboxDetailsSerializer(many=True, required=False)
@@ -171,6 +172,8 @@ class WorkerDaySerializer(serializers.ModelSerializer):
                 attrs['shop_id'] = shops[0].id
             else:
                 self.fail('no_shop', amount=len(shops), code=shop_code)
+        elif attrs.get('shop_id') and not Shop.objects.filter(id=attrs.get('shop_id'), network_id=self.context['request'].user.network_id).exists():
+            self.fail('no_such_shop_in_network')
 
         if (attrs.get('employee_id') is None) and ('username' in attrs):
             username = attrs.pop('username')
@@ -486,6 +489,15 @@ class CopyRangeSerializer(serializers.Serializer):
 class UploadTimetableSerializer(serializers.Serializer):
     shop_id = serializers.IntegerField()
     file = serializers.FileField()
+
+
+class GenerateUploadTimetableExampleSerializer(serializers.Serializer):
+    shop_id = serializers.IntegerField()
+    dt_from = serializers.DateField(format=QOS_DATE_FORMAT)
+    dt_to = serializers.DateField(format=QOS_DATE_FORMAT)
+    employee_id__in = serializers.ListField(child=serializers.IntegerField(), required=False)
+    is_fact = serializers.BooleanField(default=False)
+    is_approved = serializers.BooleanField(default=False)
 
 
 class DownloadSerializer(serializers.Serializer):

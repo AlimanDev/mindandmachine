@@ -384,7 +384,7 @@ class LocalTestCase(LocalTestCaseAsserts, TestCase):
 
 def create_departments_and_users(self, dt=None):
     dt = dt or now().date() - relativedelta(months=1)
-    self.network, _n_created = Network.objects.get_or_create(code='default', name='По умолчанию')
+    self.network, _n_created = Network.objects.get_or_create(code='default', defaults=dict(name='По умолчанию'))
     self.region, _r_created = Region.objects.update_or_create(
         id=1,
         defaults=dict(
@@ -554,7 +554,7 @@ def create_departments_and_users(self, dt=None):
         last_name='Иванов',
         network=self.network,
     )
-    self.employee2 = Employee.objects.create(user=self.user2)
+    self.employee2 = Employee.objects.create(user=self.user2, tabel_code='employee2_tabel_code')
     self.employment2 = Employment.objects.create(
         code=f'{self.user2.username}:{uuid.uuid4()}:{uuid.uuid4()}',
         employee=self.employee2,

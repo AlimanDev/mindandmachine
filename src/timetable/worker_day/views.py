@@ -1,6 +1,7 @@
 import datetime
+import io
 import json
-from itertools import groupby, chain
+from itertools import groupby
 
 import pandas as pd
 from django.conf import settings
@@ -12,7 +13,7 @@ from django.db.models.functions import Concat, Cast
 from django.http import HttpResponse
 from django.utils import timezone
 from django.utils.encoding import escape_uri_path
-from django.utils.translation import gettext_lazy as _
+from django.utils.translation import gettext as _
 from django_filters import utils
 from drf_yasg.utils import swagger_auto_schema
 from rest_framework.decorators import action
@@ -22,13 +23,12 @@ from rest_framework.response import Response
 from rest_framework.serializers import ValidationError
 
 from src.base.exceptions import FieldError
-from src.base.models import Employment, Shop, ProductionDay, Group
+from src.base.models import Employment, Shop, ProductionDay, Group, User, Employee
 from src.base.permissions import WdPermission
 from src.base.views_abstract import BaseModelViewSet
 from src.events.signals import event_signal
 from src.timetable.backends import MultiShopsFilterBackend
-from src.timetable.events import REQUEST_APPROVE_EVENT_TYPE, APPROVE_EVENT_TYPE
-from src.timetable.exceptions import WorkTimeOverlap
+from src.timetable.events import REQUEST_APPROVE_EVENT_TYPE, APPROVE_EVENT_TYPE, VACANCY_CONFIRMED_TYPE
 from src.timetable.filters import WorkerDayFilter, WorkerDayStatFilter, VacancyFilter
 from src.timetable.models import (
     WorkerDay,
@@ -47,6 +47,7 @@ from src.timetable.worker_day.serializers import (
     DeleteWorkerDaysSerializer,
     ExchangeSerializer,
     UploadTimetableSerializer,
+    GenerateUploadTimetableExampleSerializer,
     DownloadSerializer,
     WorkerDayListSerializer,
     DownloadTabelSerializer,
@@ -84,6 +85,7 @@ class WorkerDayViewSet(BaseModelViewSet):
                                                'Allowed inteval for approve: {dt_interval}'),
         'has_no_perm_to_approve_protected_wdays': _('You do not have rights to approve protected worker days ({protected_wdays}). '
                                                    'Please contact your system administrator.'),
+        "no_such_user_in_network": _("There is no such user in your network."),
     }
 
     permission_classes = [WdPermission]  # временно из-за биржи смен vacancy  [FilteredListPermission]
@@ -210,6 +212,113 @@ class WorkerDayViewSet(BaseModelViewSet):
                 self.filter_queryset(self.get_queryset().prefetch_related('worker_day_details').select_related('last_edited_by')),
                 many=True, context=self.get_serializer_context()
             ).data
+
+        if request.query_params.get('fill_empty_days', False):
+            employment__tabel_code__in = [
+                i for i in request.query_params.get('employment__tabel_code__in', '').split(',') if i]
+            employee_id__in = [i for i in request.query_params.get('employee_id__in', '').split(',') if i]
+            dt__gte = request.query_params.get('dt__gte')
+            dt__lte = request.query_params.get('dt__lte')
+            if (employment__tabel_code__in or employee_id__in) and dt__gte and dt__lte:
+                response_wdays_dict = {f"{d['employee_id']}_{d['dt']}": d for d in data}
+
+                employees = Employee.objects
+                if employee_id__in:
+                    employees = employees.filter(id__in=employee_id__in)
+                elif employment__tabel_code__in:
+                    employees = employees.filter(tabel_code__in=employment__tabel_code__in)
+
+                plan_wdays_dict = {f'{wd.employee_id}_{wd.dt}': wd for wd in WorkerDay.objects.filter(
+                    employee__in=employees,
+                    dt__gte=dt__gte,
+                    dt__lte=dt__lte,
+                    is_approved=True,
+                    is_fact=False,
+                ).exclude(
+                    type=WorkerDay.TYPE_EMPTY,
+                ).select_related(
+                    'employee__user',
+                    'shop',
+                )}
+                for employee in employees:
+                    for dt in pd.date_range(dt__gte, dt__lte).date:
+                        empl_dt_key = f"{employee.id}_{dt}"
+                        resp_wd = response_wdays_dict.get(empl_dt_key)
+                        if resp_wd:  # если есть ответ для сотрудника на конкретный день, то пропускаем
+                            continue
+
+                        plan_wd = plan_wdays_dict.get(empl_dt_key)
+
+                        # Если нет ни плана ни факта, то добавляем выходной
+                        if not plan_wd:
+                            d = {
+                                "id": None,
+                                "worker_id": employee.user_id,
+                                "employee_id": employee.id,
+                                "shop_id": None,
+                                "employment_id": None,  # нужен?
+                                "type": "H",
+                                "dt": Converter.convert_date(dt),
+                                "dttm_work_start": None,
+                                "dttm_work_end": None,
+                                "dttm_work_start_tabel": None,
+                                "dttm_work_end_tabel": None,
+                                "comment": None,
+                                "is_approved": None,
+                                "worker_day_details": [],
+                                "outsources": [],
+                                "is_fact": None,
+                                "work_hours": 0,
+                                "parent_worker_day_id": None,
+                                "created_by_id": None,
+                                "last_edited_by": None,
+                                "dttm_modified": None,
+                                "is_blocked": None
+                            }
+                            if self.request.query_params.get('by_code', False):
+                                d['shop_code'] = None
+                                d['user_login'] = employee.user.username
+                                d['employment_tabel_code'] = employee.tabel_code
+                            data.append(d)
+                            continue
+
+                        dt_now = timezone.now().date()
+                        if plan_wd and plan_wd.type in WorkerDay.TYPES_WITH_TM_RANGE:
+                            day_in_past = dt < dt_now
+                            d = {
+                                "id": None,
+                                "worker_id": employee.user_id,
+                                "employee_id": employee.id,
+                                "shop_id": plan_wd.shop_id,
+                                "employment_id": plan_wd.employment_id,
+                                "type": WorkerDay.TYPE_ABSENSE if day_in_past else WorkerDay.TYPE_WORKDAY,
+                                "dt": Converter.convert_date(dt),
+                                "dttm_work_start": None,
+                                "dttm_work_end": None,
+                                "dttm_work_start_tabel": None,
+                                "dttm_work_end_tabel": None,
+                                "comment": None,
+                                "is_approved": None,
+                                "worker_day_details": None,
+                                "outsources": None,
+                                "is_fact": None,
+                                "work_hours": 0,
+                                "parent_worker_day_id": None,
+                                "created_by_id": None,
+                                "last_edited_by": None,
+                                "dttm_modified": None,
+                                "is_blocked": None,
+                            }
+                            if not day_in_past:
+                                d["work_hours_details"] = {
+                                  "D": 0
+                                }
+                            if self.request.query_params.get('by_code', False):
+                                d['shop_code'] = plan_wd.shop.code
+                                d['user_login'] = employee.user.username
+                                d['employment_tabel_code'] = employee.tabel_code
+                            data.append(d)
+
         return Response(data)
 
     @action(detail=False, methods=['post'])
@@ -469,7 +578,7 @@ class WorkerDayViewSet(BaseModelViewSet):
                         mis_data.append(d)
 
                     if mis_data:
-                        json_data = json.dumps(mis_data, indent=4, ensure_ascii=False, cls=DjangoJSONEncoder)
+                        json_data = json.dumps(mis_data, cls=DjangoJSONEncoder)
                         transaction.on_commit(
                             lambda f_json_data=json_data: send_doctors_schedule_to_mis.delay(json_data=f_json_data))
 
@@ -576,11 +685,16 @@ class WorkerDayViewSet(BaseModelViewSet):
                     context=event_context,
                 ))
 
-            WorkerDay.check_work_time_overlap(
-                employee_id__in=worker_dates_dict.keys(),
-                dt__in=list(set(chain.from_iterable(worker_dates_dict.values()))),
-                exc_cls=ValidationError,
-            )
+                WorkerDay.check_work_time_overlap(
+                    employee_days_q=employee_days_q,
+                    exc_cls=ValidationError,
+                )
+                WorkerDay.check_tasks_violations(
+                    employee_days_q=employee_days_q,
+                    is_approved=True,
+                    is_fact=serializer.data['is_fact'],
+                    exc_cls=ValidationError,
+                )
 
         return Response()
 
@@ -630,9 +744,18 @@ class WorkerDayViewSet(BaseModelViewSet):
             raise utils.translate_validation(filterset_class.errors)
         
         paginator = LimitOffsetPagination()
+        worker_day_outsource_network_subq = WorkerDay.objects.filter(
+            pk=OuterRef('pk'),
+            outsources__id=self.request.user.network_id,
+        )
         queryset = filterset_class.filter_queryset(
             self.get_queryset().filter(
                 is_vacancy=True,
+            ).annotate(
+                worker_day_outsource_network_exitst=Exists(worker_day_outsource_network_subq),
+            ).filter(
+                Q(shop__network_id=request.user.network_id) | 
+                Q(is_outsource=True, worker_day_outsource_network_exitst=True, is_approved=True), # аутсорс фильтр
             ).select_related(
                 'shop',
                 'employee__user',
@@ -667,6 +790,59 @@ class WorkerDayViewSet(BaseModelViewSet):
         result = confirm_vacancy(pk, request.user, employee_id=self.request.data.get('employee_id', None))
         status_code = result['status_code']
         result = result['text']
+        if status_code == 200:
+            vacancy = WorkerDay.objects.get(pk=pk)
+            work_type = vacancy.work_types.first()
+            event_signal.send(
+                sender=None,
+                network_id=vacancy.shop.network_id,
+                event_code=VACANCY_CONFIRMED_TYPE,
+                user_author_id=None,
+                shop_id=vacancy.shop_id,
+                context={
+                    'user': {
+                        'last_name': request.user.last_name,
+                        'first_name': request.user.first_name,
+                    },
+                    'dt': str(vacancy.dt),
+                    'work_type': work_type.work_type_name.name if work_type else 'Без типа работ',
+                    'shop_id': vacancy.shop_id,
+                },
+            )
+
+        return Response({'result': result}, status=status_code)
+
+    @swagger_auto_schema(
+        operation_description='''
+        Метод для вывывода на вакансию сотрудника
+        ''',
+        responses=confirm_vacancy_response_schema_dictionary,
+    )
+    @action(detail=True, methods=['post'], serializer_class=None)
+    def confirm_vacancy_to_worker(self, request, pk=None):
+        user = User.objects.filter(id=request.data.get('user_id'), network_id=request.user.network_id).first()
+        if not user:
+            raise ValidationError(self.error_messages["no_such_user_in_network"])
+        result = confirm_vacancy(pk, user, employee_id=request.data.get('employee_id', None))
+        status_code = result['status_code']
+        result = result['text']
+
+        return Response({'result': result}, status=status_code)
+
+    @swagger_auto_schema(
+        operation_description='''
+        Метод для переназначения сотрудника на вакансию
+        ''',
+        responses=confirm_vacancy_response_schema_dictionary,
+    )
+    @action(detail=True, methods=['post'], serializer_class=None)
+    def reconfirm_vacancy_to_worker(self, request, pk=None):
+        user = User.objects.filter(id=request.data.get('user_id'), network_id=request.user.network_id).first()
+        if not user:
+            raise ValidationError(self.error_messages["no_such_user_in_network"])
+        result = confirm_vacancy(pk, user, employee_id=request.data.get('employee_id', None), reconfirm=True)
+        status_code = result['status_code']
+        result = result['text']
 
         return Response({'result': result}, status=status_code)
 
@@ -681,6 +857,9 @@ class WorkerDayViewSet(BaseModelViewSet):
             vacancy = WorkerDay.objects.filter(pk=pk, is_vacancy=True, is_approved=False).select_for_update().first()
             if vacancy is None:
                 raise ValidationError(_('This vacancy does not exist or has already been approved.'))
+
+            if vacancy.shop.network_id != request.user.network_id:
+                raise ValidationError(_('You can not approve vacancy from other network.'))
 
             if vacancy.employee_id:
                 WorkerDay.objects_with_excluded.filter(
@@ -1216,6 +1395,115 @@ class WorkerDayViewSet(BaseModelViewSet):
         data.validated_data['lang'] = request.user.lang
         data.validated_data['network_id'] = request.user.network_id
         return upload_timetable_util(data.validated_data, file)
+
+    @swagger_auto_schema(
+        request_body=GenerateUploadTimetableExampleSerializer,
+        responses={200: 'Шаблон расписания в формате excel.'},
+        operation_description='''
+            Возвращает шаблон для загрузки графика.\n
+            ''',
+    )
+    @action(detail=False, methods=['get'])
+    def generate_upload_example(self, request):
+        # TODO: рефакторинг + тест
+        serializer = GenerateUploadTimetableExampleSerializer(
+            data=request.query_params if request.method == 'GET' else request.data,
+            context=self.get_serializer_context(),
+        )
+        serializer.is_valid(raise_exception=True)
+
+        shop_id = serializer.validated_data.get('shop_id')
+        dt_from = serializer.validated_data.get('dt_from')
+        dt_to = serializer.validated_data.get('dt_to')
+        is_fact = serializer.validated_data.get('is_fact')
+        is_approved = serializer.validated_data.get('is_approved')
+        employee_id__in = serializer.validated_data.get('employee_id__in')
+
+        employee_qs = Employee.objects.filter(
+            employments__id__in=Employment.objects.get_active(
+                network_id=self.request.user.network_id,
+                shop_id=shop_id,
+                dt_from=dt_from,
+                dt_to=dt_to,
+                is_visible=True,
+            )
+        ).annotate(
+            position=Subquery(Employment.objects.get_active(
+                network_id=self.request.user.network_id,
+                shop_id=shop_id,
+                dt_from=dt_from,
+                dt_to=dt_to,
+                is_visible=True,
+                employee_id=OuterRef('id'),
+            ).order_by('-norm_work_hours').values('position__name')[:1])
+        ).select_related(
+            'user',
+        ).order_by('user__last_name', 'user__first_name')
+
+        if employee_id__in:
+            employee_qs = employee_qs.filter(id__in=employee_id__in)
+
+        wdays_dict = {f'{wd.employee_id}_{wd.dt}': wd for wd in WorkerDay.objects.filter(
+            Q(Q(type__in=WorkerDay.TYPES_WITH_TM_RANGE) & Q(shop_id=shop_id)) |
+            ~Q(type__in=WorkerDay.TYPES_WITH_TM_RANGE),
+            employee__in=employee_qs,
+            dt__gte=dt_from,
+            dt__lte=dt_to,
+            is_fact=is_fact,
+            is_approved=is_approved,
+        )}
+
+        rows = []
+        dates = list(
+            pd.date_range(dt_from, dt_to).date)
+        for employee in employee_qs:
+            row_data = {}
+            row_data[_('Employee id')] = employee.tabel_code
+            row_data[_('Full name')] = employee.user.fio  # TODO: разделить на 3 поля
+            row_data[_('Position')] = employee.position
+            for dt in dates:
+                _cell_value = ''
+
+                wd = wdays_dict.get(f'{employee.id}_{dt}')
+                if wd:
+                    if wd.type in WorkerDay.TYPES_WITH_TM_RANGE:
+                        tm_start = wd.dttm_work_start.strftime('%H:%M')
+                        tm_end = wd.dttm_work_end.strftime('%H:%M')
+                        _cell_value = f'{tm_start}-{tm_end}'
+                    else:
+                        _cell_value = WorkerDay.WD_TYPE_MAPPING.get(wd.type, '')
+
+                row_data[dt] = _cell_value
+
+            rows.append(row_data)
+
+        df = pd.DataFrame(rows)
+
+        output = io.BytesIO()
+        writer = pd.ExcelWriter(output, engine='xlsxwriter')
+        sheet_name = _('Timetable')
+        df.to_excel(
+            excel_writer=writer, sheet_name=sheet_name, index=False,
+            columns=[_('Employee id'), _('Full name'), _('Position')] + dates,
+        )
+        worksheet = writer.sheets[sheet_name]
+        # set the column width as per your requirement
+        for idx, col in enumerate(df):  # loop through all columns
+            series = df[col]
+            max_len = max((
+                series.astype(str).map(len).max(),  # len of largest item
+                len(str(series.name))  # len of column name/header
+            )) + 2  # adding a little extra space
+            worksheet.set_column(idx, idx, max_len)
+        writer.save()
+        output.seek(0)
+        response = HttpResponse(
+            output,
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        response['Content-Disposition'] = 'attachment; filename="{}.xlsx"'.format(
+            f'Timetable_{serializer.validated_data.get("shop_id")}_{dt_from}_{dt_to}')
+        return response
 
     @swagger_auto_schema(
         request_body=UploadTimetableSerializer,

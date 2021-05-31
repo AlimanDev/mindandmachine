@@ -339,7 +339,7 @@ class TestOperationTypeRelation(APITestCase):
             'formula': 'a + a * 2'
         }
         response = self.client.post(self.url, data, format='json')
-        self.assertEqual(response.json(), {'base': 'Base model not formula.'})
+        self.assertEqual(response.json(), {'base': 'У базовой модели тип расчета должен быть формула'})
 
     def test_reversed_relation(self):
         load_template = LoadTemplate.objects.create(

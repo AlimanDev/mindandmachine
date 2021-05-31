@@ -46,6 +46,7 @@ class OutsourceClientNetworkSerializer(serializers.Serializer):
 class NetworkSerializer(serializers.ModelSerializer):
     logo = serializers.SerializerMethodField('get_logo_url')
     default_stats = serializers.SerializerMethodField()
+    show_tabel_graph = serializers.SerializerMethodField()
 
     def get_default_stats(self, obj: Network):
         default_stats = json.loads(obj.settings_values).get('default_stats', {})
@@ -55,6 +56,9 @@ class NetworkSerializer(serializers.ModelSerializer):
             'day_top': default_stats.get('day_top', 'covering'),
             'day_bottom': default_stats.get('day_bottom', 'deadtime'),
         }
+
+    def get_show_tabel_graph(self, obj:Network):
+        return obj.settings_values_prop.get('show_tabel_graph', True)
 
     def get_logo_url(self, obj) -> str:
         if obj.logo:
@@ -76,6 +80,8 @@ class NetworkSerializer(serializers.ModelSerializer):
             'allowed_interval_for_late_arrival',
             'allowed_interval_for_early_departure',
             'default_stats',
+            'show_tabel_graph',
+            'show_worker_day_tasks',
         ]
 
 
@@ -135,7 +141,7 @@ class UserSerializer(BaseNetworkSerializer):
     class Meta:
         model = User
         fields = ['id', 'first_name', 'last_name', 'middle_name', 'network_id',
-                  'birthday', 'sex', 'avatar', 'email', 'phone_number', 'username' ]
+                  'birthday', 'sex', 'avatar', 'email', 'phone_number', 'username', 'auth_type']
 
     def validate(self, attrs):
         email = attrs.get('email')
@@ -248,6 +254,7 @@ class EmploymentListSerializer(serializers.Serializer):
         request = self.context.get('request')
         if request and request.query_params.get('include_employee'):
             self.fields['employee'] = EmployeeSerializer(required=False, read_only=True)
+
 
 class EmploymentSerializer(serializers.ModelSerializer):
     default_error_messages = {

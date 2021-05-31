@@ -116,7 +116,7 @@ class Migration(migrations.Migration):
                 ('dead_time_part', models.FloatField(default=0.1)),
                 ('beta', models.FloatField(default=0.9)),
                 ('demand_coef', models.FloatField(default=1)),
-                ('forecast_step_minutes', models.TimeField(default=datetime.time(0, 30))),
+                ('forecast_step_minutes', models.TimeField(default=datetime.time(hour=1))),
                 ('count_lack', models.BooleanField(default=False)),
                 ('method_params', models.CharField(default='[]', max_length=4096)),
                 ('cost_weights', models.CharField(default='{}', max_length=4096)),

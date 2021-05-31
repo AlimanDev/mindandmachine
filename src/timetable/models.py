@@ -13,6 +13,7 @@ from django.db.models import (
 from django.db.models.functions import Abs, Cast, Extract, Least
 from django.db.models.query import QuerySet
 from django.utils import timezone
+from django.utils.translation import gettext as _
 from model_utils import FieldTracker
 
 from src.base.models import Shop, Employment, User, Event, Network, Break, ProductionDay, Employee
@@ -20,7 +21,8 @@ from src.base.models_abstract import AbstractModel, AbstractActiveModel, Abstrac
     AbstractActiveModelManager
 from src.events.signals import event_signal
 from src.recognition.events import EMPLOYEE_WORKING_NOT_ACCORDING_TO_PLAN
-from src.timetable.exceptions import WorkTimeOverlap
+from src.tasks.models import Task
+from src.timetable.exceptions import WorkTimeOverlap, WorkDayTaskViolation
 
 
 class WorkerManager(UserManager):
@@ -212,7 +214,7 @@ class EmploymentWorkType(AbstractModel):
         unique_together = (('employment', 'work_type'),)
 
     def __str__(self):
-        return '{}, {}, {}'.format(self.employment.user.last_name, self.work_type.work_type_name.name, self.id)
+        return '{}, {}, {}'.format(self.employment.employee.user.last_name, self.work_type.work_type_name.name, self.id)
 
     id = models.BigAutoField(primary_key=True)
 
@@ -475,6 +477,30 @@ class WorkerDay(AbstractModel):
         TYPE_MATERNITY_CARE,
     )
 
+    # маппинг внутренних типов в отображаемые пользователям сокращения
+    WD_TYPE_MAPPING = {
+        TYPE_BUSINESS_TRIP: _('BT'),
+        TYPE_HOLIDAY: _('H'),
+        TYPE_ABSENSE: _('ABS'),
+        TYPE_REAL_ABSENCE: 'ПР',  # пока что нет на фронте
+        TYPE_QUALIFICATION: _('ST'),
+        TYPE_SICK: _('S'),
+        TYPE_VACATION: _('V'),
+        TYPE_EXTRA_VACATION: 'ОД',  # пока что нет на фронте
+        TYPE_STUDY_VACATION: 'У',  # пока что нет на фронте
+        TYPE_SELF_VACATION: _('VO'),
+        TYPE_SELF_VACATION_TRUE: 'ОЗ',  # пока что нет на фронте
+        TYPE_GOVERNMENT: 'Г',  # пока что нет на фронте
+        TYPE_MATERNITY: _('MAT'),
+        TYPE_MATERNITY_CARE: 'Р',  # пока что нет на фронте
+        TYPE_DONOR_OR_CARE_FOR_DISABLED_PEOPLE: 'ОВ',  # пока что нет на фронте
+        TYPE_ETC: '',
+        TYPE_EMPTY: '',
+    }
+
+    # обратный маппинг для определения внутреннего типа в загруженных графиках
+    WD_TYPE_MAPPING_REVERSED = dict((v, k) for k, v in WD_TYPE_MAPPING.items())
+
     def __str__(self):
         return '{}, {}, {}, {}, {}, {}, {}, {}'.format(
             self.employee.user.last_name if (self.employee and self.employee.user_id) else 'No worker',
@@ -715,11 +741,12 @@ class WorkerDay(AbstractModel):
             for fact in fact_qs:
                 fact.save()
 
+        # TODO: покрыть тестами
         if settings.MDA_SEND_USER_TO_SHOP_REL_ON_WD_SAVE and \
-                (self.is_vacancy or self.type == WorkerDay.TYPE_QUALIFICATION) and self.worker and self.shop:
+                (self.is_vacancy or self.type == WorkerDay.TYPE_QUALIFICATION) and self.employee and self.shop:
             from src.integration.mda.tasks import create_mda_user_to_shop_relation
             create_mda_user_to_shop_relation.delay(
-                username=self.worker.username,
+                username=self.employee.user.username,
                 shop_code=self.shop.code,
                 debug_info={
                     'wd_id': self.id,
@@ -772,7 +799,7 @@ class WorkerDay(AbstractModel):
         return closest_plan_approved, record_type
 
     @classmethod
-    def check_work_time_overlap(cls, employee_id=None, employee_id__in=None, user_id=None, user_id__in=None, dt=None,
+    def check_work_time_overlap(cls, employee_days_q=None, employee_id=None, employee_id__in=None, user_id=None, user_id__in=None, dt=None,
                               dt__in=None, raise_exc=True, exc_cls=None):
         """
         Проверка наличия пересечения рабочего времени
@@ -798,7 +825,11 @@ class WorkerDay(AbstractModel):
         if dt__in:
             lookup['dt__in'] = dt__in
 
-        overlaps_qs = cls.objects.filter(**lookup).annotate(
+        q = Q(**lookup)
+        if employee_days_q:
+            q &= employee_days_q
+
+        overlaps_qs = cls.objects.filter(q).annotate(
             has_overlap=Exists(
                 WorkerDay.objects.filter(
                     ~Q(id=OuterRef('id')),
@@ -837,6 +868,83 @@ class WorkerDay(AbstractModel):
             raise original_exc
 
         return overlaps
+
+    @classmethod
+    def check_tasks_violations(cls, is_fact, is_approved, employee_days_q=None, employee_id=None, employee_id__in=None, user_id=None, user_id__in=None, dt=None,
+                              dt__in=None, raise_exc=True, exc_cls=None):
+        """
+        Проверка наличия задач
+        """
+        lookup = {
+            'is_fact': is_fact,
+            'is_approved': is_approved,
+        }
+        if employee_id:
+            lookup['employee_id'] = employee_id
+
+        if employee_id__in:
+            lookup['employee__id__in'] = employee_id__in
+
+        if user_id:
+            lookup['employee__user_id'] = user_id
+
+        if user_id__in:
+            lookup['employee__user_id__in'] = user_id__in
+
+        if dt:
+            lookup['dt'] = dt
+
+        if dt__in:
+            lookup['dt__in'] = dt__in
+
+        q = Q(**lookup)
+        if employee_days_q:
+            q &= employee_days_q
+
+        tasks_subq = Task.objects.filter(
+            Q(dt=OuterRef('dt')),
+            Q(employee_id=OuterRef('employee_id')),
+            #Q(operation_type__shop_id=OuterRef('shop_id')),  # у выходных нету привязки к подразделению
+        )
+
+        wds_with_task_violation = WorkerDay.objects.filter(q).annotate(
+            task_least_start_time=Subquery(
+                tasks_subq.order_by('dttm_start_time').values('dttm_start_time')[:1]
+            ),
+            task_greatest_end_time=Subquery(
+                tasks_subq.order_by('-dttm_end_time').values('dttm_end_time')[:1]
+            ),
+        ).filter(
+            Q(
+                Q(type__in=WorkerDay.TYPES_WITH_TM_RANGE) &
+                Q(
+                    Q(dttm_work_start__gt=F('task_least_start_time')) |
+                    Q(dttm_work_end__lt=F('task_greatest_end_time'))
+                )
+            ) |
+            Q(
+                ~Q(type__in=WorkerDay.TYPES_WITH_TM_RANGE) &
+                Q(task_least_start_time__isnull=False)
+            )
+        ).values(
+            'employee__user__last_name',
+            'employee__user__first_name',
+            'dt',
+            'task_least_start_time',
+            'task_greatest_end_time',
+            'dttm_work_start',
+            'dttm_work_end',
+        ).distinct()
+
+        task_violations = list(wds_with_task_violation)
+
+        if task_violations and raise_exc:
+            original_exc = WorkDayTaskViolation(task_violations=task_violations)
+            if exc_cls:
+                raise exc_cls(str(original_exc))
+            raise original_exc
+
+        return task_violations
 
 
 class WorkerDayCashboxDetailsManager(models.Manager):

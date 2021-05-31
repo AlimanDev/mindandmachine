@@ -4,7 +4,7 @@ from copy import deepcopy
 from datetime import timedelta, time, datetime, date
 from src.timetable.worker_day.utils import create_fact_from_attendance_records
 from unittest import skip, mock
-from src.util.models_converter import Converter
+
 import pandas
 from django.db import transaction
 from django.utils.timezone import now
@@ -14,8 +14,10 @@ from etc.scripts.fill_calendar import main as fill_calendar
 from src.base.models import WorkerPosition
 from src.forecast.models import PeriodClients, OperationType, OperationTypeName
 from src.timetable.models import AttendanceRecords, WorkerDay, WorkType, WorkTypeName
+from src.tasks.models import Task
 from src.timetable.tests.factories import WorkerDayFactory
 from src.util.mixins.tests import TestsHelperMixin
+from src.util.models_converter import Converter
 from src.util.test import create_departments_and_users
 
 
@@ -534,6 +536,98 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
                             },
                         ], key=lambda i: (i['dt'], i['employee__user__username']))
                     )
+
+    def _create_wd_and_task(self, wd_type, start_timedelta, end_timedelta):
+        wd = self.create_worker_day(type=wd_type, shop=self.shop, dt=self.dt, is_approved=False, is_fact=False)
+        otn = OperationTypeName.objects.create(
+            name='Приём врача'
+        )
+        ot = OperationType.objects.create(
+            operation_type_name=otn,
+            shop=self.shop,
+        )
+        task = Task.objects.create(
+            operation_type=ot,
+            employee=self.employee2,
+            dt=wd.dt,
+            dttm_start_time=wd.dttm_work_start + start_timedelta if wd.dttm_work_start else datetime.combine(wd.dt, time(10)),
+            dttm_end_time=wd.dttm_work_end + end_timedelta if wd.dttm_work_end else datetime.combine(wd.dt, time(18)),
+        )
+        return wd, task
+
+    def test_cant_approve_workday_if_there_are_tasks_violations(self):
+        wd, _task = self._create_wd_and_task(
+            wd_type='W', start_timedelta=timedelta(hours=-1), end_timedelta=timedelta(hours=1))
+
+        data = {
+            'shop_id': self.shop.id,
+            'dt_from': wd.dt,
+            'dt_to': wd.dt,
+            'is_fact': False,
+        }
+
+        resp = self.client.post(f"{self.url_approve}", data, format='json')
+        self.assertContains(resp,
+            text='Операция не может быть выполнена. Нарушены ограничения по запланированным задачам.'
+                 f' (Иванов Иван2: {self.dt}. Минимальный необходимый интервал работы: 07:00-21:00. '
+                 'Текущий интервал: 08:00-20:00)', status_code=400)
+
+    def test_can_approve_workday_if_there_are_no_tasks_violations(self):
+        wd, _task = self._create_wd_and_task(
+            wd_type='W', start_timedelta=timedelta(hours=1), end_timedelta=timedelta(hours=-1))
+
+        data = {
+            'shop_id': self.shop.id,
+            'dt_from': wd.dt,
+            'dt_to': wd.dt,
+            'is_fact': False,
+        }
+
+        resp = self.client.post(f"{self.url_approve}", data, format='json')
+        self.assertContains(resp, text='', status_code=200)
+
+    def test_cant_approve_holiday_if_there_are_tasks_violations(self):
+        wd, _task = self._create_wd_and_task(
+            wd_type='H', start_timedelta=timedelta(hours=1), end_timedelta=timedelta(hours=-1))
+
+        data = {
+            'shop_id': self.shop.id,
+            'dt_from': wd.dt,
+            'dt_to': wd.dt,
+            'is_fact': False,
+        }
+
+        resp = self.client.post(f"{self.url_approve}", data, format='json')
+        self.assertContains(resp,
+            text='Операция не может быть выполнена. Нарушены ограничения по запланированным задачам.'
+                 f' (Иванов Иван2: {self.dt}. Минимальный необходимый интервал работы: 10:00-18:00. '
+                 'Текущий интервал: None-None)', status_code=400)
+
+    def test_can_approve_workday_if_there_are_no_tasks(self):
+        wd = self.create_worker_day(type='W', shop=self.shop, dt=self.dt, is_approved=False, is_fact=False)
+
+        data = {
+            'shop_id': self.shop.id,
+            'dt_from': wd.dt,
+            'dt_to': wd.dt,
+            'is_fact': False,
+        }
+
+        resp = self.client.post(f"{self.url_approve}", data, format='json')
+        self.assertContains(resp, text='', status_code=200)
+
+    def test_can_approve_holiday_if_there_are_no_tasks(self):
+        wd = self.create_worker_day(type='H', shop=self.shop, dt=self.dt, is_approved=False, is_fact=False)
+
+        data = {
+            'shop_id': self.shop.id,
+            'dt_from': wd.dt,
+            'dt_to': wd.dt,
+            'is_fact': False,
+        }
+
+        resp = self.client.post(f"{self.url_approve}", data, format='json')
+        self.assertContains(resp, text='', status_code=200)
 
 
 class TestUploadDownload(APITestCase):
