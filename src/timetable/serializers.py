@@ -1,4 +1,5 @@
 from rest_framework import serializers
+from rest_framework.validators import UniqueTogetherValidator
 
 from src.timetable.models import EmploymentWorkType
 
@@ -20,3 +21,9 @@ class EmploymentWorkTypeSerializer(serializers.ModelSerializer):
     class Meta:
         model = EmploymentWorkType
         fields = ['id', 'work_type_id', 'employment_id', 'period', 'bills_amount', 'priority', 'duration']
+        validators = [
+            UniqueTogetherValidator(
+                queryset=EmploymentWorkType.objects.all(),
+                fields=['work_type_id', 'employment_id'],
+            ),
+        ]
