@@ -616,3 +616,19 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
             (self.user2.id, self.wp1.id),
         ]
         self.assertSequenceEqual(list(map(lambda x: (x['user_id'], x['position_id']), data.json())), assert_data)
+
+    def test_employment_work_type_validation(self):
+        resp = self._create_employment()
+        self.assertEqual(resp.status_code, 201)
+        employment_id = resp.json()['id']
+        work_type_id = EmploymentWorkType.objects.filter(employment_id=employment_id).first().work_type_id
+        data = {
+            'employment_id': employment_id,
+            'work_type_id': work_type_id,
+        }
+        response = self.client.post(
+            '/rest_api/employment_work_type/', 
+            data=self.dump_data(data),
+            content_type='application/json',
+        )
+        self.assertEqual(response.json(), {'non_field_errors': ['Поля work_type_id, employment_id должны производить массив с уникальными значениями.']})
