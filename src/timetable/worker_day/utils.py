@@ -23,6 +23,7 @@ from src.base.models import (
 )
 from src.conf.djconfig import UPLOAD_TT_MATCH_EMPLOYMENT
 from src.timetable.models import (
+    AttendanceRecords,
     WorkerDay,
     WorkerDayCashboxDetails,
     WorkType,
@@ -659,3 +660,28 @@ def copy_as_excel_cells(main_worker_days, to_employee_id, to_dates, created_by=N
     ]
 
     return created_wds, work_types
+
+def create_fact_from_attendance_records(dt_from, dt_to, shop_ids=None):
+    attrs = AttendanceRecords.objects.filter(
+        dt__gte=dt_from,
+        dt__lte=dt_to + datetime.timedelta(1),
+    ).order_by('user_id', 'dttm')
+    if shop_ids:
+        attrs = attrs.filter(shop_id__in=shop_ids)
+    with transaction.atomic():
+        wds_filter = {
+            'dt__gte': dt_from,
+            'dt__lte': dt_to + datetime.timedelta(1),
+            'is_fact': True,
+            'shop_id__in': attrs.values_list('shop_id', flat=True),
+            'created_by__isnull': True,
+        }
+        # удаляем весь факт не созданный вручную
+        WorkerDay.objects.filter(**wds_filter).delete()
+
+        for record in attrs:
+            if record.terminal:
+                record.type = None
+                record.employee_id = None
+            record.save()
+       
