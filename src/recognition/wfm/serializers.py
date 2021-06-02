@@ -4,6 +4,7 @@ from rest_framework import serializers
 from rest_framework.exceptions import PermissionDenied
 
 from src.timetable.models import WorkerDay, WorkerDayCashboxDetails, Shop, User
+from src.base.serializers import NetworkSerializer
 
 
 class WorkerDayCashboxDetailsSerializer(serializers.ModelSerializer):
@@ -16,6 +17,11 @@ class WorkerDayCashboxDetailsSerializer(serializers.ModelSerializer):
     def get_name(self, obj) -> str:
         if obj.work_type and obj.work_type.work_type_name:
             return obj.work_type.work_type_name.name
+
+class ShopSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Shop
+        fields = ['id', 'name']
 
 
 class WorkerDayListSerializer(serializers.Serializer):
@@ -32,16 +38,22 @@ class WfmEmployeeSerializer(serializers.Serializer):
     id = serializers.IntegerField()
     tabel_code = serializers.CharField()
     worker_days = WorkerDayListSerializer(many=True)
+    shop = serializers.SerializerMethodField()
+
+    def get_shop(self, obj):
+        employment = obj.employments.all()[0] if obj.employments.all() else None
+        return ShopSerializer(employment.shop).data if employment else {}
 
 
 class WfmWorkerDaySerializer(serializers.ModelSerializer):
     user_id = serializers.SerializerMethodField()
     avatar = serializers.SerializerMethodField()
     employees = WfmEmployeeSerializer(many=True)
+    network = NetworkSerializer()
 
     class Meta:
         model = User
-        fields = ['user_id', 'employees', 'first_name', 'last_name', 'avatar']
+        fields = ['user_id', 'employees', 'first_name', 'last_name', 'avatar', 'network']
 
     def get_user_id(self, obj) -> int:
         return obj.id
@@ -51,11 +63,6 @@ class WfmWorkerDaySerializer(serializers.ModelSerializer):
             return obj.avatar.url
         return None
 
-
-class ShopSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Shop
-        fields = ['id', 'name']
 
 
 class WorkShiftSerializer(serializers.ModelSerializer):
