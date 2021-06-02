@@ -1,7 +1,8 @@
 from datetime import timedelta, datetime
 
 from rest_framework import serializers
-from rest_framework.exceptions import PermissionDenied
+from django.utils import six
+
 
 from src.timetable.models import WorkerDay, WorkerDayCashboxDetails, Shop, User
 
@@ -53,9 +54,14 @@ class WfmWorkerDaySerializer(serializers.ModelSerializer):
 
 
 class ShopSerializer(serializers.ModelSerializer):
+    timezone = serializers.SerializerMethodField()
+
+    def get_timezone(self, obj):
+        return str(six.text_type(obj.timezone))
+
     class Meta:
         model = Shop
-        fields = ['id', 'name']
+        fields = ['id', 'name', 'timezone']
 
 
 class WorkShiftSerializer(serializers.ModelSerializer):
