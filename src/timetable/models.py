@@ -537,9 +537,16 @@ class WorkerDay(AbstractModel):
 
         break_time_seconds = total_seconds - work_seconds
 
-        work_hours_day = round(
-            (total_seconds - night_seconds - break_time_seconds / 2) / 3600, 2)
-        work_hours_night = round((night_seconds - break_time_seconds / 2) / 3600, 2)
+        break_time_half_seconds = break_time_seconds / 2
+        if night_seconds > break_time_half_seconds:
+            work_hours_day = round(
+                (total_seconds - night_seconds - break_time_half_seconds) / 3600, 2)
+            work_hours_night = round((night_seconds - break_time_half_seconds) / 3600, 2)
+        else:
+            substract_from_day_seconds = break_time_half_seconds - night_seconds
+            work_hours_night = 0.0
+            work_hours_day = round(
+                (total_seconds - substract_from_day_seconds - break_time_half_seconds) / 3600, 2)
         work_hours = work_hours_day + work_hours_night
         return work_hours, work_hours_day, work_hours_night
 

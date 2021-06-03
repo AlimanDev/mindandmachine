@@ -1296,6 +1296,7 @@ class FunctionGroup(AbstractModel):
         'Subscribe',
         'TickPoint',
         'Timesheet',
+        'Timesheet_stats',
         'User',
         'User_change_password',
         'User_delete_biometrics',

@@ -9,7 +9,7 @@ class TimesheetFilter(FilterSet):
     class Meta:
         model = Timesheet
         fields = {
-            'dt': ['exact', 'gte', 'lte'],
+            'dt': ['exact', 'gte', 'lte', 'in'],
             'employee_id': ['exact', 'in'],
             'employee__tabel_code': ['exact', 'in'],
             'shop_id': ['exact', 'in'],

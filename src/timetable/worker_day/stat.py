@@ -621,6 +621,8 @@ class WorkersStatsGetter:
                 Sum('norm_hours', filter=curr_month_q), 0),
             norm_hours_curr_month_end=Coalesce(
                 Sum('norm_hours', filter=curr_month_end_q), 0),
+            norm_hours_selected_period=Coalesce(
+                Sum('norm_hours', filter=selected_period_q), 0),
             empl_days_count=Count('dt'),
             empl_days_count_selected_period=Count('dt', filter=selected_period_q),
             empl_days_count_outside_of_selected_period=Count('dt', filter=outside_of_selected_period_q),
@@ -646,6 +648,8 @@ class WorkersStatsGetter:
                             for norm_hours in [worker_norm_hours]:
                                 norm_hours['acc_period'] = norm_hours.get('acc_period', 0) + pc_dict[
                                     'norm_hours_acc_period']
+                                norm_hours['selected_period'] = norm_hours.get('selected_period', 0) + pc_dict[
+                                    'norm_hours_selected_period']
                                 norm_hours['prev_months'] = norm_hours.get('prev_months', 0) + pc_dict[
                                     'norm_hours_prev_months']
                                 norm_hours['curr_month'] = norm_hours.get('curr_month', 0) + pc_dict[
@@ -668,6 +672,8 @@ class WorkersStatsGetter:
                             for norm_hours in [worker_norm_hours]:
                                 norm_hours['acc_period'] = norm_hours.get('acc_period', 0) + pc_dict[
                                     'norm_hours_acc_period']
+                                norm_hours['selected_period'] = norm_hours.get('selected_period', 0) + pc_dict[
+                                    'norm_hours_selected_period']
                                 norm_hours['prev_months'] = norm_hours.get('prev_months', 0) + pc_dict[
                                     'norm_hours_prev_months']
                                 norm_hours['curr_month'] = norm_hours.get('curr_month', 0) + pc_dict[

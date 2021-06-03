@@ -1961,7 +1961,6 @@ class TestAttendanceRecords(TestsHelperMixin, APITestCase):
         self.assertEqual(wd.dttm_work_start, datetime.combine(self.dt, time(17, 54)))
         self.assertEqual(wd.dttm_work_end, datetime.combine(self.dt + timedelta(1), time(1, 54)))
 
-
     def test_create_second_record_for_prev_day_when_prev_fact_closed(self):
         self.worker_day_fact_approved.dttm_work_start = datetime.combine(self.dt - timedelta(1), time(18, 34))
         self.worker_day_fact_approved.dttm_work_end = datetime.combine(self.dt, time(1, 2))
@@ -1974,7 +1973,6 @@ class TestAttendanceRecords(TestsHelperMixin, APITestCase):
         )
         self.assertEqual(WorkerDay.objects.filter(is_fact=True, is_approved=True).count(), 1)
         self.assertEqual(WorkerDay.objects.filter(is_fact=True, is_approved=True).first().dttm_work_end, datetime.combine(self.dt, time(1, 5)))
-
 
     def test_create_att_record_and_update_not_approved(self):
         AttendanceRecords.objects.create(
@@ -2120,6 +2118,15 @@ class TestAttendanceRecords(TestsHelperMixin, APITestCase):
         self.assertEqual(attr.employee_id, self.second_employee.id)
         self.assertEqual(attr.dt, self.dt)
         self.assertEqual(attr.type, AttendanceRecords.TYPE_COMING)
+
+    def test_calc_day_and_night_work_hours_when_night_hours_is_less_than_half_of_break_time(self):
+        self.worker_day_fact_approved.dttm_work_start = datetime.combine(self.dt, time(9, 32, 8))
+        self.worker_day_fact_approved.dttm_work_end = datetime.combine(self.dt, time(22, 5, 27))
+        self.worker_day_fact_approved.save()
+        total, day, night = self.worker_day_fact_approved.calc_day_and_night_work_hours()
+        self.assertEqual(total, 11.4)
+        self.assertEqual(day, 11.4)
+        self.assertEqual(night, 0.0)
 
 
 class TestVacancy(TestsHelperMixin, APITestCase):

@@ -1,4 +1,5 @@
 import datetime
+import logging
 
 import pandas as pd
 from dateutil.relativedelta import relativedelta
@@ -12,6 +13,8 @@ from django.utils import timezone
 from src.base.models import Employee
 from .dividers import FISCAL_SHEET_DIVIDERS_MAPPING
 from ..models import WorkerDay, Timesheet
+
+logger = logging.getLogger('calc_timesheets')
 
 
 def _get_calc_periods(dt_fired=None):
@@ -134,7 +137,9 @@ class TimesheetCalculator:
         return fact_timesheet_dict
 
     def _calc(self, dt_start, dt_end):
+        logger.info(f'start receiving fact timesheet')
         fiscal_sheet_dict = self._get_fact_timesheet_data(dt_start, dt_end)
+        logger.info(f'fact timesheet received')
         if settings.FISCAL_SHEET_DIVIDER_ALIAS:
             fiscal_sheet_divider_cls = FISCAL_SHEET_DIVIDERS_MAPPING.get(settings.FISCAL_SHEET_DIVIDER_ALIAS)
             if fiscal_sheet_divider_cls:
@@ -153,6 +158,13 @@ class TimesheetCalculator:
             Timesheet.objects.bulk_create(Timesheet(**d) for d in fiscal_sheet_dict.values())
 
     def calc(self):
+        logger.info(
+            f'start timesheet calc for employee with id={self.employee.id} tabel_code={self.employee.tabel_code}')
         periods = _get_calc_periods(dt_fired=getattr(self.employee, 'dt_fired', None))
+        logger.info(f'timesheet calc periods: {periods}')
         for period in periods:
+            logger.debug(f'start period: {period}')
             self._calc(dt_start=period[0], dt_end=period[1])
+            logger.debug(f'end period: {period}')
+        logger.info(
+            f'finish timesheet calc for employee with id={self.employee.id} tabel_code={self.employee.tabel_code}')

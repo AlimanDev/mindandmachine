@@ -1,8 +1,11 @@
 import datetime
+import logging
 
 import pandas as pd
 
 from ..models import WorkerDay, Timesheet
+
+logger = logging.getLogger('calc_timesheets')
 
 
 class BaseTimesheetDivider:
@@ -53,35 +56,36 @@ class BaseTimesheetDivider:
         return outside_period_data
 
     def _make_holiday(self, dt):
+        logger.info(f'make holiday {dt}')
         data = self.fiscal_sheet_dict.get(dt)
         if data:
-            try:
-                data['additional_timesheet_hours'] = data['main_timesheet_total_hours']
-            except KeyError as e:
-                raise e
+            data['additional_timesheet_hours'] = data['main_timesheet_total_hours']
             data['main_timesheet_type'] = WorkerDay.TYPE_HOLIDAY
             data.pop('main_timesheet_total_hours', None)
             data.pop('main_timesheet_day_hours', None)
             data.pop('main_timesheet_night_hours', None)
 
     def _check_weekly_continuous_holidays(self):
+        logger.info(f'start weekly continuous holidays check')
         first_dt_weekday_num = self.dt_start.weekday()  # 0 - monday, 6 - sunday
         start_of_week = self.dt_start - datetime.timedelta(days=first_dt_weekday_num)
         outside_period_data = self._get_outside_period_data(start_of_week, first_dt_weekday_num)
-
         # если в последней неделе месяца 2 или более дней выходит за рамки месяца, то останавливаемся
         dt_stop = self.dt_end - datetime.timedelta(days=5)
+        logger.debug(f'stop dt: {dt_stop}')
         while start_of_week <= dt_stop:
             continuous_holidays_count = 0
             first_holiday_found_dt = None
             week_dates = pd.date_range(start_of_week, start_of_week + datetime.timedelta(days=6)).date
             prev_day_is_holiday = False
+            logger.debug(f'start week with start_of_week: {start_of_week}')
             for dt in week_dates:
                 dt_data = self.fiscal_sheet_dict.get(dt) or outside_period_data.get(dt)
                 current_day_is_holiday = self._is_holiday(dt_data)
 
                 if prev_day_is_holiday and current_day_is_holiday:
                     continuous_holidays_count = 2
+                    logger.debug(f'prev_day_is_holiday and current_day_is_holiday, break')
                     break
 
                 if current_day_is_holiday and not first_holiday_found_dt:
@@ -89,23 +93,33 @@ class BaseTimesheetDivider:
                     first_holiday_found_dt = dt
 
                 prev_day_is_holiday = current_day_is_holiday
+            logger.debug(f'end week continuous_holidays_count: {continuous_holidays_count}, '
+                         f'first_holiday_found_dt:{first_holiday_found_dt}')
 
             if continuous_holidays_count == 2:
                 start_of_week += datetime.timedelta(days=7)
+                logger.debug(f'continuous_holidays_count == 2, break')
                 continue
 
             if continuous_holidays_count == 1:
                 first_holiday_found_weekday = first_holiday_found_dt.weekday()
+                logger.debug(
+                    f'continuous_holidays_count == 1, first_holiday_found_weekday={first_holiday_found_weekday}')
                 if first_holiday_found_weekday == 6:  # sunday
                     dt = first_holiday_found_dt - datetime.timedelta(days=1)
                 else:
                     dt = first_holiday_found_dt + datetime.timedelta(days=1)
+                logger.debug(
+                    f'second found holiday {dt}')
                 self._make_holiday(dt)
                 start_of_week += datetime.timedelta(days=7)
 
             if continuous_holidays_count == 0:
+                logger.debug(f'continuous_holidays_count == 0, make last 2 days of week as holidays')
                 for dt in [week_dates[5], week_dates[6]]:
                     self._make_holiday(dt)
+
+        logger.info(f'finish weekly continuous holidays check')
 
     def _fill_main_timesheet(self):
         for data in self.fiscal_sheet_list:
@@ -134,33 +148,61 @@ class BaseTimesheetDivider:
         if data['main_timesheet_type'] in WorkerDay.TYPES_WITH_TM_RANGE:
             hours_overflow = data.get('main_timesheet_total_hours') - threshold_hours
             if hours_overflow > 0:
+                logger.debug(f'dt: {data["dt"]} has overflow threshold_hours: {threshold_hours} hours_overflow: {hours_overflow}')
                 if data['main_timesheet_night_hours']:
+                    logger.debug(f'has night hours: {data["main_timesheet_night_hours"]}')
                     if hours_overflow < data['main_timesheet_night_hours']:
+                        logger.debug("hours_overflow < data['main_timesheet_night_hours']")
+                        logger.debug(f"prev hours: main n: {data['main_timesheet_night_hours']} main t "
+                            f"{data['main_timesheet_total_hours']} add h {data.get('additional_timesheet_hours', 0.0)}")
                         data['main_timesheet_night_hours'] = data['main_timesheet_night_hours'] - hours_overflow
                         data['main_timesheet_total_hours'] = threshold_hours
                         data['additional_timesheet_hours'] = data.get('additional_timesheet_hours',
                                                                       0.0) + hours_overflow
+
+                        logger.debug(f"new hours: main n: {data['main_timesheet_night_hours']} main t "
+                            f"{data['main_timesheet_total_hours']} add h {data.get('additional_timesheet_hours', 0.0)}")
                         return hours_overflow
                     else:
+                        logger.debug("hours_overflow >= data['main_timesheet_night_hours']")
+                        logger.debug(f"prev hours: main n: {data['main_timesheet_night_hours']} main d"
+                                     f" {data['main_timesheet_day_hours']} main t {data['main_timesheet_total_hours']}"
+                                     f" add h {data.get('additional_timesheet_hours', 0.0)}")
                         data['main_timesheet_night_hours'] = 0.0
                         data['main_timesheet_day_hours'] = threshold_hours
                         data['main_timesheet_total_hours'] = threshold_hours
                         data['additional_timesheet_hours'] = data.get('additional_timesheet_hours',
                                                                       0.0) + hours_overflow
+
+                        logger.debug(f"new hours: main n: {data['main_timesheet_night_hours']} main d"
+                                     f" {data['main_timesheet_day_hours']} main t {data['main_timesheet_total_hours']}"
+                                     f" add h {data.get('additional_timesheet_hours', 0.0)}")
                         return hours_overflow
                 else:
+                    logger.debug('no night hours')
+                    logger.debug(f"prev hours: main d {data['main_timesheet_day_hours']}"
+                                 f" main t {data['main_timesheet_total_hours']}"
+                                 f" add h {data.get('additional_timesheet_hours', 0.0)}")
                     data['main_timesheet_day_hours'] = data['main_timesheet_day_hours'] - hours_overflow
                     data['main_timesheet_total_hours'] = threshold_hours
                     data['additional_timesheet_hours'] = data.get('additional_timesheet_hours',
                                                                   0.0) + hours_overflow
+
+                    logger.debug(f"new hours: main d {data['main_timesheet_day_hours']}"
+                                 f" main t {data['main_timesheet_total_hours']}"
+                                 f" add h {data.get('additional_timesheet_hours', 0.0)}")
                     return hours_overflow
 
         return hours_overflow
 
-    def _has_additional_timesheet_hours(self):
-        return any(i.get('additional_timesheet_hours', 0.0) for i in self.fiscal_sheet_list)
+    def _get_additional_timesheet_hours(self):
+        return sum(i.get('additional_timesheet_hours', 0.0) for i in self.fiscal_sheet_list)
 
     def _check_overtimes(self):
+        logger.info(
+            f'start overtimes check '
+            f'main t h: {self._get_main_timesheet_total_hours()} '
+            f'add h: {self._get_additional_timesheet_hours()}')
         from src.timetable.worker_day.stat import (
             WorkersStatsGetter,
         )
@@ -173,10 +215,13 @@ class BaseTimesheetDivider:
 
         # TODO: брать norm_hours (произв. календ.) для каких-то категорий сотрудников?
         norm_hours = worker_stats[self.employee.id]['plan']['approved']['sawh_hours']['curr_month']
+        logger.info(f'norm_hours: {norm_hours}')
         overtime_plan = self._get_overtime(norm_hours)  # плановые переработки
+        logger.info(f'overtime_plan at the beginning: {overtime_plan}')
 
         for data in self.fiscal_sheet_list:
             if overtime_plan == 0.0:  # не будет ли проблем из-за того, что часы у нас не целые часы?
+                logger.debug('overtime_plan == 0.0, break')
                 break
 
             if data.get('main_timesheet_type') not in WorkerDay.TYPES_WITH_TM_RANGE or data.get(
@@ -193,7 +238,7 @@ class BaseTimesheetDivider:
                     overtime_plan -= moved_hours
                 continue
             else:
-                if not self._has_additional_timesheet_hours():
+                if not self._get_additional_timesheet_hours():
                     break
 
                 if not data.get('additional_timesheet_hours'):
@@ -232,12 +277,18 @@ class BaseTimesheetDivider:
                         overtime_plan += hours_transfer
                         continue
 
+        logger.info(f'finish overtimes check, overtime_plan: {overtime_plan} '
+                    f'main t h: {self._get_main_timesheet_total_hours()} '
+                    f'add h: {self._get_additional_timesheet_hours()}')
+
     def divide(self):
+        logger.info(f'start fiscal sheet divide')
         timesheet_data = self.fiscal_sheet_dict
         self._fill_main_timesheet()
         self._check_weekly_continuous_holidays()
         self._check_not_more_than_12_hours()
         self._check_overtimes()
+        logger.info(f'finish fiscal sheet divide')
         return timesheet_data
 
 
