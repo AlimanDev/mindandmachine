@@ -473,7 +473,7 @@ IMPORT_EXPORT_USE_TRANSACTIONS = True
 SET_USER_PASSWORD_AS_LOGIN = False
 
 # Возможные вариант можно найти по FISCAL_SHEET_DIVIDERS_MAPPING
-# Если == None, то при расчете фискального табеля разделение на осн. и доп. не производится
+# Если == None, то при расчете табеля разделение на осн. и доп. не производится
 FISCAL_SHEET_DIVIDER_ALIAS = None
 
 if is_config_exists('djconfig_local.py'):

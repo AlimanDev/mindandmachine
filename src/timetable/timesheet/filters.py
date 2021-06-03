@@ -1,4 +1,5 @@
 from django_filters.rest_framework import FilterSet, OrderingFilter
+
 from ..models import Timesheet
 
 
@@ -12,5 +13,6 @@ class TimesheetFilter(FilterSet):
             'employee_id': ['exact', 'in'],
             'employee__tabel_code': ['exact', 'in'],
             'shop_id': ['exact', 'in'],
+            'shop__code': ['exact', 'in'],
             'fact_timesheet_source': ['exact', 'in'],
         }

@@ -4,9 +4,8 @@ from ..models import Timesheet
 
 
 class TimesheetSerializer(serializers.ModelSerializer):
-    employee_id = serializers.IntegerField()
-    shop_id = serializers.IntegerField()
-    employee__tabel_code = serializers.CharField()
+    employee__tabel_code = serializers.CharField(read_only=True)
+    shop__code = serializers.CharField(read_only=True)
 
     class Meta:
         model = Timesheet
@@ -16,6 +15,7 @@ class TimesheetSerializer(serializers.ModelSerializer):
             'employee__tabel_code',
             'dt',
             'shop_id',
+            'shop__code',
             'fact_timesheet_type',
             'fact_timesheet_total_hours',
             'fact_timesheet_day_hours',

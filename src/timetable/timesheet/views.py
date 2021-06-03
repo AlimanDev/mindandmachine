@@ -16,9 +16,16 @@ class TimesheetViewSet(BaseModelViewSet):
     openapi_tags = ['Timesheet', ]
 
     def get_queryset(self):
-        return Timesheet.objects.filter(
+        qs = Timesheet.objects.filter(
             # dt_fired=  # TODO: annotate dt_fired
             employee__user__network_id=self.request.user.network_id,
-        ).annotate(
-            employee__tabel_code=F('employee__tabel_code'),
         )
+        if self.request.query_params.get('by_code'):
+            qs = qs.select_related(
+                'employee',
+                'shop',
+            ).annotate(
+                employee__tabel_code=F('employee__tabel_code'),
+                shop__code=F('shop__code'),
+            )
+        return qs
