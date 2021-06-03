@@ -28,10 +28,6 @@ class WorkerDayListSerializer(serializers.Serializer):
     id = serializers.IntegerField()
     dttm_work_start = serializers.DateTimeField()
     dttm_work_end = serializers.DateTimeField()
-    position = serializers.SerializerMethodField()
-
-    def get_position(self, obj):
-        return obj.employment.position.name if obj.employment and obj.employment.position else ''
 
 
 class WfmEmployeeSerializer(serializers.Serializer):
@@ -39,6 +35,11 @@ class WfmEmployeeSerializer(serializers.Serializer):
     tabel_code = serializers.CharField()
     worker_days = WorkerDayListSerializer(many=True)
     shop = serializers.SerializerMethodField()
+    position = serializers.SerializerMethodField()
+
+    def get_position(self, obj):
+        employment = obj.employments.all()[0] if obj.employments.all() else None
+        return employment.position.name if employment and employment.position else ''
 
     def get_shop(self, obj):
         employment = obj.employments.all()[0] if obj.employments.all() else None

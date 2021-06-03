@@ -94,7 +94,7 @@ class WorkerDayViewSet(viewsets.ReadOnlyModelViewSet):
                             None,
                             dt=dt_from,
                             priority_shop_id=tick_point.shop_id,
-                        ).select_related('shop')
+                        ).select_related('shop', 'position')
                     )
                 )
             ),
@@ -106,7 +106,7 @@ class WorkerDayViewSet(viewsets.ReadOnlyModelViewSet):
                     dttm_work_end__lte=dt_to,
                     is_fact=False,
                     is_approved=True,
-                ).select_related('employment__position')
+                )
             )
         ).annotate(
             has_wdays=Exists(wd_cond.filter(employee__user_id=OuterRef('pk'))),

@@ -170,9 +170,9 @@ class TestWorkShiftViewSet(TestsHelperMixin, APITestCase):
                             'id': wd1.id, 
                             'dttm_work_start': Converter.convert_datetime(wd1.dttm_work_start),
                             'dttm_work_end': Converter.convert_datetime(wd1.dttm_work_end),
-                            'position': ''
                         }
-                    ]
+                    ],
+                    'position': ''
                 }, 
                 {
                     'id': self.second_employee.id,
@@ -186,9 +186,9 @@ class TestWorkShiftViewSet(TestsHelperMixin, APITestCase):
                             'id': wd2.id, 
                             'dttm_work_start': Converter.convert_datetime(wd2.dttm_work_start),
                             'dttm_work_end': Converter.convert_datetime(wd2.dttm_work_end),
-                            'position': 'Работник'
                         }
-                    ]
+                    ],
+                    'position': 'Работник'
                 }
             ], 
             'first_name': 'Иван2', 
