@@ -29,16 +29,18 @@ class DummyWdTypeMapper(BaseWdTypeMapper):
 
 
 class T13WdTypeMapper(BaseWdTypeMapper):
-    wd_type_to_tabel_type_mapping = {
-        WorkerDay.TYPE_WORKDAY: 'Я',
-        WorkerDay.TYPE_HOLIDAY: 'В',
-        WorkerDay.TYPE_BUSINESS_TRIP: 'К',
-        WorkerDay.TYPE_VACATION: 'ОТ',
-        WorkerDay.TYPE_SELF_VACATION: 'ДО',
-        WorkerDay.TYPE_MATERNITY: 'ОЖ',
-        WorkerDay.TYPE_SICK: 'Б',
-        # TODO: добавить оставльные
-    }
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.wd_type_to_tabel_type_mapping = {
+            WorkerDay.TYPE_WORKDAY: _('W'),
+            WorkerDay.TYPE_HOLIDAY: _('H'),
+            WorkerDay.TYPE_BUSINESS_TRIP: _('BT'),
+            WorkerDay.TYPE_VACATION: _('V'),
+            WorkerDay.TYPE_SELF_VACATION: _('VO'),
+            WorkerDay.TYPE_MATERNITY: _('MAT'),
+            WorkerDay.TYPE_SICK: _('S'),
+            # TODO: добавить оставльные
+        }
 
 
 class BaseTabelDataGetter:
@@ -269,6 +271,29 @@ class BaseTabelGenerator(BaseDocGenerator):
             'month_name': month_name,
             'year': year,
             'tabel_text': _('Tabel for {} {}y').format(month_name, year),
+            'tabel_cell_names': {
+                'fio': _('Full name'),
+                'num_in_order': _('Number in order'),
+                'fio_initials_position': _('Last name, initials, position (specialty, profession)'),
+                'tabel_code': _('Employee id'),
+                'attendance_notes': _('Notes on attendance and non-attendance at work on the dates of the month'),
+                'worked_out_for': _('Worked out for'),
+                'half_of_the_month': _('half of the month (I, II)'),
+                'month': _('month'),
+                'days': _('days'),
+                'hours': _('hours'),
+                'position': _('Position'),
+                'total_hours': _('Total hours'),
+                'total_days': _('Total days'),
+                'date': _('Date'),
+                'op_code': _('Shop code'),
+                'fact_h': _('Fact, h'),
+                'plan_h': _('Plan, h'),
+                'dttm_work_start_fact_h': _('Shift start time, fact, h'),
+                'dttm_work_end_fact_h': _('Shift end time, fact, h'),
+                'dttm_work_start_plan_h': _('Shift start time, plan, h'),
+                'dttm_work_end_plan_h': _('Shift end time, plan, h'),
+            }
         }
         return data
 
