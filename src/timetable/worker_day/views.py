@@ -1,4 +1,5 @@
 import datetime
+import io
 import json
 from itertools import groupby
 
@@ -46,6 +47,7 @@ from src.timetable.worker_day.serializers import (
     DeleteWorkerDaysSerializer,
     ExchangeSerializer,
     UploadTimetableSerializer,
+    GenerateUploadTimetableExampleSerializer,
     DownloadSerializer,
     WorkerDayListSerializer,
     DownloadTabelSerializer,
@@ -56,7 +58,7 @@ from src.timetable.worker_day.serializers import (
     BlockOrUnblockWorkerDayWrapperSerializer,
 )
 from src.timetable.worker_day.stat import count_daily_stat
-from src.timetable.worker_day.tasks import recalc_wdays
+from src.timetable.worker_day.tasks import recalc_wdays, recalc_fact_from_records
 from src.timetable.worker_day.utils import download_timetable_util, upload_timetable_util, exchange, copy_as_excel_cells
 from src.util.dg.tabel import get_tabel_generator_cls
 from src.util.models_converter import Converter
@@ -661,6 +663,14 @@ class WorkerDayViewSet(BaseModelViewSet):
                         ).values_list('id', flat=True))
                         if wd_ids:
                             transaction.on_commit(lambda wd_ids=wd_ids: recalc_wdays.delay(id__in=wd_ids))
+                    if settings.ZKTECO_INTEGRATION: # если используем терминалы
+                            transaction.on_commit(
+                                lambda: recalc_fact_from_records.delay(
+                                    serializer.validated_data['dt_from'], 
+                                    serializer.validated_data['dt_to'], 
+                                    shop_ids=[serializer.data['shop_id']]
+                                )
+                            )
 
                 # TODO: нужно ли как-то разделять события подтверждения факта и плана?
                 event_context = serializer.data.copy()
@@ -1129,6 +1139,36 @@ class WorkerDayViewSet(BaseModelViewSet):
                 **fact_filter,
             ).delete()
 
+            if data['type'] == CopyApprovedSerializer.TYPE_PLAN_TO_FACT and request.user.network.copy_plan_to_fact_crossing:
+                grouped_wds = {}
+                for wd in list_wd:
+                    grouped_wds.setdefault(wd.employee_id, {})[wd.dt] = wd
+                wds_approved =  WorkerDay.objects_with_excluded.filter(
+                    dt__in=data['dates'],
+                    employee_id__in=data['employee_ids'],
+                    is_approved=True,
+                    is_fact=True,
+                )
+                for wd in wds_approved:
+                    grouped_wds.setdefault(wd.employee_id, {})[wd.dt] = WorkerDay(
+                        shop=wd.shop,
+                        employee_id=wd.employee_id,
+                        employment=wd.employment,
+                        dttm_work_start=wd.dttm_work_start,
+                        dttm_work_end=wd.dttm_work_end,
+                        dt=wd.dt,
+                        is_fact=wd.is_fact,
+                        is_approved=wd.is_approved,
+                        type=wd.type,
+                        created_by_id=wd.created_by_id,
+                        is_vacancy=wd.is_vacancy,
+                        is_outsource=wd.is_outsource,
+                        comment=wd.comment,
+                        canceled=wd.canceled,
+                        need_count_wh=True,
+                    )
+                list_wd = [wd for user_data in grouped_wds.values() for wd in user_data.values()]
+
             WorkerDay.objects.bulk_create(
                 [
                     WorkerDay(
@@ -1355,6 +1395,115 @@ class WorkerDayViewSet(BaseModelViewSet):
         data.validated_data['lang'] = request.user.lang
         data.validated_data['network_id'] = request.user.network_id
         return upload_timetable_util(data.validated_data, file)
+
+    @swagger_auto_schema(
+        request_body=GenerateUploadTimetableExampleSerializer,
+        responses={200: 'Шаблон расписания в формате excel.'},
+        operation_description='''
+            Возвращает шаблон для загрузки графика.\n
+            ''',
+    )
+    @action(detail=False, methods=['get'])
+    def generate_upload_example(self, request):
+        # TODO: рефакторинг + тест
+        serializer = GenerateUploadTimetableExampleSerializer(
+            data=request.query_params if request.method == 'GET' else request.data,
+            context=self.get_serializer_context(),
+        )
+        serializer.is_valid(raise_exception=True)
+
+        shop_id = serializer.validated_data.get('shop_id')
+        dt_from = serializer.validated_data.get('dt_from')
+        dt_to = serializer.validated_data.get('dt_to')
+        is_fact = serializer.validated_data.get('is_fact')
+        is_approved = serializer.validated_data.get('is_approved')
+        employee_id__in = serializer.validated_data.get('employee_id__in')
+
+        employee_qs = Employee.objects.filter(
+            employments__id__in=Employment.objects.get_active(
+                network_id=self.request.user.network_id,
+                shop_id=shop_id,
+                dt_from=dt_from,
+                dt_to=dt_to,
+                is_visible=True,
+            )
+        ).annotate(
+            position=Subquery(Employment.objects.get_active(
+                network_id=self.request.user.network_id,
+                shop_id=shop_id,
+                dt_from=dt_from,
+                dt_to=dt_to,
+                is_visible=True,
+                employee_id=OuterRef('id'),
+            ).order_by('-norm_work_hours').values('position__name')[:1])
+        ).select_related(
+            'user',
+        ).order_by('user__last_name', 'user__first_name')
+
+        if employee_id__in:
+            employee_qs = employee_qs.filter(id__in=employee_id__in)
+
+        wdays_dict = {f'{wd.employee_id}_{wd.dt}': wd for wd in WorkerDay.objects.filter(
+            Q(Q(type__in=WorkerDay.TYPES_WITH_TM_RANGE) & Q(shop_id=shop_id)) |
+            ~Q(type__in=WorkerDay.TYPES_WITH_TM_RANGE),
+            employee__in=employee_qs,
+            dt__gte=dt_from,
+            dt__lte=dt_to,
+            is_fact=is_fact,
+            is_approved=is_approved,
+        )}
+
+        rows = []
+        dates = list(
+            pd.date_range(dt_from, dt_to).date)
+        for employee in employee_qs:
+            row_data = {}
+            row_data[_('Employee id')] = employee.tabel_code
+            row_data[_('Full name')] = employee.user.fio  # TODO: разделить на 3 поля
+            row_data[_('Position')] = employee.position
+            for dt in dates:
+                _cell_value = ''
+
+                wd = wdays_dict.get(f'{employee.id}_{dt}')
+                if wd:
+                    if wd.type in WorkerDay.TYPES_WITH_TM_RANGE:
+                        tm_start = wd.dttm_work_start.strftime('%H:%M')
+                        tm_end = wd.dttm_work_end.strftime('%H:%M')
+                        _cell_value = f'{tm_start}-{tm_end}'
+                    else:
+                        _cell_value = WorkerDay.WD_TYPE_MAPPING.get(wd.type, '')
+
+                row_data[dt] = _cell_value
+
+            rows.append(row_data)
+
+        df = pd.DataFrame(rows)
+
+        output = io.BytesIO()
+        writer = pd.ExcelWriter(output, engine='xlsxwriter')
+        sheet_name = _('Timetable')
+        df.to_excel(
+            excel_writer=writer, sheet_name=sheet_name, index=False,
+            columns=[_('Employee id'), _('Full name'), _('Position')] + dates,
+        )
+        worksheet = writer.sheets[sheet_name]
+        # set the column width as per your requirement
+        for idx, col in enumerate(df):  # loop through all columns
+            series = df[col]
+            max_len = max((
+                series.astype(str).map(len).max(),  # len of largest item
+                len(str(series.name))  # len of column name/header
+            )) + 2  # adding a little extra space
+            worksheet.set_column(idx, idx, max_len)
+        writer.save()
+        output.seek(0)
+        response = HttpResponse(
+            output,
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        response['Content-Disposition'] = 'attachment; filename="{}.xlsx"'.format(
+            f'Timetable_{serializer.validated_data.get("shop_id")}_{dt_from}_{dt_to}')
+        return response
 
     @swagger_auto_schema(
         request_body=UploadTimetableSerializer,

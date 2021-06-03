@@ -103,6 +103,8 @@ class Network(AbstractActiveModel):
         default=False,
         verbose_name='Считать только те фактические часы, которые есть в подтвержденном плановом графике',
     )
+    copy_plan_to_fact_crossing = models.BooleanField(
+        verbose_name="Копировать план в факт без перезаписи факта", default=False)
     download_tabel_template = models.CharField(
         max_length=64, verbose_name='Шаблон для табеля',
         choices=TABEL_FORMAT_CHOICES, default='mts',
@@ -1319,6 +1321,7 @@ class FunctionGroup(AbstractModel):
         'WorkerDay_request_approve',
         'WorkerDay_block',
         'WorkerDay_unblock',
+        'WorkerDay_generate_upload_example',
         'WorkerPosition',
         'WorkTypeName',
         'WorkType',
