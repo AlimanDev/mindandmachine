@@ -160,6 +160,10 @@ class TestWorkShiftViewSet(TestsHelperMixin, APITestCase):
             'employees': [
                 {
                     'id': self.employee2.id,
+                    'shop': {
+                        'id': self.employment2.shop.id, 
+                        'name': self.employment2.shop.name,
+                    },
                     'tabel_code': self.employee2.tabel_code, 
                     'worker_days': [
                         {
@@ -173,6 +177,10 @@ class TestWorkShiftViewSet(TestsHelperMixin, APITestCase):
                 {
                     'id': self.second_employee.id,
                     'tabel_code': self.second_employee.tabel_code, 
+                    'shop': {
+                        'id': emp.shop.id, 
+                        'name': emp.shop.name,
+                    },
                     'worker_days': [
                         {
                             'id': wd2.id, 
@@ -185,7 +193,28 @@ class TestWorkShiftViewSet(TestsHelperMixin, APITestCase):
             ], 
             'first_name': 'Иван2', 
             'last_name': 'Иванов', 
-            'avatar': None
+            'avatar': None,
+            'network': {
+                'allowed_geo_distance_km': None,
+                'allowed_interval_for_early_departure': '00:00:00',
+                'allowed_interval_for_late_arrival': '00:00:00',
+                'default_stats': {
+                    'day_bottom': 'deadtime',
+                    'day_top': 'covering',
+                    'employee_bottom': 'norm_hours_curr_month',
+                    'employee_top': 'work_hours_total'
+                },
+                'enable_camera_ticks': False,
+                'id': self.user2.network_id,
+                'logo': None,
+                'name': 'По умолчанию',
+                'primary_color': '',
+                'secondary_color': '',
+                'show_tabel_graph': True,
+                'show_worker_day_additional_info': False,
+                'show_worker_day_tasks': False,
+                'url': None
+            },
         }
         self.assertEqual(len(resp.json()), 5)
         self.assertEqual(user2, user2_data)
