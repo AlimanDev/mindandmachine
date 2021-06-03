@@ -13,6 +13,7 @@ from django.db.models import (
 from django.db.models.functions import Abs, Cast, Extract, Least
 from django.db.models.query import QuerySet
 from django.utils import timezone
+from django.utils.translation import gettext as _
 from model_utils import FieldTracker
 
 from src.base.models import Shop, Employment, User, Event, Network, Break, ProductionDay, Employee
@@ -22,6 +23,7 @@ from src.events.signals import event_signal
 from src.recognition.events import EMPLOYEE_WORKING_NOT_ACCORDING_TO_PLAN
 from src.tasks.models import Task
 from src.timetable.exceptions import WorkTimeOverlap, WorkDayTaskViolation
+from src.util.time import _time_to_float
 
 
 class WorkerManager(UserManager):
@@ -296,17 +298,20 @@ class WorkerDayQuerySet(QuerySet):
     def get_fact_edit(self, **kwargs):
         raise NotImplementedError
 
-    def get_tabel(self, **kwargs):
+    def get_tabel(self, *args, **kwargs):
         ordered_subq = self.filter(
             dt=OuterRef('dt'),
             employee_id=OuterRef('employee_id'),
             is_approved=True,
+            *args,
+            **kwargs,
         ).exclude(type=WorkerDay.TYPE_EMPTY).order_by('-is_fact', '-work_hours').values_list('id')[:1]
         return self.filter(
             Q(is_fact=True) |
             Q(~Q(type__in=WorkerDay.TYPES_WITH_TM_RANGE), is_fact=False),
             is_approved=True,
             id=Subquery(ordered_subq),
+            *args,
             **kwargs,
         )
 
@@ -490,6 +495,53 @@ class WorkerDay(AbstractModel):
 
     def __repr__(self):
         return self.__str__()
+
+    def calc_day_and_night_work_hours(self):
+        # TODO: нужно учитывать работу в праздничные дни? -- сейчас is_celebration в ProductionDay всегда False
+
+        if self.type not in self.TYPES_WITH_TM_RANGE:
+            return 0.0, 0.0, 0.0
+
+        night_edges = self.shop.network.night_edges_tm_list
+
+        if self.work_hours > datetime.timedelta(0):
+            work_seconds = self.work_hours.seconds
+        else:
+            return 0.0, 0.0, 0.0
+
+        work_start = self.dttm_work_start_tabel or self.dttm_work_start
+        work_end = self.dttm_work_end_tabel or self.dttm_work_end
+        if not (work_start and work_end):
+            return 0.0, 0.0, 0.0
+
+        work_hours = round(work_seconds / 3600, 2)
+
+        if work_end.time() <= night_edges[0] and work_start.date() == work_end.date():
+            work_hours_day = work_hours
+            return work_hours, work_hours_day, 0.0
+        if work_start.time() >= night_edges[0] and work_end.time() <= night_edges[1]:
+            work_hours_night = work_hours
+            return work_hours, 0.0, work_hours_night
+
+        if work_start.time() > night_edges[0] or work_start.time() < night_edges[1]:
+            tm_start = _time_to_float(work_start.time())
+        else:
+            tm_start = _time_to_float(night_edges[0])
+        if work_end.time() > night_edges[0] or work_end.time() < night_edges[1]:
+            tm_end = _time_to_float(work_end.time())
+        else:
+            tm_end = _time_to_float(night_edges[1])
+
+        night_seconds = (tm_end - tm_start if tm_end > tm_start else 24 - (tm_start - tm_end)) * 60 * 60
+        total_seconds = (work_end - work_start).total_seconds()
+
+        break_time_seconds = total_seconds - work_seconds
+
+        work_hours_day = round(
+            (total_seconds - night_seconds - break_time_seconds / 2) / 3600, 2)
+        work_hours_night = round((night_seconds - break_time_seconds / 2) / 3600, 2)
+        work_hours = work_hours_day + work_hours_night
+        return work_hours, work_hours_day, work_hours_night
 
     def _calc_wh(self):
         position_break_triplet_cond = self.employment and self.employment.position and self.employment.position.breaks
@@ -920,6 +972,52 @@ class WorkerDay(AbstractModel):
             raise original_exc
 
         return task_violations
+
+
+class Timesheet(AbstractModel):
+    """
+    Табель учета рабочего времени (фактический + фискальный -- разделение на основной и дополнительный)
+    """
+    SOURCE_TYPE_PLAN = 'plan'
+    SOURCE_TYPE_FACT = 'fact'
+    SOURCE_TYPE_MANUAL = 'manual'
+    SOURCE_TYPE_SYSTEM = 'system'
+
+    SOURCE_TYPES = (
+        (SOURCE_TYPE_PLAN, _('Planned timetable')),  # плановый график
+        (SOURCE_TYPE_FACT, _('Attendance records')),  # отметки
+        (SOURCE_TYPE_MANUAL, _('Manual changes')),  # ручные корректировки (заготовка, пока нет такого)
+        (SOURCE_TYPE_SYSTEM, _('Determined by the system')),  # определены системой
+    )
+
+    employee = models.ForeignKey('base.Employee', on_delete=models.CASCADE, verbose_name='Сотрудник')
+    dt = models.DateField(verbose_name='Дата')
+    shop = models.ForeignKey(
+        'base.Shop', on_delete=models.CASCADE, null=True, blank=True, verbose_name='Поздразделение')  # TODO: нужен?
+    fact_timesheet_source = models.CharField(
+        choices=SOURCE_TYPES, max_length=12, blank=True,
+        verbose_name='Источник данных для фактического табеля',
+    )
+    fact_timesheet_type = models.CharField(choices=WorkerDay.TYPES, max_length=2)
+    fact_timesheet_dttm_work_start = models.DateTimeField(null=True, blank=True)
+    fact_timesheet_dttm_work_end = models.DateTimeField(null=True, blank=True)
+    # TODO: добавить или высчитывать через (fact_timesheet_dttm_work_end - fact_timesheet_dttm_work_start) - fact_timesheet_total_hours ?
+    #fact_timesheet_break_time_minutes = models.IntegerField(null=True, blank=True)
+    fact_timesheet_total_hours = models.DecimalField(max_digits=4, decimal_places=2, null=True, blank=True)
+    fact_timesheet_day_hours = models.DecimalField(max_digits=4, decimal_places=2, null=True, blank=True)
+    fact_timesheet_night_hours = models.DecimalField(max_digits=4, decimal_places=2, null=True, blank=True)
+    main_timesheet_type = models.CharField(choices=WorkerDay.TYPES, max_length=2, blank=True)
+    main_timesheet_total_hours = models.DecimalField(max_digits=4, decimal_places=2, null=True, blank=True)
+    main_timesheet_day_hours = models.DecimalField(max_digits=4, decimal_places=2, null=True, blank=True)
+    main_timesheet_night_hours = models.DecimalField(max_digits=4, decimal_places=2, null=True, blank=True)
+    additional_timesheet_hours = models.DecimalField(max_digits=4, decimal_places=2, null=True, blank=True)
+
+    class Meta:
+        verbose_name = 'Запись в табеле'
+        verbose_name_plural = 'Записи в табеле'
+        unique_together = (
+            ('dt', 'employee'),
+        )
 
 
 class WorkerDayCashboxDetailsManager(models.Manager):

@@ -860,7 +860,7 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
         self.assertEqual(len(resp_data), 1)
         self.assertEqual(resp_data[0]['work_hours'], 10.75)
         self.assertIn('work_hours_details', resp_data[0])
-        self.assertDictEqual({'D': 10.75}, resp_data[0]['work_hours_details'])
+        self.assertDictEqual({'D': 10.75, 'N': 0.0}, resp_data[0]['work_hours_details'])
 
     def test_get_fact_tabel(self):
         plan_dttm_work_start = datetime.combine(self.dt, time(12, 0, 0))

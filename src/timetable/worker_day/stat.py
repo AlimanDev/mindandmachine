@@ -220,7 +220,8 @@ def get_month_range(year, month_num, return_days_in_month=False):
 
 
 class WorkersStatsGetter:
-    def __init__(self, shop_id, dt_from, dt_to, employee_id=None, employee_id__in=None):
+    def __init__(self, dt_from, dt_to, employee_id=None, employee_id__in=None, network=None, shop_id=None):
+        assert shop_id or network
         self.shop_id = shop_id
         self.dt_from = dt_from
         self.dt_to = dt_to
@@ -228,14 +229,15 @@ class WorkersStatsGetter:
         self.employee_id__in = employee_id__in.split(',') if isinstance(employee_id__in, str) else employee_id__in
         self.year = dt_from.year
         self.month = dt_from.month
+        self._network = network
 
     @cached_property
     def shop(self):
-        return Shop.objects.get(id=self.shop_id)
+        return Shop.objects.filter(id=self.shop_id).first()
 
     @cached_property
     def network(self):
-        return self.shop.network
+        return self._network or self.shop.network
 
     @cached_property
     def acc_period_range(self):
@@ -288,7 +290,6 @@ class WorkersStatsGetter:
             network_id=self.network.id,
             dt_from=dt_from,
             dt_to=dt_to,
-            employee__employments__shop_id=self.shop_id,
         ).select_related(
             'position'
         ).order_by(
@@ -335,6 +336,8 @@ class WorkersStatsGetter:
             employments = employments.filter(employee_id=self.employee_id)
         if self.employee_id__in:
             employments = employments.filter(employee_id__in=self.employee_id__in)
+        if self.shop_id:
+            employments = employments.filter(employee__employments__shop_id=self.shop_id)
 
         return list(employments)
 
@@ -344,13 +347,6 @@ class WorkersStatsGetter:
         for e in self.employments_list:
             employees_dict.setdefault(e.employee_id, []).append(e)
         return employees_dict
-
-    @cached_property
-    def empls_grouped_by_tabel_code(self):
-        empls_dict = {}
-        for empl in self.employments_list:
-            empls_dict.setdefault(empl.tabel_code, []).append(empl)
-        return empls_dict
 
     def _get_is_fact_key(self, is_fact):
         return 'fact' if is_fact else 'plan'
