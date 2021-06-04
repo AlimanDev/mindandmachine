@@ -214,7 +214,12 @@ class BaseTimesheetDivider:
         ).run()
 
         # TODO: брать norm_hours (произв. календ.) для каких-то категорий сотрудников?
-        norm_hours = worker_stats[self.employee.id]['plan']['approved']['sawh_hours']['curr_month']
+        try:
+            norm_hours = worker_stats[self.employee.id]['plan']['approved']['sawh_hours']['curr_month']
+        except KeyError:
+            logger.exception(
+                f'cant get norm_hours, stop overtime checking employee_id: {self.employee.id}, worker_stats: {worker_stats}')
+            return
         logger.info(f'norm_hours: {norm_hours}')
         overtime_plan = self._get_overtime(norm_hours)  # плановые переработки
         logger.info(f'overtime_plan at the beginning: {overtime_plan}')

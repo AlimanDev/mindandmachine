@@ -17,18 +17,26 @@ from ..models import WorkerDay, Timesheet
 logger = logging.getLogger('calc_timesheets')
 
 
-def _get_calc_periods(dt_fired=None):
-    dt_fired = dt_fired or datetime.date(3999, 12, 31)
+def _get_calc_periods(dt_hired=None, dt_fired=None):
+    dt_hired = dt_hired or datetime.date.min
+    dt_fired = dt_fired or datetime.date.max
     periods = []
     dt_now = timezone.now().date()
 
     if dt_now.day <= 4:
-        dt_start = (dt_now - relativedelta(months=1)).replace(day=1)
-        dt_end = min(dt_fired, (dt_start + relativedelta(months=1)).replace(day=1) - datetime.timedelta(days=1))
-        periods.append((dt_start, dt_end), )
+        prev_month_start = (dt_now - relativedelta(months=1)).replace(day=1)
+        prev_month_end = (prev_month_start + relativedelta(months=1)).replace(day=1) - datetime.timedelta(days=1)
+        dt_start = max(dt_hired, prev_month_start)
+        dt_end = min(dt_fired, prev_month_end)
+        if dt_start <= dt_end:
+            periods.append((dt_start, dt_end), )
 
-    dt_start = dt_now.replace(day=1)
-    dt_end = min(dt_fired, (dt_now + relativedelta(months=1)).replace(day=1) - datetime.timedelta(days=1))
+    curr_month_start = dt_now.replace(day=1)
+    curr_month_end = (dt_now + relativedelta(months=1)).replace(day=1) - datetime.timedelta(days=1)
+    dt_start = max(dt_hired, curr_month_start)
+    dt_end = min(dt_fired, curr_month_end)
+    if dt_start <= dt_end:
+        periods.append((dt_start, dt_end), )
     periods.append((dt_start, dt_end), )
 
     return periods
@@ -160,7 +168,10 @@ class TimesheetCalculator:
     def calc(self):
         logger.info(
             f'start timesheet calc for employee with id={self.employee.id} tabel_code={self.employee.tabel_code}')
-        periods = _get_calc_periods(dt_fired=getattr(self.employee, 'dt_fired', None))
+        periods = _get_calc_periods(
+            dt_hired=getattr(self.employee, 'dt_hired', None),
+            dt_fired=getattr(self.employee, 'dt_fired', None),
+        )
         logger.info(f'timesheet calc periods: {periods}')
         for period in periods:
             logger.debug(f'start period: {period}')
