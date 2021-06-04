@@ -1,6 +1,6 @@
 import logging
 
-from django.db.models import Max
+from django.db.models import Max, Min
 
 from src.base.models import Employee, Employment
 from src.celery.celery import app
@@ -19,8 +19,9 @@ def calc_timesheets():
             dt_from=dt_from, dt_to=dt_to,
         )
     ).annotate(
-        dt_fired=Max('employments__dt_fired')
-    )
+        dt_hired=Min('employments__dt_hired'),
+        dt_fired=Max('employments__dt_fired'),
+    ).distinct()
     for employee in qs:
         TimesheetCalculator(employee=employee).calc()
     logger.info('finish calc_timesheets')
