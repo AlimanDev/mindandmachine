@@ -144,68 +144,15 @@ class WorkerDayViewSet(BaseModelViewSet):
     def list(self, request, *args, **kwargs):
         if request.query_params.get('hours_details', False):
             data = []
-            def _time_to_float(t):
-                return t.hour + t.minute / 60 + t.second / 3600
-            prod_day_filter = {
-                'is_celebration': True,
-            }
-            if request.query_params.get('dt__gte', False):
-                prod_day_filter['dt__gte'] = request.query_params.get('dt__gte', False)
-            if request.query_params.get('dt__lte', False):
-                prod_day_filter['dt__lte'] = request.query_params.get('dt__lte', False)
-            celebration_dates = ProductionDay.objects.filter(**prod_day_filter).values_list('dt', flat=True)
 
-            night_edges = [Converter.parse_time(t) for t in request.user.network.night_edges]
-            for worker_day in self.filter_queryset(self.get_queryset().prefetch_related('worker_day_details').select_related('last_edited_by')):
+            for worker_day in self.filter_queryset(self.get_queryset().prefetch_related('worker_day_details').select_related('last_edited_by', 'shop__network')):
                 wd_dict = WorkerDayListSerializer(worker_day, context=self.get_serializer_context()).data
-                if worker_day.type in WorkerDay.TYPES_WITH_TM_RANGE:
-                    if worker_day.work_hours > datetime.timedelta(0):
-                        work_seconds = worker_day.work_hours.seconds
-                    else:
-                        wd_dict['work_hours'] = 0.0
-                        data.append(wd_dict)
-                        continue
-                    work_start = worker_day.dttm_work_start_tabel or worker_day.dttm_work_start
-                    work_end = worker_day.dttm_work_end_tabel or worker_day.dttm_work_end
-                    if not (work_start and work_end):
-                        wd_dict['work_hours'] = 0.0
-                        data.append(wd_dict)
-                        continue
-
-                    wd_dict['work_hours'] = round(work_seconds / 3600, 2)
-                    wd_dict['work_hours_details'] = {}
-                    if worker_day.dt in celebration_dates:
-                        wd_dict['work_hours_details']['H'] = wd_dict['work_hours']
-                    else:
-                        if work_end.time() <= night_edges[0] and work_start.date() == work_end.date():
-                            wd_dict['work_hours_details']['D'] = wd_dict['work_hours']
-                            data.append(wd_dict)
-                            continue
-                        if work_start.time() >= night_edges[0] and work_end.time() <= night_edges[1]:
-                            wd_dict['work_hours_details']['N'] = wd_dict['work_hours']
-                            data.append(wd_dict)
-                            continue
-
-                        if work_start.time() > night_edges[0] or work_start.time() < night_edges[1]:
-                            tm_start = _time_to_float(work_start.time())
-                        else:
-                            tm_start = _time_to_float(night_edges[0])
-                        if work_end.time() > night_edges[0] or work_end.time() < night_edges[1]:
-                            tm_end = _time_to_float(work_end.time())
-                        else:
-                            tm_end = _time_to_float(night_edges[1])
-
-                        night_seconds = (tm_end - tm_start if tm_end > tm_start else 24 - (tm_start - tm_end)) * 60 * 60
-                        total_seconds = (work_end - work_start).total_seconds()
-
-                        break_time_seconds = total_seconds - work_seconds
-
-                        wd_dict['work_hours_details']['D'] = round(
-                            (total_seconds - night_seconds - break_time_seconds / 2) / 3600, 2)
-                        wd_dict['work_hours_details']['N'] = round((night_seconds - break_time_seconds / 2) / 3600, 2)
-                        wd_dict['work_hours'] = wd_dict['work_hours_details']['D'] + wd_dict['work_hours_details']['N']
-                else:
-                    wd_dict['work_hours'] = 0.0
+                work_hours, work_hours_day, work_hours_night = worker_day.calc_day_and_night_work_hours()
+                wd_dict['work_hours'] = work_hours
+                wd_dict['work_hours_details'] = {
+                    'D': work_hours_day,
+                    'N': work_hours_night,
+                }
                 data.append(wd_dict)
         else:
             data = WorkerDayListSerializer(
