@@ -1,11 +1,13 @@
 from django.conf import settings
 from django.contrib.auth import login
 from django.db.models import Q
+from django.http import HttpResponseRedirect
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 from rest_framework.generics import GenericAPIView
 from rest_framework.response import Response
+from rest_framework.views import APIView
 
 from src.base.auth.authentication import CsrfExemptSessionAuthentication
 from src.base.exceptions import FieldError
@@ -112,7 +114,7 @@ class WFMTokenLoginView(GenericAPIView):
             # if not employments.exists():
             #     return JsonResponse.not_active_error()
 
-            login(request, user)
+            login(request, user, backend='django.contrib.auth.backends.ModelBackend')
         else:
             employments = Employment.objects.filter(
                 Q(dt_fired__gt=timezone.now().date())| Q(dt_fired__isnull=True),
@@ -128,3 +130,6 @@ class WFMTokenLoginView(GenericAPIView):
         return Response(data)
 
 
+class OneTimePassView(APIView):
+    def get(self, *args, **kwargs):
+        return HttpResponseRedirect(redirect_to=settings.EXTERNAL_HOST + '/')

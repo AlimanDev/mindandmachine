@@ -146,3 +146,4 @@ git+https://devxplorer@bitbucket.org/devxplorer/relatorio.git@89e7e2d37a27d81088
 dadata==0.3.0
 tzwhere==3.0.3
 django-environ==0.4.5
+django-sesame==2.4

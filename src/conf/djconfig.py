@@ -119,6 +119,7 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'src.util.csrf.CsrfMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'sesame.middleware.AuthenticationMiddleware',
     # 'src.main.auth.middleware.JWTAuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
@@ -154,6 +155,11 @@ DATABASES = {
         'PORT': '5432',
     }
 }
+
+AUTHENTICATION_BACKENDS = [
+    'django.contrib.auth.backends.ModelBackend',
+    'sesame.backends.ModelBackend',
+]
 
 AUTH_USER_MODEL = 'base.User'
 
@@ -469,6 +475,10 @@ IMPORT_EXPORT_USE_TRANSACTIONS = True
 
 # Eсли у пользователя пароль пустой, то при сохранении устанавливать пароль как логин
 SET_USER_PASSWORD_AS_LOGIN = False
+
+SESAME_ONE_TIME = True
+SESAME_MAX_AGE = 60 * 60  # время жизни временного токена 1 час
+SESAME_TOKEN_NAME = 'otp_token'
 
 if is_config_exists('djconfig_local.py'):
     from .djconfig_local import *
