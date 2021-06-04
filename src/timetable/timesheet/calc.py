@@ -89,7 +89,7 @@ class TimesheetCalculator:
                 wd_dict['fact_timesheet_night_hours'] = night_hours
             fact_timesheet_dict[self._get_empl_key(self.employee.id, worker_day.dt)] = wd_dict
 
-        plan_wdays_dict = {f'{wd.employee_id}_{wd.dt}': wd for wd in WorkerDay.objects.filter(
+        plan_wdays_dict = {self._get_empl_key(wd.employee_id, wd.dt): wd for wd in WorkerDay.objects.filter(
             employee=self.employee,
             dt__gte=dt_start,
             dt__lte=dt_end,
