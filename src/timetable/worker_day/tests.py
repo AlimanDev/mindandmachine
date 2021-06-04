@@ -653,7 +653,7 @@ class TestUploadDownload(APITestCase):
 
     def test_upload_timetable(self):
         file = open('etc/scripts/timetable.xlsx', 'rb')
-        response = self.client.post(f'{self.url}upload/', {'shop_id': self.shop.id, 'file': file})
+        response = self.client.post(f'{self.url}upload/', {'shop_id': self.shop.id, 'file': file}, HTTP_ACCEPT_LANGUAGE='ru')
         file.close()
         self.assertEqual(response.status_code, 200)
         self.assertEqual(WorkerDay.objects.filter(is_approved=False).count(), 150)
@@ -673,7 +673,7 @@ class TestUploadDownload(APITestCase):
     def test_download_timetable(self):
         fill_calendar('2020.4.1', '2021.12.31', self.region.id)
         file = open('etc/scripts/timetable.xlsx', 'rb')
-        self.client.post(f'{self.url}upload/', {'shop_id': self.shop.id, 'file': file})
+        self.client.post(f'{self.url}upload/', {'shop_id': self.shop.id, 'file': file}, HTTP_ACCEPT_LANGUAGE='ru')
         file.close()
         response = self.client.get(
             f'{self.url}download_timetable/?shop_id={self.shop.id}&dt_from=2020-04-01&is_approved=False')
