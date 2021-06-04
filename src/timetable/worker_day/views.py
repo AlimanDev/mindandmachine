@@ -1503,8 +1503,11 @@ class WorkerDayViewSet(BaseModelViewSet):
             tabel_generator.generate(convert_to=shop.network.convert_tabel_to or convert_to),
             content_type='application/octet-stream',
         )
-        filename = f'Табель_для_подразделения_{shop.code}_от_{timezone.now().strftime("%Y-%m-%d")}.' \
-                   f'{shop.network.convert_tabel_to or convert_to}'
+        filename = _('Tabel_for_shop_{}_from_{}.{}').format(
+            shop.code,
+            timezone.now().strftime("%Y-%m-%d"),
+            shop.network.convert_tabel_to or convert_to,
+        )
         response['Content-Disposition'] = f'attachment; filename={escape_uri_path(filename)}'
         return response
 
