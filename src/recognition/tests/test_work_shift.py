@@ -1,4 +1,5 @@
 from datetime import timedelta, time, date, datetime
+from django.http import response
 
 from django.utils import timezone
 from rest_framework import status
@@ -42,6 +43,7 @@ class TestWorkShiftViewSet(TestsHelperMixin, APITestCase):
 
         token = response.json()['token']
         self.client.defaults['HTTP_AUTHORIZATION'] = 'Token %s' % token
+        return response
 
     def _test_work_shift(self, dt, username, expected_start=None, expected_end=None, expected_shop_code=None):
         resp = self.client.get(
@@ -163,6 +165,7 @@ class TestWorkShiftViewSet(TestsHelperMixin, APITestCase):
                     'shop': {
                         'id': self.employment2.shop.id, 
                         'name': self.employment2.shop.name,
+                        'timezone': 'Europe/Moscow',
                     },
                     'tabel_code': self.employee2.tabel_code, 
                     'worker_days': [
@@ -180,6 +183,7 @@ class TestWorkShiftViewSet(TestsHelperMixin, APITestCase):
                     'shop': {
                         'id': emp.shop.id, 
                         'name': emp.shop.name,
+                        'timezone': 'Europe/Moscow',
                     },
                     'worker_days': [
                         {
@@ -218,3 +222,7 @@ class TestWorkShiftViewSet(TestsHelperMixin, APITestCase):
         }
         self.assertEqual(len(resp.json()), 5)
         self.assertEqual(user2, user2_data)
+
+    def test_auth_get_tz(self):
+        response = self._authorize_tick_point()
+        self.assertEqual(response.json()['shop']['timezone'], 'Europe/Moscow')
