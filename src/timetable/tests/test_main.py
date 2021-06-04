@@ -444,8 +444,8 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
             type=WorkerDay.TYPE_WORKDAY,
             shop=self.shop,
         )
-        create_att_record(AttendanceRecords.TYPE_COMING, datetime.combine(dt, time(17, 49)), self.user2.id, self.employee2.id, self.shop.id)
-        create_att_record(AttendanceRecords.TYPE_COMING, datetime.combine(dt + timedelta(1), time(1, 5)), self.user2.id, self.employee2.id, self.shop.id, terminal=False)
+        create_att_record(AttendanceRecords.TYPE_COMING, datetime.combine(dt, time(17, 49)), self.user2.id, self.employee2.id, self.shop.id, terminal=False)
+        create_att_record(AttendanceRecords.TYPE_COMING, datetime.combine(dt + timedelta(1), time(1, 5)), self.user2.id, self.employee2.id, self.shop.id)
         create_att_record(AttendanceRecords.TYPE_COMING, datetime.combine(dt, time(11, 56)), self.user3.id, self.employee3.id, self.shop.id, terminal=False)
         create_att_record(AttendanceRecords.TYPE_LEAVING, datetime.combine(dt, time(23, 1)), self.user3.id, self.employee3.id, self.shop.id)
 
