@@ -755,7 +755,7 @@ class WorkersStatsGetter:
                         sawh_settings_empl_sum = sum(
                             v for k, v in empl_dict['sawh_hours_by_months'].items() if k in months_until_acc_period_end)
                         empl_dict.setdefault('sawh_settings_empl_normalized', {})[month_num] = \
-                            empl_dict['sawh_hours_by_months'][month_num] / sawh_settings_empl_sum
+                            (empl_dict['sawh_hours_by_months'][month_num] / sawh_settings_empl_sum) if sawh_settings_empl_sum else 0
                         empl_dict.setdefault('sawh_hours_by_months', {})[month_num] = \
                             empl_dict['sawh_settings_empl_normalized'][month_num] * empl_dict[
                                 'norm_hours_until_acc_period_end']
