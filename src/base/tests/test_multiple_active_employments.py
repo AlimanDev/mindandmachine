@@ -507,7 +507,8 @@ class TestGetWorkersStatAndTabel(MultipleActiveEmploymentsSupportMixin, APITestC
                             "acc_period": 144.0,
                             "prev_months": 0.0,
                             "curr_month": 144.0,
-                            "curr_month_end": 144.0
+                            "curr_month_end": 144.0,
+                            "selected_period": 144.0,
                         },
                         "overtime": {
                             "acc_period": -100.25,
@@ -532,7 +533,8 @@ class TestGetWorkersStatAndTabel(MultipleActiveEmploymentsSupportMixin, APITestC
                             "acc_period": 144.0,
                             "prev_months": 0.0,
                             "curr_month": 144.0,
-                            "curr_month_end": 144.0
+                            "curr_month_end": 144.0,
+                            "selected_period": 144.0,
                         },
                         "overtime": {
                             "acc_period": -144.0,
@@ -578,7 +580,8 @@ class TestGetWorkersStatAndTabel(MultipleActiveEmploymentsSupportMixin, APITestC
                             "acc_period": 144.0,
                             "prev_months": 0.0,
                             "curr_month": 144.0,
-                            "curr_month_end": 144.0
+                            "curr_month_end": 144.0,
+                            "selected_period": 144.0,
                         },
                         "overtime": {
                             "acc_period": -144.0,
@@ -603,7 +606,8 @@ class TestGetWorkersStatAndTabel(MultipleActiveEmploymentsSupportMixin, APITestC
                             "acc_period": 176.0,
                             "prev_months": 0.0,
                             "curr_month": 176.0,
-                            "curr_month_end": 176.0
+                            "curr_month_end": 176.0,
+                            "selected_period": 176.0,
                         },
                         "overtime": {
                             "acc_period": -176.0,
@@ -648,7 +652,8 @@ class TestGetWorkersStatAndTabel(MultipleActiveEmploymentsSupportMixin, APITestC
                             "acc_period": 72.0,
                             "prev_months": 0.0,
                             "curr_month": 72.0,
-                            "curr_month_end": 72.0
+                            "curr_month_end": 72.0,
+                            "selected_period": 72.0,
                         },
                         "overtime": {
                             "acc_period": 15.5,
@@ -673,7 +678,8 @@ class TestGetWorkersStatAndTabel(MultipleActiveEmploymentsSupportMixin, APITestC
                             "acc_period": 72.0,
                             "prev_months": 0.0,
                             "curr_month": 72.0,
-                            "curr_month_end": 72.0
+                            "curr_month_end": 72.0,
+                            "selected_period": 72.0,
                         },
                         "overtime": {
                             "acc_period": -72.0,
@@ -719,7 +725,8 @@ class TestGetWorkersStatAndTabel(MultipleActiveEmploymentsSupportMixin, APITestC
                             "acc_period": 72.0,
                             "prev_months": 0.0,
                             "curr_month": 72.0,
-                            "curr_month_end": 72.0
+                            "curr_month_end": 72.0,
+                            "selected_period": 72.0,
                         },
                         "overtime": {
                             "acc_period": -72.0,
@@ -744,7 +751,8 @@ class TestGetWorkersStatAndTabel(MultipleActiveEmploymentsSupportMixin, APITestC
                             "acc_period": 88.0,
                             "prev_months": 0.0,
                             "curr_month": 88.0,
-                            "curr_month_end": 88.0
+                            "curr_month_end": 88.0,
+                            "selected_period": 88.0,
                         },
                         "overtime": {
                             "acc_period": -88.0,
