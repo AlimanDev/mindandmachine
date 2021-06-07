@@ -151,6 +151,10 @@ class Network(AbstractActiveModel):
         default=False,
         verbose_name='Создавать скрытое трудоустройство при проставлении/изменении director_code в подразделении',
     )
+    show_user_biometrics_block = models.BooleanField(
+        default=False,
+        verbose_name='Отображать блок биометрии в деталях сотрудника',
+    )
 
     @property
     def settings_values_prop(self):
