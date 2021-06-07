@@ -84,6 +84,7 @@ class NetworkSerializer(serializers.ModelSerializer):
             'default_stats',
             'show_tabel_graph',
             'show_worker_day_tasks',
+            'show_user_biometrics_block',
         ]
 
 
