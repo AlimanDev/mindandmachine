@@ -206,7 +206,9 @@ class TestWorkShiftViewSet(TestsHelperMixin, APITestCase):
                     'day_bottom': 'deadtime',
                     'day_top': 'covering',
                     'employee_bottom': 'norm_hours_curr_month',
-                    'employee_top': 'work_hours_total'
+                    'employee_top': 'work_hours_total',
+                    'timesheet_employee_bottom': 'sawh_hours',
+                    'timesheet_employee_top': 'fact_total_hours_sum',
                 },
                 'enable_camera_ticks': False,
                 'id': self.user2.network_id,
@@ -217,6 +219,7 @@ class TestWorkShiftViewSet(TestsHelperMixin, APITestCase):
                 'show_tabel_graph': True,
                 'show_worker_day_additional_info': False,
                 'show_worker_day_tasks': False,
+                'show_user_biometrics_block': False,
                 'url': None
             },
         }

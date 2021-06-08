@@ -598,7 +598,7 @@ CELERY_BEAT_SCHEDULE = {
         'options': {'queue': BACKEND_QUEUE}
     },
     'task-calc-timesheets': {
-        'task': 'src.timetable.timesheet.calc_timesheets',
+        'task': 'src.timetable.timesheet.tasks.calc_timesheets',
         'schedule': crontab(hour=3, minute=15),
         'options': {'queue': BACKEND_QUEUE}
     },

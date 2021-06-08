@@ -12,7 +12,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Django REST framework\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2021-06-08 08:56+0000\n"
+"POT-Creation-Date: 2021-06-08 10:37+0000\n"
 "PO-Revision-Date: 2017-08-03 14:58+0000\n"
 "Last-Translator: Grigory Mishchenko <grishkokot@gmail.com>\n"
 "Language-Team: Russian (http://www.transifex.com/django-rest-framework-1/"
@@ -57,7 +57,7 @@ msgstr "Нет такого пользователя"
 msgid "Unable to log in with provided credentials."
 msgstr "Невозможно войти с предоставленными учетными данными."
 
-#: src/base/models.py:247 src/base/models.py:253
+#: src/base/models.py:251 src/base/models.py:257
 #, python-brace-format
 msgid ""
 "Bad break triplet format {triplet}, should be [[int, int, [int, int,]],]."
@@ -65,38 +65,38 @@ msgstr ""
 "Некорректный формат перерыва {triplet}, должно быть [[int, int, [int, "
 "int,]],]."
 
-#: src/base/models.py:250
+#: src/base/models.py:254
 #, python-brace-format
 msgid "First value of period can not be greater then second value: {triplet}"
 msgstr ""
 "Первое значение периода не может быть больше второго значения: {triplet}"
 
-#: src/base/models.py:256
+#: src/base/models.py:260
 #, python-brace-format
 msgid "Value of break can not be greater than value of period: {triplet}"
 msgstr "Значение перерыва не может быть больше значения периода: {triplet}"
 
-#: src/base/models.py:440
+#: src/base/models.py:444
 #, python-brace-format
 msgid "Shop with parent_code={code} not found"
 msgstr "Подразделение с parent_code={code} не найдено"
 
-#: src/base/models.py:542
+#: src/base/models.py:546
 msgid "Keys of open times and close times are different."
 msgstr "Ключи в времени открытия и времени закрытия различаются."
 
-#: src/base/models.py:544
+#: src/base/models.py:548
 msgid "'All' and individual days cannot be specified."
 msgstr "Нельзя указывать all и отдельные дни."
 
-#: src/base/models.py:557
+#: src/base/models.py:561
 msgid ""
 "It is not possible to change the load template as it is in the calculation "
 "process."
 msgstr ""
 "Невозможно изменить шаблон нагрузки, так как он находится в процессе расчета."
 
-#: src/base/models.py:1119
+#: src/base/models.py:1123
 msgid ""
 "Unable to define worker access group. Assign an access group to him or a "
 "position associated with an access group."
@@ -108,38 +108,38 @@ msgstr ""
 msgid "shop_id should be defined"
 msgstr "Произошла ошибка. Попробуйте перезагрузить страницу."
 
-#: src/base/serializers.py:189
+#: src/base/serializers.py:192
 msgid "Passwords are mismatched."
 msgstr "Пароли не совпадают."
 
-#: src/base/serializers.py:190
+#: src/base/serializers.py:193
 msgid "Password is wrong."
 msgstr "Неверный пароль."
 
-#: src/base/serializers.py:261
+#: src/base/serializers.py:264
 #, python-brace-format
 msgid "Employment from {dt_hired} to {dt_fired} already exists."
 msgstr ""
 "В этом магазине уже заведено трудоустройство с {dt_hired} по {dt_fired}."
 
-#: src/base/serializers.py:262 src/timetable/worker_day/serializers.py:94
+#: src/base/serializers.py:265 src/timetable/worker_day/serializers.py:94
 #, python-brace-format
 msgid "There is {amount} models of user with username: {username}."
 msgstr ""
 "Существует {amount} моделей пользователя с именем пользователя: {username}."
 
-#: src/base/serializers.py:263
+#: src/base/serializers.py:266
 #, python-brace-format
 msgid "There is {amount} models of user with user_id: {user_id}."
 msgstr "Существует {amount} моделей пользователя с user_id: {user_id}."
 
-#: src/base/serializers.py:264 src/tasks/serializers.py:19
+#: src/base/serializers.py:267 src/tasks/serializers.py:19
 #: src/tasks/serializers.py:20
 #, python-brace-format
 msgid "There is {amount} models of shop with code: {code}."
 msgstr "Есть {amount} магазинов с кодом: {code}."
 
-#: src/base/serializers.py:265
+#: src/base/serializers.py:268
 #, python-brace-format
 msgid "There is {amount} models of position with code: {code}."
 msgstr "Есть {amount} должностей с кодом: {code}."
@@ -162,6 +162,23 @@ msgid ""
 msgstr ""
 "Неправильный формат времени {time} для значения {key}. Формат должен быть "
 "{format}."
+
+#: src/base/views.py:168
+#, fuzzy
+#| msgid "It is necessary to transfer a biometrics template (file)."
+msgid "It is necessary to transfer a biometrics template (file field)."
+msgstr "Необходимо передать шаблон биометрии (поле file)"
+
+#: src/base/views.py:183
+msgid "Biometrics template added successfully."
+msgstr "Шаблон биометрии успешно добавлен."
+
+#: src/base/views.py:186
+msgid ""
+"The employee has biometrics. To add a new biometrics template, you need to "
+"delete the current template."
+msgstr ""
+"Биометрия уже создана. Для создания новой биометрии сначала удалите нынешнюю."
 
 #: src/forecast/load_template/utils.py:511
 #, python-brace-format
@@ -316,11 +333,11 @@ msgstr "Начало"
 
 #: src/templates/user_change_form.html:9
 msgid "History"
-msgstr ""
+msgstr "История"
 
 #: src/templates/user_change_form.html:11
 msgid "View on site"
-msgstr ""
+msgstr "Посмотреть на сайте"
 
 #: src/timetable/admin.py:168
 msgid "Not approved plan"
@@ -447,15 +464,15 @@ msgstr "Расписание"
 
 #: src/timetable/models.py:1019
 msgid "Attendance records"
-msgstr ""
+msgstr "Отметки о приходе/уходе"
 
 #: src/timetable/models.py:1020
 msgid "Manual changes"
-msgstr ""
+msgstr "Ручные изменения"
 
 #: src/timetable/models.py:1021
 msgid "Determined by the system"
-msgstr ""
+msgstr "Определено системой"
 
 #: src/timetable/vacancy/utils.py:463
 msgid "There is no such vacancy"
