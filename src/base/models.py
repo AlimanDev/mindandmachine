@@ -847,17 +847,18 @@ class ProductionDay(AbstractModel):
             type__in=ProductionDay.WORK_TYPES,
         )
         if month:
-            q |= Q(dt__month=month)
+            q &= Q(dt__month=month)
 
         prod_cal_subq = ProductionDay.objects.filter(q).annotate(
-            is_equal_region_id=Case(
-                region_id=Value(region_id), then=True),
-                default=False, output_field=models.BooleanField(),
-        ).order_by('-is_equal_region_id')
+            is_equal_regions=Case(
+                When(region_id=Value(region_id), then=True),
+                default=False, output_field=models.BooleanField()
+            ),
+        ).order_by('-is_equal_regions')
 
         norm_work_hours = ProductionDay.objects.filter(
             q,
-            id=Subquery(prod_cal_subq.values('id')[:1])
+            id=Subquery(prod_cal_subq.values_list('id', flat=True)[:1])
         ).annotate(
             work_hours=Case(
                 When(type=ProductionDay.TYPE_WORK, then=Value(ProductionDay.WORK_NORM_HOURS[ProductionDay.TYPE_WORK])),
