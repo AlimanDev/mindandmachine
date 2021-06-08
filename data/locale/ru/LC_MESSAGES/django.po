@@ -12,7 +12,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Django REST framework\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2021-06-03 10:22+0000\n"
+"POT-Creation-Date: 2021-06-08 08:56+0000\n"
 "PO-Revision-Date: 2017-08-03 14:58+0000\n"
 "Last-Translator: Grigory Mishchenko <grishkokot@gmail.com>\n"
 "Language-Team: Russian (http://www.transifex.com/django-rest-framework-1/"
@@ -25,16 +25,39 @@ msgstr ""
 "%10<=4 && (n%100<12 || n%100>14) ? 1 : n%10==0 || (n%10>=5 && n%10<=9) || (n"
 "%100>=11 && n%100<=14)? 2 : 3);\n"
 
-#: src/base/auth/views.py:36
+#: src/base/admin.py:125
+msgid "Personal info"
+msgstr ""
+
+#: src/base/admin.py:126
+#, fuzzy
+#| msgid "Permission denied."
+msgid "Permissions"
+msgstr "Доступ запрещен"
+
+#: src/base/admin.py:129
+msgid "Important dates"
+msgstr ""
+
+#: src/base/admin.py:130
+msgid "Other"
+msgstr ""
+
+#: src/base/admin.py:155
+#, python-format
+msgid "%(name)s object with primary key %(key)r does not exist."
+msgstr ""
+
+#: src/base/auth/views.py:38
 msgid "There is no such user"
 msgstr "Нет такого пользователя"
 
-#: src/base/auth/views.py:37 src/base/auth/views.py:105
+#: src/base/auth/views.py:39 src/base/auth/views.py:107
 #: src/recognition/serializers.py:36
 msgid "Unable to log in with provided credentials."
 msgstr "Невозможно войти с предоставленными учетными данными."
 
-#: src/base/models.py:234 src/base/models.py:240
+#: src/base/models.py:247 src/base/models.py:253
 #, python-brace-format
 msgid ""
 "Bad break triplet format {triplet}, should be [[int, int, [int, int,]],]."
@@ -42,38 +65,38 @@ msgstr ""
 "Некорректный формат перерыва {triplet}, должно быть [[int, int, [int, "
 "int,]],]."
 
-#: src/base/models.py:237
+#: src/base/models.py:250
 #, python-brace-format
 msgid "First value of period can not be greater then second value: {triplet}"
 msgstr ""
 "Первое значение периода не может быть больше второго значения: {triplet}"
 
-#: src/base/models.py:243
+#: src/base/models.py:256
 #, python-brace-format
 msgid "Value of break can not be greater than value of period: {triplet}"
 msgstr "Значение перерыва не может быть больше значения периода: {triplet}"
 
-#: src/base/models.py:427
+#: src/base/models.py:440
 #, python-brace-format
 msgid "Shop with parent_code={code} not found"
 msgstr "Подразделение с parent_code={code} не найдено"
 
-#: src/base/models.py:529
+#: src/base/models.py:542
 msgid "Keys of open times and close times are different."
 msgstr "Ключи в времени открытия и времени закрытия различаются."
 
-#: src/base/models.py:531
+#: src/base/models.py:544
 msgid "'All' and individual days cannot be specified."
 msgstr "Нельзя указывать all и отдельные дни."
 
-#: src/base/models.py:544
+#: src/base/models.py:557
 msgid ""
 "It is not possible to change the load template as it is in the calculation "
 "process."
 msgstr ""
 "Невозможно изменить шаблон нагрузки, так как он находится в процессе расчета."
 
-#: src/base/models.py:1102
+#: src/base/models.py:1119
 msgid ""
 "Unable to define worker access group. Assign an access group to him or a "
 "position associated with an access group."
@@ -285,10 +308,19 @@ msgstr ""
 msgid "There is {amount} models of shop with tabel_code: {tabel_code}."
 msgstr "Есть {amount} магазинов с кодом: {code}."
 
-#: src/templates/download_violators.html:14 src/templates/recalc_load.html:14
-#: src/templates/recalc_wh.html:14
+#: src/templates/download_violators.html:14
+#: src/templates/generate_otp_auth_link.html:14
+#: src/templates/recalc_load.html:14 src/templates/recalc_wh.html:14
 msgid "Home"
 msgstr "Начало"
+
+#: src/templates/user_change_form.html:9
+msgid "History"
+msgstr ""
+
+#: src/templates/user_change_form.html:11
+msgid "View on site"
+msgstr ""
 
 #: src/timetable/admin.py:168
 msgid "Not approved plan"
@@ -370,42 +402,60 @@ msgid ""
 "задачам. ({task_violation_str})"
 msgstr ""
 
-#: src/timetable/models.py:482 src/util/dg/tabel.py:37
+#: src/timetable/models.py:486 src/util/dg/tabel.py:38
 msgid "BT"
 msgstr "К"
 
-#: src/timetable/models.py:483
+#: src/timetable/models.py:487
 #: src/timetable/worker_day/xlsx_utils/timetable.py:128
-#: src/timetable/worker_day/xlsx_utils/timetable.py:309 src/util/dg/tabel.py:36
+#: src/timetable/worker_day/xlsx_utils/timetable.py:309 src/util/dg/tabel.py:37
 msgid "H"
 msgstr "В"
 
-#: src/timetable/models.py:484
+#: src/timetable/models.py:488 src/util/dg/tabel.py:43
 msgid "ABS"
 msgstr "Н"
 
-#: src/timetable/models.py:486
+#: src/timetable/models.py:490
 msgid "ST"
 msgstr "КВ"
 
-#: src/timetable/models.py:487 src/util/dg/tabel.py:41
+#: src/timetable/models.py:491 src/util/dg/tabel.py:42
 msgid "S"
 msgstr "Б"
 
-#: src/timetable/models.py:488
+#: src/timetable/models.py:492
 #: src/timetable/worker_day/xlsx_utils/timetable.py:129
-#: src/timetable/worker_day/xlsx_utils/timetable.py:310 src/util/dg/tabel.py:38
+#: src/timetable/worker_day/xlsx_utils/timetable.py:310 src/util/dg/tabel.py:39
 msgid "V"
 msgstr "ОТ"
 
-#: src/timetable/models.py:491 src/util/dg/tabel.py:39
+#: src/timetable/models.py:495 src/util/dg/tabel.py:40
 msgid "VO"
 msgstr "ДО"
 
-#: src/timetable/models.py:494
-#: src/timetable/worker_day/xlsx_utils/timetable.py:311 src/util/dg/tabel.py:40
+#: src/timetable/models.py:498
+#: src/timetable/worker_day/xlsx_utils/timetable.py:311 src/util/dg/tabel.py:41
 msgid "MAT"
 msgstr "ОЖ"
+
+#: src/timetable/models.py:1018
+#, fuzzy
+#| msgid "Timetable"
+msgid "Planned timetable"
+msgstr "Расписание"
+
+#: src/timetable/models.py:1019
+msgid "Attendance records"
+msgstr ""
+
+#: src/timetable/models.py:1020
+msgid "Manual changes"
+msgstr ""
+
+#: src/timetable/models.py:1021
+msgid "Determined by the system"
+msgstr ""
 
 #: src/timetable/vacancy/utils.py:463
 msgid "There is no such vacancy"
@@ -624,44 +674,56 @@ msgstr ""
 msgid "There is no such user in your network."
 msgstr "В вашей сети нет такого пользователя."
 
-#: src/timetable/worker_day/views.py:859
+#: src/timetable/worker_day/views.py:806
 msgid "This vacancy does not exist or has already been approved."
 msgstr "Такой вакансии не существует или она уже подтверждена."
 
-#: src/timetable/worker_day/views.py:862
+#: src/timetable/worker_day/views.py:809
 msgid "You can not approve vacancy from other network."
 msgstr "Вы не можете подтвердить вакансию из другой сети."
 
-#: src/timetable/worker_day/views.py:903
+#: src/timetable/worker_day/views.py:850
 msgid "There is no such vacancy."
 msgstr "Такой вакансии не существует"
 
-#: src/timetable/worker_day/views.py:907
+#: src/timetable/worker_day/views.py:854
 msgid "The vacancy cannot be edited because it has already been responded."
 msgstr "Невозможно отредактировать вакансию, так как на неё уже откликнулись."
 
-#: src/timetable/worker_day/views.py:1461
-#: src/timetable/worker_day/views.py:1487 src/util/dg/tabel.py:278
+#: src/timetable/worker_day/views.py:1408
+#: src/timetable/worker_day/views.py:1434 src/util/dg/tabel.py:297
 msgid "Employee id"
 msgstr "Табельный номер"
 
-#: src/timetable/worker_day/views.py:1462
-#: src/timetable/worker_day/views.py:1487 src/util/dg/tabel.py:275
+#: src/timetable/worker_day/views.py:1409
+#: src/timetable/worker_day/views.py:1434 src/util/dg/tabel.py:294
 msgid "Full name"
 msgstr "ФИО"
 
-#: src/timetable/worker_day/views.py:1463
-#: src/timetable/worker_day/views.py:1487 src/util/dg/tabel.py:285
+#: src/timetable/worker_day/views.py:1410
+#: src/timetable/worker_day/views.py:1434 src/util/dg/tabel.py:304
 msgid "Position"
 msgstr "Должность"
 
-#: src/timetable/worker_day/views.py:1484
+#: src/timetable/worker_day/views.py:1431
 msgid "Timetable"
 msgstr "Расписание"
 
-#: src/timetable/worker_day/views.py:1559
-msgid "Tabel_for_shop_{}_from_{}.{}"
-msgstr "Табель_для_подразделения_{}_от_{}.{}"
+#: src/timetable/worker_day/views.py:1508
+msgid "Fact"
+msgstr "Факт"
+
+#: src/timetable/worker_day/views.py:1509
+msgid "Main"
+msgstr "Осн"
+
+#: src/timetable/worker_day/views.py:1510
+msgid "Additional"
+msgstr "Доп"
+
+#: src/timetable/worker_day/views.py:1512
+msgid "{}_timesheet_for_shop_{}_from_{}.{}"
+msgstr "{}_табель_для_подразделения_{}_от_{}.{}"
 
 #: src/timetable/worker_day/xlsx_utils/timetable.py:99
 msgid "Shop: {}"
@@ -800,84 +862,84 @@ msgstr "Ноябрь"
 msgid "December"
 msgstr "Декабрь"
 
-#: src/util/dg/tabel.py:35
+#: src/util/dg/tabel.py:36
 msgid "W"
 msgstr "Я"
 
-#: src/util/dg/tabel.py:273
+#: src/util/dg/tabel.py:292
 msgid "Tabel for {} {}y"
 msgstr "Табель учета рабочего времени за {} {}г"
 
-#: src/util/dg/tabel.py:276
+#: src/util/dg/tabel.py:295
 msgid "Number in order"
 msgstr "Номер по порядку"
 
-#: src/util/dg/tabel.py:277
+#: src/util/dg/tabel.py:296
 msgid "Last name, initials, position (specialty, profession)"
 msgstr "Фамилия, инициалы, должность (специальность, профессия)"
 
-#: src/util/dg/tabel.py:279
+#: src/util/dg/tabel.py:298
 msgid ""
 "Notes on attendance and non-attendance at work on the dates of the month"
 msgstr "Отметки о явках и неявках на работу по числам месяца"
 
-#: src/util/dg/tabel.py:280
+#: src/util/dg/tabel.py:299
 msgid "Worked out for"
 msgstr "Отработано за"
 
-#: src/util/dg/tabel.py:281
+#: src/util/dg/tabel.py:300
 msgid "half of the month (I, II)"
 msgstr "половину месяца (I, II)"
 
-#: src/util/dg/tabel.py:282
+#: src/util/dg/tabel.py:301
 msgid "month"
 msgstr "месяц"
 
-#: src/util/dg/tabel.py:283
+#: src/util/dg/tabel.py:302
 msgid "days"
 msgstr "дни"
 
-#: src/util/dg/tabel.py:284
+#: src/util/dg/tabel.py:303
 msgid "hours"
 msgstr "часы"
 
-#: src/util/dg/tabel.py:286
+#: src/util/dg/tabel.py:305
 msgid "Total hours"
 msgstr "Итого часы"
 
-#: src/util/dg/tabel.py:287
+#: src/util/dg/tabel.py:306
 msgid "Total days"
 msgstr "Итого дни"
 
-#: src/util/dg/tabel.py:288
+#: src/util/dg/tabel.py:307
 msgid "Date"
 msgstr "Дата"
 
-#: src/util/dg/tabel.py:289
+#: src/util/dg/tabel.py:308
 msgid "Shop code"
 msgstr "Код ОП"
 
-#: src/util/dg/tabel.py:290
+#: src/util/dg/tabel.py:309
 msgid "Fact, h"
 msgstr "Факт, ч"
 
-#: src/util/dg/tabel.py:291
+#: src/util/dg/tabel.py:310
 msgid "Plan, h"
 msgstr "План, ч"
 
-#: src/util/dg/tabel.py:292
+#: src/util/dg/tabel.py:311
 msgid "Shift start time, fact, h"
 msgstr "Время начала смены, факт, ч"
 
-#: src/util/dg/tabel.py:293
+#: src/util/dg/tabel.py:312
 msgid "Shift end time, fact, h"
 msgstr "Время окончания смены, факт, ч"
 
-#: src/util/dg/tabel.py:294
+#: src/util/dg/tabel.py:313
 msgid "Shift start time, plan, h"
 msgstr "Время начала смены, план, ч"
 
-#: src/util/dg/tabel.py:295
+#: src/util/dg/tabel.py:314
 msgid "Shift end time, plan, h"
 msgstr "Время окончания смены, план, ч"
 
@@ -1192,9 +1254,6 @@ msgstr "Файлы с таким расширением не поддержив�
 
 #~ msgid "Invalid version in query parameter."
 #~ msgstr "Недопустимая версия в параметре запроса."
-
-#~ msgid "Permission denied."
-#~ msgstr "Доступ запрещен"
 
 #
 #~ msgid "Loading template and operation type name must be unique"

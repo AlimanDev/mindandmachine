@@ -508,10 +508,15 @@ class DownloadSerializer(serializers.Serializer):
 
 
 class DownloadTabelSerializer(serializers.Serializer):
+    TYPE_FACT = 'F'
+    TYPE_MAIN = 'M'
+    TYPE_ADDITIONAL = 'A'
+
     dt_from = serializers.DateField(format=QOS_DATE_FORMAT)
     dt_to = serializers.DateField(format=QOS_DATE_FORMAT)
     shop_id = serializers.IntegerField()
     convert_to = serializers.ChoiceField(required=False, choices=['pdf', 'xlsx'], default='xlsx')
+    type = serializers.ChoiceField(required=False, choices=[TYPE_FACT, TYPE_MAIN, TYPE_ADDITIONAL], default=TYPE_FACT)
 
 
 class BlockOrUnblockWorkerDaySerializer(serializers.ModelSerializer):
