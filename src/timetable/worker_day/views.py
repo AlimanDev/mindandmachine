@@ -22,7 +22,7 @@ from rest_framework.response import Response
 from rest_framework.serializers import ValidationError
 
 from src.base.exceptions import FieldError
-from src.base.models import Employment, Shop, ProductionDay, Group, User, Employee
+from src.base.models import Employment, Shop, Group, User, Employee
 from src.base.permissions import WdPermission
 from src.base.views_abstract import BaseModelViewSet
 from src.events.signals import event_signal
@@ -36,6 +36,7 @@ from src.timetable.models import (
     WorkerDayPermission,
     GroupWorkerDayPermission,
 )
+from src.timetable.timesheet.tasks import calc_timesheets
 from src.timetable.vacancy.utils import cancel_vacancies, confirm_vacancy
 from src.timetable.worker_day.serializers import (
     WorkerDaySerializer,
@@ -621,6 +622,8 @@ class WorkerDayViewSet(BaseModelViewSet):
                     shop_id=serializer.data['shop_id'],
                     context=event_context,
                 ))
+
+                transaction.on_commit(lambda: calc_timesheets.delay(employee_id__in=list(worker_dates_dict.keys())))
 
                 WorkerDay.check_work_time_overlap(
                     employee_days_q=employee_days_q,
