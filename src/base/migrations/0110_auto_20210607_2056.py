@@ -26,10 +26,14 @@ def update_prod_cal_view(apps, schema_editor):
          JOIN base_region r ON s.region_id = r.id
          JOIN base_productionday pd ON
              (pd.dt >= employment.dt_hired OR employment.dt_hired IS NULL)
-                 AND (pd.dt <= employment.dt_fired OR employment.dt_fired IS NULL)
+             AND (pd.dt <= employment.dt_fired OR employment.dt_fired IS NULL)
+             AND (pd.region_id = r.id or pd.region_id = r.parent_id)
                  AND pd.id = (
                      SELECT pd2.id FROM base_productionday pd2 WHERE
-                         pd2.dt = pd.dt
+                         (pd2.dt >= employment.dt_hired OR employment.dt_hired IS NULL)
+                         AND (pd2.dt <= employment.dt_fired OR employment.dt_fired IS NULL)
+                         AND (pd2.region_id = r.id or pd2.region_id = r.parent_id)
+                         AND pd2.dt = pd.dt
                      ORDER BY pd2.region_id = r.id DESC, pd2.region_id = r.parent_id DESC
                      LIMIT 1
                  )

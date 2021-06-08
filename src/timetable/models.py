@@ -1818,6 +1818,7 @@ class ProdCal(models.Model):
     employee = models.ForeignKey('base.Employee', on_delete=models.DO_NOTHING)
     employment = models.ForeignKey('base.Employment', on_delete=models.DO_NOTHING)
     norm_hours = models.FloatField()
+    region = models.ForeignKey('base.Region', on_delete=models.DO_NOTHING)
 
     class Meta:
         managed = False

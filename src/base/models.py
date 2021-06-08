@@ -857,7 +857,7 @@ class ProductionDay(AbstractModel):
 
         norm_work_hours = ProductionDay.objects.filter(
             q,
-            id=prod_cal_subq.values('id')[:1],
+            id=Subquery(prod_cal_subq.values('id')[:1])
         ).annotate(
             work_hours=Case(
                 When(type=ProductionDay.TYPE_WORK, then=Value(ProductionDay.WORK_NORM_HOURS[ProductionDay.TYPE_WORK])),
