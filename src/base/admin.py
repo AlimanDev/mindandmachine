@@ -87,7 +87,8 @@ class NetworkConnectAdmin(admin.ModelAdmin):
 
 @admin.register(Region)
 class RegionAdmin(admin.ModelAdmin):
-    list_display = ('id', 'name', 'code')
+    list_display = ('id', 'name', 'code', 'parent')
+    list_filter = ('parent',)
 
 
 @admin.register(WorkerPosition)
@@ -340,7 +341,8 @@ class EmploymentAdmin(admin.ModelAdmin):
 
 @admin.register(ProductionDay)
 class ProductionDayAdmin(admin.ModelAdmin):
-    list_display = ('dt', 'type')
+    list_display = ('dt', 'type', 'is_celebration', 'region')
+    list_filter = ('region', 'type', 'is_celebration')
 
 
 @admin.register(Break)

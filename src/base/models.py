@@ -12,11 +12,10 @@ from django.contrib.auth.models import (
     AbstractUser as DjangoAbstractUser,
 )
 from django.contrib.postgres.fields import JSONField
-from rest_framework.serializers import ValidationError
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models
 from django.db import transaction
-from django.db.models import Case, When, Sum, Value, IntegerField, Subquery, OuterRef, F
+from django.db.models import Case, When, Sum, Value, IntegerField, Subquery, OuterRef, F, Q
 from django.db.models.functions import Coalesce
 from django.db.models.query import QuerySet
 from django.utils import timezone
@@ -24,6 +23,7 @@ from django.utils.functional import cached_property
 from django.utils.translation import gettext as _
 from model_utils import FieldTracker
 from mptt.models import MPTTModel, TreeForeignKey
+from rest_framework.serializers import ValidationError
 from timezone_field import TimeZoneField
 
 from src.base.models_abstract import (
@@ -218,6 +218,11 @@ class NetworkConnect(AbstractActiveModel):
 
 
 class Region(AbstractActiveNetworkSpecificCodeNamedModel):
+    parent = models.ForeignKey(
+        to='self', verbose_name='Родительский регион', on_delete=models.CASCADE,
+        null=True, blank=True, related_name='children',
+    )
+
     class Meta(AbstractActiveNetworkSpecificCodeNamedModel.Meta):
         verbose_name = 'Регион'
         verbose_name_plural = 'Регионы'
@@ -836,16 +841,24 @@ class ProductionDay(AbstractModel):
         :param month:
         :return: Словарь, где ключ - номер месяца, значение - количество часов.
         """
-        filter_kwargs = dict(
+        q = Q(
+            Q(region_id=region_id) | Q(region__parent_id=region_id),
             dt__year=year,
             type__in=ProductionDay.WORK_TYPES,
-            region_id=region_id,
         )
         if month:
-            filter_kwargs['dt__month'] = month
+            q &= Q(dt__month=month)
+
+        prod_cal_subq = ProductionDay.objects.filter(q).annotate(
+            is_equal_regions=Case(
+                When(region_id=Value(region_id), then=True),
+                default=False, output_field=models.BooleanField()
+            ),
+        ).order_by('-is_equal_regions')
 
         norm_work_hours = ProductionDay.objects.filter(
-            **filter_kwargs
+            q,
+            id=Subquery(prod_cal_subq.values_list('id', flat=True)[:1])
         ).annotate(
             work_hours=Case(
                 When(type=ProductionDay.TYPE_WORK, then=Value(ProductionDay.WORK_NORM_HOURS[ProductionDay.TYPE_WORK])),
