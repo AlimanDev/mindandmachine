@@ -359,6 +359,7 @@ class TestOutsource(TestsHelperMixin, APITestCase):
                         'shop': {
                             'name': self.employment1.shop.name,
                             'id': self.employment1.shop.id,
+                            'timezone': 'Europe/Moscow',
                         },
                         'worker_days': [
                             {

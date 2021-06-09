@@ -1500,13 +1500,20 @@ class WorkerDayViewSet(BaseModelViewSet):
         dt_from = serializer.validated_data.get('dt_from')
         dt_to = serializer.validated_data.get('dt_to')
         convert_to = serializer.validated_data.get('convert_to')
+        type = serializer.validated_data.get('tabel_type')
         tabel_generator_cls = get_tabel_generator_cls(tabel_format=shop.network.download_tabel_template)
-        tabel_generator = tabel_generator_cls(shop, dt_from, dt_to)
+        tabel_generator = tabel_generator_cls(shop, dt_from, dt_to, type=type)
         response = HttpResponse(
             tabel_generator.generate(convert_to=shop.network.convert_tabel_to or convert_to),
             content_type='application/octet-stream',
         )
-        filename = _('Tabel_for_shop_{}_from_{}.{}').format(
+        types = {
+            DownloadTabelSerializer.TYPE_FACT: _('Fact'),
+            DownloadTabelSerializer.TYPE_MAIN: _('Main'),
+            DownloadTabelSerializer.TYPE_ADDITIONAL: _('Additional'),
+        }
+        filename = _('{}_timesheet_for_shop_{}_from_{}.{}').format(
+            types.get(type, ''),
             shop.code,
             timezone.now().strftime("%Y-%m-%d"),
             shop.network.convert_tabel_to or convert_to,
