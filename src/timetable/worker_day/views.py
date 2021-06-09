@@ -564,6 +564,7 @@ class WorkerDayViewSet(BaseModelViewSet):
                             is_approved=False,
                             type=wd.type,
                             created_by_id=wd.created_by_id,
+                            last_edited_by_id=wd.last_edited_by_id,
                             is_vacancy=wd.is_vacancy,
                             is_outsource=wd.is_outsource,
                             comment=wd.comment,
