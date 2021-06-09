@@ -639,12 +639,14 @@ class WorkerDayViewSet(BaseModelViewSet):
                     employee_days_q=employee_days_q,
                     exc_cls=ValidationError,
                 )
-                WorkerDay.check_tasks_violations(
-                    employee_days_q=employee_days_q,
-                    is_approved=True,
-                    is_fact=serializer.data['is_fact'],
-                    exc_cls=ValidationError,
-                )
+
+                if not has_permission_to_change_protected_wdays:
+                    WorkerDay.check_tasks_violations(
+                        employee_days_q=employee_days_q,
+                        is_approved=True,
+                        is_fact=serializer.data['is_fact'],
+                        exc_cls=ValidationError,
+                    )
 
         return Response()
 
