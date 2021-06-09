@@ -262,7 +262,7 @@ LOGGING = {
     },
 }
 
-def add_logger(name, level='DEBUG', formatter='simple'):
+def add_logger(name, level='DEBUG', formatter='simple', extra_handlers : list=None):
     LOGGING['handlers'][name] = {
         'level': level,
         'class': 'logging.handlers.WatchedFileHandler',
@@ -274,9 +274,12 @@ def add_logger(name, level='DEBUG', formatter='simple'):
         'level': level,
         'propagate': True,
     }
+    if extra_handlers:
+        LOGGING['loggers'][name]['handlers'].extend(extra_handlers)
 
 add_logger('clean_wdays')
-add_logger('send_doctors_schedule_to_mis')
+add_logger('send_doctors_schedule_to_mis', extra_handlers=['mail_admins'])
+add_logger('mda_integration', extra_handlers=['mail_admins'])
 
 # LOGGING USAGE:
 # import logging
@@ -585,13 +588,13 @@ CELERY_BEAT_SCHEDULE = {
 
 if MDA_SYNC_DEPARTMENTS:
     CELERY_BEAT_SCHEDULE['task-sync-mda-departments-all-time'] = {
-        'task': 'src.integration.mda.tasks.sync_mda_departments',
+        'task': 'src.integration.mda.tasks.sync_mda_data',
         'schedule': crontab(hour=1, minute=59),
         'options': {'queue': BACKEND_QUEUE},
         'kwargs': {'threshold_seconds': None},
     }
     CELERY_BEAT_SCHEDULE['task-sync-mda-departments-last-changes'] = {
-        'task': 'src.integration.mda.tasks.sync_mda_departments',
+        'task': 'src.integration.mda.tasks.sync_mda_data',
         'schedule': crontab(minute=49),
         'options': {'queue': BACKEND_QUEUE},
         'kwargs': {'threshold_seconds': MDA_SYNC_DEPARTMENTS_THRESHOLD_SECONDS},
