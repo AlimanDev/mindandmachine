@@ -44,7 +44,7 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
 
     def create_worker_day(self, type='W', shop=None, dt=None, employee=None, employment=None, is_fact=False,
                           is_approved=False, parent_worker_day=None, is_vacancy=False, is_blocked=False, dttm_work_start=None,
-                          dttm_work_end=None):
+                          dttm_work_end=None, last_edited_by_id=None):
         shop = shop if shop else self.shop
         employment = employment if employment else self.employment2
         if not type == 'W':
@@ -66,6 +66,7 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
             work_hours=datetime.combine(dt, time(20, 0, 0)) - datetime.combine(dt, time(8, 0, 0)),
             is_vacancy=is_vacancy,
             is_blocked=is_blocked,
+            last_edited_by_id=last_edited_by_id,
         )
 
     def create_vacancy(self, shop=None, dt=None, is_approved=False, parent_worker_day=None):
@@ -267,6 +268,46 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
             self.assertEqual(wd_from_db.is_approved, True)
             self.assertIsNotNone(wd_from_db_not_approved)
             self.assertEqual(wd_from_db.work_hours, wd_from_db_not_approved.work_hours)
+
+    def test_approve_with_last_edited_by(self):
+        data = {
+            'shop_id': self.shop.id,
+            'dt_from': self.dt,
+            'dt_to': self.dt + timedelta(days=4),
+            'is_fact': False,
+        }
+        
+        wds4updating = [
+            self.create_worker_day(type=WorkerDay.TYPE_SICK, shop=self.shop, dt=self.dt + timedelta(days=1), last_edited_by_id=self.user1.id),
+            self.create_worker_day(type=WorkerDay.TYPE_SICK, shop=self.shop, dt=self.dt + timedelta(days=2), last_edited_by_id=self.user2.id),
+            self.create_worker_day(type=WorkerDay.TYPE_VACATION, shop=self.shop, dt=self.dt + timedelta(days=4), last_edited_by_id=self.user3.id),
+        ]
+
+        wdscreated = []
+        response = self.client.post(f"{self.url_approve}", data, format='json')
+        self.assertEqual(response.status_code, 200)
+
+        for wd in wds4updating:
+            wd_from_db = WorkerDay.objects.filter(id=wd.id).first()
+            wd_from_db_not_approved = WorkerDay.objects.filter(dt=wd.dt, employee_id=wd.employee_id, is_approved=False).first()
+            wdscreated.append(wd_from_db_not_approved)
+            self.assertEqual(wd_from_db.is_approved, True)
+            self.assertIsNotNone(wd_from_db_not_approved)
+            self.assertEqual(wd_from_db.work_hours, wd_from_db_not_approved.work_hours)
+            self.assertEqual(wd_from_db.last_edited_by_id, wd_from_db_not_approved.last_edited_by_id)
+
+        # second approve
+        response = self.client.post(f"{self.url_approve}", data, format='json')
+        self.assertEqual(response.status_code, 200)
+        for wd in wdscreated:
+            wd_from_db = WorkerDay.objects.filter(id=wd.id).first()
+            wd_from_db_not_approved = WorkerDay.objects.filter(dt=wd.dt, employee_id=wd.employee_id, is_approved=False).first()
+            self.assertEqual(wd_from_db.is_approved, True)
+            self.assertIsNotNone(wd_from_db_not_approved)
+            self.assertEqual(wd_from_db.work_hours, wd_from_db_not_approved.work_hours)
+            self.assertIsNotNone(wd_from_db.last_edited_by_id)
+            self.assertIsNotNone(wd_from_db_not_approved.last_edited_by_id)
+            self.assertEqual(wd_from_db.last_edited_by_id, wd_from_db_not_approved.last_edited_by_id)
 
     def test_approve_employee_ids(self):
         data = {
