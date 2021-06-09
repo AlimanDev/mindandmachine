@@ -1347,13 +1347,13 @@ class WorkerDayViewSet(BaseModelViewSet):
         return upload_timetable_util(data.validated_data, file)
 
     @swagger_auto_schema(
-        request_body=GenerateUploadTimetableExampleSerializer,
+        query_serializer=GenerateUploadTimetableExampleSerializer,
         responses={200: 'Шаблон расписания в формате excel.'},
         operation_description='''
             Возвращает шаблон для загрузки графика.\n
             ''',
     )
-    @action(detail=False, methods=['get'])
+    @action(detail=False, methods=['get'], filterset_class=None)
     def generate_upload_example(self, request):
         # TODO: рефакторинг + тест
         serializer = GenerateUploadTimetableExampleSerializer(
