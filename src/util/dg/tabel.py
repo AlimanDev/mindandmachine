@@ -48,7 +48,7 @@ class T13WdTypeMapper(BaseWdTypeMapper):
 class BaseTabelDataGetter:
     wd_type_mapper_cls = DummyWdTypeMapper
 
-    def __init__(self, shop, dt_from, dt_to, type=TabelSerializer.TYPE_MAIN):
+    def __init__(self, shop, dt_from, dt_to, type=TabelSerializer.TYPE_FACT):
         self.year = dt_from.year
         self.month = dt_from.month
 
@@ -132,7 +132,7 @@ class T13TabelDataGetter(BaseTabelDataGetter):
         day_data['value'] = getattr(wday, self.total_hours_field) if \
             (wday and (not self.type_field or getattr(wday, self.type_field) in WorkerDay.TYPES_WITH_TM_RANGE)) else ''
         if not self.type_field and day_data['value']:
-            day_data['code'] = 'Я'
+            day_data['code'] = _('W')
 
     def get_data(self):
         def _get_active_empl(wd, empls):
@@ -243,8 +243,9 @@ class MtsTabelDataGetter(BaseTabelDataGetter):
 
 class AigulTabelDataGetter(T13TabelDataGetter):
     def set_day_data(self, day_data, wday):
-        day_data['value'] = wday.rounded_work_hours if \
-            (wday and wday.type in WorkerDay.TYPES_WITH_TM_RANGE) else self._get_tabel_type(wday.type) if wday else ''
+        day_data['value'] = getattr(wday, self.total_hours_field) if \
+        (wday and (not self.type_field or getattr(wday, self.type_field) in WorkerDay.TYPES_WITH_TM_RANGE)) \
+        else self._get_tabel_type(getattr(wday, self.type_field)) if wday and self.type_field else ''
 
 
 class BaseTabelGenerator(BaseDocGenerator):
@@ -254,7 +255,7 @@ class BaseTabelGenerator(BaseDocGenerator):
 
     tabel_data_getter_cls = None
 
-    def __init__(self, shop, dt_from, dt_to, type=TabelSerializer.TYPE_MAIN):
+    def __init__(self, shop, dt_from, dt_to, type=TabelSerializer.TYPE_FACT):
         """
         :param shop: Подразделение, для сотрудников которого будет составляться табель
         :param dt_from: Дата от
