@@ -640,12 +640,14 @@ class WorkerDayViewSet(BaseModelViewSet):
                     employee_days_q=employee_days_q,
                     exc_cls=ValidationError,
                 )
-                WorkerDay.check_tasks_violations(
-                    employee_days_q=employee_days_q,
-                    is_approved=True,
-                    is_fact=serializer.data['is_fact'],
-                    exc_cls=ValidationError,
-                )
+
+                if not has_permission_to_change_protected_wdays:
+                    WorkerDay.check_tasks_violations(
+                        employee_days_q=employee_days_q,
+                        is_approved=True,
+                        is_fact=serializer.data['is_fact'],
+                        exc_cls=ValidationError,
+                    )
 
         return Response()
 
@@ -1348,13 +1350,13 @@ class WorkerDayViewSet(BaseModelViewSet):
         return upload_timetable_util(data.validated_data, file)
 
     @swagger_auto_schema(
-        request_body=GenerateUploadTimetableExampleSerializer,
+        query_serializer=GenerateUploadTimetableExampleSerializer,
         responses={200: 'Шаблон расписания в формате excel.'},
         operation_description='''
             Возвращает шаблон для загрузки графика.\n
             ''',
     )
-    @action(detail=False, methods=['get'])
+    @action(detail=False, methods=['get'], filterset_class=None)
     def generate_upload_example(self, request):
         # TODO: рефакторинг + тест
         serializer = GenerateUploadTimetableExampleSerializer(
@@ -1501,13 +1503,20 @@ class WorkerDayViewSet(BaseModelViewSet):
         dt_from = serializer.validated_data.get('dt_from')
         dt_to = serializer.validated_data.get('dt_to')
         convert_to = serializer.validated_data.get('convert_to')
+        type = serializer.validated_data.get('tabel_type')
         tabel_generator_cls = get_tabel_generator_cls(tabel_format=shop.network.download_tabel_template)
-        tabel_generator = tabel_generator_cls(shop, dt_from, dt_to)
+        tabel_generator = tabel_generator_cls(shop, dt_from, dt_to, type=type)
         response = HttpResponse(
             tabel_generator.generate(convert_to=shop.network.convert_tabel_to or convert_to),
             content_type='application/octet-stream',
         )
-        filename = _('Tabel_for_shop_{}_from_{}.{}').format(
+        types = {
+            DownloadTabelSerializer.TYPE_FACT: _('Fact'),
+            DownloadTabelSerializer.TYPE_MAIN: _('Main'),
+            DownloadTabelSerializer.TYPE_ADDITIONAL: _('Additional'),
+        }
+        filename = _('{}_timesheet_for_shop_{}_from_{}.{}').format(
+            types.get(type, ''),
             shop.code,
             timezone.now().strftime("%Y-%m-%d"),
             shop.network.convert_tabel_to or convert_to,
