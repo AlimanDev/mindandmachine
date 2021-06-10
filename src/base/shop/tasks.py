@@ -112,7 +112,7 @@ def fill_city_coords_address_timezone_from_fias_code(shop_id):
     if shop and shop.fias_code and settings.DADATA_TOKEN:
         from dadata import Dadata
         dadata = Dadata(settings.DADATA_TOKEN)
-        result = dadata.find_by_id("address", shop.fias_code)
+        result = dadata.find_by_id("fias", shop.fias_code)
         if result and result[0].get('data'):
             update_fields = []
             if result[0].get('value'):
