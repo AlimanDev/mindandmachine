@@ -1,11 +1,12 @@
 import io
 import logging
-from datetime import timedelta, datetime
+from datetime import timedelta
 from uuid import UUID
 
 import xlsxwriter
 from django.conf import settings
 from django.http.response import HttpResponse
+from django.utils.translation import gettext as _
 from django.utils.functional import cached_property
 from django.utils.timezone import now
 from django_filters.rest_framework import DjangoFilterBackend
@@ -242,8 +243,8 @@ class TickViewSet(BaseModelViewSet):
             if not wd:
                 return Response(
                     {
-                        "error": "У вас нет трудоустройства на текущий момент, "\
-                        "действие выполнить невозможно, пожалуйста, обратитесь к вашему руководству"
+                        "error": _("You do not have an active employment at the moment, "
+                        "the action can not be performed, please refer to your management")
                     }, 
                     400
                 )
@@ -258,7 +259,7 @@ class TickViewSet(BaseModelViewSet):
         ).first()
 
         if not wd and USERS_WITH_SCHEDULE_ONLY:
-            return Response({"error": "Сегодня у сотрудника нет рабочего дня в данном магазине"}, 404)
+            return Response({"error": _('Today, the employee does not have a working day in this shop')}, 404)
 
         tick = Tick.objects.create(
             user_id=user_id,
@@ -286,7 +287,7 @@ class TickViewSet(BaseModelViewSet):
         try:
             tick = Tick.objects.get(pk=kwargs['pk'])
         except Tick.DoesNotExist as e:
-            return Response({"error": "Отметка не существует"}, 404)
+            return Response({"error": _("The tick does not exist")}, 404)
 
         data = self.get_serializer_class()(data=request.data, context=self.get_serializer_context())
         data.is_valid(raise_exception=True)
@@ -297,7 +298,7 @@ class TickViewSet(BaseModelViewSet):
             tick.type = type
             tick.save()
             if settings.TRUST_TICK_REQUEST:
-                record, _ = AttendanceRecords.objects.get_or_create(
+                record, _created = AttendanceRecords.objects.get_or_create(
                     user_id=tick.user_id,
                     employee_id=tick.employee_id,
                     dttm=tick.dttm,
@@ -352,7 +353,7 @@ class TickPhotoViewSet(BaseModelViewSet):
         try:
             tick = Tick.objects.get(id=tick_id)
         except Tick.DoesNotExist as e:
-            return Response({"error": "Отметка не существует"}, 404)
+            return Response({"error": _('The tick does not exist')}, 404)
         tick_point = tick.tick_point
 
         try:
