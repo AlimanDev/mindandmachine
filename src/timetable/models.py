@@ -15,6 +15,7 @@ from django.db.models.query import QuerySet
 from django.utils import timezone
 from django.utils.translation import gettext as _
 from model_utils import FieldTracker
+from rest_framework.exceptions import ValidationError
 
 from src.base.models import Shop, Employment, User, Event, Network, Break, ProductionDay, Employee
 from src.base.models_abstract import AbstractModel, AbstractActiveModel, AbstractActiveNetworkSpecificCodeNamedModel, \
@@ -1392,6 +1393,8 @@ class AttendanceRecords(AbstractModel):
                 dt=dt,
                 priority_shop_id=shop.id,
             ).first()
+            if not employment:
+                raise ValidationError(_('You have no active employment'))
             employee_id = employment.employee_id
             if not initial_record_type:
                 record_type = AttendanceRecords.TYPE_COMING
@@ -1409,6 +1412,8 @@ class AttendanceRecords(AbstractModel):
             record_type = initial_record_type or calculated_record_type
             employee_id = closest_plan_approved.employee_id
             employment = closest_plan_approved.employment
+            if not employment:
+                raise ValidationError(_('You have no active employment'))
             dt = closest_plan_approved.dt
 
         return employee_id, employment, dt, record_type, closest_plan_approved is not None
