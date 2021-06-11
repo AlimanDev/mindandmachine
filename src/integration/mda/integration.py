@@ -125,7 +125,7 @@ class MdaIntegrationHelper:
             )),
             supervisor=Value(True, output_field=BooleanField()),
             userChecklistsOrganizer=Exists(active_employments_subq.filter(shop__level__lt=3)),
-            surveyAdmin=Value(False, output_field=BooleanField()),
+            surveyAdmin=F('admin'),
             timeZoneId=Subquery(
                 active_employments_subq.order_by(
                     '-is_visible',

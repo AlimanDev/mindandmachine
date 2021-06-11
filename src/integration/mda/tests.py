@@ -185,7 +185,7 @@ class TestMdaIntegration(TestsHelperMixin, TestCase):
         self.assertEqual(user_data['userChecklistsOrganizer'], True)
 
     def test_orgUnits_null_for_company_level(self):
-        group_admin = GroupFactory(name='УРС', code='urs')
+        group_admin = GroupFactory(name='Администратор', code='admin')
         user = UserFactory()
         employee = EmployeeFactory(user=user)
         _admin_employment = EmploymentFactory(employee=employee, shop=self.base_shop, function_group=group_admin)
@@ -196,6 +196,29 @@ class TestMdaIntegration(TestsHelperMixin, TestCase):
         user_data = list(filter(lambda u: user.id == u['id'], users_data))[0]
         self.assertEqual(user_data['orgLevel'], 'COMPANY')
         self.assertEqual(user_data['orgUnits'],  None)
+
+    def test_surveyAdmin_for_admin_true_for_oters_false(self):
+        group_admin = GroupFactory(name='Администратор', code='admin')
+        group_worker = GroupFactory(name='Сотрудник', code='worker')
+        user_admin = UserFactory()
+        user_worker = UserFactory()
+        employee_admin = EmployeeFactory(user=user_admin)
+        employee_worker = EmployeeFactory(user=user_worker)
+        _admin_employment = EmploymentFactory(
+            employee=employee_admin, shop=self.base_shop, function_group=group_admin)
+        _worker_employment = EmploymentFactory(
+            employee=employee_worker, shop=self.base_shop, function_group=group_worker)
+
+        mda_integration_helper = MdaIntegrationHelper()
+        users_data = mda_integration_helper._get_users_data()
+        self.assertEqual(len(users_data), 6)
+        user_admin_data = list(filter(lambda u: user_admin.id == u['id'], users_data))[0]
+        self.assertEqual(user_admin_data['admin'], True)
+        self.assertEqual(user_admin_data['surveyAdmin'],  True)
+
+        user_worker_data = list(filter(lambda u: user_worker.id == u['id'], users_data))[0]
+        self.assertEqual(user_worker_data['admin'], False)
+        self.assertEqual(user_worker_data['surveyAdmin'],  False)
 
     def test_correct_regionId_in_data(self):
         shop = ShopFactory(parent=self.region1, code='shop')
