@@ -630,9 +630,6 @@ if 'test' in sys.argv:
         def __getitem__(self, item):
             return None
 
-
-    sync_mda_departments
-
     MIGRATION_MODULES = MigrationDisabler()
 
 if DEBUG:
