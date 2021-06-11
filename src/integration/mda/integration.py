@@ -104,11 +104,14 @@ class MdaIntegrationHelper:
                 When(level=Value(3), then=Value('SHOP', output_field=CharField())),
                 default=Value('SHOP', output_field=CharField()), output_field=CharField(),
             ),
-            orgUnits=ArrayAgg(
-                'employees__employments__shop', distinct=True,
-                filter=Q(
-                    employees__employments__shop_id__in=active_employments_qs.values_list('shop_id', flat=True),
-                    employees__employments__shop__level=F('level'),
+            orgUnits=Case(
+                When(level=Value(0), then=None),
+                default=ArrayAgg(
+                    'employees__employments__shop', distinct=True,
+                    filter=Q(
+                        employees__employments__shop_id__in=active_employments_qs.values_list('shop_id', flat=True),
+                        employees__employments__shop__level=F('level'),
+                    ),
                 ),
             ),
             admin=Exists(active_employments_subq.filter(
