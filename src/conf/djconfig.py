@@ -587,13 +587,13 @@ CELERY_BEAT_SCHEDULE = {
 }
 
 if MDA_SYNC_DEPARTMENTS:
-    CELERY_BEAT_SCHEDULE['task-sync-mda-departments-all-time'] = {
+    CELERY_BEAT_SCHEDULE['task-sync-mda-data-all-time'] = {
         'task': 'src.integration.mda.tasks.sync_mda_data',
         'schedule': crontab(hour=1, minute=59),
         'options': {'queue': BACKEND_QUEUE},
         'kwargs': {'threshold_seconds': None},
     }
-    CELERY_BEAT_SCHEDULE['task-sync-mda-departments-last-changes'] = {
+    CELERY_BEAT_SCHEDULE['task-sync-mda-data-last-changes'] = {
         'task': 'src.integration.mda.tasks.sync_mda_data',
         'schedule': crontab(minute=49),
         'options': {'queue': BACKEND_QUEUE},
@@ -630,6 +630,8 @@ if 'test' in sys.argv:
         def __getitem__(self, item):
             return None
 
+
+    sync_mda_departments
 
     MIGRATION_MODULES = MigrationDisabler()
 
