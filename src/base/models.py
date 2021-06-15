@@ -1286,16 +1286,16 @@ class FunctionGroup(AbstractModel):
         (TYPE_ALL, 'all')
     )
 
-    FUNCS = (
-        'AutoSettings_create_timetable',
-        'AutoSettings_set_timetable',
-        'AutoSettings_delete_timetable',
-        'AuthUserView',
-        'Break',
-        'Employment',
-        'Employee',
-        'Employment_auto_timetable',
-        'Employment_timetable',
+    FUNCS_TUPLE = (
+        ('AutoSettings_create_timetable', 'Составление графика (работает только с методом Создать)'),
+        ('AutoSettings_set_timetable', 'Задать график (ответ от алгоритмов, работает только с методом Создать)'),
+        ('AutoSettings_delete_timetable', 'Удалить график (работает только с методом Создать)'),
+        ('AuthUserView', 'Получить авторизованного пользователя'),
+        ('Break', 'Перерыв'),
+        ('Employment', 'Трудоустройство'),
+        ('Employee', 'Сотрудник'),
+        ('Employment_auto_timetable', 'Выбрать сорудников для автосоставления (работает только с методом Создать)'),
+        ('Employment_timetable', 'Редактирование полей трудоустройства, связанных с расписанием'),
         'EmploymentWorkType',
         'ExchangeSettings',
         'FunctionGroupView',
