@@ -53,6 +53,7 @@ urlpatterns = [
     path('admin/recognition/ticks/download_violators/', DownloadViolatorsReportAdminView.as_view(), name='download_violators'),
     path('admin/', admin.site.urls),
     path('rest_api/recognition/', include(recognition_router.get_urls())),
+    path('rest_api/integration/mda/', include('src.integration.mda.urls')),
     path('rest_api/', include(
         base_api.urlpatterns +
         timetable_api.urlpatterns +
