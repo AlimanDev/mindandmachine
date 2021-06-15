@@ -189,3 +189,90 @@ class TestWorkShiftViewSet(TestsHelperMixin, APITestCase):
         }
         self.assertEqual(len(resp.json()), 5)
         self.assertEqual(user2, user2_data)
+
+
+    def test_get_worker_days_night_shift(self):
+        self._authorize_tick_point()
+        self.employee2.tabel_code = '1235'
+        self.employee2.save()
+        position = WorkerPosition.objects.create(
+            name='Работник',
+            network=self.network,
+        )
+        self.second_employee = Employee.objects.create(
+            tabel_code='1234', 
+            user=self.user2,
+        )
+        emp = Employment.objects.create(
+            employee=self.second_employee,
+            shop=self.shop,
+            position=position,
+        )
+        wd1 = WorkerDay.objects.create(
+            employee=self.employee2,
+            employment=self.employment2,
+            type=WorkerDay.TYPE_WORKDAY,
+            dt=self.today - timedelta(1),
+            dttm_work_start=datetime.combine(self.today - timedelta(1), time(22)),
+            dttm_work_end=datetime.combine(self.today, time(8)),
+            shop=self.shop,
+            is_approved=True,
+        )
+        wd2 = WorkerDay.objects.create(
+            employee=self.second_employee,
+            employment=emp,
+            type=WorkerDay.TYPE_WORKDAY,
+            dt=self.today,
+            dttm_work_start=datetime.combine(self.today, time(15)),
+            dttm_work_end=datetime.combine(self.today, time(20)),
+            shop=self.shop,
+            is_approved=True,
+        )
+        WorkerDay.objects.create(
+            employee=self.second_employee,
+            employment=emp,
+            type=WorkerDay.TYPE_WORKDAY,
+            dt=self.today - timedelta(1),
+            dttm_work_start=datetime.combine(self.today - timedelta(1), time(8)),
+            dttm_work_end=datetime.combine(self.today - timedelta(1), time(14)),
+            shop=self.shop,
+            is_approved=True,
+        )
+        resp = self.client.get(
+            self.get_url('TimeAttendanceWorkerDay-list'),
+        )
+        user2 = list(filter(lambda x: x['user_id'] == self.user2.id, resp.json()))[0]
+        user2_data = {
+            'user_id': self.user2.id, 
+            'employees': [
+                {
+                    'id': self.employee2.id,
+                    'tabel_code': self.employee2.tabel_code, 
+                    'worker_days': [
+                        {
+                            'id': wd1.id, 
+                            'dttm_work_start': Converter.convert_datetime(wd1.dttm_work_start),
+                            'dttm_work_end': Converter.convert_datetime(wd1.dttm_work_end),
+                            'position': ''
+                        }
+                    ]
+                }, 
+                {
+                    'id': self.second_employee.id,
+                    'tabel_code': self.second_employee.tabel_code, 
+                    'worker_days': [
+                        {
+                            'id': wd2.id, 
+                            'dttm_work_start': Converter.convert_datetime(wd2.dttm_work_start),
+                            'dttm_work_end': Converter.convert_datetime(wd2.dttm_work_end),
+                            'position': 'Работник'
+                        }
+                    ]
+                }
+            ], 
+            'first_name': 'Иван2', 
+            'last_name': 'Иванов', 
+            'avatar': None
+        }
+        self.assertEqual(len(resp.json()), 5)
+        self.assertEqual(user2, user2_data)
