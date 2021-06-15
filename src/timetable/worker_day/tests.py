@@ -2,6 +2,7 @@ import io
 import json
 from copy import deepcopy
 from datetime import timedelta, time, datetime, date
+from src.timetable.worker_day.utils import create_fact_from_attendance_records
 from unittest import skip, mock
 
 import pandas
@@ -12,8 +13,8 @@ from rest_framework.test import APITestCase
 from etc.scripts.fill_calendar import main as fill_calendar
 from src.base.models import WorkerPosition
 from src.forecast.models import PeriodClients, OperationType, OperationTypeName
+from src.timetable.models import AttendanceRecords, WorkerDay, WorkType, WorkTypeName
 from src.tasks.models import Task
-from src.timetable.models import WorkerDay, WorkType, WorkTypeName
 from src.timetable.tests.factories import WorkerDayFactory
 from src.util.mixins.tests import TestsHelperMixin
 from src.util.models_converter import Converter
@@ -43,7 +44,7 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
 
     def create_worker_day(self, type='W', shop=None, dt=None, employee=None, employment=None, is_fact=False,
                           is_approved=False, parent_worker_day=None, is_vacancy=False, is_blocked=False, dttm_work_start=None,
-                          dttm_work_end=None):
+                          dttm_work_end=None, last_edited_by_id=None):
         shop = shop if shop else self.shop
         employment = employment if employment else self.employment2
         if not type == 'W':
@@ -65,6 +66,7 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
             work_hours=datetime.combine(dt, time(20, 0, 0)) - datetime.combine(dt, time(8, 0, 0)),
             is_vacancy=is_vacancy,
             is_blocked=is_blocked,
+            last_edited_by_id=last_edited_by_id,
         )
 
     def create_vacancy(self, shop=None, dt=None, is_approved=False, parent_worker_day=None):
@@ -266,6 +268,46 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
             self.assertEqual(wd_from_db.is_approved, True)
             self.assertIsNotNone(wd_from_db_not_approved)
             self.assertEqual(wd_from_db.work_hours, wd_from_db_not_approved.work_hours)
+
+    def test_approve_with_last_edited_by(self):
+        data = {
+            'shop_id': self.shop.id,
+            'dt_from': self.dt,
+            'dt_to': self.dt + timedelta(days=4),
+            'is_fact': False,
+        }
+        
+        wds4updating = [
+            self.create_worker_day(type=WorkerDay.TYPE_SICK, shop=self.shop, dt=self.dt + timedelta(days=1), last_edited_by_id=self.user1.id),
+            self.create_worker_day(type=WorkerDay.TYPE_SICK, shop=self.shop, dt=self.dt + timedelta(days=2), last_edited_by_id=self.user2.id),
+            self.create_worker_day(type=WorkerDay.TYPE_VACATION, shop=self.shop, dt=self.dt + timedelta(days=4), last_edited_by_id=self.user3.id),
+        ]
+
+        wdscreated = []
+        response = self.client.post(f"{self.url_approve}", data, format='json')
+        self.assertEqual(response.status_code, 200)
+
+        for wd in wds4updating:
+            wd_from_db = WorkerDay.objects.filter(id=wd.id).first()
+            wd_from_db_not_approved = WorkerDay.objects.filter(dt=wd.dt, employee_id=wd.employee_id, is_approved=False).first()
+            wdscreated.append(wd_from_db_not_approved)
+            self.assertEqual(wd_from_db.is_approved, True)
+            self.assertIsNotNone(wd_from_db_not_approved)
+            self.assertEqual(wd_from_db.work_hours, wd_from_db_not_approved.work_hours)
+            self.assertEqual(wd_from_db.last_edited_by_id, wd_from_db_not_approved.last_edited_by_id)
+
+        # second approve
+        response = self.client.post(f"{self.url_approve}", data, format='json')
+        self.assertEqual(response.status_code, 200)
+        for wd in wdscreated:
+            wd_from_db = WorkerDay.objects.filter(id=wd.id).first()
+            wd_from_db_not_approved = WorkerDay.objects.filter(dt=wd.dt, employee_id=wd.employee_id, is_approved=False).first()
+            self.assertEqual(wd_from_db.is_approved, True)
+            self.assertIsNotNone(wd_from_db_not_approved)
+            self.assertEqual(wd_from_db.work_hours, wd_from_db_not_approved.work_hours)
+            self.assertIsNotNone(wd_from_db.last_edited_by_id)
+            self.assertIsNotNone(wd_from_db_not_approved.last_edited_by_id)
+            self.assertEqual(wd_from_db.last_edited_by_id, wd_from_db_not_approved.last_edited_by_id)
 
     def test_approve_employee_ids(self):
         data = {
@@ -652,7 +694,7 @@ class TestUploadDownload(APITestCase):
 
     def test_upload_timetable(self):
         file = open('etc/scripts/timetable.xlsx', 'rb')
-        response = self.client.post(f'{self.url}upload/', {'shop_id': self.shop.id, 'file': file})
+        response = self.client.post(f'{self.url}upload/', {'shop_id': self.shop.id, 'file': file}, HTTP_ACCEPT_LANGUAGE='ru')
         file.close()
         self.assertEqual(response.status_code, 200)
         self.assertEqual(WorkerDay.objects.filter(is_approved=False).count(), 150)
@@ -672,7 +714,7 @@ class TestUploadDownload(APITestCase):
     def test_download_timetable(self):
         fill_calendar('2020.4.1', '2021.12.31', self.region.id)
         file = open('etc/scripts/timetable.xlsx', 'rb')
-        self.client.post(f'{self.url}upload/', {'shop_id': self.shop.id, 'file': file})
+        self.client.post(f'{self.url}upload/', {'shop_id': self.shop.id, 'file': file}, HTTP_ACCEPT_LANGUAGE='ru')
         file.close()
         response = self.client.get(
             f'{self.url}download_timetable/?shop_id={self.shop.id}&dt_from=2020-04-01&is_approved=False')
@@ -681,3 +723,66 @@ class TestUploadDownload(APITestCase):
         self.assertEqual(tabel[tabel.columns[1]][0], 'Магазин: Shop1') #fails with python > 3.6
         self.assertEqual(tabel[tabel.columns[1]][12], 'Иванов Иван Иванович')
         self.assertEqual(tabel[tabel.columns[27]][15], 'В')
+
+class TestCreateFactFromAttendanceRecords(TestsHelperMixin, APITestCase):
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.create_departments_and_users()
+
+    def create_att_record(self, type, dttm, user_id, shop_id, employee_id, terminal=True):
+        return AttendanceRecords.objects.create(
+            dttm=dttm,
+            shop_id=shop_id,
+            user_id=user_id,
+            employee_id=employee_id,
+            type=type,
+            terminal=terminal,
+        )
+
+    def create_worker_day(self, employment, shop_id, dttm_work_start, dttm_work_end, dt, is_fact=False, is_approved=False):
+        return WorkerDay.objects.create(
+            employee_id=employment.employee_id,
+            employment=employment,
+            shop_id=shop_id,
+            dttm_work_start=dttm_work_start,
+            dttm_work_end=dttm_work_end,
+            dt=dt,
+            is_fact=is_fact,
+            is_approved=is_approved,
+            type=WorkerDay.TYPE_WORKDAY,
+        )
+
+    def test_fact_create(self): 
+        dt = date.today()
+        self.create_att_record(AttendanceRecords.TYPE_COMING, datetime.combine(dt, time(20, 56)), self.user1.id, self.employment1.shop_id, self.employment1.employee_id, terminal=False)
+        self.create_att_record(AttendanceRecords.TYPE_COMING, datetime.combine(dt + timedelta(1), time(0, 56)), self.user1.id, self.employment1.shop_id, self.employment1.employee_id, terminal=False)
+        self.create_att_record(AttendanceRecords.TYPE_COMING, datetime.combine(dt, time(20, 56)), self.user2.id, self.employment2.shop_id, self.employment2.employee_id,)
+        self.create_att_record(AttendanceRecords.TYPE_COMING, datetime.combine(dt + timedelta(1), time(0, 56)), self.user2.id, self.employment2.shop_id, self.employment2.employee_id,)
+        self.assertEqual(WorkerDay.objects.filter(is_fact=True).count(), 8)
+
+        self.create_worker_day(
+            self.employment2,
+            self.employment2.shop_id,
+            datetime.combine(dt, time(21)),
+            datetime.combine(dt + timedelta(1), time(0)),
+            dt,
+            is_approved=True,
+        )
+        self.create_worker_day(
+            self.employment1,
+            self.employment1.shop_id,
+            datetime.combine(dt, time(21)),
+            datetime.combine(dt + timedelta(1), time(0)),
+            dt,
+            is_approved=True,
+        )
+
+        create_fact_from_attendance_records(dt, dt)
+
+        self.assertEqual(WorkerDay.objects.filter(is_fact=True, is_approved=True).count(), 3) # два факта не пересчиталось, так как отметки не с терминалов
+        self.assertEqual(WorkerDay.objects.filter(is_fact=True, is_approved=False).count(), 3)
+        wd_night_shift = WorkerDay.objects.get(is_fact=True, is_approved=True, employee_id=self.employment2.employee_id)
+        self.assertEqual(wd_night_shift.dt, dt)
+        self.assertEqual(wd_night_shift.dttm_work_start, datetime.combine(dt, time(20, 56)))
+        self.assertEqual(wd_night_shift.dttm_work_end, datetime.combine(dt + timedelta(1), time(0, 56)))
