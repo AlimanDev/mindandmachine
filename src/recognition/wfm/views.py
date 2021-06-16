@@ -57,24 +57,24 @@ class WorkerDayViewSet(viewsets.ReadOnlyModelViewSet):
     def get_queryset(self):
         tick_point = self.request.user
 
-        dt_from = now().replace(hour=0, minute=0, second=0)
-        dt_to = dt_from + timedelta(days=1)
+        dttm_from = now().replace(hour=0, minute=0, second=0)
+        dt_from = dttm_from.date()
 
         wd_cond = WorkerDay.objects.filter(
+            Q(dt=dt_from, dttm_work_start__isnull=False, dttm_work_end__isnull=False) |
+            Q(dt=dt_from - timedelta(1), dttm_work_end__date=dt_from), # чтобы ночные смены попадали
             shop_id=tick_point.shop_id,
-            dttm_work_start__gte=dt_from,
-            dttm_work_end__lte=dt_to,
             child__id__isnull=True,
             is_fact=False,
             is_approved=True,
         )
         emp_cond = Employment.objects.get_active(
             # self.request.user.network_id,
-            dt_from=dt_from, dt_to=dt_from, # чтобы не попались трудоустройства с завтрашнего дня
+            dt_from=dttm_from, dt_to=dttm_from, # чтобы не попались трудоустройства с завтрашнего дня
         )
         shop_emp_cond = Employment.objects.get_active(
             self.request.user.network_id,
-            dt_from, dt_from, # чтобы не попались трудоустройства с завтрашнего дня
+            dttm_from, dttm_from, # чтобы не попались трудоустройства с завтрашнего дня
             shop_id=tick_point.shop_id,
         )
         q = Q(has_wdays=True, has_employments=True)
@@ -101,9 +101,9 @@ class WorkerDayViewSet(viewsets.ReadOnlyModelViewSet):
             Prefetch(
                 'employees__worker_days',
                 queryset=WorkerDay.objects.filter(
+                    Q(dt=dt_from, dttm_work_start__isnull=False, dttm_work_end__isnull=False) |
+                    Q(dt=dt_from - timedelta(1), dttm_work_end__date=dt_from),
                     shop_id=tick_point.shop_id,
-                    dttm_work_start__gte=dt_from,
-                    dttm_work_end__lte=dt_to,
                     is_fact=False,
                     is_approved=True,
                 )
