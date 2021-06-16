@@ -1,38 +1,20 @@
-from django.utils import timezone
-from django.db.models import F, Q
+from django.db.models import F
 from django.db.models.functions import Coalesce
-from rest_auth.views import UserDetailsView
+from django.middleware.csrf import rotate_token
+from django.utils import timezone
+from django.utils.translation import gettext as _
 from drf_yasg.utils import swagger_auto_schema
-
+from requests.exceptions import HTTPError
+from rest_auth.views import UserDetailsView
 from rest_framework import mixins
-from rest_framework.viewsets import GenericViewSet
-from rest_framework.permissions import IsAuthenticated
-from rest_framework.pagination import LimitOffsetPagination
-from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.decorators import action
+from rest_framework.pagination import LimitOffsetPagination
+from rest_framework.parsers import MultiPartParser
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from rest_framework.viewsets import GenericViewSet
 
-
-from src.base.permissions import Permission
-from src.base.serializers import (
-    EmploymentSerializer,
-    UserSerializer, 
-    FunctionGroupSerializer, 
-    WorkerPositionSerializer, 
-    NotificationSerializer, 
-    SubscribeSerializer, 
-    PasswordSerializer, 
-    ShopSettingsSerializer, 
-    NetworkSerializer, 
-    AuthUserSerializer,
-    EmploymentListSerializer,
-    UserListSerializer,
-    GroupSerializer,
-    AutoTimetableSerializer,
-    BreakSerializer,
-    ShopScheduleSerializer,
-    EmployeeSerializer,
-)
 from src.base.filters import (
     NotificationFilter,
     SubscribeFilter,
@@ -40,6 +22,7 @@ from src.base.filters import (
     BaseActiveNamedModelFilter,
     ShopScheduleFilter,
 )
+from src.base.filters import UserFilter, EmployeeFilter
 from src.base.models import (
     Employment,
     FunctionGroup,
@@ -54,16 +37,33 @@ from src.base.models import (
     ShopSchedule,
     Employee,
 )
-from src.recognition.models import UserConnecter
-from src.recognition.api.recognition import Recognition
-
-from src.base.filters import UserFilter, EmployeeFilter
+from src.base.permissions import Permission
+from src.base.serializers import (
+    EmploymentSerializer,
+    UserSerializer,
+    FunctionGroupSerializer,
+    WorkerPositionSerializer,
+    NotificationSerializer,
+    SubscribeSerializer,
+    PasswordSerializer,
+    ShopSettingsSerializer,
+    NetworkSerializer,
+    AuthUserSerializer,
+    EmploymentListSerializer,
+    UserListSerializer,
+    GroupSerializer,
+    AutoTimetableSerializer,
+    BreakSerializer,
+    ShopScheduleSerializer,
+    EmployeeSerializer,
+)
 from src.base.views_abstract import (
     BaseActiveNamedModelViewSet,
     UpdateorCreateViewSet,
     BaseModelViewSet,
 )
-from django.middleware.csrf import rotate_token
+from src.recognition.api.recognition import Recognition
+from src.recognition.models import UserConnecter
 from src.timetable.worker_day.tasks import recalc_wdays
 
 
@@ -156,6 +156,36 @@ class UserViewSet(UpdateorCreateViewSet):
             return Response()
         else:
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=True, methods=['post'], parser_classes=(MultiPartParser,))
+    def add_biometrics(self, *args, **kwargs):
+        user = self.get_object()
+
+        try:
+            user.userconnecter
+        except UserConnecter.DoesNotExist:
+            if 'file' not in self.request.data:
+                return Response({"detail": _('It is necessary to transfer a biometrics template (file field).')}, 400)
+            biometrics_image = self.request.data['file']
+            recognition = Recognition()
+            try:
+                user.avatar = biometrics_image
+                user.save()
+                partner_id = recognition.create_person({"id": user.id})
+                recognition.upload_photo(partner_id, biometrics_image)
+            except HTTPError as e:
+                return Response({"detail": str(e)}, e.response.status_code)
+
+            UserConnecter.objects.create(
+                user=user,
+                partner_id=partner_id,
+            )
+            success_msg = _('Biometrics template added successfully.')
+            return Response({"detail": success_msg}, status=status.HTTP_200_OK)
+        else:
+            error_msg = _("The employee has biometrics. "
+                          "To add a new biometrics template, you need to delete the current template.")
+            return Response({"detail": error_msg}, status=status.HTTP_400_BAD_REQUEST)
 
     @action(detail=True, methods=['post'])
     def delete_biometrics(self, request, pk=None):

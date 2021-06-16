@@ -51,6 +51,8 @@ class NetworkSerializer(serializers.ModelSerializer):
     def get_default_stats(self, obj: Network):
         default_stats = json.loads(obj.settings_values).get('default_stats', {})
         return {
+            'timesheet_employee_top': default_stats.get('timesheet_employee_top', 'fact_total_hours_sum'),
+            'timesheet_employee_bottom': default_stats.get('timesheet_employee_bottom', 'sawh_hours'),
             'employee_top': default_stats.get('employee_top', 'work_hours_total'),
             'employee_bottom': default_stats.get('employee_bottom', 'norm_hours_curr_month'),
             'day_top': default_stats.get('day_top', 'covering'),
@@ -82,6 +84,7 @@ class NetworkSerializer(serializers.ModelSerializer):
             'default_stats',
             'show_tabel_graph',
             'show_worker_day_tasks',
+            'show_user_biometrics_block',
         ]
 
 
@@ -254,6 +257,7 @@ class EmploymentListSerializer(serializers.Serializer):
         request = self.context.get('request')
         if request and request.query_params.get('include_employee'):
             self.fields['employee'] = EmployeeSerializer(required=False, read_only=True)
+
 
 class EmploymentSerializer(serializers.ModelSerializer):
     default_error_messages = {

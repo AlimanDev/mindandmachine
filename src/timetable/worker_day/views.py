@@ -1,4 +1,5 @@
 import datetime
+import io
 import json
 from itertools import groupby
 
@@ -22,7 +23,7 @@ from rest_framework.response import Response
 from rest_framework.serializers import ValidationError
 
 from src.base.exceptions import FieldError
-from src.base.models import Employment, Shop, ProductionDay, Group, User, Employee
+from src.base.models import Employment, Shop, Group, User, Employee
 from src.base.permissions import WdPermission
 from src.base.views_abstract import BaseModelViewSet
 from src.events.signals import event_signal
@@ -36,6 +37,7 @@ from src.timetable.models import (
     WorkerDayPermission,
     GroupWorkerDayPermission,
 )
+from src.timetable.timesheet.tasks import calc_timesheets
 from src.timetable.vacancy.utils import cancel_vacancies, confirm_vacancy
 from src.timetable.worker_day.serializers import (
     WorkerDaySerializer,
@@ -46,6 +48,7 @@ from src.timetable.worker_day.serializers import (
     DeleteWorkerDaysSerializer,
     ExchangeSerializer,
     UploadTimetableSerializer,
+    GenerateUploadTimetableExampleSerializer,
     DownloadSerializer,
     WorkerDayListSerializer,
     DownloadTabelSerializer,
@@ -56,7 +59,7 @@ from src.timetable.worker_day.serializers import (
     BlockOrUnblockWorkerDayWrapperSerializer,
 )
 from src.timetable.worker_day.stat import count_daily_stat
-from src.timetable.worker_day.tasks import recalc_wdays
+from src.timetable.worker_day.tasks import recalc_wdays, recalc_fact_from_records
 from src.timetable.worker_day.utils import download_timetable_util, upload_timetable_util, exchange, copy_as_excel_cells
 from src.util.dg.tabel import get_tabel_generator_cls
 from src.util.models_converter import Converter
@@ -142,68 +145,15 @@ class WorkerDayViewSet(BaseModelViewSet):
     def list(self, request, *args, **kwargs):
         if request.query_params.get('hours_details', False):
             data = []
-            def _time_to_float(t):
-                return t.hour + t.minute / 60 + t.second / 3600
-            prod_day_filter = {
-                'is_celebration': True,
-            }
-            if request.query_params.get('dt__gte', False):
-                prod_day_filter['dt__gte'] = request.query_params.get('dt__gte', False)
-            if request.query_params.get('dt__lte', False):
-                prod_day_filter['dt__lte'] = request.query_params.get('dt__lte', False)
-            celebration_dates = ProductionDay.objects.filter(**prod_day_filter).values_list('dt', flat=True)
 
-            night_edges = [Converter.parse_time(t) for t in request.user.network.night_edges]
-            for worker_day in self.filter_queryset(self.get_queryset().prefetch_related('worker_day_details').select_related('last_edited_by')):
+            for worker_day in self.filter_queryset(self.get_queryset().prefetch_related('worker_day_details').select_related('last_edited_by', 'shop__network')):
                 wd_dict = WorkerDayListSerializer(worker_day, context=self.get_serializer_context()).data
-                if worker_day.type in WorkerDay.TYPES_WITH_TM_RANGE:
-                    if worker_day.work_hours > datetime.timedelta(0):
-                        work_seconds = worker_day.work_hours.seconds
-                    else:
-                        wd_dict['work_hours'] = 0.0
-                        data.append(wd_dict)
-                        continue
-                    work_start = worker_day.dttm_work_start_tabel or worker_day.dttm_work_start
-                    work_end = worker_day.dttm_work_end_tabel or worker_day.dttm_work_end
-                    if not (work_start and work_end):
-                        wd_dict['work_hours'] = 0.0
-                        data.append(wd_dict)
-                        continue
-
-                    wd_dict['work_hours'] = round(work_seconds / 3600, 2)
-                    wd_dict['work_hours_details'] = {}
-                    if worker_day.dt in celebration_dates:
-                        wd_dict['work_hours_details']['H'] = wd_dict['work_hours']
-                    else:
-                        if work_end.time() <= night_edges[0] and work_start.date() == work_end.date():
-                            wd_dict['work_hours_details']['D'] = wd_dict['work_hours']
-                            data.append(wd_dict)
-                            continue
-                        if work_start.time() >= night_edges[0] and work_end.time() <= night_edges[1]:
-                            wd_dict['work_hours_details']['N'] = wd_dict['work_hours']
-                            data.append(wd_dict)
-                            continue
-
-                        if work_start.time() > night_edges[0] or work_start.time() < night_edges[1]:
-                            tm_start = _time_to_float(work_start.time())
-                        else:
-                            tm_start = _time_to_float(night_edges[0])
-                        if work_end.time() > night_edges[0] or work_end.time() < night_edges[1]:
-                            tm_end = _time_to_float(work_end.time())
-                        else:
-                            tm_end = _time_to_float(night_edges[1])
-
-                        night_seconds = (tm_end - tm_start if tm_end > tm_start else 24 - (tm_start - tm_end)) * 60 * 60
-                        total_seconds = (work_end - work_start).total_seconds()
-
-                        break_time_seconds = total_seconds - work_seconds
-
-                        wd_dict['work_hours_details']['D'] = round(
-                            (total_seconds - night_seconds - break_time_seconds / 2) / 3600, 2)
-                        wd_dict['work_hours_details']['N'] = round((night_seconds - break_time_seconds / 2) / 3600, 2)
-                        wd_dict['work_hours'] = wd_dict['work_hours_details']['D'] + wd_dict['work_hours_details']['N']
-                else:
-                    wd_dict['work_hours'] = 0.0
+                work_hours, work_hours_day, work_hours_night = worker_day.calc_day_and_night_work_hours()
+                wd_dict['work_hours'] = work_hours
+                wd_dict['work_hours_details'] = {
+                    'D': work_hours_day,
+                    'N': work_hours_night,
+                }
                 data.append(wd_dict)
         else:
             data = WorkerDayListSerializer(
@@ -614,6 +564,7 @@ class WorkerDayViewSet(BaseModelViewSet):
                             is_approved=False,
                             type=wd.type,
                             created_by_id=wd.created_by_id,
+                            last_edited_by_id=wd.last_edited_by_id,
                             is_vacancy=wd.is_vacancy,
                             is_outsource=wd.is_outsource,
                             comment=wd.comment,
@@ -661,6 +612,14 @@ class WorkerDayViewSet(BaseModelViewSet):
                         ).values_list('id', flat=True))
                         if wd_ids:
                             transaction.on_commit(lambda wd_ids=wd_ids: recalc_wdays.delay(id__in=wd_ids))
+                    if settings.ZKTECO_INTEGRATION: # если используем терминалы
+                            transaction.on_commit(
+                                lambda: recalc_fact_from_records.delay(
+                                    serializer.validated_data['dt_from'], 
+                                    serializer.validated_data['dt_to'], 
+                                    shop_ids=[serializer.data['shop_id']]
+                                )
+                            )
 
                 # TODO: нужно ли как-то разделять события подтверждения факта и плана?
                 event_context = serializer.data.copy()
@@ -675,16 +634,20 @@ class WorkerDayViewSet(BaseModelViewSet):
                     context=event_context,
                 ))
 
+                transaction.on_commit(lambda: calc_timesheets.delay(employee_id__in=list(worker_dates_dict.keys())))
+
                 WorkerDay.check_work_time_overlap(
                     employee_days_q=employee_days_q,
                     exc_cls=ValidationError,
                 )
-                WorkerDay.check_tasks_violations(
-                    employee_days_q=employee_days_q,
-                    is_approved=True,
-                    is_fact=serializer.data['is_fact'],
-                    exc_cls=ValidationError,
-                )
+
+                if not has_permission_to_change_protected_wdays:
+                    WorkerDay.check_tasks_violations(
+                        employee_days_q=employee_days_q,
+                        is_approved=True,
+                        is_fact=serializer.data['is_fact'],
+                        exc_cls=ValidationError,
+                    )
 
         return Response()
 
@@ -1129,6 +1092,36 @@ class WorkerDayViewSet(BaseModelViewSet):
                 **fact_filter,
             ).delete()
 
+            if data['type'] == CopyApprovedSerializer.TYPE_PLAN_TO_FACT and request.user.network.copy_plan_to_fact_crossing:
+                grouped_wds = {}
+                for wd in list_wd:
+                    grouped_wds.setdefault(wd.employee_id, {})[wd.dt] = wd
+                wds_approved =  WorkerDay.objects_with_excluded.filter(
+                    dt__in=data['dates'],
+                    employee_id__in=data['employee_ids'],
+                    is_approved=True,
+                    is_fact=True,
+                )
+                for wd in wds_approved:
+                    grouped_wds.setdefault(wd.employee_id, {})[wd.dt] = WorkerDay(
+                        shop=wd.shop,
+                        employee_id=wd.employee_id,
+                        employment=wd.employment,
+                        dttm_work_start=wd.dttm_work_start,
+                        dttm_work_end=wd.dttm_work_end,
+                        dt=wd.dt,
+                        is_fact=wd.is_fact,
+                        is_approved=wd.is_approved,
+                        type=wd.type,
+                        created_by_id=wd.created_by_id,
+                        is_vacancy=wd.is_vacancy,
+                        is_outsource=wd.is_outsource,
+                        comment=wd.comment,
+                        canceled=wd.canceled,
+                        need_count_wh=True,
+                    )
+                list_wd = [wd for user_data in grouped_wds.values() for wd in user_data.values()]
+
             WorkerDay.objects.bulk_create(
                 [
                     WorkerDay(
@@ -1357,6 +1350,115 @@ class WorkerDayViewSet(BaseModelViewSet):
         return upload_timetable_util(data.validated_data, file)
 
     @swagger_auto_schema(
+        query_serializer=GenerateUploadTimetableExampleSerializer,
+        responses={200: 'Шаблон расписания в формате excel.'},
+        operation_description='''
+            Возвращает шаблон для загрузки графика.\n
+            ''',
+    )
+    @action(detail=False, methods=['get'], filterset_class=None)
+    def generate_upload_example(self, request):
+        # TODO: рефакторинг + тест
+        serializer = GenerateUploadTimetableExampleSerializer(
+            data=request.query_params if request.method == 'GET' else request.data,
+            context=self.get_serializer_context(),
+        )
+        serializer.is_valid(raise_exception=True)
+
+        shop_id = serializer.validated_data.get('shop_id')
+        dt_from = serializer.validated_data.get('dt_from')
+        dt_to = serializer.validated_data.get('dt_to')
+        is_fact = serializer.validated_data.get('is_fact')
+        is_approved = serializer.validated_data.get('is_approved')
+        employee_id__in = serializer.validated_data.get('employee_id__in')
+
+        employee_qs = Employee.objects.filter(
+            employments__id__in=Employment.objects.get_active(
+                network_id=self.request.user.network_id,
+                shop_id=shop_id,
+                dt_from=dt_from,
+                dt_to=dt_to,
+                is_visible=True,
+            )
+        ).annotate(
+            position=Subquery(Employment.objects.get_active(
+                network_id=self.request.user.network_id,
+                shop_id=shop_id,
+                dt_from=dt_from,
+                dt_to=dt_to,
+                is_visible=True,
+                employee_id=OuterRef('id'),
+            ).order_by('-norm_work_hours').values('position__name')[:1])
+        ).select_related(
+            'user',
+        ).order_by('user__last_name', 'user__first_name')
+
+        if employee_id__in:
+            employee_qs = employee_qs.filter(id__in=employee_id__in)
+
+        wdays_dict = {f'{wd.employee_id}_{wd.dt}': wd for wd in WorkerDay.objects.filter(
+            Q(Q(type__in=WorkerDay.TYPES_WITH_TM_RANGE) & Q(shop_id=shop_id)) |
+            ~Q(type__in=WorkerDay.TYPES_WITH_TM_RANGE),
+            employee__in=employee_qs,
+            dt__gte=dt_from,
+            dt__lte=dt_to,
+            is_fact=is_fact,
+            is_approved=is_approved,
+        )}
+
+        rows = []
+        dates = list(
+            pd.date_range(dt_from, dt_to).date)
+        for employee in employee_qs:
+            row_data = {}
+            row_data[_('Employee id')] = employee.tabel_code
+            row_data[_('Full name')] = employee.user.fio  # TODO: разделить на 3 поля
+            row_data[_('Position')] = employee.position
+            for dt in dates:
+                _cell_value = ''
+
+                wd = wdays_dict.get(f'{employee.id}_{dt}')
+                if wd:
+                    if wd.type in WorkerDay.TYPES_WITH_TM_RANGE:
+                        tm_start = wd.dttm_work_start.strftime('%H:%M')
+                        tm_end = wd.dttm_work_end.strftime('%H:%M')
+                        _cell_value = f'{tm_start}-{tm_end}'
+                    else:
+                        _cell_value = WorkerDay.WD_TYPE_MAPPING.get(wd.type, '')
+
+                row_data[dt] = _cell_value
+
+            rows.append(row_data)
+
+        df = pd.DataFrame(rows)
+
+        output = io.BytesIO()
+        writer = pd.ExcelWriter(output, engine='xlsxwriter')
+        sheet_name = _('Timetable')
+        df.to_excel(
+            excel_writer=writer, sheet_name=sheet_name, index=False,
+            columns=[_('Employee id'), _('Full name'), _('Position')] + dates,
+        )
+        worksheet = writer.sheets[sheet_name]
+        # set the column width as per your requirement
+        for idx, col in enumerate(df):  # loop through all columns
+            series = df[col]
+            max_len = max((
+                series.astype(str).map(len).max(),  # len of largest item
+                len(str(series.name))  # len of column name/header
+            )) + 2  # adding a little extra space
+            worksheet.set_column(idx, idx, max_len)
+        writer.save()
+        output.seek(0)
+        response = HttpResponse(
+            output,
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        response['Content-Disposition'] = 'attachment; filename="{}.xlsx"'.format(
+            f'Timetable_{serializer.validated_data.get("shop_id")}_{dt_from}_{dt_to}')
+        return response
+
+    @swagger_auto_schema(
         request_body=UploadTimetableSerializer,
         responses={200: 'empty response'},
         operation_description='''
@@ -1401,14 +1503,24 @@ class WorkerDayViewSet(BaseModelViewSet):
         dt_from = serializer.validated_data.get('dt_from')
         dt_to = serializer.validated_data.get('dt_to')
         convert_to = serializer.validated_data.get('convert_to')
+        type = serializer.validated_data.get('tabel_type')
         tabel_generator_cls = get_tabel_generator_cls(tabel_format=shop.network.download_tabel_template)
-        tabel_generator = tabel_generator_cls(shop, dt_from, dt_to)
+        tabel_generator = tabel_generator_cls(shop, dt_from, dt_to, type=type)
         response = HttpResponse(
             tabel_generator.generate(convert_to=shop.network.convert_tabel_to or convert_to),
             content_type='application/octet-stream',
         )
-        filename = f'Табель_для_подразделения_{shop.code}_от_{timezone.now().strftime("%Y-%m-%d")}.' \
-                   f'{shop.network.convert_tabel_to or convert_to}'
+        types = {
+            DownloadTabelSerializer.TYPE_FACT: _('Fact'),
+            DownloadTabelSerializer.TYPE_MAIN: _('Main'),
+            DownloadTabelSerializer.TYPE_ADDITIONAL: _('Additional'),
+        }
+        filename = _('{}_timesheet_for_shop_{}_from_{}.{}').format(
+            types.get(type, ''),
+            shop.code,
+            timezone.now().strftime("%Y-%m-%d"),
+            shop.network.convert_tabel_to or convert_to,
+        )
         response['Content-Disposition'] = f'attachment; filename={escape_uri_path(filename)}'
         return response
 

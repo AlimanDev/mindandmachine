@@ -12,11 +12,10 @@ from django.contrib.auth.models import (
     AbstractUser as DjangoAbstractUser,
 )
 from django.contrib.postgres.fields import JSONField
-from rest_framework.serializers import ValidationError
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models
 from django.db import transaction
-from django.db.models import Case, When, Sum, Value, IntegerField, Subquery, OuterRef, F
+from django.db.models import Case, When, Sum, Value, IntegerField, Subquery, OuterRef, F, Q
 from django.db.models.functions import Coalesce
 from django.db.models.query import QuerySet
 from django.utils import timezone
@@ -24,6 +23,7 @@ from django.utils.functional import cached_property
 from django.utils.translation import gettext as _
 from model_utils import FieldTracker
 from mptt.models import MPTTModel, TreeForeignKey
+from rest_framework.serializers import ValidationError
 from timezone_field import TimeZoneField
 
 from src.base.models_abstract import (
@@ -103,6 +103,8 @@ class Network(AbstractActiveModel):
         default=False,
         verbose_name='Считать только те фактические часы, которые есть в подтвержденном плановом графике',
     )
+    copy_plan_to_fact_crossing = models.BooleanField(
+        verbose_name="Копировать план в факт без перезаписи факта", default=False)
     download_tabel_template = models.CharField(
         max_length=64, verbose_name='Шаблон для табеля',
         choices=TABEL_FORMAT_CHOICES, default='mts',
@@ -119,6 +121,14 @@ class Network(AbstractActiveModel):
         blank=True,
         null=True,
         verbose_name='Перерывы по умолчанию',
+        related_name='networks',
+    )
+    load_template = models.ForeignKey(
+        'forecast.LoadTemplate',
+        on_delete=models.PROTECT,
+        blank=True,
+        null=True,
+        verbose_name='Шаблон нагрузки по умолчанию',
         related_name='networks',
     )
     # при создании новой должности будут проставляться соотв. значения
@@ -140,6 +150,10 @@ class Network(AbstractActiveModel):
     create_employment_on_set_or_update_director_code = models.BooleanField(
         default=False,
         verbose_name='Создавать скрытое трудоустройство при проставлении/изменении director_code в подразделении',
+    )
+    show_user_biometrics_block = models.BooleanField(
+        default=False,
+        verbose_name='Отображать блок биометрии в деталях сотрудника',
     )
 
     @property
@@ -165,6 +179,11 @@ class Network(AbstractActiveModel):
             '06:00:00',
         )
         return self.settings_values_prop.get('night_edges', default_night_edges)
+
+    @cached_property
+    def night_edges_tm_list(self):
+        from src.util.models_converter import Converter
+        return [Converter.parse_time(t) for t in self.night_edges]
 
     @cached_property
     def accounting_periods_count(self):
@@ -199,6 +218,11 @@ class NetworkConnect(AbstractActiveModel):
 
 
 class Region(AbstractActiveNetworkSpecificCodeNamedModel):
+    parent = models.ForeignKey(
+        to='self', verbose_name='Родительский регион', on_delete=models.CASCADE,
+        null=True, blank=True, related_name='children',
+    )
+
     class Meta(AbstractActiveNetworkSpecificCodeNamedModel.Meta):
         verbose_name = 'Регион'
         verbose_name_plural = 'Регионы'
@@ -545,6 +569,10 @@ class Shop(MPTTModel, AbstractActiveNetworkSpecificCodeNamedModel):
             transaction.on_commit(self._handle_new_shop_created)
         elif self.tracker.has_changed('tm_open_dict') or self.tracker.has_changed('tm_close_dict'):
             transaction.on_commit(self._handle_schedule_change)
+        
+        if is_new and self.load_template_id is None:
+            self.load_template_id = self.network.load_template_id
+
         if load_template_changed and not (self.load_template_id is None):
             from src.forecast.load_template.utils import apply_load_template
             from src.forecast.load_template.tasks import calculate_shops_load
@@ -813,16 +841,24 @@ class ProductionDay(AbstractModel):
         :param month:
         :return: Словарь, где ключ - номер месяца, значение - количество часов.
         """
-        filter_kwargs = dict(
+        q = Q(
+            Q(region_id=region_id) | Q(region__parent_id=region_id),
             dt__year=year,
             type__in=ProductionDay.WORK_TYPES,
-            region_id=region_id,
         )
         if month:
-            filter_kwargs['dt__month'] = month
+            q &= Q(dt__month=month)
+
+        prod_cal_subq = ProductionDay.objects.filter(q).annotate(
+            is_equal_regions=Case(
+                When(region_id=Value(region_id), then=True),
+                default=False, output_field=models.BooleanField()
+            ),
+        ).order_by('-is_equal_regions')
 
         norm_work_hours = ProductionDay.objects.filter(
-            **filter_kwargs
+            q,
+            id=Subquery(prod_cal_subq.values_list('id', flat=True)[:1])
         ).annotate(
             work_hours=Case(
                 When(type=ProductionDay.TYPE_WORK, then=Value(ProductionDay.WORK_NORM_HOURS[ProductionDay.TYPE_WORK])),
@@ -1290,9 +1326,12 @@ class FunctionGroup(AbstractModel):
         'Shop_outsource_tree',
         'Subscribe',
         'TickPoint',
+        'Timesheet',
+        'Timesheet_stats',
         'User',
         'User_change_password',
         'User_delete_biometrics',
+        'User_add_biometrics',
         'WorkerConstraint',
         'WorkerDay',
         'WorkerDay_approve',
@@ -1319,6 +1358,7 @@ class FunctionGroup(AbstractModel):
         'WorkerDay_request_approve',
         'WorkerDay_block',
         'WorkerDay_unblock',
+        'WorkerDay_generate_upload_example',
         'WorkerPosition',
         'WorkTypeName',
         'WorkType',

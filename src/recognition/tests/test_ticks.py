@@ -1,5 +1,6 @@
 from django.test import override_settings
 from rest_framework import status
+from rest_framework.exceptions import ValidationError
 from rest_framework.test import APITestCase
 
 from src.recognition.models import Tick
@@ -162,3 +163,18 @@ class TestTicksViewSet(TestsHelperMixin, APITestCase):
         self.assertEqual(WorkerDay.objects.filter(is_fact=True, is_approved=True).count(), 1)
         self.assertEqual(AttendanceRecords.objects.get(dttm=no_type_data['dttm']).type, AttendanceRecords.TYPE_COMING)
         self.assertEqual(AttendanceRecords.objects.all().count(), 1)
+
+    def test_cant_create_att_record_withot_active_empl(self):
+        self.employment2.dt_fired = date.today() - timedelta(days=2)
+        self.employment2.save()
+        at = None
+        try:
+            at = AttendanceRecords.objects.create(
+                user_id=self.employee2.user_id,
+                shop=self.shop,
+                dttm=datetime.now(),
+            )
+        except ValidationError as e:
+            self.assertEqual(e.detail[0], 'У вас нет активного трудоустройства')
+
+        self.assertIsNone(at)

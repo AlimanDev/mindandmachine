@@ -1,6 +1,5 @@
 from datetime import date
 
-from django.db.models import Q
 from django.test import override_settings, TestCase
 
 from etc.scripts import fill_calendar
@@ -8,6 +7,7 @@ from src.base.models import (
     Network,
     SAWHSettings,
     SAWHSettingsMapping,
+    ProductionDay,
 )
 from src.base.tests.factories import (
     NetworkFactory,
@@ -17,6 +17,7 @@ from src.base.tests.factories import (
     GroupFactory,
     WorkerPositionFactory,
     EmployeeFactory,
+    RegionFactory,
 )
 from src.timetable.models import WorkerDay
 from src.timetable.tests.factories import WorkerDayFactory
@@ -24,7 +25,6 @@ from src.timetable.worker_day.stat import (
     WorkersStatsGetter,
 )
 from src.util.mixins.tests import TestsHelperMixin
-
 
 class SawhSettingsHelperMixin(TestsHelperMixin):
     acc_period = None
@@ -34,7 +34,9 @@ class SawhSettingsHelperMixin(TestsHelperMixin):
         cls.network = NetworkFactory(
             accounting_period_length=cls.acc_period,
         )
+        cls.region = RegionFactory()
         cls.shop = ShopFactory(
+            region=cls.region,
             network=cls.network,
             tm_open_dict='{"all": "08:00:00"}',
             tm_close_dict='{"all": "22:00:00"}',
@@ -324,6 +326,18 @@ class TestSAWHSettingsQuarterAccPeriod(SawhSettingsHelperMixin, TestCase):
             expected_norm_hours=176,  # по умолчанию часы из произв. календаря
         )
         self.assertEqual(res + res2 + res3, 526)
+
+    def test_override_region_prod_cal(self):
+        self.sawh_settings_mapping.shops.remove(self.shop)
+        subregion = RegionFactory(parent=self.region, name='Подрегион', code='subregion')
+        ProductionDay.objects.create(region=subregion, dt=date(2021, 2, 10), type=ProductionDay.TYPE_HOLIDAY)
+        self.shop.region = subregion
+        self.shop.save(update_fields=['region'])
+        self._test_hours_for_period(
+            dt_from=date(2021, 2, 1),
+            dt_to=date(2021, 2, 28),
+            expected_norm_hours=143,
+        )
 
 
 @override_settings(CELERY_TASK_ALWAYS_EAGER=True)

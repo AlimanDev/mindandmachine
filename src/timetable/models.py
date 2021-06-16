@@ -13,7 +13,9 @@ from django.db.models import (
 from django.db.models.functions import Abs, Cast, Extract, Least
 from django.db.models.query import QuerySet
 from django.utils import timezone
+from django.utils.translation import gettext as _
 from model_utils import FieldTracker
+from rest_framework.exceptions import ValidationError
 
 from src.base.models import Shop, Employment, User, Event, Network, Break, ProductionDay, Employee
 from src.base.models_abstract import AbstractModel, AbstractActiveModel, AbstractActiveNetworkSpecificCodeNamedModel, \
@@ -22,6 +24,7 @@ from src.events.signals import event_signal
 from src.recognition.events import EMPLOYEE_WORKING_NOT_ACCORDING_TO_PLAN
 from src.tasks.models import Task
 from src.timetable.exceptions import WorkTimeOverlap, WorkDayTaskViolation
+from src.util.time import _time_to_float
 
 
 class WorkerManager(UserManager):
@@ -296,17 +299,20 @@ class WorkerDayQuerySet(QuerySet):
     def get_fact_edit(self, **kwargs):
         raise NotImplementedError
 
-    def get_tabel(self, **kwargs):
+    def get_tabel(self, *args, **kwargs):
         ordered_subq = self.filter(
             dt=OuterRef('dt'),
             employee_id=OuterRef('employee_id'),
             is_approved=True,
+            *args,
+            **kwargs,
         ).exclude(type=WorkerDay.TYPE_EMPTY).order_by('-is_fact', '-work_hours').values_list('id')[:1]
         return self.filter(
             Q(is_fact=True) |
             Q(~Q(type__in=WorkerDay.TYPES_WITH_TM_RANGE), is_fact=False),
             is_approved=True,
             id=Subquery(ordered_subq),
+            *args,
             **kwargs,
         )
 
@@ -476,6 +482,30 @@ class WorkerDay(AbstractModel):
         TYPE_MATERNITY_CARE,
     )
 
+    # маппинг внутренних типов в отображаемые пользователям сокращения
+    WD_TYPE_MAPPING = {
+        TYPE_BUSINESS_TRIP: _('BT'),
+        TYPE_HOLIDAY: _('H'),
+        TYPE_ABSENSE: _('ABS'),
+        TYPE_REAL_ABSENCE: 'ПР',  # пока что нет на фронте
+        TYPE_QUALIFICATION: _('ST'),
+        TYPE_SICK: _('S'),
+        TYPE_VACATION: _('V'),
+        TYPE_EXTRA_VACATION: 'ОД',  # пока что нет на фронте
+        TYPE_STUDY_VACATION: 'У',  # пока что нет на фронте
+        TYPE_SELF_VACATION: _('VO'),
+        TYPE_SELF_VACATION_TRUE: 'ОЗ',  # пока что нет на фронте
+        TYPE_GOVERNMENT: 'Г',  # пока что нет на фронте
+        TYPE_MATERNITY: _('MAT'),
+        TYPE_MATERNITY_CARE: 'Р',  # пока что нет на фронте
+        TYPE_DONOR_OR_CARE_FOR_DISABLED_PEOPLE: 'ОВ',  # пока что нет на фронте
+        TYPE_ETC: '',
+        TYPE_EMPTY: '',
+    }
+
+    # обратный маппинг для определения внутреннего типа в загруженных графиках
+    WD_TYPE_MAPPING_REVERSED = dict((v, k) for k, v in WD_TYPE_MAPPING.items())
+
     def __str__(self):
         return '{}, {}, {}, {}, {}, {}, {}, {}'.format(
             self.employee.user.last_name if (self.employee and self.employee.user_id) else 'No worker',
@@ -490,6 +520,60 @@ class WorkerDay(AbstractModel):
 
     def __repr__(self):
         return self.__str__()
+
+    def calc_day_and_night_work_hours(self):
+        # TODO: нужно учитывать работу в праздничные дни? -- сейчас is_celebration в ProductionDay всегда False
+
+        if self.type not in self.TYPES_WITH_TM_RANGE:
+            return 0.0, 0.0, 0.0
+
+        night_edges = self.shop.network.night_edges_tm_list
+
+        if self.work_hours > datetime.timedelta(0):
+            work_seconds = self.work_hours.seconds
+        else:
+            return 0.0, 0.0, 0.0
+
+        work_start = self.dttm_work_start_tabel or self.dttm_work_start
+        work_end = self.dttm_work_end_tabel or self.dttm_work_end
+        if not (work_start and work_end):
+            return 0.0, 0.0, 0.0
+
+        work_hours = round(work_seconds / 3600, 2)
+
+        if work_end.time() <= night_edges[0] and work_start.date() == work_end.date():
+            work_hours_day = work_hours
+            return work_hours, work_hours_day, 0.0
+        if work_start.time() >= night_edges[0] and work_end.time() <= night_edges[1]:
+            work_hours_night = work_hours
+            return work_hours, 0.0, work_hours_night
+
+        if work_start.time() > night_edges[0] or work_start.time() < night_edges[1]:
+            tm_start = _time_to_float(work_start.time())
+        else:
+            tm_start = _time_to_float(night_edges[0])
+        if work_end.time() > night_edges[0] or work_end.time() < night_edges[1]:
+            tm_end = _time_to_float(work_end.time())
+        else:
+            tm_end = _time_to_float(night_edges[1])
+
+        night_seconds = (tm_end - tm_start if tm_end > tm_start else 24 - (tm_start - tm_end)) * 60 * 60
+        total_seconds = (work_end - work_start).total_seconds()
+
+        break_time_seconds = total_seconds - work_seconds
+
+        break_time_half_seconds = break_time_seconds / 2
+        if night_seconds > break_time_half_seconds:
+            work_hours_day = round(
+                (total_seconds - night_seconds - break_time_half_seconds) / 3600, 2)
+            work_hours_night = round((night_seconds - break_time_half_seconds) / 3600, 2)
+        else:
+            substract_from_day_seconds = break_time_half_seconds - night_seconds
+            work_hours_night = 0.0
+            work_hours_day = round(
+                (total_seconds - substract_from_day_seconds - break_time_half_seconds) / 3600, 2)
+        work_hours = work_hours_day + work_hours_night
+        return work_hours, work_hours_day, work_hours_night
 
     def _calc_wh(self):
         position_break_triplet_cond = self.employment and self.employment.position and self.employment.position.breaks
@@ -922,6 +1006,52 @@ class WorkerDay(AbstractModel):
         return task_violations
 
 
+class Timesheet(AbstractModel):
+    """
+    Табель учета рабочего времени (фактический + фискальный -- разделение на основной и дополнительный)
+    """
+    SOURCE_TYPE_PLAN = 'plan'
+    SOURCE_TYPE_FACT = 'fact'
+    SOURCE_TYPE_MANUAL = 'manual'
+    SOURCE_TYPE_SYSTEM = 'system'
+
+    SOURCE_TYPES = (
+        (SOURCE_TYPE_PLAN, _('Planned timetable')),  # плановый график
+        (SOURCE_TYPE_FACT, _('Attendance records')),  # отметки
+        (SOURCE_TYPE_MANUAL, _('Manual changes')),  # ручные корректировки (заготовка, пока нет такого)
+        (SOURCE_TYPE_SYSTEM, _('Determined by the system')),  # определены системой
+    )
+
+    employee = models.ForeignKey('base.Employee', on_delete=models.CASCADE, verbose_name='Сотрудник')
+    dt = models.DateField(verbose_name='Дата')
+    shop = models.ForeignKey(
+        'base.Shop', on_delete=models.CASCADE, null=True, blank=True, verbose_name='Поздразделение')  # TODO: нужен?
+    fact_timesheet_source = models.CharField(
+        choices=SOURCE_TYPES, max_length=12, blank=True,
+        verbose_name='Источник данных для фактического табеля',
+    )
+    fact_timesheet_type = models.CharField(choices=WorkerDay.TYPES, max_length=2)
+    fact_timesheet_dttm_work_start = models.DateTimeField(null=True, blank=True)
+    fact_timesheet_dttm_work_end = models.DateTimeField(null=True, blank=True)
+    # TODO: добавить или высчитывать через (fact_timesheet_dttm_work_end - fact_timesheet_dttm_work_start) - fact_timesheet_total_hours ?
+    #fact_timesheet_break_time_minutes = models.IntegerField(null=True, blank=True)
+    fact_timesheet_total_hours = models.DecimalField(max_digits=4, decimal_places=2, null=True, blank=True)
+    fact_timesheet_day_hours = models.DecimalField(max_digits=4, decimal_places=2, null=True, blank=True)
+    fact_timesheet_night_hours = models.DecimalField(max_digits=4, decimal_places=2, null=True, blank=True)
+    main_timesheet_type = models.CharField(choices=WorkerDay.TYPES, max_length=2, blank=True)
+    main_timesheet_total_hours = models.DecimalField(max_digits=4, decimal_places=2, null=True, blank=True)
+    main_timesheet_day_hours = models.DecimalField(max_digits=4, decimal_places=2, null=True, blank=True)
+    main_timesheet_night_hours = models.DecimalField(max_digits=4, decimal_places=2, null=True, blank=True)
+    additional_timesheet_hours = models.DecimalField(max_digits=4, decimal_places=2, null=True, blank=True)
+
+    class Meta:
+        verbose_name = 'Запись в табеле'
+        verbose_name_plural = 'Записи в табеле'
+        unique_together = (
+            ('dt', 'employee'),
+        )
+
+
 class WorkerDayCashboxDetailsManager(models.Manager):
     def qos_current_version(self):
         return super().get_queryset().select_related('worker_day').filter(worker_day__child__id__isnull=True)
@@ -1239,6 +1369,7 @@ class AttendanceRecords(AbstractModel):
     user = models.ForeignKey(User, on_delete=models.PROTECT)
     employee = models.ForeignKey(Employee, on_delete=models.PROTECT, null=True)
     verified = models.BooleanField(default=True)
+    terminal = models.BooleanField(default=False, help_text='Отметка с теримнала')
 
     shop = models.ForeignKey(Shop, on_delete=models.PROTECT) # todo: or should be to shop? fucking logic
 
@@ -1262,6 +1393,8 @@ class AttendanceRecords(AbstractModel):
                 dt=dt,
                 priority_shop_id=shop.id,
             ).first()
+            if not employment:
+                raise ValidationError(_('You have no active employment'))
             employee_id = employment.employee_id
             if not initial_record_type:
                 record_type = AttendanceRecords.TYPE_COMING
@@ -1279,6 +1412,8 @@ class AttendanceRecords(AbstractModel):
             record_type = initial_record_type or calculated_record_type
             employee_id = closest_plan_approved.employee_id
             employment = closest_plan_approved.employment
+            if not employment:
+                raise ValidationError(_('You have no active employment'))
             dt = closest_plan_approved.dt
 
         return employee_id, employment, dt, record_type, closest_plan_approved is not None
@@ -1688,6 +1823,7 @@ class ProdCal(models.Model):
     employee = models.ForeignKey('base.Employee', on_delete=models.DO_NOTHING)
     employment = models.ForeignKey('base.Employment', on_delete=models.DO_NOTHING)
     norm_hours = models.FloatField()
+    region = models.ForeignKey('base.Region', on_delete=models.DO_NOTHING)
 
     class Meta:
         managed = False
