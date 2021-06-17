@@ -278,6 +278,8 @@ def add_logger(name, level='DEBUG', formatter='simple', extra_handlers : list=No
         LOGGING['loggers'][name]['handlers'].extend(extra_handlers)
 
 add_logger('clean_wdays')
+add_logger('send_doctors_schedule_to_mis')
+add_logger('calc_timesheets')
 add_logger('send_doctors_schedule_to_mis', extra_handlers=['mail_admins'])
 add_logger('mda_integration', extra_handlers=['mail_admins'])
 
@@ -379,6 +381,7 @@ CELERY_IMPORTS = (
     'src.timetable.shop_month_stat.tasks',
     'src.timetable.vacancy.tasks',
     'src.timetable.worker_day.tasks',
+    'src.timetable.timesheet.tasks',
 )
 
 REDIS_HOST = env.str('REDIS_HOST', default='localhost')
@@ -472,6 +475,10 @@ IMPORT_EXPORT_USE_TRANSACTIONS = True
 
 # Eсли у пользователя пароль пустой, то при сохранении устанавливать пароль как логин
 SET_USER_PASSWORD_AS_LOGIN = False
+
+# Возможные вариант можно найти по FISCAL_SHEET_DIVIDERS_MAPPING
+# Если == None, то при расчете табеля разделение на осн. и доп. не производится
+FISCAL_SHEET_DIVIDER_ALIAS = None
 
 if is_config_exists('djconfig_local.py'):
     from .djconfig_local import *
@@ -582,6 +589,11 @@ CELERY_BEAT_SCHEDULE = {
     'task-auto-delete-biometrics': {
         'task': 'src.celery.tasks.auto_delete_biometrics',
         'schedule': crontab(hour=0, minute=0),
+        'options': {'queue': BACKEND_QUEUE}
+    },
+    'task-calc-timesheets': {
+        'task': 'src.timetable.timesheet.tasks.calc_timesheets',
+        'schedule': crontab(hour=3, minute=15),
         'options': {'queue': BACKEND_QUEUE}
     },
 }

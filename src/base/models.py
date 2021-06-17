@@ -167,6 +167,11 @@ class Network(AbstractActiveModel):
         return self.settings_values_prop.get('night_edges', default_night_edges)
 
     @cached_property
+    def night_edges_tm_list(self):
+        from src.util.models_converter import Converter
+        return [Converter.parse_time(t) for t in self.night_edges]
+
+    @cached_property
     def accounting_periods_count(self):
         return int(12 / self.accounting_period_length)
 
@@ -1290,6 +1295,8 @@ class FunctionGroup(AbstractModel):
         'Shop_outsource_tree',
         'Subscribe',
         'TickPoint',
+        'Timesheet',
+        'Timesheet_stats',
         'User',
         'User_change_password',
         'User_delete_biometrics',
