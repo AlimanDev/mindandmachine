@@ -38,7 +38,7 @@ class TestsHelperMixin:
     def get_url(view_name, *args, **kwargs: dict):
         return reverse(view_name, args=args, kwargs=kwargs)
 
-    def pp_dict(self, d):
+    def pp_data(self, d):
         print(json.dumps(d, indent=4, ensure_ascii=False))
 
     def print_resp(self, resp):
