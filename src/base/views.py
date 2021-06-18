@@ -265,7 +265,7 @@ class FunctionGroupView(BaseModelViewSet):
 
     @action(detail=False, methods=['get'])
     def functions(self, request):
-        return Response(FunctionGroup.FUNCS)
+        return Response(FunctionGroup.FUNCS_TUPLE)
 
 
 class WorkerPositionViewSet(UpdateorCreateViewSet):

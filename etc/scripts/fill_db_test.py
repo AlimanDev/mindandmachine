@@ -192,7 +192,7 @@ def create_users_workdays(workers, work_types_dict, start_dt, days, shop, shop_s
     cashier_group, created = Group.objects.get_or_create(name=lang_data['cashier'])
     supervisor_group, created = Group.objects.get_or_create(name=lang_data['supervisor'])
 
-    for func in FunctionGroup.FUNCS:
+    for func, _ in FunctionGroup.FUNCS_TUPLE:
         FunctionGroup.objects.get_or_create(
             access_type=FunctionGroup.TYPE_SUPERSHOP,
             group=supervisor_group,
