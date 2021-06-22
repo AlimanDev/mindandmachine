@@ -239,7 +239,7 @@ class EmploymentListSerializer(serializers.Serializer):
     dt_fired = serializers.DateField()
     salary = serializers.DecimalField(max_digits=10, decimal_places=2, default=0)
     week_availability = serializers.IntegerField()
-    norm_work_hours = serializers.IntegerField()
+    norm_work_hours = serializers.FloatField()
     min_time_btw_shifts = serializers.IntegerField()
     shift_hours_length_min = serializers.IntegerField()
     shift_hours_length_max = serializers.IntegerField()
@@ -293,7 +293,7 @@ class EmploymentSerializer(serializers.ModelSerializer):
                   'employee_id', 'is_active',
         ]
         create_only_fields = ['employee_id']
-        read_only_fields = []
+        read_only_fields = ['norm_work_hours']
         extra_kwargs = {
             'auto_timetable': {
                 'default': True,

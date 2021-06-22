@@ -105,6 +105,35 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
             position_id=put_data['position_id'],
         ).count() == 1)
 
+    def test_update_employment_norm_work_hours(self):
+        """
+        change PUT logic of employment for orteka
+        :return:
+        """
+
+        put_data = {
+            'position_id': self.worker_position.id,
+            'dt_hired': (timezone.now() - timedelta(days=300)).strftime('%Y-%m-%d'),
+            'shop_id': self.shop2.id,
+            'employee_id': self.employee2.id,
+            'norm_work_hours': 123.0,
+        }
+
+        employment_id = self._create_employment().json()['id']
+
+        resp = self.client.put(
+            path=self.get_url('Employment-detail', pk=employment_id),
+            data=self.dump_data(put_data),
+            content_type='application/json',
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(Employment.objects.filter(
+            shop_id=put_data['shop_id'],
+            dt_hired=put_data['dt_hired'],
+            employee_id=put_data['employee_id'],
+            position_id=put_data['position_id'],
+        ).first().norm_work_hours, 100.0)
+
     def test_put_by_code(self):
         self.shop2.code = str(self.shop2.id)
         self.shop2.save()
@@ -403,7 +432,7 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
             'is_fixed_hours': True,
             'salary': '150.00',
             'week_availability': 7,
-            'norm_work_hours': 100,
+            'norm_work_hours': 100.0,
             'min_time_btw_shifts': None,
             'shift_hours_length_min': None,
             'shift_hours_length_max': None,

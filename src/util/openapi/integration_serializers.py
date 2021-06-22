@@ -85,7 +85,7 @@ class EmploymentIntegrationSerializer(serializers.Serializer):
             'position_code': '1234',
             'shop_code': '6F9619FF-8B86-D011-B42D-00CF4FC964FF',
             'tabel_code': '0000-00001',
-            'norm_work_hours': 100,
+            'norm_work_hours': 100.0,
             'code': 'НМЗН-04676:baedae01-977e-11eb-83e6-00155d01881a:baedae01-977e-11eb-83e6-00155d01881a',
             'by_code': True,
         }
@@ -95,7 +95,7 @@ class EmploymentIntegrationSerializer(serializers.Serializer):
     position_code = serializers.CharField(help_text='Внешний идентификатор должности')
     shop_code = serializers.CharField(help_text='Внешний идентификатор магазина')
     tabel_code = serializers.CharField(help_text='Табельный номер сотрудника')
-    norm_work_hours = serializers.IntegerField(help_text='Ставка сотрудника в процентах')
+    norm_work_hours = serializers.FloatField(help_text='Ставка сотрудника в процентах')
     code = serializers.CharField(help_text='Уникальный идентификатор записи трудоустройства. Вариант формирования: <табельный номер>:<UID регистратора записи>:<UID регистратора события>.')
     by_code = serializers.BooleanField(help_text='Необходимо для синхронизации')
 
