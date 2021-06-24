@@ -2,6 +2,7 @@ import io
 import logging
 from datetime import timedelta
 from uuid import UUID
+from django.db.models import Exists, OuterRef, Q
 
 import xlsxwriter
 from django.conf import settings
@@ -181,10 +182,19 @@ class TickViewSet(BaseModelViewSet):
 
         dttm_from = now().replace(hour=0, minute=0, second=0)
         dttm_to = dttm_from + timedelta(days=1)
+        
+        today_comming_tick_cond = Tick.objects.filter(
+            dttm__date=dttm_from.date(),
+            type=Tick.TYPE_COMING,
+            user_id=OuterRef('user_id'),
+            tick_point__shop_id=OuterRef('tick_point__shop_id'),
+        )
 
-        queryset = Tick.objects.all().filter(
-            dttm__gte=dttm_from,
-            dttm__lte=dttm_to,
+        queryset = Tick.objects.annotate(
+            today_exists=Exists(today_comming_tick_cond),
+        ).filter(
+            (Q(dttm__gte=(dttm_from - timedelta(1))) & Q(type=Tick.TYPE_COMING) & Q(today_exists=False)) |
+            Q(dttm__gte=dttm_from, dttm__lte=dttm_to),
             dttm_deleted__isnull=True
         )
         queryset = self.strategy.filter_qs(queryset=queryset)
