@@ -1361,7 +1361,7 @@ class FunctionGroup(AbstractModel):
         ('WorkerDay_generate_upload_example', 'Скачать шаблон графика (Получить)'),
         ('WorkerPosition', 'Должность'),
         ('WorkTypeName', 'Название типа работ'),
-        ('WorkType', 'Тип раббот'),
+        ('WorkType', 'Тип работ'),
         ('WorkType_efficiency', 'Покрытие (Получить)'),
         ('ShopMonthStat', 'Статистика по магазину на месяц'),
         ('ShopMonthStat_status', 'Статус составления графика (Получить)'),
