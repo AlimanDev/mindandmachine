@@ -262,7 +262,7 @@ LOGGING = {
     },
 }
 
-def add_logger(name, level='DEBUG', formatter='simple'):
+def add_logger(name, level='DEBUG', formatter='simple', extra_handlers : list=None):
     LOGGING['handlers'][name] = {
         'level': level,
         'class': 'logging.handlers.WatchedFileHandler',
@@ -274,9 +274,14 @@ def add_logger(name, level='DEBUG', formatter='simple'):
         'level': level,
         'propagate': True,
     }
+    if extra_handlers:
+        LOGGING['loggers'][name]['handlers'].extend(extra_handlers)
 
 add_logger('clean_wdays')
 add_logger('send_doctors_schedule_to_mis')
+add_logger('calc_timesheets')
+add_logger('send_doctors_schedule_to_mis', extra_handlers=['mail_admins'])
+add_logger('mda_integration', extra_handlers=['mail_admins'])
 
 # LOGGING USAGE:
 # import logging
@@ -376,6 +381,7 @@ CELERY_IMPORTS = (
     'src.timetable.shop_month_stat.tasks',
     'src.timetable.vacancy.tasks',
     'src.timetable.worker_day.tasks',
+    'src.timetable.timesheet.tasks',
 )
 
 REDIS_HOST = env.str('REDIS_HOST', default='localhost')
@@ -469,6 +475,10 @@ IMPORT_EXPORT_USE_TRANSACTIONS = True
 
 # Eсли у пользователя пароль пустой, то при сохранении устанавливать пароль как логин
 SET_USER_PASSWORD_AS_LOGIN = False
+
+# Возможные вариант можно найти по FISCAL_SHEET_DIVIDERS_MAPPING
+# Если == None, то при расчете табеля разделение на осн. и доп. не производится
+FISCAL_SHEET_DIVIDER_ALIAS = None
 
 if is_config_exists('djconfig_local.py'):
     from .djconfig_local import *
@@ -581,17 +591,22 @@ CELERY_BEAT_SCHEDULE = {
         'schedule': crontab(hour=0, minute=0),
         'options': {'queue': BACKEND_QUEUE}
     },
+    'task-calc-timesheets': {
+        'task': 'src.timetable.timesheet.tasks.calc_timesheets',
+        'schedule': crontab(hour=3, minute=15),
+        'options': {'queue': BACKEND_QUEUE}
+    },
 }
 
 if MDA_SYNC_DEPARTMENTS:
-    CELERY_BEAT_SCHEDULE['task-sync-mda-departments-all-time'] = {
-        'task': 'src.integration.mda.tasks.sync_mda_departments',
+    CELERY_BEAT_SCHEDULE['task-sync-mda-data-all-time'] = {
+        'task': 'src.integration.mda.tasks.sync_mda_data',
         'schedule': crontab(hour=1, minute=59),
         'options': {'queue': BACKEND_QUEUE},
         'kwargs': {'threshold_seconds': None},
     }
-    CELERY_BEAT_SCHEDULE['task-sync-mda-departments-last-changes'] = {
-        'task': 'src.integration.mda.tasks.sync_mda_departments',
+    CELERY_BEAT_SCHEDULE['task-sync-mda-data-last-changes'] = {
+        'task': 'src.integration.mda.tasks.sync_mda_data',
         'schedule': crontab(minute=49),
         'options': {'queue': BACKEND_QUEUE},
         'kwargs': {'threshold_seconds': MDA_SYNC_DEPARTMENTS_THRESHOLD_SECONDS},
@@ -626,7 +641,6 @@ if 'test' in sys.argv:
     class MigrationDisabler(dict):
         def __getitem__(self, item):
             return None
-
 
     MIGRATION_MODULES = MigrationDisabler()
 

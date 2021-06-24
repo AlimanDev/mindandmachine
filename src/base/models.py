@@ -167,6 +167,11 @@ class Network(AbstractActiveModel):
         return self.settings_values_prop.get('night_edges', default_night_edges)
 
     @cached_property
+    def night_edges_tm_list(self):
+        from src.util.models_converter import Converter
+        return [Converter.parse_time(t) for t in self.night_edges]
+
+    @cached_property
     def accounting_periods_count(self):
         return int(12 / self.accounting_period_length)
 
@@ -1077,7 +1082,7 @@ class Employment(AbstractActiveModel):
 
     # new worker restrictions
     week_availability = models.SmallIntegerField(default=7)
-    norm_work_hours = models.SmallIntegerField(default=100)
+    norm_work_hours = models.FloatField(default=100)
     shift_hours_length_min = models.SmallIntegerField(blank=True, null=True)
     shift_hours_length_max = models.SmallIntegerField(blank=True, null=True)
     min_time_btw_shifts = models.SmallIntegerField(blank=True, null=True)
@@ -1290,6 +1295,8 @@ class FunctionGroup(AbstractModel):
         'Shop_outsource_tree',
         'Subscribe',
         'TickPoint',
+        'Timesheet',
+        'Timesheet_stats',
         'User',
         'User_change_password',
         'User_delete_biometrics',

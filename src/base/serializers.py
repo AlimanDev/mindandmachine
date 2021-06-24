@@ -51,6 +51,8 @@ class NetworkSerializer(serializers.ModelSerializer):
     def get_default_stats(self, obj: Network):
         default_stats = json.loads(obj.settings_values).get('default_stats', {})
         return {
+            'timesheet_employee_top': default_stats.get('timesheet_employee_top', 'fact_total_hours_sum'),
+            'timesheet_employee_bottom': default_stats.get('timesheet_employee_bottom', 'sawh_hours'),
             'employee_top': default_stats.get('employee_top', 'work_hours_total'),
             'employee_bottom': default_stats.get('employee_bottom', 'norm_hours_curr_month'),
             'day_top': default_stats.get('day_top', 'covering'),
@@ -236,7 +238,7 @@ class EmploymentListSerializer(serializers.Serializer):
     dt_fired = serializers.DateField()
     salary = serializers.DecimalField(max_digits=10, decimal_places=2, default=0)
     week_availability = serializers.IntegerField()
-    norm_work_hours = serializers.IntegerField()
+    norm_work_hours = serializers.FloatField()
     min_time_btw_shifts = serializers.IntegerField()
     shift_hours_length_min = serializers.IntegerField()
     shift_hours_length_max = serializers.IntegerField()
@@ -289,7 +291,7 @@ class EmploymentSerializer(serializers.ModelSerializer):
                   'employee_id', 'is_active',
         ]
         create_only_fields = ['employee_id']
-        read_only_fields = []
+        read_only_fields = ['norm_work_hours']
         extra_kwargs = {
             'auto_timetable': {
                 'default': True,

@@ -21,6 +21,8 @@ from src.util.utils import generate_user_token
 
 
 class TestMdaIntegration(TestsHelperMixin, TestCase):
+    maxDiff = None
+
     @classmethod
     def setUpTestData(cls):
         cls.base_shop = ShopFactory(code='base')
@@ -33,58 +35,58 @@ class TestMdaIntegration(TestsHelperMixin, TestCase):
         cls.employment2_1 = EmploymentFactory(shop=cls.shop2)
         cls.employment2_2 = EmploymentFactory(shop=cls.shop2)
 
-    def test_get_data(self):
+    def test_get_orgstruct_data(self):
         mda_integration_helper = MdaIntegrationHelper()
-        data = mda_integration_helper._get_data()
-        self.assertEqual(len(data['divisions']), 1)
-        self.assertEqual(len(data['regions']), 1)
-        self.assertEqual(len(data['shops']), 2)
-        s1_data = list(filter(lambda s: self.shop1.id == s['id'], data['shops']))[0]
-        self.assertEqual(s1_data['active'], True)
+        orgstruct_data = mda_integration_helper._get_orgstruct_data()
+        self.assertEqual(len(orgstruct_data['divisions']), 1)
+        self.assertEqual(len(orgstruct_data['regions']), 1)
+        self.assertEqual(len(orgstruct_data['shops']), 2)
+        s1_orgstruct_data = list(filter(lambda s: self.shop1.id == s['id'], orgstruct_data['shops']))[0]
+        self.assertEqual(s1_orgstruct_data['active'], True)
 
     def test_shop_without_employments_not_in_data(self):
         shop = ShopFactory(parent=self.region1, code='shop3')
         mda_integration_helper = MdaIntegrationHelper()
-        data = mda_integration_helper._get_data()
-        self.assertFalse(any(shop.id == s['id'] for s in data['shops']))
+        orgstruct_data = mda_integration_helper._get_orgstruct_data()
+        self.assertFalse(any(shop.id == s['id'] for s in orgstruct_data['shops']))
 
     def test_shop_without_code_not_in_data(self):
         shop = ShopFactory(parent=self.region1, code=None)
         mda_integration_helper = MdaIntegrationHelper()
-        data = mda_integration_helper._get_data()
-        self.assertFalse(any(shop.id == s['id'] for s in data['shops']))
+        orgstruct_data = mda_integration_helper._get_orgstruct_data()
+        self.assertFalse(any(shop.id == s['id'] for s in orgstruct_data['shops']))
 
     def test_shop_closed_less_than_half_year_ago_in_data_and_active_is_false(self):
         shop = ShopFactory(parent=self.region1, code='shop', dt_closed=date.today() - timedelta(days=10))
         EmploymentFactory(shop=shop)
         mda_integration_helper = MdaIntegrationHelper()
-        data = mda_integration_helper._get_data()
-        self.assertTrue(any(shop.id == s['id'] for s in data['shops']))
-        s_data = list(filter(lambda s: shop.id == s['id'], data['shops']))[0]
-        self.assertEqual(s_data['active'], False)
+        orgstruct_data = mda_integration_helper._get_orgstruct_data()
+        self.assertTrue(any(shop.id == s['id'] for s in orgstruct_data['shops']))
+        s_orgstruct_data = list(filter(lambda s: shop.id == s['id'], orgstruct_data['shops']))[0]
+        self.assertEqual(s_orgstruct_data['active'], False)
 
     def test_shop_deleted_less_than_half_year_ago_in_data_and_active_is_false(self):
         shop = ShopFactory(parent=self.region1, code='shop', dttm_deleted=datetime.today() - timedelta(days=10))
         EmploymentFactory(shop=shop)
         mda_integration_helper = MdaIntegrationHelper()
-        data = mda_integration_helper._get_data()
-        self.assertTrue(any(shop.id == s['id'] for s in data['shops']))
-        s_data = list(filter(lambda s: shop.id == s['id'], data['shops']))[0]
-        self.assertEqual(s_data['active'], False)
+        orgstruct_data = mda_integration_helper._get_orgstruct_data()
+        self.assertTrue(any(shop.id == s['id'] for s in orgstruct_data['shops']))
+        s_orgstruct_data = list(filter(lambda s: shop.id == s['id'], orgstruct_data['shops']))[0]
+        self.assertEqual(s_orgstruct_data['active'], False)
 
     def test_shop_closed_more_than_half_year_ago_not_in_data(self):
         shop = ShopFactory(parent=self.region1, code='shop', dt_closed=date.today() - timedelta(days=365))
         EmploymentFactory(shop=shop)
         mda_integration_helper = MdaIntegrationHelper()
-        data = mda_integration_helper._get_data()
-        self.assertFalse(any(shop.id == s['id'] for s in data['shops']))
+        orgstruct_data = mda_integration_helper._get_orgstruct_data()
+        self.assertFalse(any(shop.id == s['id'] for s in orgstruct_data['shops']))
 
     def test_shop_more_more_than_half_year_ago_not_in_data(self):
         shop = ShopFactory(parent=self.region1, code='shop', dttm_deleted=datetime.today() - timedelta(days=365))
         EmploymentFactory(shop=shop)
         mda_integration_helper = MdaIntegrationHelper()
-        data = mda_integration_helper._get_data()
-        self.assertFalse(any(shop.id == s['id'] for s in data['shops']))
+        orgstruct_data = mda_integration_helper._get_orgstruct_data()
+        self.assertFalse(any(shop.id == s['id'] for s in orgstruct_data['shops']))
 
     def test_is_all_day_true(self):
         shop = ShopFactory(
@@ -93,9 +95,9 @@ class TestMdaIntegration(TestsHelperMixin, TestCase):
         )
         EmploymentFactory(shop=shop)
         mda_integration_helper = MdaIntegrationHelper()
-        data = mda_integration_helper._get_data()
-        s_data = list(filter(lambda s: shop.id == s['id'], data['shops']))[0]
-        self.assertEqual(s_data['allDay'], True)
+        orgstruct_data = mda_integration_helper._get_orgstruct_data()
+        s_orgstruct_data = list(filter(lambda s: shop.id == s['id'], orgstruct_data['shops']))[0]
+        self.assertEqual(s_orgstruct_data['allDay'], True)
 
     def test_is_all_day_false(self):
         shop = ShopFactory(
@@ -104,27 +106,127 @@ class TestMdaIntegration(TestsHelperMixin, TestCase):
         )
         EmploymentFactory(shop=shop)
         mda_integration_helper = MdaIntegrationHelper()
-        data = mda_integration_helper._get_data()
-        s_data = list(filter(lambda s: shop.id == s['id'], data['shops']))[0]
-        self.assertEqual(s_data['allDay'], False)
+        orgstruct_data = mda_integration_helper._get_orgstruct_data()
+        s_orgstruct_data = list(filter(lambda s: shop.id == s['id'], orgstruct_data['shops']))[0]
+        self.assertEqual(s_orgstruct_data['allDay'], False)
 
     def test_correct_director_login_in_data(self):
+        group_director = GroupFactory(name='Директор', code='director')
+        position_director = WorkerPositionFactory(name='Директор', group=group_director)
         shop = ShopFactory(parent=self.region1, code='shop')
-        director = EmploymentFactory(shop=shop)
+        director = EmploymentFactory(shop=shop, position=position_director)
         shop.director = director.employee.user
         shop.save()
         mda_integration_helper = MdaIntegrationHelper()
-        data = mda_integration_helper._get_data()
-        s_data = list(filter(lambda s: shop.id == s['id'], data['shops']))[0]
-        self.assertEqual(s_data['directorLogin'], director.employee.user.username)
+        orgstruct_data = mda_integration_helper._get_orgstruct_data()
+        s_orgstruct_data = list(filter(lambda s: shop.id == s['id'], orgstruct_data['shops']))[0]
+        self.assertEqual(s_orgstruct_data['directorLogin'], director.employee.user.username)
+
+        users_data = mda_integration_helper._get_users_data()
+        director_data = list(filter(lambda u: director.employee.user_id == u['id'], users_data))[0]
+        self.assertEqual(director_data['active'], True)
+        self.assertEqual(director_data['orgLevel'], 'SHOP')
+        self.assertEqual(director_data['orgUnits'], [str(shop.id)])
+        self.assertEqual(director_data['admin'], False)
+        self.assertEqual(director_data['shopDirector'], True)
+
+    def test_multiple_directors(self):
+        group_director = GroupFactory(name='Директор', code='director')
+        position_director = WorkerPositionFactory(name='Директор', group=group_director)
+        shop = ShopFactory(parent=self.region1, code='shop')
+        director = EmploymentFactory(shop=shop, position=position_director)
+        director2 = EmploymentFactory(shop=shop, position=position_director)
+        shop.director = director.employee.user
+        shop.save()
+        mda_integration_helper = MdaIntegrationHelper()
+        orgstruct_data = mda_integration_helper._get_orgstruct_data()
+        s_orgstruct_data = list(filter(lambda s: shop.id == s['id'], orgstruct_data['shops']))[0]
+        self.assertEqual(s_orgstruct_data['directorLogin'], director.employee.user.username)
+
+        users_data = mda_integration_helper._get_users_data()
+        director_data = list(filter(lambda u: director.employee.user_id == u['id'], users_data))[0]
+        self.assertEqual(director_data['shopDirector'], True)
+
+        director2_data = list(filter(lambda u: director2.employee.user_id == u['id'], users_data))[0]
+        self.assertEqual(director2_data['shopDirector'], False)
+
+        shop.director = director2.employee.user
+        shop.save()
+
+        users_data = mda_integration_helper._get_users_data()
+        director_data = list(filter(lambda u: director.employee.user_id == u['id'], users_data))[0]
+        self.assertEqual(director_data['shopDirector'], False)
+
+        director2_data = list(filter(lambda u: director2.employee.user_id == u['id'], users_data))[0]
+        self.assertEqual(director2_data['shopDirector'], True)
+
+    def test_multiple_levels(self):
+        region = ShopFactory(parent=self.division1, code='region')
+        shop = ShopFactory(parent=region, code='shop')
+        group_director = GroupFactory(name='Директор', code='director')
+        group_urs = GroupFactory(name='УРС', code='urs')
+        position_director = WorkerPositionFactory(name='Директор', group=group_director)
+        position_urs = WorkerPositionFactory(name='Директор', group=group_urs)
+        user = UserFactory()
+        employee = EmployeeFactory(user=user)
+        _region_director = EmploymentFactory(employee=employee, shop=region, position=position_urs)
+        shop_director = EmploymentFactory(employee=employee, shop=shop, position=position_director)
+
+        mda_integration_helper = MdaIntegrationHelper()
+        orgstruct_data = mda_integration_helper._get_orgstruct_data()
+        s_orgstruct_data = list(filter(lambda s: shop.id == s['id'], orgstruct_data['shops']))[0]
+        self.assertEqual(s_orgstruct_data['directorLogin'], shop_director.employee.user.username)
+
+        users_data = mda_integration_helper._get_users_data()
+        self.assertEqual(len(users_data), 5)
+        user_data = list(filter(lambda u: user.id == u['id'], users_data))[0]
+        self.assertEqual(user_data['shopDirector'], True)
+        self.assertEqual(user_data['orgLevel'], 'SHOP')
+        self.assertEqual(user_data['userChecklistsOrganizer'], True)
+
+    def test_orgUnits_null_for_company_level(self):
+        group_admin = GroupFactory(name='Администратор', code='admin')
+        user = UserFactory()
+        employee = EmployeeFactory(user=user)
+        _admin_employment = EmploymentFactory(employee=employee, shop=self.base_shop, function_group=group_admin)
+
+        mda_integration_helper = MdaIntegrationHelper()
+        users_data = mda_integration_helper._get_users_data()
+        self.assertEqual(len(users_data), 5)
+        user_data = list(filter(lambda u: user.id == u['id'], users_data))[0]
+        self.assertEqual(user_data['orgLevel'], 'COMPANY')
+        self.assertEqual(user_data['orgUnits'],  None)
+
+    def test_surveyAdmin_for_admin_true_for_oters_false(self):
+        group_admin = GroupFactory(name='Администратор', code='admin')
+        group_worker = GroupFactory(name='Сотрудник', code='worker')
+        user_admin = UserFactory()
+        user_worker = UserFactory()
+        employee_admin = EmployeeFactory(user=user_admin)
+        employee_worker = EmployeeFactory(user=user_worker)
+        _admin_employment = EmploymentFactory(
+            employee=employee_admin, shop=self.base_shop, function_group=group_admin)
+        _worker_employment = EmploymentFactory(
+            employee=employee_worker, shop=self.base_shop, function_group=group_worker)
+
+        mda_integration_helper = MdaIntegrationHelper()
+        users_data = mda_integration_helper._get_users_data()
+        self.assertEqual(len(users_data), 6)
+        user_admin_data = list(filter(lambda u: user_admin.id == u['id'], users_data))[0]
+        self.assertEqual(user_admin_data['admin'], True)
+        self.assertEqual(user_admin_data['surveyAdmin'],  True)
+
+        user_worker_data = list(filter(lambda u: user_worker.id == u['id'], users_data))[0]
+        self.assertEqual(user_worker_data['admin'], False)
+        self.assertEqual(user_worker_data['surveyAdmin'],  False)
 
     def test_correct_regionId_in_data(self):
         shop = ShopFactory(parent=self.region1, code='shop')
         EmploymentFactory(shop=shop)
         mda_integration_helper = MdaIntegrationHelper()
-        data = mda_integration_helper._get_data()
-        s_data = list(filter(lambda s: shop.id == s['id'], data['shops']))[0]
-        self.assertEqual(s_data['regionId'], self.region1.id)
+        orgstruct_data = mda_integration_helper._get_orgstruct_data()
+        s_orgstruct_data = list(filter(lambda s: shop.id == s['id'], orgstruct_data['shops']))[0]
+        self.assertEqual(s_orgstruct_data['regionId'], self.region1.id)
 
 
 class TestVMdaUsers(TestsHelperMixin, TestCase):
