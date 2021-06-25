@@ -55,6 +55,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('forecast', '0037_auto_20210331_0713'),
+        ('timetable', '0062_fill_employee_and_update_views'),
     ]
 
     operations = [

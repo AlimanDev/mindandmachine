@@ -19,6 +19,12 @@ from src.util.dg.ticks_report import TicksOdsReportGenerator, TicksOdtReportGene
 admin.site.unregister(Group)
 
 
+class RelatedOnlyDropdownNameOrderedFilter(RelatedOnlyDropdownFilter):
+    def field_choices(self, field, request, model_admin):
+        pk_qs = model_admin.get_queryset(request).distinct().values_list('%s__pk' % self.field_path, flat=True)
+        return field.get_choices(include_blank=False, limit_choices_to={'pk__in': pk_qs}, ordering=['name',])
+
+
 class UserListFilter(admin.SimpleListFilter):
     title = 'User'
     parameter_name = 'user__id__exact'
@@ -37,7 +43,7 @@ class UserListFilter(admin.SimpleListFilter):
         if self.related_filter_parameter in request.GET:
             dt = now().date()
             e = Employment.objects.get_active(request.user.network_id, dt, dt, shop_id=request.GET[self.related_filter_parameter]).values_list(
-                'user_id')
+                'employee__user_id')
             queryset = queryset.filter(id__in=e)
         for user in queryset:
             list_of_questions.append(
@@ -100,7 +106,7 @@ class TickAdmin(admin.ModelAdmin):
 
     list_filter = [
         ('tickphoto__liveness', TickMinLivenessFilter),
-        ('tick_point__shop', RelatedOnlyDropdownFilter),
+        ('tick_point__shop', RelatedOnlyDropdownNameOrderedFilter),
         ('dttm', DateTimeRangeFilter),
         'type',
         UserListFilter,
@@ -108,6 +114,10 @@ class TickAdmin(admin.ModelAdmin):
 
     actions = ['download_old', 'ticks_report_xlsx', 'ticks_report_docx']
     change_list_template = 'ticks_change_list.html'
+    list_select_related = (
+        'user',
+        'tick_point'
+    )
 
     def get_queryset(self, request):
         return super(TickAdmin, self).get_queryset(request).prefetch_related(

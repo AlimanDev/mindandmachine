@@ -710,3 +710,27 @@ class TestDepartment(TestsHelperMixin, APITestCase):
         shop.save(force_create_director_employment=True)
         employment_count = employment_qs.count()
         self.assertEqual(employment_count, 1)
+
+    def test_set_default_load_template(self):
+        shop = Shop.objects.create(
+            name='Test',
+            parent=self.root_shop,
+            tm_open_dict='{"all":"07:00:00"}',
+            tm_close_dict='{"all":"23:00:00"}',
+            region=self.region,
+            settings=self.shop_settings,
+            network=self.network,
+        )
+        self.assertIsNone(shop.load_template_id)
+        self.network.load_template = self.load_template
+        self.network.save()
+        shop = Shop.objects.create(
+            name='Test2',
+            parent=self.root_shop,
+            tm_open_dict='{"all":"07:00:00"}',
+            tm_close_dict='{"all":"23:00:00"}',
+            region=self.region,
+            settings=self.shop_settings,
+            network=self.network,
+        )
+        self.assertEqual(shop.load_template_id, self.load_template.id)

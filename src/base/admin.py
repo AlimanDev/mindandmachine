@@ -1,10 +1,33 @@
-from django.contrib import admin
+import urllib.parse
+
+from django import forms
+from django.conf import settings
+from django.contrib import admin, messages
+from django.contrib.admin.options import IS_POPUP_VAR
+from django.contrib.admin.utils import unquote
+from django.contrib.auth.admin import UserAdmin
+from django.contrib.auth.forms import UserChangeForm
+from django.core.exceptions import PermissionDenied
 from django.forms import Form
+from django.http import Http404, HttpResponseRedirect
+from django.template.response import TemplateResponse
+from django.urls import path, reverse, resolve
+from django.utils.html import escape
+from django.utils.safestring import mark_safe
+from django.utils.translation import gettext_lazy as _
 from import_export import resources
 from import_export.admin import ExportActionMixin, ImportMixin
 from import_export.fields import Field
-from django.urls import resolve
+from sesame.utils import get_token
 
+from src.base.forms import (
+    NetworkAdminForm,
+    ShopAdminForm,
+    ShopSettingsAdminForm,
+    BreakAdminForm,
+    CustomImportFunctionGroupForm,
+    CustomConfirmImportFunctionGroupForm,
+)
 from src.base.models import (
     Employment,
     User,
@@ -24,18 +47,11 @@ from src.base.models import (
     NetworkConnect,
 )
 from src.timetable.models import GroupWorkerDayPermission
-from src.base.forms import (
-    NetworkAdminForm, 
-    ShopAdminForm, 
-    ShopSettingsAdminForm, 
-    BreakAdminForm, 
-    CustomImportFunctionGroupForm,
-    CustomConfirmImportFunctionGroupForm,
-)
 
 
 class FunctionGroupResource(resources.ModelResource):
     group = Field(attribute='group_id')
+
     class Meta:
         model = FunctionGroup
         import_id_fields = ('func', 'method', 'group',)
@@ -62,6 +78,7 @@ class NetworkAdmin(admin.ModelAdmin):
     list_display = ('id', 'name', 'code', 'logo')
     form = NetworkAdminForm
 
+
 @admin.register(NetworkConnect)
 class NetworkConnectAdmin(admin.ModelAdmin):
     list_display = ('id', 'outsourcing', 'client')
@@ -70,7 +87,8 @@ class NetworkConnectAdmin(admin.ModelAdmin):
 
 @admin.register(Region)
 class RegionAdmin(admin.ModelAdmin):
-    list_display = ('id', 'name', 'code')
+    list_display = ('id', 'name', 'code', 'parent')
+    list_filter = ('parent',)
 
 
 @admin.register(WorkerPosition)
@@ -79,26 +97,120 @@ class WorkerPositionAdmin(admin.ModelAdmin):
     search_fields = ('name', 'code')
 
 
+class QsUserChangeForm(UserChangeForm):
+    class Meta(UserChangeForm.Meta):
+        model = User
+
+
+class AdmimGenerateOTPAuthLinkForm(forms.Form):
+    """
+    Пустая форма для создания временной ссылки для входа под конкретным пользователем
+    """
+    def __init__(self, user, *args, **kwargs):
+        self.user = user
+        super().__init__(*args, **kwargs)
+
+    def save(self, **kwargs):
+        return settings.EXTERNAL_HOST + reverse('auth:one_time_pass') + '?' + urllib.parse.urlencode(
+            {settings.SESAME_TOKEN_NAME: get_token(self.user)})
+
+
 @admin.register(User)
-class QsUserAdmin(admin.ModelAdmin):
+class QsUserAdmin(UserAdmin):
     list_display = ('first_name', 'last_name', 'shop_name', 'id', 'username',)
     search_fields = ('first_name', 'last_name', 'id', 'username',)
+    readonly_fields = ('dttm_added',)
+    form = QsUserChangeForm
+    fieldsets = (
+        (None, {'fields': ('username', 'password', 'auth_type')}),
+        (_('Personal info'), {'fields': ('last_name', 'first_name', 'middle_name', 'birthday', 'sex', 'email', 'phone_number', 'lang', 'avatar')}),
+        (_('Permissions'), {
+            'fields': ('is_active', 'is_staff', 'is_superuser', 'groups', 'user_permissions'),
+        }),
+        (_('Important dates'), {'fields': ('last_login', 'date_joined', 'dttm_added', 'dttm_deleted')}),
+        (_('Other'), {'fields': (
+            'network',
+            'code',
+            'access_token',
+            'black_list_symbol',
+        )}),
+    )
+    generate_otp_auth_link_form = AdmimGenerateOTPAuthLinkForm
+    generate_otp_auth_link_template = 'generate_otp_auth_link.html'
+    change_form_template = 'user_change_form.html'
 
-    # list_filter = ('employment__shop', )
+    def get_urls(self):
+        return [
+            path(
+                '<_id>/generate_otp_auth_link/',
+                self.admin_site.admin_view(self.user_generate_otp_auth_link),
+                name='generate_otp_auth_link',
+            ),
+        ] + super().get_urls()
 
-    # list_display = ('first_name', 'last_name', 'employment__shop__name', 'parent_title', 'work_type_name', 'id')
-    # search_fields = ('first_name', 'last_name', 'employment__shop__parent__name', 'workercashboxinfo__work_type__name', 'id')
+    def user_generate_otp_auth_link(self, request, _id, form_url=''):
+        user = self.get_object(request, unquote(_id))
+        if not self.has_change_permission(request, user):
+            raise PermissionDenied
+        if user is None:
+            raise Http404(_('%(name)s object with primary key %(key)r does not exist.') % {
+                'name': self.model._meta.verbose_name,
+                'key': escape(_id),
+            })
+        if request.method == 'POST':
+            form = self.generate_otp_auth_link_form(user, request.POST)
+            if form.is_valid():
+                otp_auth_link = form.save()
+                msg = mark_safe(f'<a href="{otp_auth_link}">Ссылка</a> успешно сгенерирована')
+                messages.success(request, msg)
+                return HttpResponseRedirect(
+                    reverse(
+                        '%s:%s_%s_change' % (
+                            self.admin_site.name,
+                            user._meta.app_label,
+                            user._meta.model_name,
+                        ),
+                        args=(user.pk,),
+                    )
+                )
+        else:
+            form = self.generate_otp_auth_link_form(user)
 
-    # @staticmethod
-    # def parent_title(instance: User):
-    #     if instance.shop and instance.shop.parent:
-    #         return instance.shop.parent_title()
-    #     return 'без магазина'
+        fieldsets = [(None, {'fields': list(form.base_fields)})]
+        adminForm = admin.helpers.AdminForm(form, fieldsets, {})
+
+        context = {
+            'title': 'Сгенерировать одноразовую ссылку для входа: %s' % escape(user.get_username()),
+            'adminForm': adminForm,
+            'form_url': form_url,
+            'form': form,
+            'is_popup': (IS_POPUP_VAR in request.POST or
+                         IS_POPUP_VAR in request.GET),
+            'add': True,
+            'change': False,
+            'has_delete_permission': False,
+            'has_change_permission': True,
+            'has_absolute_url': False,
+            'opts': self.model._meta,
+            'original': user,
+            'save_as': False,
+            'show_save': True,
+            **self.admin_site.each_context(request),
+        }
+
+        request.current_app = self.admin_site.name
+
+        return TemplateResponse(
+            request,
+            self.generate_otp_auth_link_template,
+            context,
+        )
 
     @staticmethod
     def shop_name(instance: User):
         res = ', '.join(
-            list(Employment.objects.get_active(employee__user=instance).values_list('shop__name', flat=True).distinct()))
+            list(
+                Employment.objects.get_active(employee__user=instance).values_list('shop__name', flat=True).distinct()))
         return res
 
     '''
@@ -207,29 +319,30 @@ class FunctionGroupAdmin(ImportMixin, ExportActionMixin, admin.ModelAdmin):
         return super().get_import_data_kwargs(request, *args, **kwargs)
 
 
-
 @admin.register(Employment)
 class EmploymentAdmin(admin.ModelAdmin):
     list_display = ('id', 'shop', 'employee', 'function_group', 'dt_hired_formated', 'dt_fired_formated')
     list_select_related = ('employee', 'employee__user', 'shop', 'function_group')
     list_filter = ('shop', 'employee')
-    search_fields = ('employee__user__first_name', 'employee__user__last_name', 'shop__name', 'shop__parent__name', 'employee__tabel_code')
+    search_fields = ('employee__user__first_name', 'employee__user__last_name', 'shop__name', 'shop__parent__name',
+                     'employee__tabel_code')
     raw_id_fields = ('shop', 'employee', 'position')
 
     def dt_hired_formated(self, obj):
         return obj.dt_hired.strftime('%d.%m.%Y') if obj.dt_hired else '-'
-    
+
     dt_hired_formated.short_description = 'dt hired'
 
     def dt_fired_formated(self, obj):
         return obj.dt_fired.strftime('%d.%m.%Y') if obj.dt_fired else '-'
-    
+
     dt_fired_formated.short_description = 'dt fired'
 
 
 @admin.register(ProductionDay)
 class ProductionDayAdmin(admin.ModelAdmin):
-    list_display = ('dt', 'type')
+    list_display = ('dt', 'type', 'is_celebration', 'region')
+    list_filter = ('region', 'type', 'is_celebration')
 
 
 @admin.register(Break)

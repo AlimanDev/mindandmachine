@@ -48,20 +48,6 @@ from src.util.models_converter import (
 )
 
 
-class TokenAuthentication(BaseAuthentication):
-    def authenticate(self, request):
-        token = request.data.get('access_token') or request.query_params.get('access_token')
-        if not token:
-            return None
-
-        try:
-            user = User.objects.get(access_token=token)
-        except User.DoesNotExist:
-            raise AuthenticationFailed('No such user')
-
-        return (user, None)
-
-
 class AutoSettingsViewSet(viewsets.ViewSet):
     error_messages = {
         "tt_create_past": _("Timetable should be built at least from {num} day from now."),
@@ -846,7 +832,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
 
 
     @swagger_auto_schema(request_body=AutoSettingsSetSerializer, methods=['post'], responses={200: '{}', 400: 'cannot parse json'})
-    @action(detail=False, methods=['post'], authentication_classes=[TokenAuthentication])
+    @action(detail=False, methods=['post'])
     def set_timetable(self, request):
         """
         Ждет request'a от qos_algo. Когда получает, записывает данные по расписанию в бд
