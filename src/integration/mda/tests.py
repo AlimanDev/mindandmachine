@@ -182,6 +182,23 @@ class TestMdaIntegration(TestsHelperMixin, TestCase):
         user_data = list(filter(lambda u: user.id == u['id'], users_data))[0]
         self.assertEqual(user_data['shopDirector'], True)
         self.assertEqual(user_data['orgLevel'], 'SHOP')
+        self.assertEqual(user_data['userChecklistsOrganizer'], False)
+
+    def test_userChecklistsOrganizer(self):
+        region = ShopFactory(parent=self.division1, code='region')
+        group_urs = GroupFactory(name='УРС', code='urs')
+        position_urs = WorkerPositionFactory(name='Директор', group=group_urs)
+        user = UserFactory()
+        employee = EmployeeFactory(user=user)
+        _region_director = EmploymentFactory(employee=employee, shop=region, position=position_urs)
+
+        mda_integration_helper = MdaIntegrationHelper()
+
+        users_data = mda_integration_helper._get_users_data()
+        self.assertEqual(len(users_data), 5)
+        user_data = list(filter(lambda u: user.id == u['id'], users_data))[0]
+        self.assertEqual(user_data['shopDirector'], False)
+        self.assertEqual(user_data['orgLevel'], 'REGION')
         self.assertEqual(user_data['userChecklistsOrganizer'], True)
 
     def test_orgUnits_null_for_company_level(self):

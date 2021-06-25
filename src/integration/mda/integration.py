@@ -124,7 +124,13 @@ class MdaIntegrationHelper:
                 active=True,
             )),
             supervisor=Value(True, output_field=BooleanField()),
-            userChecklistsOrganizer=Exists(active_employments_subq.filter(shop__level__lt=3)),
+            _levelGtShopExists=Exists(active_employments_subq.filter(shop__level__lt=3)),
+            _shopLevelExitst=Exists(active_employments_subq.filter(shop__level__gte=3)),
+            userChecklistsOrganizer=Case(
+                When(_shopLevelExitst=Value(True), then=Value(False, output_field=BooleanField())),
+                When(_levelGtShopExists=Value(True), then=Value(True, output_field=BooleanField())),
+                default=Value(False, output_field=BooleanField()), output_field=BooleanField(),
+            ),
             surveyAdmin=F('admin'),
             timeZoneId=Subquery(
                 active_employments_subq.order_by(
