@@ -1,7 +1,6 @@
 import json
 from datetime import datetime, timedelta, date
 from dateutil.relativedelta import relativedelta
-from django.db.models.aggregates import Max, Min
 from django.utils import timezone
 
 import requests
@@ -19,7 +18,7 @@ from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError, AuthenticationFailed
 from rest_framework.response import Response
 
-from src.base.models import Shop, Employment, ShopSchedule, User, ProductionDay, ShopSettings, WorkerPosition, Employee
+from src.base.models import Shop, Employment, User, ProductionDay, ShopSettings, WorkerPosition, Employee
 from src.base.permissions import Permission
 from src.timetable.vacancy.tasks import create_shop_vacancies_and_notify, cancel_shop_vacancies
 from src.forecast.models import PeriodClients
@@ -678,27 +677,17 @@ class AutoSettingsViewSet(viewsets.ViewSet):
 
         # Спрос
 
-        shop_times = ShopSchedule.objects.filter(
-            shop_id=shop_id,
-            dt__gte=dt_from,
-            dt__lte=dt_to,
-            type=ShopSchedule.WORKDAY_TYPE,
-        ).aggregate(
-            open=Min('opens'),
-            close=Max('closes'),
-        )
-
         absenteeism_coef = shop.settings.absenteeism if shop.settings else 0
         periods = PeriodClients.objects.shop_times_filter(
             shop,
+            dt_from=dt_from,
+            dt_to=dt_to,
             operation_type__dttm_deleted__isnull=True,
             operation_type__work_type__shop_id=shop_id,
             operation_type__work_type__dttm_deleted__isnull=True,
             type=PeriodClients.LONG_FORECASE_TYPE,
             dttm_forecast__date__gte=dt_from,
             dttm_forecast__date__lte=dt_to,
-            dttm_forecast__time__gte=shop_times['open'],
-            dttm_forecast__time__lt=shop_times['close'],
         ).values(
             'dttm_forecast',
             'operation_type__work_type_id',

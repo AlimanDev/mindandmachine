@@ -1,11 +1,13 @@
+from dateutil.relativedelta import relativedelta
 from django.db import models
+from django.db.models.aggregates import Max, Min
 
 from src.base import models_utils
 import datetime
 from django.utils import timezone
 
 from src.base.models_abstract import AbstractModel, AbstractActiveModel, AbstractActiveNetworkSpecificCodeNamedModel
-from src.base.models import Shop
+from src.base.models import Shop, ShopSchedule
 
 from src.timetable.models import WorkType, WorkTypeName, Network
 
@@ -283,10 +285,12 @@ class OperationTemplate(AbstractActiveNetworkSpecificCodeNamedModel):
 
 
 class PeriodClientsManager(models.Manager):
-    def shop_times_filter(self, shop, *args, weekday=False, **kwargs):
+    def shop_times_filter(self, shop, *args, weekday=False, dt_from=None, dt_to=None, **kwargs):
         '''
         param:
         shop - Shop object
+        dt_from - date object
+        dt_to - date object
         weekday - bool - смотреть по дням недели
         https://docs.djangoproject.com/en/3.0/ref/models/querysets/#week-day
         '''
@@ -304,9 +308,21 @@ class PeriodClientsManager(models.Manager):
                     filt |= (models.Q(dttm_forecast__week_day=week_day) & (models.Q(dttm_forecast__time__gte=tm_start) | models.Q(dttm_forecast__time__lt=tm_end)))
             return self.filter(filt, *args, **kwargs)
         else:
-            shop_close_times = list(shop.close_times.values())
-            max_shop_time = datetime.time(23, 59) if datetime.time(0,0) in shop_close_times else max(shop_close_times)
-            min_shop_time = min(list(shop.open_times.values()))
+            if not dt_from:
+                dt_from = datetime.date.today().replace(day=1)
+            if not dt_to:
+                dt_to = dt_from + relativedelta(day=31)
+            shop_times = ShopSchedule.objects.filter(
+                shop_id=shop.id,
+                dt__gte=dt_from,
+                dt__lte=dt_to,
+                type=ShopSchedule.WORKDAY_TYPE,
+            ).aggregate(
+                open=Min('opens'),
+                close=Max('closes'),
+            )
+            max_shop_time = datetime.time(23, 59) if datetime.time(0,0) == shop_times['close'] else shop_times['close']
+            min_shop_time = shop_times['open']
             time_filter = {}
             if max_shop_time != min_shop_time:
                 time_filter['dttm_forecast__time__gte'] = min_shop_time if min_shop_time < max_shop_time else max_shop_time
