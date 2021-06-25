@@ -205,14 +205,6 @@ class BaseUploadDownloadTimeTable:
 
         return users
 
-    def upload(self, file, is_fact=False):
-        raise NotImplementedError()
-
-    @xlsx_method
-    def download(self, request, workbook, form):
-        raise NotImplementedError()
-
-class UploadDownloadTimetableV1(BaseUploadDownloadTimeTable):
     def upload(self, timetable_file, form, is_fact=False):
         """
         Принимает от клиента экселевский файл и создает расписание (на месяц)
@@ -225,7 +217,7 @@ class UploadDownloadTimetableV1(BaseUploadDownloadTimeTable):
             raise ValidationError(_('Failed to open active sheet.'))
         ######################### сюда писать логику чтения из экселя ######################################################
 
-        users_df = df[df.columns[:3]]
+        users_df = df[df.columns[:3]].unique()
         number_column = df.columns[0]
         name_column = df.columns[1]
         position_column = df.columns[2]
@@ -234,7 +226,23 @@ class UploadDownloadTimetableV1(BaseUploadDownloadTimeTable):
         users_df[position_column] = users_df[position_column].astype(str)
 
         users = self._upload_employments(users_df, number_column, name_column, position_column, shop_id, form['network_id'])
-        
+
+        return self._upload(df, users, form, is_fact)
+
+    @xlsx_method
+    def download(self, request, workbook, form):
+        raise NotImplementedError()
+
+    def _upload(self, df, users, form, is_fact):
+        raise NotImplementedError()
+
+class UploadDownloadTimetableV1(BaseUploadDownloadTimeTable):
+
+    def _upload(self, df, users, form, is_fact):
+        number_column = df.columns[0]
+        name_column = df.columns[1]
+        position_column = df.columns[2]
+        shop_id = form['shop_id']
         dates = []
         for dt in df.columns[3:]:
             if not isinstance(dt, datetime.datetime):
@@ -419,7 +427,84 @@ class UploadDownloadTimetableV2(BaseUploadDownloadTimeTable):
 
         return workbook, _('Timetable_for_shop_{}_from_{}.xlsx').format(shop.name, form['dt_from'])
 
+    def _upload(self, df, users, form, is_fact):
+        number_column = df.columns[0]
+        name_column = df.columns[1]
+        position_column = df.columns[2]
+        dt_column = df.columns[3]
+        start_column = df.columns[4]
+        end_column = df.columns[5]
+        shop_id = form['shop_id']
 
-    @xlsx_method
-    def upload(self, file, is_fact):
-        pass
+        employees = {}
+
+        for data in users:
+            employees[data[0].tabel_code] = data
+        
+        
+        work_types = {
+            w.work_type_name.name.lower(): w
+            for w in WorkType.objects.select_related('work_type_name').filter(shop_id=shop_id, dttm_deleted__isnull=True)
+        }
+        if (len(work_types) == 0):
+            raise ValidationError(_('There are no active work types in this shop.'))
+
+        first_type = next(iter(work_types.values()))
+        
+        with transaction.atomic():
+            for index, data in df.iterrows():
+                if data[number_column].startswith('*') or data[name_column].startswith('*') \
+                    or data[position_column].startswith('*'):
+                    continue
+                number_cond = data[number_column] != 'nan'
+                name_cond = data[name_column] != 'nan'
+                position_cond = data[position_column] != 'nan'
+                if not number_cond and (not name_cond or not position_cond):
+                    continue
+                employee, employment = employees[data[number_column]]
+                dttm_work_start = None
+                dttm_work_end = None
+                try:
+                    cell_data = str(data[i + 3]).upper().strip()
+                    if cell_data.replace(' ', '').replace('\n', '') in SKIP_SYMBOLS:
+                        continue
+                    if not (cell_data in WorkerDay.WD_TYPE_MAPPING_REVERSED):
+                        splited_cell = data[i + 3].replace('\n', '').strip().split()
+                        work_type = work_types.get(data[position_column].upper(), first_type) if len(splited_cell) == 1 else work_types.get(splited_cell[1].upper(), first_type)
+                        times = splited_cell[0].split('-')
+                        type_of_work = WorkerDay.TYPE_WORKDAY
+                        dttm_work_start = datetime.datetime.combine(
+                            dt, Converter.parse_time(times[0] + ':00')
+                        )
+                        dttm_work_end = datetime.datetime.combine(
+                            dt, Converter.parse_time(times[1] + ':00')
+                        )
+                        if dttm_work_end < dttm_work_start:
+                            dttm_work_end += datetime.timedelta(days=1)
+                    elif not is_fact:
+                        type_of_work = WorkerDay.WD_TYPE_MAPPING_REVERSED[cell_data]
+                    else:
+                        continue
+                except Exception as e:
+                    raise ValidationError(_('The employee {user.first_name} {user.last_name} in the cell for {dt} has the wrong value: {value}.').format(user=employee.user, dt=dt, value=str(data[i + 3])))
+
+                WorkerDay.objects.filter(dt=dt, employee=employee, is_fact=is_fact, is_approved=False).delete()
+            
+                new_wd = WorkerDay.objects.create(
+                    employee=employee,
+                    shop_id=shop_id,
+                    dt=dt,
+                    is_fact=is_fact,
+                    is_approved=False,
+                    employment=employment,
+                    dttm_work_start=dttm_work_start,
+                    dttm_work_end=dttm_work_end,
+                    type=type_of_work,
+                )
+                if type_of_work == WorkerDay.TYPE_WORKDAY:
+                    WorkerDayCashboxDetails.objects.create(
+                        worker_day=new_wd,
+                        work_type=work_type,
+                    )
+
+        return Response()       
