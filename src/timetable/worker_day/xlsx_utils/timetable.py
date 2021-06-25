@@ -155,10 +155,10 @@ class Timetable_xlsx(Tabel_xlsx):
                     elif (wd.type in self.WORKERDAY_TYPE_CHANGE2HOLIDAY) \
                             and (self.prod_days[day].type == ProductionDay.TYPE_HOLIDAY):
                         wd.type = WorkerDay.TYPE_HOLIDAY
-                        text = self.WORKERDAY_TYPE_VALUE[wd.type]
+                        text = WorkerDay.WD_TYPE_MAPPING[wd.type]
 
                     else:
-                        text = self.WORKERDAY_TYPE_VALUE[wd.type]
+                        text = WorkerDay.WD_TYPE_MAPPING[wd.type]
                     cell_format.update({
                         'font_color': self.WORKERDAY_TYPE_COLORS[wd.type][0],
                         'bg_color': self.WORKERDAY_TYPE_COLORS[wd.type][1],

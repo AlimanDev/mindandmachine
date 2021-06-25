@@ -12,11 +12,10 @@ from django.contrib.auth.models import (
     AbstractUser as DjangoAbstractUser,
 )
 from django.contrib.postgres.fields import JSONField
-from rest_framework.serializers import ValidationError
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models
 from django.db import transaction
-from django.db.models import Case, When, Sum, Value, IntegerField, Subquery, OuterRef, F
+from django.db.models import Case, When, Sum, Value, IntegerField, Subquery, OuterRef, F, Q
 from django.db.models.functions import Coalesce
 from django.db.models.query import QuerySet
 from django.utils import timezone
@@ -24,6 +23,7 @@ from django.utils.functional import cached_property
 from django.utils.translation import gettext as _
 from model_utils import FieldTracker
 from mptt.models import MPTTModel, TreeForeignKey
+from rest_framework.serializers import ValidationError
 from timezone_field import TimeZoneField
 
 from src.base.models_abstract import (
@@ -103,6 +103,8 @@ class Network(AbstractActiveModel):
         default=False,
         verbose_name='Считать только те фактические часы, которые есть в подтвержденном плановом графике',
     )
+    copy_plan_to_fact_crossing = models.BooleanField(
+        verbose_name="Копировать план в факт без перезаписи факта", default=False)
     download_tabel_template = models.CharField(
         max_length=64, verbose_name='Шаблон для табеля',
         choices=TABEL_FORMAT_CHOICES, default='mts',
@@ -119,6 +121,14 @@ class Network(AbstractActiveModel):
         blank=True,
         null=True,
         verbose_name='Перерывы по умолчанию',
+        related_name='networks',
+    )
+    load_template = models.ForeignKey(
+        'forecast.LoadTemplate',
+        on_delete=models.PROTECT,
+        blank=True,
+        null=True,
+        verbose_name='Шаблон нагрузки по умолчанию',
         related_name='networks',
     )
     # при создании новой должности будут проставляться соотв. значения
@@ -140,6 +150,10 @@ class Network(AbstractActiveModel):
     create_employment_on_set_or_update_director_code = models.BooleanField(
         default=False,
         verbose_name='Создавать скрытое трудоустройство при проставлении/изменении director_code в подразделении',
+    )
+    show_user_biometrics_block = models.BooleanField(
+        default=False,
+        verbose_name='Отображать блок биометрии в деталях сотрудника',
     )
 
     @property
@@ -204,6 +218,11 @@ class NetworkConnect(AbstractActiveModel):
 
 
 class Region(AbstractActiveNetworkSpecificCodeNamedModel):
+    parent = models.ForeignKey(
+        to='self', verbose_name='Родительский регион', on_delete=models.CASCADE,
+        null=True, blank=True, related_name='children',
+    )
+
     class Meta(AbstractActiveNetworkSpecificCodeNamedModel.Meta):
         verbose_name = 'Регион'
         verbose_name_plural = 'Регионы'
@@ -550,6 +569,10 @@ class Shop(MPTTModel, AbstractActiveNetworkSpecificCodeNamedModel):
             transaction.on_commit(self._handle_new_shop_created)
         elif self.tracker.has_changed('tm_open_dict') or self.tracker.has_changed('tm_close_dict'):
             transaction.on_commit(self._handle_schedule_change)
+        
+        if is_new and self.load_template_id is None:
+            self.load_template_id = self.network.load_template_id
+
         if load_template_changed and not (self.load_template_id is None):
             from src.forecast.load_template.utils import apply_load_template
             from src.forecast.load_template.tasks import calculate_shops_load
@@ -818,16 +841,24 @@ class ProductionDay(AbstractModel):
         :param month:
         :return: Словарь, где ключ - номер месяца, значение - количество часов.
         """
-        filter_kwargs = dict(
+        q = Q(
+            Q(region_id=region_id) | Q(region__parent_id=region_id),
             dt__year=year,
             type__in=ProductionDay.WORK_TYPES,
-            region_id=region_id,
         )
         if month:
-            filter_kwargs['dt__month'] = month
+            q &= Q(dt__month=month)
+
+        prod_cal_subq = ProductionDay.objects.filter(q).annotate(
+            is_equal_regions=Case(
+                When(region_id=Value(region_id), then=True),
+                default=False, output_field=models.BooleanField()
+            ),
+        ).order_by('-is_equal_regions')
 
         norm_work_hours = ProductionDay.objects.filter(
-            **filter_kwargs
+            q,
+            id=Subquery(prod_cal_subq.values_list('id', flat=True)[:1])
         ).annotate(
             work_hours=Case(
                 When(type=ProductionDay.TYPE_WORK, then=Value(ProductionDay.WORK_NORM_HOURS[ProductionDay.TYPE_WORK])),
@@ -1255,213 +1286,103 @@ class FunctionGroup(AbstractModel):
         (TYPE_ALL, 'all')
     )
 
-    FUNCS = (
-        'AutoSettings_create_timetable',
-        'AutoSettings_set_timetable',
-        'AutoSettings_delete_timetable',
-        'AuthUserView',
-        'Break',
-        'Employment',
-        'Employee',
-        'Employment_auto_timetable',
-        'Employment_timetable',
-        'EmploymentWorkType',
-        'ExchangeSettings',
-        'FunctionGroupView',
-        'FunctionGroupView_functions',
-        'LoadTemplate',
-        'LoadTemplate_apply',
-        'LoadTemplate_calculate',
-        'LoadTemplate_download',
-        'LoadTemplate_upload',
-        'Network',
-        'Notification',
-        'OperationTemplate',
-        'OperationTypeName',
-        'OperationType',
-        'OperationTypeRelation',
-        'OperationTypeTemplate',
-        'PeriodClients',
-        'PeriodClients_indicators',
-        'PeriodClients_put',
-        'PeriodClients_delete',
-        'PeriodClients_upload',
-        'PeriodClients_download',
-        'Receipt',
-        'Group',
-        'Shop',
-        'Shop_stat',
-        'Shop_tree',
-        'Shop_outsource_tree',
-        'Subscribe',
-        'TickPoint',
-        'Timesheet',
-        'Timesheet_stats',
-        'User',
-        'User_change_password',
-        'User_delete_biometrics',
-        'WorkerConstraint',
-        'WorkerDay',
-        'WorkerDay_approve',
-        'WorkerDay_daily_stat',
-        'WorkerDay_worker_stat',
-        'WorkerDay_vacancy',
-        'WorkerDay_change_list',
-        'WorkerDay_copy_approved',
-        'WorkerDay_copy_range',
-        'WorkerDay_duplicate',
-        'WorkerDay_delete_worker_days',
-        'WorkerDay_exchange',
-        'WorkerDay_exchange_approved',
-        'WorkerDay_confirm_vacancy',
-        'WorkerDay_confirm_vacancy_to_worker',
-        'WorkerDay_reconfirm_vacancy_to_worker',
-        'WorkerDay_upload',
-        'WorkerDay_upload_fact',
-        'WorkerDay_download_timetable',
-        'WorkerDay_download_tabel',
-        'WorkerDay_editable_vacancy',
-        'WorkerDay_approve_vacancy',
-        'WorkerDay_change_range',
-        'WorkerDay_request_approve',
-        'WorkerDay_block',
-        'WorkerDay_unblock',
-        'WorkerPosition',
-        'WorkTypeName',
-        'WorkType',
-        'WorkType_efficiency',
-        'ShopMonthStat',
-        'ShopMonthStat_status',
-        'ShopSettings',
-        'ShopSchedule',
-        'VacancyBlackList',
-        'Task',
-
-        'signout',
-        'password_edit',
-
-        'get_worker_day_approves',
-        'create_worker_day_approve',
-        'delete_worker_day_approve',
-
-        'get_cashboxes',
-        'get_cashboxes_info',
-        # 'get_cashboxes_open_time',
-        # 'get_cashboxes_used_resource',
-        'create_cashbox',
-        'update_cashbox',
-        'delete_cashbox',
-
-        'get_types',
-        'create_work_type',
-        'edit_work_type',
-        'delete_work_type',
-
-        'get_notifications',
-        'get_notifications2',
-        'set_notifications_read',
-
-        'get_worker_day',
-        'delete_worker_day',
-        'request_worker_day',
-        'set_worker_day',
-        'handle_worker_day_request',
-        'get_worker_day_logs',
-
-        'get_cashier_info',
-        'change_cashier_info',
-        'create_cashier',
-        'get_cashiers_info',
-
-        'select_cashiers',
-        'get_not_working_cashiers_list',
-        'get_cashiers_list',
-        'change_cashier_status',
-        'set_selected_cashiers',
-        'delete_cashier',
-
-        'set_timetable',
-        'create_timetable',
-        'delete_timetable',
-        'get_cashier_timetable',
-        'get_cashiers_timetable',
-        'dublicate_cashier_table',
-
-        'get_slots',
-        'get_all_slots',
-
-        'get_workers',
-        'get_outsource_workers',
-
-        'get_user_urv',
-        'upload_urv',
-
-        'get_forecast',
-
-        'upload_demand',
-        'upload_timetable',
-
-        'notify_workers_about_vacancy',
-        'do_notify_action',
-
-        'get_workers_to_exchange',
-        'exchange_workers_day',
-
-        # algo callbacks
-        'set_demand',
-        'set_pred_bills',
-
-        'get_operation_templates',
-        'create_operation_template',
-        'update_operation_template',
-        'delete_operation_template',
-
-        'show_vacancy',
-        'cancel_vacancy',
-        'confirm_vacancy',
-
-        # download/
-        'get_demand_xlsx',
-        'get_department_stats_xlsx',
-        'get_timetable_xlsx',
-        'get_urv_xlsx',
-        'get_tabel',
-
-        # shop/
-        'get_department',
-        'add_department',
-        'edit_department',
-        'get_department_list',
-        'get_department_stats',
-        'get_parameters',
-        'set_parameters',
-
-        'get_demand_change_logs',
-        'get_table',
-
-        'get_status',
-        'get_change_request',
-        'get_month_stat',
-        'get_indicators',
-        'get_worker_position_list',
-        'set_worker_restrictions',
-        'create_predbills_request',
+    FUNCS_TUPLE = (
+        ('AutoSettings_create_timetable', 'Составление графика (Создать)'),
+        ('AutoSettings_set_timetable', 'Задать график (ответ от алгоритмов, Создать)'),
+        ('AutoSettings_delete_timetable', 'Удалить график (Создать)'),
+        ('AuthUserView', 'Получить авторизованного пользователя'),
+        ('Break', 'Перерыв'),
+        ('Employment', 'Трудоустройство'),
+        ('Employee', 'Сотрудник'),
+        ('Employment_auto_timetable', 'Выбрать сорудников для автосоставления (Создать)'),
+        ('Employment_timetable', 'Редактирование полей трудоустройства, связанных с расписанием'),
+        ('EmploymentWorkType', 'Связь трудоустройства и типа работ'),
+        ('ExchangeSettings', 'Настройки обмена сменами'),
+        ('FunctionGroupView', 'Доступ к функциям'),
+        ('FunctionGroupView_functions', 'Получить список доступных функций (Получить)'),
+        ('LoadTemplate', 'Шаблон нагрузки'),
+        ('LoadTemplate_apply', 'Применить шаблон нагрузки (Создать)'),
+        ('LoadTemplate_calculate', 'Рассчитать нагрузку (Создать)'),
+        ('LoadTemplate_download', 'Скачать шаблон нагрузки (Получить)'),
+        ('LoadTemplate_upload', 'Загрузить шаблон нагрузки (Создать)'),
+        ('Network', 'Сеть'),
+        ('Notification', 'Уведомление'),
+        ('OperationTemplate', 'Шаблон операции'),
+        ('OperationTypeName', 'Название типа операции'),
+        ('OperationType', 'Тип операции'),
+        ('OperationTypeRelation', 'Отношение типов операций'),
+        ('OperationTypeTemplate', 'Шаблон типа операции'),
+        ('PeriodClients', 'Нагрузка'),
+        ('PeriodClients_indicators', 'Индикаторы нагрузки (Получить)'),
+        ('PeriodClients_put', 'Обновить нагрузку (Обновить)'),
+        ('PeriodClients_delete', 'Удалить нагрузку (Удалить)'),
+        ('PeriodClients_upload', 'Загрузить нагрузку (Создать)'),
+        ('PeriodClients_download', 'Скачать нагрузку (Получить)'),
+        ('Receipt', 'Чек'),
+        ('Group', 'Группа доступа'),
+        ('Shop', 'Отдел'),
+        ('Shop_stat', 'Статистика по отделам (Получить)'),
+        ('Shop_tree', 'Дерево отделов (Получить)'),
+        ('Shop_outsource_tree', 'Дерево отделов клиентов (для аутсорс компаний) (Получить)'),
+        ('Subscribe', 'Subscribe'),
+        ('TickPoint', 'Точка отметки'),
+        ('Timesheet', 'Табель'),
+        ('Timesheet_stats', 'Статистика табеля (Получить)'),
+        ('User', 'Пользователь'),
+        ('User_change_password', 'Сменить пароль пользователю (Создать)'),
+        ('User_delete_biometrics', 'Удалить биометрию пользователя (Создать)'),
+        ('User_add_biometrics', 'Добавить биометрию пользователя (Создать)'),
+        ('WorkerConstraint', 'Ограничения сотрудника'),
+        ('WorkerDay', 'Рабочий день'),
+        ('WorkerDay_approve', 'Подтвердить график (Создать)'),
+        ('WorkerDay_daily_stat', 'Статистика по дням (Получить)'),
+        ('WorkerDay_worker_stat', 'Статистика по работникам (Получить)'),
+        ('WorkerDay_vacancy', 'Список вакансий (Получить)'),
+        ('WorkerDay_change_list', 'Редактирование дней списоком (Создать)'),
+        ('WorkerDay_copy_approved', 'Копировать рабочие дни из разных версий (Создать)'),
+        ('WorkerDay_copy_range', 'Копировать дни на следующий месяц (Создать)'),
+        ('WorkerDay_duplicate', 'Копировать рабочие дни как ячейки эксель (Создать)'),
+        ('WorkerDay_delete_worker_days', 'Удалить рабочие дни (Создать)'),
+        ('WorkerDay_exchange', 'Обмен сменами (Создать)'),
+        ('WorkerDay_exchange_approved', 'Обмен подтвержденными сменами (Создать)'),
+        ('WorkerDay_confirm_vacancy', 'Откликнуться вакансию (Создать)'),
+        ('WorkerDay_confirm_vacancy_to_worker', 'Назначить работника на вакансию (Создать)'),
+        ('WorkerDay_reconfirm_vacancy_to_worker', 'Переназначить работника на вакансию (Создать)'),
+        ('WorkerDay_upload', 'Загрузить плановый график (Создать)'),
+        ('WorkerDay_upload_fact', 'Загрузить фактический график (Создать)'),
+        ('WorkerDay_download_timetable', 'Скачать плановый график (Получить)'),
+        ('WorkerDay_download_tabel', 'Скачать табель (Получить)'),
+        ('WorkerDay_editable_vacancy', 'Получить редактируемую вакансию (Получить)'),
+        ('WorkerDay_approve_vacancy', 'Подтвердить вакансию (Создать)'),
+        ('WorkerDay_change_range', 'Создание/обновление дней за период (Создать)'),
+        ('WorkerDay_request_approve', 'Запросить подтверждение графика (Создать)'),
+        ('WorkerDay_block', 'Заблокировать рабочий день (Создать)'),
+        ('WorkerDay_unblock', 'Разблокировать рабочий день (Создать)'),
+        ('WorkerDay_generate_upload_example', 'Скачать шаблон графика (Получить)'),
+        ('WorkerPosition', 'Должность'),
+        ('WorkTypeName', 'Название типа работ'),
+        ('WorkType', 'Тип работ'),
+        ('WorkType_efficiency', 'Покрытие (Получить)'),
+        ('ShopMonthStat', 'Статистика по магазину на месяц'),
+        ('ShopMonthStat_status', 'Статус составления графика (Получить)'),
+        ('ShopSettings', 'Настройки автосоставления'),
+        ('ShopSchedule', 'Расписание магазина'),
+        ('VacancyBlackList', 'Черный список для вакансий'),
+        ('Task', 'Задача'),
     )
 
-    METHODS = (
-        'GET',
-        'POST',
-        'PUT',
-        'DELETE'
+    METHODS_TUPLE = (
+        ('GET', 'Получить'),
+        ('POST', 'Создать'),
+        ('PUT', 'Обновить'),
+        ('DELETE', 'Удалить'),
     )
-
-    FUNCS_TUPLE = ((f, f) for f in FUNCS)
 
     dttm_added = models.DateTimeField(auto_now_add=True)
     dttm_modified = models.DateTimeField(blank=True, null=True)
     group = models.ForeignKey(Group, on_delete=models.PROTECT, related_name='allowed_functions', blank=True, null=True)
-    func = models.CharField(max_length=128, choices=FUNCS_TUPLE)
-    method = models.CharField(max_length=6, choices=((m, m) for m in METHODS), default='GET')
+    func = models.CharField(max_length=128, choices=FUNCS_TUPLE, help_text='В скобках указывается метод с которым работает данная функция')
+    method = models.CharField(max_length=6, choices=METHODS_TUPLE, default='GET')
     access_type = models.CharField(choices=TYPES, max_length=32)
     level_up = models.IntegerField(default=0)
     level_down = models.IntegerField(default=100)

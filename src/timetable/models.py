@@ -15,6 +15,7 @@ from django.db.models.query import QuerySet
 from django.utils import timezone
 from django.utils.translation import gettext as _
 from model_utils import FieldTracker
+from rest_framework.exceptions import ValidationError
 
 from src.base.models import Shop, Employment, User, Event, Network, Break, ProductionDay, Employee
 from src.base.models_abstract import AbstractModel, AbstractActiveModel, AbstractActiveNetworkSpecificCodeNamedModel, \
@@ -480,6 +481,30 @@ class WorkerDay(AbstractModel):
         TYPE_MATERNITY,
         TYPE_MATERNITY_CARE,
     )
+
+    # маппинг внутренних типов в отображаемые пользователям сокращения
+    WD_TYPE_MAPPING = {
+        TYPE_BUSINESS_TRIP: _('BT'),
+        TYPE_HOLIDAY: _('H'),
+        TYPE_ABSENSE: _('ABS'),
+        TYPE_REAL_ABSENCE: 'ПР',  # пока что нет на фронте
+        TYPE_QUALIFICATION: _('ST'),
+        TYPE_SICK: _('S'),
+        TYPE_VACATION: _('V'),
+        TYPE_EXTRA_VACATION: 'ОД',  # пока что нет на фронте
+        TYPE_STUDY_VACATION: 'У',  # пока что нет на фронте
+        TYPE_SELF_VACATION: _('VO'),
+        TYPE_SELF_VACATION_TRUE: 'ОЗ',  # пока что нет на фронте
+        TYPE_GOVERNMENT: 'Г',  # пока что нет на фронте
+        TYPE_MATERNITY: _('MAT'),
+        TYPE_MATERNITY_CARE: 'Р',  # пока что нет на фронте
+        TYPE_DONOR_OR_CARE_FOR_DISABLED_PEOPLE: 'ОВ',  # пока что нет на фронте
+        TYPE_ETC: '',
+        TYPE_EMPTY: '',
+    }
+
+    # обратный маппинг для определения внутреннего типа в загруженных графиках
+    WD_TYPE_MAPPING_REVERSED = dict((v, k) for k, v in WD_TYPE_MAPPING.items())
 
     def __str__(self):
         return '{}, {}, {}, {}, {}, {}, {}, {}'.format(
@@ -1344,6 +1369,7 @@ class AttendanceRecords(AbstractModel):
     user = models.ForeignKey(User, on_delete=models.PROTECT)
     employee = models.ForeignKey(Employee, on_delete=models.PROTECT, null=True)
     verified = models.BooleanField(default=True)
+    terminal = models.BooleanField(default=False, help_text='Отметка с теримнала')
 
     shop = models.ForeignKey(Shop, on_delete=models.PROTECT) # todo: or should be to shop? fucking logic
 
@@ -1367,6 +1393,8 @@ class AttendanceRecords(AbstractModel):
                 dt=dt,
                 priority_shop_id=shop.id,
             ).first()
+            if not employment:
+                raise ValidationError(_('You have no active employment'))
             employee_id = employment.employee_id
             if not initial_record_type:
                 record_type = AttendanceRecords.TYPE_COMING
@@ -1384,6 +1412,8 @@ class AttendanceRecords(AbstractModel):
             record_type = initial_record_type or calculated_record_type
             employee_id = closest_plan_approved.employee_id
             employment = closest_plan_approved.employment
+            if not employment:
+                raise ValidationError(_('You have no active employment'))
             dt = closest_plan_approved.dt
 
         return employee_id, employment, dt, record_type, closest_plan_approved is not None
@@ -1793,6 +1823,7 @@ class ProdCal(models.Model):
     employee = models.ForeignKey('base.Employee', on_delete=models.DO_NOTHING)
     employment = models.ForeignKey('base.Employment', on_delete=models.DO_NOTHING)
     norm_hours = models.FloatField()
+    region = models.ForeignKey('base.Region', on_delete=models.DO_NOTHING)
 
     class Meta:
         managed = False

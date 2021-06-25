@@ -84,6 +84,7 @@ class NetworkSerializer(serializers.ModelSerializer):
             'default_stats',
             'show_tabel_graph',
             'show_worker_day_tasks',
+            'show_user_biometrics_block',
         ]
 
 
@@ -256,6 +257,7 @@ class EmploymentListSerializer(serializers.Serializer):
         request = self.context.get('request')
         if request and request.query_params.get('include_employee'):
             self.fields['employee'] = EmployeeSerializer(required=False, read_only=True)
+
 
 class EmploymentSerializer(serializers.ModelSerializer):
     default_error_messages = {

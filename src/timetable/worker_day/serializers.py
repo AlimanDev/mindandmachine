@@ -491,6 +491,15 @@ class UploadTimetableSerializer(serializers.Serializer):
     file = serializers.FileField()
 
 
+class GenerateUploadTimetableExampleSerializer(serializers.Serializer):
+    shop_id = serializers.IntegerField()
+    dt_from = serializers.DateField(format=QOS_DATE_FORMAT)
+    dt_to = serializers.DateField(format=QOS_DATE_FORMAT)
+    employee_id__in = serializers.ListField(child=serializers.IntegerField(), required=False)
+    is_fact = serializers.BooleanField(default=False)
+    is_approved = serializers.BooleanField(default=False)
+
+
 class DownloadSerializer(serializers.Serializer):
     dt_from = serializers.DateField(format=QOS_DATE_FORMAT)
     is_approved = serializers.BooleanField(default=True)
@@ -499,10 +508,15 @@ class DownloadSerializer(serializers.Serializer):
 
 
 class DownloadTabelSerializer(serializers.Serializer):
+    TYPE_FACT = 'F'
+    TYPE_MAIN = 'M'
+    TYPE_ADDITIONAL = 'A'
+
     dt_from = serializers.DateField(format=QOS_DATE_FORMAT)
     dt_to = serializers.DateField(format=QOS_DATE_FORMAT)
     shop_id = serializers.IntegerField()
     convert_to = serializers.ChoiceField(required=False, choices=['pdf', 'xlsx'], default='xlsx')
+    tabel_type = serializers.ChoiceField(required=False, choices=[TYPE_FACT, TYPE_MAIN, TYPE_ADDITIONAL], default=TYPE_FACT)
 
 
 class BlockOrUnblockWorkerDaySerializer(serializers.ModelSerializer):
