@@ -6,7 +6,11 @@ from rest_auth.views import (
 )
 from rest_framework_nested import routers
 
-from src.base.auth.views import WFMTokenLoginView
+from src.base.auth.views import (
+    WFMTokenLoginView,
+    OneTimePassView,
+)
+
 from src.base.shop.views import ShopViewSet
 from src.base.views import (
     EmploymentViewSet,
@@ -32,7 +36,8 @@ rest_auth_urls = [
     url(r'^allowed_functions/$', FunctionGroupView.as_view({'get': 'list'}), name='user'),
     url(r'^signin_token/?$', WFMTokenLoginView.as_view(), kwargs={'version': '0.9'}, name='signin_token'),
     # Использует Ортека старый формат
-    # url(r'^notification', NotificationViewSet.as_view(), name='notification')
+    # url(r'^notification', NotificationViewSet.as_view(), name='notification'),
+    url(r'^otp/$', OneTimePassView.as_view(), name='one_time_pass'),
 ]
 
 # Routers provide an easy way of automatically determining the URL conf.

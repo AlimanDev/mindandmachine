@@ -403,7 +403,7 @@ def create_departments_and_users(self, dt=None):
             level_up=1,
             level_down=99,
             # access_type=FunctionGroup.TYPE_ALL
-        ) for func in FunctionGroup.FUNCS for method in FunctionGroup.METHODS
+        ) for func, _ in FunctionGroup.FUNCS_TUPLE for method, _ in FunctionGroup.METHODS_TUPLE
     ])
     GroupWorkerDayPermission.objects.bulk_create(
         GroupWorkerDayPermission(
@@ -433,7 +433,7 @@ def create_departments_and_users(self, dt=None):
             level_up=0,
             level_down=99,
             # access_type=FunctionGroup.TYPE_SUPERSHOP
-        ) for func in FunctionGroup.FUNCS
+        ) for func, _ in FunctionGroup.FUNCS_TUPLE
     ])
     GroupWorkerDayPermission.objects.bulk_create(
         GroupWorkerDayPermission(
@@ -452,7 +452,7 @@ def create_departments_and_users(self, dt=None):
             level_up=0,
             level_down=0,
             # access_type=FunctionGroup.TYPE_SELF
-        ) for func in FunctionGroup.FUNCS
+        ) for func, _ in FunctionGroup.FUNCS_TUPLE
     ])
 
     Shop._tree_manager.rebuild()

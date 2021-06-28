@@ -8,8 +8,8 @@ def drop_views(apps, schema_editor):
 def create_views(apps, schema_editor):
     schema_editor.execute(
         """
-        create or replace view prod_cal as
-        SELECT pd.id,
+        CREATE OR REPLACE VIEW prod_cal AS
+    SELECT pd.id,
         pd.dt,
         employee.user_id,
         employment.id AS employment_id,
@@ -24,12 +24,26 @@ def create_views(apps, schema_editor):
                 ELSE 0::double precision
             END) AS norm_hours,
         employment.employee_id
-       FROM base_productionday pd
-         JOIN base_employment employment ON (pd.dt >= employment.dt_hired OR employment.dt_hired IS NULL) AND (pd.dt <= employment.dt_fired OR employment.dt_fired IS NULL) AND employment.dttm_deleted IS NULL
+       FROM base_employment employment
+         JOIN base_shop s ON employment.shop_id = s.id
+         JOIN base_region r ON s.region_id = r.id
+         JOIN base_productionday pd ON
+             (pd.dt >= employment.dt_hired OR employment.dt_hired IS NULL)
+             AND (pd.dt <= employment.dt_fired OR employment.dt_fired IS NULL)
+             AND (pd.region_id = r.id or pd.region_id = r.parent_id)
+                 AND pd.id = (
+                     SELECT pd2.id FROM base_productionday pd2 WHERE
+                         (pd2.dt >= employment.dt_hired OR employment.dt_hired IS NULL)
+                         AND (pd2.dt <= employment.dt_fired OR employment.dt_fired IS NULL)
+                         AND (pd2.region_id = r.id or pd2.region_id = r.parent_id)
+                         AND pd2.dt = pd.dt
+                     ORDER BY pd2.region_id = r.id DESC, pd2.region_id = r.parent_id DESC
+                     LIMIT 1
+                 )
          JOIN base_employee employee ON employment.employee_id = employee.id
          JOIN base_user u ON employee.user_id = u.id
-         JOIN base_shop s ON employment.shop_id = s.id AND pd.region_id = s.region_id
          LEFT JOIN base_workerposition wp ON employment.position_id = wp.id AND pd.dt >= '2020-01-01'::date
+      WHERE employment.dttm_deleted IS NULL
       GROUP BY pd.id, pd.dt, employee.user_id, employment.id, u.username, employment.shop_id, s.code, pd.region_id;
         """
     )

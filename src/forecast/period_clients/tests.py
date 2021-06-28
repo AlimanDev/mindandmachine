@@ -346,6 +346,8 @@ class TestDemand(APITestCase):
         for op in self.o_types:
             op.dttm_added = datetime.combine(self.date, time(12, 0))
             op.save()
+        self.shop.forecast_step_minutes = '00:30:00'
+        self.shop.save()
         self.data['set_value'] = 30
         self.data['operation_type_id'] = [self.o_type_4.id]
         response = self.client.put(f'{self.url}put/', data=self.data)

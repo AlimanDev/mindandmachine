@@ -203,7 +203,7 @@ class TestAutoWorkerExchange(TestCase):
                 type=PeriodClients.LONG_FORECASE_TYPE,
                 operation_type=operation_type
             ))
-            dttm_from += datetime.timedelta(minutes=30)
+            dttm_from += datetime.timedelta(minutes=60)
         else:
             PeriodClients.objects.bulk_create(pc_list)
 
