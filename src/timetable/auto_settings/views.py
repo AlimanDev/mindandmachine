@@ -666,6 +666,8 @@ class AutoSettingsViewSet(viewsets.ViewSet):
         absenteeism_coef = shop.settings.absenteeism if shop.settings else 0
         periods = PeriodClients.objects.shop_times_filter(
             shop,
+            dt_from=dt_from,
+            dt_to=dt_to,
             operation_type__dttm_deleted__isnull=True,
             operation_type__work_type__shop_id=shop_id,
             operation_type__work_type__dttm_deleted__isnull=True,
