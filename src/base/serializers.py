@@ -170,6 +170,11 @@ class EmployeeSerializer(BaseNetworkSerializer):
     class Meta:
         model = Employee
         fields = ['id', 'user', 'user_id', 'tabel_code', ]
+        extra_kwargs = {
+            'tabel_code': {
+                'required': False,
+            },
+        }
 
     def __init__(self, *args, **kwargs):
         super(EmployeeSerializer, self).__init__(*args, **kwargs)
