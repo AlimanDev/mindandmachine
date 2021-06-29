@@ -56,7 +56,7 @@ class TestOutsource(TestsHelperMixin, APITestCase):
                 func=func,
                 level_up=1,
                 level_down=99,
-            ) for func in FunctionGroup.FUNCS for method in FunctionGroup.METHODS
+            ) for func, _ in FunctionGroup.FUNCS_TUPLE for method, _ in FunctionGroup.METHODS_TUPLE
         ])
         GroupWorkerDayPermission.objects.bulk_create(
             GroupWorkerDayPermission(

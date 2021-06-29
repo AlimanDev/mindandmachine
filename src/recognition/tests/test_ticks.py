@@ -3,7 +3,7 @@ from rest_framework import status
 from rest_framework.exceptions import ValidationError
 from rest_framework.test import APITestCase
 
-from src.recognition.models import Tick
+from src.recognition.models import Tick, TickPoint
 from src.util.mixins.tests import TestsHelperMixin
 from src.timetable.models import WorkerDay, AttendanceRecords
 from datetime import date, timedelta, datetime, time
@@ -28,6 +28,24 @@ class TestTicksViewSet(TestsHelperMixin, APITestCase):
 
     def setUp(self):
         self._set_authorization_token(self.user2.username)
+
+    def _authorize_tick_point(self):
+        t = TickPoint.objects.create(
+            network=self.network,
+            name='test',
+            shop=self.shop,
+        )
+
+        response = self.client.post(
+            path='/api/v1/token-auth/',
+            data={
+                'key': t.key,
+            }
+        )
+
+        token = response.json()['token']
+        self.client.defaults['HTTP_AUTHORIZATION'] = 'Token %s' % token
+        return response
 
     def test_create_and_update_and_list_ticks(self):
         resp_coming = self.client.post(
@@ -178,3 +196,35 @@ class TestTicksViewSet(TestsHelperMixin, APITestCase):
             self.assertEqual(e.detail[0], 'У вас нет активного трудоустройства')
 
         self.assertIsNone(at)
+
+    def test_get_ticks_for_tick_point(self):
+        tick_point_id = self._authorize_tick_point().json()['tick_point']['id']
+        dt = date.today()
+        Tick.objects.create(
+            user=self.user1,
+            dttm=datetime.combine(dt - timedelta(1), time(16, 0, 2)),
+            employee=self.employee1,
+            tick_point_id=tick_point_id,
+            type=Tick.TYPE_COMING,
+            lateness=timedelta(0),
+        )
+        Tick.objects.create(
+            user=self.user1,
+            dttm=datetime.combine(dt, time(2, 3, 43)),
+            employee=self.employee1,
+            tick_point_id=tick_point_id,
+            type=Tick.TYPE_LEAVING,
+            lateness=timedelta(0),
+        )
+        response = self.client.get(self.get_url('Tick-list'))
+        self.assertEqual(len(response.json()), 2)
+        Tick.objects.create(
+            user=self.user1,
+            dttm=datetime.combine(dt, time(16, 0, 2)),
+            employee=self.employee1,
+            tick_point_id=tick_point_id,
+            type=Tick.TYPE_COMING,
+            lateness=timedelta(0),
+        )
+        response = self.client.get(self.get_url('Tick-list'))
+        self.assertEqual(len(response.json()), 2)
