@@ -2,6 +2,7 @@ import datetime
 import io
 import json
 from itertools import groupby
+from src.timetable.worker_day.timetable import get_timetable_generator_cls
 
 import pandas as pd
 from django.conf import settings
@@ -60,7 +61,7 @@ from src.timetable.worker_day.serializers import (
 )
 from src.timetable.worker_day.stat import count_daily_stat
 from src.timetable.worker_day.tasks import recalc_wdays, recalc_fact_from_records
-from src.timetable.worker_day.utils import download_timetable_util, upload_timetable_util, exchange, copy_as_excel_cells
+from src.timetable.worker_day.utils import exchange, copy_as_excel_cells
 from src.util.dg.tabel import get_tabel_generator_cls
 from src.util.models_converter import Converter
 from src.util.openapi.responses import (
@@ -1345,9 +1346,11 @@ class WorkerDayViewSet(BaseModelViewSet):
     def upload(self, request, file):
         data = UploadTimetableSerializer(data=request.data)
         data.is_valid(raise_exception=True)
-        data.validated_data['lang'] = request.user.lang
         data.validated_data['network_id'] = request.user.network_id
-        return upload_timetable_util(data.validated_data, file)
+        shop = Shop.objects.get(id=data.validated_data.get('shop_id'))
+        timetable_generator_cls = get_timetable_generator_cls(timetable_format=shop.network.timetable_format)
+        timetable_generator = timetable_generator_cls()
+        return timetable_generator.upload(data.validated_data, file)
 
     @swagger_auto_schema(
         query_serializer=GenerateUploadTimetableExampleSerializer,
@@ -1471,9 +1474,11 @@ class WorkerDayViewSet(BaseModelViewSet):
     def upload_fact(self, request, file):
         data = UploadTimetableSerializer(data=request.data)
         data.is_valid(raise_exception=True)
-        data.validated_data['lang'] = request.user.lang
         data.validated_data['network_id'] = request.user.network_id
-        return upload_timetable_util(data.validated_data, file, is_fact=True)
+        shop = Shop.objects.get(id=data.validated_data.get('shop_id'))
+        timetable_generator_cls = get_timetable_generator_cls(timetable_format=shop.network.timetable_format)
+        timetable_generator = timetable_generator_cls()
+        return timetable_generator.upload(data.validated_data, file, is_fact=True)
 
     @swagger_auto_schema(
         query_serializer=DownloadSerializer,
@@ -1486,7 +1491,10 @@ class WorkerDayViewSet(BaseModelViewSet):
     def download_timetable(self, request):
         data = DownloadSerializer(data=request.query_params)
         data.is_valid(raise_exception=True)
-        return download_timetable_util(request, data.validated_data)
+        shop = Shop.objects.get(id=data.validated_data.get('shop_id'))
+        timetable_generator_cls = get_timetable_generator_cls(timetable_format=shop.network.timetable_format)
+        timetable_generator = timetable_generator_cls()
+        return timetable_generator.download(data.validated_data)
 
     @swagger_auto_schema(
         query_serializer=DownloadSerializer,

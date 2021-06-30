@@ -1,13 +1,17 @@
 import datetime
+import io
 import time
 from dateutil.relativedelta import relativedelta
 from django.db import transaction
+from django.http.response import HttpResponse
+from django.utils.encoding import escape_uri_path
 
 import pandas as pd
 from django.db.models import Q, F
 from django.utils.translation import gettext as _
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
+import xlsxwriter
 
 from src.base.models import (
     User,
@@ -25,12 +29,33 @@ from src.timetable.models import (
 )
 from src.timetable.worker_day.stat import WorkersStatsGetter
 from src.timetable.worker_day.xlsx_utils.timetable import Timetable_xlsx
-from src.util.download import xlsx_method
 from src.util.models_converter import Converter
 
 SKIP_SYMBOLS = ['NAN', '']
 
 class BaseUploadDownloadTimeTable:
+
+    def __init__(self):
+        self.wd_type_mapping = {
+            WorkerDay.TYPE_BUSINESS_TRIP: _('BT'),
+            WorkerDay.TYPE_HOLIDAY: _('H'),
+            WorkerDay.TYPE_ABSENSE: _('ABS'),
+            WorkerDay.TYPE_REAL_ABSENCE: 'ПР',  # пока что нет на фронте
+            WorkerDay.TYPE_QUALIFICATION: _('ST'),
+            WorkerDay.TYPE_SICK: _('S'),
+            WorkerDay.TYPE_VACATION: _('V'),
+            WorkerDay.TYPE_EXTRA_VACATION: 'ОД',  # пока что нет на фронте
+            WorkerDay.TYPE_STUDY_VACATION: 'У',  # пока что нет на фронте
+            WorkerDay.TYPE_SELF_VACATION: _('VO'),
+            WorkerDay.TYPE_SELF_VACATION_TRUE: 'ОЗ',  # пока что нет на фронте
+            WorkerDay.TYPE_GOVERNMENT: 'Г',  # пока что нет на фронте
+            WorkerDay.TYPE_MATERNITY: _('MAT'),
+            WorkerDay.TYPE_MATERNITY_CARE: 'Р',  # пока что нет на фронте
+            WorkerDay.TYPE_DONOR_OR_CARE_FOR_DISABLED_PEOPLE: 'ОВ',  # пока что нет на фронте
+            WorkerDay.TYPE_ETC: '',
+            WorkerDay.TYPE_EMPTY: '',
+        }
+        self.wd_type_mapping_reversed = dict((v, k) for k, v in self.wd_type_mapping.items())
 
     def get_employment_qs(self, network_id, shop_id, dt_from=None, dt_to=None):
         if not dt_from:
@@ -104,7 +129,7 @@ class BaseUploadDownloadTimeTable:
                 position = positions.get(data[position_column].lower().strip())
                 if not position:
                     # Нет такой должности {position}
-                    raise ValidationError(_('There is no such position {position}.').format(position=data[position_column]))
+                    raise ValidationError({"message": _('There is no such position {position}.').format(position=data[position_column])})
                 names = data[name_column].split()
                 tabel_code = str(data[number_column]).split('.')[0]
                 created = False
@@ -116,7 +141,7 @@ class BaseUploadDownloadTimeTable:
                 }
                 user = None
                 if UPLOAD_TT_MATCH_EMPLOYMENT:
-                    employment = Employment.objects.filter(employee__tabel_code=tabel_code, shop=shop)
+                    employment = Employment.objects.filter(employee__tabel_code=tabel_code, shop_id=shop_id)
                     if number_cond and employment.exists():
                         employee = employment.first().employee  # TODO: покрыть тестами
                         user = employee.user
@@ -205,7 +230,7 @@ class BaseUploadDownloadTimeTable:
 
         return users
 
-    def upload(self, timetable_file, form, is_fact=False):
+    def upload(self, form, timetable_file, is_fact=False):
         """
         Принимает от клиента экселевский файл и создает расписание (на месяц)
         """
@@ -214,10 +239,10 @@ class BaseUploadDownloadTimeTable:
         try:
             df = pd.read_excel(timetable_file)
         except KeyError:
-            raise ValidationError(_('Failed to open active sheet.'))
+            raise ValidationError({"message": _('Failed to open active sheet.')})
         ######################### сюда писать логику чтения из экселя ######################################################
 
-        users_df = df[df.columns[:3]].unique()
+        users_df = df[df.columns[:3]].drop_duplicates()
         number_column = df.columns[0]
         name_column = df.columns[1]
         position_column = df.columns[2]
@@ -229,14 +254,27 @@ class BaseUploadDownloadTimeTable:
 
         return self._upload(df, users, form, is_fact)
 
-    @xlsx_method
-    def download(self, request, workbook, form):
+    def download(self, form):
+        output = io.BytesIO()
+        workbook = xlsxwriter.Workbook(output, {'in_memory': True})
+        workbook, name = self._download(workbook, form)
+        workbook.close()
+        output.seek(0)
+
+        response = HttpResponse(
+            output,
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        response['Content-Disposition'] = 'attachment; filename="{}.xlsx"'.format(escape_uri_path(name))
+        return response
+        
+    def _download(self, workbook, form):
         raise NotImplementedError()
 
     def _upload(self, df, users, form, is_fact):
         raise NotImplementedError()
 
-class UploadDownloadTimetableV1(BaseUploadDownloadTimeTable):
+class UploadDownloadTimetableCells(BaseUploadDownloadTimeTable):
 
     def _upload(self, df, users, form, is_fact):
         number_column = df.columns[0]
@@ -256,7 +294,7 @@ class UploadDownloadTimetableV1(BaseUploadDownloadTimeTable):
             for w in WorkType.objects.select_related('work_type_name').filter(shop_id=shop_id, dttm_deleted__isnull=True)
         }
         if (len(work_types) == 0):
-            raise ValidationError(_('There are no active work types in this shop.'))
+            raise ValidationError({"message": _('There are no active work types in this shop.')})
 
         first_type = next(iter(work_types.values()))
         timetable_df = df[df.columns[:3 + len(dates)]]
@@ -285,7 +323,7 @@ class UploadDownloadTimetableV1(BaseUploadDownloadTimeTable):
                     cell_data = str(data[i + 3]).upper().strip()
                     if cell_data.replace(' ', '').replace('\n', '') in SKIP_SYMBOLS:
                         continue
-                    if not (cell_data in WorkerDay.WD_TYPE_MAPPING_REVERSED):
+                    if not (cell_data in self.wd_type_mapping_reversed):
                         splited_cell = data[i + 3].replace('\n', '').strip().split()
                         work_type = work_types.get(data[position_column].upper(), first_type) if len(splited_cell) == 1 else work_types.get(splited_cell[1].upper(), first_type)
                         times = splited_cell[0].split('-')
@@ -299,11 +337,19 @@ class UploadDownloadTimetableV1(BaseUploadDownloadTimeTable):
                         if dttm_work_end < dttm_work_start:
                             dttm_work_end += datetime.timedelta(days=1)
                     elif not is_fact:
-                        type_of_work = WorkerDay.WD_TYPE_MAPPING_REVERSED[cell_data]
+                        type_of_work = self.wd_type_mapping_reversed[cell_data]
                     else:
                         continue
                 except Exception as e:
-                    raise ValidationError(_('The employee {user.first_name} {user.last_name} in the cell for {dt} has the wrong value: {value}.').format(user=employee.user, dt=dt, value=str(data[i + 3])))
+                    raise ValidationError(
+                        {
+                            "message": _('The employee {user.first_name} {user.last_name} in the cell for {dt} has the wrong value: {value}.').format(
+                                user=employee.user, 
+                                dt=dt, 
+                                value=str(data[i + 3]
+                            ))
+                        }
+                    )
 
                 WorkerDay.objects.filter(dt=dt, employee=employee, is_fact=is_fact, is_approved=False).delete()
             
@@ -326,10 +372,8 @@ class UploadDownloadTimetableV1(BaseUploadDownloadTimeTable):
 
         return Response()
 
-    @xlsx_method
-    def download(self, request, workbook, form):
+    def _download(self, workbook, form):
         ws = workbook.add_worksheet(_('Timetable for signature.'))
-
         shop = Shop.objects.get(pk=form['shop_id'])
         timetable = Timetable_xlsx(
             workbook,
@@ -367,7 +411,7 @@ class UploadDownloadTimetableV1(BaseUploadDownloadTimeTable):
         timetable.construnts_users_info(employments, 11, 0, ['code', 'fio', 'position'])
 
         # fill page 1
-        timetable.fill_table(workdays, employments, stat, 11, 4, stat_type=stat_type)
+        timetable.fill_table(workdays, employments, stat, 11, 4, stat_type=stat_type, mapping=self.wd_type_mapping)
 
         # fill page 2
         timetable.fill_table2(shop, timetable.prod_days[-1].dt, workdays)
@@ -375,8 +419,8 @@ class UploadDownloadTimetableV1(BaseUploadDownloadTimeTable):
         return workbook, _('Timetable_for_shop_{}_from_{}.xlsx').format(shop.name, form['dt_from'])
 
 
-class UploadDownloadTimetableV2(BaseUploadDownloadTimeTable):
-    def download(self, request, workbook, form):
+class UploadDownloadTimetableRows(BaseUploadDownloadTimeTable):
+    def _download(self, workbook, form):
         def _get_active_empl(wd, empls):
             if wd.employment:
                 return wd.employment
@@ -390,7 +434,25 @@ class UploadDownloadTimetableV2(BaseUploadDownloadTimeTable):
 
         shop = Shop.objects.get(pk=form['shop_id'])
         dt_from = form['dt_from']
-        dt_to = dt_from + relativedelta(month=1)
+        dt_to = dt_from + relativedelta(day=31)
+
+        header_format = workbook.add_format({
+            'border': 1,
+            'bold': True,
+            'text_wrap': True,
+            'valign': 'vcenter',
+            'align': 'center',
+        })
+        def_dict_format = {
+            'border': 1,
+            'valign': 'vcenter',
+            'align': 'center',
+            'text_wrap': True,
+        }
+        gray_format_dict = def_dict_format.copy()
+        gray_format_dict['bg_color'] = '#dedede'
+        def_format = workbook.add_format(def_dict_format)
+        gray_format = workbook.add_format(gray_format_dict)
         
         empls = {}
         employments = self.get_employment_qs(shop.network_id, shop.id, dt_from=dt_from, dt_to=dt_to)
@@ -406,24 +468,32 @@ class UploadDownloadTimetableV2(BaseUploadDownloadTimeTable):
         DT_COL = 3
         START_COL = 4
         END_COL = 5
-        ws.write_string(0, TABEL_COL, _("Employee id"))
-        ws.write_string(0, FIO_COL, _("Full name"))
-        ws.write_string(0, POSITION_COL, _("Position"))
-        ws.write_string(0, DT_COL, _("Date"))
-        ws.write_string(0, START_COL, _("Shift start"))
-        ws.write_string(0, END_COL, _("Shift end"))
+        ws.write_string(0, TABEL_COL, _("Employee id"), header_format)
+        ws.set_column(TABEL_COL, TABEL_COL, 12)
+        ws.write_string(0, FIO_COL, _("Full name"), header_format)
+        ws.set_column(FIO_COL, FIO_COL, 30)
+        ws.write_string(0, POSITION_COL, _("Position"), header_format)
+        ws.set_column(POSITION_COL, POSITION_COL, 12)
+        ws.write_string(0, DT_COL, _("Date"), header_format)
+        ws.set_column(DT_COL, DT_COL, 10)
+        ws.write_string(0, START_COL, _("Shift start"), header_format)
+        ws.set_column(START_COL, START_COL, 10)
+        ws.write_string(0, END_COL, _("Shift end"), header_format)
+        ws.set_column(END_COL, END_COL, 10)
 
         row = 1
         for wd in workdays:
+            style = gray_format if row % 2 == 1 else def_format 
             active_empl = _get_active_empl(wd, empls)
             if not active_empl or not active_empl.position:
                 continue
-            ws.write_string(row, TABEL_COL, wd.employee.tabel_code)
-            ws.write_string(row, FIO_COL, wd.employee.user.get_fio())
-            ws.write_string(row, POSITION_COL, active_empl.position.name)
-            ws.write_string(row, DT_COL, str(wd.dt))
-            ws.write_string(row, START_COL, wd.dttm_work_start.time().strftime('%H:%M'))
-            ws.write_string(row, END_COL, wd.dttm_work_end.time().strftime('%H:%M'))
+            ws.write_string(row, TABEL_COL, wd.employee.tabel_code, style)
+            ws.write_string(row, FIO_COL, wd.employee.user.get_fio(), style)
+            ws.write_string(row, POSITION_COL, active_empl.position.name, style)
+            ws.write_string(row, DT_COL, str(wd.dt), style)
+            ws.write_string(row, START_COL, wd.dttm_work_start.time().strftime('%H:%M') if wd.dttm_work_start else self.wd_type_mapping[wd.type], style)
+            ws.write_string(row, END_COL, wd.dttm_work_end.time().strftime('%H:%M') if wd.dttm_work_end else self.wd_type_mapping[wd.type], style)
+            row += 1
 
         return workbook, _('Timetable_for_shop_{}_from_{}.xlsx').format(shop.name, form['dt_from'])
 
@@ -435,6 +505,9 @@ class UploadDownloadTimetableV2(BaseUploadDownloadTimeTable):
         start_column = df.columns[4]
         end_column = df.columns[5]
         shop_id = form['shop_id']
+        df[number_column] = df[number_column].astype(str)
+        df[name_column] = df[name_column].astype(str)
+        df[position_column] = df[position_column].astype(str)
 
         employees = {}
 
@@ -442,17 +515,13 @@ class UploadDownloadTimetableV2(BaseUploadDownloadTimeTable):
             employees[data[0].tabel_code] = data
         
         
-        work_types = {
-            w.work_type_name.name.lower(): w
-            for w in WorkType.objects.select_related('work_type_name').filter(shop_id=shop_id, dttm_deleted__isnull=True)
-        }
-        if (len(work_types) == 0):
-            raise ValidationError(_('There are no active work types in this shop.'))
+        work_type = WorkType.objects.select_related('work_type_name').filter(shop_id=shop_id, dttm_deleted__isnull=True).first()
 
-        first_type = next(iter(work_types.values()))
+        if not work_type:
+            raise ValidationError({"message": _('There are no active work types in this shop.')})
         
         with transaction.atomic():
-            for index, data in df.iterrows():
+            for i, data in df.iterrows():
                 if data[number_column].startswith('*') or data[name_column].startswith('*') \
                     or data[position_column].startswith('*'):
                     continue
@@ -465,28 +534,36 @@ class UploadDownloadTimetableV2(BaseUploadDownloadTimeTable):
                 dttm_work_start = None
                 dttm_work_end = None
                 try:
-                    cell_data = str(data[i + 3]).upper().strip()
-                    if cell_data.replace(' ', '').replace('\n', '') in SKIP_SYMBOLS:
-                        continue
-                    if not (cell_data in WorkerDay.WD_TYPE_MAPPING_REVERSED):
-                        splited_cell = data[i + 3].replace('\n', '').strip().split()
-                        work_type = work_types.get(data[position_column].upper(), first_type) if len(splited_cell) == 1 else work_types.get(splited_cell[1].upper(), first_type)
-                        times = splited_cell[0].split('-')
+                    dt = pd.to_datetime(data[dt_column]).date()
+                except:
+                    raise ValidationError({"message": _('Can not parse date value {} on row {}.').format(data[dt_column], i + 2)})
+                try:
+                    type = data[start_column]
+                    if not (type in self.wd_type_mapping_reversed):
+                        start, end = data[start_column], data[end_column]
                         type_of_work = WorkerDay.TYPE_WORKDAY
                         dttm_work_start = datetime.datetime.combine(
-                            dt, Converter.parse_time(times[0] + ':00')
+                            dt, Converter.parse_time(start + ':00')
                         )
                         dttm_work_end = datetime.datetime.combine(
-                            dt, Converter.parse_time(times[1] + ':00')
+                            dt, Converter.parse_time(end + ':00')
                         )
                         if dttm_work_end < dttm_work_start:
                             dttm_work_end += datetime.timedelta(days=1)
                     elif not is_fact:
-                        type_of_work = WorkerDay.WD_TYPE_MAPPING_REVERSED[cell_data]
+                        type_of_work = self.wd_type_mapping_reversed[type]
                     else:
                         continue
                 except Exception as e:
-                    raise ValidationError(_('The employee {user.first_name} {user.last_name} in the cell for {dt} has the wrong value: {value}.').format(user=employee.user, dt=dt, value=str(data[i + 3])))
+                    raise ValidationError(
+                        {
+                            "message": _('The employee {user.first_name} {user.last_name} in the row {i} has the wrong value: {value}.').format(
+                                user=employee.user, 
+                                i=i + 2,
+                                value=data[start_column]
+                            )
+                        }
+                    )
 
                 WorkerDay.objects.filter(dt=dt, employee=employee, is_fact=is_fact, is_approved=False).delete()
             
@@ -508,3 +585,13 @@ class UploadDownloadTimetableV2(BaseUploadDownloadTimeTable):
                     )
 
         return Response()       
+
+
+timetable_formats = {
+    'cell_format': UploadDownloadTimetableCells,
+    'row_format': UploadDownloadTimetableRows,
+}
+
+def get_timetable_generator_cls(timetable_format='cell_format'):
+    tabel_generator_cls = timetable_formats.get(timetable_format)
+    return tabel_generator_cls

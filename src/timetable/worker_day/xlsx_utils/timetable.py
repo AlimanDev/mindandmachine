@@ -128,7 +128,7 @@ class Timetable_xlsx(Tabel_xlsx):
         self.worksheet.write_string(9, count_of_days + 6, _('H'), format_header_text)
         self.worksheet.write_string(9, count_of_days + 7, _('V'), format_header_text)
 
-    def fill_table(self, workdays, employments, stat, row_s, col_s, stat_type='approved'):
+    def fill_table(self, workdays, employments, stat, row_s, col_s, stat_type='approved', mapping=WorkerDay.WD_TYPE_MAPPING):
         """
         одинаковая сортировка у workdays и users должна быть
         :param workdays:
@@ -155,10 +155,10 @@ class Timetable_xlsx(Tabel_xlsx):
                     elif (wd.type in self.WORKERDAY_TYPE_CHANGE2HOLIDAY) \
                             and (self.prod_days[day].type == ProductionDay.TYPE_HOLIDAY):
                         wd.type = WorkerDay.TYPE_HOLIDAY
-                        text = WorkerDay.WD_TYPE_MAPPING[wd.type]
+                        text = mapping[wd.type]
 
                     else:
-                        text = WorkerDay.WD_TYPE_MAPPING[wd.type]
+                        text = mapping[wd.type]
                     cell_format.update({
                         'font_color': self.WORKERDAY_TYPE_COLORS[wd.type][0],
                         'bg_color': self.WORKERDAY_TYPE_COLORS[wd.type][1],
