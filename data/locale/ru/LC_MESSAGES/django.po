@@ -12,7 +12,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Django REST framework\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2021-06-10 07:25+0000\n"
+"POT-Creation-Date: 2021-06-30 07:37+0000\n"
 "PO-Revision-Date: 2017-08-03 14:58+0000\n"
 "Last-Translator: Grigory Mishchenko <grishkokot@gmail.com>\n"
 "Language-Team: Russian (http://www.transifex.com/django-rest-framework-1/"
@@ -108,38 +108,38 @@ msgstr ""
 msgid "shop_id should be defined"
 msgstr "Произошла ошибка. Попробуйте перезагрузить страницу."
 
-#: src/base/serializers.py:192
+#: src/base/serializers.py:197
 msgid "Passwords are mismatched."
 msgstr "Пароли не совпадают."
 
-#: src/base/serializers.py:193
+#: src/base/serializers.py:198
 msgid "Password is wrong."
 msgstr "Неверный пароль."
 
-#: src/base/serializers.py:264
+#: src/base/serializers.py:269
 #, python-brace-format
 msgid "Employment from {dt_hired} to {dt_fired} already exists."
 msgstr ""
 "В этом магазине уже заведено трудоустройство с {dt_hired} по {dt_fired}."
 
-#: src/base/serializers.py:265 src/timetable/worker_day/serializers.py:94
+#: src/base/serializers.py:270 src/timetable/worker_day/serializers.py:94
 #, python-brace-format
 msgid "There is {amount} models of user with username: {username}."
 msgstr ""
 "Существует {amount} моделей пользователя с именем пользователя: {username}."
 
-#: src/base/serializers.py:266
+#: src/base/serializers.py:271
 #, python-brace-format
 msgid "There is {amount} models of user with user_id: {user_id}."
 msgstr "Существует {amount} моделей пользователя с user_id: {user_id}."
 
-#: src/base/serializers.py:267 src/tasks/serializers.py:19
+#: src/base/serializers.py:272 src/tasks/serializers.py:19
 #: src/tasks/serializers.py:20
 #, python-brace-format
 msgid "There is {amount} models of shop with code: {code}."
 msgstr "Есть {amount} магазинов с кодом: {code}."
 
-#: src/base/serializers.py:268
+#: src/base/serializers.py:273
 #, python-brace-format
 msgid "There is {amount} models of position with code: {code}."
 msgstr "Есть {amount} должностей с кодом: {code}."
@@ -180,7 +180,7 @@ msgid ""
 msgstr ""
 "Биометрия уже создана. Для создания новой биометрии сначала удалите нынешнюю."
 
-#: src/forecast/load_template/utils.py:511
+#: src/forecast/load_template/utils.py:520
 #, python-brace-format
 msgid "These operation types do not exist: {types}."
 msgstr "Данные типы операций не существуют: {types}."
@@ -319,7 +319,7 @@ msgstr ""
 "Дистанция до магазина не должна превышать {allowed_distance_km} км (сейчас "
 "{distance_now_km} км)"
 
-#: src/recognition/views.py:246
+#: src/recognition/views.py:256
 msgid ""
 "You do not have an active employment at the moment, the action can not be "
 "performed, please refer to your management"
@@ -327,11 +327,11 @@ msgstr ""
 "У вас нет трудоустройства на текущий момент, действие выполнить невозможно, "
 "пожалуйста, обратитесь к вашему руководству"
 
-#: src/recognition/views.py:262
+#: src/recognition/views.py:272
 msgid "Today, the employee does not have a working day in this shop"
 msgstr "Сегодня у сотрудника нет рабочего дня в данном магазине"
 
-#: src/recognition/views.py:290 src/recognition/views.py:356
+#: src/recognition/views.py:300 src/recognition/views.py:366
 msgid "The tick does not exist"
 msgstr "Отметка не существует"
 
@@ -377,26 +377,26 @@ msgstr "Факт черновик"
 msgid "Date start should be less then date end"
 msgstr "Дата начала должна быть меньше чем дата окончания."
 
-#: src/timetable/auto_settings/views.py:66
+#: src/timetable/auto_settings/views.py:52
 #, python-brace-format
 msgid "Timetable should be built at least from {num} day from now."
 msgstr "Расписание можно строить не раньше чем через {num} дня от текущего"
 
-#: src/timetable/auto_settings/views.py:67
+#: src/timetable/auto_settings/views.py:53
 msgid "Timetable already exists."
 msgstr "Расписание уже существует"
 
-#: src/timetable/auto_settings/views.py:68
+#: src/timetable/auto_settings/views.py:54
 #, python-brace-format
 msgid "No work type set for users: {users}."
 msgstr "Не проставлены типы работ у пользователей: {users}."
 
-#: src/timetable/auto_settings/views.py:69
+#: src/timetable/auto_settings/views.py:55
 #, python-brace-format
 msgid "Not enough demand {period} for work type {work_type}."
 msgstr "На типе работ {work_type} не хватает объектов спроса {period}."
 
-#: src/timetable/auto_settings/views.py:70
+#: src/timetable/auto_settings/views.py:56
 #, python-brace-format
 msgid ""
 "More than one shift are selected for worker {id} {last_name} {first_name} "
@@ -405,19 +405,19 @@ msgstr ""
 "Ошибка! Работник {id} {last_name} {first_name} с фиксированными часами, но "
 "на один день выбрано больше одной смены!"
 
-#: src/timetable/auto_settings/views.py:71
+#: src/timetable/auto_settings/views.py:57
 msgid "Fail sending data to server."
 msgstr "Ошибка отправки данных на сервер."
 
-#: src/timetable/auto_settings/views.py:72
+#: src/timetable/auto_settings/views.py:58
 msgid "You can't delete timetable in the past."
 msgstr "Вы не можете удалить расписание в прошлом."
 
-#: src/timetable/auto_settings/views.py:73
+#: src/timetable/auto_settings/views.py:59
 msgid "You need to select auto-scheduling settings for the department."
 msgstr "Необходимо выбрать шаблон смен."
 
-#: src/timetable/auto_settings/views.py:74
+#: src/timetable/auto_settings/views.py:60
 msgid "You need to select an interval within a single accounting period."
 msgstr "Небходимо выбрать интервал в рамках одного учетного периода."
 
@@ -490,7 +490,7 @@ msgstr "Ручные изменения"
 msgid "Determined by the system"
 msgstr "Определено системой"
 
-#: src/timetable/models.py:1397
+#: src/timetable/models.py:1397 src/timetable/models.py:1416
 msgid "You have no active employment"
 msgstr "У вас нет активного трудоустройства"
 
@@ -957,26 +957,34 @@ msgid "Shop code"
 msgstr "Код ОП"
 
 #: src/util/dg/tabel.py:310
+msgid "Shop name"
+msgstr "Наименование ОП"
+
+#: src/util/dg/tabel.py:311
+msgid "Work type"
+msgstr "Тип работ"
+
+#: src/util/dg/tabel.py:312
 msgid "Fact, h"
 msgstr "Факт, ч"
 
-#: src/util/dg/tabel.py:311
+#: src/util/dg/tabel.py:313
 msgid "Plan, h"
 msgstr "План, ч"
 
-#: src/util/dg/tabel.py:312
+#: src/util/dg/tabel.py:314
 msgid "Shift start time, fact, h"
 msgstr "Время начала смены, факт, ч"
 
-#: src/util/dg/tabel.py:313
+#: src/util/dg/tabel.py:315
 msgid "Shift end time, fact, h"
 msgstr "Время окончания смены, факт, ч"
 
-#: src/util/dg/tabel.py:314
+#: src/util/dg/tabel.py:316
 msgid "Shift start time, plan, h"
 msgstr "Время начала смены, план, ч"
 
-#: src/util/dg/tabel.py:315
+#: src/util/dg/tabel.py:317
 msgid "Shift end time, plan, h"
 msgstr "Время окончания смены, план, ч"
 
