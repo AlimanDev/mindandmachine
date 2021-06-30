@@ -132,7 +132,7 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
             dt_hired=put_data['dt_hired'],
             employee_id=put_data['employee_id'],
             position_id=put_data['position_id'],
-        ).first().norm_work_hours, 100.0)
+        ).first().norm_work_hours, 123.0)
 
     def test_put_by_code(self):
         self.shop2.code = str(self.shop2.id)
