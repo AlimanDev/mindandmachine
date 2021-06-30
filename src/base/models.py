@@ -55,6 +55,11 @@ class Network(AbstractActiveModel):
         ('aigul', 'AigulTabelGenerator'),
     )
 
+    TIMETABLE_FORMAT_CHOICES = (
+        ('cell_format', 'Ячейки'),
+        ('row_format', 'Строки'),
+    )
+
     CONVERT_TABEL_TO_CHOICES = (
         ('xlsx', 'xlsx'),
         ('pdf', 'PDF'),
@@ -108,6 +113,10 @@ class Network(AbstractActiveModel):
     download_tabel_template = models.CharField(
         max_length=64, verbose_name='Шаблон для табеля',
         choices=TABEL_FORMAT_CHOICES, default='mts',
+    )
+    timetable_format = models.CharField(
+        max_length=64, verbose_name='Формат загрузки/выгрузки расписания',
+        choices=TIMETABLE_FORMAT_CHOICES, default='cell_format',
     )
     convert_tabel_to = models.CharField(
         max_length=64, verbose_name='Конвертировать табель в',

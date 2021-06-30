@@ -724,6 +724,32 @@ class TestUploadDownload(APITestCase):
         self.assertEqual(tabel[tabel.columns[1]][12], 'Иванов Иван Иванович')
         self.assertEqual(tabel[tabel.columns[27]][15], 'В')
 
+    def test_download_timetable_v2(self):
+        fill_calendar('2020.4.1', '2021.12.31', self.region.id)
+        file = open('etc/scripts/timetable.xlsx', 'rb')
+        self.client.post(f'{self.url}upload/', {'shop_id': self.shop.id, 'file': file}, HTTP_ACCEPT_LANGUAGE='ru')
+        file.close()
+        self.network.timetable_format = 'row_format'
+        self.network.save()
+        response = self.client.get(
+            f'{self.url}download_timetable/?shop_id={self.shop.id}&dt_from=2020-04-01&is_approved=False')
+        tabel = pandas.read_excel(io.BytesIO(response.content))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(dict(tabel.iloc[0]), {'Табельный номер': 27511, 'ФИО': 'Аленова Алена Аленовна', 'Должность': 'Продавец', 'Дата': '2020-04-01', 'Начало смены': '10:00', 'Окончание смены': '20:00'})
+        self.assertEqual(dict(tabel.iloc[37]), {'Табельный номер': 23739, 'ФИО': 'Иванов Иван Иванович', 'Должность': 'Директор магазина', 'Дата': '2020-04-08', 'Начало смены': '10:00', 'Окончание смены': '20:00'})
+        self.assertEqual(dict(tabel.iloc[45]), {'Табельный номер': 23739, 'ФИО': 'Иванов Иван Иванович', 'Должность': 'Директор магазина', 'Дата': '2020-04-16', 'Начало смены': 'В', 'Окончание смены': 'В'})
+        self.assertEqual(dict(tabel.iloc[68]), {'Табельный номер': 28479, 'ФИО': 'Петров Петр Петрович', 'Должность': 'Продавец', 'Дата': '2020-04-09', 'Начало смены': '10:00', 'Окончание смены': '20:00'})
+
+    def test_upload_timetable_v2(self):
+        self.network.timetable_format = 'row_format'
+        self.network.save()
+        file = open('etc/scripts/timetable_rows.xlsx', 'rb')
+        response = self.client.post(f'{self.url}upload/', {'shop_id': self.shop.id, 'file': file}, HTTP_ACCEPT_LANGUAGE='ru')
+        file.close()
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(WorkerDay.objects.filter(is_approved=False).count(), 150)
+
+
 class TestCreateFactFromAttendanceRecords(TestsHelperMixin, APITestCase):
 
     @classmethod
