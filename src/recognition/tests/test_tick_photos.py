@@ -8,7 +8,7 @@ from src.recognition.utils import check_duplicate_biometrics
 from src.recognition.events import DUPLICATE_BIOMETRICS
 from src.recognition.models import UserConnecter
 from src.util.mixins.tests import TestsHelperMixin
-from src.recognition.api.recognition import Tevian
+from src.recognition.api.recognition import Recognition
 from src.events.models import EventType
 from src.notifications.models import EventEmailNotification
 
@@ -43,7 +43,7 @@ class TestTickPhotos(TestsHelperMixin, APITestCase):
             system_email_template='notifications/email/duplicate_biometrics.html',
         )
         event_email_notification.users.add(self.user2)
-        with mock.patch.object(Tevian, 'identify', lambda x, y: 1) as identify:
+        with mock.patch.object(Recognition, 'identify', lambda x, y: 1) as identify:
             with override_settings(CELERY_TASK_ALWAYS_EAGER=True):
                 check_duplicate_biometrics(None, self.user3, shop_id=self.shop2.id)
         self.assertEqual(len(mail.outbox), 1)
