@@ -291,7 +291,7 @@ class EmploymentSerializer(serializers.ModelSerializer):
                   'employee_id', 'is_active',
         ]
         create_only_fields = ['employee_id']
-        read_only_fields = ['norm_work_hours']
+        read_only_fields = []
         extra_kwargs = {
             'auto_timetable': {
                 'default': True,
