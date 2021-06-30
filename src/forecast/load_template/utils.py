@@ -15,7 +15,7 @@ from django.utils import timezone
 import datetime
 from src.forecast.operation_type_template.views import OperationTypeTemplateSerializer
 from src.base.shop.serializers import ShopSerializer
-from django.db.models import F, Case, When, TimeField, Q
+from django.db.models import F, Case, When, TimeField, Q, Max, Min
 from django.db.models.functions import Least, Greatest
 from django.utils.translation import gettext as _
 from src.util.models_converter import Converter
@@ -438,6 +438,15 @@ def prepare_load_template_request(load_template_id, shop_id, dt_from, dt_to):
         'forecast_params': json.loads(shop.load_template.forecast_params),
         'round_delta': shop.load_template.round_delta,
     }
+    data['shop']['times'] = ShopSchedule.objects.filter(
+        shop_id=shop_id,
+        dt__gte=dt_from,
+        dt__lte=dt_to,
+        type=ShopSchedule.WORKDAY_TYPE,
+    ).aggregate(
+        open=Min('opens'),
+        close=Max('closes'),
+    )
     relations = {}
     for rel in OperationTypeRelation.objects.filter(
             base__load_template_id=load_template_id,

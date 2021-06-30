@@ -842,6 +842,7 @@ class TestEmployeeAPI(MultipleActiveEmploymentsSupportMixin, APITestCase):
         super().setUpTestData()
         cls.add_group_perm(cls.group1, 'Employee', 'GET')
         cls.add_group_perm(cls.group1, 'Employee', 'PUT')
+        cls.add_group_perm(cls.group1, 'Employee', 'POST')
 
     def test_get_employee_with_employments(self):
         self.client.force_authenticate(user=self.user1)
@@ -874,3 +875,15 @@ class TestEmployeeAPI(MultipleActiveEmploymentsSupportMixin, APITestCase):
         )
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(Employee.objects.get(id=self.employee1_1.id).tabel_code, new_tabel_code)
+
+    def test_can_create_employee_without_tabel_code(self):
+        self.client.force_authenticate(user=self.user1)
+        resp = self.client.post(
+            self.get_url('Employee-list'),
+            data=self.dump_data({'user_id': self.user1.id}),
+            content_type='application/json',
+        )
+        self.assertEqual(resp.status_code, 201)
+        e = Employee.objects.get(id=resp.json()['id'])
+        self.assertEqual(e.user_id, self.user1.id)
+        self.assertEqual(e.tabel_code, None)

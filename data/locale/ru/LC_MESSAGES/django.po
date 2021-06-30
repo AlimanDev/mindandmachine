@@ -12,7 +12,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Django REST framework\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2021-06-30 06:59+0000\n"
+"POT-Creation-Date: 2021-06-30 08:00+0000\n"
 "PO-Revision-Date: 2017-08-03 14:58+0000\n"
 "Last-Translator: Grigory Mishchenko <grishkokot@gmail.com>\n"
 "Language-Team: Russian (http://www.transifex.com/django-rest-framework-1/"
@@ -108,38 +108,38 @@ msgstr ""
 msgid "shop_id should be defined"
 msgstr "Произошла ошибка. Попробуйте перезагрузить страницу."
 
-#: src/base/serializers.py:192
+#: src/base/serializers.py:197
 msgid "Passwords are mismatched."
 msgstr "Пароли не совпадают."
 
-#: src/base/serializers.py:193
+#: src/base/serializers.py:198
 msgid "Password is wrong."
 msgstr "Неверный пароль."
 
-#: src/base/serializers.py:264
+#: src/base/serializers.py:269
 #, python-brace-format
 msgid "Employment from {dt_hired} to {dt_fired} already exists."
 msgstr ""
 "В этом магазине уже заведено трудоустройство с {dt_hired} по {dt_fired}."
 
-#: src/base/serializers.py:265 src/timetable/worker_day/serializers.py:94
+#: src/base/serializers.py:270 src/timetable/worker_day/serializers.py:94
 #, python-brace-format
 msgid "There is {amount} models of user with username: {username}."
 msgstr ""
 "Существует {amount} моделей пользователя с именем пользователя: {username}."
 
-#: src/base/serializers.py:266
+#: src/base/serializers.py:271
 #, python-brace-format
 msgid "There is {amount} models of user with user_id: {user_id}."
 msgstr "Существует {amount} моделей пользователя с user_id: {user_id}."
 
-#: src/base/serializers.py:267 src/tasks/serializers.py:19
+#: src/base/serializers.py:272 src/tasks/serializers.py:19
 #: src/tasks/serializers.py:20
 #, python-brace-format
 msgid "There is {amount} models of shop with code: {code}."
 msgstr "Есть {amount} магазинов с кодом: {code}."
 
-#: src/base/serializers.py:268
+#: src/base/serializers.py:273
 #, python-brace-format
 msgid "There is {amount} models of position with code: {code}."
 msgstr "Есть {amount} должностей с кодом: {code}."
@@ -180,7 +180,7 @@ msgid ""
 msgstr ""
 "Биометрия уже создана. Для создания новой биометрии сначала удалите нынешнюю."
 
-#: src/forecast/load_template/utils.py:511
+#: src/forecast/load_template/utils.py:520
 #, python-brace-format
 msgid "These operation types do not exist: {types}."
 msgstr "Данные типы операций не существуют: {types}."
@@ -646,7 +646,7 @@ msgstr ""
 "файле {}."
 
 #: src/timetable/worker_day/timetable.py:297
-#: src/timetable/worker_day/timetable.py:519
+#: src/timetable/worker_day/timetable.py:521
 msgid "There are no active work types in this shop."
 msgstr "В данном магазине нет активных типов работ"
 
@@ -665,7 +665,7 @@ msgid "Timetable for signature."
 msgstr "Расписание на подпись."
 
 #: src/timetable/worker_day/timetable.py:419
-#: src/timetable/worker_day/timetable.py:496
+#: src/timetable/worker_day/timetable.py:498
 msgid "Timetable_for_shop_{}_from_{}.xlsx"
 msgstr "Расписание_для_подразделения_{}_от_{}.xlsx"
 
@@ -695,15 +695,15 @@ msgstr "Дата"
 msgid "Shift start"
 msgstr "Начало смены"
 
-#: src/timetable/worker_day/timetable.py:480
+#: src/timetable/worker_day/timetable.py:481
 msgid "Shift end"
 msgstr "Окончание смены"
 
-#: src/timetable/worker_day/timetable.py:537
+#: src/timetable/worker_day/timetable.py:539
 msgid "Can not parse date value {} on row {}."
 msgstr "Дата {} на строке {} указана в неверном формате."
 
-#: src/timetable/worker_day/timetable.py:558
+#: src/timetable/worker_day/timetable.py:560
 #, python-brace-format
 msgid ""
 "The employee {user.first_name} {user.last_name} in the row {i} has the wrong "
@@ -992,26 +992,34 @@ msgid "Shop code"
 msgstr "Код ОП"
 
 #: src/util/dg/tabel.py:310
+msgid "Shop name"
+msgstr "Наименование ОП"
+
+#: src/util/dg/tabel.py:311
+msgid "Work type"
+msgstr "Тип работ"
+
+#: src/util/dg/tabel.py:312
 msgid "Fact, h"
 msgstr "Факт, ч"
 
-#: src/util/dg/tabel.py:311
+#: src/util/dg/tabel.py:313
 msgid "Plan, h"
 msgstr "План, ч"
 
-#: src/util/dg/tabel.py:312
+#: src/util/dg/tabel.py:314
 msgid "Shift start time, fact, h"
 msgstr "Время начала смены, факт, ч"
 
-#: src/util/dg/tabel.py:313
+#: src/util/dg/tabel.py:315
 msgid "Shift end time, fact, h"
 msgstr "Время окончания смены, факт, ч"
 
-#: src/util/dg/tabel.py:314
+#: src/util/dg/tabel.py:316
 msgid "Shift start time, plan, h"
 msgstr "Время начала смены, план, ч"
 
-#: src/util/dg/tabel.py:315
+#: src/util/dg/tabel.py:317
 msgid "Shift end time, plan, h"
 msgstr "Время окончания смены, план, ч"
 

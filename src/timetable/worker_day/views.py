@@ -595,9 +595,9 @@ class WorkerDayViewSet(BaseModelViewSet):
                     ]
                 )
 
-                # если план, то отмечаем, что график подтвержден
+                # если план
                 if not serializer.data['is_fact']:
-
+                    # отмечаем, что график подтвержден
                     ShopMonthStat.objects.filter(
                         shop_id=serializer.data['shop_id'],
                         dt=serializer.validated_data['dt_from'].replace(day=1),
@@ -622,6 +622,14 @@ class WorkerDayViewSet(BaseModelViewSet):
                                 )
                             )
 
+                    if not has_permission_to_change_protected_wdays:
+                        WorkerDay.check_tasks_violations(
+                            employee_days_q=employee_days_q,
+                            is_approved=True,
+                            is_fact=serializer.data['is_fact'],
+                            exc_cls=ValidationError,
+                        )
+
                 # TODO: нужно ли как-то разделять события подтверждения факта и плана?
                 event_context = serializer.data.copy()
                 # TODO: добавлять ли детальную информацию о подтвержденных днях в контекст?
@@ -641,14 +649,6 @@ class WorkerDayViewSet(BaseModelViewSet):
                     employee_days_q=employee_days_q,
                     exc_cls=ValidationError,
                 )
-
-                if not has_permission_to_change_protected_wdays:
-                    WorkerDay.check_tasks_violations(
-                        employee_days_q=employee_days_q,
-                        is_approved=True,
-                        is_fact=serializer.data['is_fact'],
-                        exc_cls=ValidationError,
-                    )
 
         return Response()
 
