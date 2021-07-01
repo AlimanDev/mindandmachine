@@ -239,7 +239,8 @@ class AuthUserView(UserDetailsView):
     openapi_tags = ['Auth',]
 
     def check_permissions(self, request, *args, **kwargs):
-        rotate_token(request)
+        if not request.user or not request.user.is_authenticated:
+            rotate_token(request)
         return super().check_permissions(request, *args, **kwargs)
 
     def get_queryset(self):
