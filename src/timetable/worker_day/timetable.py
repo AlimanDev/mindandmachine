@@ -58,7 +58,7 @@ class BaseUploadDownloadTimeTable:
         }
         self.wd_type_mapping_reversed = dict((v, k) for k, v in self.wd_type_mapping.items())
 
-    def get_employment_qs(self, network_id, shop_id, dt_from=None, dt_to=None):
+    def _get_employment_qs(self, network_id, shop_id, dt_from=None, dt_to=None):
         if not dt_from:
             dt_from = datetime.date.today()
         if not dt_to:
@@ -74,7 +74,7 @@ class BaseUploadDownloadTimeTable:
             'position',
         ).order_by('employee__user__last_name', 'employee__user__first_name', 'employee__user__middle_name', 'employee_id')
 
-    def get_worker_day_qs(self, employee_ids=[], dt_from=None, dt_to=None, is_approved=True):
+    def _get_worker_day_qs(self, employee_ids=[], dt_from=None, dt_to=None, is_approved=True):
         workdays = WorkerDay.objects.select_related('employee', 'employee__user', 'shop').filter(
             Q(dt__lte=F('employment__dt_fired')) | Q(employment__dt_fired__isnull=True) | Q(employment__isnull=True),
             (Q(dt__gte=F('employment__dt_hired')) | Q(employment__isnull=True)) & Q(dt__gte=dt_from),
@@ -93,6 +93,46 @@ class BaseUploadDownloadTimeTable:
                 '-id',
             ]
         )
+
+    def _get_employee_qs(self, network_id, shop_id, dt_from, dt_to, employee_id__in):
+        employee_qs = Employee.objects.filter(
+            employments__id__in=Employment.objects.get_active(
+                network_id=network_id,
+                shop_id=shop_id,
+                dt_from=dt_from,
+                dt_to=dt_to,
+                is_visible=True,
+            )
+        ).annotate(
+            position=Subquery(Employment.objects.get_active(
+                network_id=network_id,
+                shop_id=shop_id,
+                dt_from=dt_from,
+                dt_to=dt_to,
+                is_visible=True,
+                employee_id=OuterRef('id'),
+            ).order_by('-norm_work_hours').values('position__name')[:1])
+        ).select_related(
+            'user',
+        ).order_by('user__last_name', 'user__first_name')
+
+        if employee_id__in:
+            employee_qs = employee_qs.filter(id__in=employee_id__in)
+
+        return employee_qs
+
+    def _get_worker_day_dict(self, shop_id, employee_qs, dt_from, dt_to, is_fact, is_approved):
+        return {
+            f'{wd.employee_id}_{wd.dt}': wd for wd in WorkerDay.objects.filter(
+                Q(Q(type__in=WorkerDay.TYPES_WITH_TM_RANGE) & Q(shop_id=shop_id)) |
+                ~Q(type__in=WorkerDay.TYPES_WITH_TM_RANGE),
+                employee__in=employee_qs,
+                dt__gte=dt_from,
+                dt__lte=dt_to,
+                is_fact=is_fact,
+                is_approved=is_approved,
+            )
+        }
 
     def _upload_employments(self, df, number_column, name_column, position_column, shop_id, network_id):
         groups = {
@@ -401,7 +441,7 @@ class UploadDownloadTimetableCells(BaseUploadDownloadTimeTable):
             prod_days=None
         )
 
-        employments = self.get_employment_qs(shop.network_id, shop.id, dt_from=timetable.prod_days[0].dt, dt_to=timetable.prod_days[-1].dt)
+        employments = self._get_employment_qs(shop.network_id, shop.id, dt_from=timetable.prod_days[0].dt, dt_to=timetable.prod_days[-1].dt)
         employee_ids = employments.values_list('employee_id', flat=True)
         stat = WorkersStatsGetter(
             dt_from=timetable.prod_days[0].dt,
@@ -411,7 +451,7 @@ class UploadDownloadTimetableCells(BaseUploadDownloadTimeTable):
         ).run()
         stat_type = 'approved' if form['is_approved'] else 'not_approved'
 
-        workdays = self.get_worker_day_qs(employee_ids=employee_ids, dt_from=timetable.prod_days[0].dt, dt_to=timetable.prod_days[-1].dt, is_approved=form['is_approved'])
+        workdays = self._get_worker_day_qs(employee_ids=employee_ids, dt_from=timetable.prod_days[0].dt, dt_to=timetable.prod_days[-1].dt, is_approved=form['is_approved'])
 
         if form.get('inspection_version', False):
             timetable.change_for_inspection(timetable.prod_month.get('norm_work_hours', 0), workdays)
@@ -438,39 +478,9 @@ class UploadDownloadTimetableCells(BaseUploadDownloadTimeTable):
 
     def _generate_upload_example(self, writer, shop_id, dt_from, dt_to, is_fact, is_approved, employee_id__in):
         shop = Shop.objects.get(id=shop_id)
-        employee_qs = Employee.objects.filter(
-            employments__id__in=Employment.objects.get_active(
-                network_id=shop.network_id,
-                shop_id=shop_id,
-                dt_from=dt_from,
-                dt_to=dt_to,
-                is_visible=True,
-            )
-        ).annotate(
-            position=Subquery(Employment.objects.get_active(
-                network_id=shop.network_id,
-                shop_id=shop_id,
-                dt_from=dt_from,
-                dt_to=dt_to,
-                is_visible=True,
-                employee_id=OuterRef('id'),
-            ).order_by('-norm_work_hours').values('position__name')[:1])
-        ).select_related(
-            'user',
-        ).order_by('user__last_name', 'user__first_name')
+        employee_qs = self._get_employee_qs(shop.network_id, shop_id, dt_from, dt_to, employee_id__in)
 
-        if employee_id__in:
-            employee_qs = employee_qs.filter(id__in=employee_id__in)
-
-        wdays_dict = {f'{wd.employee_id}_{wd.dt}': wd for wd in WorkerDay.objects.filter(
-            Q(Q(type__in=WorkerDay.TYPES_WITH_TM_RANGE) & Q(shop_id=shop_id)) |
-            ~Q(type__in=WorkerDay.TYPES_WITH_TM_RANGE),
-            employee__in=employee_qs,
-            dt__gte=dt_from,
-            dt__lte=dt_to,
-            is_fact=is_fact,
-            is_approved=is_approved,
-        )}
+        wdays_dict = self._get_worker_day_dict(shop_id, employee_qs, dt_from, dt_to, is_fact, is_approved)
 
         rows = []
         dates = list(
@@ -585,12 +595,12 @@ class UploadDownloadTimetableRows(BaseUploadDownloadTimeTable):
         dt_to = dt_from + relativedelta(day=31)
 
         empls = {}
-        employments = self.get_employment_qs(shop.network_id, shop.id, dt_from=dt_from, dt_to=dt_to)
+        employments = self._get_employment_qs(shop.network_id, shop.id, dt_from=dt_from, dt_to=dt_to)
         employee_ids = employments.values_list('employee_id', flat=True)
         for e in employments:
             empls.setdefault(e.employee_id, []).append(e)
         
-        workdays = self.get_worker_day_qs(employee_ids=employee_ids, dt_from=dt_from, dt_to=dt_to, is_approved=form['is_approved']).select_related('employment', 'employment__position')
+        workdays = self._get_worker_day_qs(employee_ids=employee_ids, dt_from=dt_from, dt_to=dt_to, is_approved=form['is_approved']).select_related('employment', 'employment__position')
 
         rows = []
 
@@ -716,39 +726,9 @@ class UploadDownloadTimetableRows(BaseUploadDownloadTimeTable):
     def _generate_upload_example(self, wrtier, shop_id, dt_from, dt_to, is_fact, is_approved, employee_id__in):
         workbook = wrtier.book
         shop = Shop.objects.get(id=shop_id)
-        employee_qs = Employee.objects.filter(
-            employments__id__in=Employment.objects.get_active(
-                network_id=shop.network_id,
-                shop_id=shop_id,
-                dt_from=dt_from,
-                dt_to=dt_to,
-                is_visible=True,
-            )
-        ).annotate(
-            position=Subquery(Employment.objects.get_active(
-                network_id=shop.network_id,
-                shop_id=shop_id,
-                dt_from=dt_from,
-                dt_to=dt_to,
-                is_visible=True,
-                employee_id=OuterRef('id'),
-            ).order_by('-norm_work_hours').values('position__name')[:1])
-        ).select_related(
-            'user',
-        ).order_by('user__last_name', 'user__first_name')
+        employee_qs = self._get_employee_qs(shop.network_id, shop_id, dt_from, dt_to, employee_id__in)
 
-        if employee_id__in:
-            employee_qs = employee_qs.filter(id__in=employee_id__in)
-
-        wdays_dict = {f'{wd.employee_id}_{wd.dt}': wd for wd in WorkerDay.objects.filter(
-            Q(Q(type__in=WorkerDay.TYPES_WITH_TM_RANGE) & Q(shop_id=shop_id)) |
-            ~Q(type__in=WorkerDay.TYPES_WITH_TM_RANGE),
-            employee__in=employee_qs,
-            dt__gte=dt_from,
-            dt__lte=dt_to,
-            is_fact=is_fact,
-            is_approved=is_approved,
-        )}
+        wdays_dict = self._get_worker_day_dict(shop_id, employee_qs, dt_from, dt_to, is_fact, is_approved)
 
         rows = []
         dates = list(
