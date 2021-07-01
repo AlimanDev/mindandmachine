@@ -333,3 +333,12 @@ class TestUserViewSet(TestsHelperMixin, APITestCase):
 
         user = User.objects.get(username=username)
         self.assertEqual(user.email, '')
+
+    def test_csrf_token(self):
+        self.client.logout()
+        resp = self.client.get('/rest_api/auth/user/')
+        self.assertIsNotNone(resp.client.cookies.get('csrftoken'))
+        resp = self.client.post('/rest_api/auth/login/', data=self.dump_data({'username': self.USER_USERNAME, 'password': self.USER_PASSWORD}), content_type='application/json')
+        token = resp.client.cookies.get('csrftoken')
+        resp = self.client.get('/rest_api/auth/user/')
+        self.assertEquals(resp.client.cookies.get('csrftoken'), token)
