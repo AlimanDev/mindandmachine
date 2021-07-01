@@ -11,7 +11,7 @@ from django.utils.timezone import now
 from rest_framework.test import APITestCase
 
 from etc.scripts.fill_calendar import main as fill_calendar
-from src.base.models import WorkerPosition
+from src.base.models import Employee, WorkerPosition
 from src.forecast.models import PeriodClients, OperationType, OperationTypeName
 from src.timetable.models import AttendanceRecords, WorkerDay, WorkType, WorkTypeName
 from src.tasks.models import Task
@@ -731,11 +731,12 @@ class TestUploadDownload(APITestCase):
         file.close()
         self.network.timetable_format = 'row_format'
         self.network.save()
+        Employee.objects.filter(tabel_code=27511).update(tabel_code=None)
         response = self.client.get(
             f'{self.url}download_timetable/?shop_id={self.shop.id}&dt_from=2020-04-01&is_approved=False')
-        tabel = pandas.read_excel(io.BytesIO(response.content))
+        tabel = pandas.read_excel(io.BytesIO(response.content)).fillna('')
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(dict(tabel.iloc[0]), {'Табельный номер': 27511, 'ФИО': 'Аленова Алена Аленовна', 'Должность': 'Продавец', 'Дата': '2020-04-01', 'Начало смены': '10:00', 'Окончание смены': '20:00'})
+        self.assertEqual(dict(tabel.iloc[0]), {'Табельный номер': '', 'ФИО': 'Аленова Алена Аленовна', 'Должность': 'Продавец', 'Дата': '2020-04-01', 'Начало смены': '10:00', 'Окончание смены': '20:00'})
         self.assertEqual(dict(tabel.iloc[37]), {'Табельный номер': 23739, 'ФИО': 'Иванов Иван Иванович', 'Должность': 'Директор магазина', 'Дата': '2020-04-08', 'Начало смены': '10:00', 'Окончание смены': '20:00'})
         self.assertEqual(dict(tabel.iloc[45]), {'Табельный номер': 23739, 'ФИО': 'Иванов Иван Иванович', 'Должность': 'Директор магазина', 'Дата': '2020-04-16', 'Начало смены': 'В', 'Окончание смены': 'В'})
         self.assertEqual(dict(tabel.iloc[68]), {'Табельный номер': 28479, 'ФИО': 'Петров Петр Петрович', 'Должность': 'Продавец', 'Дата': '2020-04-09', 'Начало смены': '10:00', 'Окончание смены': '20:00'})
