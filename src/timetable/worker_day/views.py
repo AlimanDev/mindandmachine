@@ -643,7 +643,13 @@ class WorkerDayViewSet(BaseModelViewSet):
                     context=event_context,
                 ))
 
-                transaction.on_commit(lambda: calc_timesheets.delay(employee_id__in=list(worker_dates_dict.keys())))
+                # запустим с небольшой задержкой, чтобы успели пересчитаться часы в факте
+                transaction.on_commit(lambda: calc_timesheets.apply_async(
+                    countdown=2,
+                    kwargs=dict(
+                        employee_id__in=list(worker_dates_dict.keys())
+                    ))
+                )
 
                 WorkerDay.check_work_time_overlap(
                     employee_days_q=employee_days_q,
