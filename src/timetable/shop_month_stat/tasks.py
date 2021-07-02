@@ -1,9 +1,12 @@
+from datetime import date, datetime
+
+from dateutil.relativedelta import relativedelta
+from django.conf import settings
+
+from src.base.models import Shop
 from src.celery.celery import app
 from src.timetable.models import ShopMonthStat
-from datetime import date, datetime
-from django.conf import settings
 from src.timetable.work_type.utils import get_efficiency as get_shop_stats
-from src.base.models import Shop
 
 
 @app.task
@@ -17,7 +20,7 @@ def update_shop_stats(dt=None):
     if len(shops) != len(month_stats):
         shops_with_stats = list(ShopMonthStat.objects.filter(
             shop__child__isnull=True,
-            shop__in=shops, 
+            shop__in=shops,
             dt=dt,
         ).values_list('shop_id', flat=True))
         ShopMonthStat.objects.bulk_create(
