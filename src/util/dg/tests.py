@@ -56,7 +56,12 @@ class TestGenerateTabel(TestsHelperMixin, TestCase):
         cls.outsource_shop = ShopFactory(network=cls.outsource_network)
         cls.outsource_user = UserFactory(network=cls.outsource_network)
         cls.outsource_employee = EmployeeFactory(user=cls.outsource_user)
-        cls.outsource_employment = EmploymentFactory(employee=cls.outsource_employee, shop=cls.outsource_shop)
+        cls.outsource_employment = EmploymentFactory(
+            employee=cls.outsource_employee,
+            shop=cls.outsource_shop,
+            dt_hired=cls.dt_from - timedelta(days=90),
+            dt_fired=cls.dt_from + timedelta(days=90),
+        )
         NetworkConnect.objects.create(
             client=cls.network,
             outsourcing=cls.outsource_network,
@@ -92,6 +97,8 @@ class TestGenerateTabel(TestsHelperMixin, TestCase):
 
     def setUp(self) -> None:
         self.outsource_network.refresh_from_db()
+        self.second_empl.refresh_from_db()
+        self.outsource_employment.refresh_from_db()
 
     def test_generate_mts_tabel(self):
         g = MtsTabelDataGetter(shop=self.shop, dt_from=self.dt_from, dt_to=self.dt_to)

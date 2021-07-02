@@ -44,8 +44,8 @@ def sync_mda_user_to_shop_relation(dt=None, delay_sec=0.01):
         is_fact=False, is_approved=True,
         shop__isnull=False, employee__isnull=False,
         dt=dt,
-    ).values('worker__username', 'shop__code').distinct()
+    ).values('employee__user__username', 'shop__code').distinct()
     for wd in wdays:
-        create_mda_user_to_shop_relation(username=wd['worker__username'], shop_code=wd['shop__code'])
+        create_mda_user_to_shop_relation(username=wd['employee__user__username'], shop_code=wd['shop__code'])
         if delay_sec:
             time_in_secs.sleep(delay_sec)

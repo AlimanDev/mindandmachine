@@ -2,6 +2,7 @@ import uuid
 from calendar import monthrange
 from datetime import datetime
 
+import pytest
 from django.test import TestCase
 
 from src.base.models import Employment
@@ -10,6 +11,7 @@ from src.util.dg.tabel import T13TabelGenerator, CustomT13TabelGenerator, MTSTab
 from src.util.mixins.tests import TestsHelperMixin
 
 
+@pytest.mark.skip(reason="For manual tests")
 class TestGenerateTabel(TestsHelperMixin, TestCase):
     @classmethod
     def setUpTestData(cls):
@@ -19,7 +21,7 @@ class TestGenerateTabel(TestsHelperMixin, TestCase):
         Employment.objects.create(
             network=cls.network,
             code=f'{cls.user2.username}:{uuid.uuid4()}:{uuid.uuid4()}',
-            user=cls.user2,
+            employee=cls.employee2,
             shop=cls.shop,
             function_group=cls.employee_group,
             dt_hired=cls.dt_now,

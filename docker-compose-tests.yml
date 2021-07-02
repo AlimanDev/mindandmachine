@@ -1,0 +1,55 @@
+version: '2.1'
+
+services:
+  redis:
+    image: redis:6.2.1
+    restart: unless-stopped
+    environment:
+      - ALLOW_EMPTY_PASSWORD=yes
+    volumes:
+      - ./etc/compose/tests_mounts/redis_data:/data
+
+  converter:
+    image: eugenmayer/kontextwork-converter:production
+    restart: unless-stopped
+    volumes:
+      - ./etc/compose/tests_mounts/jod_converter_conf:/etc/app
+
+  postgres:
+    build:
+      context: .
+      dockerfile: ./etc/compose/postgres/Dockerfile
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: qostest
+      POSTGRES_USER: qostest
+      POSTGRES_PASSWORD: qostest
+
+  web:
+    build:
+      context: .
+      dockerfile: ./etc/compose/web/Dockerfile
+    restart: unless-stopped
+    command: pytest -v --junitxml=./etc/reports/junit.xml
+    volumes:
+      - ./etc/compose/tests_mounts/reports:/webapp/etc/reports
+      - ./etc/compose/tests_mounts/uwsgi:/uwsgi
+      - ./etc/compose/tests_mounts/logs:/webapp/logs
+      - ./etc/compose/tests_mounts/media:/webapp/media
+      - ./etc/compose/tests_mounts/static:/webapp/static
+      - ./local_settings_web.py:/webapp/src/conf/djconfig_local.py
+      - ./etc/compose/tests_mounts/ipython_data:/root/.ipython/profile_default
+    environment:
+      REDIS_HOST: redis
+      HOST: http://web:80
+      DB_NAME: qostest
+      DB_USER: qostest
+      DB_PASSWORD: qostest
+      DB_HOST: postgres
+      JOD_CONVERTER_URL: http://converter:8080
+      UWSGI_WORKERS: 1
+      UWSGI_THREADS: 1
+    depends_on:
+      - postgres
+      - redis
+      - converter

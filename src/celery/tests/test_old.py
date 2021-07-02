@@ -6,20 +6,20 @@ from src.timetable.models import (
     WorkerDayCashboxDetails,
 )
 
-from ..tasks import (
-    # update_worker_month_stat,
-    allocation_of_time_for_work_on_cashbox,
-    release_all_workers,
-    create_pred_bills,
-    cancel_vacancies,
-    workers_hard_exchange
-)
+# from ..tasks import (
+#     # update_worker_month_stat,
+#     allocation_of_time_for_work_on_cashbox,
+#     release_all_workers,
+#     create_pred_bills,
+#     cancel_vacancies,
+#     workers_hard_exchange
+# )
 
 
-class TestCelery(LocalTestCase):
-
-    def setUp(self, *args, **kwargs):
-        super().setUp()
+# class TestCelery(LocalTestCase):
+#
+#     def setUp(self, *args, **kwargs):
+#         super().setUp()
 
     # def test_update_worker_month_stat(self):
     #     update_worker_month_stat()
@@ -80,10 +80,10 @@ class TestCelery(LocalTestCase):
     #     # 0.0 not greater than 0
     #     # self.assertGreater(x[3].duration, 0)
 
-    def test_create_pred_bills(self):
-        from django.core.exceptions import EmptyResultSet
-        try:
-            create_pred_bills()
-        except EmptyResultSet:
-            pass
+    # def test_create_pred_bills(self):
+    #     from django.core.exceptions import EmptyResultSet
+    #     try:
+    #         create_pred_bills()
+    #     except EmptyResultSet:
+    #         pass
 
