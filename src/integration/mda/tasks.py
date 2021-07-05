@@ -17,7 +17,7 @@ logger = logging.getLogger('mda_integration')
 
 @app.task
 def sync_mda_data(threshold_seconds=settings.MDA_SYNC_DEPARTMENTS_THRESHOLD_SECONDS):
-    mda = MdaIntegrationHelper(logger=logger)
+    mda = MdaIntegrationHelper()
     mda.sync_orgstruct(threshold_seconds=threshold_seconds)
     mda.sync_users(threshold_seconds=threshold_seconds)
 
