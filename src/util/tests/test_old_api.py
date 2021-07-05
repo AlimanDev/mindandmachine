@@ -1,7 +1,9 @@
-from src.util.test import LocalTestCase
 from unittest import skip
 
-#старое апи. Не используется
+import pytest
+
+
+@pytest.mark.skip(reason="Старое апи. Не используется")
 class TestApiMethod:
     def auth(self, username):
         self.client.post(
@@ -92,16 +94,17 @@ class TestApiMethod:
         self.assertEqual(response.status_code, 200)
         self.assertResponseCodeEqual(response, 200)
 
-        response = self.api_get('/api/timetable/auto_settings/get_status?dt=2019-06-01&shop_id={}'.format(self.shop2.id))
+        response = self.api_get(
+            '/api/timetable/auto_settings/get_status?dt=2019-06-01&shop_id={}'.format(self.shop2.id))
         self.assertEqual(response.json()['code'], 403)
-        #self.assertResponseCodeEqual(response, 403)
+        # self.assertResponseCodeEqual(response, 403)
         self.assertEqual(response.json()['data']['error_message'],
                          'Вы не можете просматрировать информацию по другим магазинам')
 
     def test_auth_required(self):
         response = self.api_get('/api/timetable/auto_settings/get_status?dt=2019-06-01&shop_id={}'.format(self.shop.id))
         self.assertEqual(response.json()['code'], 401)
-        #self.assertResponseCodeEqual(response, 401)
+        # self.assertResponseCodeEqual(response, 401)
         self.assertEqual(response.json()['data']['error_type'], 'AuthRequired')
 
     def test_valid_form(self):

@@ -31,3 +31,10 @@ docs/qos*
 update.sh
 tmp/
 etc/compose/build-custom.sh
+
+.coverage
+coverage.xml
+junit.xml
+xunit.xml
+.pytest_cache/
+etc/compose/tests_mounts/

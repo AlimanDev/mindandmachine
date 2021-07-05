@@ -136,11 +136,13 @@ class T13TabelDataGetter(BaseTabelDataGetter):
 
     def get_data(self):
         def _get_active_empl(wd, empls):
-            return list(filter(
+            active_empls = list(filter(
                 lambda e: (e.dt_hired is None or e.dt_hired <= wd.dt) and (
                             e.dt_fired is None or wd.dt <= e.dt_fired),
                 empls.get(wd.employee_id, []),
-            ))[0]
+            ))
+            if active_empls:
+                return active_empls[0]
 
         tabel_wdays = self._get_tabel_wdays_qs()
 
