@@ -17,6 +17,8 @@ class TimesheetSerializer(serializers.ModelSerializer):
             'shop_id',
             'shop__code',
             'fact_timesheet_type',
+            'fact_timesheet_dttm_work_start',
+            'fact_timesheet_dttm_work_end',
             'fact_timesheet_total_hours',
             'fact_timesheet_day_hours',
             'fact_timesheet_night_hours',
