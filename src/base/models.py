@@ -20,7 +20,7 @@ from django.db.models.functions import Coalesce
 from django.db.models.query import QuerySet
 from django.utils import timezone
 from django.utils.functional import cached_property
-from django.utils.translation import gettext as _
+from django.utils.translation import gettext_lazy as _
 from model_utils import FieldTracker
 from mptt.models import MPTTModel, TreeForeignKey
 from rest_framework.serializers import ValidationError
@@ -43,10 +43,10 @@ class Network(AbstractActiveModel):
     ACC_PERIOD_YEAR = 12
 
     ACCOUNTING_PERIOD_LENGTH_CHOICES = (
-        (ACC_PERIOD_MONTH, 'Месяц'),
-        (ACC_PERIOD_QUARTER, 'Квартал'),
-        (ACC_PERIOD_HALF_YEAR, 'Пол года'),
-        (ACC_PERIOD_YEAR, 'Год'),
+        (ACC_PERIOD_MONTH, _('Month')),
+        (ACC_PERIOD_QUARTER, _('Quarter')),
+        (ACC_PERIOD_HALF_YEAR, _('Half a year')),
+        (ACC_PERIOD_YEAR, _('Year')),
     )
 
     TABEL_FORMAT_CHOICES = (
@@ -56,8 +56,8 @@ class Network(AbstractActiveModel):
     )
 
     TIMETABLE_FORMAT_CHOICES = (
-        ('cell_format', 'Ячейки'),
-        ('row_format', 'Строки'),
+        ('cell_format', _('Cells')),
+        ('row_format', _('Rows')),
     )
 
     CONVERT_TABEL_TO_CHOICES = (
@@ -69,57 +69,57 @@ class Network(AbstractActiveModel):
         verbose_name = 'Сеть магазинов'
         verbose_name_plural = 'Сети магазинов'
 
-    logo = models.ImageField(null=True, blank=True, upload_to='logo/%Y/%m')
+    logo = models.ImageField(null=True, blank=True, upload_to='logo/%Y/%m', verbose_name=_('Logo'))
     url = models.CharField(blank=True, null=True, max_length=255)
-    primary_color = models.CharField(max_length=7, blank=True)
-    secondary_color = models.CharField(max_length=7, blank=True)
-    name = models.CharField(max_length=128, unique=True)
-    code = models.CharField(max_length=64, unique=True, null=True, blank=True)
+    primary_color = models.CharField(max_length=7, blank=True, verbose_name=_('Primary color'))
+    secondary_color = models.CharField(max_length=7, blank=True, verbose_name=_('Secondary color'))
+    name = models.CharField(max_length=128, unique=True, verbose_name=_('Name'))
+    code = models.CharField(max_length=64, unique=True, null=True, blank=True, verbose_name=_('Code'))
     # нужен ли идентификатор сотруднка чтобы откликнуться на вакансию
-    need_symbol_for_vacancy = models.BooleanField(default=False)
-    settings_values = models.TextField(default='{}')  # настройки для сети. Cейчас есть настройки для приемки чеков + ночные смены
+    need_symbol_for_vacancy = models.BooleanField(default=False, verbose_name=_('Need symbol for vacancy'))
+    settings_values = models.TextField(default='{}', verbose_name=_('Settings values'))  # настройки для сети. Cейчас есть настройки для приемки чеков + ночные смены
     allowed_interval_for_late_arrival = models.DurationField(
-        verbose_name='Допустимый интервал для опоздания', default=datetime.timedelta(seconds=0))
+        verbose_name=_('Allowed interval for late_arrival'), default=datetime.timedelta(seconds=0))
     allowed_interval_for_early_departure = models.DurationField(
-        verbose_name='Допустимый интервал для раннего ухода', default=datetime.timedelta(seconds=0))
+        verbose_name=_('Allowed interval for early departure'), default=datetime.timedelta(seconds=0))
     allow_workers_confirm_outsource_vacancy = models.BooleanField(
-        verbose_name='Разрешать работникам сети откликаться на аутсорс вакансии', default=False)
-    okpo = models.CharField(blank=True, null=True, max_length=15, verbose_name='Код по ОКПО')
+        verbose_name=_('Allow workers confirm outsource vacancy'), default=False)
+    okpo = models.CharField(blank=True, null=True, max_length=15, verbose_name=_('OKPO code'))
     allowed_geo_distance_km = models.DecimalField(
         max_digits=10, decimal_places=2, null=True, blank=True,
-        verbose_name='Разрешенная дистанция до магазина при создании отметок (км)',
+        verbose_name=_('Allowed geo distance (km)'),
     )
     enable_camera_ticks = models.BooleanField(
-        default=False, verbose_name='Включить отметки по камере в мобильной версии')
+        default=False, verbose_name=_('Enable camera ticks'))
     show_worker_day_additional_info = models.BooleanField(
-        default=False, verbose_name='Отображать доп. информацию в подтвержденных факте и плане', 
-        help_text='Отображение при наведении на уголок информации о том, кто и когда последний раз редактировал рабочий день')
+        default=False, verbose_name=_('Show worker day additional info'),
+        help_text=_('Displaying information about who last edited a worker day and when, when hovering over the corner'))
     show_worker_day_tasks = models.BooleanField(
-        default=False, verbose_name='Отображать задачи в доп. информацию по рабочему дню')
+        default=False, verbose_name=_('Show worker day tasks'))
     crop_work_hours_by_shop_schedule = models.BooleanField(
-        default=False, verbose_name='Обрезать рабочие часы по времени работы магазина'
+        default=False, verbose_name=_('Crop work hours by shop schedule')
     )
     clean_wdays_on_employment_dt_change = models.BooleanField(
-        default=False, verbose_name='Запускать скрипт очистки дней при изменении дат трудойстройства',
+        default=False, verbose_name=_('Clean worker days on employment date change'),
     )
     accounting_period_length = models.PositiveSmallIntegerField(
-        choices=ACCOUNTING_PERIOD_LENGTH_CHOICES, verbose_name='Длина учетного периода', default=1)
+        choices=ACCOUNTING_PERIOD_LENGTH_CHOICES, verbose_name=_('Accounting period length'), default=1)
     only_fact_hours_that_in_approved_plan = models.BooleanField(
         default=False,
-        verbose_name='Считать только те фактические часы, которые есть в подтвержденном плановом графике',
+        verbose_name=_('Count only fact hours that in approved plan'),
     )
     copy_plan_to_fact_crossing = models.BooleanField(
-        verbose_name="Копировать план в факт без перезаписи факта", default=False)
+        verbose_name=_("Copy plan to fact crossing"), default=False)
     download_tabel_template = models.CharField(
-        max_length=64, verbose_name='Шаблон для табеля',
+        max_length=64, verbose_name=_('Download tabel template'),
         choices=TABEL_FORMAT_CHOICES, default='mts',
     )
     timetable_format = models.CharField(
-        max_length=64, verbose_name='Формат загрузки/выгрузки расписания',
+        max_length=64, verbose_name=_('Timetable format'),
         choices=TIMETABLE_FORMAT_CHOICES, default='cell_format',
     )
     convert_tabel_to = models.CharField(
-        max_length=64, verbose_name='Конвертировать табель в',
+        max_length=64, verbose_name=_('Convert tabel to'),
         null=True, blank=True,
         choices=CONVERT_TABEL_TO_CHOICES,
         default='xlsx',
@@ -129,7 +129,7 @@ class Network(AbstractActiveModel):
         on_delete=models.PROTECT,
         blank=True,
         null=True,
-        verbose_name='Перерывы по умолчанию',
+        verbose_name=_('Default breaks'),
         related_name='networks',
     )
     load_template = models.ForeignKey(
@@ -137,32 +137,32 @@ class Network(AbstractActiveModel):
         on_delete=models.PROTECT,
         blank=True,
         null=True,
-        verbose_name='Шаблон нагрузки по умолчанию',
+        verbose_name=_('Default load template'),
         related_name='networks',
     )
     # при создании новой должности будут проставляться соотв. значения
     # пример значения можно найти в src.base.tests.test_worker_position.TestSetWorkerPositionDefaultsModel
-    worker_position_default_values = models.TextField(verbose_name='Параметры должностей по умолчанию', default='{}')
+    worker_position_default_values = models.TextField(verbose_name=_('Worker position default values'), default='{}')
     descrease_employment_dt_fired_in_api = models.BooleanField(
-        default=False, verbose_name='Уменьшать дату окончания трудоустройства',
-        help_text='Актуально для данных, получаемых через api',
+        default=False, verbose_name=_('Descrease employment date fired in api'),
+        help_text=_('Relevant for data received via the api'),
     )
     consider_remaining_hours_in_prev_months_when_calc_norm_hours = models.BooleanField(
-        default=False, verbose_name='Учитывать неотработанные часы за предыдущие месяца при расчете нормы часов',
+        default=False, verbose_name=_('Consider remaining hours in previous months when calculating norm hours'),
     )
     outsourcings = models.ManyToManyField(
         'self', through='base.NetworkConnect', through_fields=('client', 'outsourcing'), symmetrical=False, related_name='clients')
     ignore_parent_code_when_updating_department_via_api = models.BooleanField(
-        default=False, verbose_name='Не учитывать parent_code при изменении подразделения через api',
-        help_text='Необходимо включить для случаев, когда оргструктура поддерживается вручную',
+        default=False, verbose_name=_('Ignore parent code when updating department via api'),
+        help_text=_('It must be enabled for cases when the organizational structure is maintained manually'),
     )
     create_employment_on_set_or_update_director_code = models.BooleanField(
         default=False,
-        verbose_name='Создавать скрытое трудоустройство при проставлении/изменении director_code в подразделении',
+        verbose_name=_('Create employment on set or update director code'),
     )
     show_user_biometrics_block = models.BooleanField(
         default=False,
-        verbose_name='Отображать блок биометрии в деталях сотрудника',
+        verbose_name=_('Show user biometrics block'),
     )
 
     @property
