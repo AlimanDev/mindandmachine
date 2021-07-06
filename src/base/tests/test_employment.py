@@ -200,10 +200,11 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
         self.assertEqual(e.employee.tabel_code, self.employee2.tabel_code)  # cant change tabel_code for existing employment
 
     def test_auto_timetable(self):
+        Employment.objects.all().update(auto_timetable=True)
         employment_ids = list(Employment.objects.filter(shop=self.shop).values_list('id', flat=True))
         employment_ids = employment_ids[1:-2]
 
-        self.assertEqual(Employment.objects.get_active(self.network, shop=self.shop, auto_timetable=True).count(), 4)
+        self.assertEqual(Employment.objects.get_active(self.network, shop=self.shop, auto_timetable=True).count(), 5)
         data = {
             "employment_ids": employment_ids,
             "auto_timetable": False,

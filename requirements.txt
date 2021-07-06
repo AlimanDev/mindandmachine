@@ -148,3 +148,7 @@ dadata==0.3.0
 tzwhere==3.0.3
 django-environ==0.4.5
 django-sesame==2.4
+pytest==6.2.4
+pytest-django==4.4.0
+pytest-cov==2.12.1
+coverage==5.5

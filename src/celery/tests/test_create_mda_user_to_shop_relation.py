@@ -16,7 +16,7 @@ class TestCreateMDAUserToShopRelation(TestsHelperMixin, TestCase):
         cls.dt_now = timezone.now().date()
         cls.create_departments_and_users()
         cls.wd = WorkerDay.objects.create(
-            worker=cls.user2,
+            employee=cls.employee2,
             employment=cls.employment2,
             dt=cls.dt_now,
             type=WorkerDay.TYPE_WORKDAY,
@@ -112,7 +112,7 @@ class TestCreateMDAUserToShopRelation(TestsHelperMixin, TestCase):
 
         # простой рабочий день
         wd = WorkerDay.objects.create(
-            worker=self.user5,
+            employee=self.employee5,
             employment=self.employment5,
             dt=self.dt_now,
             type=WorkerDay.TYPE_WORKDAY,

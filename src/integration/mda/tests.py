@@ -1,4 +1,5 @@
 from datetime import datetime, date, timedelta
+from unittest import mock
 
 from django.test import TestCase
 from django.utils import timezone
@@ -18,6 +19,18 @@ from src.timetable.models import WorkerDay
 from src.timetable.tests.factories import WorkerDayFactory
 from src.util.mixins.tests import TestsHelperMixin
 from src.util.utils import generate_user_token
+
+
+class MockResponse:
+    def __init__(self, json_data, status_code):
+        self.json_data = json_data
+        self.status_code = status_code
+
+    def json(self):
+        return self.json_data
+
+    def raise_for_status(self):
+        pass
 
 
 class TestMdaIntegration(TestsHelperMixin, TestCase):
@@ -244,6 +257,30 @@ class TestMdaIntegration(TestsHelperMixin, TestCase):
         orgstruct_data = mda_integration_helper._get_orgstruct_data()
         s_orgstruct_data = list(filter(lambda s: shop.id == s['id'], orgstruct_data['shops']))[0]
         self.assertEqual(s_orgstruct_data['regionId'], self.region1.id)
+
+    @mock.patch('src.integration.mda.integration.logger')
+    @mock.patch('src.integration.mda.integration.requests.post')
+    def test_orgstruct_errors(self, _post, _logger):
+        errors_dict = {
+            'divisionErrors': ['division1', 'division2'],
+            'regionErrors': ['region1', 'region2'],
+            'shopErrors': ['shop1', 'shop2'],
+        }
+        _post.return_value = MockResponse(json_data=errors_dict, status_code=200)
+        mda_integration_helper = MdaIntegrationHelper()
+        mda_integration_helper.sync_orgstruct()
+        _logger.error.assert_called_with(errors_dict)
+
+    @mock.patch('src.integration.mda.integration.logger')
+    @mock.patch('src.integration.mda.integration.requests.post')
+    def test_users_errors(self, _post, _logger):
+        errors_dict = {
+            'userErrors': ['user1', 'user2']
+        }
+        _post.return_value = MockResponse(json_data=errors_dict, status_code=200)
+        mda_integration_helper = MdaIntegrationHelper()
+        mda_integration_helper.sync_users()
+        _logger.error.assert_called_with(errors_dict)
 
 
 class TestVMdaUsers(TestsHelperMixin, TestCase):
