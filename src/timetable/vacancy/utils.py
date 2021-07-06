@@ -30,11 +30,11 @@ from datetime import timedelta, datetime, time
 import pandas
 from dateutil.relativedelta import relativedelta
 from django.conf import settings
-from django.utils.translation import gettext as _
 from django.core.mail import EmailMultiAlternatives
 from django.db import transaction
 from django.db.models import Q, Exists, OuterRef, Sum, Subquery, DurationField
 from django.utils.timezone import now
+from django.utils.translation import gettext as _
 
 from src.base.models import (
     Employment,
@@ -57,8 +57,7 @@ from src.timetable.models import (
     ShopMonthStat,
     VacancyBlackList,
 )
-from src.timetable.work_type.utils import get_efficiency as get_shop_stats
-from src.util.emails import send_email
+from src.timetable.work_type.utils import ShopEfficiencyGetter
 
 
 def create_event_and_notify(workers, **kwargs):
@@ -663,11 +662,11 @@ def create_vacancies_and_notify(shop_id, work_type_id, dt_from=None, dt_to=None)
 
     print('check vacancies for {}; {}'.format(shop_id, work_type_id))
     params['work_type_ids'] = [work_type_id]
-    shop_stat = get_shop_stats(
-        shop_id,
-        params,
+    shop_stat = ShopEfficiencyGetter(
+        shop_id=shop_id,
         consider_vacancies=True,
-    )
+        **params,
+    ).get()
     df_stat = pandas.DataFrame(shop_stat['lack_of_cashiers_on_period'])
 
     # df_stat['dttm'] = pandas.to_datetime(df_stat.dttm, format=QOS_DATETIME_FORMAT)
@@ -837,11 +836,11 @@ def cancel_vacancies(shop_id, work_type_id, dt_from=None, dt_to=None, approved=F
     }
 
     params['work_type_ids'] = [work_type_id]
-    shop_stat = get_shop_stats(
-        shop_id,
-        params,
+    shop_stat = ShopEfficiencyGetter(
+        shop_id=shop_id,
         consider_vacancies=True,
-    )
+        **params,
+    ).get()
     df_stat=pandas.DataFrame(shop_stat['tt_periods']['real_cashiers']).rename({'amount':'real_cashiers'}, axis=1)
     df_stat['predict_cashier_needs'] = pandas.DataFrame(shop_stat['tt_periods']['predict_cashier_needs']).amount
 
@@ -981,11 +980,11 @@ def workers_exchange():
         for work_type in shop.work_types.all():
             params['work_type_ids'] = [work_type.id]
 
-            shop_stat = get_shop_stats(
+            shop_stat = ShopEfficiencyGetter(
                 shop.id,
-                params,
                 consider_vacancies=False,
-            )
+                **params,
+            ).get()
 
             df_stat=pandas.DataFrame(shop_stat['tt_periods']['real_cashiers']).rename({'amount':'real_cashiers'}, axis=1)
             df_stat['predict_cashier_needs'] = pandas.DataFrame(shop_stat['tt_periods']['predict_cashier_needs']).amount
