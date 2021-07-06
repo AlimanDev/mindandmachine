@@ -1,7 +1,7 @@
 import datetime
-import io
 import json
 from itertools import groupby
+from src.timetable.vacancy.tasks import cancel_shop_vacancies, create_shop_vacancies_and_notify
 from src.timetable.worker_day.timetable import get_timetable_generator_cls
 
 import pandas as pd
@@ -32,6 +32,7 @@ from src.timetable.backends import MultiShopsFilterBackend
 from src.timetable.events import REQUEST_APPROVE_EVENT_TYPE, APPROVE_EVENT_TYPE, VACANCY_CONFIRMED_TYPE
 from src.timetable.filters import WorkerDayFilter, WorkerDayStatFilter, VacancyFilter
 from src.timetable.models import (
+    WorkType,
     WorkerDay,
     WorkerDayCashboxDetails,
     ShopMonthStat,
@@ -614,14 +615,21 @@ class WorkerDayViewSet(BaseModelViewSet):
                         if wd_ids:
                             transaction.on_commit(lambda wd_ids=wd_ids: recalc_wdays.delay(id__in=wd_ids))
                     if settings.ZKTECO_INTEGRATION: # если используем терминалы
-                            transaction.on_commit(
-                                lambda: recalc_fact_from_records.delay(
-                                    serializer.validated_data['dt_from'], 
-                                    serializer.validated_data['dt_to'], 
-                                    shop_ids=[serializer.data['shop_id']]
-                                )
+                        transaction.on_commit(
+                            lambda: recalc_fact_from_records.delay(
+                                serializer.validated_data['dt_from'], 
+                                serializer.validated_data['dt_to'], 
+                                shop_ids=[serializer.data['shop_id']]
                             )
-
+                        )
+                    
+                    for work_type in WorkType.objects.qos_filter_active(datetime.date.today(), datetime.date.today(), shop_id=serializer.validated_data['shop_id']):
+                        transaction.on_commit(
+                            lambda: cancel_shop_vacancies.apply_async((serializer.validated_data['shop_id'], work_type.id))
+                        )
+                        transaction.on_commit(
+                            lambda: create_shop_vacancies_and_notify.apply_async((serializer.validated_data['shop_id'], work_type.id))
+                        )
                     if not has_permission_to_change_protected_wdays:
                         WorkerDay.check_tasks_violations(
                             employee_days_q=employee_days_q,
