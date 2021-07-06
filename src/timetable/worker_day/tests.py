@@ -724,6 +724,17 @@ class TestUploadDownload(APITestCase):
         self.assertEqual(tabel[tabel.columns[1]][12], 'Иванов Иван Иванович')
         self.assertEqual(tabel[tabel.columns[27]][15], 'В')
 
+    def test_download_timetable_example_no_active_epmpls(self):
+        fill_calendar('2020.4.1', '2021.12.31', self.region.id)
+        Employee.objects.filter(employments__shop=self.shop).delete()
+        response = self.client.get(
+            f'{self.url}generate_upload_example/?shop_id={self.shop.id}&dt_from=2020-04-01&dt_to=2020-04-30')
+        tabel = pandas.read_excel(io.BytesIO(response.content))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(tabel), 0) #fails with python > 3.6
+        self.assertEqual(len(tabel.columns), 33)
+        self.assertEqual(list(tabel.columns[:3]), ['Табельный номер', 'ФИО', 'Должность'])
+
     def test_download_timetable_v2(self):
         fill_calendar('2020.4.1', '2021.12.31', self.region.id)
         file = open('etc/scripts/timetable.xlsx', 'rb')

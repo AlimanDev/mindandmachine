@@ -506,7 +506,10 @@ class UploadDownloadTimetableCells(BaseUploadDownloadTimeTable):
 
             rows.append(row_data)
 
-        df = pd.DataFrame(rows)
+        if not rows:
+            df = pd.DataFrame(columns=[_('Employee id'), _('Full name'), _('Position')] + dates)
+        else:
+            df = pd.DataFrame(rows)
         sheet_name = _('Timetable')
         df.to_excel(
             excel_writer=writer, sheet_name=sheet_name, index=False,
