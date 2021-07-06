@@ -255,7 +255,7 @@ class ShopEfficiencyGetter:
             day_stats.setdefault('work_hours', {})[dt_converted] = work_hours
             day_stats.setdefault('work_days', {})[dt_converted] = work_days
             day_stats.setdefault('income', {})[dt_converted] = income
-            day_stats.setdefault('perfomance', {})[dt_converted] = income / work_hours
+            day_stats.setdefault('perfomance', {})[dt_converted] = np.nan_to_num(income / work_hours)
 
         real_cashiers = []
         predict_cashier_needs = []
