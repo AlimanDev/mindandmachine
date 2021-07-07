@@ -167,7 +167,10 @@ class ShopEfficiencyGetter:
         )
 
     def _init_arrays(self):
-        # TODO: отрефакторить на sql запросы/вьюхи?
+        consider_vacancy_map_wdays = {
+            True: list(self._get_wdays_qs(consider_vacancies=True)),
+            False: list(self._get_wdays_qs(consider_vacancies=False)),
+        }
         self.predict_needs_array = np.zeros(len(self.dttms))
         self._fill_array(
             self.predict_needs_array,
@@ -178,28 +181,28 @@ class ShopEfficiencyGetter:
         self.wdays_array = np.zeros(len(self.dttms))
         self._fill_array(
             self.wdays_array,
-            list(self._get_wdays_qs(consider_vacancies=self.consider_vacancies)),
+            consider_vacancy_map_wdays.get(self.consider_vacancies),
             self.lambda_index_wdays,
             self.lambda_add_wdays,
         )
         self.wdays_with_open_vacancies_array = np.zeros(len(self.dttms))
         self._fill_array(
             self.wdays_with_open_vacancies_array,
-            list(self._get_wdays_qs(consider_vacancies=True)),
+            consider_vacancy_map_wdays.get(True),
             self.lambda_index_wdays,
             self.lambda_add_wdays,
         )
         self.work_hours_array = np.zeros(len(self.dttms))
         self._fill_array(
             self.work_hours_array,
-            list(self._get_wdays_qs()),
+            consider_vacancy_map_wdays.get(False),
             self.lambda_index_work_hours,
             self.lambda_add_work_hours,
         )
         self.work_days_array = np.zeros(len(self.dttms))
         self._fill_array(
             self.work_days_array,
-            list(self._get_wdays_qs()),
+            consider_vacancy_map_wdays.get(False),
             self.lambda_index_work_days,
             self.lambda_add_work_days,
         )
