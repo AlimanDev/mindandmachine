@@ -302,6 +302,21 @@ class TestWorkType(APITestCase):
             work_type=self.work_type3,
         )
 
+        open_vac = WorkerDay.objects.create(
+            dttm_work_start=datetime.combine(dt_now, time(hour=10)),
+            dttm_work_end=datetime.combine(dt_now, time(hour=22)),
+            type=WorkerDay.TYPE_WORKDAY,
+            dt=dt_now,
+            shop=self.shop,
+            is_approved=True,
+            is_fact=False,
+            is_vacancy=True,
+        )
+        WorkerDayCashboxDetails.objects.create(
+            worker_day=open_vac,
+            work_type=self.work_type1,
+        )
+
         url = f'{self.url}efficiency/'
 
         get_params = {
@@ -322,7 +337,7 @@ class TestWorkType(APITestCase):
         self.assertEqual(day_stats['covering'][Converter.convert_date(dt_now)], 0.125)
         self.assertEqual(day_stats['predict_hours'][Converter.convert_date(dt_now)], 72.0)
         self.assertEqual(day_stats['graph_hours'][Converter.convert_date(dt_now)], 9.0)
-        self.assertEqual(day_stats['graph_hours_with_open_vacancies'][Converter.convert_date(dt_now)], 9.0)
+        self.assertEqual(day_stats['graph_hours_with_open_vacancies'][Converter.convert_date(dt_now)], 21.0)
         self.assertEqual(day_stats['work_hours'][Converter.convert_date(dt_now)], 8.0)
         self.assertEqual(day_stats['work_days'][Converter.convert_date(dt_now)], 1.0)
         self.assertEqual(day_stats['income'][Converter.convert_date(dt_now)], 2400.0)

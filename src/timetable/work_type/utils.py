@@ -118,7 +118,6 @@ class ShopEfficiencyGetter:
         )
 
     def _get_wdays_qs(self, consider_vacancies=False):
-        # кэширование одинаковых запросов? -- сама джанга не делает?
         base_wd_q = Q(
             Q(employment__dt_fired__gte=self.dt_from) &
             Q(dt__lte=F('employment__dt_fired')) |
@@ -244,8 +243,8 @@ class ShopEfficiencyGetter:
                 np.maximum(wdays_array_for_dt - predict_needs_for_dt, 0).sum() / wdays_array_for_dt.sum())
             predict_hours = int((predict_needs_for_dt * self.period_length_in_minutes / 60).sum())
             graph_hours = int((wdays_array_for_dt * self.period_length_in_minutes / 60).sum())
-            graph_hours_with_open_vacancies = int((
-                                                          wdays_with_open_vacancies_array_for_dt * self.period_length_in_minutes / 60).sum())
+            graph_hours_with_open_vacancies = int(
+                (wdays_with_open_vacancies_array_for_dt * self.period_length_in_minutes / 60).sum())
             work_hours = np.nan_to_num(work_hours_for_dt).sum()
             work_days = np.nan_to_num(work_days_for_dt).sum()
             income = np.nan_to_num(income_for_dt).sum()
