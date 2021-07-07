@@ -1296,6 +1296,7 @@ class FunctionGroup(AbstractModel):
     )
 
     FUNCS_TUPLE = (
+        ('AttendanceRecords', 'Отметка'),
         ('AutoSettings_create_timetable', 'Составление графика (Создать)'),
         ('AutoSettings_set_timetable', 'Задать график (ответ от алгоритмов, Создать)'),
         ('AutoSettings_delete_timetable', 'Удалить график (Создать)'),
