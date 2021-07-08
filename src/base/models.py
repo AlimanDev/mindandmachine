@@ -1304,6 +1304,7 @@ class FunctionGroup(AbstractModel):
         ('Break', 'Перерыв'),
         ('Employment', 'Трудоустройство'),
         ('Employee', 'Сотрудник'),
+        ('Employee_attendance_records_report', 'Отчет по отметкам по сотрудникам (Получить)'),
         ('Employment_auto_timetable', 'Выбрать сорудников для автосоставления (Создать)'),
         ('Employment_timetable', 'Редактирование полей трудоустройства, связанных с расписанием'),
         ('EmploymentWorkType', 'Связь трудоустройства и типа работ'),

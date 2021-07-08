@@ -906,3 +906,26 @@ class TestEmployeeAPI(MultipleActiveEmploymentsSupportMixin, APITestCase):
         resp_data = resp.json()
         self.assertEqual(len(resp_data), 1)
         self.assertEqual(resp_data[0]['id'], self.employee3.id)
+
+    def test_get_attendance_records_report(self):
+        from src.timetable.models import AttendanceRecords
+        coming_time = time(10)
+        leaving_time = time(20)
+        AttendanceRecords.objects.create(
+            shop=self.shop1,
+            type=AttendanceRecords.TYPE_COMING,
+            user=self.user1,
+            dttm=datetime.combine(self.dt, coming_time),
+        )
+        AttendanceRecords.objects.create(
+            shop=self.shop1,
+            type=AttendanceRecords.TYPE_LEAVING,
+            user=self.user1,
+            dttm=datetime.combine(self.dt, leaving_time),
+        )
+        self.client.force_authenticate(user=self.user1)
+        self.add_group_perm(self.group1, 'Employee_attendance_records_report', 'GET')
+        resp = self.client.get(self.get_url('Employee-attendance-records-report'))
+        BytesIO = pd.io.common.BytesIO
+        df = pd.read_excel(BytesIO(resp.content), engine='xlrd')
+        self.assertEqual(len(df.index), 2)
