@@ -296,16 +296,17 @@ class TestAutoWorkerExchange(APITestCase):
         else:
             PeriodClients.objects.bulk_create(pc_list)
 
-    def create_users(self, quantity):
+    def create_users(self, quantity, user=None):
+        resp = []
         for number in range(1, quantity + 1):
-            user = User.objects.create_user(
+            new_user = user or User.objects.create_user(
                 network=self.network,
                 username='User{}'.format(number),
                 email='test{}@test.ru'.format(number),
                 last_name='Имя{}'.format(number),
                 first_name='Фамилия{}'.format(number)
             )
-            employee = EmployeeFactory(user=user)
+            employee = EmployeeFactory(user=new_user)
             emp = Employment.objects.create(
                 shop=self.shop2,
                 employee=employee,
@@ -315,6 +316,9 @@ class TestAutoWorkerExchange(APITestCase):
                 employment=emp,
                 work_type=self.work_type2,
             )
+            resp.append((new_user, employee, emp))
+
+        return resp
 
     def create_worker_day(self):
         for employment in Employment.objects.exclude(id=self.employment_dir.id):
@@ -654,8 +658,8 @@ class TestAutoWorkerExchange(APITestCase):
         self.assertEqual(result, {'status_code': 200, 'text': 'Вакансия успешно принята.'})
 
     def test_shift_elongation(self):
-        self.create_users(1)
-        user = User.objects.exclude(username='dir').first()
+        resp = self.create_users(1)
+        user = resp[0][0]
         self.create_vacancy(9, 21, self.work_type2)
         self.create_worker_days(Employment.objects.get(employee__user=user), self.dt_now, 1, 10, 18)
         worker_shift_elongation()
@@ -919,3 +923,18 @@ class TestAutoWorkerExchange(APITestCase):
         response = self.client.get(f'/rest_api/worker_day/vacancy/?limit=100&offset=0')
         self.assertEquals(len(response.json()['results']), 1)
         self.assertNotEquals(response.json()['results'][0]['id'], vacancy.id)
+
+    def test_employees_time_overlap_on_confirm_vacancies(self):
+        resp = self.create_users(1)
+        user, employee1, employment1 = resp[0]
+        self.update_or_create_holidays(employment1, self.dt_now, 1)
+        resp2 = self.create_users(1, user=user)
+        _user, employee2, employment2 = resp2[0]
+        self.update_or_create_holidays(employment2, self.dt_now, 1)
+        vac1 = self.create_vacancy(9, 21, self.work_type2)
+        vac2 = self.create_vacancy(9, 21, self.work_type2)
+        result = confirm_vacancy(vac1.id, user, employee_id=employee1.id)
+        self.assertDictEqual(result, {'status_code': 200, 'text': 'Вакансия успешно принята.'})
+        result = confirm_vacancy(vac2.id, user, employee_id=employee2.id)
+        self.assertEqual(result['status_code'], 400)
+        self.assertIn('Операция не может быть выполнена. Недопустимое пересечение времени работы.', result['text'])
