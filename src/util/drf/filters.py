@@ -54,3 +54,25 @@ class QNumberFilter(QFilterAndOrIsNullMixin, NumberFilter):
 
 class QDateFilter(QFilterAndOrIsNullMixin, DateFilter):
     pass
+
+
+class QEmploymentGroupListFilter(Filter):
+    def __init__(self, *args, lookup_prefix='', **kwargs):
+        self.lookup_prefix = lookup_prefix
+        super(QEmploymentGroupListFilter, self).__init__(*args, **kwargs)
+
+    def get_q(self, value):
+        if value in EMPTY_VALUES:
+            return None
+
+        function_group_lookup = '%s%s__%s' % (self.lookup_prefix, 'function_group_id', self.lookup_expr)
+        position_group_lookup = '%s%s__%s' % (self.lookup_prefix, 'position__group_id', self.lookup_expr)
+
+        if self.lookup_expr == 'in':
+            value = value.split(',')
+
+        q = Q(
+            Q(**{function_group_lookup: value}) |
+            Q(**{position_group_lookup: value})
+        )
+        return q
