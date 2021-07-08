@@ -879,6 +879,9 @@ class AutoSettingsViewSet(viewsets.ViewSet):
                         # todo: actually use a form here is better
                         # todo: too much request to db
 
+                        if wd['type'] == 'R':
+                            continue
+
                         dt = Converter.parse_date(wd['dt'])
                         wd_obj = WorkerDay(
                             is_approved=False,
