@@ -833,11 +833,14 @@ class WorkerDay(AbstractModel):
         return closest_plan_approved, record_type
 
     @classmethod
-    def check_work_time_overlap(cls, employee_days_q=None, employee_id=None, employee_id__in=None, user_id=None, user_id__in=None, dt=None,
-                              dt__in=None, raise_exc=True, exc_cls=None):
+    def check_work_time_overlap(cls, employee_days_q=None, employee_id=None, employee_id__in=None, user_id=None,
+                                user_id__in=None, dt=None, dt__in=None, raise_exc=True, exc_cls=None):
         """
         Проверка наличия пересечения рабочего времени
         """
+        if not (employee_days_q or employee_id or employee_id__in or user_id or user_id__in):
+            return
+
         lookup = {
             'type__in': WorkerDay.TYPES_WITH_TM_RANGE,
         }
