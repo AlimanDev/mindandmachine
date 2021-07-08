@@ -1,3 +1,4 @@
+from src.timetable.forms import ExchangeSettingsForm
 from django.contrib import admin
 from django.utils.translation import gettext as _
 from rangefilter.filter import DateRangeFilter, DateTimeRangeFilter
@@ -260,7 +261,7 @@ class AttendanceRecordsAdmin(admin.ModelAdmin):
 
 @admin.register(ExchangeSettings)
 class ExchangeSettingsAdmin(admin.ModelAdmin):
-    pass
+    form = ExchangeSettingsForm
 
 
 @admin.register(Event)
