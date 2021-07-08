@@ -13,7 +13,7 @@ from django.db.models import (
 from django.db.models.functions import Abs, Cast, Extract, Least
 from django.db.models.query import QuerySet
 from django.utils import timezone
-from django.utils.translation import gettext as _
+from django.utils.translation import gettext_lazy as _
 from model_utils import FieldTracker
 from rest_framework.exceptions import ValidationError
 
@@ -1640,36 +1640,42 @@ class ExchangeSettings(AbstractModel):
     }
 
     # Создаем ли автоматически вакансии
-    automatic_check_lack = models.BooleanField(default=False)
+    automatic_create_vacancies = models.BooleanField(default=False, verbose_name=_('Automatic create vacancies'))
+    # Удаляем ли автоматически вакансии
+    automatic_delete_vacancies = models.BooleanField(default=False, verbose_name=_('Automatic delete vacancies'))
     # Период, за который проверяем
-    automatic_check_lack_timegap = models.DurationField(default=datetime.timedelta(days=7))
+    automatic_check_lack_timegap = models.DurationField(default=datetime.timedelta(days=7), verbose_name=_('Automatic check lack timegap'))
     #с какого дня выводить с выходного
-    automatic_holiday_worker_select_timegap = models.DurationField(default=datetime.timedelta(days=8))
+    automatic_holiday_worker_select_timegap = models.DurationField(default=datetime.timedelta(days=8), verbose_name=_('Automatic holiday worker select timegap'))
     #включать ли автоматическую биржу смен
-    automatic_exchange = models.BooleanField(default=False)
+    automatic_exchange = models.BooleanField(default=False, verbose_name=_('Automatic exchange'))
     #максимальное количество рабочих часов в месяц для вывода с выходного
-    max_working_hours = models.IntegerField(default=192)
+    max_working_hours = models.IntegerField(default=192, verbose_name=_('Max working hours'))
 
-    constraints = models.CharField(max_length=250, default=json.dumps(default_constraints))
-    exclude_positions = models.ManyToManyField('base.WorkerPosition', blank=True)
+    constraints = models.CharField(max_length=250, default=json.dumps(default_constraints), verbose_name=_('Constraints'))
+    exclude_positions = models.ManyToManyField('base.WorkerPosition', blank=True, verbose_name=_('Exclude positions'))
     # Минимальная потребность в сотруднике при создании вакансии
-    automatic_create_vacancy_lack_min = models.FloatField(default=.5)
+    automatic_create_vacancy_lack_min = models.FloatField(default=.5, verbose_name=_('Automatic create vacancy lack min'))
     # Максимальная потребность в сотруднике для удалении вакансии
-    automatic_delete_vacancy_lack_max = models.FloatField(default=0.3)
+    automatic_delete_vacancy_lack_max = models.FloatField(default=0.3, verbose_name=_('Automatic delete vacancy lack max'))
 
     # Только автоназначение сотрудников
-    automatic_worker_select_timegap = models.DurationField(default=datetime.timedelta(days=1))
+    automatic_worker_select_timegap = models.DurationField(default=datetime.timedelta(days=1), verbose_name=_('Automatic worker select timegap'))
     #период за который делаем обмен сменами
-    automatic_worker_select_timegap_to = models.DurationField(default=datetime.timedelta(days=2))
+    automatic_worker_select_timegap_to = models.DurationField(default=datetime.timedelta(days=2), verbose_name=_('Automatic worker select timegap to'))
     # Дробное число, на какую долю сотрудник не занят, чтобы совершить обмен
-    automatic_worker_select_overflow_min = models.FloatField(default=0.8)
+    automatic_worker_select_overflow_min = models.FloatField(default=0.8, verbose_name=_('Automatic worker select overflow min'))
 
     # Длина смены
-    working_shift_min_hours = models.DurationField(default=datetime.timedelta(hours=4)) # Минимальная длина смены
-    working_shift_max_hours = models.DurationField(default=datetime.timedelta(hours=12)) # Максимальная длина смены
+    working_shift_min_hours = models.DurationField(default=datetime.timedelta(hours=4), verbose_name=_('Working shift min hours')) # Минимальная длина смены
+    working_shift_max_hours = models.DurationField(default=datetime.timedelta(hours=12), verbose_name=_('Working shift max hours')) # Максимальная длина смены
 
     # Расстояние до родителя, в поддереве которого ищем сотрудников для автоназначения
-    automatic_worker_select_tree_level = models.IntegerField(default=1)
+    automatic_worker_select_tree_level = models.IntegerField(default=1, verbose_name=_('Automatic worker select tree level'))
+
+    # Аутсорс компании, которым можно будет откликаться на автоматически созданную вакансию
+    outsources = models.ManyToManyField(Network, verbose_name=_('Outsourcing companies'), blank=True,
+        help_text=_('Outsourcing companies that will be able to respond to an automatically created vacancy'), related_name='client_exchange_settings')
 
 
 class VacancyBlackList(models.Model):

@@ -140,6 +140,14 @@ class Network(AbstractActiveModel):
         verbose_name=_('Default load template'),
         related_name='networks',
     )
+    exchange_settings = models.ForeignKey(
+        'timetable.ExchangeSettings',
+        on_delete=models.PROTECT,
+        blank=True,
+        null=True,
+        verbose_name=_('Default exchange settings'),
+        related_name='networks',
+    )
     # при создании новой должности будут проставляться соотв. значения
     # пример значения можно найти в src.base.tests.test_worker_position.TestSetWorkerPositionDefaultsModel
     worker_position_default_values = models.TextField(verbose_name=_('Worker position default values'), default='{}')
@@ -624,14 +632,7 @@ class Shop(MPTTModel, AbstractActiveNetworkSpecificCodeNamedModel):
         return res
 
     def get_exchange_settings(self):
-        return self.exchange_settings if self.exchange_settings_id \
-            else apps.get_model(
-                'timetable',
-                'ExchangeSettings',
-            ).objects.filter(
-                network_id=self.network_id,
-                shops__isnull=True,
-            ).first()
+        return self.exchange_settings or self.network.exchange_settings
 
     def get_tz_offset(self):
         if self.timezone:

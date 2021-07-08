@@ -19,13 +19,9 @@ def vacancies_create_and_cancel():
         for e in ExchangeSettings.objects.filter(shops__isnull=True)
     }
 
-    # exchange_settings = ExchangeSettings.objects.first()
-    # if not exchange_settings.automatic_check_lack:
-    #     return
-
     for shop in Shop.objects.select_related('exchange_settings').all():
         exchange_settings = shop.exchange_settings or exchange_settings_network.get(shop.network_id)
-        if exchange_settings == None or not exchange_settings.automatic_check_lack:
+        if exchange_settings == None or not (exchange_settings.automatic_create_vacancies or exchange_settings.automatic_delete_vacancies):
             continue
 
         for work_type in shop.work_types.all():

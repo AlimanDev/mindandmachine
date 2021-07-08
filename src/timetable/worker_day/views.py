@@ -98,7 +98,7 @@ class WorkerDayViewSet(BaseModelViewSet):
     openapi_tags = ['WorkerDay',]
 
     def get_queryset(self):
-        queryset = WorkerDay.objects.all().prefetch_related('outsources')
+        queryset = WorkerDay.objects.filter(canceled=False).prefetch_related('outsources')
 
         if self.request.query_params.get('by_code', False):
             return queryset.annotate(
@@ -138,6 +138,10 @@ class WorkerDayViewSet(BaseModelViewSet):
 
     def perform_destroy(self, worker_day):
         if worker_day.is_vacancy:
+            if not worker_day.created_by_id and not worker_day.employee_id:
+                worker_day.canceled = True
+                worker_day.save()
+                return
             worker_day.is_approved = False
             # worker_day.child.all().delete()
         if worker_day.is_approved:
@@ -625,10 +629,10 @@ class WorkerDayViewSet(BaseModelViewSet):
                     
                     for work_type in WorkType.objects.qos_filter_active(datetime.date.today(), datetime.date.today(), shop_id=serializer.validated_data['shop_id']):
                         transaction.on_commit(
-                            lambda: cancel_shop_vacancies.apply_async((serializer.validated_data['shop_id'], work_type.id))
+                            lambda: cancel_shop_vacancies.delay(serializer.validated_data['shop_id'], work_type.id)
                         )
                         transaction.on_commit(
-                            lambda: create_shop_vacancies_and_notify.apply_async((serializer.validated_data['shop_id'], work_type.id))
+                            lambda: create_shop_vacancies_and_notify.delay(serializer.validated_data['shop_id'], work_type.id)
                         )
                     if not has_permission_to_change_protected_wdays:
                         WorkerDay.check_tasks_violations(
