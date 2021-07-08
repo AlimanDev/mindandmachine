@@ -284,6 +284,15 @@ class WorkerDaySerializer(serializers.ModelSerializer):
             if outsources:
                 worker_day.outsources.set(outsources)
 
+            if worker_day.is_vacancy:
+                work_types = list(map(lambda x: x['work_type_id'], details))
+                WorkerDay.objects.filter(
+                    is_vacancy=True,
+                    dt=worker_day.dt,
+                    shop_id=worker_day.shop_id,
+                    worker_day_details__work_type_id__in=work_types,
+                ).distinct().update(canceled=False)
+
             self._check_overlap(employee_id=worker_day.employee_id, dt=worker_day.dt)
 
             return worker_day

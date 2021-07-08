@@ -6,6 +6,7 @@ APPROVE_EVENT_TYPE = 'approve'
 VACANCY_CONFIRMED_TYPE = 'vacancy_confirmed'
 VACANCY_CREATED = 'vacancy_created'
 VACANCY_DELETED = 'vacancy_deleted'
+EMPLOYEE_VACANCY_DELETED = 'employee_vacancy_deleted'
 
 class RequestApproveEvent(BaseRegisteredEvent):
     name = 'Запрос на подтверждение графика'
@@ -42,3 +43,12 @@ class VacancyDeletedEvent(BaseRegisteredEvent):
     def get_recipients(self):
         from src.base.models import User
         return [User(id=uuid4(), email=self.context.get('director', {}).get('email'), first_name=self.context.get('director', {}).get('name', '')), ]
+
+class VacancyDeletedEvent(BaseRegisteredEvent):
+    name = 'Удалена вакансия для сотрудника'
+    code = EMPLOYEE_VACANCY_DELETED
+    write_history = True
+
+    def get_recipients(self):
+        from src.base.models import User
+        return list(User.objects.filter(id=self.context.get('user_id')))

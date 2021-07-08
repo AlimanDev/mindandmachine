@@ -6,7 +6,7 @@ from django.db import transaction
 from django.test.utils import override_settings
 from rest_framework.test import APITestCase
 from src.notifications.models.event_notification import EventEmailNotification
-from src.timetable.events import VACANCY_CREATED, VACANCY_DELETED
+from src.timetable.events import EMPLOYEE_VACANCY_DELETED, VACANCY_CREATED, VACANCY_DELETED
 
 from dateutil.relativedelta import relativedelta
 from django.utils.timezone import now
@@ -166,6 +166,12 @@ class TestAutoWorkerExchange(APITestCase):
             network=cls.network,
         )
 
+        cls.work_type_name2 = WorkTypeName.objects.create(
+            name='Кассы2',
+            code='2',
+            network=cls.network,
+        )
+
         cls.user_dir = User.objects.create_user(
             network=cls.network,
             username='dir',
@@ -190,6 +196,9 @@ class TestAutoWorkerExchange(APITestCase):
         cls.deleted_event, _ = EventType.objects.get_or_create(
             code=VACANCY_DELETED, network=cls.network,
         )
+        cls.employee_deleted_event, _ = EventType.objects.get_or_create(
+            code=EMPLOYEE_VACANCY_DELETED, network=cls.network,
+        )
         cls.event_email_notification_vacancy_created = EventEmailNotification.objects.create(
             event_type=cls.created_event,
             system_email_template='notifications/email/vacancy_created.html',
@@ -202,6 +211,12 @@ class TestAutoWorkerExchange(APITestCase):
             subject='Автоматически удалена вакансия',
             get_recipients_from_event_type=True,
         )
+        cls.event_email_notification_employee_vacancy_deleted = EventEmailNotification.objects.create(
+            event_type=cls.employee_deleted_event,
+            system_email_template='notifications/email/employee_vacancy_deleted.html',
+            subject='Удалена вакансия',
+            get_recipients_from_event_type=True,
+        )
 
         cls.work_type1 = WorkType.objects.create(
             shop=cls.shop,
@@ -211,6 +226,11 @@ class TestAutoWorkerExchange(APITestCase):
         cls.work_type2 = WorkType.objects.create(
             shop=cls.shop2,
             work_type_name=cls.work_type_name,
+        )
+
+        cls.work_type3 = WorkType.objects.create(
+            shop=cls.shop,
+            work_type_name=cls.work_type_name2,
         )
 
         cls.operation_type_name = OperationTypeName.objects.create(
@@ -680,7 +700,7 @@ class TestAutoWorkerExchange(APITestCase):
         self.dt_now = self.dt_now + datetime.timedelta(days=1)
         vac1 = self.create_vacancy(9, 20, self.work_type1)
         vac2 = self.create_vacancy(9, 20, self.work_type1)
-        employments = list(Employment.objects.all())
+        employments = list(Employment.objects.exclude(id=self.employment_dir.id))
         vac1.employee_id = employments[0].employee_id
         vac1.employment = employments[0]
         vac1.save()
@@ -695,8 +715,11 @@ class TestAutoWorkerExchange(APITestCase):
         self.assertEquals(wd.type, WorkerDay.TYPE_HOLIDAY)
         self.assertFalse(wd.is_vacancy)
         self.assertEqual(vacancies.count(), 1)
-        self.assertEquals(mail.outbox[0].subject, self.event_email_notification_vacancy_deleted.subject)
-        self.assertEquals(mail.outbox[0].to[0], self.user_dir.email)
+        self.assertEqual(len(mail.outbox), 2)
+        self.assertEquals(mail.outbox[0].subject, self.event_email_notification_employee_vacancy_deleted.subject)
+        self.assertEquals(mail.outbox[0].to[0], employments[0].employee.user.email)
+        self.assertEquals(mail.outbox[1].subject, self.event_email_notification_vacancy_deleted.subject)
+        self.assertEquals(mail.outbox[1].to[0], self.user_dir.email)
         shop_name = self.shop.name
         dt = self.dt_now
         dttm_from = datetime.datetime.combine(self.dt_now, datetime.time(9, 0))
@@ -704,7 +727,8 @@ class TestAutoWorkerExchange(APITestCase):
         dttm_from = dttm_from.strftime('%Y-%m-%d %H:%M:%S')
         user = employments[0].employee.user
         user = f'{user.last_name} {user.first_name}'
-        self.assertEquals(mail.outbox[0].body, f'Здравствуйте, {self.user_dir.first_name}!\n\nВ отделе {shop_name} отменена вакансия у сотрудника {user} без табельного номера на {dt} с {dttm_from} по {dttm_to}\n\nПисьмо отправлено роботом.')
+        self.assertEquals(mail.outbox[0].body, f'Здравствуйте, {employments[0].employee.user.first_name}!\n\nУ вас была автоматически отменена вакансия в отделе {shop_name} на {dt} с {dttm_from} по {dttm_to}\n\nПисьмо отправлено роботом.')
+        self.assertEquals(mail.outbox[1].body, f'Здравствуйте, {self.user_dir.first_name}!\n\nВ отделе {shop_name} отменена вакансия у сотрудника {user} без табельного номера на {dt} с {dttm_from} по {dttm_to}\n\nПисьмо отправлено роботом.')
 
     def test_create_vacancy_without_outsource(self):
         self.create_period_clients(1, self.operation_type)
@@ -758,3 +782,140 @@ class TestAutoWorkerExchange(APITestCase):
                             [datetime.time(9, 0), datetime.time(21, 0)])
             
             self._assert_vacancy_created_notifications_created(1)
+
+    def test_cancel_vacancy_and_create(self):
+        self.create_period_clients(2, self.operation_type)
+        len_vacancies = len(WorkerDay.objects.filter(is_vacancy=True))
+        self.assertEqual(len_vacancies, 0)
+        create_vacancies_and_notify(self.shop.id, self.work_type1.id)
+        self.assertEquals(WorkerDay.objects.filter(is_vacancy=True).count(), 2)
+        vacancy = WorkerDay.objects.filter(is_vacancy=True).first()
+        self.client.force_authenticate(user=self.user_dir)
+        response = self.client.delete(f"/rest_api/worker_day/{vacancy.id}/")
+        self.assertEquals(response.status_code, 204)
+        self.assertEquals(WorkerDay.objects.filter(is_vacancy=True).count(), 2)
+        self.assertEquals(WorkerDay.objects.filter(is_vacancy=True, canceled=True).first().id, vacancy.id)
+        create_vacancies_and_notify(self.shop.id, self.work_type1.id)
+        self.assertEquals(WorkerDay.objects.filter(is_vacancy=True).count(), 2)
+        self.assertEquals(WorkerDay.objects.filter(is_vacancy=True, canceled=True).first().id, vacancy.id)
+
+    def test_cancel_vacancy_and_create_with_employee(self):
+        self.create_users(1)
+        self.create_period_clients(2, self.operation_type)
+        len_vacancies = len(WorkerDay.objects.filter(is_vacancy=True))
+        self.assertEqual(len_vacancies, 0)
+        create_vacancies_and_notify(self.shop.id, self.work_type1.id)
+        self.assertEquals(WorkerDay.objects.filter(is_vacancy=True).count(), 2)
+        employment = Employment.objects.exclude(id=self.employment_dir.id).first()
+        vacancy = WorkerDay.objects.filter(is_vacancy=True).first()
+        vacancy.employee_id = employment.employee_id
+        vacancy.employment = employment
+        vacancy.save()
+        self.client.force_authenticate(user=self.user_dir)
+        response = self.client.delete(f"/rest_api/worker_day/{vacancy.id}/")
+        self.assertEquals(response.status_code, 204)
+        self.assertEquals(WorkerDay.objects.filter(is_vacancy=True).count(), 2)
+        self.assertEquals(WorkerDay.objects.filter(is_vacancy=True, canceled=True).first().id, vacancy.id)
+        wd = WorkerDay.objects.filter(employee_id=employment.employee_id, is_approved=True).first()
+        self.assertEquals(wd.type, WorkerDay.TYPE_HOLIDAY)
+        self.assertFalse(wd.is_vacancy)
+        self.assertNotEquals(wd.id, vacancy.id)
+        self.assertEqual(len(mail.outbox), 3)
+        self.assertEquals(mail.outbox[2].subject, self.event_email_notification_employee_vacancy_deleted.subject)
+        self.assertEquals(mail.outbox[2].to[0], employment.employee.user.email)
+        shop_name = self.shop.name
+        dt = self.dt_now
+        dttm_from = datetime.datetime.combine(self.dt_now, datetime.time(9, 0))
+        dttm_to = dttm_from.replace(hour=21, minute=0, second=0, microsecond=0).strftime('%Y-%m-%d %H:%M:%S')
+        dttm_from = dttm_from.strftime('%Y-%m-%d %H:%M:%S')
+        user = employment.employee.user
+        self.assertEquals(mail.outbox[2].body, f'Здравствуйте, {user.first_name}!\n\nУ вас была отменена вакансия в отделе {shop_name} на {dt} с {dttm_from} по {dttm_to}\n\nПисьмо отправлено роботом.')
+        create_vacancies_and_notify(self.shop.id, self.work_type1.id)
+        self.assertEquals(WorkerDay.objects.filter(is_vacancy=True).count(), 2)
+        self.assertEquals(WorkerDay.objects.filter(is_vacancy=True, canceled=True).first().id, vacancy.id)
+
+    def test_cancel_vacancy_and_create_via_api(self):
+        self.create_period_clients(2, self.operation_type)
+        len_vacancies = len(WorkerDay.objects.filter(is_vacancy=True))
+        self.assertEqual(len_vacancies, 0)
+        create_vacancies_and_notify(self.shop.id, self.work_type1.id)
+        self.assertEquals(WorkerDay.objects.filter(is_vacancy=True).count(), 2)
+        vacancy = WorkerDay.objects.filter(is_vacancy=True).first()
+        self.client.force_authenticate(user=self.user_dir)
+        response = self.client.delete(f"/rest_api/worker_day/{vacancy.id}/")
+        self.assertEquals(response.status_code, 204)
+        self.assertEquals(WorkerDay.objects.filter(is_vacancy=True).count(), 2)
+        self.assertEquals(WorkerDay.objects.filter(is_vacancy=True, canceled=True).first().id, vacancy.id)
+        response = self.client.post(
+            '/rest_api/worker_day/',
+            data={
+                'shop_id': self.shop.id,
+                'is_vacancy': True,
+                'type': WorkerDay.TYPE_WORKDAY,
+                'worker_day_details': [
+                    {
+                        'work_part': 1.0,
+                        'work_type_id': self.work_type1.id,
+                    },
+                ],
+                'dttm_work_start': datetime.datetime.combine(self.dt_now, datetime.time(9, 0)),
+                'dttm_work_end': datetime.datetime.combine(self.dt_now, datetime.time(21, 0)),
+                'dt': self.dt_now,
+                'is_fact': False,
+            },
+            format='json'
+        )
+        self.assertEquals(response.status_code, 201)
+        self.assertEquals(WorkerDay.objects.filter(is_vacancy=True).count(), 3)
+        self.assertEquals(WorkerDay.objects.filter(is_vacancy=True, canceled=True).count(), 0)
+
+    def test_cancel_vacancy_and_create_via_api_another_work_type(self):
+        self.create_period_clients(2, self.operation_type)
+        len_vacancies = len(WorkerDay.objects.filter(is_vacancy=True))
+        self.assertEqual(len_vacancies, 0)
+        create_vacancies_and_notify(self.shop.id, self.work_type1.id)
+        self.assertEquals(WorkerDay.objects.filter(is_vacancy=True).count(), 2)
+        vacancy = WorkerDay.objects.filter(is_vacancy=True).first()
+        self.client.force_authenticate(user=self.user_dir)
+        response = self.client.delete(f"/rest_api/worker_day/{vacancy.id}/")
+        self.assertEquals(response.status_code, 204)
+        self.assertEquals(WorkerDay.objects.filter(is_vacancy=True).count(), 2)
+        self.assertEquals(WorkerDay.objects.filter(is_vacancy=True, canceled=True).first().id, vacancy.id)
+        response = self.client.post(
+            '/rest_api/worker_day/',
+            data={
+                'shop_id': self.shop.id,
+                'is_vacancy': True,
+                'type': WorkerDay.TYPE_WORKDAY,
+                'worker_day_details': [
+                    {
+                        'work_part': 1.0,
+                        'work_type_id': self.work_type3.id,
+                    },
+                ],
+                'dttm_work_start': datetime.datetime.combine(self.dt_now, datetime.time(9, 0)),
+                'dttm_work_end': datetime.datetime.combine(self.dt_now, datetime.time(21, 0)),
+                'dt': self.dt_now,
+                'is_fact': False,
+            },
+            format='json'
+        )
+        self.assertEquals(response.status_code, 201)
+        self.assertEquals(WorkerDay.objects.filter(is_vacancy=True).count(), 3)
+        self.assertEquals(WorkerDay.objects.filter(is_vacancy=True, canceled=True).first().id, vacancy.id)
+
+    def test_canceled_vacancy_not_showed(self):
+        self.create_period_clients(2, self.operation_type)
+        len_vacancies = len(WorkerDay.objects.filter(is_vacancy=True))
+        self.assertEqual(len_vacancies, 0)
+        create_vacancies_and_notify(self.shop.id, self.work_type1.id)
+        self.assertEquals(WorkerDay.objects.filter(is_vacancy=True).count(), 2)
+        vacancy = WorkerDay.objects.filter(is_vacancy=True).first()
+        self.client.force_authenticate(user=self.user_dir)
+        response = self.client.delete(f"/rest_api/worker_day/{vacancy.id}/")
+        self.assertEquals(response.status_code, 204)
+        self.assertEquals(WorkerDay.objects.filter(is_vacancy=True).count(), 2)
+        self.assertEquals(WorkerDay.objects.filter(is_vacancy=True, canceled=True).first().id, vacancy.id)
+        response = self.client.get(f'/rest_api/worker_day/vacancy/?limit=100&offset=0')
+        self.assertEquals(len(response.json()['results']), 1)
+        self.assertNotEquals(response.json()['results'][0]['id'], vacancy.id)

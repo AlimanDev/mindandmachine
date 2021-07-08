@@ -9,4 +9,5 @@ SYSTEM_EMAIL_TEMPLATES = [
     ('notifications/email/vacancy_confirmed.html', 'Сотрудник {{user.last_name}} {{user.first_name}} откликнулся на вакансию {{dt}} с типом работ {{work_type}}'),
     ('notifications/email/vacancy_created.html', 'В отделе {{shop_name}} автомтически создана вакансия на {{dt}} с {{dttm_from}} по {{dttm_to}} для типа работ {{work_type}}'),
     ('notifications/email/vacancy_deleted.html', 'В отделе {{shop_name}} отменена вакансия у сотрудника {{last_name}} {{first_name}} с табельным номером {{tabel_code}} | без сотрудника на {{dt}} с {{dttm_from}} по {{dttm_to}}'),
+    ('notifications/email/employee_vacancy_deleted.html', 'У вас была {% if auto %}автоматически {% endif %}отменена вакансия в отделе {{shop_name}} на {{dt}} с {{dttm_from}} по {{dttm_to}}'),
 ]

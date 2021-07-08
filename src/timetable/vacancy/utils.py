@@ -45,7 +45,7 @@ from src.base.models import (
     Employee,
 )
 from src.events.signals import event_signal
-from src.timetable.events import VACANCY_CREATED, VACANCY_DELETED
+from src.timetable.events import EMPLOYEE_VACANCY_DELETED, VACANCY_CREATED, VACANCY_DELETED
 from src.conf.djconfig import (
     QOS_DATETIME_FORMAT,
     EMAIL_HOST_USER,
@@ -403,7 +403,7 @@ def do_shift_elongation(vacancy, max_working_hours):
             msg.send()
 
 
-def cancel_vacancy(vacancy_id):
+def cancel_vacancy(vacancy_id, auto=True):
     vacancy = WorkerDay.objects.filter(id=vacancy_id, is_vacancy=True).select_related(
         'shop', 
         'shop__director', 
@@ -413,53 +413,69 @@ def cancel_vacancy(vacancy_id):
     if vacancy:
         shop = vacancy.shop
         employee = vacancy.employee
+        if auto or vacancy.created_by_id:
+            vacancy.delete()
+        else:
+            vacancy.canceled = True
+            vacancy.employee = None
+            vacancy.employment = None
+            vacancy.save()
         if employee:
+            employee_obj = employee
             employee = {
                 'first_name': employee.user.first_name,
                 'last_name': employee.user.last_name,
                 'tabel_code': employee.tabel_code or '',
             }
-            wd, created = WorkerDay.objects.update_or_create(
+            WorkerDay.objects.create(
                 dt=vacancy.dt,
-                employee_id=vacancy.employee_id,
+                employee=employee_obj,
                 is_approved=vacancy.is_approved,
                 is_fact=False,
-                defaults={
-                    'dttm_work_start': None,
-                    'dttm_work_end': None,
-                    'shop_id': None,
-                    'type': WorkerDay.TYPE_HOLIDAY,
-                    'employment': None,
-                    'is_vacancy': False,
-                    'is_outource': False,
-                }
+                dttm_work_start=None,
+                dttm_work_end=None,
+                shop_id=None,
+                type=WorkerDay.TYPE_HOLIDAY,
+                employment=None,
+                is_vacancy=False,
+                is_outsource=False,
             )
-            if not created:
-                WorkerDayCashboxDetails.objects.filter(
-                    worker_day=wd,
-                ).delete()
-                wd.outsources.clear()
-        else:   
-            vacancy.delete()
-        event_signal.send(
-            sender=None,
-            network_id=shop.network_id,
-            event_code=VACANCY_DELETED,
-            user_author_id=None,
-            shop_id=shop.id,
-            context={
-                'director': {
-                    'email': shop.director.email if shop.director else shop.email,
-                    'name': shop.director.first_name if shop.director else shop.name,
+            event_signal.send(
+                sender=None,
+                network_id=shop.network_id,
+                event_code=EMPLOYEE_VACANCY_DELETED,
+                user_author_id=None,
+                shop_id=shop.id,
+                context={
+                    'user_id': employee_obj.user_id,
+                    'dt': vacancy.dt.strftime('%Y-%m-%d'),
+                    'dttm_from': vacancy.dttm_work_start.strftime('%Y-%m-%d %H:%M:%S'),
+                    'dttm_to': vacancy.dttm_work_end.strftime('%Y-%m-%d %H:%M:%S'),
+                    'shop_id': shop.id,
+                    'shop_name': shop.name,
+                    'auto': auto,
                 },
-                'dt': vacancy.dt.strftime('%Y-%m-%d'),
-                'dttm_from': vacancy.dttm_work_start.strftime('%Y-%m-%d %H:%M:%S'),
-                'dttm_to': vacancy.dttm_work_end.strftime('%Y-%m-%d %H:%M:%S'),
-                'shop_id': shop.id,
-                'shop_name': shop.name,
-                'employee': employee,
-            },
-        )
+            )
+        if auto:
+            event_signal.send(
+                sender=None,
+                network_id=shop.network_id,
+                event_code=VACANCY_DELETED,
+                user_author_id=None,
+                shop_id=shop.id,
+                context={
+                    'director': {
+                        'email': shop.director.email if shop.director else shop.email,
+                        'name': shop.director.first_name if shop.director else shop.name,
+                    },
+                    'dt': vacancy.dt.strftime('%Y-%m-%d'),
+                    'dttm_from': vacancy.dttm_work_start.strftime('%Y-%m-%d %H:%M:%S'),
+                    'dttm_to': vacancy.dttm_work_end.strftime('%Y-%m-%d %H:%M:%S'),
+                    'shop_id': shop.id,
+                    'shop_name': shop.name,
+                    'employee': employee,
+                },
+            )
 
 
 def create_vacancy(dttm_from, dttm_to, shop_id, work_type_id, outsources=[]):
@@ -472,6 +488,7 @@ def create_vacancy(dttm_from, dttm_to, shop_id, work_type_id, outsources=[]):
         dt=dttm_from.date(),
         shop_id=shop_id,
         is_outsource=is_outsource,
+        is_approved=True, # чтобы в покрытии учитывалось при автоматическом создании вакансий
     )
     worker_day.outsources.add(*outsources)
     WorkerDayCashboxDetails.objects.create(
@@ -525,6 +542,7 @@ def confirm_vacancy(vacancy_id, user, employee_id=None, exchange=False, reconfir
         vacancy = WorkerDay.objects.get_plan_approved(
             id=vacancy_id,
             is_vacancy=True,
+            canceled=False,
             **no_employee_filter,
         ).select_for_update().first()
         res = {

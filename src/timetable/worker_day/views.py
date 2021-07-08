@@ -40,7 +40,7 @@ from src.timetable.models import (
     GroupWorkerDayPermission,
 )
 from src.timetable.timesheet.tasks import calc_timesheets
-from src.timetable.vacancy.utils import cancel_vacancies, confirm_vacancy
+from src.timetable.vacancy.utils import cancel_vacancies, cancel_vacancy, confirm_vacancy
 from src.timetable.worker_day.serializers import (
     WorkerDaySerializer,
     WorkerDayApproveSerializer,
@@ -138,12 +138,8 @@ class WorkerDayViewSet(BaseModelViewSet):
 
     def perform_destroy(self, worker_day):
         if worker_day.is_vacancy:
-            if not worker_day.created_by_id and not worker_day.employee_id:
-                worker_day.canceled = True
-                worker_day.save()
-                return
-            worker_day.is_approved = False
-            # worker_day.child.all().delete()
+            cancel_vacancy(worker_day.id, auto=False)
+            return
         if worker_day.is_approved:
             raise FieldError(self.error_messages['cannot_delete'])
         super().perform_destroy(worker_day)

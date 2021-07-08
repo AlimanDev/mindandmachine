@@ -1,0 +1,5 @@
+{% extends 'notifications/email/base.html' %}
+
+{% block content %}
+<p>У вас была {% if auto %}автоматически {% endif %}отменена вакансия в отделе {{ shop_name }} на {{ dt }} с {{ dttm_from }} по {{ dttm_to }}</p>
+{% endblock %}
