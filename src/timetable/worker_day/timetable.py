@@ -8,6 +8,7 @@ from django.http.response import HttpResponse
 from django.utils.encoding import escape_uri_path
 
 import pandas as pd
+from django.conf import settings
 from django.db.models import Q, F
 from django.utils.translation import gettext as _
 from rest_framework.exceptions import ValidationError
@@ -22,7 +23,6 @@ from src.base.models import (
     Group,
     Employee,
 )
-from src.conf.djconfig import UPLOAD_TT_MATCH_EMPLOYMENT
 from src.timetable.models import (
     WorkerDay,
     WorkerDayCashboxDetails,
@@ -181,7 +181,7 @@ class BaseUploadDownloadTimeTable:
                     'network_id': network_id,
                 }
                 user = None
-                if UPLOAD_TT_MATCH_EMPLOYMENT:
+                if settings.UPLOAD_TT_MATCH_EMPLOYMENT:
                     employment = Employment.objects.filter(employee__tabel_code=tabel_code, shop_id=shop_id)
                     if number_cond and employment.exists():
                         employee = employment.first().employee  # TODO: покрыть тестами
@@ -204,11 +204,12 @@ class BaseUploadDownloadTimeTable:
                             employee__user__last_name=names[0],
                             employee__user__middle_name=names[2] if len(names) > 2 else None
                         )
-                        if employment.exists():
+                        if employment.exists() and settings.UPLOAD_TT_CREATE_EMPLOYEE:
                             employee = employment.first().employee
-                            if number_cond:
-                                employee.tabel_code = tabel_code
-                                employee.save(update_fields=('tabel_code',))
+                            if number_cond and employee.tabel_code != tabel_code:
+                                user = employee.user
+                                employee = Employee.objects.create(user=user, tabel_code=tabel_code)
+                                created = True
                         else:
                             user_data['username'] = str(time.time() * 1000000)[:-2],
                             user = User.objects.create(**user_data)
@@ -223,14 +224,14 @@ class BaseUploadDownloadTimeTable:
                         employee = Employee.objects.filter(
                             **{'user__' + k: v for k,v in user_data.items()}
                         )
-                        if employee.exists():
-                            if number_cond:
-                                employee.update(tabel_code=tabel_code,)
+                        if employee.exists() and settings.UPLOAD_TT_CREATE_EMPLOYEE:
                             employee = employee.first()
+                            if number_cond and employee.tabel_code != tabel_code:
+                                user = employee.user
+                                employee = Employee.objects.create(user=user, tabel_code=tabel_code)
+                                created = True
                         else:
                             user_data['username'] = str(time.time() * 1000000)[:-2]
-                            if number_cond:
-                                user_data['tabel_code'] = tabel_code
                             user = User.objects.create(**user_data)
                             employee = Employee.objects.create(user=user, tabel_code=tabel_code)
                             created = True
@@ -244,7 +245,7 @@ class BaseUploadDownloadTimeTable:
                         function_group=func_group,
                         position=position,
                     )
-                    if UPLOAD_TT_MATCH_EMPLOYMENT and number_cond:
+                    if settings.UPLOAD_TT_MATCH_EMPLOYMENT and number_cond:
                         employee.tabel_code = tabel_code
                         employee.save(update_fields=('tabel_code',))
                 else:
@@ -668,7 +669,7 @@ class UploadDownloadTimetableRows(BaseUploadDownloadTimeTable):
                 position_cond = data[position_column] != 'nan'
                 if not number_cond and (not name_cond or not position_cond):
                     continue
-                employee, employment = employees[data[number_column]]
+                employee, employment = employees[str(data[number_column]).split('.')[0]]
                 dttm_work_start = None
                 dttm_work_end = None
                 if _get_str_data(data[start_column]) in SKIP_SYMBOLS:
