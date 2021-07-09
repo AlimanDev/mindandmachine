@@ -273,7 +273,7 @@ class WorkerDayViewSet(BaseModelViewSet):
     @action(detail=False, methods=['post'])
     def request_approve(self, request, *args, **kwargs):
         """
-        Запрос на подтверждении графика
+        Запрос на подтверждение графика
         """
         serializer = RequestApproveSerializer(data=request.data, **kwargs)
         serializer.is_valid(raise_exception=True)
