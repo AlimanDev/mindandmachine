@@ -57,8 +57,7 @@ class WorkerDayViewSet(viewsets.ReadOnlyModelViewSet):
     def get_queryset(self):
         tick_point = self.request.user
 
-        dttm_from = now().replace(hour=0, minute=0, second=0)
-        dt_from = dttm_from.date()
+        dt_from = now() + timedelta(hours=tick_point.shop.get_tz_offset())
 
         wd_cond = WorkerDay.objects.filter(
             Q(dt=dt_from, dttm_work_start__isnull=False, dttm_work_end__isnull=False) |
@@ -70,11 +69,11 @@ class WorkerDayViewSet(viewsets.ReadOnlyModelViewSet):
         )
         emp_cond = Employment.objects.get_active(
             # self.request.user.network_id,
-            dt_from=dttm_from, dt_to=dttm_from, # чтобы не попались трудоустройства с завтрашнего дня
+            dt_from=dt_from, dt_to=dt_from, # чтобы не попались трудоустройства с завтрашнего дня
         )
         shop_emp_cond = Employment.objects.get_active(
             self.request.user.network_id,
-            dttm_from, dttm_from, # чтобы не попались трудоустройства с завтрашнего дня
+            dt_from, dt_from, # чтобы не попались трудоустройства с завтрашнего дня
             shop_id=tick_point.shop_id,
         )
         q = Q(has_wdays=True, has_employments=True)

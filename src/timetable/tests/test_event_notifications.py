@@ -21,6 +21,7 @@ from src.timetable.events import REQUEST_APPROVE_EVENT_TYPE, APPROVE_EVENT_TYPE
 from src.timetable.models import WorkerDay, WorkerDayPermission, GroupWorkerDayPermission
 from src.timetable.tests.factories import WorkerDayFactory
 from src.util.mixins.tests import TestsHelperMixin
+from src.util.models_converter import Converter
 
 
 class TestRequestApproveEventNotifications(TestsHelperMixin, APITestCase):
@@ -52,6 +53,7 @@ class TestRequestApproveEventNotifications(TestsHelperMixin, APITestCase):
             method='POST',
             func='WorkerDay_request_approve',
         )
+        cls.dt_now = datetime.now().date()
 
     def setUp(self):
         self.client.force_authenticate(user=self.user_dir)
@@ -67,7 +69,12 @@ class TestRequestApproveEventNotifications(TestsHelperMixin, APITestCase):
             )
             event_email_notification.shop_groups.add(self.group_urs)
             with mock.patch.object(transaction, 'on_commit', lambda t: t()):
-                resp = self.client.post(self.get_url('WorkerDay-request-approve'), data={'shop_id': self.shop.id})
+                resp = self.client.post(self.get_url('WorkerDay-request-approve'), data={
+                    'shop_id': self.shop.id,
+                    'is_fact': True,
+                    'dt_from': Converter.convert_date(self.dt_now),
+                    'dt_to': Converter.convert_date(self.dt_now),
+                })
             self.assertEqual(resp.status_code, status.HTTP_200_OK)
             self.assertEqual(len(mail.outbox), 1)
             self.assertEqual(mail.outbox[0].subject, subject)

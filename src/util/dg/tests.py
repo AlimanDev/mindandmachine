@@ -7,7 +7,7 @@ from django.test import TestCase
 
 from src.base.models import Employment, Employee, NetworkConnect
 from src.base.tests.factories import NetworkFactory, ShopFactory, UserFactory, EmployeeFactory, EmploymentFactory
-from src.timetable.models import Timesheet, WorkTypeName, WorkType, WorkerDay
+from src.timetable.models import PlanAndFactHours, Timesheet, WorkTypeName, WorkType, WorkerDay
 from src.timetable.tests.factories import WorkerDayFactory
 from src.timetable.timesheet.tasks import calc_timesheets
 from src.util.dg.tabel import T13TabelDataGetter, MtsTabelDataGetter
@@ -76,6 +76,7 @@ class TestGenerateTabel(TestsHelperMixin, TestCase):
             type=WorkerDay.TYPE_WORKDAY,
             dttm_work_start=datetime.combine(cls.dt_now, time(8, 0, 0)),
             dttm_work_end=datetime.combine(cls.dt_now, time(19, 30, 0)),
+            cashbox_details__work_type=cls.work_type,
         )
         WorkerDayFactory(
             is_fact=True,
@@ -87,6 +88,7 @@ class TestGenerateTabel(TestsHelperMixin, TestCase):
             type=WorkerDay.TYPE_WORKDAY,
             dttm_work_start=datetime.combine(cls.dt_now, time(7, 58, 0)),
             dttm_work_end=datetime.combine(cls.dt_now, time(19, 59, 1)),
+            cashbox_details__work_type=cls.work_type,
         )
         calc_timesheets()
         cls.types_mapping = {
