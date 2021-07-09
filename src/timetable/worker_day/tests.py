@@ -2,6 +2,8 @@ import io
 import json
 from copy import deepcopy
 from datetime import timedelta, time, datetime, date
+
+from django.test.utils import override_settings
 from src.timetable.worker_day.utils import create_fact_from_attendance_records
 from unittest import skip, mock
 
@@ -11,7 +13,7 @@ from django.utils.timezone import now
 from rest_framework.test import APITestCase
 
 from etc.scripts.fill_calendar import main as fill_calendar
-from src.base.models import Employee, WorkerPosition
+from src.base.models import Employee, User, WorkerPosition
 from src.forecast.models import PeriodClients, OperationType, OperationTypeName
 from src.timetable.models import AttendanceRecords, WorkerDay, WorkType, WorkTypeName
 from src.tasks.models import Task
@@ -692,12 +694,54 @@ class TestUploadDownload(APITestCase):
         self.url = '/rest_api/worker_day/'
         self.client.force_authenticate(user=self.user1)
 
-    def test_upload_timetable(self):
+    def test_upload_timetable_match_tabel_code(self):
         file = open('etc/scripts/timetable.xlsx', 'rb')
         response = self.client.post(f'{self.url}upload/', {'shop_id': self.shop.id, 'file': file}, HTTP_ACCEPT_LANGUAGE='ru')
         file.close()
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(WorkerDay.objects.filter(is_approved=False).count(), 150)
+        self.assertEqual(WorkerDay.objects.filter(is_approved=False).count(), 180)
+        self.assertEquals(User.objects.filter(last_name='Смешнов').count(), 1)
+        user = User.objects.filter(last_name='Смешнов').first()
+        self.assertEquals(Employee.objects.filter(user=user).count(), 2)
+
+    def test_upload_timetable(self):
+        file = open('etc/scripts/timetable.xlsx', 'rb')
+        with override_settings(UPLOAD_TT_MATCH_EMPLOYMENT=False):
+            response = self.client.post(f'{self.url}upload/', {'shop_id': self.shop.id, 'file': file}, HTTP_ACCEPT_LANGUAGE='ru')
+        file.close()
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(WorkerDay.objects.filter(is_approved=False).count(), 180)
+        self.assertEquals(User.objects.filter(last_name='Смешнов').count(), 1)
+        user = User.objects.filter(last_name='Смешнов').first()
+        self.assertEquals(Employee.objects.filter(user=user).count(), 2)
+
+    def test_upload_timetable_many_users(self):
+        file = open('etc/scripts/timetable.xlsx', 'rb')
+        with override_settings(UPLOAD_TT_CREATE_EMPLOYEE=False, UPLOAD_TT_MATCH_EMPLOYMENT=False):
+            response = self.client.post(f'{self.url}upload/', {'shop_id': self.shop.id, 'file': file}, HTTP_ACCEPT_LANGUAGE='ru')
+        file.close()
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(WorkerDay.objects.filter(is_approved=False).count(), 180)
+        self.assertEquals(User.objects.filter(last_name='Смешнов').count(), 2)
+        user1 = User.objects.filter(last_name='Смешнов').first()
+        user2 = User.objects.filter(last_name='Смешнов').last()
+        self.assertNotEquals(user1.id, user2.id)
+        self.assertEquals(Employee.objects.filter(user=user1).count(), 1)
+        self.assertEquals(Employee.objects.filter(user=user2).count(), 1)
+
+    def test_upload_timetable_many_users_match_tabel_code(self):
+        file = open('etc/scripts/timetable.xlsx', 'rb')
+        with override_settings(UPLOAD_TT_CREATE_EMPLOYEE=False):
+            response = self.client.post(f'{self.url}upload/', {'shop_id': self.shop.id, 'file': file}, HTTP_ACCEPT_LANGUAGE='ru')
+        file.close()
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(WorkerDay.objects.filter(is_approved=False).count(), 180)
+        self.assertEquals(User.objects.filter(last_name='Смешнов').count(), 2)
+        user1 = User.objects.filter(last_name='Смешнов').first()
+        user2 = User.objects.filter(last_name='Смешнов').last()
+        self.assertNotEquals(user1.id, user2.id)
+        self.assertEquals(Employee.objects.filter(user=user1).count(), 1)
+        self.assertEquals(Employee.objects.filter(user=user2).count(), 1)
 
     @skip('Сервер не доступен')
     def test_download_tabel(self):
@@ -759,7 +803,10 @@ class TestUploadDownload(APITestCase):
         response = self.client.post(f'{self.url}upload/', {'shop_id': self.shop.id, 'file': file}, HTTP_ACCEPT_LANGUAGE='ru')
         file.close()
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(WorkerDay.objects.filter(is_approved=False).count(), 150)
+        self.assertEqual(WorkerDay.objects.filter(is_approved=False).count(), 180)
+        self.assertEquals(User.objects.filter(last_name='Смешнов').count(), 1)
+        user = User.objects.filter(last_name='Смешнов').first()
+        self.assertEquals(Employee.objects.filter(user=user).count(), 2)
 
 
 class TestCreateFactFromAttendanceRecords(TestsHelperMixin, APITestCase):
