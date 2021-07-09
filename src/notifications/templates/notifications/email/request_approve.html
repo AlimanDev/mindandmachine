@@ -1,7 +1,7 @@
 {% extends 'notifications/email/base.html' %}
 
 {% block content %}
-<p>Магазин {{ shop.name }} запрашивает подтверждение графика.</p>
-<p>Комментарий:</p>
-<p>{{ comment }}</p>
+<p>Подразделение {{ shop.name }} запрашивает подтверждение графика.</p>
+{% comment %}<p>Комментарий:</p>
+<p>{{ comment }}</p>{% endcomment %}
 {% endblock %}
