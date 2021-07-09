@@ -427,7 +427,7 @@ class WorkerDayViewSet(BaseModelViewSet):
                     ).values(
                         'employee_user_fio',
                     ).annotate(
-                        dates=StringAgg(Cast('dt', CharField()), delimiter=','),
+                        dates=StringAgg(Cast('dt', CharField()), delimiter=',', ordering='dt'),
                     ))
                     if protected_wdays:
                         raise PermissionDenied(self.error_messages['has_no_perm_to_approve_protected_wdays'].format(
