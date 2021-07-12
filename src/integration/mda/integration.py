@@ -110,7 +110,7 @@ class MdaIntegrationHelper:
                 default=ArrayAgg(
                     'employees__employments__shop', distinct=True,
                     filter=Q(
-                        employees__employments__shop_id__in=active_employments_qs.values_list('shop_id', flat=True),
+                        employees__employments__id__in=active_employments_qs.values_list('id', flat=True),
                         employees__employments__shop__level=F('level'),
                     ),
                 ),
