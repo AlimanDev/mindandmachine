@@ -273,7 +273,7 @@ class WorkerDayViewSet(BaseModelViewSet):
     @action(detail=False, methods=['post'])
     def request_approve(self, request, *args, **kwargs):
         """
-        Запрос на подтверждении графика
+        Запрос на подтверждение графика
         """
         serializer = RequestApproveSerializer(data=request.data, **kwargs)
         serializer.is_valid(raise_exception=True)
@@ -427,7 +427,7 @@ class WorkerDayViewSet(BaseModelViewSet):
                     ).values(
                         'employee_user_fio',
                     ).annotate(
-                        dates=StringAgg(Cast('dt', CharField()), delimiter=','),
+                        dates=StringAgg(Cast('dt', CharField()), delimiter=',', ordering='dt'),
                     ))
                     if protected_wdays:
                         raise PermissionDenied(self.error_messages['has_no_perm_to_approve_protected_wdays'].format(

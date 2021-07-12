@@ -28,6 +28,8 @@ QOS_DEV_AUTOLOGIN_USERNAME = None
 QOS_DEV_AUTOLOGIN_PASSWORD = None
 # переменная указывающая как матчить табельный номер при загрузке расписания (через User или через Employment)
 UPLOAD_TT_MATCH_EMPLOYMENT = True
+# создаем employee при загрузке или двух разных юзеров, фикс для граната
+UPLOAD_TT_CREATE_EMPLOYEE = True
 
 QOS_CAMERA_KEY = '1'
 

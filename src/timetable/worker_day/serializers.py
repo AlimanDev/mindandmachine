@@ -6,8 +6,8 @@ from rest_framework import serializers
 from rest_framework.exceptions import ValidationError, NotFound
 
 from src.base.models import Employment, User, Shop, Employee, Network
-from src.base.shop.serializers import ShopSerializer
 from src.base.serializers import UserShorSerializer, NetworkSerializer
+from src.base.shop.serializers import ShopSerializer
 from src.conf.djconfig import QOS_DATE_FORMAT
 from src.timetable.models import (
     WorkerDay,
@@ -18,8 +18,15 @@ from src.util.models_converter import Converter
 
 
 class RequestApproveSerializer(serializers.Serializer):
-    shop_id = serializers.IntegerField(required=True)
+    shop_id = serializers.IntegerField()
     comment = serializers.CharField(allow_blank=True, required=False)
+    is_fact = serializers.BooleanField()
+    dt_from = serializers.DateField()
+    dt_to = serializers.DateField()
+    employee_ids = serializers.ListField(
+        child=serializers.IntegerField(),
+        required=False,
+    )
 
 
 class WorkerDayApproveSerializer(serializers.Serializer):

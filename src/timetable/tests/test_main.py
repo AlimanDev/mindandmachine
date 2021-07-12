@@ -1932,31 +1932,65 @@ class TestAttendanceRecords(TestsHelperMixin, APITestCase):
         self.assertEqual(new_wd.is_vacancy, True)
 
     def test_create_attendance_records_for_different_shops(self):
+        self.worker_day_fact_approved.delete()
+
         tm_start = datetime.combine(self.dt, time(6, 0, 0))
-        AttendanceRecords.objects.create(
+        ar = AttendanceRecords.objects.create(
             dttm=tm_start,
             type=AttendanceRecords.TYPE_COMING,
             shop=self.shop2,
             user=self.user2
         )
-        self.worker_day_fact_approved.refresh_from_db()
-        self.assertEqual(self.worker_day_fact_approved.type, WorkerDay.TYPE_WORKDAY)
-        self.assertEqual(self.worker_day_fact_approved.dttm_work_start, tm_start)
-        self.assertEqual(self.worker_day_fact_approved.dttm_work_end, None)
-        self.assertEqual(self.worker_day_fact_approved.is_vacancy, True)
+        wd = WorkerDay.objects.filter(
+            employee=ar.employee,
+            is_fact=True,
+            is_approved=True,
+            dt=tm_start.date()
+        ).first()
+        self.assertIsNotNone(wd)
+        self.assertEqual(wd.type, WorkerDay.TYPE_WORKDAY)
+        self.assertEqual(wd.dttm_work_start, tm_start)
+        self.assertEqual(wd.dttm_work_end, None)
+        self.assertEqual(wd.is_vacancy, True)
 
-        tm_end = datetime.combine(self.dt, time(19, 0, 0))
+        tm_end = datetime.combine(self.dt, time(12, 0, 0))
         AttendanceRecords.objects.create(
             dttm=tm_end,
             type=AttendanceRecords.TYPE_LEAVING,
             shop=self.shop2,
             user=self.user2
         )
-        self.worker_day_fact_approved.refresh_from_db()
-        self.assertEqual(self.worker_day_fact_approved.type, WorkerDay.TYPE_WORKDAY)
-        self.assertEqual(self.worker_day_fact_approved.dttm_work_start, tm_start)
-        self.assertEqual(self.worker_day_fact_approved.dttm_work_end, tm_end)
-        self.assertEqual(self.worker_day_fact_approved.is_vacancy, True)
+        wd.refresh_from_db()
+        self.assertEqual(wd.type, WorkerDay.TYPE_WORKDAY)
+        self.assertEqual(wd.dttm_work_start, tm_start)
+        self.assertEqual(wd.dttm_work_end, tm_end)
+        self.assertEqual(wd.is_vacancy, True)
+
+        tm_start2 = datetime.combine(self.dt, time(13, 0, 0))
+        AttendanceRecords.objects.create(
+            dttm=tm_start2,
+            type=AttendanceRecords.TYPE_COMING,
+            shop=self.shop3,
+            user=self.user2
+        )
+        wd.refresh_from_db()
+        self.assertEqual(wd.type, WorkerDay.TYPE_WORKDAY)
+        self.assertEqual(wd.dttm_work_start, tm_start)
+        self.assertEqual(wd.dttm_work_end, tm_end)
+        self.assertEqual(wd.is_vacancy, True)
+
+        tm_end2 = datetime.combine(self.dt, time(20, 0, 0))
+        AttendanceRecords.objects.create(
+            dttm=tm_end2,
+            type=AttendanceRecords.TYPE_LEAVING,
+            shop=self.shop3,
+            user=self.user2
+        )
+        wd.refresh_from_db()
+        self.assertEqual(wd.type, WorkerDay.TYPE_WORKDAY)
+        self.assertEqual(wd.dttm_work_start, tm_start)
+        self.assertEqual(wd.dttm_work_end, tm_end2)
+        self.assertEqual(wd.is_vacancy, True)
 
     def test_fact_work_type_received_from_plan_approved(self):
         self.worker_day_fact_approved.delete()

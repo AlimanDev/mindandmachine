@@ -102,7 +102,7 @@ def exchange(data, error_messages):
             ).values(
                 'worker_fio',
             ).annotate(
-                dates=StringAgg(Cast('dt', CharField()), delimiter=','),
+                dates=StringAgg(Cast('dt', CharField()), delimiter=',', ordering='dt'),
             ))
             if protected_wdays:
                 raise PermissionDenied(error_messages['has_no_perm_to_approve_protected_wdays'].format(

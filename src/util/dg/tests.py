@@ -7,7 +7,7 @@ from django.test import TestCase
 
 from src.base.models import Employment, Employee, NetworkConnect
 from src.base.tests.factories import NetworkFactory, ShopFactory, UserFactory, EmployeeFactory, EmploymentFactory
-from src.timetable.models import Timesheet, WorkTypeName, WorkType, WorkerDay
+from src.timetable.models import PlanAndFactHours, Timesheet, WorkTypeName, WorkType, WorkerDay
 from src.timetable.tests.factories import WorkerDayFactory
 from src.timetable.timesheet.tasks import calc_timesheets
 from src.util.dg.tabel import T13TabelDataGetter, MtsTabelDataGetter
@@ -76,6 +76,7 @@ class TestGenerateTabel(TestsHelperMixin, TestCase):
             type=WorkerDay.TYPE_WORKDAY,
             dttm_work_start=datetime.combine(cls.dt_now, time(8, 0, 0)),
             dttm_work_end=datetime.combine(cls.dt_now, time(19, 30, 0)),
+            cashbox_details__work_type=cls.work_type,
         )
         WorkerDayFactory(
             is_fact=True,
@@ -87,6 +88,7 @@ class TestGenerateTabel(TestsHelperMixin, TestCase):
             type=WorkerDay.TYPE_WORKDAY,
             dttm_work_start=datetime.combine(cls.dt_now, time(7, 58, 0)),
             dttm_work_end=datetime.combine(cls.dt_now, time(19, 59, 1)),
+            cashbox_details__work_type=cls.work_type,
         )
         calc_timesheets()
         cls.types_mapping = {
@@ -256,7 +258,7 @@ class TestGenerateTabel(TestsHelperMixin, TestCase):
     def test_generate_custom_t13_tabel_additional(self):
         g = T13TabelDataGetter(shop=self.shop, dt_from=self.dt_from, dt_to=self.dt_to, type='A')
         data = g.get_data()
-        self.assertEqual(len(data['users']), WorkerDay.objects.filter(shop=self.shop, type=WorkerDay.TYPE_WORKDAY).values('employee').distinct().count())
+        self.assertEqual(len(data['users']), Timesheet.objects.filter(shop=self.shop, additional_timesheet_hours__gt=0).values('employee').distinct().count())
         for user in data['users']:
             dt_first = self.dt_from - timedelta(1)
             tabel_code = user['tabel_code']
@@ -292,9 +294,9 @@ class TestGenerateTabel(TestsHelperMixin, TestCase):
             self.assertEqual(user['first_half_month_whours'], first_half_month_whours)
             self.assertEqual(user['second_half_month_wdays'], second_half_month_wdays)
             self.assertEqual(user['second_half_month_whours'], second_half_month_whours)
-        ind = list(map(lambda x: x['fio'], data['users'])).index(f'{self.user2.last_name} {self.user2.first_name}')
-        self.assertEqual(data['users'][ind]['fio'], data['users'][ind + 1]['fio'])
-        self.assertNotEqual(data['users'][ind]['tabel_code'], data['users'][ind + 1]['tabel_code'])
+        two_empls = list(filter(lambda x: x['fio'] == f'{self.user2.last_name} {self.user2.first_name}', data['users']))
+        if len(two_empls) == 2: # не всегда может быть доп табель
+            self.assertNotEqual(two_empls[0]['tabel_code'], two_empls[1]['tabel_code'])
 
     def test_generate_custom_t13_tabel_for_outsource_shop_main(self):
         g = T13TabelDataGetter(shop=self.outsource_shop, dt_from=self.dt_from, dt_to=self.dt_to, type='M')

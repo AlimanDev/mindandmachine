@@ -1424,3 +1424,70 @@ class TestAutoSettings(APITestCase):
         self.assertEqual(employment2Info['workdays'][1]['dt'], '2021-02-03')
         self.assertEqual(employment2Info['workdays'][2]['type'], 'H')
         self.assertEqual(employment2Info['workdays'][2]['dt'], '2021-02-04')
+
+    def test_set_timetable_with_wds_from_other_shops(self):
+        timetable = ShopMonthStat.objects.create(
+            shop=self.shop,
+            dt=now().date().replace(day=1),
+            status=ShopMonthStat.PROCESSING,
+            dttm_status_change=now()
+        )
+
+        dt = now().date()
+        tm_from = time(10, 0, 0)
+        tm_to = time(20, 0, 0)
+
+        dttm_from = Converter.convert_datetime(
+            datetime.combine(dt, tm_from),
+        )
+
+        dttm_to = Converter.convert_datetime(
+            datetime.combine(dt, tm_to),
+        )
+
+        self.wd1 = WorkerDay.objects.create(
+            shop=self.shop,
+            employee=self.employee2,
+            employment=self.employment2,
+            dt=self.dt,
+            type=WorkerDay.TYPE_WORKDAY,
+            dttm_work_start=datetime.combine(self.dt, tm_from),
+            dttm_work_end = datetime.combine(self.dt, tm_to),
+        )
+
+        response = self.client.post(self.url, {
+            'timetable_id': timetable.id,
+            'data': json.dumps({
+                'timetable_status': 'R',
+                'users': {
+                    self.employee2.id: {
+                        'workdays': [
+                            {
+                                'dt': Converter.convert_date(dt),
+                                'type': 'R',
+                                'dttm_work_start': None,
+                                'dttm_work_end': None,
+                                'details': []
+                            },
+                        ]
+                    },
+                }
+            })
+        })
+
+        self.assertEqual(response.status_code, 200)
+
+        self.assertEqual(WorkerDay.objects.filter(
+            type="R",
+        ).count(), 0)
+
+        wd = WorkerDay.objects.filter(
+            shop=self.shop,
+            is_fact=False,
+            type=WorkerDay.TYPE_WORKDAY,
+            is_approved=False,
+        ).first()
+
+        self.assertEqual(wd.employee_id, self.employee2.id)
+        self.assertEqual(wd.shop_id, self.shop.id)
+        self.assertEqual(wd.type, WorkerDay.TYPE_WORKDAY)
