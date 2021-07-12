@@ -218,7 +218,7 @@ class MdaIntegrationHelper:
             headers={
                 'x-public-token': settings.MDA_PUBLIC_API_AUTH_TOKEN,
             },
-            timeout=(5, 90),
+            timeout=(5, 300),
         )
         try:
             resp.raise_for_status()
@@ -234,7 +234,7 @@ class MdaIntegrationHelper:
             headers={
                 'x-public-token': settings.MDA_PUBLIC_API_AUTH_TOKEN,
             },
-            timeout=(5, 90),
+            timeout=(5, 900),  # бешеный таймаут, т.к. запрос по всем юзерам может идти долго
         )
         try:
             resp.raise_for_status()
