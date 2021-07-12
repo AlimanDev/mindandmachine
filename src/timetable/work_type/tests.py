@@ -316,6 +316,21 @@ class TestWorkType(APITestCase):
             worker_day=open_vac,
             work_type=self.work_type1,
         )
+        canceled_open_vac = WorkerDay.objects.create(
+            dttm_work_start=datetime.combine(dt_now, time(hour=10)),
+            dttm_work_end=datetime.combine(dt_now, time(hour=22)),
+            type=WorkerDay.TYPE_WORKDAY,
+            dt=dt_now + timedelta(days=1),
+            shop=self.shop,
+            is_approved=True,
+            is_fact=False,
+            is_vacancy=True,
+            canceled=True,
+        )
+        WorkerDayCashboxDetails.objects.create(
+            worker_day=canceled_open_vac,
+            work_type=self.work_type1,
+        )
 
         url = f'{self.url}efficiency/'
 

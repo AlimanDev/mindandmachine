@@ -125,6 +125,7 @@ class ShopEfficiencyGetter:
             Q(employment__dt_hired__lte=self.dt_to) &
             Q(dt__gte=F('employment__dt_hired')) |
             Q(employment__dt_hired__isnull=True),
+            canceled=False,
             dt__gte=self.dt_from,
             dt__lte=self.dt_to,
         )
