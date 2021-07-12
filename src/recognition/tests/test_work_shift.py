@@ -357,7 +357,7 @@ class TestWorkShiftViewSet(TestsHelperMixin, APITestCase):
         self._authorize_tick_point()
         self.employee2.tabel_code = '1235'
         self.employee2.save()
-        self.shop.timezone = 'Asia/Yekaterinburg'
+        self.shop.timezone = 'Asia/Vladivostok'
         self.shop.save()
         if datetime.now().hour <= 14:
             self.today -= timedelta(1)
@@ -416,7 +416,7 @@ class TestWorkShiftViewSet(TestsHelperMixin, APITestCase):
                     'shop': {
                         'id': self.employment2.shop.id, 
                         'name': self.employment2.shop.name,
-                        'timezone': 'Asia/Yekaterinburg',
+                        'timezone': 'Asia/Vladivostok',
                     },
                     'tabel_code': self.employee2.tabel_code, 
                     'worker_days': [
@@ -433,7 +433,7 @@ class TestWorkShiftViewSet(TestsHelperMixin, APITestCase):
                     'shop': {
                         'id': emp.shop.id, 
                         'name': emp.shop.name,
-                        'timezone': 'Asia/Yekaterinburg',
+                        'timezone': 'Asia/Vladivostok',
                     },
                     'tabel_code': self.second_employee.tabel_code, 
                     'worker_days': [

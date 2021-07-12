@@ -258,7 +258,7 @@ class TestGenerateTabel(TestsHelperMixin, TestCase):
     def test_generate_custom_t13_tabel_additional(self):
         g = T13TabelDataGetter(shop=self.shop, dt_from=self.dt_from, dt_to=self.dt_to, type='A')
         data = g.get_data()
-        self.assertEqual(len(data['users']), WorkerDay.objects.filter(shop=self.shop, type=WorkerDay.TYPE_WORKDAY).values('employee').distinct().count())
+        self.assertEqual(len(data['users']), Timesheet.objects.filter(shop=self.shop, additional_timesheet_hours__gt=0).values('employee').distinct().count())
         for user in data['users']:
             dt_first = self.dt_from - timedelta(1)
             tabel_code = user['tabel_code']
