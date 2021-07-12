@@ -45,13 +45,16 @@ class MultipleActiveEmploymentsSupportMixin(TestsHelperMixin):
         )
         cls.user1 = UserFactory(email='dir@example.com', network=cls.network)
         cls.user2 = UserFactory(email='urs@example.com', network=cls.network)
+        cls.user3 = UserFactory(email='urs@example.com', network=cls.network)
 
         cls.employee1_1 = EmployeeFactory(user=cls.user1, tabel_code='employee1_1')
         cls.employee1_2 = EmployeeFactory(user=cls.user1, tabel_code='employee1_2')
         cls.employee2_1 = EmployeeFactory(user=cls.user2, tabel_code='employee2_1')
         cls.employee2_2 = EmployeeFactory(user=cls.user2, tabel_code='employee2_2')
+        cls.employee3 = EmployeeFactory(user=cls.user3, tabel_code='employee3')
 
         cls.group1 = GroupFactory(network=cls.network)
+        cls.group2 = GroupFactory(network=cls.network)
 
         cls.work_type3_other = WorkTypeFactory(
             shop=cls.shop3,
@@ -99,6 +102,10 @@ class MultipleActiveEmploymentsSupportMixin(TestsHelperMixin):
         )
         cls.employment2_2_3 = EmploymentFactory(
             employee=cls.employee2_2, shop=cls.shop3, function_group=cls.group1, norm_work_hours=50,
+            work_types__work_type=cls.work_type3_cachier,
+        )
+        cls.employment3 = EmploymentFactory(
+            employee=cls.employee3, shop=cls.shop3, function_group=cls.group2,
             work_types__work_type=cls.work_type3_cachier,
         )
         cls.dt = timezone.now().date()
@@ -850,7 +857,7 @@ class TestEmployeeAPI(MultipleActiveEmploymentsSupportMixin, APITestCase):
             self.get_url('Employee-list'), data={'include_employments': True, 'show_constraints': True})
         self.assertEqual(resp.status_code, 200)
         resp_data = resp.json()
-        self.assertEqual(len(resp_data), 4)
+        self.assertEqual(len(resp_data), 5)
         employee_data = resp_data[0]
         self.assertIn('employments', employee_data)
         employment_data = employee_data['employments'][0]
@@ -861,7 +868,7 @@ class TestEmployeeAPI(MultipleActiveEmploymentsSupportMixin, APITestCase):
         resp = self.client.get(self.get_url('Employee-list'))
         self.assertEqual(resp.status_code, 200)
         resp_data = resp.json()
-        self.assertEqual(len(resp_data), 4)
+        self.assertEqual(len(resp_data), 5)
         employee_data = resp_data[0]
         self.assertNotIn('employments', employee_data)
 
@@ -887,3 +894,38 @@ class TestEmployeeAPI(MultipleActiveEmploymentsSupportMixin, APITestCase):
         e = Employee.objects.get(id=resp.json()['id'])
         self.assertEqual(e.user_id, self.user1.id)
         self.assertEqual(e.tabel_code, None)
+
+    def test_can_filter_by_group_id(self):
+        self.client.force_authenticate(user=self.user1)
+        resp = self.client.get(
+            self.get_url('Employee-list'),
+            data={'group_id__in': str(self.group2.id)},
+            content_type='application/json',
+        )
+        self.assertEqual(resp.status_code, 200)
+        resp_data = resp.json()
+        self.assertEqual(len(resp_data), 1)
+        self.assertEqual(resp_data[0]['id'], self.employee3.id)
+
+    def test_get_attendance_records_report(self):
+        from src.timetable.models import AttendanceRecords
+        coming_time = time(10)
+        leaving_time = time(20)
+        AttendanceRecords.objects.create(
+            shop=self.shop1,
+            type=AttendanceRecords.TYPE_COMING,
+            user=self.user1,
+            dttm=datetime.combine(self.dt, coming_time),
+        )
+        AttendanceRecords.objects.create(
+            shop=self.shop1,
+            type=AttendanceRecords.TYPE_LEAVING,
+            user=self.user1,
+            dttm=datetime.combine(self.dt, leaving_time),
+        )
+        self.client.force_authenticate(user=self.user1)
+        self.add_group_perm(self.group1, 'Employee_attendance_records_report', 'GET')
+        resp = self.client.get(self.get_url('Employee-attendance-records-report'))
+        BytesIO = pd.io.common.BytesIO
+        df = pd.read_excel(BytesIO(resp.content), engine='xlrd')
+        self.assertEqual(len(df.index), 2)

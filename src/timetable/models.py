@@ -1541,15 +1541,6 @@ class AttendanceRecords(AbstractModel):
                 is_approved=True,
             ).select_for_update().first()
 
-            # для случаев когда сотрудник перепутал магазины, отметился сначала в одном, потом еще раз в другом
-            if fact_approved and fact_approved.shop_id != self.shop_id:
-                # TODO: что будет если отметиться на приход в одном магазина, а на уход в другом?
-                fact_approved.dttm_work_start = None
-                fact_approved.dttm_work_end = None
-                fact_approved.shop_id = self.shop_id
-                fact_approved.is_vacancy = active_user_empl.shop_id != self.shop_id if active_user_empl else False
-                fact_approved.save(update_fields=('shop_id', 'dttm_work_start', 'dttm_work_end', 'is_vacancy'))
-
             if fact_approved:
                 # если это отметка о приходе, то не перезаписываем время начала работы в графике
                 # если время отметки больше, чем время начала работы в существующем графике
