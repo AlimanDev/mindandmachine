@@ -57,7 +57,7 @@ class WorkerDayViewSet(viewsets.ReadOnlyModelViewSet):
     def get_queryset(self):
         tick_point = self.request.user
 
-        dt_from = now() + timedelta(hours=tick_point.shop.get_tz_offset())
+        dt_from = (now() + timedelta(hours=tick_point.shop.get_tz_offset())).date()
 
         wd_cond = WorkerDay.objects.filter(
             Q(dt=dt_from, dttm_work_start__isnull=False, dttm_work_end__isnull=False) |
