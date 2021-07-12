@@ -294,9 +294,9 @@ class TestGenerateTabel(TestsHelperMixin, TestCase):
             self.assertEqual(user['first_half_month_whours'], first_half_month_whours)
             self.assertEqual(user['second_half_month_wdays'], second_half_month_wdays)
             self.assertEqual(user['second_half_month_whours'], second_half_month_whours)
-        ind = list(map(lambda x: x['fio'], data['users'])).index(f'{self.user2.last_name} {self.user2.first_name}')
-        self.assertEqual(data['users'][ind]['fio'], data['users'][ind + 1]['fio'])
-        self.assertNotEqual(data['users'][ind]['tabel_code'], data['users'][ind + 1]['tabel_code'])
+        two_empls = list(filter(lambda x: x['fio'] == f'{self.user2.last_name} {self.user2.first_name}', data['users']))
+        if len(two_empls) == 2: # не всегда может быть доп табель
+            self.assertNotEqual(two_empls[0]['tabel_code'], two_empls[1]['tabel_code'])
 
     def test_generate_custom_t13_tabel_for_outsource_shop_main(self):
         g = T13TabelDataGetter(shop=self.outsource_shop, dt_from=self.dt_from, dt_to=self.dt_to, type='M')
