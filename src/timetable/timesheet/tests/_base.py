@@ -62,7 +62,7 @@ class TestTimesheetMixin(TestsHelperMixin):
         cls.add_group_perm(cls.group_worker, 'Timesheet', 'GET')
         fill_calendar.fill_days('2021.01.1', '2021.12.31', cls.shop.region.id)
 
-    def _calc_timesheets(self):
+    def _calc_timesheets(self, dt_from=None, dt_to=None, dttm_now=None):
         with mock.patch('src.timetable.timesheet.calc.timezone.now') as _now_mock:
-            _now_mock.return_value = datetime.combine(date(2021, 6, 7), time(10, 10, 10))
-            calc_timesheets(employee_id__in=[self.employee_worker.id])
+            _now_mock.return_value = dttm_now or datetime.combine(date(2021, 6, 7), time(10, 10, 10))
+            calc_timesheets(employee_id__in=[self.employee_worker.id], dt_from=dt_from, dt_to=dt_to)
