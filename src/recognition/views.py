@@ -3,6 +3,7 @@ import logging
 from datetime import timedelta
 from uuid import UUID
 from django.db.models import Exists, OuterRef, Q
+from django.http import request
 
 import xlsxwriter
 from django.conf import settings
@@ -179,12 +180,13 @@ class TickViewSet(BaseModelViewSet):
         """
         GET /api/v1/ticks
         """
+        offset = self.request.user.shop.get_tz_offset() if isinstance(self.request.user, TickPoint) else 0
 
-        dttm_from = now().replace(hour=0, minute=0, second=0)
-        dttm_to = dttm_from + timedelta(days=1)
+        dt_from = (now() + timedelta(hours=offset)).date()
+        dt_to = dt_from + timedelta(days=1)
         
         today_comming_tick_cond = Tick.objects.filter(
-            dttm__date=dttm_from.date(),
+            dttm__date=dt_from,
             type=Tick.TYPE_COMING,
             user_id=OuterRef('user_id'),
             tick_point__shop_id=OuterRef('tick_point__shop_id'),
@@ -193,8 +195,8 @@ class TickViewSet(BaseModelViewSet):
         queryset = Tick.objects.annotate(
             today_exists=Exists(today_comming_tick_cond),
         ).filter(
-            (Q(dttm__gte=(dttm_from - timedelta(1))) & Q(type=Tick.TYPE_COMING) & Q(today_exists=False)) |
-            Q(dttm__gte=dttm_from, dttm__lte=dttm_to),
+            (Q(dttm__date__gte=(dt_from - timedelta(1))) & Q(type=Tick.TYPE_COMING) & Q(today_exists=False)) |
+            Q(dttm__date__gte=dt_from, dttm__date__lte=dt_to),
             dttm_deleted__isnull=True
         )
         queryset = self.strategy.filter_qs(queryset=queryset)
