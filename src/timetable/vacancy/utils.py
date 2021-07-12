@@ -48,6 +48,7 @@ from src.conf.djconfig import (
     QOS_DATETIME_FORMAT,
     EMAIL_HOST_USER,
 )
+from src.timetable.exceptions import WorkTimeOverlap
 from src.timetable.models import (
     ExchangeSettings,
     WorkerDay,
@@ -470,162 +471,169 @@ def confirm_vacancy(vacancy_id, user, employee_id=None, exchange=False, reconfir
         'vacancy_success': _('The vacancy was successfully accepted.'),
         'cant_reconfrm_fact_exists': _("You can't reassign an employee to this vacancy, because the employee has already entered this vacancy.")
     }
-    with transaction.atomic():
-        no_employee_filter = {}
-        if not reconfirm:
-            no_employee_filter['employee__isnull'] = True
-        vacancy = WorkerDay.objects.get_plan_approved(
-            id=vacancy_id,
-            is_vacancy=True,
-            **no_employee_filter,
-        ).select_for_update().first()
-        res = {
-            'status_code': 200,
-        }
-        if not vacancy:
-            res['text'] = messages['no_vacancy']
-            res['status_code'] = 404
-            return res
+    try:
+        with transaction.atomic():
+            no_employee_filter = {}
+            if not reconfirm:
+                no_employee_filter['employee__isnull'] = True
+            vacancy = WorkerDay.objects.get_plan_approved(
+                id=vacancy_id,
+                is_vacancy=True,
+                **no_employee_filter,
+            ).select_for_update().first()
+            res = {
+                'status_code': 200,
+            }
+            if not vacancy:
+                res['text'] = messages['no_vacancy']
+                res['status_code'] = 404
+                return res
 
-        if reconfirm:
-            fact = WorkerDay.objects.filter(
-                employee_id=vacancy.employee_id,
-                is_fact=True,
-                is_approved=True,
-                dt=vacancy.dt,
-            )
-            if fact.exists():
-                res['text'] = messages['cant_reconfrm_fact_exists']
+            if reconfirm:
+                fact = WorkerDay.objects.filter(
+                    employee_id=vacancy.employee_id,
+                    is_fact=True,
+                    is_approved=True,
+                    dt=vacancy.dt,
+                )
+                if fact.exists():
+                    res['text'] = messages['cant_reconfrm_fact_exists']
+                    res['status_code'] = 400
+                    return res
+
+            vacancy_shop = vacancy.shop
+
+            if user.black_list_symbol is None and vacancy_shop.network.need_symbol_for_vacancy:
+                res['text'] = messages['need_symbol_for_vacancy']
                 res['status_code'] = 400
                 return res
 
-        vacancy_shop = vacancy.shop
+            shops_for_black_list = vacancy_shop.get_ancestors(include_self=True)
 
-        if user.black_list_symbol is None and vacancy_shop.network.need_symbol_for_vacancy:
-            res['text'] = messages['need_symbol_for_vacancy']
-            res['status_code'] = 400
-            return res
+            if VacancyBlackList.objects.filter(symbol=user.black_list_symbol, shop__in=shops_for_black_list).exists():
+                res['text'] = messages['cant_apply_vacancy']
+                res['status_code'] = 400
+                return res
 
-        shops_for_black_list = vacancy_shop.get_ancestors(include_self=True)
+            employee_filter = {}
+            if employee_id:
+                employee_filter['employee_id'] = employee_id
+            else:
+                employee_filter['employee__user_id'] = user.id
+            active_employment = Employment.objects.get_active_empl_by_priority(
+                network_id=user.network_id, dt=vacancy.dt,
+                priority_shop_id=vacancy.shop_id,
+                priority_work_type_id=vacancy.work_types.values_list('id', flat=True).first(),
+                **employee_filter,
+            ).select_related(
+                'shop',
+            ).first()
 
-        if VacancyBlackList.objects.filter(symbol=user.black_list_symbol, shop__in=shops_for_black_list).exists():
-            res['text'] = messages['cant_apply_vacancy']
-            res['status_code'] = 400
-            return res
+            # на даем откликнуться на вакансию, если нет активного трудоустройства в день вакансии
+            if not active_employment:
+                res['text'] = messages['cant_apply_vacancy_no_active_employement']
+                res['status_code'] = 400
+                return res
 
-        employee_filter = {}
-        if employee_id:
-            employee_filter['employee_id'] = employee_id
-        else:
-            employee_filter['employee__user_id'] = user.id
-        active_employment = Employment.objects.get_active_empl_by_priority(
-            network_id=user.network_id, dt=vacancy.dt,
-            priority_shop_id=vacancy.shop_id,
-            priority_work_type_id=vacancy.work_types.values_list('id', flat=True).first(),
-            **employee_filter,
-        ).select_related(
-            'shop',
-        ).first()
+            # сотрудник из другой сети не может принять вакансию если это не аутсорс вакансия
+            if not vacancy.is_outsource and active_employment.shop.network_id != vacancy_shop.network_id:
+                res['text'] = messages['cant_apply_vacancy_not_outsource']
+                res['status_code'] = 400
+                return res
+            # сотрудник из текущей сети не может принять аутсорс вакансию если это запрещено в сети
+            elif vacancy.is_outsource and active_employment.shop.network_id == vacancy_shop.network_id and not vacancy_shop.network.allow_workers_confirm_outsource_vacancy:
+                res['text'] = messages['cant_apply_vacancy_outsource_not_allowed']
+                res['status_code'] = 400
+                return res
+            # сотрудник из другой сети не может принять вакансию если это аутсорс вакансия, но его сеть не в списке доступных
+            elif vacancy.is_outsource and active_employment.shop.network_id != vacancy_shop.network_id\
+                and not vacancy.outsources.filter(id=active_employment.shop.network_id).exists():
+                res['text'] = messages['cant_apply_vacancy_outsource_no_network']
+                res['status_code'] = 400
+                return res
 
-        # на даем откликнуться на вакансию, если нет активного трудоустройства в день вакансии
-        if not active_employment:
-            res['text'] = messages['cant_apply_vacancy_no_active_employement']
-            res['status_code'] = 400
-            return res
+            employee_worker_day = WorkerDay.objects.get_plan_approved(
+                employee_id=active_employment.employee_id,
+                dt=vacancy.dt,
+            ).select_related('shop').first()
 
-        # сотрудник из другой сети не может принять вакансию если это не аутсорс вакансия
-        if not vacancy.is_outsource and active_employment.shop.network_id != vacancy_shop.network_id:
-            res['text'] = messages['cant_apply_vacancy_not_outsource']
-            res['status_code'] = 400
-            return res
-        # сотрудник из текущей сети не может принять аутсорс вакансию если это запрещено в сети
-        elif vacancy.is_outsource and active_employment.shop.network_id == vacancy_shop.network_id and not vacancy_shop.network.allow_workers_confirm_outsource_vacancy:
-            res['text'] = messages['cant_apply_vacancy_outsource_not_allowed']
-            res['status_code'] = 400
-            return res
-        # сотрудник из другой сети не может принять вакансию если это аутсорс вакансия, но его сеть не в списке доступных
-        elif vacancy.is_outsource and active_employment.shop.network_id != vacancy_shop.network_id\
-            and not vacancy.outsources.filter(id=active_employment.shop.network_id).exists():
-            res['text'] = messages['cant_apply_vacancy_outsource_no_network']
-            res['status_code'] = 400
-            return res
-
-        employee_worker_day = WorkerDay.objects.get_plan_approved(
-            employee_id=active_employment.employee_id,
-            dt=vacancy.dt,
-        ).select_related('shop').first()
-
-        # нельзя откликнуться на вакансию если для сотрудника не составлен график на этот день
-        if not employee_worker_day and not (vacancy.is_outsource and vacancy_shop.network_id != active_employment.shop.network_id):
-            res['text'] = messages['no_timetable']
-            res['status_code'] = 400
-            return res
-
-
-        # откликаться на вакансию можно только в нерабочие/неоплачиваемые дни
-        update_condition = employee_worker_day.type not in WorkerDay.TYPES_PAID if employee_worker_day else True
-        if active_employment.shop_id != vacancy_shop.id and not exchange:
-            try:
-                tt = ShopMonthStat.objects.get(shop=vacancy_shop, dt=vacancy.dt.replace(day=1))
-            except ShopMonthStat.DoesNotExist:
+            # нельзя откликнуться на вакансию если для сотрудника не составлен график на этот день
+            if not employee_worker_day and not (vacancy.is_outsource and vacancy_shop.network_id != active_employment.shop.network_id):
                 res['text'] = messages['no_timetable']
                 res['status_code'] = 400
                 return res
 
-            if not tt.is_approved:  # todo: добавить задержку на отклик для других магазинов
-                update_condition = False
 
-        if update_condition or exchange:
-            if employee_worker_day:
-                employee_worker_day.delete()
-            if reconfirm:
-                WorkerDay.objects.filter(
-                    is_fact=False,
-                    is_approved=False,
+            # откликаться на вакансию можно только в нерабочие/неоплачиваемые дни
+            update_condition = employee_worker_day.type not in WorkerDay.TYPES_PAID if employee_worker_day else True
+            if active_employment.shop_id != vacancy_shop.id and not exchange:
+                try:
+                    tt = ShopMonthStat.objects.get(shop=vacancy_shop, dt=vacancy.dt.replace(day=1))
+                except ShopMonthStat.DoesNotExist:
+                    res['text'] = messages['no_timetable']
+                    res['status_code'] = 400
+                    return res
+
+                if not tt.is_approved:  # todo: добавить задержку на отклик для других магазинов
+                    update_condition = False
+
+            if update_condition or exchange:
+                if employee_worker_day:
+                    employee_worker_day.delete()
+                if reconfirm:
+                    WorkerDay.objects.filter(
+                        is_fact=False,
+                        is_approved=False,
+                        dt=vacancy.dt,
+                        employee_id=vacancy.employee_id,
+                        is_vacancy=True,
+                    ).delete()
+
+                # TODO: добавить проверку на пересечение с рабочими днями у этого же пользователя
+                vacancy.employee = active_employment.employee
+                vacancy.employment = active_employment
+                vacancy.save(
+                    update_fields=(
+                        'employee',
+                        'employment',
+                    )
+                )
+
+                WorkerDay.objects_with_excluded.filter(
                     dt=vacancy.dt,
                     employee_id=vacancy.employee_id,
-                    is_vacancy=True,
+                    is_fact=vacancy.is_fact,
+                    is_approved=False,
                 ).delete()
 
-            # TODO: добавить проверку на пересечение с рабочими днями у этого же пользователя
-            vacancy.employee = active_employment.employee
-            vacancy.employment = active_employment
-            vacancy.save(
-                update_fields=(
-                    'employee',
-                    'employment',
+                vacancy_details = WorkerDayCashboxDetails.objects.filter(
+                    worker_day=vacancy).values('work_type_id', 'work_part')
+
+                vacancy.id = None
+                vacancy.is_approved = False
+                vacancy.save()
+
+                WorkerDayCashboxDetails.objects.bulk_create(
+                    WorkerDayCashboxDetails(
+                        worker_day=vacancy,
+                        work_type_id=details['work_type_id'],
+                        work_part=details['work_part'],
+                    ) for details in vacancy_details
                 )
-            )
 
-            WorkerDay.objects_with_excluded.filter(
-                dt=vacancy.dt,
-                employee_id=vacancy.employee_id,
-                is_fact=vacancy.is_fact,
-                is_approved=False,
-            ).delete()
+                # TODO: создать событие об отклике на вакансию
 
-            vacancy_details = WorkerDayCashboxDetails.objects.filter(
-                worker_day=vacancy).values('work_type_id', 'work_part')
+                Event.objects.filter(worker_day=vacancy).delete()
+                res['text'] = messages['vacancy_success']
 
-            vacancy.id = None
-            vacancy.is_approved = False
-            vacancy.save()
+                WorkerDay.check_work_time_overlap(employee_id=vacancy.employee_id, dt=vacancy.dt)
 
-            WorkerDayCashboxDetails.objects.bulk_create(
-                WorkerDayCashboxDetails(
-                    worker_day=vacancy,
-                    work_type_id=details['work_type_id'],
-                    work_part=details['work_part'],
-                ) for details in vacancy_details
-            )
-
-            # TODO: создать событие об отклике на вакансию
-
-            Event.objects.filter(worker_day=vacancy).delete()
-            res['text'] = messages['vacancy_success']
-        else:
-            res['text'] = messages['cant_apply_vacancy']
-            res['status_code'] = 400
+            else:
+                res['text'] = messages['cant_apply_vacancy']
+                res['status_code'] = 400
+    except WorkTimeOverlap as e:
+        res['text'] = str(e)
+        res['status_code'] = 400
 
     return res
 

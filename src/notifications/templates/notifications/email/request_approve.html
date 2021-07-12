@@ -1,7 +1,5 @@
 {% extends 'notifications/email/base.html' %}
 
 {% block content %}
-<p>Магазин {{ shop.name }} запрашивает подтверждение графика.</p>
-<p>Комментарий:</p>
-<p>{{ comment }}</p>
+<p>Подразделение {{ shop.name }} запрашивает подтверждение {% if is_fact %}фактического{% else %}планового{% endif %} графика за период от {{ dt_from }} до {{ dt_to }}.</p>
 {% endblock %}

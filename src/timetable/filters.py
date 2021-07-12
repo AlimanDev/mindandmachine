@@ -22,6 +22,12 @@ class WorkerDayFilter(FilterSet):
     dt_from = DateFilter(field_name='dt', lookup_expr='gte', label="Начало периода")  # aa: fixme: delete
     dt_to = DateFilter(field_name='dt', lookup_expr='lte', label='Окончание периода') # aa: fixme: delete
     fact_tabel = BooleanFilter(method='filter_fact_tabel', label="Выгрузка табеля")
+    fact_shop_code__in = ListFilter(
+        method='filter_fact_shop_code__in',
+        label='Выгрузка сотрудников подразделений '
+              '+ сотрудников у которых есть хотя бы 1 фактически подтвержденный рабочий день в одном из указанных подразделений,'
+              ' предполагается использование вместе с фильтром fact_tabel=true',
+    )
 
     # параметры для совместимости с существующими интеграциями, не удалять
     worker_id = NumberFilter(field_name='employee__user_id')
@@ -31,6 +37,32 @@ class WorkerDayFilter(FilterSet):
     def filter_fact_tabel(self, queryset, name, value):
         if value:
             return queryset.get_tabel()
+
+        return queryset
+
+    def filter_fact_shop_code__in(self, queryset, name, value):
+        if value:
+            fact_shop_code__in = value.split(',')
+            employee_ids = list(Employment.objects.get_active(
+                self.request.user.network_id,
+                dt_from=self.form.cleaned_data.get('dt__gte'),
+                dt_to=self.form.cleaned_data.get('dt__lte'),
+            ).annotate(
+                has_fact_approved_in_shop=Exists(
+                    queryset.filter(
+                        is_fact=True,
+                        is_approved=True,
+                        shop__code__in=fact_shop_code__in,
+                        employee_id=OuterRef('employee_id'),
+                    )
+                )
+            ).filter(
+                Q(shop__code__in=fact_shop_code__in) |
+                Q(has_fact_approved_in_shop=True),
+            ).values_list('employee_id', flat=True))
+            return queryset.filter(
+                employee_id__in=employee_ids,
+            ).distinct()
 
         return queryset
 

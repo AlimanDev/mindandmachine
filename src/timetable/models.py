@@ -858,11 +858,14 @@ class WorkerDay(AbstractModel):
         return closest_plan_approved, record_type
 
     @classmethod
-    def check_work_time_overlap(cls, employee_days_q=None, employee_id=None, employee_id__in=None, user_id=None, user_id__in=None, dt=None,
-                              dt__in=None, raise_exc=True, exc_cls=None):
+    def check_work_time_overlap(cls, employee_days_q=None, employee_id=None, employee_id__in=None, user_id=None,
+                                user_id__in=None, dt=None, dt__in=None, raise_exc=True, exc_cls=None):
         """
         Проверка наличия пересечения рабочего времени
         """
+        if not (employee_days_q or employee_id or employee_id__in or user_id or user_id__in):
+            return
+
         lookup = {
             'type__in': WorkerDay.TYPES_WITH_TM_RANGE,
         }
@@ -1537,15 +1540,6 @@ class AttendanceRecords(AbstractModel):
                 is_fact=True,
                 is_approved=True,
             ).select_for_update().first()
-
-            # для случаев когда сотрудник перепутал магазины, отметился сначала в одном, потом еще раз в другом
-            if fact_approved and fact_approved.shop_id != self.shop_id:
-                # TODO: что будет если отметиться на приход в одном магазина, а на уход в другом?
-                fact_approved.dttm_work_start = None
-                fact_approved.dttm_work_end = None
-                fact_approved.shop_id = self.shop_id
-                fact_approved.is_vacancy = active_user_empl.shop_id != self.shop_id if active_user_empl else False
-                fact_approved.save(update_fields=('shop_id', 'dttm_work_start', 'dttm_work_end', 'is_vacancy'))
 
             if fact_approved:
                 # если это отметка о приходе, то не перезаписываем время начала работы в графике
