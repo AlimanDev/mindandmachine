@@ -358,7 +358,7 @@ class TestGetWorkersStatAndTabel(MultipleActiveEmploymentsSupportMixin, APITestC
         cls.add_group_perm(cls.group1, 'WorkerDay_worker_stat', 'GET')
 
     def _create_wdays(self, dt_now):
-        for dt in pd.date_range(dt_now, dt_now + timedelta(days=4)):
+        for dt in pd.date_range(dt_now, dt_now + timedelta(days=4)).date:
             WorkerDayFactory(
                 dt=dt,
                 employee=self.employee1_1,
@@ -370,7 +370,7 @@ class TestGetWorkersStatAndTabel(MultipleActiveEmploymentsSupportMixin, APITestC
                 cashbox_details__work_type=self.work_type1_cachier,
             )
 
-        for dt in pd.date_range(dt_now + timedelta(days=5), dt_now + timedelta(days=9)):
+        for dt in pd.date_range(dt_now + timedelta(days=5), dt_now + timedelta(days=9)).date:
             WorkerDayFactory(
                 dt=dt,
                 employee=self.employee1_1,
@@ -390,7 +390,7 @@ class TestGetWorkersStatAndTabel(MultipleActiveEmploymentsSupportMixin, APITestC
                 is_approved=True,
             )
 
-        for dt in pd.date_range(dt_now + timedelta(days=10), dt_now + timedelta(days=14)):
+        for dt in pd.date_range(dt_now + timedelta(days=10), dt_now + timedelta(days=14)).date:
             WorkerDayFactory(
                 dt=dt,
                 employee=self.employee1_2,
@@ -402,7 +402,7 @@ class TestGetWorkersStatAndTabel(MultipleActiveEmploymentsSupportMixin, APITestC
                 cashbox_details__work_type=self.work_type1_cleaner,
             )
 
-        for dt in pd.date_range(dt_now + timedelta(days=15), dt_now + timedelta(days=19)):
+        for dt in pd.date_range(dt_now + timedelta(days=15), dt_now + timedelta(days=19)).date:
             WorkerDayFactory(
                 dt=dt,
                 employee=self.employee1_1,
@@ -422,7 +422,7 @@ class TestGetWorkersStatAndTabel(MultipleActiveEmploymentsSupportMixin, APITestC
                 is_approved=True,
             )
 
-        for dt in pd.date_range(dt_now + timedelta(days=20), dt_now + timedelta(days=24)):
+        for dt in pd.date_range(dt_now + timedelta(days=20), dt_now + timedelta(days=24)).date:
             WorkerDayFactory(
                 dt=dt,
                 employee=self.employee1_2,
@@ -471,6 +471,63 @@ class TestGetWorkersStatAndTabel(MultipleActiveEmploymentsSupportMixin, APITestC
         self.assertEqual(len(list(filter(lambda i: i['type'] == WorkerDay.TYPE_WORKDAY, resp_data))), 10)
         self.assertEqual(len(list(filter(lambda i: i['type'] == WorkerDay.TYPE_HOLIDAY, resp_data))), 5)
         self.assertEqual(len(list(filter(lambda i: i['type'] == WorkerDay.TYPE_VACATION, resp_data))), 5)
+
+    def test_fact_tabel_data_by_fact_shop_code__in_filter(self):
+        self._create_wdays(self.dt_now)
+        for dt in pd.date_range(self.dt_now + timedelta(days=25), self.dt_now + timedelta(days=28)).date:
+            WorkerDayFactory(
+                dt=dt,
+                employee=self.employee1_1,
+                employment=self.employment1_1_1,
+                shop=self.shop3,
+                type=WorkerDay.TYPE_WORKDAY,
+                is_fact=True,
+                is_approved=True,
+                cashbox_details__work_type=self.work_type3_cachier,
+            )
+        for dt in pd.date_range(self.dt_now + timedelta(days=25), self.dt_now + timedelta(days=28)).date:
+            WorkerDayFactory(
+                dt=dt,
+                employee=self.employee2_2,
+                employment=self.employment2_2_3,
+                shop=self.shop3,
+                type=WorkerDay.TYPE_WORKDAY,
+                is_fact=True,
+                is_approved=True,
+                cashbox_details__work_type=self.work_type3_cachier,
+            )
+        self.client.force_authenticate(user=self.user1)
+        resp = self.client.get(
+            self.get_url('WorkerDay-list'),
+            data={
+                'dt__gte': self.dt_now,
+                'dt__lte': self.dt_now + timedelta(days=28),
+                'fact_tabel': True,
+                'fact_shop_code__in': [self.shop3.code],
+                'by_code': True,
+            },
+        )
+        self.assertEqual(resp.status_code, 200)
+        resp_data = resp.json()
+        self.assertEqual(len(resp_data), 23)
+        self.assertEqual(len(list(
+            filter(lambda i: i['type'] == WorkerDay.TYPE_WORKDAY and i['employee_id'] == self.employee1_1.id and i[
+                'shop_id'] == self.shop1.id,
+                   resp_data))), 5)
+        self.assertEqual(len(list(
+            filter(lambda i: i['type'] == WorkerDay.TYPE_WORKDAY and i['employee_id'] == self.employee1_1.id and i[
+                'shop_id'] == self.shop3.id,
+                   resp_data))), 4)
+        self.assertEqual(len(list(
+            filter(lambda i: i['type'] == WorkerDay.TYPE_HOLIDAY and i['employee_id'] == self.employee1_1.id,
+                   resp_data))), 5)
+        self.assertEqual(len(list(
+            filter(lambda i: i['type'] == WorkerDay.TYPE_VACATION and i['employee_id'] == self.employee1_1.id,
+                   resp_data))), 5)
+        self.assertEqual(len(list(
+            filter(lambda i: i['type'] == WorkerDay.TYPE_WORKDAY and i['employee_id'] == self.employee2_2.id and i[
+                'shop_id'] == self.shop3.id,
+                   resp_data))), 4)
 
     def test_get_worker_stat_by_employee(self):
         """
