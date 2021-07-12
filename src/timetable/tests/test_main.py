@@ -2602,7 +2602,7 @@ class TestVacancy(TestsHelperMixin, APITestCase):
 
 
 
-class TestAditionalFunctions(APITestCase):
+class TestAditionalFunctions(TestsHelperMixin, APITestCase):
     USER_USERNAME = "user1"
     USER_EMAIL = "q@q.q"
     USER_PASSWORD = "4242"
@@ -3429,3 +3429,45 @@ class TestAditionalFunctions(APITestCase):
     #     self.assertEqual(len(data), 2)
     #     self.assertEqual(len(data[str(self.user2.id)]), 3)
     #     self.assertEqual(len(data[str(self.user3.id)]), 3)
+
+    def test_recalc(self):
+        today = date.today()
+        wd = WorkerDayFactory(
+            dt=today,
+            type=WorkerDay.TYPE_WORKDAY,
+            employee=self.employee2,
+            employment=self.employment2,
+            shop=self.employment2.shop,
+            is_approved=True,
+            is_fact=True,
+            dttm_work_start=datetime.combine(today, time(10)),
+            dttm_work_end=datetime.combine(today, time(19)),
+        )
+        self.assertEqual(wd.work_hours, timedelta(hours=8))
+        self.add_group_perm(self.employee_group, 'WorkerDay_recalc', 'POST')
+
+        WorkerDay.objects.filter(id=wd.id).update(work_hours=timedelta(0))
+        wd.refresh_from_db()
+        self.assertEqual(wd.work_hours, timedelta(0))
+        data = {
+            'shop_id': wd.employment.shop_id,
+            'employee_id__in': [self.employee2.id],
+            'dt_from': today,
+            'dt_to': today,
+        }
+        with self.settings(CELERY_TASK_ALWAYS_EAGER=True):
+            resp = self.client.post(
+                path=self.get_url('WorkerDay-recalc'),
+                data=self.dump_data(data), content_type='application/json',
+            )
+        self.assertContains(resp, 'Пересчет часов успешно запущен.', status_code=200)
+        wd.refresh_from_db()
+        self.assertEqual(wd.work_hours, timedelta(hours=8))
+
+        data['employee_id__in'] = [self.employee8.id]
+        with self.settings(CELERY_TASK_ALWAYS_EAGER=True):
+            resp2 = self.client.post(
+                path=self.get_url('WorkerDay-recalc'),
+                data=self.dump_data(data), content_type='application/json',
+            )
+        self.assertContains(resp2, 'Не найдено сотрудников удовлетворяющих условиям запроса.', status_code=400)

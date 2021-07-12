@@ -557,3 +557,10 @@ class BlockOrUnblockWorkerDaySerializer(serializers.ModelSerializer):
 
 class BlockOrUnblockWorkerDayWrapperSerializer(serializers.Serializer):
     worker_days = BlockOrUnblockWorkerDaySerializer(many=True)
+
+
+class RecalcWdaysSerializer(serializers.Serializer):
+    shop_id = serializers.IntegerField()
+    dt_from = serializers.DateField(format=QOS_DATE_FORMAT)
+    dt_to = serializers.DateField(format=QOS_DATE_FORMAT)
+    employee_id__in = serializers.ListField(child=serializers.IntegerField(), required=False)

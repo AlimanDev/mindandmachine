@@ -18,6 +18,7 @@ def clean_wdays(filter_kwargs: dict = None, exclude_kwargs: dict = None, only_lo
     )
     clean_wdays_helper.run()
 
+
 @app.task
 def recalc_wdays(**kwargs):
     wdays_qs = WorkerDay.objects.filter(type__in=WorkerDay.TYPES_WITH_TM_RANGE, **kwargs)
@@ -26,6 +27,7 @@ def recalc_wdays(**kwargs):
             wd_obj = WorkerDay.objects.filter(id=wd_id).select_for_update().first()
             if wd_obj:
                 wd_obj.save()
+
 
 @app.task
 def recalc_fact_from_records(dt_from, dt_to, shop_ids=None):
