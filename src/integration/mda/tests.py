@@ -4,6 +4,7 @@ from django.test import TestCase
 from django.utils import timezone
 from rest_framework.test import APITestCase
 
+from src.base.models import Employment
 from src.base.tests.factories import (
     EmploymentFactory,
     ShopFactory,
@@ -244,6 +245,30 @@ class TestMdaIntegration(TestsHelperMixin, TestCase):
         orgstruct_data = mda_integration_helper._get_orgstruct_data()
         s_orgstruct_data = list(filter(lambda s: shop.id == s['id'], orgstruct_data['shops']))[0]
         self.assertEqual(s_orgstruct_data['regionId'], self.region1.id)
+
+    def test_there_is_no_user_with_dt_fired_90_days_ago(self):
+        Employment.objects.all().delete()
+        shop = ShopFactory(parent=self.region1, code='shop')
+        EmploymentFactory(
+            shop=shop,
+            dt_hired=datetime.now() - timedelta(days=220),
+            dt_fired=datetime.now() - timedelta(days=90),
+        )
+        mda_integration_helper = MdaIntegrationHelper()
+        users_data = mda_integration_helper._get_users_data()
+        self.assertEqual(len(users_data), 0)
+
+    def test_there_is_user_with_dt_fired_30_days_ago(self):
+        Employment.objects.all().delete()
+        shop = ShopFactory(parent=self.region1, code='shop')
+        EmploymentFactory(
+            shop=shop,
+            dt_hired=datetime.now() - timedelta(days=220),
+            dt_fired=datetime.now() - timedelta(days=30),
+        )
+        mda_integration_helper = MdaIntegrationHelper()
+        users_data = mda_integration_helper._get_users_data()
+        self.assertEqual(len(users_data), 1)
 
 
 class TestVMdaUsers(TestsHelperMixin, TestCase):

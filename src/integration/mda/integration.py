@@ -153,7 +153,13 @@ class MdaIntegrationHelper:
                 F('user_last_modified'),
                 F('employment_last_modified'),
                 F('position_last_modified'),
-            )
+            ),
+            add_to_unload=Exists(Employment.objects.get_active(
+                dt_from=self.dt_now - timedelta(days=60), dt_to=self.dt_now,
+                employee__user_id=OuterRef('id'),
+            ))
+        ).filter(
+            add_to_unload=True,
         )
         if threshold_seconds:
             qs = qs.filter(
