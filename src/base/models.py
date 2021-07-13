@@ -1297,6 +1297,7 @@ class FunctionGroup(AbstractModel):
 
     FUNCS_TUPLE = (
         ('AttendanceRecords', 'Отметка'),
+        ('AttendanceRecords_report', 'Отчет по отметкам (Получить)'),
         ('AutoSettings_create_timetable', 'Составление графика (Создать)'),
         ('AutoSettings_set_timetable', 'Задать график (ответ от алгоритмов, Создать)'),
         ('AutoSettings_delete_timetable', 'Удалить график (Создать)'),
@@ -1304,7 +1305,6 @@ class FunctionGroup(AbstractModel):
         ('Break', 'Перерыв'),
         ('Employment', 'Трудоустройство'),
         ('Employee', 'Сотрудник'),
-        ('Employee_attendance_records_report', 'Отчет по отметкам по сотрудникам (Получить)'),
         ('Employment_auto_timetable', 'Выбрать сорудников для автосоставления (Создать)'),
         ('Employment_timetable', 'Редактирование полей трудоустройства, связанных с расписанием'),
         ('EmploymentWorkType', 'Связь трудоустройства и типа работ'),
