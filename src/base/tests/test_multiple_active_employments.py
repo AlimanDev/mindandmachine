@@ -923,9 +923,43 @@ class TestEmployeeAPI(MultipleActiveEmploymentsSupportMixin, APITestCase):
             user=self.user1,
             dttm=datetime.combine(self.dt, leaving_time),
         )
+        AttendanceRecords.objects.create(
+            shop=self.shop2,
+            type=AttendanceRecords.TYPE_COMING,
+            user=self.user2,
+            dttm=datetime.combine(self.dt, coming_time),
+        )
+        AttendanceRecords.objects.create(
+            shop=self.shop2,
+            type=AttendanceRecords.TYPE_LEAVING,
+            user=self.user2,
+            dttm=datetime.combine(self.dt, leaving_time),
+        )
         self.client.force_authenticate(user=self.user1)
-        self.add_group_perm(self.group1, 'Employee_attendance_records_report', 'GET')
-        resp = self.client.get(self.get_url('Employee-attendance-records-report'))
+        self.add_group_perm(self.group1, 'AttendanceRecords_report', 'GET')
+        resp = self.client.get(self.get_url('AttendanceRecords-report'))
+        BytesIO = pd.io.common.BytesIO
+        df = pd.read_excel(BytesIO(resp.content), engine='xlrd')
+        self.assertEqual(len(df.index), 4)
+
+        resp = self.client.get(
+            self.get_url('AttendanceRecords-report'), data={'employee_id__in': [self.employee1_1.id]})
         BytesIO = pd.io.common.BytesIO
         df = pd.read_excel(BytesIO(resp.content), engine='xlrd')
         self.assertEqual(len(df.index), 2)
+
+        resp = self.client.get(
+            self.get_url('AttendanceRecords-report'), data={'shop_id__in': [self.shop1.id]})
+        BytesIO = pd.io.common.BytesIO
+        df = pd.read_excel(BytesIO(resp.content), engine='xlrd')
+        self.assertEqual(len(df.index), 2)
+
+        resp = self.client.get(
+            self.get_url('AttendanceRecords-report'),
+            data={
+                'shop_id__in': [self.shop1.id],
+                'employee_id__in': [self.employee2_1.id]
+            })
+        BytesIO = pd.io.common.BytesIO
+        df = pd.read_excel(BytesIO(resp.content), engine='xlrd')
+        self.assertEqual(len(df.index), 0)
