@@ -17,34 +17,43 @@ from ..models import WorkerDay, Timesheet
 logger = logging.getLogger('calc_timesheets')
 
 
-def _get_calc_periods(dt_hired=None, dt_fired=None):
+def _get_calc_periods(dt_hired=None, dt_fired=None, dt_from=None, dt_to=None):
     dt_hired = dt_hired or datetime.date.min
     dt_fired = dt_fired or datetime.date.max
-    periods = []
-    dt_now = timezone.now().date()
 
-    if dt_now.day <= 4:
-        prev_month_start = (dt_now - relativedelta(months=1)).replace(day=1)
-        prev_month_end = (prev_month_start + relativedelta(months=1)).replace(day=1) - datetime.timedelta(days=1)
-        dt_start = max(dt_hired, prev_month_start)
-        dt_end = min(dt_fired, prev_month_end)
+    periods = []
+    if (dt_from is None and dt_to is None):
+        dt_now = timezone.now().date()
+
+        if dt_now.day <= 4:
+            prev_month_start = (dt_now - relativedelta(months=1)).replace(day=1)
+            prev_month_end = (prev_month_start + relativedelta(months=1)).replace(day=1) - datetime.timedelta(days=1)
+            dt_start = max(dt_hired, prev_month_start)
+            dt_end = min(dt_fired, prev_month_end)
+            if dt_start <= dt_end:
+                periods.append((dt_start, dt_end), )
+
+        curr_month_start = dt_now.replace(day=1)
+        curr_month_end = (dt_now + relativedelta(months=1)).replace(day=1) - datetime.timedelta(days=1)
+        dt_start = max(dt_hired, curr_month_start)
+        dt_end = min(dt_fired, curr_month_end)
         if dt_start <= dt_end:
             periods.append((dt_start, dt_end), )
-
-    curr_month_start = dt_now.replace(day=1)
-    curr_month_end = (dt_now + relativedelta(months=1)).replace(day=1) - datetime.timedelta(days=1)
-    dt_start = max(dt_hired, curr_month_start)
-    dt_end = min(dt_fired, curr_month_end)
-    if dt_start <= dt_end:
         periods.append((dt_start, dt_end), )
-    periods.append((dt_start, dt_end), )
+    else:
+        dt_start = max(dt_hired, dt_from)
+        dt_end = min(dt_fired, dt_to)
+        if dt_start < dt_end:
+            periods.append((dt_start, dt_end))
 
     return periods
 
 
 class TimesheetCalculator:
-    def __init__(self, employee: Employee):
+    def __init__(self, employee: Employee, dt_from=None, dt_to=None):
         self.employee = employee
+        self.dt_from = dt_from
+        self.dt_to = dt_to
 
     def _get_timesheet_wdays_qs(self, employee, dt_start, dt_end):
         return WorkerDay.objects.get_tabel(
@@ -168,9 +177,12 @@ class TimesheetCalculator:
     def calc(self):
         logger.info(
             f'start timesheet calc for employee with id={self.employee.id} tabel_code={self.employee.tabel_code}')
+
         periods = _get_calc_periods(
             dt_hired=getattr(self.employee, 'dt_hired', None),
             dt_fired=getattr(self.employee, 'dt_fired', None),
+            dt_from=self.dt_from,
+            dt_to=self.dt_to,
         )
         logger.info(f'timesheet calc periods: {periods}')
         for period in periods:

@@ -1932,31 +1932,65 @@ class TestAttendanceRecords(TestsHelperMixin, APITestCase):
         self.assertEqual(new_wd.is_vacancy, True)
 
     def test_create_attendance_records_for_different_shops(self):
+        self.worker_day_fact_approved.delete()
+
         tm_start = datetime.combine(self.dt, time(6, 0, 0))
-        AttendanceRecords.objects.create(
+        ar = AttendanceRecords.objects.create(
             dttm=tm_start,
             type=AttendanceRecords.TYPE_COMING,
             shop=self.shop2,
             user=self.user2
         )
-        self.worker_day_fact_approved.refresh_from_db()
-        self.assertEqual(self.worker_day_fact_approved.type, WorkerDay.TYPE_WORKDAY)
-        self.assertEqual(self.worker_day_fact_approved.dttm_work_start, tm_start)
-        self.assertEqual(self.worker_day_fact_approved.dttm_work_end, None)
-        self.assertEqual(self.worker_day_fact_approved.is_vacancy, True)
+        wd = WorkerDay.objects.filter(
+            employee=ar.employee,
+            is_fact=True,
+            is_approved=True,
+            dt=tm_start.date()
+        ).first()
+        self.assertIsNotNone(wd)
+        self.assertEqual(wd.type, WorkerDay.TYPE_WORKDAY)
+        self.assertEqual(wd.dttm_work_start, tm_start)
+        self.assertEqual(wd.dttm_work_end, None)
+        self.assertEqual(wd.is_vacancy, True)
 
-        tm_end = datetime.combine(self.dt, time(19, 0, 0))
+        tm_end = datetime.combine(self.dt, time(12, 0, 0))
         AttendanceRecords.objects.create(
             dttm=tm_end,
             type=AttendanceRecords.TYPE_LEAVING,
             shop=self.shop2,
             user=self.user2
         )
-        self.worker_day_fact_approved.refresh_from_db()
-        self.assertEqual(self.worker_day_fact_approved.type, WorkerDay.TYPE_WORKDAY)
-        self.assertEqual(self.worker_day_fact_approved.dttm_work_start, tm_start)
-        self.assertEqual(self.worker_day_fact_approved.dttm_work_end, tm_end)
-        self.assertEqual(self.worker_day_fact_approved.is_vacancy, True)
+        wd.refresh_from_db()
+        self.assertEqual(wd.type, WorkerDay.TYPE_WORKDAY)
+        self.assertEqual(wd.dttm_work_start, tm_start)
+        self.assertEqual(wd.dttm_work_end, tm_end)
+        self.assertEqual(wd.is_vacancy, True)
+
+        tm_start2 = datetime.combine(self.dt, time(13, 0, 0))
+        AttendanceRecords.objects.create(
+            dttm=tm_start2,
+            type=AttendanceRecords.TYPE_COMING,
+            shop=self.shop3,
+            user=self.user2
+        )
+        wd.refresh_from_db()
+        self.assertEqual(wd.type, WorkerDay.TYPE_WORKDAY)
+        self.assertEqual(wd.dttm_work_start, tm_start)
+        self.assertEqual(wd.dttm_work_end, tm_end)
+        self.assertEqual(wd.is_vacancy, True)
+
+        tm_end2 = datetime.combine(self.dt, time(20, 0, 0))
+        AttendanceRecords.objects.create(
+            dttm=tm_end2,
+            type=AttendanceRecords.TYPE_LEAVING,
+            shop=self.shop3,
+            user=self.user2
+        )
+        wd.refresh_from_db()
+        self.assertEqual(wd.type, WorkerDay.TYPE_WORKDAY)
+        self.assertEqual(wd.dttm_work_start, tm_start)
+        self.assertEqual(wd.dttm_work_end, tm_end2)
+        self.assertEqual(wd.is_vacancy, True)
 
     def test_fact_work_type_received_from_plan_approved(self):
         self.worker_day_fact_approved.delete()
@@ -2602,7 +2636,7 @@ class TestVacancy(TestsHelperMixin, APITestCase):
 
 
 
-class TestAditionalFunctions(APITestCase):
+class TestAditionalFunctions(TestsHelperMixin, APITestCase):
     USER_USERNAME = "user1"
     USER_EMAIL = "q@q.q"
     USER_PASSWORD = "4242"
@@ -3429,6 +3463,47 @@ class TestAditionalFunctions(APITestCase):
     #     self.assertEqual(len(data), 2)
     #     self.assertEqual(len(data[str(self.user2.id)]), 3)
     #     self.assertEqual(len(data[str(self.user3.id)]), 3)
+    def test_recalc(self):
+        today = date.today()
+        wd = WorkerDayFactory(
+            dt=today,
+            type=WorkerDay.TYPE_WORKDAY,
+            employee=self.employee2,
+            employment=self.employment2,
+            shop=self.employment2.shop,
+            is_approved=True,
+            is_fact=True,
+            dttm_work_start=datetime.combine(today, time(10)),
+            dttm_work_end=datetime.combine(today, time(19)),
+        )
+        self.assertEqual(wd.work_hours, timedelta(hours=8))
+        self.add_group_perm(self.employee_group, 'WorkerDay_recalc', 'POST')
+
+        WorkerDay.objects.filter(id=wd.id).update(work_hours=timedelta(0))
+        wd.refresh_from_db()
+        self.assertEqual(wd.work_hours, timedelta(0))
+        data = {
+            'shop_id': wd.employment.shop_id,
+            'employee_id__in': [self.employee2.id],
+            'dt_from': today,
+            'dt_to': today,
+        }
+        with self.settings(CELERY_TASK_ALWAYS_EAGER=True):
+            resp = self.client.post(
+                path=self.get_url('WorkerDay-recalc'),
+                data=self.dump_data(data), content_type='application/json',
+            )
+        self.assertContains(resp, 'Пересчет часов успешно запущен.', status_code=200)
+        wd.refresh_from_db()
+        self.assertEqual(wd.work_hours, timedelta(hours=8))
+
+        data['employee_id__in'] = [self.employee8.id]
+        with self.settings(CELERY_TASK_ALWAYS_EAGER=True):
+            resp2 = self.client.post(
+                path=self.get_url('WorkerDay-recalc'),
+                data=self.dump_data(data), content_type='application/json',
+            )
+        self.assertContains(resp2, 'Не найдено сотрудников удовлетворяющих условиям запроса.', status_code=400)
 
 class TestFineLogic(APITestCase):
     USER_USERNAME = "user1"

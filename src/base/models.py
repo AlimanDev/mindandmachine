@@ -1311,6 +1311,7 @@ class FunctionGroup(AbstractModel):
     )
 
     FUNCS_TUPLE = (
+        ('AttendanceRecords', 'Отметка'),
         ('AutoSettings_create_timetable', 'Составление графика (Создать)'),
         ('AutoSettings_set_timetable', 'Задать график (ответ от алгоритмов, Создать)'),
         ('AutoSettings_delete_timetable', 'Удалить график (Создать)'),
@@ -1318,6 +1319,7 @@ class FunctionGroup(AbstractModel):
         ('Break', 'Перерыв'),
         ('Employment', 'Трудоустройство'),
         ('Employee', 'Сотрудник'),
+        ('Employee_attendance_records_report', 'Отчет по отметкам по сотрудникам (Получить)'),
         ('Employment_auto_timetable', 'Выбрать сорудников для автосоставления (Создать)'),
         ('Employment_timetable', 'Редактирование полей трудоустройства, связанных с расписанием'),
         ('EmploymentWorkType', 'Связь трудоустройства и типа работ'),
@@ -1352,6 +1354,7 @@ class FunctionGroup(AbstractModel):
         ('TickPoint', 'Точка отметки'),
         ('Timesheet', 'Табель'),
         ('Timesheet_stats', 'Статистика табеля (Получить)'),
+        ('Timesheet_recalc', 'Запустить пересчет табеля (Создать)'),
         ('User', 'Пользователь'),
         ('User_change_password', 'Сменить пароль пользователю (Создать)'),
         ('User_delete_biometrics', 'Удалить биометрию пользователя (Создать)'),
@@ -1383,6 +1386,7 @@ class FunctionGroup(AbstractModel):
         ('WorkerDay_block', 'Заблокировать рабочий день (Создать)'),
         ('WorkerDay_unblock', 'Разблокировать рабочий день (Создать)'),
         ('WorkerDay_generate_upload_example', 'Скачать шаблон графика (Получить)'),
+        ('WorkerDay_recalc', 'Пересчитать часы (Создать)'),
         ('WorkerPosition', 'Должность'),
         ('WorkTypeName', 'Название типа работ'),
         ('WorkType', 'Тип работ'),

@@ -110,7 +110,7 @@ class MdaIntegrationHelper:
                 default=ArrayAgg(
                     'employees__employments__shop', distinct=True,
                     filter=Q(
-                        employees__employments__shop_id__in=active_employments_qs.values_list('shop_id', flat=True),
+                        employees__employments__id__in=active_employments_qs.values_list('id', flat=True),
                         employees__employments__shop__level=F('level'),
                     ),
                 ),
@@ -154,7 +154,13 @@ class MdaIntegrationHelper:
                 F('user_last_modified'),
                 F('employment_last_modified'),
                 F('position_last_modified'),
-            )
+            ),
+            add_to_unload=Exists(Employment.objects.get_active(
+                dt_from=self.dt_now - timedelta(days=60), dt_to=self.dt_now,
+                employee__user_id=OuterRef('id'),
+            ))
+        ).filter(
+            add_to_unload=True,
         )
         if threshold_seconds:
             qs = qs.filter(
@@ -218,7 +224,7 @@ class MdaIntegrationHelper:
             headers={
                 'x-public-token': settings.MDA_PUBLIC_API_AUTH_TOKEN,
             },
-            timeout=(5, 90),
+            timeout=(5, 300),
         )
         try:
             resp.raise_for_status()
@@ -234,7 +240,7 @@ class MdaIntegrationHelper:
             headers={
                 'x-public-token': settings.MDA_PUBLIC_API_AUTH_TOKEN,
             },
-            timeout=(5, 90),
+            timeout=(5, 1800),  # бешеный таймаут, т.к. запрос по всем юзерам может идти оооочень долго
         )
         try:
             resp.raise_for_status()
