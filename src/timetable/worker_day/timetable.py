@@ -276,25 +276,31 @@ class BaseUploadDownloadTimeTable:
         """
         Принимает от клиента экселевский файл и создает расписание (на месяц)
         """
-        shop_id = form['shop_id']
+        with transaction.atomic():
+            shop_id = form['shop_id']
 
-        try:
-            df = pd.read_excel(timetable_file)
-        except KeyError:
-            raise ValidationError({"message": _('Failed to open active sheet.')})
-        ######################### сюда писать логику чтения из экселя ######################################################
+            try:
+                df = pd.read_excel(timetable_file)
+            except KeyError:
+                raise ValidationError({"message": _('Failed to open active sheet.')})
+            ######################### сюда писать логику чтения из экселя ######################################################
 
-        users_df = df[df.columns[:3]].drop_duplicates()
-        number_column = df.columns[0]
-        name_column = df.columns[1]
-        position_column = df.columns[2]
-        users_df[number_column] = users_df[number_column].astype(str)
-        users_df[name_column] = users_df[name_column].astype(str)
-        users_df[position_column] = users_df[position_column].astype(str)
+            users_df = df[df.columns[:3]].drop_duplicates()
+            number_column = df.columns[0]
+            name_column = df.columns[1]
+            position_column = df.columns[2]
+            users_df[number_column] = users_df[number_column].astype(str)
+            users_df[name_column] = users_df[name_column].astype(str)
+            users_df[position_column] = users_df[position_column].astype(str)
 
-        users = self._upload_employments(users_df, number_column, name_column, position_column, shop_id, form['network_id'])
+            users = self._upload_employments(users_df, number_column, name_column, position_column, shop_id, form['network_id'])
 
-        return self._upload(df, users, form, is_fact)
+            res = self._upload(df, users, form, is_fact)
+
+            employee_id__in = [u[0].id for u in users]
+            WorkerDay.check_work_time_overlap(employee_id__in=employee_id__in, exc_cls=ValidationError)
+
+        return res
 
     def download(self, form):
         output = io.BytesIO()
