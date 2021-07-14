@@ -165,7 +165,7 @@ class Network(AbstractActiveModel):
         verbose_name=_('Show user biometrics block'),
     )
     # при рассчете фактических часов, будут рассчитываться штрафы
-    # пример значения можно найти в src.base.tests.test_worker_position.TestSetWorkerPositionDefaultsModel
+    # пример значения можно найти в src.timetable.tests.test_main.TestFineLogic
     fines_settings = models.TextField(default='{}', verbose_name=_('Fines settings'))
 
     @property
@@ -1025,7 +1025,7 @@ class WorkerPosition(AbstractActiveNetworkSpecificCodeNamedModel):
 
     @cached_property
     def wp_fines(self):
-        wp_fines_dict = self.network.fines_settings_values
+        wp_fines_dict = self.network.fines_settings_values if self.network else None
         if wp_fines_dict:
             for re_pattern, wp_fines in wp_fines_dict.items():
                 if re.search(re_pattern, self.name, re.IGNORECASE):

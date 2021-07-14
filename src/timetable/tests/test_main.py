@@ -3560,11 +3560,11 @@ class TestFineLogic(APITestCase):
         )
         return user, employee, employment
 
-    def _create_or_update_worker_day(self, employment, dttm_from, dttm_to, is_fact=False):
+    def _create_or_update_worker_day(self, employment, dttm_from, dttm_to, is_fact=False, is_approved=True):
         wd, _ =  WorkerDay.objects.update_or_create(
             employee_id=employment.employee_id,
             is_fact=is_fact,
-            is_approved=True,
+            is_approved=is_approved,
             dt=dttm_from.date(),
             shop=self.shop,
             type=WorkerDay.TYPE_WORKDAY,
@@ -3605,3 +3605,22 @@ class TestFineLogic(APITestCase):
         self.assertEquals(fact_wd_cleaner.work_hours, timedelta(hours=9, minutes=45))
         fact_wd_cleaner_bad = self._create_or_update_worker_day(self.cleaner[2], datetime.combine(dt, time(10, 5)), datetime.combine(dt, time(19, 50)), is_fact=True)
         self.assertEquals(fact_wd_cleaner_bad.work_hours, timedelta(hours=9, minutes=15))
+
+    def test_facts_work_hours_recalculated_on_plan_change(self):
+        dt = date.today()
+        plan_approved = self._create_or_update_worker_day(self.dir[2], datetime.combine(dt, time(9)), datetime.combine(dt, time(20)))
+
+        fact_approved = self._create_or_update_worker_day(self.dir[2], datetime.combine(dt, time(8, 35)), datetime.combine(dt, time(20, 25)), is_fact=True)
+        self.assertEqual(fact_approved.work_hours.total_seconds(), 11 * 3600 + 20 * 60)
+
+        fact_not_approved = self._create_or_update_worker_day(self.dir[2], datetime.combine(dt, time(9)), datetime.combine(dt, time(19)), is_approved=False, is_fact=True)
+        self.assertEqual(fact_not_approved.work_hours.total_seconds(), 6 * 3600 + 30 * 60)
+
+        plan_approved.dttm_work_start = datetime.combine(dt, time(11, 00, 0))
+        plan_approved.dttm_work_end = datetime.combine(dt, time(17, 00, 0))
+        plan_approved.save()
+
+        fact_approved.refresh_from_db()
+        self.assertEqual(fact_approved.work_hours.total_seconds(), 11 * 3600 + 20 * 60)
+        fact_not_approved.refresh_from_db()
+        self.assertEqual(fact_not_approved.work_hours.total_seconds(), 9 * 3600 + 30 * 60)
