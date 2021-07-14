@@ -13,7 +13,7 @@ from django.utils.timezone import now
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from src.base.models import FunctionGroup, Network, Employment, ShopSchedule, Shop, Employee
+from src.base.models import Break, FunctionGroup, Network, Employment, Region, ShopSchedule, Shop, Employee, User, WorkerPosition
 from src.events.models import EventType
 from src.notifications.models.event_notification import EventEmailNotification
 from src.timetable.events import VACANCY_CONFIRMED_TYPE
@@ -3463,7 +3463,6 @@ class TestAditionalFunctions(TestsHelperMixin, APITestCase):
     #     self.assertEqual(len(data), 2)
     #     self.assertEqual(len(data[str(self.user2.id)]), 3)
     #     self.assertEqual(len(data[str(self.user3.id)]), 3)
-
     def test_recalc(self):
         today = date.today()
         wd = WorkerDayFactory(
@@ -3505,3 +3504,104 @@ class TestAditionalFunctions(TestsHelperMixin, APITestCase):
                 data=self.dump_data(data), content_type='application/json',
             )
         self.assertContains(resp2, 'Не найдено сотрудников удовлетворяющих условиям запроса.', status_code=400)
+
+class TestFineLogic(APITestCase):
+    USER_USERNAME = "user1"
+    USER_EMAIL = "q@q.q"
+    USER_PASSWORD = "4242"
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.network = Network.objects.create(name='Test')
+        cls.shop = Shop.objects.create(
+            name='Shop',
+            network=cls.network,
+            region=Region.objects.create(name='Def'),
+        )
+        cls.network.fines_settings = json.dumps(
+           {
+                r'(.*)?директор|управляющий(.*)?': {
+                    'arrive_fines': [[-5, 10, 60], [60, 3600, 120]],
+                    'departure_fines': [[-5, 10, 60], [60, 3600, 120]],
+                },
+                r'(.*)?кладовщик|курьер(.*)?': {
+                    'arrive_fines': [[0, 10, 30], [30, 3600, 60]],
+                    'departure_fines': [[-10, 10, 30], [60, 3600, 60]],
+                },
+                r'(.*)?продавец|кассир|менеджер|консультант(.*)?': {
+                    'arrive_fines': [[-4, 60, 60], [60, 120, 120]],
+                    'departure_fines': [],
+                },
+            }
+        )
+        cls.network.save()
+        cls.breaks = Break.objects.create(
+            name='brk',
+            value='[[0, 3600, [30]]]',
+        )
+        cls.cashier = cls._create_user(cls, WorkerPosition.objects.create(network=cls.network, name='Продавец-кассир', breaks=cls.breaks), 'Cashier', 'cashier')
+        cls.dir = cls._create_user(cls, WorkerPosition.objects.create(network=cls.network, name='Директор Магазина', breaks=cls.breaks), 'Dir', 'dir')
+        cls.courier = cls._create_user(cls, WorkerPosition.objects.create(network=cls.network, name='Курьер', breaks=cls.breaks), 'Courier', 'courier')
+        cls.cleaner = cls._create_user(cls, WorkerPosition.objects.create(network=cls.network, name='Уборщик', breaks=cls.breaks), 'Cleaner', 'cleaner')
+
+    def _create_user(self, position, last_name, username):
+        user = User.objects.create(
+            last_name=last_name,
+            username=username,
+        )
+        employee = Employee.objects.create(
+            user=user,
+            tabel_code=username,
+        )
+        employment = Employment.objects.create(
+            employee=employee,
+            position=position,
+            shop=self.shop,
+        )
+        return user, employee, employment
+
+    def _create_or_update_worker_day(self, employment, dttm_from, dttm_to, is_fact=False):
+        wd, _ =  WorkerDay.objects.update_or_create(
+            employee_id=employment.employee_id,
+            is_fact=is_fact,
+            is_approved=True,
+            dt=dttm_from.date(),
+            shop=self.shop,
+            type=WorkerDay.TYPE_WORKDAY,
+            defaults=dict(
+                dttm_work_start=dttm_from,
+                dttm_work_end=dttm_to,
+                employment=employment,
+            )
+        )
+        return wd
+
+    def test_fine_settings(self):
+        dt = date.today()
+        plan_wd_dir = self._create_or_update_worker_day(self.dir[2], datetime.combine(dt, time(10)), datetime.combine(dt, time(20)))
+        self.assertEquals(plan_wd_dir.work_hours, timedelta(hours=9, minutes=30))
+        fact_wd_dir = self._create_or_update_worker_day(self.dir[2], datetime.combine(dt, time(9, 53)), datetime.combine(dt, time(20, 10)), is_fact=True)
+        self.assertEquals(fact_wd_dir.work_hours, timedelta(hours=9, minutes=47))
+        fact_wd_dir_bad = self._create_or_update_worker_day(self.dir[2], datetime.combine(dt, time(9, 56)), datetime.combine(dt, time(20)), is_fact=True)
+        self.assertEquals(fact_wd_dir_bad.work_hours, timedelta(hours=7, minutes=34))
+
+        plan_wd_cashier = self._create_or_update_worker_day(self.cashier[2], datetime.combine(dt, time(10)), datetime.combine(dt, time(20)))
+        self.assertEquals(plan_wd_cashier.work_hours, timedelta(hours=9, minutes=30))
+        fact_wd_cashier = self._create_or_update_worker_day(self.cashier[2], datetime.combine(dt, time(9, 55)), datetime.combine(dt, time(20, 10)), is_fact=True)
+        self.assertEquals(fact_wd_cashier.work_hours, timedelta(hours=9, minutes=45))
+        fact_wd_cashier_bad = self._create_or_update_worker_day(self.cashier[2], datetime.combine(dt, time(9, 56)), datetime.combine(dt, time(20)), is_fact=True)
+        self.assertEquals(fact_wd_cashier_bad.work_hours, timedelta(hours=8, minutes=34))
+
+        plan_wd_courier = self._create_or_update_worker_day(self.courier[2], datetime.combine(dt, time(10)), datetime.combine(dt, time(20)))
+        self.assertEquals(plan_wd_courier.work_hours, timedelta(hours=9, minutes=30))
+        fact_wd_courier = self._create_or_update_worker_day(self.courier[2], datetime.combine(dt, time(9, 55)), datetime.combine(dt, time(20, 11)), is_fact=True)
+        self.assertEquals(fact_wd_courier.work_hours, timedelta(hours=9, minutes=46))
+        fact_wd_courier_bad = self._create_or_update_worker_day(self.courier[2], datetime.combine(dt, time(10, 1)), datetime.combine(dt, time(19, 50)), is_fact=True)
+        self.assertEquals(fact_wd_courier_bad.work_hours, timedelta(hours=8, minutes=19))
+
+        plan_wd_cleaner = self._create_or_update_worker_day(self.cleaner[2], datetime.combine(dt, time(10)), datetime.combine(dt, time(20)))
+        self.assertEquals(plan_wd_cleaner.work_hours, timedelta(hours=9, minutes=30))
+        fact_wd_cleaner = self._create_or_update_worker_day(self.cleaner[2], datetime.combine(dt, time(9, 55)), datetime.combine(dt, time(20, 10)), is_fact=True)
+        self.assertEquals(fact_wd_cleaner.work_hours, timedelta(hours=9, minutes=45))
+        fact_wd_cleaner_bad = self._create_or_update_worker_day(self.cleaner[2], datetime.combine(dt, time(10, 5)), datetime.combine(dt, time(19, 50)), is_fact=True)
+        self.assertEquals(fact_wd_cleaner_bad.work_hours, timedelta(hours=9, minutes=15))

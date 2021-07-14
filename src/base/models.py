@@ -164,6 +164,9 @@ class Network(AbstractActiveModel):
         default=False,
         verbose_name=_('Show user biometrics block'),
     )
+    # при рассчете фактических часов, будут рассчитываться штрафы
+    # пример значения можно найти в src.base.tests.test_worker_position.TestSetWorkerPositionDefaultsModel
+    fines_settings = models.TextField(default='{}', verbose_name=_('Fines settings'))
 
     @property
     def settings_values_prop(self):
@@ -180,6 +183,10 @@ class Network(AbstractActiveModel):
     @cached_property
     def position_default_values(self):
         return json.loads(self.worker_position_default_values)
+
+    @cached_property
+    def fines_settings_values(self):
+        return json.loads(self.fines_settings)
 
     @cached_property
     def night_edges(self):
@@ -1015,6 +1022,14 @@ class WorkerPosition(AbstractActiveNetworkSpecificCodeNamedModel):
             for re_pattern, wp_defaults in wp_defaults_dict.items():
                 if re.search(re_pattern, self.name, re.IGNORECASE):
                     return wp_defaults
+
+    @cached_property
+    def wp_fines(self):
+        wp_fines_dict = self.network.fines_settings_values
+        if wp_fines_dict:
+            for re_pattern, wp_fines in wp_fines_dict.items():
+                if re.search(re_pattern, self.name, re.IGNORECASE):
+                    return wp_fines
 
     def _set_plain_defaults(self):
         if self.wp_defaults:
