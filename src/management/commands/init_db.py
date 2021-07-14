@@ -1,9 +1,11 @@
 import os
-from django.core.management.base import BaseCommand
-from django.db import transaction
 from datetime import time, datetime, timedelta, date
 
-from src.conf.djconfig import BASE_DIR
+from django.core.management.base import BaseCommand
+from django.db import transaction
+
+from etc.scripts import fill_calendar
+from etc.scripts.create_access_groups import password_generator, update_group_functions
 from src.base.models import (
     Shop,
     Region,
@@ -13,40 +15,18 @@ from src.base.models import (
     Employee,
     Network,
 )
+from src.conf.djconfig import BASE_DIR
 from src.forecast.models import (
     OperationType,
     OperationTypeName,
-    PeriodClients,
 )
 from src.timetable.models import (
     WorkType,
     WorkTypeName,
     ExchangeSettings,
 )
-from etc.scripts import fill_calendar
-from etc.scripts.create_access_groups import password_generator, update_group_functions
-from dateutil.relativedelta import relativedelta
+from etc.scripts.fill.demand import fill_demand
 
-def fill_demand(shop):
-    period_clients = []
-    dt_from = date.today().replace(day=1)
-    dt_to = dt_from + relativedelta(months=2)
-    dttms = [
-        datetime.combine(dt_from + timedelta(i), time(j))
-        for i in range((dt_to - dt_from).days)
-        for j in range(24)
-    ]
-    period_clients = [
-        PeriodClients(
-            value=1,
-            operation_type=o_type,
-            type=PeriodClients.LONG_FORECASE_TYPE,
-            dttm_forecast=dttm,
-        )
-        for o_type in OperationType.objects.filter(work_type__shop=shop)
-        for dttm in dttms
-    ]
-    PeriodClients.objects.bulk_create(period_clients)
 
 class Command(BaseCommand):
     help = 'Add DB data for client'
@@ -72,11 +52,13 @@ class Command(BaseCommand):
                     'name': "Регион 1",
                 }
             )
-            fill_calendar.fill_days('2020.1.1', (datetime.now() + timedelta(days=730)).date().strftime('%Y.%m.%d'), 1, file_name=os.path.join(BASE_DIR, 'etc/scripts/work_data.csv'))
+            fill_calendar.fill_days('2020.1.1', (datetime.now() + timedelta(days=730)).date().strftime('%Y.%m.%d'), 1,
+                                    file_name=os.path.join(BASE_DIR, 'etc/scripts/work_data.csv'))
             super_shop = Shop.objects.first()
             super_shop.name = options.get('client_name') or 'Корневой магазин'
             super_shop.save()
-            update_group_functions(network=network, path=os.path.join(BASE_DIR, 'etc/scripts/function_group_default.xlsx'))
+            update_group_functions(network=network,
+                                   path=os.path.join(BASE_DIR, 'etc/scripts/function_group_default.xlsx'))
             admin = User.objects.create(
                 is_staff=True,
                 is_superuser=True,
@@ -149,9 +131,11 @@ class Command(BaseCommand):
                 operation_types = []
                 for wt in work_types:
                     work_type = WorkType.objects.create(work_type_name=work_type_names[wt], shop_id=shop.id)
-                    operation_types.append(OperationType(operation_type_name=operation_type_names[wt], work_type=work_type))
+                    operation_types.append(
+                        OperationType(operation_type_name=operation_type_names[wt], work_type=work_type))
                 OperationType.objects.bulk_create(operation_types)
-                fill_demand(shop)
+                fill_demand(shop_ids=[shop.id])
             Shop.objects.rebuild()
             ExchangeSettings.objects.create(network=network)
-            self.stdout.write(self.style.SUCCESS('Successfully filled database. Created {} work types.'.format(WorkTypeName.objects.count())))
+            self.stdout.write(self.style.SUCCESS(
+                'Successfully filled database. Created {} work types.'.format(WorkTypeName.objects.count())))
