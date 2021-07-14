@@ -81,7 +81,7 @@ class NetworkAdmin(admin.ModelAdmin):
         (_('Basic settings'), {'fields': ('logo', 'url', 'primary_color', 'secondary_color', 'name', 'code', 'okpo')}),
         (_('Time attendance settings'), {'fields': ('allowed_interval_for_late_arrival', 'allowed_interval_for_early_departure', 'allowed_geo_distance_km', 'enable_camera_ticks')}),
         (_('Time tracking settings'), {
-            'fields': ('crop_work_hours_by_shop_schedule', 'accounting_period_length', 'only_fact_hours_that_in_approved_plan', 'consider_remaining_hours_in_prev_months_when_calc_norm_hours'),
+            'fields': ('crop_work_hours_by_shop_schedule', 'accounting_period_length', 'only_fact_hours_that_in_approved_plan', 'consider_remaining_hours_in_prev_months_when_calc_norm_hours', 'fines_settings'),
         }),
         (_('Vacancy settings'), {'fields': ('need_symbol_for_vacancy', 'allow_workers_confirm_outsource_vacancy')}),
         (_('Format settings'), {'fields': ('download_tabel_template', 'convert_tabel_to', 'timetable_format')}),

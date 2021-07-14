@@ -45,13 +45,16 @@ class MultipleActiveEmploymentsSupportMixin(TestsHelperMixin):
         )
         cls.user1 = UserFactory(email='dir@example.com', network=cls.network)
         cls.user2 = UserFactory(email='urs@example.com', network=cls.network)
+        cls.user3 = UserFactory(email='urs@example.com', network=cls.network)
 
         cls.employee1_1 = EmployeeFactory(user=cls.user1, tabel_code='employee1_1')
         cls.employee1_2 = EmployeeFactory(user=cls.user1, tabel_code='employee1_2')
         cls.employee2_1 = EmployeeFactory(user=cls.user2, tabel_code='employee2_1')
         cls.employee2_2 = EmployeeFactory(user=cls.user2, tabel_code='employee2_2')
+        cls.employee3 = EmployeeFactory(user=cls.user3, tabel_code='employee3')
 
         cls.group1 = GroupFactory(network=cls.network)
+        cls.group2 = GroupFactory(network=cls.network)
 
         cls.work_type3_other = WorkTypeFactory(
             shop=cls.shop3,
@@ -99,6 +102,10 @@ class MultipleActiveEmploymentsSupportMixin(TestsHelperMixin):
         )
         cls.employment2_2_3 = EmploymentFactory(
             employee=cls.employee2_2, shop=cls.shop3, function_group=cls.group1, norm_work_hours=50,
+            work_types__work_type=cls.work_type3_cachier,
+        )
+        cls.employment3 = EmploymentFactory(
+            employee=cls.employee3, shop=cls.shop3, function_group=cls.group2,
             work_types__work_type=cls.work_type3_cachier,
         )
         cls.dt = timezone.now().date()
@@ -351,7 +358,7 @@ class TestGetWorkersStatAndTabel(MultipleActiveEmploymentsSupportMixin, APITestC
         cls.add_group_perm(cls.group1, 'WorkerDay_worker_stat', 'GET')
 
     def _create_wdays(self, dt_now):
-        for dt in pd.date_range(dt_now, dt_now + timedelta(days=4)):
+        for dt in pd.date_range(dt_now, dt_now + timedelta(days=4)).date:
             WorkerDayFactory(
                 dt=dt,
                 employee=self.employee1_1,
@@ -363,7 +370,7 @@ class TestGetWorkersStatAndTabel(MultipleActiveEmploymentsSupportMixin, APITestC
                 cashbox_details__work_type=self.work_type1_cachier,
             )
 
-        for dt in pd.date_range(dt_now + timedelta(days=5), dt_now + timedelta(days=9)):
+        for dt in pd.date_range(dt_now + timedelta(days=5), dt_now + timedelta(days=9)).date:
             WorkerDayFactory(
                 dt=dt,
                 employee=self.employee1_1,
@@ -383,7 +390,7 @@ class TestGetWorkersStatAndTabel(MultipleActiveEmploymentsSupportMixin, APITestC
                 is_approved=True,
             )
 
-        for dt in pd.date_range(dt_now + timedelta(days=10), dt_now + timedelta(days=14)):
+        for dt in pd.date_range(dt_now + timedelta(days=10), dt_now + timedelta(days=14)).date:
             WorkerDayFactory(
                 dt=dt,
                 employee=self.employee1_2,
@@ -395,7 +402,7 @@ class TestGetWorkersStatAndTabel(MultipleActiveEmploymentsSupportMixin, APITestC
                 cashbox_details__work_type=self.work_type1_cleaner,
             )
 
-        for dt in pd.date_range(dt_now + timedelta(days=15), dt_now + timedelta(days=19)):
+        for dt in pd.date_range(dt_now + timedelta(days=15), dt_now + timedelta(days=19)).date:
             WorkerDayFactory(
                 dt=dt,
                 employee=self.employee1_1,
@@ -415,7 +422,7 @@ class TestGetWorkersStatAndTabel(MultipleActiveEmploymentsSupportMixin, APITestC
                 is_approved=True,
             )
 
-        for dt in pd.date_range(dt_now + timedelta(days=20), dt_now + timedelta(days=24)):
+        for dt in pd.date_range(dt_now + timedelta(days=20), dt_now + timedelta(days=24)).date:
             WorkerDayFactory(
                 dt=dt,
                 employee=self.employee1_2,
@@ -464,6 +471,63 @@ class TestGetWorkersStatAndTabel(MultipleActiveEmploymentsSupportMixin, APITestC
         self.assertEqual(len(list(filter(lambda i: i['type'] == WorkerDay.TYPE_WORKDAY, resp_data))), 10)
         self.assertEqual(len(list(filter(lambda i: i['type'] == WorkerDay.TYPE_HOLIDAY, resp_data))), 5)
         self.assertEqual(len(list(filter(lambda i: i['type'] == WorkerDay.TYPE_VACATION, resp_data))), 5)
+
+    def test_fact_tabel_data_by_fact_shop_code__in_filter(self):
+        self._create_wdays(self.dt_now)
+        for dt in pd.date_range(self.dt_now + timedelta(days=25), self.dt_now + timedelta(days=28)).date:
+            WorkerDayFactory(
+                dt=dt,
+                employee=self.employee1_1,
+                employment=self.employment1_1_1,
+                shop=self.shop3,
+                type=WorkerDay.TYPE_WORKDAY,
+                is_fact=True,
+                is_approved=True,
+                cashbox_details__work_type=self.work_type3_cachier,
+            )
+        for dt in pd.date_range(self.dt_now + timedelta(days=25), self.dt_now + timedelta(days=28)).date:
+            WorkerDayFactory(
+                dt=dt,
+                employee=self.employee2_2,
+                employment=self.employment2_2_3,
+                shop=self.shop3,
+                type=WorkerDay.TYPE_WORKDAY,
+                is_fact=True,
+                is_approved=True,
+                cashbox_details__work_type=self.work_type3_cachier,
+            )
+        self.client.force_authenticate(user=self.user1)
+        resp = self.client.get(
+            self.get_url('WorkerDay-list'),
+            data={
+                'dt__gte': self.dt_now,
+                'dt__lte': self.dt_now + timedelta(days=28),
+                'fact_tabel': True,
+                'fact_shop_code__in': [self.shop3.code],
+                'by_code': True,
+            },
+        )
+        self.assertEqual(resp.status_code, 200)
+        resp_data = resp.json()
+        self.assertEqual(len(resp_data), 23)
+        self.assertEqual(len(list(
+            filter(lambda i: i['type'] == WorkerDay.TYPE_WORKDAY and i['employee_id'] == self.employee1_1.id and i[
+                'shop_id'] == self.shop1.id,
+                   resp_data))), 5)
+        self.assertEqual(len(list(
+            filter(lambda i: i['type'] == WorkerDay.TYPE_WORKDAY and i['employee_id'] == self.employee1_1.id and i[
+                'shop_id'] == self.shop3.id,
+                   resp_data))), 4)
+        self.assertEqual(len(list(
+            filter(lambda i: i['type'] == WorkerDay.TYPE_HOLIDAY and i['employee_id'] == self.employee1_1.id,
+                   resp_data))), 5)
+        self.assertEqual(len(list(
+            filter(lambda i: i['type'] == WorkerDay.TYPE_VACATION and i['employee_id'] == self.employee1_1.id,
+                   resp_data))), 5)
+        self.assertEqual(len(list(
+            filter(lambda i: i['type'] == WorkerDay.TYPE_WORKDAY and i['employee_id'] == self.employee2_2.id and i[
+                'shop_id'] == self.shop3.id,
+                   resp_data))), 4)
 
     def test_get_worker_stat_by_employee(self):
         """
@@ -850,7 +914,7 @@ class TestEmployeeAPI(MultipleActiveEmploymentsSupportMixin, APITestCase):
             self.get_url('Employee-list'), data={'include_employments': True, 'show_constraints': True})
         self.assertEqual(resp.status_code, 200)
         resp_data = resp.json()
-        self.assertEqual(len(resp_data), 4)
+        self.assertEqual(len(resp_data), 5)
         employee_data = resp_data[0]
         self.assertIn('employments', employee_data)
         employment_data = employee_data['employments'][0]
@@ -861,7 +925,7 @@ class TestEmployeeAPI(MultipleActiveEmploymentsSupportMixin, APITestCase):
         resp = self.client.get(self.get_url('Employee-list'))
         self.assertEqual(resp.status_code, 200)
         resp_data = resp.json()
-        self.assertEqual(len(resp_data), 4)
+        self.assertEqual(len(resp_data), 5)
         employee_data = resp_data[0]
         self.assertNotIn('employments', employee_data)
 
@@ -887,3 +951,72 @@ class TestEmployeeAPI(MultipleActiveEmploymentsSupportMixin, APITestCase):
         e = Employee.objects.get(id=resp.json()['id'])
         self.assertEqual(e.user_id, self.user1.id)
         self.assertEqual(e.tabel_code, None)
+
+    def test_can_filter_by_group_id(self):
+        self.client.force_authenticate(user=self.user1)
+        resp = self.client.get(
+            self.get_url('Employee-list'),
+            data={'group_id__in': str(self.group2.id)},
+            content_type='application/json',
+        )
+        self.assertEqual(resp.status_code, 200)
+        resp_data = resp.json()
+        self.assertEqual(len(resp_data), 1)
+        self.assertEqual(resp_data[0]['id'], self.employee3.id)
+
+    def test_get_attendance_records_report(self):
+        from src.timetable.models import AttendanceRecords
+        coming_time = time(10)
+        leaving_time = time(20)
+        AttendanceRecords.objects.create(
+            shop=self.shop1,
+            type=AttendanceRecords.TYPE_COMING,
+            user=self.user1,
+            dttm=datetime.combine(self.dt, coming_time),
+        )
+        AttendanceRecords.objects.create(
+            shop=self.shop1,
+            type=AttendanceRecords.TYPE_LEAVING,
+            user=self.user1,
+            dttm=datetime.combine(self.dt, leaving_time),
+        )
+        AttendanceRecords.objects.create(
+            shop=self.shop2,
+            type=AttendanceRecords.TYPE_COMING,
+            user=self.user2,
+            dttm=datetime.combine(self.dt, coming_time),
+        )
+        AttendanceRecords.objects.create(
+            shop=self.shop2,
+            type=AttendanceRecords.TYPE_LEAVING,
+            user=self.user2,
+            dttm=datetime.combine(self.dt, leaving_time),
+        )
+        self.client.force_authenticate(user=self.user1)
+        self.add_group_perm(self.group1, 'AttendanceRecords_report', 'GET')
+        resp = self.client.get(self.get_url('AttendanceRecords-report'))
+        BytesIO = pd.io.common.BytesIO
+        df = pd.read_excel(BytesIO(resp.content), engine='xlrd')
+        self.assertEqual(len(df.index), 4)
+
+        resp = self.client.get(
+            self.get_url('AttendanceRecords-report'), data={'employee_id__in': [self.employee1_1.id]})
+        BytesIO = pd.io.common.BytesIO
+        df = pd.read_excel(BytesIO(resp.content), engine='xlrd')
+        self.assertEqual(len(df.index), 2)
+
+        resp = self.client.get(
+            self.get_url('AttendanceRecords-report'), data={'shop_id__in': [self.shop1.id]})
+        BytesIO = pd.io.common.BytesIO
+        df = pd.read_excel(BytesIO(resp.content), engine='xlrd')
+        self.assertEqual(len(df.index), 2)
+
+        resp = self.client.get(
+            self.get_url('AttendanceRecords-report'),
+            data={
+                'shop_id__in': [self.shop1.id],
+                'employee_id__in': [self.employee2_1.id]
+            })
+        BytesIO = pd.io.common.BytesIO
+        df = pd.read_excel(BytesIO(resp.content), engine='xlrd')
+        self.assertEqual(len(df.index), 0)

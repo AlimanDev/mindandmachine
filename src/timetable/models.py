@@ -603,8 +603,10 @@ class WorkerDay(AbstractModel):
                     if self.dttm_work_end > dttm_shop_close:
                         dttm_work_end = dttm_shop_close
             break_time = None
-            if self.shop.network.only_fact_hours_that_in_approved_plan and \
-                    self.type in WorkerDay.TYPES_WITH_TM_RANGE and self.is_fact:
+            dttm_work_start_plan = None
+            dttm_work_end_plan = None
+            fines = None
+            if self.is_fact:
                 plan_approved = WorkerDay.objects.filter(
                     dt=self.dt,
                     employee_id=self.employee_id,
@@ -615,38 +617,44 @@ class WorkerDay(AbstractModel):
                     dttm_work_end__isnull=False,
                 ).first()
                 if plan_approved:
-                    late_arrival_delta = self.shop.network.allowed_interval_for_late_arrival
-                    allowed_late_arrival_cond = late_arrival_delta and \
-                        dttm_work_start > plan_approved.dttm_work_start and \
-                        (dttm_work_start - plan_approved.dttm_work_start).total_seconds() < \
-                                                             late_arrival_delta.total_seconds()
-                    if allowed_late_arrival_cond:
-                        dttm_work_start = plan_approved.dttm_work_start
-                    else:
-                        dttm_work_start = max(dttm_work_start, plan_approved.dttm_work_start)
+                    dttm_work_start_plan = plan_approved.dttm_work_start
+                    dttm_work_end_plan = plan_approved.dttm_work_end
+                    fines = self.employment.position.wp_fines if self.employment and self.employment.position else None
+                if self.shop.network.only_fact_hours_that_in_approved_plan and \
+                    self.type in WorkerDay.TYPES_WITH_TM_RANGE:
+                    if plan_approved:
+                        late_arrival_delta = self.shop.network.allowed_interval_for_late_arrival
+                        allowed_late_arrival_cond = late_arrival_delta and \
+                            dttm_work_start > plan_approved.dttm_work_start and \
+                            (dttm_work_start - plan_approved.dttm_work_start).total_seconds() < \
+                                                                late_arrival_delta.total_seconds()
+                        if allowed_late_arrival_cond:
+                            dttm_work_start = plan_approved.dttm_work_start
+                        else:
+                            dttm_work_start = max(dttm_work_start, plan_approved.dttm_work_start)
 
-                    early_departure_delta = self.shop.network.allowed_interval_for_early_departure
-                    allowed_early_departure_cond = early_departure_delta and \
-                                                dttm_work_end < plan_approved.dttm_work_end and \
-                                                (plan_approved.dttm_work_end - dttm_work_end).total_seconds() < \
-                                                early_departure_delta.total_seconds()
-                    if allowed_early_departure_cond:
-                        dttm_work_end = plan_approved.dttm_work_end
+                        early_departure_delta = self.shop.network.allowed_interval_for_early_departure
+                        allowed_early_departure_cond = early_departure_delta and \
+                                                    dttm_work_end < plan_approved.dttm_work_end and \
+                                                    (plan_approved.dttm_work_end - dttm_work_end).total_seconds() < \
+                                                    early_departure_delta.total_seconds()
+                        if allowed_early_departure_cond:
+                            dttm_work_end = plan_approved.dttm_work_end
+                        else:
+                            dttm_work_end = min(dttm_work_end, plan_approved.dttm_work_end)
+                        # учитываем перерыв плана, если факт получился больше
+                        fact_hours = self.count_work_hours(breaks, dttm_work_start, dttm_work_end)
+                        plan_hours = plan_approved.work_hours
+                        if fact_hours > plan_hours:
+                            work_hours = (plan_approved.dttm_work_end - plan_approved.dttm_work_start).total_seconds() / 60
+                            for break_triplet in breaks:
+                                if work_hours >= break_triplet[0] and work_hours <= break_triplet[1]:
+                                    break_time = sum(break_triplet[2])
+                                    break
                     else:
-                        dttm_work_end = min(dttm_work_end, plan_approved.dttm_work_end)
-                    # учитываем перерыв плана, если факт получился больше
-                    fact_hours = self.count_work_hours(breaks, dttm_work_start, dttm_work_end)
-                    plan_hours = plan_approved.work_hours
-                    if fact_hours > plan_hours:
-                        work_hours = (plan_approved.dttm_work_end - plan_approved.dttm_work_start).total_seconds() / 60
-                        for break_triplet in breaks:
-                            if work_hours >= break_triplet[0] and work_hours <= break_triplet[1]:
-                                break_time = sum(break_triplet[2])
-                                break
-                else:
-                    return dttm_work_start, dttm_work_end, datetime.timedelta(0)
+                        return dttm_work_start, dttm_work_end, datetime.timedelta(0)
 
-            return dttm_work_start, dttm_work_end, self.count_work_hours(breaks, dttm_work_start, dttm_work_end, break_time=break_time)
+            return dttm_work_start, dttm_work_end, self.count_work_hours(breaks, dttm_work_start, dttm_work_end, break_time=break_time, dttm_work_start_plan=dttm_work_start_plan, dttm_work_end_plan=dttm_work_end_plan, fines=fines)
 
         return self.dttm_work_start, self.dttm_work_end, datetime.timedelta(0)
 
@@ -719,8 +727,21 @@ class WorkerDay(AbstractModel):
         return t in cls.TYPES_WITH_TM_RANGE
 
     @staticmethod
-    def count_work_hours(break_triplets, dttm_work_start, dttm_work_end, break_time=None):
+    def count_work_hours(break_triplets, dttm_work_start, dttm_work_end, break_time=None, fines=None, dttm_work_start_plan=None, dttm_work_end_plan=None):
         work_hours = (dttm_work_end - dttm_work_start).total_seconds() / 60
+        if dttm_work_start_plan and dttm_work_end_plan and fines:
+            arrive_fines = fines.get('arrive_fines', [])
+            departure_fines = fines.get('departure_fines', [])
+            arrive_timedelta = (dttm_work_start - dttm_work_start_plan).total_seconds() / 60
+            departure_timedelta = (dttm_work_end_plan - dttm_work_end).total_seconds() / 60
+            for arrive_fine in arrive_fines:
+                if arrive_timedelta >= arrive_fine[0] and arrive_timedelta <= arrive_fine[1]:
+                    work_hours = work_hours - arrive_fine[2]
+                    break
+            for departure_fine in departure_fines:
+                if departure_timedelta >= departure_fine[0] and departure_timedelta <= departure_fine[1]:
+                    work_hours = work_hours - departure_fine[2]
+                    break
         if break_time:
             work_hours = work_hours - break_time
             return datetime.timedelta(minutes=work_hours)
@@ -780,9 +801,10 @@ class WorkerDay(AbstractModel):
         is_new = self.id is None
 
         res = super().save(*args, **kwargs)
+        fines = self.employment.position.wp_fines if self.employment and self.employment.position else None
 
         # запускаем пересчет часов для факта, если изменились часы в подтвержденном плане
-        if self.shop and self.shop.network.only_fact_hours_that_in_approved_plan and \
+        if self.shop and (self.shop.network.only_fact_hours_that_in_approved_plan or fines) and \
                 self.tracker.has_changed('work_hours') and \
                 self.type in WorkerDay.TYPES_WITH_TM_RANGE and self.is_plan and self.is_approved:
             fact_qs = WorkerDay.objects.filter(
@@ -1540,15 +1562,6 @@ class AttendanceRecords(AbstractModel):
                 is_fact=True,
                 is_approved=True,
             ).select_for_update().first()
-
-            # для случаев когда сотрудник перепутал магазины, отметился сначала в одном, потом еще раз в другом
-            if fact_approved and fact_approved.shop_id != self.shop_id:
-                # TODO: что будет если отметиться на приход в одном магазина, а на уход в другом?
-                fact_approved.dttm_work_start = None
-                fact_approved.dttm_work_end = None
-                fact_approved.shop_id = self.shop_id
-                fact_approved.is_vacancy = active_user_empl.shop_id != self.shop_id if active_user_empl else False
-                fact_approved.save(update_fields=('shop_id', 'dttm_work_start', 'dttm_work_end', 'is_vacancy'))
 
             if fact_approved:
                 # если это отметка о приходе, то не перезаписываем время начала работы в графике

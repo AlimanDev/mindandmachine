@@ -172,6 +172,9 @@ class Network(AbstractActiveModel):
         default=False,
         verbose_name=_('Show user biometrics block'),
     )
+    # при рассчете фактических часов, будут рассчитываться штрафы
+    # пример значения можно найти в src.timetable.tests.test_main.TestFineLogic
+    fines_settings = models.TextField(default='{}', verbose_name=_('Fines settings'))
 
     @property
     def settings_values_prop(self):
@@ -188,6 +191,10 @@ class Network(AbstractActiveModel):
     @cached_property
     def position_default_values(self):
         return json.loads(self.worker_position_default_values)
+
+    @cached_property
+    def fines_settings_values(self):
+        return json.loads(self.fines_settings)
 
     @cached_property
     def night_edges(self):
@@ -1017,6 +1024,14 @@ class WorkerPosition(AbstractActiveNetworkSpecificCodeNamedModel):
                 if re.search(re_pattern, self.name, re.IGNORECASE):
                     return wp_defaults
 
+    @cached_property
+    def wp_fines(self):
+        wp_fines_dict = self.network.fines_settings_values if self.network else None
+        if wp_fines_dict:
+            for re_pattern, wp_fines in wp_fines_dict.items():
+                if re.search(re_pattern, self.name, re.IGNORECASE):
+                    return wp_fines
+
     def _set_plain_defaults(self):
         if self.wp_defaults:
             hours_in_a_week = self.wp_defaults.get('hours_in_a_week')
@@ -1297,6 +1312,8 @@ class FunctionGroup(AbstractModel):
     )
 
     FUNCS_TUPLE = (
+        ('AttendanceRecords', 'Отметка'),
+        ('AttendanceRecords_report', 'Отчет по отметкам (Получить)'),
         ('AutoSettings_create_timetable', 'Составление графика (Создать)'),
         ('AutoSettings_set_timetable', 'Задать график (ответ от алгоритмов, Создать)'),
         ('AutoSettings_delete_timetable', 'Удалить график (Создать)'),
@@ -1338,6 +1355,7 @@ class FunctionGroup(AbstractModel):
         ('TickPoint', 'Точка отметки'),
         ('Timesheet', 'Табель'),
         ('Timesheet_stats', 'Статистика табеля (Получить)'),
+        ('Timesheet_recalc', 'Запустить пересчет табеля (Создать)'),
         ('User', 'Пользователь'),
         ('User_change_password', 'Сменить пароль пользователю (Создать)'),
         ('User_delete_biometrics', 'Удалить биометрию пользователя (Создать)'),
@@ -1369,6 +1387,7 @@ class FunctionGroup(AbstractModel):
         ('WorkerDay_block', 'Заблокировать рабочий день (Создать)'),
         ('WorkerDay_unblock', 'Разблокировать рабочий день (Создать)'),
         ('WorkerDay_generate_upload_example', 'Скачать шаблон графика (Получить)'),
+        ('WorkerDay_recalc', 'Пересчитать часы (Создать)'),
         ('WorkerPosition', 'Должность'),
         ('WorkTypeName', 'Название типа работ'),
         ('WorkType', 'Тип работ'),

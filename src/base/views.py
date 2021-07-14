@@ -220,7 +220,7 @@ class EmployeeViewSet(UpdateorCreateViewSet):
 
     def get_queryset(self):
         qs = Employee.objects.filter(
-            user__network_id=self.request.user.network_id
+            user__network_id=self.request.user.network_id if self.request.user.is_authenticated else None
         ).select_related(
             'user',
         )

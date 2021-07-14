@@ -15,6 +15,7 @@ class NetworkAdminForm(DefaultOverrideAdminWidgetsForm):
     json_fields = [
         'settings_values',
         'worker_position_default_values',
+        'fines_settings',
     ]
 
 

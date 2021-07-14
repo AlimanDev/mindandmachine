@@ -1,8 +1,6 @@
 import datetime
 import json
 from itertools import groupby
-from src.timetable.vacancy.tasks import vacancies_create_and_cancel_for_shop
-from src.timetable.worker_day.timetable import get_timetable_generator_cls
 
 import pandas as pd
 from django.conf import settings
@@ -41,6 +39,7 @@ from src.timetable.models import (
 )
 from src.timetable.timesheet.tasks import calc_timesheets
 from src.timetable.vacancy.utils import cancel_vacancies, cancel_vacancy, confirm_vacancy
+from src.timetable.vacancy.tasks import vacancies_create_and_cancel_for_shop
 from src.timetable.worker_day.serializers import (
     WorkerDaySerializer,
     WorkerDayApproveSerializer,
@@ -59,9 +58,11 @@ from src.timetable.worker_day.serializers import (
     RequestApproveSerializer,
     CopyRangeSerializer,
     BlockOrUnblockWorkerDayWrapperSerializer,
+    RecalcWdaysSerializer,
 )
 from src.timetable.worker_day.stat import count_daily_stat
 from src.timetable.worker_day.tasks import recalc_wdays, recalc_fact_from_records
+from src.timetable.worker_day.timetable import get_timetable_generator_cls
 from src.timetable.worker_day.utils import exchange, copy_as_excel_cells
 from src.util.dg.tabel import get_tabel_generator_cls
 from src.util.models_converter import Converter
@@ -623,7 +624,7 @@ class WorkerDayViewSet(BaseModelViewSet):
                             )
                         )
                     
-                    vacancies_create_and_cancel_for_shop.delay(serializer.validated_data['shop_id'])
+                    transaction.on_commit(lambda: vacancies_create_and_cancel_for_shop.delay(serializer.validated_data['shop_id']))
                     if not has_permission_to_change_protected_wdays:
                         WorkerDay.check_tasks_violations(
                             employee_days_q=employee_days_q,
@@ -1500,3 +1501,31 @@ class WorkerDayViewSet(BaseModelViewSet):
                 is_fact=dict_to_block['is_fact'],
             ).update(is_blocked=False)
         return Response()
+
+    @swagger_auto_schema(
+        request_body=RecalcWdaysSerializer,
+        responses={200: None},
+        operation_description='''
+        Пересчет часов
+        '''
+    )
+    @action(detail=False, methods=['post'])
+    def recalc(self, *args, **kwargs):
+        serializer = RecalcWdaysSerializer(
+            data=self.request.data, context=self.get_serializer_context())
+        serializer.is_valid(raise_exception=True)
+        employee_filter = {}
+        if serializer.validated_data.get('employee_id__in'):
+            employee_filter['employee_id__in'] = serializer.validated_data['employee_id__in']
+        employee_ids = Employment.objects.get_active(
+            Shop.objects.get(id=serializer.validated_data['shop_id']).network_id,
+            dt_from=serializer.validated_data['dt_from'],
+            dt_to=serializer.validated_data['dt_to'],
+            shop_id=serializer.validated_data['shop_id'],
+            **employee_filter,
+        ).values_list('employee_id', flat=True)
+        employee_ids = list(employee_ids)
+        if not employee_ids:
+            raise ValidationError({'detail': _('No employees satisfying the conditions.')})
+        recalc_wdays.delay(employee_id__in=employee_ids)
+        return Response({'detail': _('Hours recalculation started successfully.')})

@@ -200,6 +200,8 @@ class TestTicksViewSet(TestsHelperMixin, APITestCase):
     def test_get_ticks_for_tick_point(self):
         tick_point_id = self._authorize_tick_point().json()['tick_point']['id']
         dt = date.today()
+        self.shop.timezone = 'UTC'
+        self.shop.save()
         Tick.objects.create(
             user=self.user1,
             dttm=datetime.combine(dt - timedelta(1), time(16, 0, 2)),
