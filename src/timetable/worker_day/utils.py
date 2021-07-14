@@ -271,3 +271,39 @@ def create_fact_from_attendance_records(dt_from, dt_to, shop_ids=None):
                 record.employee_id = None
             record.save()
        
+def create_worker_days_range(dates, type=WorkerDay.TYPE_WORKDAY, shop_id=None, employee_id=None, tm_work_start=None, tm_work_end=None, work_type_id=None, is_approved=False, is_vacancy=False, outsources=[]):
+    with transaction.atomic():
+        created_wds = []
+        employment = None
+        if employee_id:
+            WorkerDay.objects.filter(
+                dt__in=dates,
+                is_approved=is_approved,
+                is_fact=False,
+                employee_id=employee_id,
+            ).delete()
+        if employee_id and type == WorkerDay.TYPE_WORKDAY:
+            employment = Employment.objects.get_active_empl_by_priority(None, dt=dates[0], priority_shop_id=shop_id, priority_work_type_id=work_type_id, employee_id=employee_id).first()
+        for date in dates:
+            wd = WorkerDay.objects.create(
+                dt=date,
+                shop_id=shop_id,
+                employee_id=employee_id,
+                employment=employment,
+                is_vacancy=is_vacancy,
+                is_approved=is_approved,
+                dttm_work_start=datetime.datetime.combine(date, tm_work_start),
+                dttm_work_end=datetime.datetime.combine(date, tm_work_end),
+                type=type,
+                is_outsource=bool(outsources),
+            )
+            if outsources:
+                wd.outsources.add(*outsources)
+            if work_type_id:
+                WorkerDayCashboxDetails.objects.create(
+                    worker_day=wd,
+                    work_type_id=work_type_id,
+                )
+            created_wds.append(created_wds)
+
+        return created_wds

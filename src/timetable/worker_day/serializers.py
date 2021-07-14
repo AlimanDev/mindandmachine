@@ -360,16 +360,20 @@ class VacancySerializer(serializers.Serializer):
         return None
 
 
-class ListChangeSrializer(serializers.Serializer):
+class ListChangeSerializer(serializers.Serializer):
     default_error_messages = {
         "invalid_dt_change_list": _("Wrong dates format.")}
-    shop_id = serializers.IntegerField()
-    workers = serializers.JSONField()
-    type = serializers.CharField()
+    shop_id = serializers.IntegerField(required=False)
+    employee_id = serializers.IntegerField(required=False)
+    type = serializers.ChoiceField(choices=WorkerDay.WD_TYPE_MAPPING.keys())
     tm_work_start = serializers.TimeField(required=False)
     tm_work_end = serializers.TimeField(required=False)
-    work_type = serializers.IntegerField(required=False)
-    comment = serializers.CharField(max_length=128, required=False)
+    work_type_id = serializers.IntegerField(required=False)
+    is_vacancy = serializers.BooleanField(default=False)
+    dt_from = serializers.DateField()
+    dt_to = serializers.DateField()
+    outsources = serializers.ListField(required=False, child=serializers.IntegerField(), allow_null=True, allow_empty=True, write_only=True)
+    days_of_week = serializers.ListField(required=False, child=serializers.IntegerField(), allow_null=True, allow_empty=True, write_only=True)
 
     def is_valid(self, *args, **kwargs):
         super().is_valid(*args, **kwargs)
@@ -378,6 +382,8 @@ class ListChangeSrializer(serializers.Serializer):
                 self.tm_work_start.fail('required')
             if self.validated_data.get('tm_work_end') is None:
                 self.tm_work_end.fail('required')
+            if self.validated_data.get('shop_id') is None:
+                self.shop_id.fail('required')
 
             workers = self.validated_data.get('workers')
             for key, value in workers.items():
