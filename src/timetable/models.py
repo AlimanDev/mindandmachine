@@ -801,9 +801,10 @@ class WorkerDay(AbstractModel):
         is_new = self.id is None
 
         res = super().save(*args, **kwargs)
+        fines = self.employment.position.wp_fines if self.employment and self.employment.position else None
 
         # запускаем пересчет часов для факта, если изменились часы в подтвержденном плане
-        if self.shop and self.shop.network.only_fact_hours_that_in_approved_plan and \
+        if self.shop and (self.shop.network.only_fact_hours_that_in_approved_plan or fines) and \
                 self.tracker.has_changed('work_hours') and \
                 self.type in WorkerDay.TYPES_WITH_TM_RANGE and self.is_plan and self.is_approved:
             fact_qs = WorkerDay.objects.filter(
