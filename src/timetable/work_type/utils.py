@@ -292,6 +292,8 @@ class ShopEfficiencyGetter:
         # ФОТ считаем как: часы производственные календарь * кол-во сотрудников с учетом их ставок.
         fot = ProdCal.objects.filter(
             employee__in=active_shop_empls_for_period.values_list('employee_id', flat=True),
+            dt__gte=self.dt_from,
+            dt__lte=self.dt_to,
         ).aggregate(
             norm_hours_sum=Sum('norm_hours')
         )['norm_hours_sum']
