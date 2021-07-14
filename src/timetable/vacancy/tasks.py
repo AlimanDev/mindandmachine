@@ -1,10 +1,11 @@
+import datetime
 from src.celery.celery import app
 from src.timetable.vacancy.utils import (
     create_vacancies_and_notify,
     cancel_vacancies,
     workers_exchange,
 )
-from src.timetable.models import ExchangeSettings
+from src.timetable.models import ExchangeSettings, WorkType
 from src.base.models import Shop
 
 
@@ -24,9 +25,17 @@ def vacancies_create_and_cancel():
         if exchange_settings == None or not (exchange_settings.automatic_create_vacancies or exchange_settings.automatic_delete_vacancies):
             continue
 
-        for work_type in shop.work_types.all():
-            cancel_shop_vacancies.apply_async((shop.id, work_type.id))
-            create_shop_vacancies_and_notify.apply_async((shop.id, work_type.id))
+        vacancies_create_and_cancel_for_shop(shop.id)
+
+@app.task
+def vacancies_create_and_cancel_for_shop(shop_id):
+    """
+    Создание вакансий для всех магазинов
+    """
+
+    for work_type in WorkType.objects.qos_filter_active(datetime.date.today(), datetime.date.today(), shop_id=shop_id):
+        cancel_vacancies(shop_id, work_type.id)
+        create_vacancies_and_notify(shop_id, work_type.id)
 
 
 @app.task

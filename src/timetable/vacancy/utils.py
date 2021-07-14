@@ -880,7 +880,7 @@ def cancel_vacancies(shop_id, work_type_id, dt_from=None, dt_to=None, approved=F
         'from_dt': from_dt,
         'to_dt': to_dt,
     }
-    print(min_dttm)
+
     params['work_type_ids'] = [work_type_id]
     shop_stat = get_shop_stats(
         shop_id,
@@ -1005,7 +1005,6 @@ def workers_exchange():
 
     for shop in shop_list:
         exchange_settings = shop.get_exchange_settings()
-        print(exchange_settings)
         if not exchange_settings or not exchange_settings.automatic_exchange:
             continue
         from_dt = (now().replace(minute=0, second=0, microsecond=0) + exchange_settings.automatic_worker_select_timegap).date()

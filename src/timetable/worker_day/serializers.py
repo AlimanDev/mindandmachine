@@ -291,6 +291,7 @@ class WorkerDaySerializer(serializers.ModelSerializer):
             if outsources:
                 worker_day.outsources.set(outsources)
 
+            # при создании вакансии вручную "востанавливаем" удаленные вакансии, которые были созданы автоматом
             if worker_day.is_vacancy:
                 work_types = list(map(lambda x: x['work_type_id'], details))
                 WorkerDay.objects.filter(

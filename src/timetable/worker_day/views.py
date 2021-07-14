@@ -1,7 +1,7 @@
 import datetime
 import json
 from itertools import groupby
-from src.timetable.vacancy.tasks import cancel_shop_vacancies, create_shop_vacancies_and_notify
+from src.timetable.vacancy.tasks import vacancies_create_and_cancel_for_shop
 from src.timetable.worker_day.timetable import get_timetable_generator_cls
 
 import pandas as pd
@@ -623,13 +623,7 @@ class WorkerDayViewSet(BaseModelViewSet):
                             )
                         )
                     
-                    for work_type in WorkType.objects.qos_filter_active(datetime.date.today(), datetime.date.today(), shop_id=serializer.validated_data['shop_id']):
-                        transaction.on_commit(
-                            lambda: cancel_shop_vacancies.delay(serializer.validated_data['shop_id'], work_type.id)
-                        )
-                        transaction.on_commit(
-                            lambda: create_shop_vacancies_and_notify.delay(serializer.validated_data['shop_id'], work_type.id)
-                        )
+                    vacancies_create_and_cancel_for_shop.delay(serializer.validated_data['shop_id'])
                     if not has_permission_to_change_protected_wdays:
                         WorkerDay.check_tasks_violations(
                             employee_days_q=employee_days_q,
