@@ -2664,7 +2664,7 @@ class TestAditionalFunctions(TestsHelperMixin, APITestCase):
             result[dt] = WorkerDay.objects.create(
                 employee=employment.employee,
                 employment=employment,
-                shop=employment.shop,
+                shop=None,
                 dt=dt,
                 type=WorkerDay.TYPE_HOLIDAY,
                 is_approved=approved,
@@ -2672,7 +2672,7 @@ class TestAditionalFunctions(TestsHelperMixin, APITestCase):
             )
         return result
 
-    def create_worker_days(self, employment, dt_from, count, from_tm, to_tm, approved, wds={}, is_blocked=False, night_shift=False):
+    def create_worker_days(self, employment, dt_from, count, from_tm, to_tm, approved, wds={}, is_blocked=False, night_shift=False, shop_id=None):
         result = {}
         for day in range(count):
             date = dt_from + timedelta(days=day)
@@ -2681,7 +2681,7 @@ class TestAditionalFunctions(TestsHelperMixin, APITestCase):
             wd = WorkerDay.objects.create(
                 employment=employment,
                 employee=employment.employee,
-                shop=employment.shop,
+                shop_id=shop_id or employment.shop_id,
                 dt=date,
                 type=WorkerDay.TYPE_WORKDAY,
                 dttm_work_start=datetime.combine(date, time(from_tm)),
@@ -2702,7 +2702,8 @@ class TestAditionalFunctions(TestsHelperMixin, APITestCase):
         dt_from = date.today()
         self.create_worker_days(self.employment2, dt_from, 4, 10, 20, True)
         self.create_worker_days(self.employment3, dt_from, 4, 9, 21, True)
-        self.create_worker_days(self.employment2, dt_from, 3, 16, 20, False)
+        self.create_worker_days(self.employment2, dt_from, 2, 16, 20, False)
+        self.create_worker_days(self.employment2, dt_from + timedelta(2), 1, 16, 20, False, shop_id=self.shop2.id)
         self.create_worker_days(self.employment3, dt_from, 4, 10, 21, False)
         self.update_or_create_holidays(self.employment2, dt_from + timedelta(3), 1, False)
 
@@ -2719,6 +2720,33 @@ class TestAditionalFunctions(TestsHelperMixin, APITestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(WorkerDay.objects.filter(is_approved=True).count(), 8)
         self.assertEqual(WorkerDay.objects.filter(is_approved=False).count(), 2)
+
+    def test_delete_exclude_other_shops(self):
+        dt_from = date.today()
+        self.create_worker_days(self.employment2, dt_from, 4, 10, 20, True)
+        self.create_worker_days(self.employment3, dt_from, 4, 9, 21, True)
+        self.create_worker_days(self.employment2, dt_from, 2, 16, 20, False)
+        self.create_worker_days(self.employment2, dt_from + timedelta(2), 1, 16, 20, False, shop_id=self.shop2.id)
+        self.create_worker_days(self.employment3, dt_from, 2, 10, 21, False)
+        self.create_worker_days(self.employment3, dt_from + timedelta(2), 2, 10, 21, False, shop_id=self.shop2.id)
+        self.update_or_create_holidays(self.employment2, dt_from + timedelta(3), 1, False)
+
+        url = f'{self.url}delete_worker_days/'
+        data = {
+            'employee_ids':[self.employment2.employee_id, self.employment3.employee_id],
+            'dates':[
+                dt_from + timedelta(i)
+                for i in range(3)
+            ],
+            'shop_id': self.shop.id,
+        }
+        response = self.client.post(url, data, format='json')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(WorkerDay.objects.filter(is_approved=True).count(), 8)
+        self.assertEqual(WorkerDay.objects.filter(is_approved=False, shop_id=self.shop.id).count(), 0)
+        self.assertEqual(WorkerDay.objects.filter(is_approved=False, shop_id=self.shop2.id).count(), 3)
+        self.assertEqual(WorkerDay.objects.filter(is_approved=False, shop_id=None).count(), 1)
     
     def test_delete_fact(self):
         dt_from = date.today()

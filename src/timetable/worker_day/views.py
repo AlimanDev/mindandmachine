@@ -1275,9 +1275,13 @@ class WorkerDayViewSet(BaseModelViewSet):
             data.is_valid(raise_exception=True)
             data = data.validated_data
             filt = {}
+            q_filt = Q()
             if data['exclude_created_by']:
                 filt['created_by__isnull'] = True
+            if data.get('shop_id'):
+                q_filt |= Q(shop_id=data['shop_id']) | Q(shop__isnull=True)
             WorkerDay.objects_with_excluded.filter(
+                q_filt,
                 is_approved=False,
                 is_fact=data['is_fact'],
                 employee_id__in=data['employee_ids'],
