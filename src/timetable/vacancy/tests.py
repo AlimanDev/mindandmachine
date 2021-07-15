@@ -862,7 +862,7 @@ class TestAutoWorkerExchange(APITestCase):
                         'work_type_id': self.work_type1.id,
                     },
                 ],
-                'dttm_work_start': datetime.datetime.combine(self.dt_now, datetime.time(9, 0)),
+                'dttm_work_start': datetime.datetime.combine(self.dt_now, datetime.time(10, 0)),
                 'dttm_work_end': datetime.datetime.combine(self.dt_now, datetime.time(21, 0)),
                 'dt': self.dt_now,
                 'is_fact': False,
@@ -870,7 +870,10 @@ class TestAutoWorkerExchange(APITestCase):
             format='json'
         )
         self.assertEquals(response.status_code, 201)
-        self.assertEquals(WorkerDay.objects.filter(is_vacancy=True).count(), 3)
+        self.assertEquals(response.json()['id'], vacancy.id)
+        vacancy.refresh_from_db()
+        self.assertEquals(vacancy.dttm_work_start, datetime.datetime.combine(self.dt_now, datetime.time(10, 0)))
+        self.assertEquals(WorkerDay.objects.filter(is_vacancy=True).count(), 2)
         self.assertEquals(WorkerDay.objects.filter(is_vacancy=True, canceled=True).count(), 0)
 
     def test_cancel_vacancy_and_create_via_api_another_work_type(self):
