@@ -1,10 +1,16 @@
 from django import forms
 from django.db.models import Q
 from datetime import date, timedelta
-from src.base.models import User, Shop, Employment, Employee
+from src.base.models import User, Shop, Employment
 from src.timetable.worker_day.tasks import recalc_wdays
 from django.contrib.admin.widgets import AdminDateWidget, FilteredSelectMultiple
+from src.base.forms import DefaultOverrideAdminWidgetsForm
 
+
+class ExchangeSettingsForm(DefaultOverrideAdminWidgetsForm):
+    json_fields = [
+        'constraints',
+    ]
 
 
 def get_users():

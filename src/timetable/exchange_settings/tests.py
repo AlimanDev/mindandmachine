@@ -37,7 +37,8 @@ class TestExchangeSettings(APITestCase):
         data = {
             'id': self.exchange_serttings1.id, 
             'constraints': '{"second_day_before": 40, "second_day_after": 32, "first_day_after": 32, "first_day_before": 40, "1day_before": 40, "1day_after": 40}', 
-            'automatic_check_lack': False, 
+            'automatic_create_vacancies': False, 
+            'automatic_delete_vacancies': False, 
             'automatic_check_lack_timegap': '7 00:00:00', 
             'automatic_holiday_worker_select_timegap': '8 00:00:00', 
             'automatic_exchange': False,
@@ -51,7 +52,8 @@ class TestExchangeSettings(APITestCase):
             'working_shift_max_hours': '12:00:00', 
             'automatic_worker_select_tree_level': 1, 
             'network': self.network.id, 
-            'exclude_positions': []
+            'exclude_positions': [],
+            'outsources': [],
         }
         resp = response.json()
         resp.pop('dttm_modified')
@@ -68,7 +70,8 @@ class TestExchangeSettings(APITestCase):
         data = {
             'id': response.json()['id'], 
             'constraints': '{"second_day_before": 40, "second_day_after": 32, "first_day_after": 32, "first_day_before": 40, "1day_before": 40, "1day_after": 40}', 
-            'automatic_check_lack': False, 
+            'automatic_create_vacancies': False, 
+            'automatic_delete_vacancies': False, 
             'automatic_check_lack_timegap': '7 00:00:00', 
             'automatic_holiday_worker_select_timegap': '8 00:00:00', 
             'automatic_exchange': False,
@@ -82,7 +85,8 @@ class TestExchangeSettings(APITestCase):
             'working_shift_max_hours': '12:00:00', 
             'automatic_worker_select_tree_level': 1, 
             'network': None, 
-            'exclude_positions': []
+            'exclude_positions': [],
+            'outsources': [],
         }
         resp = response.json()
         resp.pop('dttm_modified')
@@ -99,7 +103,8 @@ class TestExchangeSettings(APITestCase):
         data = {
             'id': self.exchange_serttings1.id, 
             'constraints': '{"second_day_before": 40, "second_day_after": 32, "first_day_after": 32, "first_day_before": 40, "1day_before": 40, "1day_after": 40}', 
-            'automatic_check_lack': False, 
+            'automatic_create_vacancies': False, 
+            'automatic_delete_vacancies': False, 
             'automatic_check_lack_timegap': '7 00:00:00', 
             'automatic_holiday_worker_select_timegap': '8 00:00:00', 
             'automatic_exchange': False,
@@ -113,7 +118,8 @@ class TestExchangeSettings(APITestCase):
             'working_shift_max_hours': '12:00:00', 
             'automatic_worker_select_tree_level': 1, 
             'network': self.network.id, 
-            'exclude_positions': []
+            'exclude_positions': [],
+            'outsources': [],
         }
         resp = response.json()
         resp.pop('dttm_modified')
