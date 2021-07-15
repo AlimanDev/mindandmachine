@@ -450,6 +450,7 @@ class DeleteWorkerDaysSerializer(serializers.Serializer):
     dates = serializers.ListField(child=serializers.DateField())
     is_fact = serializers.BooleanField(default=False)
     exclude_created_by = serializers.BooleanField(default=True)
+    shop_id = serializers.IntegerField(required=False)
 
 
 class ExchangeSerializer(serializers.Serializer):
