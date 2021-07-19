@@ -9,7 +9,7 @@ from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from src.base.models import Shop, ShopSchedule, NetworkConnect, Network, Employment, Group
+from src.base.models import Shop, ShopSchedule, NetworkConnect, Network, Employment, Group, User
 from src.base.tests.factories import UserFactory, ShopFactory
 from src.forecast.tests.factories import LoadTemplateFactory
 from src.timetable.models import ShopMonthStat
@@ -734,3 +734,55 @@ class TestDepartment(TestsHelperMixin, APITestCase):
             network=self.network,
         )
         self.assertEqual(shop.load_template_id, self.load_template.id)
+
+    def test_create_with_director_group_and_new_employment(self):
+        user = User.objects.create(
+            username='TestUserDir',
+            network=self.network,
+        )
+        data = {
+            "parent_code": self.root_shop.code,
+            "name": 'Region Shop3',
+            "tm_open_dict": {"all": "07:00:00"},
+            "tm_close_dict": {"all": "23:00:00"},
+            "region_id": self.region.id,
+            "code": None,
+            "address": None,
+            "nonstandard_schedule": [],
+            "type": 's',
+            "dt_opened": '2019-01-01',
+            # "dt_closed": None,
+            "timezone": 'Europe/Moscow',
+            'restricted_end_times': '[]',
+            'restricted_start_times': '[]',
+            'settings_id': self.shop_settings.id,
+            'forecast_step_minutes': '00:30:00',
+            'is_active': True,
+            'director_code': user.username,
+            'distance': None,
+        }
+        self.network.set_settings_value('shop_lvl_to_role_code_mapping', {'1':'admin'})
+        self.network.create_employment_on_set_or_update_director_code = True
+        self.network.clean_wdays_on_employment_dt_change = True
+        self.network.save()
+
+        response = self.client.post(self.url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        shop = response.json()
+        data['id'] = shop['id']
+        data['parent_id'] = self.root_shop.id
+        data.pop('parent_code')
+        data['director_id'] = user.id
+        data['area'] = 0.0
+        data['dt_closed'] = None
+        data['load_template_id'] = None
+        data['load_template_status'] = 'R'
+        data['exchange_settings_id'] = None
+        data['fias_code'] = ''
+        data['latitude'] = None
+        data['longitude'] = None
+        data['distance'] = None
+        data['email'] = None
+        data.pop('director_code')
+        data.pop('nonstandard_schedule')
+        self.assertDictEqual(shop, data)

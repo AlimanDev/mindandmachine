@@ -565,7 +565,7 @@ class Shop(MPTTModel, AbstractActiveNetworkSpecificCodeNamedModel):
                     defaults=dict(
                         function_group=role,
                         dt_hired=timezone.now().date(),
-                        dt_fired='3999-01-01',
+                        dt_fired=datetime.date(3999, 1, 1),
                     )
                 )
 
