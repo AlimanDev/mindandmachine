@@ -580,8 +580,8 @@ class WorkerDay(AbstractModel):
         if self.dttm_work_end and self.dttm_work_start and self.shop and (
                 self.shop.settings or position_break_triplet_cond or self.shop.network.breaks):
             breaks = self.employment.position.breaks.breaks if position_break_triplet_cond else self.shop.settings.breaks.breaks if self.shop.settings else self.shop.network.breaks.breaks
-            dttm_work_start = self.dttm_work_start
-            dttm_work_end = self.dttm_work_end
+            dttm_work_start = _dttm_work_start = self.dttm_work_start
+            dttm_work_end = _dttm_work_end = self.dttm_work_end
             if self.shop.network.crop_work_hours_by_shop_schedule and self.crop_work_hours_by_shop_schedule:
                 from src.util.models_converter import Converter
                 dt = Converter.parse_date(self.dt) if isinstance(self.dt, str) else self.dt
@@ -616,8 +616,8 @@ class WorkerDay(AbstractModel):
                 ).first()
                 if plan_approved:
                     fine = self.get_fine(
-                        dttm_work_start, 
-                        dttm_work_end, 
+                        _dttm_work_start, 
+                        _dttm_work_end, 
                         plan_approved.dttm_work_start,
                         plan_approved.dttm_work_end,
                         self.employment.position.wp_fines if self.employment and self.employment.position else None,
