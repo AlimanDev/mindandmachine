@@ -580,8 +580,8 @@ class WorkerDay(AbstractModel):
         if self.dttm_work_end and self.dttm_work_start and self.shop and (
                 self.shop.settings or position_break_triplet_cond or self.shop.network.breaks):
             breaks = self.employment.position.breaks.breaks if position_break_triplet_cond else self.shop.settings.breaks.breaks if self.shop.settings else self.shop.network.breaks.breaks
-            dttm_work_start = self.dttm_work_start
-            dttm_work_end = self.dttm_work_end
+            dttm_work_start = _dttm_work_start = self.dttm_work_start
+            dttm_work_end = _dttm_work_end = self.dttm_work_end
             if self.shop.network.crop_work_hours_by_shop_schedule and self.crop_work_hours_by_shop_schedule:
                 from src.util.models_converter import Converter
                 dt = Converter.parse_date(self.dt) if isinstance(self.dt, str) else self.dt
@@ -603,9 +603,7 @@ class WorkerDay(AbstractModel):
                     if self.dttm_work_end > dttm_shop_close:
                         dttm_work_end = dttm_shop_close
             break_time = None
-            dttm_work_start_plan = None
-            dttm_work_end_plan = None
-            fines = None
+            fine = 0
             if self.is_fact:
                 plan_approved = WorkerDay.objects.filter(
                     dt=self.dt,
@@ -617,9 +615,13 @@ class WorkerDay(AbstractModel):
                     dttm_work_end__isnull=False,
                 ).first()
                 if plan_approved:
-                    dttm_work_start_plan = plan_approved.dttm_work_start
-                    dttm_work_end_plan = plan_approved.dttm_work_end
-                    fines = self.employment.position.wp_fines if self.employment and self.employment.position else None
+                    fine = self.get_fine(
+                        _dttm_work_start, 
+                        _dttm_work_end, 
+                        plan_approved.dttm_work_start,
+                        plan_approved.dttm_work_end,
+                        self.employment.position.wp_fines if self.employment and self.employment.position else None,
+                    )
                 if self.shop.network.only_fact_hours_that_in_approved_plan and \
                     self.type in WorkerDay.TYPES_WITH_TM_RANGE:
                     if plan_approved:
@@ -654,7 +656,7 @@ class WorkerDay(AbstractModel):
                     else:
                         return dttm_work_start, dttm_work_end, datetime.timedelta(0)
 
-            return dttm_work_start, dttm_work_end, self.count_work_hours(breaks, dttm_work_start, dttm_work_end, break_time=break_time, dttm_work_start_plan=dttm_work_start_plan, dttm_work_end_plan=dttm_work_end_plan, fines=fines)
+            return dttm_work_start, dttm_work_end, self.count_work_hours(breaks, dttm_work_start, dttm_work_end, break_time=break_time, fine=fine)
 
         return self.dttm_work_start, self.dttm_work_end, datetime.timedelta(0)
 
@@ -727,21 +729,8 @@ class WorkerDay(AbstractModel):
         return t in cls.TYPES_WITH_TM_RANGE
 
     @staticmethod
-    def count_work_hours(break_triplets, dttm_work_start, dttm_work_end, break_time=None, fines=None, dttm_work_start_plan=None, dttm_work_end_plan=None):
-        work_hours = (dttm_work_end - dttm_work_start).total_seconds() / 60
-        if dttm_work_start_plan and dttm_work_end_plan and fines:
-            arrive_fines = fines.get('arrive_fines', [])
-            departure_fines = fines.get('departure_fines', [])
-            arrive_timedelta = (dttm_work_start - dttm_work_start_plan).total_seconds() / 60
-            departure_timedelta = (dttm_work_end_plan - dttm_work_end).total_seconds() / 60
-            for arrive_fine in arrive_fines:
-                if arrive_timedelta >= arrive_fine[0] and arrive_timedelta <= arrive_fine[1]:
-                    work_hours = work_hours - arrive_fine[2]
-                    break
-            for departure_fine in departure_fines:
-                if departure_timedelta >= departure_fine[0] and departure_timedelta <= departure_fine[1]:
-                    work_hours = work_hours - departure_fine[2]
-                    break
+    def count_work_hours(break_triplets, dttm_work_start, dttm_work_end, break_time=None, fine=0):
+        work_hours = ((dttm_work_end - dttm_work_start).total_seconds() / 60) - fine
         if break_time:
             work_hours = work_hours - break_time
             return datetime.timedelta(minutes=work_hours)
@@ -754,6 +743,24 @@ class WorkerDay(AbstractModel):
             return datetime.timedelta(0)
 
         return datetime.timedelta(minutes=work_hours)
+
+    @staticmethod
+    def get_fine(dttm_work_start, dttm_work_end, dttm_work_start_plan, dttm_work_end_plan, fines):
+        fine = 0
+        if dttm_work_start_plan and dttm_work_end_plan and fines:
+            arrive_fines = fines.get('arrive_fines', [])
+            departure_fines = fines.get('departure_fines', [])
+            arrive_timedelta = (dttm_work_start - dttm_work_start_plan).total_seconds() / 60
+            departure_timedelta = (dttm_work_end_plan - dttm_work_end).total_seconds() / 60
+            for arrive_fine in arrive_fines:
+                if arrive_timedelta >= arrive_fine[0] and arrive_timedelta <= arrive_fine[1]:
+                    fine += arrive_fine[2]
+                    break
+            for departure_fine in departure_fines:
+                if departure_timedelta >= departure_fine[0] and departure_timedelta <= departure_fine[1]:
+                    fine += departure_fine[2]
+                    break
+        return fine
 
     def get_department(self):
         return self.shop
