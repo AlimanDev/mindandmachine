@@ -271,7 +271,7 @@ def create_fact_from_attendance_records(dt_from, dt_to, shop_ids=None):
                 record.employee_id = None
             record.save()
        
-def create_worker_days_range(dates, type=WorkerDay.TYPE_WORKDAY, shop_id=None, employee_id=None, tm_work_start=None, tm_work_end=None, work_type_id=None, is_approved=False, is_vacancy=False, outsources=[]):
+def create_worker_days_range(dates, type=WorkerDay.TYPE_WORKDAY, shop_id=None, employee_id=None, tm_work_start=None, tm_work_end=None, work_type_id=None, is_approved=False, is_vacancy=False, outsources=[], created_by=None):
     with transaction.atomic():
         created_wds = []
         employment = None
@@ -296,6 +296,8 @@ def create_worker_days_range(dates, type=WorkerDay.TYPE_WORKDAY, shop_id=None, e
                 dttm_work_end=datetime.datetime.combine(date, tm_work_end),
                 type=type,
                 is_outsource=bool(outsources),
+                created_by=created_by,
+                last_edited_by=created_by,
             )
             if outsources:
                 wd.outsources.add(*outsources)
@@ -304,6 +306,6 @@ def create_worker_days_range(dates, type=WorkerDay.TYPE_WORKDAY, shop_id=None, e
                     worker_day=wd,
                     work_type_id=work_type_id,
                 )
-            created_wds.append(created_wds)
+            created_wds.append(wd)
 
         return created_wds

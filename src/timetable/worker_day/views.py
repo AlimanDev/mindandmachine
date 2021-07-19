@@ -39,7 +39,7 @@ from src.timetable.models import (
 from src.timetable.timesheet.tasks import calc_timesheets
 from src.timetable.vacancy.utils import cancel_vacancies, confirm_vacancy
 from src.timetable.worker_day.serializers import (
-    ListChangeSerializer,
+    ChangeListSerializer,
     WorkerDaySerializer,
     WorkerDayApproveSerializer,
     WorkerDayWithParentSerializer,
@@ -1432,7 +1432,7 @@ class WorkerDayViewSet(BaseModelViewSet):
         return Response({'detail': _('Hours recalculation started successfully.')})
     
     @swagger_auto_schema(
-        request_body=ListChangeSerializer,
+        request_body=ChangeListSerializer,
         responses={200: None},
         operation_description='''
         Проставление типов дней (кроме РД) на промежуток для сотрудника
@@ -1440,22 +1440,22 @@ class WorkerDayViewSet(BaseModelViewSet):
     )
     @action(detail=False, methods=['post'])
     def change_list(self, request):
-        data = ListChangeSerializer(data=request.data, context={'request': request})
+        data = ChangeListSerializer(data=request.data, context={'request': request})
         data.is_valid(raise_exception=True)
         data = data.validated_data
         wd_perm = GroupWorkerDayPermission.objects.filter(
             group__in=request.user.get_group_ids(Shop.objects.get(id=data['shop_id']) if data['shop_id'] else None),
             worker_day_permission__action=WorkerDayPermission.CREATE_OR_UPDATE,
             worker_day_permission__graph_type=WorkerDayPermission.PLAN,
-            wd_type=data['type'],
-        ).select_related('worker_day_permission').first()
+            worker_day_permission__wd_type=data['type'],
+        ).first()
         if not wd_perm:
             raise PermissionDenied(
                     self.error_messages['no_perm_to_approve_wd_types'].format(wd_type_str=dict(WorkerDay.TYPES)[data['type']]))
 
         today = (datetime.datetime.now() + datetime.timedelta(hours=3)).date()
-        limit_days_in_past = wd_perm.worker_day_permission.limit_days_in_past
-        limit_days_in_future = wd_perm.worker_day_permission.limit_days_in_future
+        limit_days_in_past = wd_perm.limit_days_in_past
+        limit_days_in_future = wd_perm.limit_days_in_future
         date_limit_in_past = None
         date_limit_in_future = None
         if limit_days_in_past is not None:
@@ -1473,7 +1473,7 @@ class WorkerDayViewSet(BaseModelViewSet):
                         dt_interval=dt_interval,
                     )
                 )
-        response = WorkerDayListSerializer(
+        response = WorkerDaySerializer(
             create_worker_days_range(
                 data['dates'], 
                 type=data['type'], 
@@ -1484,7 +1484,8 @@ class WorkerDayViewSet(BaseModelViewSet):
                 is_vacancy=data['is_vacancy'],
                 outsources=data['outsources'],
                 work_type_id=data['work_type_id'],
+                created_by=data['created_by'],
             ),
             many=True,
-        )
+        ).data
         return Response(response)
