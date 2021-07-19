@@ -30,11 +30,14 @@ def cron_event():
         report_config__cron__in=posible_crons,
     )
     for event_email_notification in events:
+        dates = event_email_notification.report_config.get_dates()
         send_event_email_notifications.delay(
             event_email_notification_id=event_email_notification.id,
             user_author_id=None,
             context={
                 'shop_ids': list(event_email_notification.report_config.shops.all().values_list('id', flat=True)),
+                'dt_from': dates['dt_from'].strftime('%Y-%m-%dT%H:%M:%S'),
+                'dt_to': dates['dt_to'].strftime('%Y-%m-%dT%H:%M:%S'),
             },
         )
 

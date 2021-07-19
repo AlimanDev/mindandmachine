@@ -35,7 +35,7 @@ class UrvStatTodayEvent(BaseRegisteredEvent):
         return urv_stat_v1(dt, dt, title=title, shop_ids=self.context.get('shop_ids', []), network_id=self.network_id, comming_only=True, in_memory=True)
 
 class UrvViolatorsReportEvent(BaseRegisteredEvent):
-    name = 'Отправка отчета по нарушителям УРВ за вчерашний день'
+    name = 'Отправка отчета по нарушителям УРВ'
     code = URV_VIOLATORS_REPORT
     write_history = False
 
