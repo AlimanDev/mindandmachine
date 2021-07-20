@@ -36,8 +36,8 @@ def cron_event():
             user_author_id=None,
             context={
                 'shop_ids': list(event_email_notification.report_config.shops.all().values_list('id', flat=True)),
-                'dt_from': dates['dt_from'].strftime('%Y-%m-%dT%H:%M:%S'),
-                'dt_to': dates['dt_to'].strftime('%Y-%m-%dT%H:%M:%S'),
+                'dt_from': dates['dt_from'].strftime('%Y-%m-%d'),
+                'dt_to': dates['dt_to'].strftime('%Y-%m-%d'),
             },
         )
 

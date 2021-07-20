@@ -65,6 +65,7 @@ class TestUrvFiles(APITestCase):
             dttm_work_end=dttm_work_end,
             is_fact=is_fact,
             is_approved=is_approved,
+            created_by=self.user1,
         )
 
     def _create_att_record(self, employment, dttm, type):
@@ -106,16 +107,22 @@ class TestUrvFiles(APITestCase):
         )
         data = urv_violators_report(self.network.id, dt_from=self.dt, dt_to=self.dt, exclude_created_by=True)
         assert_data = {
+            self.employment2.employee_id: {
+                self.dt: {
+                    'shop_id': self.employment3.shop_id, 
+                    'types': ['ED']
+                }
+            },
             self.employment3.employee_id: {
                 self.dt: {
                     'shop_id': self.employment3.shop_id, 
-                    'type': 'L'
+                    'types': ['L', 'LA']
                 }
             },
             self.employment4.employee_id: {
                 self.dt: {
                     'shop_id': self.employment4.shop_id, 
-                    'type': 'BFL'
+                    'types': ['L', 'BF']
                 }
             }
         }
@@ -155,37 +162,56 @@ class TestUrvFiles(APITestCase):
         )
         data = urv_violators_report(self.network.id, dt_from=self.dt, dt_to=self.dt, exclude_created_by=True)
         assert_data = {
+            self.employment2.employee_id: {
+                self.dt: {
+                    'shop_id': self.employment3.shop_id, 
+                    'types': ['ED']
+                }
+            },
             self.employment3.employee_id: {
                 self.dt: {
                     'shop_id': self.employment3.shop_id, 
-                    'type': 'L'
+                    'types': ['L', 'LA']
                 }
             },
             self.employment4.employee_id: {
                 self.dt: {
                     'shop_id': self.employment4.shop_id, 
-                    'type': 'BFL'
+                    'types': ['L', 'BF']
                 }
             },
             self.employment5.employee_id: {
                 self.dt: {
                     'shop_id': self.employment5.shop_id, 
-                    'type': 'R'
+                    'types': ['R']
                 }
             }
         }
+        self.assertEqual(data, assert_data)
         data = urv_violators_report(self.network.id, dt_from=self.dt, dt_to=self.dt)
         assert_data = {
+            self.employment2.employee_id: {
+                self.dt: {
+                    'shop_id': self.employment3.shop_id, 
+                    'types': ['ED']
+                }
+            },
             self.employment3.employee_id: {
                 self.dt: {
                     'shop_id': self.employment3.shop_id, 
-                    'type': 'L'
+                    'types': ['L', 'LA']
                 }
             },
             self.employment4.employee_id: {
                 self.dt: {
                     'shop_id': self.employment4.shop_id, 
-                    'type': 'BF'
+                    'types': ['BF']
+                }
+            },
+            self.employment5.employee_id: {
+                self.dt: {
+                    'shop_id': self.employment5.shop_id, 
+                    'types': ['ED']
                 }
             }
         }
@@ -193,17 +219,27 @@ class TestUrvFiles(APITestCase):
 
 
     def test_urv_violators_report_xlsx(self):
-        data = urv_violators_report_xlsx(self.network.id, dt=self.dt, in_memory=True)
+        data = urv_violators_report_xlsx(self.network.id, dt_from=self.dt, dt_to=self.dt, in_memory=True)
         df = pd.read_excel(data['file']).fillna('')
-        data = {
+        data1 = {
+            'Дата': self.dt.strftime('%d.%m.%Y'),
             'Код объекта': self.shop.code,
             'Название объекта': self.shop.name, 
             'Табельный номер': '',
             'ФИО': 'Сидоров Иван3', 
-            'Нарушение': 'Нет ухода'
+            'Нарушение': 'Нет ухода\nОпоздание'
         }
-        self.assertEqual(len(df.iloc[:,:]), 1)
-        self.assertEqual(dict(df.iloc[0]), data)
+        data2 = {
+            'Дата': self.dt.strftime('%d.%m.%Y'),
+            'Код объекта': self.shop.code,
+            'Название объекта': self.shop.name, 
+            'Табельный номер': 'employee2_tabel_code',
+            'ФИО': 'Иванов Иван2', 
+            'Нарушение': 'Ранний уход'
+        }
+        self.assertEqual(len(df.iloc[:,:]), 2)
+        self.assertEqual(dict(df.iloc[0]), data1)
+        self.assertEqual(dict(df.iloc[1]), data2)
 
 
     def test_urv_violators_report_xlsx_v2(self):
@@ -216,7 +252,7 @@ class TestUrvFiles(APITestCase):
             'Табельный номер': '', 
             'ФИО': 'Сидоров Иван3', 
             'Должность': '',
-            self.dt.strftime('%d.%m.%Y'): 'Нет ухода'
+            self.dt.strftime('%d.%m.%Y'): 'Нет ухода\nОпоздание'
         }
-        self.assertEqual(len(df.iloc[:,:]), 1)
+        self.assertEqual(len(df.iloc[:,:]), 2)
         self.assertEqual(dict(df.iloc[0, :6]), data)

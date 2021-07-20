@@ -1,10 +1,9 @@
 from src.timetable.models import WorkerDay, AttendanceRecords
-from src.base.models import Shop, User, Employment, Employee
+from src.base.models import Network, Shop, Employment, Employee
 import xlsxwriter
 import io
-from datetime import date, datetime, timedelta
-from django.db.models import Sum, Q, Count, Exists, OuterRef
-from django.db.models.functions import Trunc
+from datetime import date, timedelta
+from django.db.models import Exists, OuterRef, Subquery
 from dateutil.relativedelta import relativedelta
 
 NO_RECORDS = 'R'
@@ -12,10 +11,8 @@ NO_COMMING = 'C'
 NO_LEAVING = 'L'
 NO_COMING_PROBABLY = 'CP'
 BAD_FACT = 'BF'
-BAD_FACT_NO_COMMING = 'BFC'
-BAD_FACT_NO_LEAVING = 'BFL'
-
-NO_COMMING_HOURS = 4
+LATE_ARRIVAL = 'LA'
+EARLY_DEPARTURE = 'ED'
 
 text = {
     NO_RECORDS: 'Нет отметок',
@@ -23,8 +20,8 @@ text = {
     NO_LEAVING: 'Нет ухода',
     NO_COMING_PROBABLY: 'Предположительно нет отметки о приходе',
     BAD_FACT: 'Выход не по плану',
-    BAD_FACT_NO_COMMING: 'Выход не по плану\nНет прихода',
-    BAD_FACT_NO_LEAVING: 'Выход не по плану\nНет ухода',
+    LATE_ARRIVAL: 'Опоздание',
+    EARLY_DEPARTURE: 'Ранний уход',
 }
 
 
@@ -56,7 +53,7 @@ def urv_violators_report(network_id, dt_from=None, dt_to=None, exclude_created_b
     if exclude_created_by:
         no_comming = no_comming.annotate(
             exist_records=Exists(
-            AttendanceRecords.objects.filter(
+                AttendanceRecords.objects.filter(
                     employee_id=OuterRef('employee_id'),
                     dt=OuterRef('dt'),
                     type=AttendanceRecords.TYPE_COMING,
@@ -80,7 +77,7 @@ def urv_violators_report(network_id, dt_from=None, dt_to=None, exclude_created_b
     if exclude_created_by:
         no_leaving = no_leaving.annotate(
             exist_records=Exists(
-            AttendanceRecords.objects.filter(
+                AttendanceRecords.objects.filter(
                     employee_id=OuterRef('employee_id'),
                     dt=OuterRef('dt'),
                     type=AttendanceRecords.TYPE_LEAVING,
@@ -107,13 +104,13 @@ def urv_violators_report(network_id, dt_from=None, dt_to=None, exclude_created_b
     for record in no_comming:
         data.setdefault(record.employee_id, {})[record.dt] = {
             'shop_id': record.shop_id,
-            'type': NO_COMMING,
+            'types': [NO_COMMING,],
         }
 
     for record in no_leaving:
         data.setdefault(record.employee_id, {})[record.dt] = {
             'shop_id': record.shop_id,
-            'type': NO_LEAVING,
+            'types': [NO_LEAVING,],
         }
     
     fact_without_plan = WorkerDay.objects.filter(
@@ -138,14 +135,38 @@ def urv_violators_report(network_id, dt_from=None, dt_to=None, exclude_created_b
         exist_plan=False,
     )
     for record in fact_without_plan:
-        type = data.get(record.employee_id, {}).get(record.dt, {}).get('type', BAD_FACT)
-        if type == NO_COMMING:
-            type = BAD_FACT_NO_COMMING
-        elif type == NO_LEAVING:
-            type = BAD_FACT_NO_LEAVING
+        types = data.get(record.employee_id, {}).get(record.dt, {}).get('types', [])
+        types.append(BAD_FACT)
         data.setdefault(record.employee_id, {})[record.dt] = {
             'shop_id': record.shop_id,
-            'type': type,
+            'types': types,
+        }
+    network = Network.objects.get(id=network_id)
+    fact_subq = WorkerDay.objects.filter(
+        employee_id=OuterRef('employee_id'),
+        dt=OuterRef('dt'),
+        is_fact=True,
+        is_approved=True,
+    )
+    if exclude_created_by:
+        fact_subq = fact_subq.filter(created_by__isnull=True)
+    bad_arrival_departure = worker_days.annotate(
+        dttm_work_start_fact=Subquery(
+            fact_subq.values('dttm_work_start')[:1]
+        ),
+        dttm_work_end_fact=Subquery(
+            fact_subq.values('dttm_work_end')[:1]
+        ),
+    )
+    for record in bad_arrival_departure:
+        types = data.get(record.employee_id, {}).get(record.dt, {}).get('types', [])
+        if record.dttm_work_start_fact and record.dttm_work_start_fact - record.dttm_work_start >= network.allowed_interval_for_late_arrival:
+            types.append(LATE_ARRIVAL)
+        if record.dttm_work_end_fact and record.dttm_work_end - record.dttm_work_end_fact >= network.allowed_interval_for_early_departure:
+            types.append(EARLY_DEPARTURE)
+        data.setdefault(record.employee_id, {})[record.dt] = {
+            'shop_id': record.shop_id,
+            'types': types,
         }
 
     if exclude_created_by:
@@ -177,29 +198,32 @@ def urv_violators_report(network_id, dt_from=None, dt_to=None, exclude_created_b
         second_key = record.dt
         data.setdefault(first_key, {})[second_key] = {
             'shop_id': record.shop_id,
-            'type': NO_RECORDS,
+            'types': [NO_RECORDS,],
         } 
 
     return data
 
 
-def urv_violators_report_xlsx(network_id, dt=None, title=None, shop_ids=None, in_memory=False):
-    if not dt:
-        dt = date.today() - timedelta(1)
+def urv_violators_report_xlsx(network_id, dt_from=None, dt_to=None, title=None, shop_ids=None, in_memory=False):
+    if not dt_from:
+        dt_from = date.today() - timedelta(1)
+    if not dt_to:
+        dt_to = dt_from
     if not title:
-        title = f'URV_violators_report_{dt}.xlsx'
+        title = f'URV_violators_report_{dt_from}-{dt_to}.xlsx'
     SHOP_CODE = 0
     SHOP = 1
     TABEL_CODE = 2
-    FIO = 3
-    REASON = 4
+    DATE = 3
+    FIO = 4
+    REASON = 5
     shop_filter = {}
     if shop_ids:
         shop_filter['id__in'] = shop_ids
     shops = { 
         s.id: s for s in Shop.objects.filter(**shop_filter)
     }
-    data = urv_violators_report(network_id, dt_from=dt, dt_to=dt, shop_ids=shop_ids, exclude_created_by=True)
+    data = urv_violators_report(network_id, dt_from=dt_from, dt_to=dt_to, shop_ids=shop_ids, exclude_created_by=True)
     employees = {
         e.id: e for e in Employee.objects.select_related('user').filter(
             id__in=data.keys(),
@@ -218,14 +242,15 @@ def urv_violators_report_xlsx(network_id, dt=None, title=None, shop_ids=None, in
             'shop_code': shops.get(reason['shop_id'], Shop()).code or '',
             'tabel': employees.get(employee_id).tabel_code or '',
             'fio': employees.get(employee_id).user.fio,
-            'reason': text.get(reason['type']),
+            'reason': '\n'.join([text.get(t) for t in reason['types']]),
+            'dt': dt,
         }
         for employee_id, record in data.items()
         for dt, reason in record.items()
     ]
-    rows = sorted(rows, key=lambda x: x['shop'])
+    rows = sorted(rows, key=lambda x: (x['shop'], x['dt']))
 
-    worksheet = workbook.add_worksheet('{}'.format(dt.strftime('%Y.%m.%d')))
+    worksheet = workbook.add_worksheet('{}-{}'.format(dt_from.strftime('%Y.%m.%d'), dt_to.strftime('%Y.%m.%d')))
     def_format = workbook.add_format({
         'border': 1,
         'valign': 'vcenter',
@@ -243,10 +268,12 @@ def urv_violators_report_xlsx(network_id, dt=None, title=None, shop_ids=None, in
     worksheet.write_string(0, SHOP, 'Название объекта', header_format)
     worksheet.write_string(0, TABEL_CODE, 'Табельный номер', header_format)
     worksheet.write_string(0, FIO, 'ФИО', header_format)
+    worksheet.write_string(0, DATE, 'Дата', header_format)
     worksheet.write_string(0, REASON, 'Нарушение', header_format)
     worksheet.set_column(SHOP_CODE, SHOP_CODE, 10)
     worksheet.set_column(SHOP, SHOP, 12)
     worksheet.set_column(TABEL_CODE, TABEL_CODE, 15)
+    worksheet.set_column(DATE, DATE, 15)
     worksheet.set_column(FIO, FIO, 20)
     worksheet.set_column(REASON, REASON, 15)
     row = 1
@@ -254,6 +281,7 @@ def urv_violators_report_xlsx(network_id, dt=None, title=None, shop_ids=None, in
         worksheet.write_string(row, SHOP_CODE, record['shop_code'], def_format)
         worksheet.write_string(row, SHOP, record['shop'], def_format)
         worksheet.write_string(row, TABEL_CODE, record['tabel'], def_format)
+        worksheet.write_string(row, DATE, record['dt'].strftime('%d.%m.%Y'), def_format)
         worksheet.write_string(row, FIO, record['fio'], def_format)
         worksheet.write_string(row, REASON, record['reason'], def_format)
         row += 1
@@ -360,7 +388,7 @@ def urv_violators_report_xlsx_v2(network_id, dt_from=None, dt_to=None, title=Non
         col = POSITION
         for dt in dates:
             col += 1
-            worksheet.write_string(row, col, text.get(record['records'].get(dt, {}).get('type', ''), ''), workbook.add_format(def_format))
+            worksheet.write_string(row, col, '\n'.join([text.get(t) for t in record['records'].get(dt, {}).get('types', [])]), workbook.add_format(def_format))
         row += 1
 
     workbook.close()

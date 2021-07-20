@@ -473,6 +473,7 @@ class TestSendUrvViolatorsEventNotifications(TestsHelperMixin, APITestCase):
             df = pd.read_excel(data, engine='xlrd').fillna('')
             data = [
                 {
+                    'Дата': self.dt.strftime('%d.%m.%Y'),
                     'Код объекта': self.shop.code,
                     'Название объекта': self.shop.name,
                     'Табельный номер': '',  
@@ -480,6 +481,7 @@ class TestSendUrvViolatorsEventNotifications(TestsHelperMixin, APITestCase):
                     'Нарушение': 'Нет ухода',
                 }, 
                 {
+                    'Дата': self.dt.strftime('%d.%m.%Y'),
                     'Код объекта': self.shop.code,
                     'Название объекта': self.shop.name, 
                     'Табельный номер': '',
@@ -487,6 +489,7 @@ class TestSendUrvViolatorsEventNotifications(TestsHelperMixin, APITestCase):
                     'Нарушение': 'Нет отметок',
                 },
                 {
+                    'Дата': self.dt.strftime('%d.%m.%Y'),
                     'Код объекта': self.shop2.code,
                     'Название объекта': self.shop2.name,
                     'Табельный номер': '',
@@ -517,6 +520,7 @@ class TestSendUrvViolatorsEventNotifications(TestsHelperMixin, APITestCase):
             df = pd.read_excel(data, engine='xlrd').fillna('')
             data = [
                 {
+                    'Дата': self.dt.strftime('%d.%m.%Y'),
                     'Код объекта': self.shop2.code,
                     'Название объекта': self.shop2.name,
                     'Табельный номер': '',
