@@ -7,6 +7,7 @@ URV_STAT = 'urv_stat'
 URV_STAT_TODAY = 'urv_stat_today'
 URV_VIOLATORS_REPORT = 'urv_violators_report'
 URV_STAT_V2 = 'urv_stat_v2'
+UNACCOUNTED_OVERTIME = 'unaccounted_overtime'
 
 class URVReportEventMixin:
     @staticmethod
@@ -67,3 +68,13 @@ class UrvStatV2Event(BaseRegisteredEvent, URVReportEventMixin):
         title = f'URV_users_{dt_from}-{dt_to}.xlsx'
 
         return urv_stat_v2(dt_from, dt_to, title=title, network_id=self.network_id, shop_ids=self.context.get('shop_ids', []), in_memory=True)
+
+class UnaccountedOvertivmeEvent(BaseRegisteredEvent, URVReportEventMixin):
+    name = 'Отправка отчета по неучтенным переработкам'
+    code = UNACCOUNTED_OVERTIME
+    write_history = False
+
+    def get_file(self):
+        from src.reports.utils.unaccounted_overtime import unaccounted_overtimes_xlsx
+        dt_from, dt_to = self.get_dates(self.context)
+        return unaccounted_overtimes_xlsx(self.network_id, dt_from=dt_from, dt_to=dt_to, shop_ids=self.context.get('shop_ids', []), in_memory=True)

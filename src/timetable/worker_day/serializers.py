@@ -17,6 +17,23 @@ from src.timetable.models import (
 from src.util.models_converter import Converter
 
 
+class UnaccountedOvertimeMixin:
+    def unaccounted_overtime_getter(self, obj):
+        unaccounted_overtime = 0
+        dttm_work_start = obj.dttm_work_start
+        dttm_work_end = obj.dttm_work_end
+        dttm_work_start_tabel = obj.dttm_work_start_tabel
+        dttm_work_end_tabel = obj.dttm_work_end_tabel
+        if all([dttm_work_start, dttm_work_end, dttm_work_start_tabel, dttm_work_end_tabel]):
+            unaccounted_overtime = max(
+                (dttm_work_end - dttm_work_end_tabel).total_seconds(), 
+                0,
+            ) + max(
+                (dttm_work_start_tabel - dttm_work_start).total_seconds(), 
+                0,
+            )
+        return unaccounted_overtime / 60
+
 class RequestApproveSerializer(serializers.Serializer):
     shop_id = serializers.IntegerField()
     comment = serializers.CharField(allow_blank=True, required=False)
@@ -59,7 +76,7 @@ class WorkerDayCashboxDetailsListSerializer(serializers.Serializer):
     work_part = serializers.FloatField()
 
 
-class WorkerDayListSerializer(serializers.Serializer):
+class WorkerDayListSerializer(serializers.Serializer, UnaccountedOvertimeMixin):
     id = serializers.IntegerField()
     worker_id = serializers.IntegerField(source='employee.user_id')
     employee_id = serializers.IntegerField()
@@ -85,6 +102,10 @@ class WorkerDayListSerializer(serializers.Serializer):
     last_edited_by = UserShorSerializer(read_only=True)
     dttm_modified = serializers.DateTimeField(read_only=True)
     is_blocked = serializers.BooleanField(read_only=True)
+    unaccounted_overtime = serializers.SerializerMethodField()
+
+    def get_unaccounted_overtime(self, obj):
+        return self.unaccounted_overtime_getter(obj)
 
     def get_work_hours(self, obj) -> float:
         if isinstance(obj.work_hours, timedelta):
@@ -93,7 +114,7 @@ class WorkerDayListSerializer(serializers.Serializer):
         return obj.work_hours
 
 
-class WorkerDaySerializer(serializers.ModelSerializer):
+class WorkerDaySerializer(serializers.ModelSerializer, UnaccountedOvertimeMixin):
     default_error_messages = {
         'check_dates': _('Date start should be less then date end'),
         'worker_day_exist': _("Worker day already exist."),
@@ -124,6 +145,7 @@ class WorkerDaySerializer(serializers.ModelSerializer):
     last_edited_by = serializers.HiddenField(default=serializers.CurrentUserDefault())
     outsources = NetworkSerializer(many=True, read_only=True)
     outsources_ids = serializers.ListField(required=False, child=serializers.IntegerField(), allow_null=True, allow_empty=True, write_only=True)
+    unaccounted_overtime = serializers.SerializerMethodField()
 
     class Meta:
         model = WorkerDay
@@ -131,7 +153,7 @@ class WorkerDaySerializer(serializers.ModelSerializer):
                   'comment', 'is_approved', 'worker_day_details', 'is_fact', 'work_hours', 'parent_worker_day_id',
                   'is_outsource', 'is_vacancy', 'shop_code', 'user_login', 'username', 'created_by', 'last_edited_by',
                   'crop_work_hours_by_shop_schedule', 'dttm_work_start_tabel', 'dttm_work_end_tabel', 'is_blocked',
-                  'employment_tabel_code', 'outsources', 'outsources_ids']
+                  'employment_tabel_code', 'outsources', 'outsources_ids', 'unaccounted_overtime']
         read_only_fields = ['work_hours', 'parent_worker_day_id', 'is_blocked']
         create_only_fields = ['is_fact']
         ref_name = 'WorkerDaySerializer'
@@ -347,6 +369,9 @@ class WorkerDaySerializer(serializers.ModelSerializer):
                 if field not in data:
                     raise serializers.ValidationError({field: self.error_messages['required']})
         return data
+
+    def get_unaccounted_overtime(self, obj):
+        return self.unaccounted_overtime_getter(obj)
 
 
 class WorkerDayWithParentSerializer(WorkerDaySerializer):
