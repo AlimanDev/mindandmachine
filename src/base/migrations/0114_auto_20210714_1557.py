@@ -13,6 +13,7 @@ def add_permissions(apps, schema_editor):
         ('Task', ['GET']),
         ('ShopSchedule', ['GET']),
         ('Employee', ['GET']),
+        ('AttendanceRecords', ['GET']),
     )
     groups = Group.objects.all()
     for group in groups:

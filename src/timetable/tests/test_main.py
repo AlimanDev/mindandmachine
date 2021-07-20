@@ -3573,6 +3573,9 @@ class TestFineLogic(APITestCase):
         cls.courier = cls._create_user(cls, WorkerPosition.objects.create(network=cls.network, name='Курьер', breaks=cls.breaks), 'Courier', 'courier')
         cls.cleaner = cls._create_user(cls, WorkerPosition.objects.create(network=cls.network, name='Уборщик', breaks=cls.breaks), 'Cleaner', 'cleaner')
 
+    def setUp(self):
+        self.network.refresh_from_db()
+
     def _create_user(self, position, last_name, username):
         user = User.objects.create(
             last_name=last_name,
@@ -3653,6 +3656,34 @@ class TestFineLogic(APITestCase):
         self.assertEqual(fact_approved.work_hours.total_seconds(), 11 * 3600 + 20 * 60)
         fact_not_approved.refresh_from_db()
         self.assertEqual(fact_not_approved.work_hours.total_seconds(), 9 * 3600 + 30 * 60)
+
+    def test_fine_settings_only_work_hours_that_in_plan(self):
+        self.network.only_fact_hours_that_in_approved_plan = True
+        self.network.save()
+        dt = date.today()
+        plan_wd_dir = self._create_or_update_worker_day(self.dir[2], datetime.combine(dt, time(10)), datetime.combine(dt, time(20)))
+        self.assertEquals(plan_wd_dir.work_hours, timedelta(hours=9, minutes=30))
+        fact_wd_dir = self._create_or_update_worker_day(self.dir[2], datetime.combine(dt, time(9, 53)), datetime.combine(dt, time(20, 10)), is_fact=True)
+        self.assertEquals(fact_wd_dir.work_hours, timedelta(hours=9, minutes=30))
+        fact_wd_dir_bad = self._create_or_update_worker_day(self.dir[2], datetime.combine(dt, time(9, 56)), datetime.combine(dt, time(20)), is_fact=True)
+        self.assertEquals(fact_wd_dir_bad.work_hours, timedelta(hours=7, minutes=30))
+
+    def test_fine_settings_crop_work_hours_by_shop_schedule(self):
+        self.network.crop_work_hours_by_shop_schedule = True
+        self.network.save()
+        dt = date.today()
+        ShopSchedule.objects.create(
+            dt=dt,
+            shop=self.shop,
+            opens='10:00:00',
+            closes='20:00:00',
+        )
+        plan_wd_dir = self._create_or_update_worker_day(self.dir[2], datetime.combine(dt, time(10)), datetime.combine(dt, time(20)))
+        self.assertEquals(plan_wd_dir.work_hours, timedelta(hours=9, minutes=30))
+        fact_wd_dir = self._create_or_update_worker_day(self.dir[2], datetime.combine(dt, time(9, 53)), datetime.combine(dt, time(20, 10)), is_fact=True)
+        self.assertEquals(fact_wd_dir.work_hours, timedelta(hours=9, minutes=30))
+        fact_wd_dir_bad = self._create_or_update_worker_day(self.dir[2], datetime.combine(dt, time(9, 56)), datetime.combine(dt, time(20)), is_fact=True)
+        self.assertEquals(fact_wd_dir_bad.work_hours, timedelta(hours=7, minutes=30))
 
 class TestUnaccountedOvertimesAPI(APITestCase):
     USER_USERNAME = "user1"
