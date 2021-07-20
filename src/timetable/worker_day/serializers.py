@@ -6,8 +6,8 @@ from rest_framework import serializers
 from rest_framework.exceptions import ValidationError, NotFound
 
 from src.base.models import Employment, User, Shop, Employee, Network
-from src.base.shop.serializers import ShopSerializer
 from src.base.serializers import UserShorSerializer, NetworkSerializer
+from src.base.shop.serializers import ShopSerializer
 from src.conf.djconfig import QOS_DATE_FORMAT
 from src.timetable.models import (
     WorkerDay,
@@ -18,8 +18,15 @@ from src.util.models_converter import Converter
 
 
 class RequestApproveSerializer(serializers.Serializer):
-    shop_id = serializers.IntegerField(required=True)
+    shop_id = serializers.IntegerField()
     comment = serializers.CharField(allow_blank=True, required=False)
+    is_fact = serializers.BooleanField()
+    dt_from = serializers.DateField()
+    dt_to = serializers.DateField()
+    employee_ids = serializers.ListField(
+        child=serializers.IntegerField(),
+        required=False,
+    )
 
 
 class WorkerDayApproveSerializer(serializers.Serializer):
@@ -263,7 +270,28 @@ class WorkerDaySerializer(serializers.ModelSerializer):
 
             details = validated_data.pop('worker_day_details', None)
             outsources = validated_data.pop('outsources', None)
-            if validated_data.get('employee_id'):
+            canceled_vacancies = WorkerDay.objects.filter(
+                is_vacancy=True,
+                dt=validated_data.get('dt'),
+                shop_id=validated_data.get('shop_id'),
+                worker_day_details__work_type_id__in=list(map(lambda x: x['work_type_id'], details)) if details else [],
+                canceled=True,
+                is_fact=False,
+                is_approved=True,
+                employee_id__isnull=True,
+            )
+            # при создании вакансии вручную пробуем "востанавить" удаленную вакансию, которая была создана автоматом
+            if validated_data.get('is_vacancy') and not validated_data.get('is_fact')\
+                and not validated_data.get('employee_id') and canceled_vacancies.exists():
+                worker_day = canceled_vacancies.first()
+                WorkerDay.objects.filter(
+                    id=worker_day.id,
+                ).update(
+                    canceled=False,
+                    **validated_data,
+                )
+                worker_day.refresh_from_db()
+            elif validated_data.get('employee_id'):
                 worker_day, _created = WorkerDay.objects.update_or_create(
                     dt=validated_data.get('dt'),
                     employee_id=validated_data.get('employee_id'),
@@ -443,6 +471,7 @@ class DeleteWorkerDaysSerializer(serializers.Serializer):
     dates = serializers.ListField(child=serializers.DateField())
     is_fact = serializers.BooleanField(default=False)
     exclude_created_by = serializers.BooleanField(default=True)
+    shop_id = serializers.IntegerField(required=False)
 
 
 class ExchangeSerializer(serializers.Serializer):
@@ -491,6 +520,15 @@ class UploadTimetableSerializer(serializers.Serializer):
     file = serializers.FileField()
 
 
+class GenerateUploadTimetableExampleSerializer(serializers.Serializer):
+    shop_id = serializers.IntegerField()
+    dt_from = serializers.DateField(format=QOS_DATE_FORMAT)
+    dt_to = serializers.DateField(format=QOS_DATE_FORMAT)
+    employee_id__in = serializers.ListField(child=serializers.IntegerField(), required=False)
+    is_fact = serializers.BooleanField(default=False)
+    is_approved = serializers.BooleanField(default=False)
+
+
 class DownloadSerializer(serializers.Serializer):
     dt_from = serializers.DateField(format=QOS_DATE_FORMAT)
     is_approved = serializers.BooleanField(default=True)
@@ -499,10 +537,15 @@ class DownloadSerializer(serializers.Serializer):
 
 
 class DownloadTabelSerializer(serializers.Serializer):
+    TYPE_FACT = 'F'
+    TYPE_MAIN = 'M'
+    TYPE_ADDITIONAL = 'A'
+
     dt_from = serializers.DateField(format=QOS_DATE_FORMAT)
     dt_to = serializers.DateField(format=QOS_DATE_FORMAT)
     shop_id = serializers.IntegerField()
     convert_to = serializers.ChoiceField(required=False, choices=['pdf', 'xlsx'], default='xlsx')
+    tabel_type = serializers.ChoiceField(required=False, choices=[TYPE_FACT, TYPE_MAIN, TYPE_ADDITIONAL], default=TYPE_FACT)
 
 
 class BlockOrUnblockWorkerDaySerializer(serializers.ModelSerializer):
@@ -543,3 +586,10 @@ class BlockOrUnblockWorkerDaySerializer(serializers.ModelSerializer):
 
 class BlockOrUnblockWorkerDayWrapperSerializer(serializers.Serializer):
     worker_days = BlockOrUnblockWorkerDaySerializer(many=True)
+
+
+class RecalcWdaysSerializer(serializers.Serializer):
+    shop_id = serializers.IntegerField()
+    dt_from = serializers.DateField(format=QOS_DATE_FORMAT)
+    dt_to = serializers.DateField(format=QOS_DATE_FORMAT)
+    employee_id__in = serializers.ListField(child=serializers.IntegerField(), required=False)

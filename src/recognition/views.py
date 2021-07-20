@@ -1,11 +1,14 @@
 import io
 import logging
-from datetime import timedelta, datetime
+from datetime import timedelta
 from uuid import UUID
+from django.db.models import Exists, OuterRef, Q
+from django.http import request
 
 import xlsxwriter
 from django.conf import settings
 from django.http.response import HttpResponse
+from django.utils.translation import gettext as _
 from django.utils.functional import cached_property
 from django.utils.timezone import now
 from django_filters.rest_framework import DjangoFilterBackend
@@ -177,13 +180,23 @@ class TickViewSet(BaseModelViewSet):
         """
         GET /api/v1/ticks
         """
+        offset = self.request.user.shop.get_tz_offset() if isinstance(self.request.user, TickPoint) else 0
 
-        dttm_from = now().replace(hour=0, minute=0, second=0)
-        dttm_to = dttm_from + timedelta(days=1)
+        dt_from = (now() + timedelta(hours=offset)).date()
+        dt_to = dt_from + timedelta(days=1)
+        
+        today_comming_tick_cond = Tick.objects.filter(
+            dttm__date=dt_from,
+            type=Tick.TYPE_COMING,
+            user_id=OuterRef('user_id'),
+            tick_point__shop_id=OuterRef('tick_point__shop_id'),
+        )
 
-        queryset = Tick.objects.all().filter(
-            dttm__gte=dttm_from,
-            dttm__lte=dttm_to,
+        queryset = Tick.objects.annotate(
+            today_exists=Exists(today_comming_tick_cond),
+        ).filter(
+            (Q(dttm__date__gte=(dt_from - timedelta(1))) & Q(type=Tick.TYPE_COMING) & Q(today_exists=False)) |
+            Q(dttm__date__gte=dt_from, dttm__date__lte=dt_to),
             dttm_deleted__isnull=True
         )
         queryset = self.strategy.filter_qs(queryset=queryset)
@@ -242,8 +255,8 @@ class TickViewSet(BaseModelViewSet):
             if not wd:
                 return Response(
                     {
-                        "error": "У вас нет трудоустройства на текущий момент, "\
-                        "действие выполнить невозможно, пожалуйста, обратитесь к вашему руководству"
+                        "error": _("You do not have an active employment at the moment, "
+                        "the action can not be performed, please refer to your management")
                     }, 
                     400
                 )
@@ -258,7 +271,7 @@ class TickViewSet(BaseModelViewSet):
         ).first()
 
         if not wd and USERS_WITH_SCHEDULE_ONLY:
-            return Response({"error": "Сегодня у сотрудника нет рабочего дня в данном магазине"}, 404)
+            return Response({"error": _('Today, the employee does not have a working day in this shop')}, 404)
 
         tick = Tick.objects.create(
             user_id=user_id,
@@ -286,7 +299,7 @@ class TickViewSet(BaseModelViewSet):
         try:
             tick = Tick.objects.get(pk=kwargs['pk'])
         except Tick.DoesNotExist as e:
-            return Response({"error": "Отметка не существует"}, 404)
+            return Response({"error": _("The tick does not exist")}, 404)
 
         data = self.get_serializer_class()(data=request.data, context=self.get_serializer_context())
         data.is_valid(raise_exception=True)
@@ -297,7 +310,7 @@ class TickViewSet(BaseModelViewSet):
             tick.type = type
             tick.save()
             if settings.TRUST_TICK_REQUEST:
-                record, _ = AttendanceRecords.objects.get_or_create(
+                record, _created = AttendanceRecords.objects.get_or_create(
                     user_id=tick.user_id,
                     employee_id=tick.employee_id,
                     dttm=tick.dttm,
@@ -352,7 +365,7 @@ class TickPhotoViewSet(BaseModelViewSet):
         try:
             tick = Tick.objects.get(id=tick_id)
         except Tick.DoesNotExist as e:
-            return Response({"error": "Отметка не существует"}, 404)
+            return Response({"error": _('The tick does not exist')}, 404)
         tick_point = tick.tick_point
 
         try:

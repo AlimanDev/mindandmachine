@@ -5,7 +5,7 @@ from datetime import date, timedelta
 from src.celery.tasks import auto_delete_biometrics
 from src.recognition.models import UserConnecter
 from src.util.mixins.tests import TestsHelperMixin
-from src.recognition.api.recognition import Tevian
+from src.recognition.api.recognition import Recognition
 
 
 class TestBiometricDeletion(TestsHelperMixin, APITestCase):
@@ -25,7 +25,7 @@ class TestBiometricDeletion(TestsHelperMixin, APITestCase):
         self._set_authorization_token(self.user2.username)
 
     def test_delete_biometrics_after_3_years(self):
-        with mock.patch.object(Tevian, 'delete_person') as delete_person:
+        with mock.patch.object(Recognition, 'delete_person') as delete_person:
             auto_delete_biometrics()
             delete_person.assert_called_once()
         self.assertEqual(UserConnecter.objects.count(), 2)

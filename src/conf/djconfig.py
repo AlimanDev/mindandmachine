@@ -28,6 +28,8 @@ QOS_DEV_AUTOLOGIN_USERNAME = None
 QOS_DEV_AUTOLOGIN_PASSWORD = None
 # переменная указывающая как матчить табельный номер при загрузке расписания (через User или через Employment)
 UPLOAD_TT_MATCH_EMPLOYMENT = True
+# создаем employee при загрузке или двух разных юзеров, фикс для граната
+UPLOAD_TT_CREATE_EMPLOYEE = True
 
 QOS_CAMERA_KEY = '1'
 
@@ -95,6 +97,13 @@ REST_FRAMEWORK = {
     ],
     'DEFAULT_RENDERER_CLASSES': [
         'rest_framework.renderers.JSONRenderer',
+        'rest_framework_xml.renderers.XMLRenderer',
+    ],
+    'DEFAULT_PARSER_CLASSES': [
+        'rest_framework.parsers.JSONParser',
+        'rest_framework.parsers.MultiPartParser',
+        'rest_framework.parsers.FormParser',
+        'rest_framework_xml.parsers.XMLParser',
     ],
 }
 OLD_PASSWORD_FIELD_ENABLED=True
@@ -119,6 +128,7 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'src.util.csrf.CsrfMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'sesame.middleware.AuthenticationMiddleware',
     # 'src.main.auth.middleware.JWTAuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
@@ -154,6 +164,11 @@ DATABASES = {
         'PORT': '5432',
     }
 }
+
+AUTHENTICATION_BACKENDS = [
+    'django.contrib.auth.backends.ModelBackend',
+    'sesame.backends.ModelBackend',
+]
 
 AUTH_USER_MODEL = 'base.User'
 
@@ -475,6 +490,10 @@ IMPORT_EXPORT_USE_TRANSACTIONS = True
 
 # Eсли у пользователя пароль пустой, то при сохранении устанавливать пароль как логин
 SET_USER_PASSWORD_AS_LOGIN = False
+
+SESAME_ONE_TIME = True
+SESAME_MAX_AGE = 60 * 60  # время жизни временного токена 1 час
+SESAME_TOKEN_NAME = 'otp_token'
 
 # Возможные вариант можно найти по FISCAL_SHEET_DIVIDERS_MAPPING
 # Если == None, то при расчете табеля разделение на осн. и доп. не производится

@@ -84,6 +84,7 @@ class NetworkSerializer(serializers.ModelSerializer):
             'default_stats',
             'show_tabel_graph',
             'show_worker_day_tasks',
+            'show_user_biometrics_block',
         ]
 
 
@@ -169,6 +170,11 @@ class EmployeeSerializer(BaseNetworkSerializer):
     class Meta:
         model = Employee
         fields = ['id', 'user', 'user_id', 'tabel_code', ]
+        extra_kwargs = {
+            'tabel_code': {
+                'required': False,
+            },
+        }
 
     def __init__(self, *args, **kwargs):
         super(EmployeeSerializer, self).__init__(*args, **kwargs)
@@ -256,6 +262,7 @@ class EmploymentListSerializer(serializers.Serializer):
         request = self.context.get('request')
         if request and request.query_params.get('include_employee'):
             self.fields['employee'] = EmployeeSerializer(required=False, read_only=True)
+
 
 class EmploymentSerializer(serializers.ModelSerializer):
     default_error_messages = {

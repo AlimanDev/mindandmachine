@@ -1,13 +1,14 @@
-from datetime import timedelta
 import json
-
-from django.utils import timezone
-from rest_framework.test import APITestCase
+from datetime import timedelta
 from unittest import mock
 
+from django.core.files.uploadedfile import SimpleUploadedFile
+from django.utils import timezone
+from rest_framework.test import APITestCase
+
+from src.base.models import WorkerPosition, Employment, User, Network, NetworkConnect
 from src.recognition.api import recognition
 from src.recognition.models import UserConnecter
-from src.base.models import WorkerPosition, Employment, User, Network, NetworkConnect
 from src.timetable.models import WorkTypeName
 from src.util.mixins.tests import TestsHelperMixin
 from src.util.models_converter import Converter
@@ -138,7 +139,6 @@ class TestUserViewSet(TestsHelperMixin, APITestCase):
         self.assertEqual(user1['has_biometrics'], True)
         self.assertEqual(user2['has_biometrics'], False)
 
-    
     def test_delete_biometrics(self):
         self.user1.avatar = 'test/path/avatar.jpg'
         self.user1.save()
@@ -161,6 +161,35 @@ class TestUserViewSet(TestsHelperMixin, APITestCase):
         self.assertEqual(UserConnecter.objects.count(), 0)
         self.user1.refresh_from_db()
         self.assertFalse(bool(self.user1.avatar))
+
+    def test_add_biometrics(self):
+        self.user1.avatar = None
+        self.user1.save()
+        UserConnecter.objects.filter(user=self.user1).delete()
+
+        class TevianMock:
+            def create_person(self, data):
+                partner_id = 123123
+                return partner_id
+
+            def upload_photo(self, partner_id, image):
+                photo_id = 313123
+                return photo_id
+
+        with mock.patch.object(recognition, 'Tevian', TevianMock):
+            dummy_file = SimpleUploadedFile("file.jpg", b"image content", content_type="image/jpeg")
+            response = self.client.post(
+                self.get_url('User-add-biometrics', pk=self.user1.id),
+                data={'file': dummy_file},
+                format='multipart',
+            )
+
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data, {'detail': 'Шаблон биометрии успешно добавлен.'})
+        self.assertEqual(UserConnecter.objects.count(), 1)
+        self.user1.refresh_from_db()
+        self.assertTrue(bool(self.user1.avatar))
 
     def test_delete_non_existing_biometrics(self):
         response = self.client.post(
@@ -304,3 +333,12 @@ class TestUserViewSet(TestsHelperMixin, APITestCase):
 
         user = User.objects.get(username=username)
         self.assertEqual(user.email, '')
+
+    def test_csrf_token(self):
+        self.client.logout()
+        resp = self.client.get('/rest_api/auth/user/')
+        self.assertIsNotNone(resp.client.cookies.get('csrftoken'))
+        resp = self.client.post('/rest_api/auth/login/', data=self.dump_data({'username': self.USER_USERNAME, 'password': self.USER_PASSWORD}), content_type='application/json')
+        token = resp.client.cookies.get('csrftoken')
+        resp = self.client.get('/rest_api/auth/user/')
+        self.assertEquals(resp.client.cookies.get('csrftoken'), token)

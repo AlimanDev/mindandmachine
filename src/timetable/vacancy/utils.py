@@ -44,6 +44,8 @@ from src.base.models import (
     Notification,
     Employee,
 )
+from src.events.signals import event_signal
+from src.timetable.events import EMPLOYEE_VACANCY_DELETED, VACANCY_CREATED, VACANCY_DELETED
 from src.conf.djconfig import (
     QOS_DATETIME_FORMAT,
     EMAIL_HOST_USER,
@@ -401,56 +403,118 @@ def do_shift_elongation(vacancy, max_working_hours):
             msg.send()
 
 
-def notify_about_canceled_vacancy(vacancy):
-    if vacancy.employee_id:
-        employee = vacancy.employee
-        shop = vacancy.shop
-        create_event_and_notify(
-            [employee.user],
-            type='vacancy_canceled',
-            shop=shop,
-            params={'vacancy': vacancy, 'shop': shop},
-        )
-        if shop.email:
-            message = f'Это автоматическое уведомление для {shop.name} об изменениях в графике:\n\n' + \
-                    f'У сотрудника {employee.user.last_name} {employee.user.first_name} ' + \
-                    f'отменена вакансия на {vacancy.dt}.\n\n' + \
-                    f'Посмотреть детали можно по ссылке: http://{settings.DOMAIN}'
-            msg = EmailMultiAlternatives(
-                subject='Изменение в графике выхода сотрудников',
-                body=message,
-                from_email=EMAIL_HOST_USER,
-                to=[shop.email,],
-            )
-            msg.send()
-
-
-def cancel_vacancy(vacancy_id):
-    vacancy = WorkerDay.objects.filter(id=vacancy_id, is_vacancy=True).first()
+def cancel_vacancy(vacancy_id, auto=True):
+    vacancy = WorkerDay.objects.filter(id=vacancy_id, is_vacancy=True).select_related(
+        'shop', 
+        'shop__director', 
+        'employee', 
+        'employee__user',
+    ).first()
     if vacancy:
-        notify_about_canceled_vacancy(vacancy)
-        # if vacancy.worker:
-        #     wd, created = WorkerDay.objects.update_or_create(
-        #         dt=vacancy.dt,
-        #         worker_id=vacancy.worker_id,
-        #         is_approved=False,
-        #         is_fact=False,
-        #         defaults={
-        #             'dttm_work_start': None,
-        #             'dttm_work_end': None,
-        #             'shop_id': vacancy.shop_id,
-        #             'type': WorkerDay.TYPE_HOLIDAY,
-        #             'employment': vacancy.employment,
-        #             'parent_worker_day': vacancy,
-        #             'is_vacancy': False,
-        #         }
-        #     )
-        #     if not created:
-        #         WorkerDayCashboxDetails.objects.filter(
-        #             worker_day=wd,
-        #         ).delete()            
-        # else:   
-        vacancy.delete()
+        shop = vacancy.shop
+        employee = vacancy.employee
+        if auto or vacancy.created_by_id:
+            vacancy.delete()
+        else:
+            vacancy.canceled = True
+            vacancy.employee = None
+            vacancy.employment = None
+            vacancy.save()
+        if employee:
+            employee_obj = employee
+            employee = {
+                'first_name': employee.user.first_name,
+                'last_name': employee.user.last_name,
+                'tabel_code': employee.tabel_code or '',
+            }
+            WorkerDay.objects.create(
+                dt=vacancy.dt,
+                employee=employee_obj,
+                is_approved=vacancy.is_approved,
+                is_fact=False,
+                dttm_work_start=None,
+                dttm_work_end=None,
+                shop_id=None,
+                type=WorkerDay.TYPE_HOLIDAY,
+                employment=None,
+                is_vacancy=False,
+                is_outsource=False,
+            )
+            event_signal.send(
+                sender=None,
+                network_id=shop.network_id,
+                event_code=EMPLOYEE_VACANCY_DELETED,
+                user_author_id=None,
+                shop_id=shop.id,
+                context={
+                    'user_id': employee_obj.user_id,
+                    'dt': vacancy.dt.strftime('%Y-%m-%d'),
+                    'dttm_from': vacancy.dttm_work_start.strftime('%Y-%m-%d %H:%M:%S'),
+                    'dttm_to': vacancy.dttm_work_end.strftime('%Y-%m-%d %H:%M:%S'),
+                    'shop_id': shop.id,
+                    'shop_name': shop.name,
+                    'auto': auto,
+                },
+            )
+        if auto:
+            event_signal.send(
+                sender=None,
+                network_id=shop.network_id,
+                event_code=VACANCY_DELETED,
+                user_author_id=None,
+                shop_id=shop.id,
+                context={
+                    'director': {
+                        'email': shop.director.email if shop.director else shop.email,
+                        'name': shop.director.first_name if shop.director else shop.name,
+                    },
+                    'dt': vacancy.dt.strftime('%Y-%m-%d'),
+                    'dttm_from': vacancy.dttm_work_start.strftime('%Y-%m-%d %H:%M:%S'),
+                    'dttm_to': vacancy.dttm_work_end.strftime('%Y-%m-%d %H:%M:%S'),
+                    'shop_id': shop.id,
+                    'shop_name': shop.name,
+                    'employee': employee,
+                },
+            )
+
+
+def create_vacancy(dttm_from, dttm_to, shop_id, work_type_id, outsources=[]):
+    is_outsource = bool(outsources)
+    worker_day = WorkerDay.objects.create(
+        dttm_work_start=dttm_from,
+        dttm_work_end=dttm_to,
+        type=WorkerDay.TYPE_WORKDAY,
+        is_vacancy=True,
+        dt=dttm_from.date(),
+        shop_id=shop_id,
+        is_outsource=is_outsource,
+        is_approved=True, # чтобы в покрытии учитывалось при автоматическом создании вакансий
+    )
+    worker_day.outsources.add(*outsources)
+    WorkerDayCashboxDetails.objects.create(
+        work_type_id=work_type_id,
+        worker_day=worker_day,  
+    )
+    shop = Shop.objects.get(id=shop_id)
+    event_signal.send(
+        sender=None,
+        network_id=shop.network_id,
+        event_code=VACANCY_CREATED,
+        user_author_id=None,
+        shop_id=shop_id,
+        context={
+            'director': {
+                'email': shop.director.email if shop.director else shop.email,
+                'name': shop.director.first_name if shop.director else shop.name,
+            },
+            'dt': worker_day.dt.strftime('%Y-%m-%d'),
+            'dttm_from': worker_day.dttm_work_start.strftime('%Y-%m-%d %H:%M:%S'),
+            'dttm_to': worker_day.dttm_work_end.strftime('%Y-%m-%d %H:%M:%S'),
+            'shop_id': shop_id,
+            'shop_name': shop.name,
+            'work_type': WorkType.objects.select_related('work_type_name').get(id=work_type_id).work_type_name.name,
+        },
+    )
 
 
 def confirm_vacancy(vacancy_id, user, employee_id=None, exchange=False, reconfirm=False):
@@ -471,6 +535,9 @@ def confirm_vacancy(vacancy_id, user, employee_id=None, exchange=False, reconfir
         'vacancy_success': _('The vacancy was successfully accepted.'),
         'cant_reconfrm_fact_exists': _("You can't reassign an employee to this vacancy, because the employee has already entered this vacancy.")
     }
+    res = {
+        'status_code': 200,
+    }
     try:
         with transaction.atomic():
             no_employee_filter = {}
@@ -479,11 +546,9 @@ def confirm_vacancy(vacancy_id, user, employee_id=None, exchange=False, reconfir
             vacancy = WorkerDay.objects.get_plan_approved(
                 id=vacancy_id,
                 is_vacancy=True,
+                canceled=False,
                 **no_employee_filter,
             ).select_for_update().first()
-            res = {
-                'status_code': 200,
-            }
             if not vacancy:
                 res['text'] = messages['no_vacancy']
                 res['status_code'] = 404
@@ -645,10 +710,10 @@ def create_vacancies_and_notify(shop_id, work_type_id, dt_from=None, dt_to=None)
 
     shop=Shop.objects.get(id=shop_id)
     exchange_settings = shop.get_exchange_settings()
-    if exchange_settings is None:
+    if exchange_settings is None or not exchange_settings.automatic_create_vacancies:
         return
-    if not exchange_settings.automatic_check_lack:
-        return
+
+    outsources = list(exchange_settings.outsources.all())
     tm_open_dict = shop.open_times
     tm_close_dict = shop.close_times
 
@@ -786,34 +851,7 @@ def create_vacancies_and_notify(shop_id, work_type_id, dt_from=None, dt_to=None)
             if dttm_from < dttm_shop_opens:
                 dttm_from = dttm_shop_opens
             print('create vacancy {} {} {}'.format(dttm_from, dttm_to, work_type_id))
-
-            worker_day = WorkerDay.objects.create(
-                dttm_work_start=dttm_from,
-                dttm_work_end=dttm_to,
-                type=WorkerDay.TYPE_WORKDAY,
-                is_vacancy=True,
-                dt=dttm_from.date(),
-                shop=shop,
-            )
-
-            WorkerDayCashboxDetails.objects.create(
-                work_type_id=work_type_id,
-                worker_day=worker_day,  
-            )
-
-            workers = search_candidates(
-                worker_day,
-                own_shop=True,
-                other_shops=True,
-                other_supershops=True,
-                outsource=True)
-
-            create_event_and_notify(
-                workers,
-                worker_day=worker_day,
-                type='vacancy',
-                shop=shop,
-            )
+            create_vacancy(dttm_from, dttm_to, shop_id, work_type_id, outsources=outsources)
 
 
 def cancel_vacancies(shop_id, work_type_id, dt_from=None, dt_to=None, approved=False):
@@ -823,7 +861,7 @@ def cancel_vacancies(shop_id, work_type_id, dt_from=None, dt_to=None, approved=F
     """
     shop = Shop.objects.get(id=shop_id)
     exchange_settings = shop.get_exchange_settings()
-    if not exchange_settings or not exchange_settings.automatic_check_lack:
+    if not exchange_settings or not exchange_settings.automatic_delete_vacancies:
         return
 
     if dt_from is None:
@@ -880,17 +918,11 @@ def cancel_vacancies(shop_id, work_type_id, dt_from=None, dt_to=None, approved=F
 
 
 def holiday_workers_exchange():
-    exchange_settings_network = {
-        e.network_id: e
-        for e in ExchangeSettings.objects.filter(shops__isnull=True)
-    }
-    
-
     shops = Shop.objects.select_related('exchange_settings').filter(dttm_deleted__isnull=True)
 
     for shop in shops:
         exchange_settings = shop.get_exchange_settings()
-        if not exchange_settings.automatic_exchange:
+        if not exchange_settings or not exchange_settings.automatic_exchange:
             continue
         max_working_hours = exchange_settings.max_working_hours
         days = max_working_hours / 24
@@ -933,16 +965,12 @@ def worker_shift_elongation():
     Проходится по всем вакансиям всех не удалённых магазинов
     Выполняет функцию рпасширения смены для каждой вакансии
     """
-    exchange_settings_network = {
-        e.network_id: e
-        for e in ExchangeSettings.objects.filter(shops__isnull=True)
-    }
     
     shops = Shop.objects.select_related('exchange_settings').filter(dttm_deleted__isnull=True)
 
     for shop in shops:
         exchange_settings = shop.get_exchange_settings()
-        if not exchange_settings.automatic_exchange:
+        if not exchange_settings or not exchange_settings.automatic_exchange:
             continue
         max_working_hours = exchange_settings.max_working_hours
         days = max_working_hours / 24
@@ -977,7 +1005,7 @@ def workers_exchange():
 
     for shop in shop_list:
         exchange_settings = shop.get_exchange_settings()
-        if not exchange_settings.automatic_check_lack:
+        if not exchange_settings or not exchange_settings.automatic_exchange:
             continue
         from_dt = (now().replace(minute=0, second=0, microsecond=0) + exchange_settings.automatic_worker_select_timegap).date()
         to_dt = from_dt + exchange_settings.automatic_worker_select_timegap_to
@@ -1002,11 +1030,14 @@ def workers_exchange():
             df_stat['work_type_id'] = work_type.id
             df_shop_stat = df_shop_stat.append(df_stat)
 
+    if not len(df_shop_stat):
+        return
+
     df_shop_stat.set_index([# df_shop_stat.shop_id,
                             df_shop_stat.work_type_id, df_shop_stat.dttm], inplace=True)
     for shop in shop_list:
         exchange_settings = shop.get_exchange_settings()
-        if not exchange_settings.automatic_check_lack:
+        if not exchange_settings or not exchange_settings.automatic_exchange:
             continue
         exchange_shops = list(shop.exchange_shops.all())
         exclude_positions = exchange_settings.exclude_positions.all()

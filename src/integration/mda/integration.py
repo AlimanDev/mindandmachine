@@ -24,10 +24,11 @@ from .serializers import (
 
 CLOSED_OR_DELETED_THRESHOLD_DAYS = 180
 
+logger = logging.getLogger('mda_integration')
+
 
 class MdaIntegrationHelper:
-    def __init__(self, logger=None):
-        self.logger = logger or logging.getLogger('mda_integration')
+    def __init__(self):
         self.dttm_now = timezone.now()
         self.dt_now = self.dttm_now.date()
 
@@ -207,6 +208,15 @@ class MdaIntegrationHelper:
 
         writer.save()
 
+    def _log_errors(self, resp_data, key_names: list):
+        errors = {}
+        for k in key_names:
+            if k in resp_data:
+                errors[k] = resp_data[k]
+
+        if errors:
+            logger.error(errors)
+
     def sync_orgstruct(self, threshold_seconds=settings.MDA_SYNC_DEPARTMENTS_THRESHOLD_SECONDS):
         resp = requests.post(
             url=settings.MDA_PUBLIC_API_HOST + '/api/public/v1/mindandmachine/loadOrgstruct',
@@ -214,13 +224,14 @@ class MdaIntegrationHelper:
             headers={
                 'x-public-token': settings.MDA_PUBLIC_API_AUTH_TOKEN,
             },
-            timeout=(5, 30),
+            timeout=(5, 300),
         )
-        # TODO: запись ошибок в лог
         try:
             resp.raise_for_status()
         except requests.RequestException:
-            self.logger.exception(f'text:{resp.text}, headers: {resp.headers}')
+            logger.exception(f'text:{resp.text}, headers: {resp.headers}')
+
+        self._log_errors(resp_data=resp.json(), key_names=['divisionErrors', 'regionErrors', 'shopErrors'])
 
     def sync_users(self, threshold_seconds=settings.MDA_SYNC_DEPARTMENTS_THRESHOLD_SECONDS):
         resp = requests.post(
@@ -229,10 +240,11 @@ class MdaIntegrationHelper:
             headers={
                 'x-public-token': settings.MDA_PUBLIC_API_AUTH_TOKEN,
             },
-            timeout=(5, 30),
+            timeout=(5, 1800),  # бешеный таймаут, т.к. запрос по всем юзерам может идти оооочень долго
         )
-        # TODO: запись ошибок в лог
         try:
             resp.raise_for_status()
         except requests.RequestException:
-            self.logger.exception(f'text:{resp.text}, headers: {resp.headers}')
+            logger.exception(f'text:{resp.text}, headers: {resp.headers}')
+
+        self._log_errors(resp_data=resp.json(), key_names=['userErrors'])

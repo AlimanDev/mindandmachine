@@ -1,0 +1,17 @@
+[run]
+branch = True
+omit = *migrations*
+       *test_*
+       *tests*
+       */.virtualenvs/*
+       */venv/*
+       */virtualenv/*
+
+
+[report]
+omit = *migrations*
+       *test_*
+       *tests*
+       */.virtualenvs/*
+       */venv/*
+       */virtualenv/*

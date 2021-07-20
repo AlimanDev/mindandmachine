@@ -5,6 +5,7 @@ from django.utils import six
 
 
 from src.timetable.models import WorkerDay, WorkerDayCashboxDetails, Shop, User
+from src.base.serializers import NetworkSerializer
 
 
 class WorkerDayCashboxDetailsSerializer(serializers.ModelSerializer):
@@ -18,41 +19,6 @@ class WorkerDayCashboxDetailsSerializer(serializers.ModelSerializer):
         if obj.work_type and obj.work_type.work_type_name:
             return obj.work_type.work_type_name.name
 
-
-class WorkerDayListSerializer(serializers.Serializer):
-    id = serializers.IntegerField()
-    dttm_work_start = serializers.DateTimeField()
-    dttm_work_end = serializers.DateTimeField()
-    position = serializers.SerializerMethodField()
-
-    def get_position(self, obj):
-        return obj.employment.position.name if obj.employment and obj.employment.position else ''
-
-
-class WfmEmployeeSerializer(serializers.Serializer):
-    id = serializers.IntegerField()
-    tabel_code = serializers.CharField()
-    worker_days = WorkerDayListSerializer(many=True)
-
-
-class WfmWorkerDaySerializer(serializers.ModelSerializer):
-    user_id = serializers.SerializerMethodField()
-    avatar = serializers.SerializerMethodField()
-    employees = WfmEmployeeSerializer(many=True)
-
-    class Meta:
-        model = User
-        fields = ['user_id', 'employees', 'first_name', 'last_name', 'avatar']
-
-    def get_user_id(self, obj) -> int:
-        return obj.id
-
-    def get_avatar(self, obj) -> str:
-        if obj.avatar:
-            return obj.avatar.url
-        return None
-
-
 class ShopSerializer(serializers.ModelSerializer):
     timezone = serializers.SerializerMethodField()
 
@@ -62,6 +28,47 @@ class ShopSerializer(serializers.ModelSerializer):
     class Meta:
         model = Shop
         fields = ['id', 'name', 'timezone']
+
+
+class WorkerDayListSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    dttm_work_start = serializers.DateTimeField()
+    dttm_work_end = serializers.DateTimeField()
+
+
+class WfmEmployeeSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    tabel_code = serializers.CharField()
+    worker_days = WorkerDayListSerializer(many=True)
+    shop = serializers.SerializerMethodField()
+    position = serializers.SerializerMethodField()
+
+    def get_position(self, obj):
+        employment = obj.employments.all()[0] if obj.employments.all() else None
+        return employment.position.name if employment and employment.position else ''
+
+    def get_shop(self, obj):
+        employment = obj.employments.all()[0] if obj.employments.all() else None
+        return ShopSerializer(employment.shop).data if employment else {}
+
+
+class WfmWorkerDaySerializer(serializers.ModelSerializer):
+    user_id = serializers.SerializerMethodField()
+    avatar = serializers.SerializerMethodField()
+    employees = WfmEmployeeSerializer(many=True)
+    network = NetworkSerializer()
+
+    class Meta:
+        model = User
+        fields = ['user_id', 'employees', 'first_name', 'last_name', 'avatar', 'network']
+
+    def get_user_id(self, obj) -> int:
+        return obj.id
+
+    def get_avatar(self, obj) -> str:
+        if obj.avatar:
+            return obj.avatar.url
+        return None
 
 
 class WorkShiftSerializer(serializers.ModelSerializer):

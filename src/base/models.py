@@ -12,18 +12,18 @@ from django.contrib.auth.models import (
     AbstractUser as DjangoAbstractUser,
 )
 from django.contrib.postgres.fields import JSONField
-from rest_framework.serializers import ValidationError
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models
 from django.db import transaction
-from django.db.models import Case, When, Sum, Value, IntegerField, Subquery, OuterRef, F
+from django.db.models import Case, When, Sum, Value, IntegerField, Subquery, OuterRef, F, Q
 from django.db.models.functions import Coalesce
 from django.db.models.query import QuerySet
 from django.utils import timezone
 from django.utils.functional import cached_property
-from django.utils.translation import gettext as _
+from django.utils.translation import gettext_lazy as _
 from model_utils import FieldTracker
 from mptt.models import MPTTModel, TreeForeignKey
+from rest_framework.serializers import ValidationError
 from timezone_field import TimeZoneField
 
 from src.base.models_abstract import (
@@ -43,16 +43,21 @@ class Network(AbstractActiveModel):
     ACC_PERIOD_YEAR = 12
 
     ACCOUNTING_PERIOD_LENGTH_CHOICES = (
-        (ACC_PERIOD_MONTH, 'Месяц'),
-        (ACC_PERIOD_QUARTER, 'Квартал'),
-        (ACC_PERIOD_HALF_YEAR, 'Пол года'),
-        (ACC_PERIOD_YEAR, 'Год'),
+        (ACC_PERIOD_MONTH, _('Month')),
+        (ACC_PERIOD_QUARTER, _('Quarter')),
+        (ACC_PERIOD_HALF_YEAR, _('Half a year')),
+        (ACC_PERIOD_YEAR, _('Year')),
     )
 
     TABEL_FORMAT_CHOICES = (
         ('mts', 'MTSTabelGenerator'),
         ('t13_custom', 'CustomT13TabelGenerator'),
         ('aigul', 'AigulTabelGenerator'),
+    )
+
+    TIMETABLE_FORMAT_CHOICES = (
+        ('cell_format', _('Cells')),
+        ('row_format', _('Rows')),
     )
 
     CONVERT_TABEL_TO_CHOICES = (
@@ -64,51 +69,57 @@ class Network(AbstractActiveModel):
         verbose_name = 'Сеть магазинов'
         verbose_name_plural = 'Сети магазинов'
 
-    logo = models.ImageField(null=True, blank=True, upload_to='logo/%Y/%m')
+    logo = models.ImageField(null=True, blank=True, upload_to='logo/%Y/%m', verbose_name=_('Logo'))
     url = models.CharField(blank=True, null=True, max_length=255)
-    primary_color = models.CharField(max_length=7, blank=True)
-    secondary_color = models.CharField(max_length=7, blank=True)
-    name = models.CharField(max_length=128, unique=True)
-    code = models.CharField(max_length=64, unique=True, null=True, blank=True)
+    primary_color = models.CharField(max_length=7, blank=True, verbose_name=_('Primary color'))
+    secondary_color = models.CharField(max_length=7, blank=True, verbose_name=_('Secondary color'))
+    name = models.CharField(max_length=128, unique=True, verbose_name=_('Name'))
+    code = models.CharField(max_length=64, unique=True, null=True, blank=True, verbose_name=_('Code'))
     # нужен ли идентификатор сотруднка чтобы откликнуться на вакансию
-    need_symbol_for_vacancy = models.BooleanField(default=False)
-    settings_values = models.TextField(default='{}')  # настройки для сети. Cейчас есть настройки для приемки чеков + ночные смены
+    need_symbol_for_vacancy = models.BooleanField(default=False, verbose_name=_('Need symbol for vacancy'))
+    settings_values = models.TextField(default='{}', verbose_name=_('Settings values'))  # настройки для сети. Cейчас есть настройки для приемки чеков + ночные смены
     allowed_interval_for_late_arrival = models.DurationField(
-        verbose_name='Допустимый интервал для опоздания', default=datetime.timedelta(seconds=0))
+        verbose_name=_('Allowed interval for late_arrival'), default=datetime.timedelta(seconds=0))
     allowed_interval_for_early_departure = models.DurationField(
-        verbose_name='Допустимый интервал для раннего ухода', default=datetime.timedelta(seconds=0))
+        verbose_name=_('Allowed interval for early departure'), default=datetime.timedelta(seconds=0))
     allow_workers_confirm_outsource_vacancy = models.BooleanField(
-        verbose_name='Разрешать работникам сети откликаться на аутсорс вакансии', default=False)
-    okpo = models.CharField(blank=True, null=True, max_length=15, verbose_name='Код по ОКПО')
+        verbose_name=_('Allow workers confirm outsource vacancy'), default=False)
+    okpo = models.CharField(blank=True, null=True, max_length=15, verbose_name=_('OKPO code'))
     allowed_geo_distance_km = models.DecimalField(
         max_digits=10, decimal_places=2, null=True, blank=True,
-        verbose_name='Разрешенная дистанция до магазина при создании отметок (км)',
+        verbose_name=_('Allowed geo distance (km)'),
     )
     enable_camera_ticks = models.BooleanField(
-        default=False, verbose_name='Включить отметки по камере в мобильной версии')
+        default=False, verbose_name=_('Enable camera ticks'))
     show_worker_day_additional_info = models.BooleanField(
-        default=False, verbose_name='Отображать доп. информацию в подтвержденных факте и плане', 
-        help_text='Отображение при наведении на уголок информации о том, кто и когда последний раз редактировал рабочий день')
+        default=False, verbose_name=_('Show worker day additional info'),
+        help_text=_('Displaying information about who last edited a worker day and when, when hovering over the corner'))
     show_worker_day_tasks = models.BooleanField(
-        default=False, verbose_name='Отображать задачи в доп. информацию по рабочему дню')
+        default=False, verbose_name=_('Show worker day tasks'))
     crop_work_hours_by_shop_schedule = models.BooleanField(
-        default=False, verbose_name='Обрезать рабочие часы по времени работы магазина'
+        default=False, verbose_name=_('Crop work hours by shop schedule')
     )
     clean_wdays_on_employment_dt_change = models.BooleanField(
-        default=False, verbose_name='Запускать скрипт очистки дней при изменении дат трудойстройства',
+        default=False, verbose_name=_('Clean worker days on employment date change'),
     )
     accounting_period_length = models.PositiveSmallIntegerField(
-        choices=ACCOUNTING_PERIOD_LENGTH_CHOICES, verbose_name='Длина учетного периода', default=1)
+        choices=ACCOUNTING_PERIOD_LENGTH_CHOICES, verbose_name=_('Accounting period length'), default=1)
     only_fact_hours_that_in_approved_plan = models.BooleanField(
         default=False,
-        verbose_name='Считать только те фактические часы, которые есть в подтвержденном плановом графике',
+        verbose_name=_('Count only fact hours that in approved plan'),
     )
+    copy_plan_to_fact_crossing = models.BooleanField(
+        verbose_name=_("Copy plan to fact crossing"), default=False)
     download_tabel_template = models.CharField(
-        max_length=64, verbose_name='Шаблон для табеля',
+        max_length=64, verbose_name=_('Download tabel template'),
         choices=TABEL_FORMAT_CHOICES, default='mts',
     )
+    timetable_format = models.CharField(
+        max_length=64, verbose_name=_('Timetable format'),
+        choices=TIMETABLE_FORMAT_CHOICES, default='cell_format',
+    )
     convert_tabel_to = models.CharField(
-        max_length=64, verbose_name='Конвертировать табель в',
+        max_length=64, verbose_name=_('Convert tabel to'),
         null=True, blank=True,
         choices=CONVERT_TABEL_TO_CHOICES,
         default='xlsx',
@@ -118,29 +129,52 @@ class Network(AbstractActiveModel):
         on_delete=models.PROTECT,
         blank=True,
         null=True,
-        verbose_name='Перерывы по умолчанию',
+        verbose_name=_('Default breaks'),
+        related_name='networks',
+    )
+    load_template = models.ForeignKey(
+        'forecast.LoadTemplate',
+        on_delete=models.PROTECT,
+        blank=True,
+        null=True,
+        verbose_name=_('Default load template'),
+        related_name='networks',
+    )
+    exchange_settings = models.ForeignKey(
+        'timetable.ExchangeSettings',
+        on_delete=models.PROTECT,
+        blank=True,
+        null=True,
+        verbose_name=_('Default exchange settings'),
         related_name='networks',
     )
     # при создании новой должности будут проставляться соотв. значения
     # пример значения можно найти в src.base.tests.test_worker_position.TestSetWorkerPositionDefaultsModel
-    worker_position_default_values = models.TextField(verbose_name='Параметры должностей по умолчанию', default='{}')
+    worker_position_default_values = models.TextField(verbose_name=_('Worker position default values'), default='{}')
     descrease_employment_dt_fired_in_api = models.BooleanField(
-        default=False, verbose_name='Уменьшать дату окончания трудоустройства',
-        help_text='Актуально для данных, получаемых через api',
+        default=False, verbose_name=_('Descrease employment date fired in api'),
+        help_text=_('Relevant for data received via the api'),
     )
     consider_remaining_hours_in_prev_months_when_calc_norm_hours = models.BooleanField(
-        default=False, verbose_name='Учитывать неотработанные часы за предыдущие месяца при расчете нормы часов',
+        default=False, verbose_name=_('Consider remaining hours in previous months when calculating norm hours'),
     )
     outsourcings = models.ManyToManyField(
         'self', through='base.NetworkConnect', through_fields=('client', 'outsourcing'), symmetrical=False, related_name='clients')
     ignore_parent_code_when_updating_department_via_api = models.BooleanField(
-        default=False, verbose_name='Не учитывать parent_code при изменении подразделения через api',
-        help_text='Необходимо включить для случаев, когда оргструктура поддерживается вручную',
+        default=False, verbose_name=_('Ignore parent code when updating department via api'),
+        help_text=_('It must be enabled for cases when the organizational structure is maintained manually'),
     )
     create_employment_on_set_or_update_director_code = models.BooleanField(
         default=False,
-        verbose_name='Создавать скрытое трудоустройство при проставлении/изменении director_code в подразделении',
+        verbose_name=_('Create employment on set or update director code'),
     )
+    show_user_biometrics_block = models.BooleanField(
+        default=False,
+        verbose_name=_('Show user biometrics block'),
+    )
+    # при рассчете фактических часов, будут рассчитываться штрафы
+    # пример значения можно найти в src.timetable.tests.test_main.TestFineLogic
+    fines_settings = models.TextField(default='{}', verbose_name=_('Fines settings'))
 
     @property
     def settings_values_prop(self):
@@ -157,6 +191,10 @@ class Network(AbstractActiveModel):
     @cached_property
     def position_default_values(self):
         return json.loads(self.worker_position_default_values)
+
+    @cached_property
+    def fines_settings_values(self):
+        return json.loads(self.fines_settings)
 
     @cached_property
     def night_edges(self):
@@ -204,6 +242,11 @@ class NetworkConnect(AbstractActiveModel):
 
 
 class Region(AbstractActiveNetworkSpecificCodeNamedModel):
+    parent = models.ForeignKey(
+        to='self', verbose_name='Родительский регион', on_delete=models.CASCADE,
+        null=True, blank=True, related_name='children',
+    )
+
     class Meta(AbstractActiveNetworkSpecificCodeNamedModel.Meta):
         verbose_name = 'Регион'
         verbose_name_plural = 'Регионы'
@@ -522,7 +565,7 @@ class Shop(MPTTModel, AbstractActiveNetworkSpecificCodeNamedModel):
                     defaults=dict(
                         function_group=role,
                         dt_hired=timezone.now().date(),
-                        dt_fired='3999-01-01',
+                        dt_fired=datetime.date(3999, 1, 1),
                     )
                 )
 
@@ -550,6 +593,10 @@ class Shop(MPTTModel, AbstractActiveNetworkSpecificCodeNamedModel):
             transaction.on_commit(self._handle_new_shop_created)
         elif self.tracker.has_changed('tm_open_dict') or self.tracker.has_changed('tm_close_dict'):
             transaction.on_commit(self._handle_schedule_change)
+        
+        if is_new and self.load_template_id is None:
+            self.load_template_id = self.network.load_template_id
+
         if load_template_changed and not (self.load_template_id is None):
             from src.forecast.load_template.utils import apply_load_template
             from src.forecast.load_template.tasks import calculate_shops_load
@@ -592,14 +639,7 @@ class Shop(MPTTModel, AbstractActiveNetworkSpecificCodeNamedModel):
         return res
 
     def get_exchange_settings(self):
-        return self.exchange_settings if self.exchange_settings_id \
-            else apps.get_model(
-                'timetable',
-                'ExchangeSettings',
-            ).objects.filter(
-                network_id=self.network_id,
-                shops__isnull=True,
-            ).first()
+        return self.exchange_settings or self.network.exchange_settings
 
     def get_tz_offset(self):
         if self.timezone:
@@ -818,16 +858,24 @@ class ProductionDay(AbstractModel):
         :param month:
         :return: Словарь, где ключ - номер месяца, значение - количество часов.
         """
-        filter_kwargs = dict(
+        q = Q(
+            Q(region_id=region_id) | Q(region__parent_id=region_id),
             dt__year=year,
             type__in=ProductionDay.WORK_TYPES,
-            region_id=region_id,
         )
         if month:
-            filter_kwargs['dt__month'] = month
+            q &= Q(dt__month=month)
+
+        prod_cal_subq = ProductionDay.objects.filter(q).annotate(
+            is_equal_regions=Case(
+                When(region_id=Value(region_id), then=True),
+                default=False, output_field=models.BooleanField()
+            ),
+        ).order_by('-is_equal_regions')
 
         norm_work_hours = ProductionDay.objects.filter(
-            **filter_kwargs
+            q,
+            id=Subquery(prod_cal_subq.values_list('id', flat=True)[:1])
         ).annotate(
             work_hours=Case(
                 When(type=ProductionDay.TYPE_WORK, then=Value(ProductionDay.WORK_NORM_HOURS[ProductionDay.TYPE_WORK])),
@@ -975,6 +1023,14 @@ class WorkerPosition(AbstractActiveNetworkSpecificCodeNamedModel):
             for re_pattern, wp_defaults in wp_defaults_dict.items():
                 if re.search(re_pattern, self.name, re.IGNORECASE):
                     return wp_defaults
+
+    @cached_property
+    def wp_fines(self):
+        wp_fines_dict = self.network.fines_settings_values if self.network else None
+        if wp_fines_dict:
+            for re_pattern, wp_fines in wp_fines_dict.items():
+                if re.search(re_pattern, self.name, re.IGNORECASE):
+                    return wp_fines
 
     def _set_plain_defaults(self):
         if self.wp_defaults:
@@ -1255,213 +1311,107 @@ class FunctionGroup(AbstractModel):
         (TYPE_ALL, 'all')
     )
 
-    FUNCS = (
-        'AutoSettings_create_timetable',
-        'AutoSettings_set_timetable',
-        'AutoSettings_delete_timetable',
-        'AuthUserView',
-        'Break',
-        'Employment',
-        'Employee',
-        'Employment_auto_timetable',
-        'Employment_timetable',
-        'EmploymentWorkType',
-        'ExchangeSettings',
-        'FunctionGroupView',
-        'FunctionGroupView_functions',
-        'LoadTemplate',
-        'LoadTemplate_apply',
-        'LoadTemplate_calculate',
-        'LoadTemplate_download',
-        'LoadTemplate_upload',
-        'Network',
-        'Notification',
-        'OperationTemplate',
-        'OperationTypeName',
-        'OperationType',
-        'OperationTypeRelation',
-        'OperationTypeTemplate',
-        'PeriodClients',
-        'PeriodClients_indicators',
-        'PeriodClients_put',
-        'PeriodClients_delete',
-        'PeriodClients_upload',
-        'PeriodClients_download',
-        'Receipt',
-        'Group',
-        'Shop',
-        'Shop_stat',
-        'Shop_tree',
-        'Shop_outsource_tree',
-        'Subscribe',
-        'TickPoint',
-        'Timesheet',
-        'Timesheet_stats',
-        'User',
-        'User_change_password',
-        'User_delete_biometrics',
-        'WorkerConstraint',
-        'WorkerDay',
-        'WorkerDay_approve',
-        'WorkerDay_daily_stat',
-        'WorkerDay_worker_stat',
-        'WorkerDay_vacancy',
-        'WorkerDay_change_list',
-        'WorkerDay_copy_approved',
-        'WorkerDay_copy_range',
-        'WorkerDay_duplicate',
-        'WorkerDay_delete_worker_days',
-        'WorkerDay_exchange',
-        'WorkerDay_exchange_approved',
-        'WorkerDay_confirm_vacancy',
-        'WorkerDay_confirm_vacancy_to_worker',
-        'WorkerDay_reconfirm_vacancy_to_worker',
-        'WorkerDay_upload',
-        'WorkerDay_upload_fact',
-        'WorkerDay_download_timetable',
-        'WorkerDay_download_tabel',
-        'WorkerDay_editable_vacancy',
-        'WorkerDay_approve_vacancy',
-        'WorkerDay_change_range',
-        'WorkerDay_request_approve',
-        'WorkerDay_block',
-        'WorkerDay_unblock',
-        'WorkerPosition',
-        'WorkTypeName',
-        'WorkType',
-        'WorkType_efficiency',
-        'ShopMonthStat',
-        'ShopMonthStat_status',
-        'ShopSettings',
-        'ShopSchedule',
-        'VacancyBlackList',
-        'Task',
-
-        'signout',
-        'password_edit',
-
-        'get_worker_day_approves',
-        'create_worker_day_approve',
-        'delete_worker_day_approve',
-
-        'get_cashboxes',
-        'get_cashboxes_info',
-        # 'get_cashboxes_open_time',
-        # 'get_cashboxes_used_resource',
-        'create_cashbox',
-        'update_cashbox',
-        'delete_cashbox',
-
-        'get_types',
-        'create_work_type',
-        'edit_work_type',
-        'delete_work_type',
-
-        'get_notifications',
-        'get_notifications2',
-        'set_notifications_read',
-
-        'get_worker_day',
-        'delete_worker_day',
-        'request_worker_day',
-        'set_worker_day',
-        'handle_worker_day_request',
-        'get_worker_day_logs',
-
-        'get_cashier_info',
-        'change_cashier_info',
-        'create_cashier',
-        'get_cashiers_info',
-
-        'select_cashiers',
-        'get_not_working_cashiers_list',
-        'get_cashiers_list',
-        'change_cashier_status',
-        'set_selected_cashiers',
-        'delete_cashier',
-
-        'set_timetable',
-        'create_timetable',
-        'delete_timetable',
-        'get_cashier_timetable',
-        'get_cashiers_timetable',
-        'dublicate_cashier_table',
-
-        'get_slots',
-        'get_all_slots',
-
-        'get_workers',
-        'get_outsource_workers',
-
-        'get_user_urv',
-        'upload_urv',
-
-        'get_forecast',
-
-        'upload_demand',
-        'upload_timetable',
-
-        'notify_workers_about_vacancy',
-        'do_notify_action',
-
-        'get_workers_to_exchange',
-        'exchange_workers_day',
-
-        # algo callbacks
-        'set_demand',
-        'set_pred_bills',
-
-        'get_operation_templates',
-        'create_operation_template',
-        'update_operation_template',
-        'delete_operation_template',
-
-        'show_vacancy',
-        'cancel_vacancy',
-        'confirm_vacancy',
-
-        # download/
-        'get_demand_xlsx',
-        'get_department_stats_xlsx',
-        'get_timetable_xlsx',
-        'get_urv_xlsx',
-        'get_tabel',
-
-        # shop/
-        'get_department',
-        'add_department',
-        'edit_department',
-        'get_department_list',
-        'get_department_stats',
-        'get_parameters',
-        'set_parameters',
-
-        'get_demand_change_logs',
-        'get_table',
-
-        'get_status',
-        'get_change_request',
-        'get_month_stat',
-        'get_indicators',
-        'get_worker_position_list',
-        'set_worker_restrictions',
-        'create_predbills_request',
+    FUNCS_TUPLE = (
+        ('AttendanceRecords', 'Отметка'),
+        ('AttendanceRecords_report', 'Отчет по отметкам (Получить)'),
+        ('AutoSettings_create_timetable', 'Составление графика (Создать)'),
+        ('AutoSettings_set_timetable', 'Задать график (ответ от алгоритмов, Создать)'),
+        ('AutoSettings_delete_timetable', 'Удалить график (Создать)'),
+        ('AuthUserView', 'Получить авторизованного пользователя'),
+        ('Break', 'Перерыв'),
+        ('Employment', 'Трудоустройство'),
+        ('Employee', 'Сотрудник'),
+        ('Employment_auto_timetable', 'Выбрать сорудников для автосоставления (Создать)'),
+        ('Employment_timetable', 'Редактирование полей трудоустройства, связанных с расписанием'),
+        ('EmploymentWorkType', 'Связь трудоустройства и типа работ'),
+        ('ExchangeSettings', 'Настройки обмена сменами'),
+        ('FunctionGroupView', 'Доступ к функциям'),
+        ('FunctionGroupView_functions', 'Получить список доступных функций (Получить)'),
+        ('LoadTemplate', 'Шаблон нагрузки'),
+        ('LoadTemplate_apply', 'Применить шаблон нагрузки (Создать)'),
+        ('LoadTemplate_calculate', 'Рассчитать нагрузку (Создать)'),
+        ('LoadTemplate_download', 'Скачать шаблон нагрузки (Получить)'),
+        ('LoadTemplate_upload', 'Загрузить шаблон нагрузки (Создать)'),
+        ('Network', 'Сеть'),
+        ('Notification', 'Уведомление'),
+        ('OperationTemplate', 'Шаблон операции'),
+        ('OperationTypeName', 'Название типа операции'),
+        ('OperationType', 'Тип операции'),
+        ('OperationTypeRelation', 'Отношение типов операций'),
+        ('OperationTypeTemplate', 'Шаблон типа операции'),
+        ('PeriodClients', 'Нагрузка'),
+        ('PeriodClients_indicators', 'Индикаторы нагрузки (Получить)'),
+        ('PeriodClients_put', 'Обновить нагрузку (Обновить)'),
+        ('PeriodClients_delete', 'Удалить нагрузку (Удалить)'),
+        ('PeriodClients_upload', 'Загрузить нагрузку (Создать)'),
+        ('PeriodClients_download', 'Скачать нагрузку (Получить)'),
+        ('Receipt', 'Чек'),
+        ('Group', 'Группа доступа'),
+        ('Shop', 'Отдел'),
+        ('Shop_stat', 'Статистика по отделам (Получить)'),
+        ('Shop_tree', 'Дерево отделов (Получить)'),
+        ('Shop_outsource_tree', 'Дерево отделов клиентов (для аутсорс компаний) (Получить)'),
+        ('Subscribe', 'Subscribe'),
+        ('TickPoint', 'Точка отметки'),
+        ('Timesheet', 'Табель'),
+        ('Timesheet_stats', 'Статистика табеля (Получить)'),
+        ('Timesheet_recalc', 'Запустить пересчет табеля (Создать)'),
+        ('User', 'Пользователь'),
+        ('User_change_password', 'Сменить пароль пользователю (Создать)'),
+        ('User_delete_biometrics', 'Удалить биометрию пользователя (Создать)'),
+        ('User_add_biometrics', 'Добавить биометрию пользователя (Создать)'),
+        ('WorkerConstraint', 'Ограничения сотрудника'),
+        ('WorkerDay', 'Рабочий день'),
+        ('WorkerDay_approve', 'Подтвердить график (Создать)'),
+        ('WorkerDay_daily_stat', 'Статистика по дням (Получить)'),
+        ('WorkerDay_worker_stat', 'Статистика по работникам (Получить)'),
+        ('WorkerDay_vacancy', 'Список вакансий (Получить)'),
+        ('WorkerDay_change_list', 'Редактирование дней списоком (Создать)'),
+        ('WorkerDay_copy_approved', 'Копировать рабочие дни из разных версий (Создать)'),
+        ('WorkerDay_copy_range', 'Копировать дни на следующий месяц (Создать)'),
+        ('WorkerDay_duplicate', 'Копировать рабочие дни как ячейки эксель (Создать)'),
+        ('WorkerDay_delete_worker_days', 'Удалить рабочие дни (Создать)'),
+        ('WorkerDay_exchange', 'Обмен сменами (Создать)'),
+        ('WorkerDay_exchange_approved', 'Обмен подтвержденными сменами (Создать)'),
+        ('WorkerDay_confirm_vacancy', 'Откликнуться вакансию (Создать)'),
+        ('WorkerDay_confirm_vacancy_to_worker', 'Назначить работника на вакансию (Создать)'),
+        ('WorkerDay_reconfirm_vacancy_to_worker', 'Переназначить работника на вакансию (Создать)'),
+        ('WorkerDay_upload', 'Загрузить плановый график (Создать)'),
+        ('WorkerDay_upload_fact', 'Загрузить фактический график (Создать)'),
+        ('WorkerDay_download_timetable', 'Скачать плановый график (Получить)'),
+        ('WorkerDay_download_tabel', 'Скачать табель (Получить)'),
+        ('WorkerDay_editable_vacancy', 'Получить редактируемую вакансию (Получить)'),
+        ('WorkerDay_approve_vacancy', 'Подтвердить вакансию (Создать)'),
+        ('WorkerDay_change_range', 'Создание/обновление дней за период (Создать)'),
+        ('WorkerDay_request_approve', 'Запросить подтверждение графика (Создать)'),
+        ('WorkerDay_block', 'Заблокировать рабочий день (Создать)'),
+        ('WorkerDay_unblock', 'Разблокировать рабочий день (Создать)'),
+        ('WorkerDay_generate_upload_example', 'Скачать шаблон графика (Получить)'),
+        ('WorkerDay_recalc', 'Пересчитать часы (Создать)'),
+        ('WorkerPosition', 'Должность'),
+        ('WorkTypeName', 'Название типа работ'),
+        ('WorkType', 'Тип работ'),
+        ('WorkType_efficiency', 'Покрытие (Получить)'),
+        ('ShopMonthStat', 'Статистика по магазину на месяц'),
+        ('ShopMonthStat_status', 'Статус составления графика (Получить)'),
+        ('ShopSettings', 'Настройки автосоставления'),
+        ('ShopSchedule', 'Расписание магазина'),
+        ('VacancyBlackList', 'Черный список для вакансий'),
+        ('Task', 'Задача'),
     )
 
-    METHODS = (
-        'GET',
-        'POST',
-        'PUT',
-        'DELETE'
+    METHODS_TUPLE = (
+        ('GET', 'Получить'),
+        ('POST', 'Создать'),
+        ('PUT', 'Обновить'),
+        ('DELETE', 'Удалить'),
     )
-
-    FUNCS_TUPLE = ((f, f) for f in FUNCS)
 
     dttm_added = models.DateTimeField(auto_now_add=True)
     dttm_modified = models.DateTimeField(blank=True, null=True)
     group = models.ForeignKey(Group, on_delete=models.PROTECT, related_name='allowed_functions', blank=True, null=True)
-    func = models.CharField(max_length=128, choices=FUNCS_TUPLE)
-    method = models.CharField(max_length=6, choices=((m, m) for m in METHODS), default='GET')
+    func = models.CharField(max_length=128, choices=FUNCS_TUPLE, help_text='В скобках указывается метод с которым работает данная функция')
+    method = models.CharField(max_length=6, choices=METHODS_TUPLE, default='GET')
     access_type = models.CharField(choices=TYPES, max_length=32)
     level_up = models.IntegerField(default=0)
     level_down = models.IntegerField(default=100)

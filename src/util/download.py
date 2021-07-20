@@ -1,3 +1,4 @@
+from django.utils.encoding import escape_uri_path
 import xlsxwriter
 import io
 from functools import wraps
@@ -19,7 +20,7 @@ def xlsx_method(func):
                 output,
                 content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
             )
-            response['Content-Disposition'] = 'attachment; filename="{}.xlsx"'.format(name)
+            response['Content-Disposition'] = 'attachment; filename="{}.xlsx"'.format(escape_uri_path(name))
         else:
             response = workbook
 

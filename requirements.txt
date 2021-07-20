@@ -52,6 +52,7 @@ django-treebeard==4.3
 django-uuidfield==0.5.0
 djangocms-admin-style==1.4.0
 djangorestframework==3.11.0
+djangorestframework-xml==2.0.0
 docutils==0.14
 drf-nested-routers==0.91
 drf-yasg==1.20.0
@@ -103,7 +104,7 @@ pycparser==2.19
 pyfcm==1.4.7
 Pygments==2.4.2
 pygraphviz==1.5
-pyjwt==1.7.1
+PyJWT==1.7.1
 pylint==1.8.4
 pylint-django==0.11
 pylint-plugin-utils==0.2.6
@@ -146,3 +147,8 @@ git+https://devxplorer@bitbucket.org/devxplorer/relatorio.git@89e7e2d37a27d81088
 dadata==0.3.0
 tzwhere==3.0.3
 django-environ==0.4.5
+django-sesame==2.4
+pytest==6.2.4
+pytest-django==4.4.0
+pytest-cov==2.12.1
+coverage==5.5

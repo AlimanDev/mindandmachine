@@ -2,7 +2,14 @@ from django.db.models import Q
 from django_filters.rest_framework import FilterSet, DateFilter, NumberFilter, CharFilter, BooleanFilter, OrderingFilter
 
 from src.base.models import Employment, User, Notification, Subscribe, Shop, ShopSchedule, Employee
-from src.util.drf.filters import ListFilter, QCharFilter, QNumberFilter, QListFilter, QDateFilter
+from src.util.drf.filters import (
+    ListFilter,
+    QCharFilter,
+    QNumberFilter,
+    QListFilter,
+    QDateFilter,
+    QEmploymentGroupListFilter,
+)
 from src.util.drf.filterset import QFilterSet
 
 
@@ -122,6 +129,8 @@ class EmployeeFilter(QFilterSet):
 
     tabel_code = QCharFilter(field_name='tabel_code')
     tabel_code__in = QListFilter(field_name='tabel_code', lookup_expr='in')
+
+    group_id__in = QEmploymentGroupListFilter(lookup_prefix='employments__', lookup_expr='in')
 
     class Meta:
         model = Employee

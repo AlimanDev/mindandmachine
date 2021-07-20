@@ -162,44 +162,77 @@ class TestWorkShiftViewSet(TestsHelperMixin, APITestCase):
             'employees': [
                 {
                     'id': self.employee2.id,
+                    'shop': {
+                        'id': self.employment2.shop.id, 
+                        'name': self.employment2.shop.name,
+                        'timezone': 'Europe/Moscow',
+                    },
                     'tabel_code': self.employee2.tabel_code, 
                     'worker_days': [
                         {
                             'id': wd1.id, 
                             'dttm_work_start': Converter.convert_datetime(wd1.dttm_work_start),
                             'dttm_work_end': Converter.convert_datetime(wd1.dttm_work_end),
-                            'position': ''
                         }
-                    ]
+                    ],
+                    'position': ''
                 }, 
                 {
                     'id': self.second_employee.id,
                     'tabel_code': self.second_employee.tabel_code, 
+                    'shop': {
+                        'id': emp.shop.id, 
+                        'name': emp.shop.name,
+                        'timezone': 'Europe/Moscow',
+                    },
                     'worker_days': [
                         {
                             'id': wd2.id, 
                             'dttm_work_start': Converter.convert_datetime(wd2.dttm_work_start),
                             'dttm_work_end': Converter.convert_datetime(wd2.dttm_work_end),
-                            'position': 'Работник'
                         }
-                    ]
+                    ],
+                    'position': 'Работник'
                 }
             ], 
             'first_name': 'Иван2', 
             'last_name': 'Иванов', 
-            'avatar': None
+            'avatar': None,
+            'network': {
+                'allowed_geo_distance_km': None,
+                'allowed_interval_for_early_departure': '00:00:00',
+                'allowed_interval_for_late_arrival': '00:00:00',
+                'default_stats': {
+                    'day_bottom': 'deadtime',
+                    'day_top': 'covering',
+                    'employee_bottom': 'norm_hours_curr_month',
+                    'employee_top': 'work_hours_total',
+                    'timesheet_employee_bottom': 'sawh_hours',
+                    'timesheet_employee_top': 'fact_total_hours_sum',
+                },
+                'enable_camera_ticks': False,
+                'id': self.user2.network_id,
+                'logo': None,
+                'name': 'По умолчанию',
+                'primary_color': '',
+                'secondary_color': '',
+                'show_tabel_graph': True,
+                'show_worker_day_additional_info': False,
+                'show_worker_day_tasks': False,
+                'show_user_biometrics_block': False,
+                'url': None
+            },
         }
         self.assertEqual(len(resp.json()), 5)
         self.assertEqual(user2, user2_data)
 
-    def test_auth_get_tz(self):
-        response = self._authorize_tick_point()
-        self.assertEqual(response.json()['shop']['timezone'], 'Europe/Moscow')
 
     def test_get_worker_days_night_shift(self):
         self._authorize_tick_point()
         self.employee2.tabel_code = '1235'
         self.employee2.save()
+        self.shop.timezone = 'UTC'
+        self.shop.save()
         position = WorkerPosition.objects.create(
             name='Работник',
             network=self.network,
@@ -252,32 +285,194 @@ class TestWorkShiftViewSet(TestsHelperMixin, APITestCase):
             'employees': [
                 {
                     'id': self.employee2.id,
+                    'shop': {
+                        'id': self.employment2.shop.id, 
+                        'name': self.employment2.shop.name,
+                        'timezone': 'UTC',
+                    },
                     'tabel_code': self.employee2.tabel_code, 
                     'worker_days': [
                         {
                             'id': wd1.id, 
                             'dttm_work_start': Converter.convert_datetime(wd1.dttm_work_start),
                             'dttm_work_end': Converter.convert_datetime(wd1.dttm_work_end),
-                            'position': ''
                         }
-                    ]
+                    ],
+                    'position': ''
                 }, 
                 {
                     'id': self.second_employee.id,
+                    'shop': {
+                        'id': emp.shop.id, 
+                        'name': emp.shop.name,
+                        'timezone': 'UTC',
+                    },
                     'tabel_code': self.second_employee.tabel_code, 
                     'worker_days': [
                         {
                             'id': wd2.id, 
                             'dttm_work_start': Converter.convert_datetime(wd2.dttm_work_start),
                             'dttm_work_end': Converter.convert_datetime(wd2.dttm_work_end),
-                            'position': 'Работник'
                         }
-                    ]
+                    ],
+                    'position': 'Работник'
                 }
             ], 
             'first_name': 'Иван2', 
             'last_name': 'Иванов', 
-            'avatar': None
+            'avatar': None,
+            'network': {
+                'allowed_geo_distance_km': None,
+                'allowed_interval_for_early_departure': '00:00:00',
+                'allowed_interval_for_late_arrival': '00:00:00',
+                'default_stats': {
+                    'day_bottom': 'deadtime',
+                    'day_top': 'covering',
+                    'employee_bottom': 'norm_hours_curr_month',
+                    'employee_top': 'work_hours_total',
+                    'timesheet_employee_bottom': 'sawh_hours',
+                    'timesheet_employee_top': 'fact_total_hours_sum',
+                },
+                'enable_camera_ticks': False,
+                'id': self.user2.network_id,
+                'logo': None,
+                'name': 'По умолчанию',
+                'primary_color': '',
+                'secondary_color': '',
+                'show_tabel_graph': True,
+                'show_worker_day_additional_info': False,
+                'show_worker_day_tasks': False,
+                'show_user_biometrics_block': False,
+                'url': None
+            },
+        }
+        self.assertEqual(len(resp.json()), 5)
+        self.assertEqual(user2, user2_data)
+
+    def test_auth_get_tz(self):
+        response = self._authorize_tick_point()
+        self.assertEqual(response.json()['shop']['timezone'], 'Europe/Moscow')
+
+    def test_get_worker_days_night_shift_tz(self):
+        self._authorize_tick_point()
+        self.employee2.tabel_code = '1235'
+        self.employee2.save()
+        self.shop.timezone = 'Asia/Vladivostok'
+        self.shop.save()
+        if datetime.now().hour <= 14:
+            self.today -= timedelta(1)
+        position = WorkerPosition.objects.create(
+            name='Работник',
+            network=self.network,
+        )
+        self.second_employee = Employee.objects.create(
+            tabel_code='1234', 
+            user=self.user2,
+        )
+        emp = Employment.objects.create(
+            employee=self.second_employee,
+            shop=self.shop,
+            position=position,
+        )
+        wd1 = WorkerDay.objects.create(
+            employee=self.employee2,
+            employment=self.employment2,
+            type=WorkerDay.TYPE_WORKDAY,
+            dt=self.today,
+            dttm_work_start=datetime.combine(self.today, time(22)),
+            dttm_work_end=datetime.combine(self.today + timedelta(1), time(8)),
+            shop=self.shop,
+            is_approved=True,
+        )
+        wd2 = WorkerDay.objects.create(
+            employee=self.second_employee,
+            employment=emp,
+            type=WorkerDay.TYPE_WORKDAY,
+            dt=self.today + timedelta(1),
+            dttm_work_start=datetime.combine(self.today + timedelta(1), time(15)),
+            dttm_work_end=datetime.combine(self.today + timedelta(1), time(20)),
+            shop=self.shop,
+            is_approved=True,
+        )
+        WorkerDay.objects.create(
+            employee=self.second_employee,
+            employment=emp,
+            type=WorkerDay.TYPE_WORKDAY,
+            dt=self.today,
+            dttm_work_start=datetime.combine(self.today, time(8)),
+            dttm_work_end=datetime.combine(self.today, time(14)),
+            shop=self.shop,
+            is_approved=True,
+        )
+        resp = self.client.get(
+            self.get_url('TimeAttendanceWorkerDay-list'),
+        )
+        user2 = list(filter(lambda x: x['user_id'] == self.user2.id, resp.json()))[0]
+        user2_data = {
+            'user_id': self.user2.id, 
+            'employees': [
+                {
+                    'id': self.employee2.id,
+                    'shop': {
+                        'id': self.employment2.shop.id, 
+                        'name': self.employment2.shop.name,
+                        'timezone': 'Asia/Vladivostok',
+                    },
+                    'tabel_code': self.employee2.tabel_code, 
+                    'worker_days': [
+                        {
+                            'id': wd1.id, 
+                            'dttm_work_start': Converter.convert_datetime(wd1.dttm_work_start),
+                            'dttm_work_end': Converter.convert_datetime(wd1.dttm_work_end),
+                        }
+                    ],
+                    'position': ''
+                }, 
+                {
+                    'id': self.second_employee.id,
+                    'shop': {
+                        'id': emp.shop.id, 
+                        'name': emp.shop.name,
+                        'timezone': 'Asia/Vladivostok',
+                    },
+                    'tabel_code': self.second_employee.tabel_code, 
+                    'worker_days': [
+                        {
+                            'id': wd2.id, 
+                            'dttm_work_start': Converter.convert_datetime(wd2.dttm_work_start),
+                            'dttm_work_end': Converter.convert_datetime(wd2.dttm_work_end),
+                        }
+                    ],
+                    'position': 'Работник'
+                }
+            ], 
+            'first_name': 'Иван2', 
+            'last_name': 'Иванов', 
+            'avatar': None,
+            'network': {
+                'allowed_geo_distance_km': None,
+                'allowed_interval_for_early_departure': '00:00:00',
+                'allowed_interval_for_late_arrival': '00:00:00',
+                'default_stats': {
+                    'day_bottom': 'deadtime',
+                    'day_top': 'covering',
+                    'employee_bottom': 'norm_hours_curr_month',
+                    'employee_top': 'work_hours_total',
+                    'timesheet_employee_bottom': 'sawh_hours',
+                    'timesheet_employee_top': 'fact_total_hours_sum',
+                },
+                'enable_camera_ticks': False,
+                'id': self.user2.network_id,
+                'logo': None,
+                'name': 'По умолчанию',
+                'primary_color': '',
+                'secondary_color': '',
+                'show_tabel_graph': True,
+                'show_worker_day_additional_info': False,
+                'show_worker_day_tasks': False,
+                'show_user_biometrics_block': False,
+                'url': None
+            },
         }
         self.assertEqual(len(resp.json()), 5)
         self.assertEqual(user2, user2_data)
