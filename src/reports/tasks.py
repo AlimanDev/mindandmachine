@@ -65,6 +65,7 @@ def cron_report():
             posible_crons.append(cron)
     reports = ReportConfig.objects.filter(
         cron__in=posible_crons,
+        is_active=True,
     )
     for report in reports:
         send_report_emails.delay(

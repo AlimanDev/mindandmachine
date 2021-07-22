@@ -38,7 +38,8 @@ class ReportConfig(models.Model):
         (ACC_PERIOD_HALF_YEAR, _('Half a year')),
         (ACC_PERIOD_YEAR, _('Year')),
     )
-    report_type = models.ForeignKey('reports.ReportType', verbose_name='Тип отчета', on_delete=models.CASCADE, null=True)
+    report_type = models.ForeignKey('reports.ReportType', verbose_name='Тип отчета', on_delete=models.CASCADE)
+    is_active = models.BooleanField(default=True, verbose_name='Активен')
     cron = models.ForeignKey(
         CrontabSchedule,
         verbose_name='Расписание для отправки', on_delete=models.PROTECT,

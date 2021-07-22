@@ -13,6 +13,7 @@ from uuid import uuid4
 
 class AbstractEventNotification(AbstractModel):
     event_type = models.ForeignKey('events.EventType', verbose_name='Тип события', on_delete=models.CASCADE)
+    is_active = models.BooleanField(default=True, verbose_name='Активен')
 
     class Meta:
         abstract = True
@@ -161,7 +162,7 @@ class EventEmailNotification(AbstractEventNotificationWithRecipients):
         return subject
 
     def __str__(self):
-        return '{}, {} получателей{}'.format(
+        return '{} получателей{}'.format(
             self.event_type.name,
             self.shops.count() + self.users.count()\
             + (len(self.email_addresses.split(',')) if self.email_addresses else 0),
