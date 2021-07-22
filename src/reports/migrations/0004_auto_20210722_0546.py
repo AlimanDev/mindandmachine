@@ -47,6 +47,7 @@ def move_events_to_report_config(app, schema_editor):
     notifications.delete()
     EventType.objects.filter(code__in=ReportType.objects.all().values_list('code', flat=True)).delete()
     ReportConfig.objects.filter(id__in=report_ids_to_delete).delete()
+    ReportConfig.objects.filter(report_type__isnull=True).delete()
 
 
 class Migration(migrations.Migration):

@@ -2,7 +2,7 @@ from dateutil.relativedelta import relativedelta
 from rest_framework.test import APITestCase
 from src.util.test import create_departments_and_users
 from datetime import date, timedelta
-from src.reports.models import ReportConfig
+from src.reports.models import ReportConfig, ReportType
 from django_celery_beat.models import CrontabSchedule
 
 
@@ -23,6 +23,7 @@ class TestReportConfig(APITestCase):
             count_of_periods=count_of_periods,
             period=period,
             include_today=include_today,
+            report_type=ReportType.objects.first(),
         )
 
     def test_yesterday(self):
