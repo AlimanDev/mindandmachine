@@ -387,7 +387,6 @@ class ChangeListSerializer(serializers.Serializer):
     }
     shop_id = serializers.IntegerField(required=False)
     employee_id = serializers.IntegerField(required=False)
-    # type = serializers.ChoiceField(choices=WorkerDay.WD_TYPE_MAPPING.keys())
     type = serializers.CharField()
     tm_work_start = serializers.TimeField(required=False)
     tm_work_end = serializers.TimeField(required=False)
