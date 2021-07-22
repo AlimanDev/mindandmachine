@@ -1,2 +1,2 @@
 default_app_config = 'src.reports.apps.ReportsConfig'
-from .events import UrvStatEvent, UrvStatTodayEvent, UrvViolatorsReportEvent, UrvStatV2Event, UnaccountedOvertivmeEvent
+from .reports import UrvStatReport, UrvStatTodayReport, UrvViolatorsReport, UrvStatV2Report, UnaccountedOvertivmeReport

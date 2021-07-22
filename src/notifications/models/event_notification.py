@@ -49,18 +49,6 @@ class AbstractEventNotificationWithRecipients(AbstractEventNotification):
         abstract = True
 
 
-    def get_file(self, user_author_id: int, context: dict):
-        event_cls = EventRegistryHolder.get_registry().get(self.event_type.code)
-        if event_cls:
-            return event_cls(
-                network_id=self.event_type.network_id,
-                user_author_id=user_author_id,
-                context=context,
-            ).get_file()
-        else:
-            return None
-
-
     def get_recipients(self, user_author_id: int, context: dict):
         """
         :param user_author_id:
@@ -145,8 +133,6 @@ class EventEmailNotification(AbstractEventNotificationWithRecipients):
         help_text='По умолчанию берется из названия "Системный E-mail шаблон"'
     )
 
-    report_config = models.ForeignKey(ReportConfig, on_delete=models.PROTECT, null=True, blank=True, verbose_name='Конфигурация отчета')
-
     class Meta:
         verbose_name = 'Email оповещение о событиях'
         verbose_name_plural = 'Email оповещения о событиях'
@@ -175,14 +161,10 @@ class EventEmailNotification(AbstractEventNotificationWithRecipients):
         return subject
 
     def __str__(self):
-        cron_str = ''
-        if self.report_config:
-            cron_str = f', расписание {self.report_config.cron}'
         return '{}, {} получателей{}'.format(
             self.event_type.name,
             self.shops.count() + self.users.count()\
             + (len(self.email_addresses.split(',')) if self.email_addresses else 0),
-            cron_str,
         )
 
 
