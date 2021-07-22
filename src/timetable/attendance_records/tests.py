@@ -16,7 +16,7 @@ from src.timetable.models import AttendanceRecords
 from src.util.mixins.tests import TestsHelperMixin
 
 
-class AttendanceRecordsViewSet(TestsHelperMixin, APITestCase):
+class TestAttendanceRecordsViewSet(TestsHelperMixin, APITestCase):
     @classmethod
     def setUpTestData(cls):
         breaks = BreakFactory(value='[[0, 2040, [60]]]', code='1h')

@@ -1,19 +1,20 @@
-from rest_framework import serializers
-from django_filters.rest_framework import FilterSet
-from src.base.permissions import Permission
-from src.base.views_abstract import BaseModelViewSet
-from src.timetable.models import WorkType,WorkTypeName
-from src.timetable.work_type_name.views import WorkTypeNameSerializer
-from rest_framework.decorators import action
-from src.timetable.work_type.utils import get_efficiency
-from src.conf.djconfig import QOS_DATE_FORMAT
-from rest_framework.validators import UniqueTogetherValidator
-from rest_framework.response import Response
-from drf_yasg.utils import swagger_auto_schema
-from src.util.openapi.responses import efficieny_response_schema_dict as response_schema_dict
-from django.db.models import Q
 from datetime import datetime
 
+from django.db.models import Q
+from django_filters.rest_framework import FilterSet
+from drf_yasg.utils import swagger_auto_schema
+from rest_framework import serializers
+from rest_framework.decorators import action
+from rest_framework.response import Response
+from rest_framework.validators import UniqueTogetherValidator
+
+from src.base.permissions import Permission
+from src.base.views_abstract import BaseModelViewSet
+from src.conf.djconfig import QOS_DATE_FORMAT
+from src.timetable.models import WorkType, WorkTypeName
+from src.timetable.work_type.utils import ShopEfficiencyGetter
+from src.timetable.work_type_name.views import WorkTypeNameSerializer
+from src.util.openapi.responses import efficieny_response_schema_dict as response_schema_dict
 
 
 # Serializers define the API representation.
@@ -194,4 +195,4 @@ class WorkTypeViewSet(BaseModelViewSet):
 
         data.is_valid(raise_exception=True)
 
-        return Response(get_efficiency(data.validated_data.get('shop_id'), data.validated_data), status=200)
+        return Response(ShopEfficiencyGetter(**data.validated_data).get(), status=200)

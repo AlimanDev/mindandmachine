@@ -140,6 +140,14 @@ class Network(AbstractActiveModel):
         verbose_name=_('Default load template'),
         related_name='networks',
     )
+    exchange_settings = models.ForeignKey(
+        'timetable.ExchangeSettings',
+        on_delete=models.PROTECT,
+        blank=True,
+        null=True,
+        verbose_name=_('Default exchange settings'),
+        related_name='networks',
+    )
     # при создании новой должности будут проставляться соотв. значения
     # пример значения можно найти в src.base.tests.test_worker_position.TestSetWorkerPositionDefaultsModel
     worker_position_default_values = models.TextField(verbose_name=_('Worker position default values'), default='{}')
@@ -164,6 +172,9 @@ class Network(AbstractActiveModel):
         default=False,
         verbose_name=_('Show user biometrics block'),
     )
+    # при рассчете фактических часов, будут рассчитываться штрафы
+    # пример значения можно найти в src.timetable.tests.test_main.TestFineLogic
+    fines_settings = models.TextField(default='{}', verbose_name=_('Fines settings'))
 
     @property
     def settings_values_prop(self):
@@ -180,6 +191,10 @@ class Network(AbstractActiveModel):
     @cached_property
     def position_default_values(self):
         return json.loads(self.worker_position_default_values)
+
+    @cached_property
+    def fines_settings_values(self):
+        return json.loads(self.fines_settings)
 
     @cached_property
     def night_edges(self):
@@ -550,7 +565,7 @@ class Shop(MPTTModel, AbstractActiveNetworkSpecificCodeNamedModel):
                     defaults=dict(
                         function_group=role,
                         dt_hired=timezone.now().date(),
-                        dt_fired='3999-01-01',
+                        dt_fired=datetime.date(3999, 1, 1),
                     )
                 )
 
@@ -624,14 +639,7 @@ class Shop(MPTTModel, AbstractActiveNetworkSpecificCodeNamedModel):
         return res
 
     def get_exchange_settings(self):
-        return self.exchange_settings if self.exchange_settings_id \
-            else apps.get_model(
-                'timetable',
-                'ExchangeSettings',
-            ).objects.filter(
-                network_id=self.network_id,
-                shops__isnull=True,
-            ).first()
+        return self.exchange_settings or self.network.exchange_settings
 
     def get_tz_offset(self):
         if self.timezone:
@@ -1016,6 +1024,14 @@ class WorkerPosition(AbstractActiveNetworkSpecificCodeNamedModel):
                 if re.search(re_pattern, self.name, re.IGNORECASE):
                     return wp_defaults
 
+    @cached_property
+    def wp_fines(self):
+        wp_fines_dict = self.network.fines_settings_values if self.network else None
+        if wp_fines_dict:
+            for re_pattern, wp_fines in wp_fines_dict.items():
+                if re.search(re_pattern, self.name, re.IGNORECASE):
+                    return wp_fines
+
     def _set_plain_defaults(self):
         if self.wp_defaults:
             hours_in_a_week = self.wp_defaults.get('hours_in_a_week')
@@ -1297,6 +1313,7 @@ class FunctionGroup(AbstractModel):
 
     FUNCS_TUPLE = (
         ('AttendanceRecords', 'Отметка'),
+        ('AttendanceRecords_report', 'Отчет по отметкам (Получить)'),
         ('AutoSettings_create_timetable', 'Составление графика (Создать)'),
         ('AutoSettings_set_timetable', 'Задать график (ответ от алгоритмов, Создать)'),
         ('AutoSettings_delete_timetable', 'Удалить график (Создать)'),
@@ -1304,7 +1321,6 @@ class FunctionGroup(AbstractModel):
         ('Break', 'Перерыв'),
         ('Employment', 'Трудоустройство'),
         ('Employee', 'Сотрудник'),
-        ('Employee_attendance_records_report', 'Отчет по отметкам по сотрудникам (Получить)'),
         ('Employment_auto_timetable', 'Выбрать сорудников для автосоставления (Создать)'),
         ('Employment_timetable', 'Редактирование полей трудоустройства, связанных с расписанием'),
         ('EmploymentWorkType', 'Связь трудоустройства и типа работ'),

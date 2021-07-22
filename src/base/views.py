@@ -1,12 +1,7 @@
-import io
-
-import pandas as pd
-from django.db.models import Case, When, F
+from django.db.models import F
 from django.db.models.functions import Coalesce
-from django.http import HttpResponse
 from django.middleware.csrf import rotate_token
 from django.utils import timezone
-from django.utils.encoding import escape_uri_path
 from django.utils.translation import gettext as _
 from drf_yasg.utils import swagger_auto_schema
 from requests.exceptions import HTTPError
@@ -237,50 +232,6 @@ class EmployeeViewSet(UpdateorCreateViewSet):
             qs = qs.prefetch_related(prefetch)
 
         return qs.distinct()
-
-    @action(detail=False, methods=['get'], permission_classes=[Permission])
-    def attendance_records_report(self, *args, **kwargs):
-        from django.db.models import Value, CharField
-        from src.timetable.models import AttendanceRecords
-        att_records = AttendanceRecords.objects.filter(
-            employee__in=self.filter_queryset(self.get_queryset()),
-        ).annotate(
-            type_name=Case(
-                When(type=AttendanceRecords.TYPE_COMING, then=Value(_('Coming'), output_field=CharField())),
-                When(type=AttendanceRecords.TYPE_LEAVING, then=Value(_('Leaving'), output_field=CharField())),
-                default=Value(''), output_field=CharField()
-            )
-        ).values_list(
-            'user__last_name',
-            'user__first_name',
-            'user__username',
-            'employee__tabel_code',
-            'shop__name',
-            'shop__code',
-            'type_name',
-            'dttm',
-        ).order_by('user__last_name', 'user__first_name', 'employee__tabel_code', 'dttm')
-        df = pd.DataFrame(list(att_records), columns=(
-            _('Last name'),
-            _('First name'),
-            _('Username'),
-            _('Employee id'),
-            _('Department name'),
-            _('Department code'),
-            _('Record type'),
-            _('Date and time of the record'),
-        ))
-        output = io.BytesIO()
-        writer = pd.ExcelWriter(output, engine='xlsxwriter')
-        df.to_excel(writer, sheet_name=_('Records'), index=False)
-        writer.save()
-        output.seek(0)
-        response = HttpResponse(
-            output,
-            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-        )
-        response['Content-Disposition'] = 'attachment; filename="{}.xlsx"'.format(escape_uri_path(self.action))
-        return response
 
 
 class AuthUserView(UserDetailsView):

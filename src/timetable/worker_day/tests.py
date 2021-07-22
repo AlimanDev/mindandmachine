@@ -715,6 +715,15 @@ class TestUploadDownload(APITestCase):
         user = User.objects.filter(last_name='Смешнов').first()
         self.assertEquals(Employee.objects.filter(user=user).count(), 2)
 
+    def test_cant_upload_timetable_with_time_overlap_for_user(self):
+        file = open('etc/scripts/timetable_overlap.xlsx', 'rb')
+        with override_settings(UPLOAD_TT_MATCH_EMPLOYMENT=False):
+            resp = self.client.post(f'{self.url}upload/', {'shop_id': self.shop.id, 'file': file},
+                                    HTTP_ACCEPT_LANGUAGE='ru')
+        file.close()
+        self.assertContains(resp, text='Операция не может быть выполнена. Недопустимое пересечение времени работы.',
+                            status_code=400)
+
     def test_upload_timetable_many_users(self):
         file = open('etc/scripts/timetable.xlsx', 'rb')
         with override_settings(UPLOAD_TT_CREATE_EMPLOYEE=False, UPLOAD_TT_MATCH_EMPLOYMENT=False):

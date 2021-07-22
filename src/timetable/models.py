@@ -13,7 +13,7 @@ from django.db.models import (
 from django.db.models.functions import Abs, Cast, Extract, Least
 from django.db.models.query import QuerySet
 from django.utils import timezone
-from django.utils.translation import gettext as _
+from django.utils.translation import gettext_lazy as _
 from model_utils import FieldTracker
 from rest_framework.exceptions import ValidationError
 
@@ -580,8 +580,8 @@ class WorkerDay(AbstractModel):
         if self.dttm_work_end and self.dttm_work_start and self.shop and (
                 self.shop.settings or position_break_triplet_cond or self.shop.network.breaks):
             breaks = self.employment.position.breaks.breaks if position_break_triplet_cond else self.shop.settings.breaks.breaks if self.shop.settings else self.shop.network.breaks.breaks
-            dttm_work_start = self.dttm_work_start
-            dttm_work_end = self.dttm_work_end
+            dttm_work_start = _dttm_work_start = self.dttm_work_start
+            dttm_work_end = _dttm_work_end = self.dttm_work_end
             if self.shop.network.crop_work_hours_by_shop_schedule and self.crop_work_hours_by_shop_schedule:
                 from src.util.models_converter import Converter
                 dt = Converter.parse_date(self.dt) if isinstance(self.dt, str) else self.dt
@@ -603,8 +603,8 @@ class WorkerDay(AbstractModel):
                     if self.dttm_work_end > dttm_shop_close:
                         dttm_work_end = dttm_shop_close
             break_time = None
-            if self.shop.network.only_fact_hours_that_in_approved_plan and \
-                    self.type in WorkerDay.TYPES_WITH_TM_RANGE and self.is_fact:
+            fine = 0
+            if self.is_fact:
                 plan_approved = WorkerDay.objects.filter(
                     dt=self.dt,
                     employee_id=self.employee_id,
@@ -615,38 +615,48 @@ class WorkerDay(AbstractModel):
                     dttm_work_end__isnull=False,
                 ).first()
                 if plan_approved:
-                    late_arrival_delta = self.shop.network.allowed_interval_for_late_arrival
-                    allowed_late_arrival_cond = late_arrival_delta and \
-                        dttm_work_start > plan_approved.dttm_work_start and \
-                        (dttm_work_start - plan_approved.dttm_work_start).total_seconds() < \
-                                                             late_arrival_delta.total_seconds()
-                    if allowed_late_arrival_cond:
-                        dttm_work_start = plan_approved.dttm_work_start
-                    else:
-                        dttm_work_start = max(dttm_work_start, plan_approved.dttm_work_start)
+                    fine = self.get_fine(
+                        _dttm_work_start, 
+                        _dttm_work_end, 
+                        plan_approved.dttm_work_start,
+                        plan_approved.dttm_work_end,
+                        self.employment.position.wp_fines if self.employment and self.employment.position else None,
+                    )
+                if self.shop.network.only_fact_hours_that_in_approved_plan and \
+                    self.type in WorkerDay.TYPES_WITH_TM_RANGE:
+                    if plan_approved:
+                        late_arrival_delta = self.shop.network.allowed_interval_for_late_arrival
+                        allowed_late_arrival_cond = late_arrival_delta and \
+                            dttm_work_start > plan_approved.dttm_work_start and \
+                            (dttm_work_start - plan_approved.dttm_work_start).total_seconds() < \
+                                                                late_arrival_delta.total_seconds()
+                        if allowed_late_arrival_cond:
+                            dttm_work_start = plan_approved.dttm_work_start
+                        else:
+                            dttm_work_start = max(dttm_work_start, plan_approved.dttm_work_start)
 
-                    early_departure_delta = self.shop.network.allowed_interval_for_early_departure
-                    allowed_early_departure_cond = early_departure_delta and \
-                                                dttm_work_end < plan_approved.dttm_work_end and \
-                                                (plan_approved.dttm_work_end - dttm_work_end).total_seconds() < \
-                                                early_departure_delta.total_seconds()
-                    if allowed_early_departure_cond:
-                        dttm_work_end = plan_approved.dttm_work_end
+                        early_departure_delta = self.shop.network.allowed_interval_for_early_departure
+                        allowed_early_departure_cond = early_departure_delta and \
+                                                    dttm_work_end < plan_approved.dttm_work_end and \
+                                                    (plan_approved.dttm_work_end - dttm_work_end).total_seconds() < \
+                                                    early_departure_delta.total_seconds()
+                        if allowed_early_departure_cond:
+                            dttm_work_end = plan_approved.dttm_work_end
+                        else:
+                            dttm_work_end = min(dttm_work_end, plan_approved.dttm_work_end)
+                        # учитываем перерыв плана, если факт получился больше
+                        fact_hours = self.count_work_hours(breaks, dttm_work_start, dttm_work_end)
+                        plan_hours = plan_approved.work_hours
+                        if fact_hours > plan_hours:
+                            work_hours = (plan_approved.dttm_work_end - plan_approved.dttm_work_start).total_seconds() / 60
+                            for break_triplet in breaks:
+                                if work_hours >= break_triplet[0] and work_hours <= break_triplet[1]:
+                                    break_time = sum(break_triplet[2])
+                                    break
                     else:
-                        dttm_work_end = min(dttm_work_end, plan_approved.dttm_work_end)
-                    # учитываем перерыв плана, если факт получился больше
-                    fact_hours = self.count_work_hours(breaks, dttm_work_start, dttm_work_end)
-                    plan_hours = plan_approved.work_hours
-                    if fact_hours > plan_hours:
-                        work_hours = (plan_approved.dttm_work_end - plan_approved.dttm_work_start).total_seconds() / 60
-                        for break_triplet in breaks:
-                            if work_hours >= break_triplet[0] and work_hours <= break_triplet[1]:
-                                break_time = sum(break_triplet[2])
-                                break
-                else:
-                    return dttm_work_start, dttm_work_end, datetime.timedelta(0)
+                        return dttm_work_start, dttm_work_end, datetime.timedelta(0)
 
-            return dttm_work_start, dttm_work_end, self.count_work_hours(breaks, dttm_work_start, dttm_work_end, break_time=break_time)
+            return dttm_work_start, dttm_work_end, self.count_work_hours(breaks, dttm_work_start, dttm_work_end, break_time=break_time, fine=fine)
 
         return self.dttm_work_start, self.dttm_work_end, datetime.timedelta(0)
 
@@ -719,8 +729,8 @@ class WorkerDay(AbstractModel):
         return t in cls.TYPES_WITH_TM_RANGE
 
     @staticmethod
-    def count_work_hours(break_triplets, dttm_work_start, dttm_work_end, break_time=None):
-        work_hours = (dttm_work_end - dttm_work_start).total_seconds() / 60
+    def count_work_hours(break_triplets, dttm_work_start, dttm_work_end, break_time=None, fine=0):
+        work_hours = ((dttm_work_end - dttm_work_start).total_seconds() / 60) - fine
         if break_time:
             work_hours = work_hours - break_time
             return datetime.timedelta(minutes=work_hours)
@@ -733,6 +743,24 @@ class WorkerDay(AbstractModel):
             return datetime.timedelta(0)
 
         return datetime.timedelta(minutes=work_hours)
+
+    @staticmethod
+    def get_fine(dttm_work_start, dttm_work_end, dttm_work_start_plan, dttm_work_end_plan, fines):
+        fine = 0
+        if dttm_work_start_plan and dttm_work_end_plan and fines:
+            arrive_fines = fines.get('arrive_fines', [])
+            departure_fines = fines.get('departure_fines', [])
+            arrive_timedelta = (dttm_work_start - dttm_work_start_plan).total_seconds() / 60
+            departure_timedelta = (dttm_work_end_plan - dttm_work_end).total_seconds() / 60
+            for arrive_fine in arrive_fines:
+                if arrive_timedelta >= arrive_fine[0] and arrive_timedelta <= arrive_fine[1]:
+                    fine += arrive_fine[2]
+                    break
+            for departure_fine in departure_fines:
+                if departure_timedelta >= departure_fine[0] and departure_timedelta <= departure_fine[1]:
+                    fine += departure_fine[2]
+                    break
+        return fine
 
     def get_department(self):
         return self.shop
@@ -780,9 +808,10 @@ class WorkerDay(AbstractModel):
         is_new = self.id is None
 
         res = super().save(*args, **kwargs)
+        fines = self.employment.position.wp_fines if self.employment and self.employment.position else None
 
         # запускаем пересчет часов для факта, если изменились часы в подтвержденном плане
-        if self.shop and self.shop.network.only_fact_hours_that_in_approved_plan and \
+        if self.shop and (self.shop.network.only_fact_hours_that_in_approved_plan or fines) and \
                 self.tracker.has_changed('work_hours') and \
                 self.type in WorkerDay.TYPES_WITH_TM_RANGE and self.is_plan and self.is_approved:
             fact_qs = WorkerDay.objects.filter(
@@ -1634,36 +1663,42 @@ class ExchangeSettings(AbstractModel):
     }
 
     # Создаем ли автоматически вакансии
-    automatic_check_lack = models.BooleanField(default=False)
+    automatic_create_vacancies = models.BooleanField(default=False, verbose_name=_('Automatic create vacancies'))
+    # Удаляем ли автоматически вакансии
+    automatic_delete_vacancies = models.BooleanField(default=False, verbose_name=_('Automatic delete vacancies'))
     # Период, за который проверяем
-    automatic_check_lack_timegap = models.DurationField(default=datetime.timedelta(days=7))
+    automatic_check_lack_timegap = models.DurationField(default=datetime.timedelta(days=7), verbose_name=_('Automatic check lack timegap'))
     #с какого дня выводить с выходного
-    automatic_holiday_worker_select_timegap = models.DurationField(default=datetime.timedelta(days=8))
+    automatic_holiday_worker_select_timegap = models.DurationField(default=datetime.timedelta(days=8), verbose_name=_('Automatic holiday worker select timegap'))
     #включать ли автоматическую биржу смен
-    automatic_exchange = models.BooleanField(default=False)
+    automatic_exchange = models.BooleanField(default=False, verbose_name=_('Automatic exchange'))
     #максимальное количество рабочих часов в месяц для вывода с выходного
-    max_working_hours = models.IntegerField(default=192)
+    max_working_hours = models.IntegerField(default=192, verbose_name=_('Max working hours'))
 
-    constraints = models.CharField(max_length=250, default=json.dumps(default_constraints))
-    exclude_positions = models.ManyToManyField('base.WorkerPosition', blank=True)
+    constraints = models.CharField(max_length=250, default=json.dumps(default_constraints), verbose_name=_('Constraints'))
+    exclude_positions = models.ManyToManyField('base.WorkerPosition', blank=True, verbose_name=_('Exclude positions'))
     # Минимальная потребность в сотруднике при создании вакансии
-    automatic_create_vacancy_lack_min = models.FloatField(default=.5)
+    automatic_create_vacancy_lack_min = models.FloatField(default=.5, verbose_name=_('Automatic create vacancy lack min'))
     # Максимальная потребность в сотруднике для удалении вакансии
-    automatic_delete_vacancy_lack_max = models.FloatField(default=0.3)
+    automatic_delete_vacancy_lack_max = models.FloatField(default=0.3, verbose_name=_('Automatic delete vacancy lack max'))
 
     # Только автоназначение сотрудников
-    automatic_worker_select_timegap = models.DurationField(default=datetime.timedelta(days=1))
+    automatic_worker_select_timegap = models.DurationField(default=datetime.timedelta(days=1), verbose_name=_('Automatic worker select timegap'))
     #период за который делаем обмен сменами
-    automatic_worker_select_timegap_to = models.DurationField(default=datetime.timedelta(days=2))
+    automatic_worker_select_timegap_to = models.DurationField(default=datetime.timedelta(days=2), verbose_name=_('Automatic worker select timegap to'))
     # Дробное число, на какую долю сотрудник не занят, чтобы совершить обмен
-    automatic_worker_select_overflow_min = models.FloatField(default=0.8)
+    automatic_worker_select_overflow_min = models.FloatField(default=0.8, verbose_name=_('Automatic worker select overflow min'))
 
     # Длина смены
-    working_shift_min_hours = models.DurationField(default=datetime.timedelta(hours=4)) # Минимальная длина смены
-    working_shift_max_hours = models.DurationField(default=datetime.timedelta(hours=12)) # Максимальная длина смены
+    working_shift_min_hours = models.DurationField(default=datetime.timedelta(hours=4), verbose_name=_('Working shift min hours')) # Минимальная длина смены
+    working_shift_max_hours = models.DurationField(default=datetime.timedelta(hours=12), verbose_name=_('Working shift max hours')) # Максимальная длина смены
 
     # Расстояние до родителя, в поддереве которого ищем сотрудников для автоназначения
-    automatic_worker_select_tree_level = models.IntegerField(default=1)
+    automatic_worker_select_tree_level = models.IntegerField(default=1, verbose_name=_('Automatic worker select tree level'))
+
+    # Аутсорс компании, которым можно будет откликаться на автоматически созданную вакансию
+    outsources = models.ManyToManyField(Network, verbose_name=_('Outsourcing companies'), blank=True,
+        help_text=_('Outsourcing companies that will be able to respond to an automatically created vacancy'), related_name='client_exchange_settings')
 
 
 class VacancyBlackList(models.Model):

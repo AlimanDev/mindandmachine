@@ -30,6 +30,7 @@ from src.timetable.backends import MultiShopsFilterBackend
 from src.timetable.events import REQUEST_APPROVE_EVENT_TYPE, APPROVE_EVENT_TYPE, VACANCY_CONFIRMED_TYPE
 from src.timetable.filters import WorkerDayFilter, WorkerDayStatFilter, VacancyFilter
 from src.timetable.models import (
+    WorkType,
     WorkerDay,
     WorkerDayCashboxDetails,
     ShopMonthStat,
@@ -37,7 +38,8 @@ from src.timetable.models import (
     GroupWorkerDayPermission,
 )
 from src.timetable.timesheet.tasks import calc_timesheets
-from src.timetable.vacancy.utils import cancel_vacancies, confirm_vacancy
+from src.timetable.vacancy.utils import cancel_vacancies, cancel_vacancy, confirm_vacancy
+from src.timetable.vacancy.tasks import vacancies_create_and_cancel_for_shop
 from src.timetable.worker_day.serializers import (
     ChangeListSerializer,
     WorkerDaySerializer,
@@ -98,7 +100,7 @@ class WorkerDayViewSet(BaseModelViewSet):
     openapi_tags = ['WorkerDay',]
 
     def get_queryset(self):
-        queryset = WorkerDay.objects.all().prefetch_related('outsources')
+        queryset = WorkerDay.objects.filter(canceled=False).prefetch_related('outsources')
 
         if self.request.query_params.get('by_code', False):
             return queryset.annotate(
@@ -138,8 +140,8 @@ class WorkerDayViewSet(BaseModelViewSet):
 
     def perform_destroy(self, worker_day):
         if worker_day.is_vacancy:
-            worker_day.is_approved = False
-            # worker_day.child.all().delete()
+            cancel_vacancy(worker_day.id, auto=False)
+            return
         if worker_day.is_approved:
             raise FieldError(self.error_messages['cannot_delete'])
         super().perform_destroy(worker_day)
@@ -615,14 +617,15 @@ class WorkerDayViewSet(BaseModelViewSet):
                         if wd_ids:
                             transaction.on_commit(lambda wd_ids=wd_ids: recalc_wdays.delay(id__in=wd_ids))
                     if settings.ZKTECO_INTEGRATION: # если используем терминалы
-                            transaction.on_commit(
-                                lambda: recalc_fact_from_records.delay(
-                                    serializer.validated_data['dt_from'], 
-                                    serializer.validated_data['dt_to'], 
-                                    shop_ids=[serializer.data['shop_id']]
-                                )
+                        transaction.on_commit(
+                            lambda: recalc_fact_from_records.delay(
+                                serializer.validated_data['dt_from'], 
+                                serializer.validated_data['dt_to'], 
+                                shop_ids=[serializer.data['shop_id']]
                             )
-
+                        )
+                    
+                    transaction.on_commit(lambda: vacancies_create_and_cancel_for_shop.delay(serializer.validated_data['shop_id']))
                     if not has_permission_to_change_protected_wdays:
                         WorkerDay.check_tasks_violations(
                             employee_days_q=employee_days_q,
@@ -1179,9 +1182,13 @@ class WorkerDayViewSet(BaseModelViewSet):
             data.is_valid(raise_exception=True)
             data = data.validated_data
             filt = {}
+            q_filt = Q()
             if data['exclude_created_by']:
                 filt['created_by__isnull'] = True
+            if data.get('shop_id'):
+                q_filt |= Q(shop_id=data['shop_id']) | Q(shop__isnull=True)
             WorkerDay.objects_with_excluded.filter(
+                q_filt,
                 is_approved=False,
                 is_fact=data['is_fact'],
                 employee_id__in=data['employee_ids'],
