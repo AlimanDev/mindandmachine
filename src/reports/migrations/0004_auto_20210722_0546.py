@@ -46,6 +46,7 @@ def move_events_to_report_config(app, schema_editor):
     report_ids_to_delete = list(notifications.values_list('report_config_id', flat=True))
     notifications.delete()
     EventType.objects.filter(code__in=ReportType.objects.all().values_list('code', flat=True)).delete()
+    EventEmailNotification.objects.all().update(report_config=None)
     ReportConfig.objects.filter(id__in=report_ids_to_delete).delete()
     ReportConfig.objects.filter(report_type__isnull=True).delete()
 
