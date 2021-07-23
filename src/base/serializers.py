@@ -47,6 +47,7 @@ class NetworkSerializer(serializers.ModelSerializer):
     logo = serializers.SerializerMethodField('get_logo_url')
     default_stats = serializers.SerializerMethodField()
     show_tabel_graph = serializers.SerializerMethodField()
+    unaccounted_overtime_threshold = serializers.SerializerMethodField()
 
     def get_default_stats(self, obj: Network):
         default_stats = json.loads(obj.settings_values).get('default_stats', {})
@@ -61,6 +62,9 @@ class NetworkSerializer(serializers.ModelSerializer):
 
     def get_show_tabel_graph(self, obj:Network):
         return obj.settings_values_prop.get('show_tabel_graph', True)
+
+    def get_unaccounted_overtime_threshold(self, obj:Network):
+        return obj.settings_values_prop.get('unaccounted_overtime_threshold', 60)
 
     def get_logo_url(self, obj) -> str:
         if obj.logo:
@@ -85,6 +89,7 @@ class NetworkSerializer(serializers.ModelSerializer):
             'show_tabel_graph',
             'show_worker_day_tasks',
             'show_user_biometrics_block',
+            'unaccounted_overtime_threshold',
         ]
 
 

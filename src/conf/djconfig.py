@@ -580,8 +580,8 @@ CELERY_BEAT_SCHEDULE = {
         'schedule': crontab(hour=1, minute=0),
         'options': {'queue': BACKEND_QUEUE}
     },
-    'task-trigger-cron-event': {
-        'task': 'src.events.tasks.cron_event',
+    'task-trigger-cron-report': {
+        'task': 'src.reports.tasks.cron_report',
         'schedule': crontab(minute='*/1'),
         'options': {'queue': BACKEND_QUEUE}
     },
