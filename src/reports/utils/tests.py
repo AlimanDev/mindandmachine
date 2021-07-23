@@ -129,7 +129,23 @@ class TestUrvFiles(APITestCase):
         }
         self.assertEqual(data, assert_data)
 
-    
+    def test_urv_violators_report_in_time(self):
+        self._create_att_record(
+            self.employment2,
+            datetime.combine(self.dt + timedelta(1), time(1)),
+            AttendanceRecords.TYPE_LEAVING,
+        )
+        data = urv_violators_report(self.network.id, dt_from=self.dt, dt_to=self.dt, exclude_created_by=True)
+        assert_data = {
+            self.employment3.employee_id: {
+                self.dt: {
+                    'shop_id': self.employment3.shop_id, 
+                    'types': ['L', 'LA']
+                }
+            },
+        }
+        self.assertEqual(data, assert_data)
+
     def test_urv_violators_report_exclude_created_by(self):
         self._create_att_record(
             self.employment4,

@@ -38,7 +38,7 @@ def send_report_emails(report_config_id: int):
             employments_by_shops.setdefault(e.shop_id, []).append(e)
         for shop_id, employments in employments_by_shops.items():
             # пока что только дочерние магазины
-            shops = Shop.objects.filter(parent_id=shop_id).values_list('id', flat=True)
+            shops = Shop.objects.get(id=shop_id).get_descendants(include_self=False).values_list('id', flat=True)
             emails = [e.employee.user.email for e in employments]
             context['shop_ids'] = list(shops) or [shop_id]
             datatuple.extend(get_datatuple(recipients + emails, subject, message_content, report_config.get_file(context)))

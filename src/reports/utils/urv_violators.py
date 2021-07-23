@@ -149,7 +149,7 @@ def urv_violators_report(network_id, dt_from=None, dt_to=None, exclude_created_b
         is_approved=True,
     )
     if exclude_created_by:
-        fact_subq = fact_subq.filter(created_by__isnull=True)
+        fact_subq = fact_subq.filter(last_edited_by__isnull=True)
     bad_arrival_departure = worker_days.annotate(
         dttm_work_start_fact=Subquery(
             fact_subq.values('dttm_work_start')[:1]
@@ -160,10 +160,12 @@ def urv_violators_report(network_id, dt_from=None, dt_to=None, exclude_created_b
     )
     for record in bad_arrival_departure:
         types = data.get(record.employee_id, {}).get(record.dt, {}).get('types', [])
-        if record.dttm_work_start_fact and record.dttm_work_start_fact - record.dttm_work_start >= network.allowed_interval_for_late_arrival:
+        if record.dttm_work_start_fact and record.dttm_work_start_fact - record.dttm_work_start > network.allowed_interval_for_late_arrival:
             types.append(LATE_ARRIVAL)
-        if record.dttm_work_end_fact and record.dttm_work_end - record.dttm_work_end_fact >= network.allowed_interval_for_early_departure:
+        if record.dttm_work_end_fact and record.dttm_work_end - record.dttm_work_end_fact > network.allowed_interval_for_early_departure:
             types.append(EARLY_DEPARTURE)
+        if not types:
+            continue
         data.setdefault(record.employee_id, {})[record.dt] = {
             'shop_id': record.shop_id,
             'types': types,
