@@ -25,7 +25,6 @@ def send_event_email_notifications(event_email_notification_id: int, user_author
     template = event_email_notification.get_email_template()
     enrich_context(context)
     subject = Template(event_email_notification.get_subject_template()).render(Context(context))
-    attach_file = event_email_notification.get_file(user_author_id, context)
     datatuple = []
 
     for recipient in set(event_email_notification.get_recipients(user_author_id, context)):
@@ -43,7 +42,7 @@ def send_event_email_notifications(event_email_notification_id: int, user_author
                     subject,
                     textify(message_content),
                     message_content,
-                    attach_file,
+                    None,
                     None,
                     [email]
                 )
@@ -58,7 +57,7 @@ def send_event_email_notifications(event_email_notification_id: int, user_author
                     subject,
                     textify(message_content),
                     message_content,
-                    attach_file,
+                    None,
                     None,
                     [email]
                 )
@@ -82,6 +81,7 @@ def send_notifications_task(**kwargs):
     event_email_notifications = EventEmailNotification.objects.filter(
         event_type__code=kwargs.get('event_code'),
         event_type__network_id=kwargs.get('network_id'),
+        is_active=True,
     )
 
     for event_email_notification in event_email_notifications:
@@ -94,6 +94,7 @@ def send_notifications_task(**kwargs):
     online_notifications = EventOnlineNotification.objects.filter(
         event_type__code=kwargs.get('event_code'),
         event_type__network_id=kwargs.get('network_id'),
+        is_active=True,
     )
     for online_notification in online_notifications:
         send_online_notifications.delay(
@@ -105,6 +106,7 @@ def send_notifications_task(**kwargs):
     webhook_notifications = EventWebhookNotification.objects.filter(
         event_type__code=kwargs.get('event_code'),
         event_type__network_id=kwargs.get('network_id'),
+        is_active=True,
     )
     for webhook_notification in webhook_notifications:
         send_webhook_notifications.delay(

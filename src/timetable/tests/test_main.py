@@ -150,6 +150,7 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
             'is_outsource': False,
             'outsources': [],
             'is_vacancy': False,
+            'unaccounted_overtime': 0.0,
             'crop_work_hours_by_shop_schedule': True,
         }
 
@@ -3683,3 +3684,93 @@ class TestFineLogic(APITestCase):
         self.assertEquals(fact_wd_dir.work_hours, timedelta(hours=9, minutes=30))
         fact_wd_dir_bad = self._create_or_update_worker_day(self.dir[2], datetime.combine(dt, time(9, 56)), datetime.combine(dt, time(20)), is_fact=True)
         self.assertEquals(fact_wd_dir_bad.work_hours, timedelta(hours=7, minutes=30))
+
+class TestUnaccountedOvertimesAPI(APITestCase):
+    USER_USERNAME = "user1"
+    USER_EMAIL = "q@q.q"
+    USER_PASSWORD = "4242"
+
+    def setUp(self):
+        super().setUp()
+        create_departments_and_users(self)
+        self.dt = date.today()
+        self.network.only_fact_hours_that_in_approved_plan = True
+        self.network.save()
+        self._create_worker_day(
+            self.employment2,
+            dttm_work_start=datetime.combine(self.dt, time(13)),
+            dttm_work_end=datetime.combine(self.dt + timedelta(1), time(1)),
+            is_approved=True,
+        )
+        self._create_worker_day(
+            self.employment3,
+            dttm_work_start=datetime.combine(self.dt, time(8)),
+            dttm_work_end=datetime.combine(self.dt, time(20)),
+            is_approved=True,
+        )
+        self._create_worker_day(
+            self.employment4,
+            dttm_work_start=datetime.combine(self.dt, time(8)),
+            dttm_work_end=datetime.combine(self.dt, time(20)),
+            is_approved=True,
+        )
+        # переработка 3 часа
+        self._create_worker_day(
+            self.employment2,
+            dttm_work_start=datetime.combine(self.dt, time(12)),
+            dttm_work_end=datetime.combine(self.dt + timedelta(1), time(3)),
+            is_approved=True,
+            is_fact=True,
+        )
+        # нет переработки
+        self._create_worker_day(
+            self.employment3,
+            dttm_work_start=datetime.combine(self.dt, time(8)),
+            dttm_work_end=datetime.combine(self.dt, time(20)),
+            is_approved=True,
+            is_fact=True,
+        )
+        # переработка 1 час
+        self.wd = self._create_worker_day(
+            self.employment4,
+            dttm_work_start=datetime.combine(self.dt, time(7)),
+            dttm_work_end=datetime.combine(self.dt, time(20, 30)),
+            is_approved=True,
+            is_fact=True,
+        )
+        self.client.force_authenticate(self.user1)
+
+    def _create_worker_day(self, employment, dt=None, is_fact=False, is_approved=False, dttm_work_start=None, dttm_work_end=None, type=WorkerDay.TYPE_WORKDAY):
+        if not dt:
+            dt = self.dt
+        return WorkerDay.objects.create(
+            shop_id=self.shop.id,
+            type=type,
+            employment=employment,
+            employee=employment.employee,
+            dt=dt,
+            dttm_work_start=dttm_work_start,
+            dttm_work_end=dttm_work_end,
+            is_fact=is_fact,
+            is_approved=is_approved,
+            created_by=self.user1,
+        )
+
+    def test_get_list(self):
+        dt = Converter.convert_date(self.dt)
+
+        response = self.client.get(f'/rest_api/worker_day/?shop_id={self.shop.id}&dt={dt}&is_fact=1')
+        self.assertEquals(len(response.json()), 3)
+        overtimes = list(map(lambda x: (x['employee_id'], x['unaccounted_overtime']), response.json()))
+        assert_overtimes = [
+            (self.employee2.id, 180.0),
+            (self.employee3.id, 0.0),
+            (self.employee4.id, 90.0),
+        ]
+        self.assertEquals(overtimes, assert_overtimes)
+
+    def test_get(self):
+        dt = Converter.convert_date(self.dt)
+
+        response = self.client.get(f'/rest_api/worker_day/{self.wd.id}/')
+        self.assertEquals(response.json()['unaccounted_overtime'], 90.0)

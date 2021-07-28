@@ -1,9 +1,4 @@
-from typing import Type
-
-from rest_framework import serializers
-
-
-class EventRegistryHolder(type):
+class ReportRegistryHolder(type):
     registry = {}
 
     def __new__(cls, name, bases, attrs):
@@ -22,7 +17,7 @@ class EventRegistryHolder(type):
         return dict(cls.registry)
 
 
-class BaseRegisteredEvent(metaclass=EventRegistryHolder):
+class BaseRegisteredReport(metaclass=ReportRegistryHolder):
     """
     Any class that will inherits from BaseRegisteredClass will be included
     inside the dict RegistryHolder.REGISTRY, the key being the name of the
@@ -30,11 +25,9 @@ class BaseRegisteredEvent(metaclass=EventRegistryHolder):
     """
     code = None
     name = None
-    write_history = True
 
-    def __init__(self, network_id, user_author_id, context):
+    def __init__(self, network_id, context):
         self.network_id = network_id
-        self.user_author_id = user_author_id
         self.context = context
 
     def __str__(self):
@@ -43,5 +36,5 @@ class BaseRegisteredEvent(metaclass=EventRegistryHolder):
     def __repr__(self):
         return self.__str__()
 
-    def get_recipients(self):
-        return []
+    def get_file(self):
+        return None
