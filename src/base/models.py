@@ -942,6 +942,7 @@ class User(DjangoAbstractUser, AbstractModel):
         default=LOCAL_AUTH,
         choices=AUTH_TYPES,
     )
+    ldap_login = models.CharField(max_length=150, null=True, blank=True)
 
     def get_fio(self):
         """

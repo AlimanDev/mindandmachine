@@ -54,10 +54,15 @@ class TestUserViewSet(TestsHelperMixin, APITestCase):
         data['email'] = 'email@example.com'
         data['auth_type'] = 'ldap'
         resp = self.client.put(self.get_url('User-detail', pk=username), data=data)
+        self.assertContains(
+            resp, text='ldap_login should be specified for ldap auth_type.', status_code=400)
+        data['ldap_login'] = 'some_ldap_login'
+        resp = self.client.put(self.get_url('User-detail', pk=username), data=data)
         self.assertEqual(resp.status_code, 200)
         user.refresh_from_db()
         self.assertEqual(user.email, 'email@example.com')
         self.assertEqual(user.auth_type, 'ldap')
+        self.assertEqual(user.ldap_login, 'some_ldap_login')
 
         data['auth_type'] = 'invalid'
         resp = self.client.put(self.get_url('User-detail', pk=username), data=data)

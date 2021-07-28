@@ -113,6 +113,6 @@ class UserDTOSerializer(serializers.ModelSerializer):
                 'source': 'last_name',
             },
             'ldapLogin': {
-                'source': 'username',
+                'source': 'ldap_login',
             },
         }
