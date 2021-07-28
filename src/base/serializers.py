@@ -149,7 +149,7 @@ class UserSerializer(BaseNetworkSerializer):
     class Meta:
         model = User
         fields = ['id', 'first_name', 'last_name', 'middle_name', 'network_id',
-                  'birthday', 'sex', 'avatar', 'email', 'phone_number', 'username', 'auth_type']
+                  'birthday', 'sex', 'avatar', 'email', 'phone_number', 'username', 'auth_type', 'ldap_login']
 
     def validate(self, attrs):
         email = attrs.get('email')
@@ -159,6 +159,10 @@ class UserSerializer(BaseNetworkSerializer):
             except DjangoValidationError:
                 # TODO: добавить запись в лог?
                 attrs['email'] = ''
+
+        auth_type = attrs.get('auth_type')
+        if auth_type == User.LDAP_AUTH and not attrs.get('ldap_login'):
+            raise serializers.ValidationError('ldap_login should be specified for ldap auth_type.')
 
         return attrs
 
