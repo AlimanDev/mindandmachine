@@ -214,7 +214,7 @@ class MdaIntegrationHelper:
             if k in resp_data:
                 errors[k] = resp_data[k]
 
-        if errors:
+        if any(errors.get(k) for k in key_names):
             logger.error(errors)
 
     def sync_orgstruct(self, threshold_seconds=settings.MDA_SYNC_DEPARTMENTS_THRESHOLD_SECONDS):
