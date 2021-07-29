@@ -866,7 +866,7 @@ class WorkerDayViewSet(BaseModelViewSet):
             raise ValidationError(_('There is no such vacancy.'))
         if not vacancy.is_approved:
             return Response(WorkerDaySerializer(vacancy).data)
-        if vacancy.empoyee_id:
+        if vacancy.employee_id:
             raise ValidationError(_('The vacancy cannot be edited because it has already been responded.'))
         editable_vacancy = WorkerDay.objects.filter(parent_worker_day=vacancy).first()
         if editable_vacancy is None:
