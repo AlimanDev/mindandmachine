@@ -41,6 +41,7 @@ from src.timetable.timesheet.tasks import calc_timesheets
 from src.timetable.vacancy.utils import cancel_vacancies, cancel_vacancy, confirm_vacancy
 from src.timetable.vacancy.tasks import vacancies_create_and_cancel_for_shop
 from src.timetable.worker_day.serializers import (
+    ChangeListSerializer,
     WorkerDaySerializer,
     WorkerDayApproveSerializer,
     WorkerDayWithParentSerializer,
@@ -63,7 +64,7 @@ from src.timetable.worker_day.serializers import (
 from src.timetable.worker_day.stat import count_daily_stat
 from src.timetable.worker_day.tasks import recalc_wdays, recalc_fact_from_records
 from src.timetable.worker_day.timetable import get_timetable_generator_cls
-from src.timetable.worker_day.utils import exchange, copy_as_excel_cells
+from src.timetable.worker_day.utils import create_worker_days_range, exchange, copy_as_excel_cells
 from src.util.dg.tabel import get_tabel_generator_cls
 from src.util.models_converter import Converter
 from src.util.openapi.responses import (
@@ -960,103 +961,6 @@ class WorkerDayViewSet(BaseModelViewSet):
 
         return Response(res)
 
-    # @action(detail=False, methods=['post'])
-    # def change_list(self, request):
-    #     data = ListChangeSrializer(data=request.data, context={'request': request})
-    #     data.is_valid(raise_exception=True)
-    #     data = data.validated_data
-    #     is_type_with_tm_range = WorkerDay.is_type_with_tm_range(data['type'])
-    #
-    #     response = {}
-    #
-    #     shop_id = data['shop_id']
-    #     shop = Shop.objects.get(id=shop_id)
-    #
-    #     work_type = WorkType.objects.get(id=data['work_type']) if data['work_type'] else None
-    #     work_types = {}
-    #     employments = {
-    #         e.user_id: e
-    #         for e in Employment.objects.get_active(
-    #             network_id=shop.network_id,
-    #             user_id__in=data['workers'].keys(),
-    #             shop_id=shop_id,
-    #         )
-    #     }
-    #     for user_id, dates in data['workers'].items():
-    #         employment = employments.get(user_id, None)
-    #         wds = []
-    #         for dt in dates:
-    #             wd_args = {
-    #                 'type': data['type'],
-    #                 'employment': employment,
-    #                 'created_by': request.user,
-    #                 'comment': data['comment'],
-    #                 'dttm_added': timezone.now(),
-    #                 'is_vacancy': False,
-    #             }
-    #             if is_type_with_tm_range:
-    #                 dttm_work_start = timezone.datetime.combine(dt, data[
-    #                     'tm_work_start'])  # на самом деле с фронта приходят время а не дата-время
-    #                 tm_work_end = data['tm_work_end']
-    #                 dttm_work_end = timezone.datetime.combine(dt, tm_work_end) if tm_work_end > data['tm_work_start'] else \
-    #                     timezone.datetime.combine(dt + timezone.timedelta(days=1), tm_work_end)
-    #                 wd_args.update({
-    #                     'dttm_work_start': dttm_work_start,
-    #                     'dttm_work_end': dttm_work_end,
-    #                 })
-    #             wd, created = WorkerDay.objects.filter(Q(shop_id=shop_id)|Q(shop__isnull=True)).update_or_create(
-    #                 worker_id=user_id,
-    #                 dt=dt,
-    #                 is_approved=False,
-    #                 is_fact=False,
-    #                 defaults=wd_args,
-    #             )
-    #             wd_details = WorkerDayCashboxDetails.objects.filter(worker_day=wd)
-    #             work_types.update({
-    #                 wd.work_type_id: wd.work_type.shop_id
-    #                 for wd in wd_details.select_related('work_type')
-    #             })
-    #             wd_details.delete()
-    #             #TODO add cancel worker day
-    #             # if not created and wd_details.exists():
-    #             #     old_work_type = wd_details.first().work_type
-    #             #     if old_work_type not in work_types:
-    #             #         work_types.append(old_work_type)
-    #             #     if wd_details.filter(is_vacancy=True).exists():
-    #             #         for wd_detail in wd_details.filter(is_vacancy=True):
-    #             #             cancel_vacancy(wd_detail.id)
-    #             #             worker_day.canceled = True
-    #             #     else:
-    #             #         worker_day.canceled = False
-    #             #     wd_details.filter(is_vacancy=False).delete()
-    #             # else:
-    #             #     worker_day.canceled = False
-    #             if created:
-    #                 wd.parent_worker_day = WorkerDay.objects.filter(
-    #                     worker_id=user_id,
-    #                     dt=dt,
-    #                     shop_id=shop_id,
-    #                     is_approved=True,
-    #                 ).first()
-    #                 wd.save()
-    #             if wd.type == WorkerDay.TYPE_WORKDAY:
-    #                 WorkerDayCashboxDetails.objects.create(
-    #                     work_type=work_type,
-    #                     worker_day=wd,
-    #                 )
-    #
-    #             wds.append(wd)
-    #
-    #         response[user_id] = WorkerDaySerializer(wds, many=True).data
-    #
-    #     if work_type and data['type'] == WorkerDay.TYPE_WORKDAY:
-    #         cancel_vacancies(work_type.shop_id, work_type.id)
-    #     if len(work_types):
-    #         for wt, sh_id in work_types.items():
-    #             create_vacancies_and_notify(sh_id, wt)
-    #
-    #     return Response(response, status=200)
-
     @swagger_auto_schema(
         request_body=CopyApprovedSerializer,
         operation_description='''
@@ -1533,3 +1437,62 @@ class WorkerDayViewSet(BaseModelViewSet):
             raise ValidationError({'detail': _('No employees satisfying the conditions.')})
         recalc_wdays.delay(employee_id__in=employee_ids)
         return Response({'detail': _('Hours recalculation started successfully.')})
+    
+    @swagger_auto_schema(
+        request_body=ChangeListSerializer,
+        responses={200: None},
+        operation_description='''
+        Проставление типов дней (кроме РД) на промежуток для сотрудника
+        '''
+    )
+    @action(detail=False, methods=['post'])
+    def change_list(self, request):
+        data = ChangeListSerializer(data=request.data, context={'request': request})
+        data.is_valid(raise_exception=True)
+        data = data.validated_data
+        wd_perm = GroupWorkerDayPermission.objects.filter(
+            group__in=request.user.get_group_ids(Shop.objects.get(id=data['shop_id']) if data['shop_id'] else None),
+            worker_day_permission__action=WorkerDayPermission.CREATE_OR_UPDATE,
+            worker_day_permission__graph_type=WorkerDayPermission.PLAN,
+            worker_day_permission__wd_type=data['type'],
+        ).first()
+        if not wd_perm:
+            raise PermissionDenied(
+                    self.error_messages['no_perm_to_approve_wd_types'].format(wd_type_str=dict(WorkerDay.TYPES)[data['type']]))
+
+        today = (datetime.datetime.now() + datetime.timedelta(hours=3)).date()
+        limit_days_in_past = wd_perm.limit_days_in_past
+        limit_days_in_future = wd_perm.limit_days_in_future
+        date_limit_in_past = None
+        date_limit_in_future = None
+        if limit_days_in_past is not None:
+            date_limit_in_past = today - datetime.timedelta(days=limit_days_in_past)
+        if limit_days_in_future is not None:
+            date_limit_in_future = today + datetime.timedelta(days=limit_days_in_future)
+        if date_limit_in_past or date_limit_in_future:
+            if (date_limit_in_past and data['dt_from'] < date_limit_in_past) or \
+                    (date_limit_in_future and data['dt_to'] > date_limit_in_future):
+                dt_interval = f'с {Converter.convert_date(date_limit_in_past) or "..."} ' \
+                            f'по {Converter.convert_date(date_limit_in_future) or "..."}'
+                raise PermissionDenied(
+                    self.error_messages['approve_days_interval_restriction'].format(
+                        wd_type_str=dict(WorkerDay.TYPES)[data['type']],
+                        dt_interval=dt_interval,
+                    )
+                )
+        response = WorkerDaySerializer(
+            create_worker_days_range(
+                data['dates'], 
+                type=data['type'], 
+                employee_id=data['employee_id'], 
+                shop_id=data['shop_id'],
+                tm_work_start=data.get('tm_work_start'),
+                tm_work_end=data.get('tm_work_end'),
+                is_vacancy=data['is_vacancy'],
+                outsources=data['outsources'],
+                work_type_id=data.get('work_type_id'),
+                created_by=data['created_by'],
+            ),
+            many=True,
+        ).data
+        return Response(response)

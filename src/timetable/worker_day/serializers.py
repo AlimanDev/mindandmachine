@@ -1,4 +1,5 @@
 from datetime import timedelta
+import pandas as pd
 
 from django.db import transaction
 from django.utils.translation import gettext_lazy as _
@@ -14,7 +15,6 @@ from src.timetable.models import (
     WorkerDayCashboxDetails,
     WorkType,
 )
-from src.util.models_converter import Converter
 
 
 class UnaccountedOvertimeMixin:
@@ -406,32 +406,60 @@ class VacancySerializer(serializers.Serializer):
         return None
 
 
-class ListChangeSrializer(serializers.Serializer):
+class ChangeListSerializer(serializers.Serializer):
     default_error_messages = {
-        "invalid_dt_change_list": _("Wrong dates format.")}
-    shop_id = serializers.IntegerField()
-    workers = serializers.JSONField()
+        'check_dates': _('Date start should be less then date end'),
+    }
+    shop_id = serializers.IntegerField(required=False)
+    employee_id = serializers.IntegerField(required=False)
     type = serializers.CharField()
     tm_work_start = serializers.TimeField(required=False)
     tm_work_end = serializers.TimeField(required=False)
-    work_type = serializers.IntegerField(required=False)
-    comment = serializers.CharField(max_length=128, required=False)
+    work_type_id = serializers.IntegerField(required=False)
+    is_vacancy = serializers.BooleanField(default=False)
+    dt_from = serializers.DateField()
+    dt_to = serializers.DateField()
+    outsources = serializers.ListField(required=False, child=serializers.IntegerField(), allow_null=True, allow_empty=True, write_only=True)
+    # 0 - ПН, 6 - ВС
+    days_of_week = serializers.ListField(required=False, child=serializers.IntegerField(), allow_null=True, allow_empty=True, write_only=True)
+    created_by = serializers.HiddenField(default=serializers.CurrentUserDefault())
+
+    def _generate_dates(self, dt_from, dt_to, days_of_week=[]):
+        dates = pd.date_range(dt_from, dt_to)
+        if days_of_week:
+            dates = dates[dates.dayofweek.isin(days_of_week)]
+        return list(dates.date)
 
     def is_valid(self, *args, **kwargs):
         super().is_valid(*args, **kwargs)
+        if self.validated_data['is_vacancy']:
+            self.validated_data['type'] = WorkerDay.TYPE_WORKDAY
+            self.validated_data['employee_id'] = None
+            self.validated_data['outsources'] = Network.objects.filter(id__in=self.validated_data.get('outsources', []))
+        else:
+            if not self.validated_data['type'] in WorkerDay.TYPES_WITH_TM_RANGE:
+                self.validated_data['shop_id'] = None 
+            self.validated_data['outsources'] = []
         if WorkerDay.is_type_with_tm_range(self.validated_data['type']):
-            if self.validated_data.get('tm_work_start') is None:
+            if not self.validated_data.get('tm_work_start'):
                 self.tm_work_start.fail('required')
-            if self.validated_data.get('tm_work_end') is None:
+            if not self.validated_data.get('tm_work_end'):
                 self.tm_work_end.fail('required')
-
-            workers = self.validated_data.get('workers')
-            for key, value in workers.items():
-                try:
-                    workers[key] = list(map(lambda x: Converter.parse_date(x), value))
-                except:
-                    raise ValidationError({'error': self.error_messages['invalid_dt_change_list']})
-
+            if not self.validated_data.get('shop_id'):
+                self.shop_id.fail('required')
+            if not self.validated_data.get('work_type_id'):
+                self.work_type_id.fail('required')
+        else:
+            if not self.validated_data.get('employee_id'):
+                self.employee_id.fail('required')
+        if self.validated_data['dt_from'] > self.validated_data['dt_to']:
+            self.fail('check_dates')
+        self.validated_data['dates'] = self._generate_dates(
+            self.validated_data['dt_from'], 
+            self.validated_data['dt_to'], 
+            days_of_week=self.validated_data.get('days_of_week', [])
+        )
+        return True
 
 class ChangeRangeSerializer(serializers.Serializer):
     is_fact = serializers.BooleanField()
