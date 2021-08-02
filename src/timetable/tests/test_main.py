@@ -3464,7 +3464,12 @@ class TestAditionalFunctions(TestsHelperMixin, APITestCase):
             'type': WorkerDay.TYPE_WORKDAY,
             'tm_work_start': '10:00:00',
             'tm_work_end': '22:00:00',
-            'work_type_id': self.work_type.id,
+            'cashbox_details': [
+                {
+                    'work_type_id': self.work_type.id,
+                    'work_part': 1,
+                }
+            ],
             'is_vacancy': True,
             'dt_from': dt_from,
             'dt_to': dt_from + timedelta(9),
@@ -3488,7 +3493,12 @@ class TestAditionalFunctions(TestsHelperMixin, APITestCase):
             'type': WorkerDay.TYPE_WORKDAY,
             'tm_work_start': '10:00:00',
             'tm_work_end': '22:00:00',
-            'work_type_id': self.work_type.id,
+            'cashbox_details': [
+                {
+                    'work_type_id': self.work_type.id,
+                    'work_part': 1,
+                }
+            ],
             'is_vacancy': True,
             'dt_from': dt_from,
             'dt_to': dt_from + timedelta(9),
@@ -3513,7 +3523,12 @@ class TestAditionalFunctions(TestsHelperMixin, APITestCase):
             'type': WorkerDay.TYPE_WORKDAY,
             'tm_work_start': '10:00:00',
             'tm_work_end': '22:00:00',
-            'work_type_id': self.work_type.id,
+            'cashbox_details': [
+                {
+                    'work_type_id': self.work_type.id,
+                    'work_part': 1,
+                }
+            ],
             'is_vacancy': True,
             'dt_from': dt_from,
             'dt_to': dt_from + timedelta(9),
@@ -3546,6 +3561,38 @@ class TestAditionalFunctions(TestsHelperMixin, APITestCase):
         data = response.json()
         self.assertEquals(len(data), 31)
         self.assertEquals(WorkerDay.objects.filter(employee_id=self.employee1.id, type=WorkerDay.TYPE_VACATION, dt__gte=dt_from, dt__lte=dt_to).count(), 31)
+
+    def test_change_list_create_vacancy_many_work_types(self):
+        dt_from = date.today()
+        work_type_name2 = WorkTypeName.objects.create(name='Магазин2', network=self.network)
+        work_type2 = WorkType.objects.create(
+            work_type_name=work_type_name2,
+            shop=self.shop)
+        data = {
+            'shop_id': self.shop.id,
+            'type': WorkerDay.TYPE_WORKDAY,
+            'tm_work_start': '10:00:00',
+            'tm_work_end': '22:00:00',
+            'cashbox_details': [
+                {
+                    'work_type_id': self.work_type.id,
+                    'work_part': 0.5,
+                },
+                {
+                    'work_type_id': work_type2.id,
+                    'work_part': 0.5,
+                }
+            ],
+            'is_vacancy': True,
+            'dt_from': dt_from,
+            'dt_to': dt_from + timedelta(9),
+        }
+        url = f'{self.url}change_list/'
+        response = self.client.post(url, data, format='json')
+        data = response.json()
+        self.assertEquals(len(data), 10)
+        self.assertEquals(WorkerDay.objects.filter(is_vacancy=True, shop_id=self.shop.id, is_outsource=False).count(), 10)
+        self.assertEquals(WorkerDayCashboxDetails.objects.count(), 20)
 
     def test_recalc(self):
         today = date.today()

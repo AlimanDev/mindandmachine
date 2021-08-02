@@ -1,5 +1,6 @@
 import datetime
 import json
+from src.util.models_converter import Converter
 
 from django.conf import settings
 from django.contrib.postgres.aggregates import StringAgg
@@ -13,9 +14,11 @@ from rest_framework.exceptions import ValidationError, PermissionDenied
 from src.base.models import (
     Employment,
     Group,
+    Shop,
 )
 from src.timetable.models import (
     AttendanceRecords,
+    GroupWorkerDayPermission,
     WorkerDay,
     WorkerDayCashboxDetails,
 )
@@ -271,7 +274,7 @@ def create_fact_from_attendance_records(dt_from, dt_to, shop_ids=None):
                 record.employee_id = None
             record.save()
        
-def create_worker_days_range(dates, type=WorkerDay.TYPE_WORKDAY, shop_id=None, employee_id=None, tm_work_start=None, tm_work_end=None, work_type_id=None, is_approved=False, is_vacancy=False, outsources=[], created_by=None):
+def create_worker_days_range(dates, type=WorkerDay.TYPE_WORKDAY, shop_id=None, employee_id=None, tm_work_start=None, tm_work_end=None, cashbox_details=[], is_approved=False, is_vacancy=False, outsources=[], created_by=None):
     with transaction.atomic():
         created_wds = []
         employment = None
@@ -282,9 +285,27 @@ def create_worker_days_range(dates, type=WorkerDay.TYPE_WORKDAY, shop_id=None, e
                 is_fact=False,
                 employee_id=employee_id,
             ).delete()
-        if employee_id and type == WorkerDay.TYPE_WORKDAY:
-            employment = Employment.objects.get_active_empl_by_priority(None, dt=dates[0], priority_shop_id=shop_id, priority_work_type_id=work_type_id, employee_id=employee_id).first()
+        priority_work_type_id = None
+        if cashbox_details:
+            priority_work_type_id = sorted(cashbox_details, key=lambda x: x['work_part'])[0]['work_type_id']
         for date in dates:
+            if employee_id and type == WorkerDay.TYPE_WORKDAY:
+                employment = Employment.objects.get_active_empl_by_priority(
+                    network_id=None, 
+                    employee_id=employee_id,
+                    dt=date,
+                    priority_shop_id=shop_id,
+                    priority_work_type_id=priority_work_type_id,
+                ).select_related(
+                    'position__breaks',
+                ).first()
+
+                # не создавать день, если нету активного трудоустройства на эту дату
+                if not employment:
+                    raise ValidationError(
+                        _('It is not possible to create days on the selected dates. '
+                        'Please check whether the employee has active employment.')
+                    )
             wd = WorkerDay.objects.create(
                 dt=date,
                 shop_id=shop_id,
@@ -299,13 +320,54 @@ def create_worker_days_range(dates, type=WorkerDay.TYPE_WORKDAY, shop_id=None, e
                 created_by=created_by,
                 last_edited_by=created_by,
             )
-            if outsources:
-                wd.outsources.add(*outsources)
-            if work_type_id:
-                WorkerDayCashboxDetails.objects.create(
-                    worker_day=wd,
-                    work_type_id=work_type_id,
-                )
+            if type == WorkerDay.TYPE_WORKDAY:
+                if outsources and is_vacancy:
+                    wd.outsources.add(*outsources)
+                for detail in cashbox_details:
+                    WorkerDayCashboxDetails.objects.create(
+                        worker_day=wd,
+                        work_type_id=detail['work_type_id'],
+                        work_part=detail['work_part'],
+                    )
             created_wds.append(wd)
 
         return created_wds
+
+def check_worker_day_permissions(user, shop_id, action, graph_type, wd_types, dt_from, dt_to, error_messages):
+    wd_perms = GroupWorkerDayPermission.objects.filter(
+        group__in=user.get_group_ids(Shop.objects.get(id=shop_id) if shop_id else None),
+        worker_day_permission__action=action,
+        worker_day_permission__graph_type=graph_type,
+    ).select_related('worker_day_permission').values_list(
+        'worker_day_permission__wd_type', 'limit_days_in_past', 'limit_days_in_future',
+    ).distinct()
+    wd_perms_dict = {wdp[0]: wdp for wdp in wd_perms}
+
+    today = (datetime.datetime.now() + datetime.timedelta(hours=3)).date()
+    for wd_type in wd_types:
+        wdp = wd_perms_dict.get(wd_type)
+        wd_type_display_str = dict(WorkerDay.TYPES)[wd_type]
+        if wdp is None:
+            raise PermissionDenied(
+                error_messages['no_perm_to_approve_wd_types'].format(wd_type_str=wd_type_display_str))
+
+        limit_days_in_past = wdp[1]
+        limit_days_in_future = wdp[2]
+        date_limit_in_past = None
+        date_limit_in_future = None
+        if limit_days_in_past is not None:
+            date_limit_in_past = today - datetime.timedelta(days=limit_days_in_past)
+        if limit_days_in_future is not None:
+            date_limit_in_future = today + datetime.timedelta(days=limit_days_in_future)
+        if date_limit_in_past or date_limit_in_future:
+            if (date_limit_in_past and dt_from < date_limit_in_past) or \
+                    (date_limit_in_future and dt_to > date_limit_in_future):
+                dt_interval = f'с {Converter.convert_date(date_limit_in_past) or "..."} ' \
+                                f'по {Converter.convert_date(date_limit_in_future) or "..."}'
+                raise PermissionDenied(
+                    error_messages['approve_days_interval_restriction'].format(
+                        wd_type_str=wd_type_display_str,
+                        dt_interval=dt_interval,
+                    )
+                )
+    return wd_perms

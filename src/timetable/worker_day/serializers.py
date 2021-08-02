@@ -390,7 +390,7 @@ class ChangeListSerializer(serializers.Serializer):
     type = serializers.CharField()
     tm_work_start = serializers.TimeField(required=False)
     tm_work_end = serializers.TimeField(required=False)
-    work_type_id = serializers.IntegerField(required=False)
+    cashbox_details = WorkerDayCashboxDetailsSerializer(many=True, required=False)
     is_vacancy = serializers.BooleanField(default=False)
     dt_from = serializers.DateField()
     dt_to = serializers.DateField()
@@ -422,11 +422,12 @@ class ChangeListSerializer(serializers.Serializer):
                 self.tm_work_end.fail('required')
             if not self.validated_data.get('shop_id'):
                 self.shop_id.fail('required')
-            if not self.validated_data.get('work_type_id'):
-                self.work_type_id.fail('required')
+            if not self.validated_data.get('cashbox_details'):
+                self.cashbox_details.fail('required')
         else:
             if not self.validated_data.get('employee_id'):
                 self.employee_id.fail('required')
+            self.validated_data['cashbox_details'] = []
         if self.validated_data['dt_from'] > self.validated_data['dt_to']:
             self.fail('check_dates')
         self.validated_data['dates'] = self._generate_dates(
