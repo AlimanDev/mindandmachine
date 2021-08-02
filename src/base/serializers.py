@@ -47,6 +47,7 @@ class NetworkSerializer(serializers.ModelSerializer):
     logo = serializers.SerializerMethodField('get_logo_url')
     default_stats = serializers.SerializerMethodField()
     show_tabel_graph = serializers.SerializerMethodField()
+    unaccounted_overtime_threshold = serializers.SerializerMethodField()
 
     def get_default_stats(self, obj: Network):
         default_stats = json.loads(obj.settings_values).get('default_stats', {})
@@ -61,6 +62,9 @@ class NetworkSerializer(serializers.ModelSerializer):
 
     def get_show_tabel_graph(self, obj:Network):
         return obj.settings_values_prop.get('show_tabel_graph', True)
+
+    def get_unaccounted_overtime_threshold(self, obj:Network):
+        return obj.settings_values_prop.get('unaccounted_overtime_threshold', 60)
 
     def get_logo_url(self, obj) -> str:
         if obj.logo:
@@ -85,6 +89,7 @@ class NetworkSerializer(serializers.ModelSerializer):
             'show_tabel_graph',
             'show_worker_day_tasks',
             'show_user_biometrics_block',
+            'unaccounted_overtime_threshold',
         ]
 
 
@@ -144,7 +149,7 @@ class UserSerializer(BaseNetworkSerializer):
     class Meta:
         model = User
         fields = ['id', 'first_name', 'last_name', 'middle_name', 'network_id',
-                  'birthday', 'sex', 'avatar', 'email', 'phone_number', 'username', 'auth_type']
+                  'birthday', 'sex', 'avatar', 'email', 'phone_number', 'username', 'auth_type', 'ldap_login']
 
     def validate(self, attrs):
         email = attrs.get('email')
@@ -154,6 +159,10 @@ class UserSerializer(BaseNetworkSerializer):
             except DjangoValidationError:
                 # TODO: добавить запись в лог?
                 attrs['email'] = ''
+
+        auth_type = attrs.get('auth_type')
+        if auth_type == User.LDAP_AUTH and not attrs.get('ldap_login'):
+            raise serializers.ValidationError('ldap_login should be specified for ldap auth_type.')
 
         return attrs
 

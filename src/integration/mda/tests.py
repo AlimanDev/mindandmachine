@@ -298,6 +298,19 @@ class TestMdaIntegration(TestsHelperMixin, TestCase):
 
     @mock.patch('src.integration.mda.integration.logger')
     @mock.patch('src.integration.mda.integration.requests.post')
+    def test_orgstruct_logger_not_called_when_there_are_no_errors(self, _post, _logger):
+        errors_dict = {
+            'divisionErrors': [],
+            'regionErrors': [],
+            'shopErrors': [],
+        }
+        _post.return_value = MockResponse(json_data=errors_dict, status_code=200)
+        mda_integration_helper = MdaIntegrationHelper()
+        mda_integration_helper.sync_orgstruct()
+        _logger.error.assert_not_called()
+
+    @mock.patch('src.integration.mda.integration.logger')
+    @mock.patch('src.integration.mda.integration.requests.post')
     def test_users_errors(self, _post, _logger):
         errors_dict = {
             'userErrors': ['user1', 'user2']

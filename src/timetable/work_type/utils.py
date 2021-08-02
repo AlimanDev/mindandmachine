@@ -28,13 +28,14 @@ class ShopEfficiencyGetterError(ValidationError):
 
 class ShopEfficiencyGetter:
     def __init__(self, shop_id, from_dt, to_dt, graph_type='plan_approved', work_type_ids: list = None,
-                 consider_vacancies=False, efficiency=True, indicators=False, **kwargs):
+                 consider_vacancies=False, efficiency=True, indicators=False, consider_canceled=False, **kwargs):
         self.shop_id = shop_id
         self.dt_from = from_dt
         self.dt_to = to_dt + datetime.timedelta(days=1)  # To include last day in "x < to_dt" conds
         self.graph_type = graph_type
         self.work_type_ids = work_type_ids
         self.consider_vacancies = consider_vacancies  # для обратной совместимости
+        self.consider_canceled = consider_canceled  # учитывать отмененные вакансии для автоматической биржи смен
         self.efficiency = efficiency
         self.indicators = indicators
         self.lambda_index_periodclients = lambda x: [self._dttm2index(self.dt_from, x.dttm_forecast)]
@@ -125,12 +126,14 @@ class ShopEfficiencyGetter:
             Q(employment__dt_hired__lte=self.dt_to) &
             Q(dt__gte=F('employment__dt_hired')) |
             Q(employment__dt_hired__isnull=True),
-            canceled=False,
             dt__gte=self.dt_from,
             dt__lte=self.dt_to,
         )
         if not consider_vacancies:
             base_wd_q &= Q(employee__isnull=False)
+
+        if not self.consider_canceled:
+            base_wd_q &= Q(canceled=False)
 
         qs = WorkerDay.objects.filter(base_wd_q)
 
