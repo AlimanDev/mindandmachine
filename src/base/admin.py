@@ -87,7 +87,7 @@ class NetworkAdmin(admin.ModelAdmin):
         (_('Format settings'), {'fields': ('download_tabel_template', 'convert_tabel_to', 'timetable_format')}),
         (_('Timetable settings'), {'fields': ('show_worker_day_additional_info', 'show_worker_day_tasks', 'copy_plan_to_fact_crossing')}),
         (_('Integration settings'), {'fields': ('descrease_employment_dt_fired_in_api', 'ignore_parent_code_when_updating_department_via_api', 'create_employment_on_set_or_update_director_code',)}),
-        (_('Default settings'), {'fields': ('breaks', 'load_template', 'worker_position_default_values')}),
+        (_('Default settings'), {'fields': ('breaks', 'load_template', 'exchange_settings', 'worker_position_default_values')}),
         (_('Other'), {'fields': (
             'settings_values',
             'show_user_biometrics_block',
