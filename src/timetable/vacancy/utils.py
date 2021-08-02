@@ -738,6 +738,7 @@ def create_vacancies_and_notify(shop_id, work_type_id, dt_from=None, dt_to=None)
     shop_stat = ShopEfficiencyGetter(
         shop_id=shop_id,
         consider_vacancies=True,
+        consider_canceled=True,
         **params,
     ).get()
     df_stat = pandas.DataFrame(shop_stat['lack_of_cashiers_on_period'])
