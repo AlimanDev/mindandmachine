@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, time
+from datetime import timedelta
 
 from rest_framework import status
 from rest_framework.test import APITestCase
@@ -11,9 +11,8 @@ from src.forecast.models import (
     LoadTemplate, 
     OperationTypeTemplate, 
     OperationTypeRelation,
-    PeriodClients,
 )
-from src.timetable.models import WorkTypeName, WorkType
+from src.timetable.models import WorkTypeName
 
 
 class TestOperationTypeRelation(APITestCase):
@@ -134,7 +133,10 @@ class TestOperationTypeRelation(APITestCase):
                 'const_value': None,
             }, 
             'formula': 'a * 2',
-            'type': 'F'
+            'type': 'F',
+            'max_value': None,
+            'threshold': None,
+            'days_of_week': [0, 1, 2, 3, 4, 5, 6]
         }
         self.assertEqual(response.json(), data)
 
@@ -191,7 +193,73 @@ class TestOperationTypeRelation(APITestCase):
                 'const_value': None,
             }, 
             'formula': 'a + a * 2',
-            'type': 'F'
+            'type': 'F',
+            'max_value': None,
+            'threshold': None,
+            'days_of_week': [0, 1, 2, 3, 4, 5, 6]
+        }
+        self.assertEqual(operation_type_relataion, data)
+
+    def test_create_change_workload_between(self):
+        load_template = LoadTemplate.objects.create(
+            name='TEST'
+        )
+        op_temp1 = OperationTypeTemplate.objects.create(
+            load_template=load_template,
+            operation_type_name=self.operation_type_name1,
+        )
+        op_temp2 = OperationTypeTemplate.objects.create(
+            load_template=load_template,
+            operation_type_name=self.operation_type_name2,
+        )
+        data = {
+            'base_id': op_temp1.id,
+            'depended_id': op_temp2.id,
+            'type': OperationTypeRelation.TYPE_CHANGE_WORKLOAD_BETWEEN,
+            'max_value': 1.0,
+            'threshold': 0.3,
+            'days_of_week': [1, 2, 3],
+        }
+        response = self.client.post(self.url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        operation_type_relataion = response.json()
+        data = {
+            'id': operation_type_relataion['id'], 
+            'base': {
+                'id': op_temp1.id, 
+                'load_template_id': load_template.id, 
+                'operation_type_name': {
+                    'id': self.operation_type_name1.id, 
+                    'name': 'Кассы', 
+                    'code': None,
+                    'work_type_name_id': self.work_type_name1.id, 
+                    'do_forecast': self.operation_type_name1.do_forecast, 
+                },
+                'tm_from': None,
+                'tm_to': None,
+                'forecast_step': '01:00:00',
+                'const_value': None,
+            }, 
+            'depended': {
+                'id': op_temp2.id, 
+                'load_template_id': load_template.id, 
+                'operation_type_name': {
+                    'id': self.operation_type_name2.id, 
+                    'name': 'Строительные работы', 
+                    'code': None,
+                    'work_type_name_id': None, 
+                    'do_forecast': self.operation_type_name2.do_forecast, 
+                },
+                'tm_from': None,
+                'tm_to': None,
+                'forecast_step': '01:00:00',
+                'const_value': None,
+            }, 
+            'formula': None,
+            'type': 'C',
+            'max_value': 1.0,
+            'threshold': 0.3,
+            'days_of_week': [1, 2, 3]
         }
         self.assertEqual(operation_type_relataion, data)
 

@@ -1,6 +1,8 @@
 from dateutil.relativedelta import relativedelta
 from django.db import models
 from django.db.models.aggregates import Max, Min
+from django.utils.functional import cached_property
+import json
 
 from src.base import models_utils
 import datetime
@@ -139,8 +141,8 @@ class OperationTypeRelation(AbstractModel):
         (TYPE_CHANGE_WORKLOAD_BETWEEN, 'Перекидывание нагрузки между типами работ'),
     ]
 
-    depended = models.ForeignKey(OperationTypeTemplate, on_delete=models.CASCADE, related_name='bases') # parent
     base = models.ForeignKey(OperationTypeTemplate, on_delete=models.CASCADE, related_name='depends') # child
+    depended = models.ForeignKey(OperationTypeTemplate, on_delete=models.CASCADE, related_name='bases') # parent
     formula = models.CharField(max_length=1024, null=True, blank=True)
     type = models.CharField(max_length=1, default=TYPE_FORMULA)
     max_value = models.FloatField(null=True, blank=True)
@@ -157,6 +159,13 @@ class OperationTypeRelation(AbstractModel):
         else:
             text += f' max_value: {self.max_value}, threshold: {self.threshold}, days_of_week: {self.days_of_week}'
         return text
+
+    @cached_property
+    def days_of_week_list(self):
+        data = self.days_of_week
+        if isinstance(data, str):
+            data = json.loads(data or '[]')
+        return data or []
 
 
 class OperationTemplate(AbstractActiveNetworkSpecificCodeNamedModel):
