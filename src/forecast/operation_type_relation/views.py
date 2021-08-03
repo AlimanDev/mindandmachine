@@ -31,15 +31,16 @@ class OperationTypeRelationSerializer(serializers.ModelSerializer):
         "bad_steps":_("Depended must have same or bigger forecast step, got {} -> {}"),
     }
 
-    formula = serializers.CharField()
+    formula = serializers.CharField(required=False)
     depended = OperationTypeTemplateSerializer(read_only=True)
     base = OperationTypeTemplateSerializer(read_only=True)
     depended_id = serializers.IntegerField(write_only=True)
     base_id = serializers.IntegerField(write_only=True)
+    days_of_week = serializers.ListField(required=False, allow_null=True, allow_empty=True, child=serializers.IntegerField())
 
     class Meta:
         model = OperationTypeRelation
-        fields = ['id', 'base', 'depended', 'formula', 'depended_id', 'base_id', 'type']
+        fields = ['id', 'base', 'depended', 'formula', 'depended_id', 'base_id', 'type', 'max_value', 'threshold', 'days_of_week']
         validators = [
             UniqueTogetherValidator(
                 queryset=OperationTypeRelation.objects.all(),
@@ -55,10 +56,17 @@ class OperationTypeRelationSerializer(serializers.ModelSerializer):
         lambda_check = r'^(if|else|\+|-|\*|/|\s|a|[0-9]|=|>|<|\.)*'
         if self.validated_data.get('type', 'F') == OperationTypeRelation.TYPE_PREDICTION:
             self.validated_data['formula'] = 'a'
-        if not re.fullmatch(lambda_check, self.validated_data['formula']):
+        if self.validated_data.get('type', 'F') == OperationTypeRelation.TYPE_FORMULA and not re.fullmatch(lambda_check, self.validated_data.get('formula', '')):
             raise FieldError(self.error_messages["error_in_formula"].format(formula=self.validated_data['formula']), 'formula')
 
-        # self.validated_data['formula'] = "lambda a: " + self.validated_data['formula']
+        if self.validated_data.get('type', 'F') == OperationTypeRelation.TYPE_CHANGE_WORKLOAD_BETWEEN:
+            self.validated_data['formula'] = None
+            if not self.validated_data.get('max_value'):
+                raise FieldError(self.error_messages['required'], 'max_value')
+            if not self.validated_data.get('threshold'):
+                raise FieldError(self.error_messages['required'], 'threshold')
+            
+
         if self.validated_data['depended_id'] == self.validated_data['base_id']:
             raise FieldError(self.error_messages["depended_base_same"])
 
