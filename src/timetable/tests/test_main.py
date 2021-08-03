@@ -3608,17 +3608,17 @@ class TestAditionalFunctions(TestsHelperMixin, APITestCase):
         # no tm_start
         response = self.client.post(url, data, format='json')
         self.assertEquals(response.status_code, 400)
-        self.assertEquals(response.json(), {'tm_work_start': ['Это поле обязательно.']})
+        self.assertEquals(response.json(), {'tm_work_start': 'Это поле обязательно.'})
         data['tm_work_start'] = '10:00:00'
         # no tm_end
         response = self.client.post(url, data, format='json')
         self.assertEquals(response.status_code, 400)
-        self.assertEquals(response.json(), {'tm_work_end': ['Это поле обязательно.']})
+        self.assertEquals(response.json(), {'tm_work_end': 'Это поле обязательно.'})
         data['tm_work_end'] = '20:00:00'
         # no cashbox_details
         response = self.client.post(url, data, format='json')
         self.assertEquals(response.status_code, 400)
-        self.assertEquals(response.json(), {'cashbox_details': ['Это поле обязательно.']})
+        self.assertEquals(response.json(), {'cashbox_details': 'Это поле обязательно.'})
         data['cashbox_details'] = [
             {
                 'work_type_id': self.work_type.id,
@@ -3628,11 +3628,11 @@ class TestAditionalFunctions(TestsHelperMixin, APITestCase):
         # no employee_id
         response = self.client.post(url, data, format='json')
         self.assertEquals(response.status_code, 400)
-        self.assertEquals(response.json(), {'employee_id': ['Это поле обязательно.']})
+        self.assertEquals(response.json(), {'employee_id': 'Это поле обязательно.'})
         data['type'] = WorkerDay.TYPE_VACATION
         response = self.client.post(url, data, format='json')
         self.assertEquals(response.status_code, 400)
-        self.assertEquals(response.json(), {'employee_id': ['Это поле обязательно.']})
+        self.assertEquals(response.json(), {'employee_id': 'Это поле обязательно.'})
 
     def test_recalc(self):
         today = date.today()

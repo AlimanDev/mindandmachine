@@ -1,4 +1,5 @@
 from datetime import timedelta
+from src.base.exceptions import FieldError
 import pandas as pd
 
 from django.db import transaction
@@ -442,18 +443,18 @@ class ChangeListSerializer(serializers.Serializer):
             self.validated_data['outsources'] = []
         if WorkerDay.is_type_with_tm_range(self.validated_data['type']):
             if not self.validated_data.get('tm_work_start'):
-                raise ValidationError(detail={'tm_work_start': [self.error_messages['required']]})
+                raise FieldError(self.error_messages['required'], 'tm_work_start')
             if not self.validated_data.get('tm_work_end'):
-                raise ValidationError(detail={'tm_work_end': [self.error_messages['required']]})
+                raise FieldError(self.error_messages['required'], 'tm_work_end')
             if not self.validated_data.get('shop_id'):
-                raise ValidationError(detail={'shop_id': [self.error_messages['required']]})
+                raise FieldError(self.error_messages['required'], 'shop_id')
             if not self.validated_data.get('cashbox_details'):
-                raise ValidationError(detail={'cashbox_details': [self.error_messages['required']]})
+                raise FieldError(self.error_messages['required'], 'cashbox_details')
             if not self.validated_data.get('is_vacancy') and not self.validated_data.get('employee_id'):
-                raise ValidationError(detail={'employee_id': [self.error_messages['required']]})
+                raise FieldError(self.error_messages['required'], 'employee_id')
         else:
             if not self.validated_data.get('employee_id'):
-                raise ValidationError(detail={'employee_id': [self.error_messages['required']]})
+                raise FieldError(self.error_messages['required'], 'employee_id')
             self.validated_data['cashbox_details'] = []
         if self.validated_data['dt_from'] > self.validated_data['dt_to']:
             self.fail('check_dates')
