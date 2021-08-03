@@ -29,6 +29,7 @@ class OperationTypeRelationSerializer(serializers.ModelSerializer):
         "base_not_formula": _("Base model not formula."),
         "const_cant_be_base": _("Constant operation can\'t be base."),
         "bad_steps":_("Depended must have same or bigger forecast step, got {} -> {}"),
+        "bad_day_of_week": _("Bad day of week, possible values: 0, 1, 2, 3, 4, 5, 6")
     }
 
     formula = serializers.CharField(required=False)
@@ -36,7 +37,7 @@ class OperationTypeRelationSerializer(serializers.ModelSerializer):
     base = OperationTypeTemplateSerializer(read_only=True)
     depended_id = serializers.IntegerField(write_only=True)
     base_id = serializers.IntegerField(write_only=True)
-    days_of_week = serializers.ListField(required=False, allow_null=True, allow_empty=True, child=serializers.IntegerField())
+    days_of_week = serializers.ListField(required=False, allow_null=True, allow_empty=True, child=serializers.IntegerField(), write_only=True)
 
     class Meta:
         model = OperationTypeRelation
@@ -65,7 +66,13 @@ class OperationTypeRelationSerializer(serializers.ModelSerializer):
                 raise FieldError(self.error_messages['required'], 'max_value')
             if not self.validated_data.get('threshold'):
                 raise FieldError(self.error_messages['required'], 'threshold')
-            
+            if not self.validated_data.get('days_of_week'):
+                raise FieldError(self.error_messages['required'], 'days_of_week')
+
+            days_of_week = self.validated_data.get('days_of_week', [])
+            if any([7 in days_of_week, 8 in days_of_week, 9 in days_of_week]):
+                raise FieldError(self.error_messages['bad_day_of_week'], 'days_of_week')
+            self.validated_data['days_of_week'] = list(set(days_of_week))
 
         if self.validated_data['depended_id'] == self.validated_data['base_id']:
             raise FieldError(self.error_messages["depended_base_same"])
@@ -108,6 +115,11 @@ class OperationTypeRelationSerializer(serializers.ModelSerializer):
                     raise FieldError(self.error_messages["cycle_relation"],'base')
                 else:
                     self.check_relations(base_id, relation['depended'].id)
+
+    def to_representation(self, instance: OperationTypeRelation):
+        data = super().to_representation(instance)
+        data['days_of_week'] = instance.days_of_week_list
+        return data
 
 
 class OperationTypeRelationFilter(FilterSet):
