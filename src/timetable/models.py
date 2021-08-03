@@ -10,6 +10,7 @@ from django.db import transaction
 from django.db.models import (
     Subquery, OuterRef, Max, Q, Case, When, Value, FloatField, F, IntegerField, Exists
 )
+from django.db.models import UniqueConstraint
 from django.db.models.functions import Abs, Cast, Extract, Least
 from django.db.models.query import QuerySet
 from django.utils import timezone
@@ -393,8 +394,12 @@ class WorkerDay(AbstractModel):
     class Meta:
         verbose_name = 'Рабочий день сотрудника'
         verbose_name_plural = 'Рабочие дни сотрудников'
-        unique_together = (
-            ('dt', 'employee', 'is_fact', 'is_approved'),
+        constraints = (
+            UniqueConstraint(
+                fields=['dt', 'employee', 'is_fact', 'is_approved'],
+                condition=~Q(type__in=['W', 'Q', 'T']),
+                name='unique_dt_employee_is_fact_is_approved_if_not_workday'
+            ),
         )
 
     TYPE_HOLIDAY = 'H'
@@ -706,6 +711,9 @@ class WorkerDay(AbstractModel):
         verbose_name='Защищенный день',
         help_text='Доступен для изменения/подтверждения только определенным группам доступа (настраивается)',
     )
+    closest_plan_approved = models.ForeignKey(
+        'self', null=True, blank=True, on_delete=models.CASCADE,
+        help_text='Используется в факте подтвержденном (созданном на основе отметок) для связи с планом подтвержденным')
 
     objects = WorkerDayManager.from_queryset(WorkerDayQuerySet)()  # исключает раб. дни у которых employment_id is null
     objects_with_excluded = models.Manager.from_queryset(WorkerDayQuerySet)()
@@ -1448,7 +1456,7 @@ class AttendanceRecords(AbstractModel):
                 raise ValidationError(_('You have no active employment'))
             dt = closest_plan_approved.dt
 
-        return employee_id, employment, dt, record_type, closest_plan_approved is not None
+        return employee_id, employment, dt, record_type, closest_plan_approved
 
     def _create_wd_details(self, dt, fact_approved, active_user_empl):
         plan_approved = WorkerDay.objects.filter(
@@ -1501,6 +1509,7 @@ class AttendanceRecords(AbstractModel):
                 employee_id=fact_approved.employee_id,
                 is_fact=fact_approved.is_fact,
                 is_approved=False,
+                closest_plan_approved=fact_approved.closest_plan_approved,
             )
         except WorkerDay.DoesNotExist:
             not_approved = WorkerDay.objects.create(
@@ -1515,6 +1524,7 @@ class AttendanceRecords(AbstractModel):
                 type=fact_approved.type,
                 is_vacancy=fact_approved.is_vacancy,
                 is_outsource=fact_approved.is_outsource,
+                closest_plan_approved=fact_approved.closest_plan_approved,
             )
             WorkerDayCashboxDetails.objects.bulk_create(
                 [
@@ -1548,11 +1558,8 @@ class AttendanceRecords(AbstractModel):
     def save(self, *args, **kwargs):
         """
         Создание WorkerDay при занесении отметок.
-
-        При создании отметки время о приходе или уходе заносится в фактический подтвержденный график WorkerDay.
-        Если подтвержденного факта нет - создаем новый подтвержденный факт.
         """
-        employee_id, active_user_empl, dt, record_type, plan_exists = self.get_day_data(
+        employee_id, active_user_empl, dt, record_type, closest_plan_approved = self.get_day_data(
             self.dttm, self.user, self.shop, self.type)
         self.dt = self.dt or dt
         self.type = self.type or record_type
@@ -1563,7 +1570,11 @@ class AttendanceRecords(AbstractModel):
             return res
 
         with transaction.atomic():
+            closest_plan_approved_q = Q(closest_plan_approved=closest_plan_approved)
+            if self.type == self.TYPE_LEAVING:
+                closest_plan_approved_q |= Q(dttm_work_start__isnull=False, dttm_work_end__isnull=True)
             fact_approved = WorkerDay.objects.filter(
+                closest_plan_approved_q,
                 dt=self.dt,
                 employee_id=self.employee_id,
                 is_fact=True,
@@ -1587,6 +1598,7 @@ class AttendanceRecords(AbstractModel):
             else:
                 if self.type == self.TYPE_LEAVING:
                     prev_fa_wd = WorkerDay.objects.filter(
+                        closest_plan_approved_q,
                         shop_id=self.shop_id,
                         employee_id=self.employee_id,
                         dt__lt=self.dt,
@@ -1594,7 +1606,7 @@ class AttendanceRecords(AbstractModel):
                         is_approved=True,
                     ).order_by('dt').last()
 
-                    # Если предыдущая смена не закрыта.
+                    # Если предыдущая смена начата.
                     if prev_fa_wd and prev_fa_wd.dttm_work_start:
                         close_prev_work_shift_cond = (
                             self.dttm - prev_fa_wd.dttm_work_start).total_seconds() < settings.MAX_WORK_SHIFT_SECONDS
@@ -1617,6 +1629,7 @@ class AttendanceRecords(AbstractModel):
                     employee_id=self.employee_id,
                     is_fact=True,
                     is_approved=True,
+                    closest_plan_approved=closest_plan_approved,
                     defaults={
                         'shop_id': self.shop_id,
                         'employment': active_user_empl,
@@ -1628,7 +1641,7 @@ class AttendanceRecords(AbstractModel):
                 if _wd_created or not fact_approved.worker_day_details.exists():
                     self._create_wd_details(self.dt, fact_approved, active_user_empl)
                 if _wd_created:
-                    if not plan_exists:
+                    if not closest_plan_approved:
                         transaction.on_commit(lambda: event_signal.send(
                             sender=None,
                             network_id=self.user.network_id,

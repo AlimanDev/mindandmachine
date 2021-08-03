@@ -1719,6 +1719,7 @@ class TestAttendanceRecords(TestsHelperMixin, APITestCase):
             dttm_work_end=datetime.combine(self.dt, time(20, 2, 1)),
             is_approved=True,
             parent_worker_day=self.worker_day_plan_approved,
+            closest_plan_approved=self.worker_day_plan_approved,
         )
         self.worker_day_fact_not_approved = WorkerDayFactory(
             shop=self.shop,
@@ -1729,7 +1730,8 @@ class TestAttendanceRecords(TestsHelperMixin, APITestCase):
             type=WorkerDay.TYPE_WORKDAY,
             dttm_work_start=datetime.combine(self.dt, time(7, 58, 0)),
             dttm_work_end=datetime.combine(self.dt, time(19, 59, 1)),
-            parent_worker_day=self.worker_day_fact_approved
+            parent_worker_day=self.worker_day_fact_approved,
+            closest_plan_approved=self.worker_day_plan_approved,
         )
 
     def test_attendancerecords_update(self):
@@ -2146,17 +2148,19 @@ class TestAttendanceRecords(TestsHelperMixin, APITestCase):
         self.assertEqual(wd.dttm_work_end, datetime.combine(self.dt + timedelta(1), time(1, 54)))
 
     def test_create_second_record_for_prev_day_when_prev_fact_closed(self):
-        self.worker_day_fact_approved.dttm_work_start = datetime.combine(self.dt - timedelta(1), time(18, 34))
-        self.worker_day_fact_approved.dttm_work_end = datetime.combine(self.dt, time(1, 2))
+        self.worker_day_fact_approved.dt = self.dt
+        self.worker_day_fact_approved.dttm_work_start = datetime.combine(self.dt, time(18, 34))
+        self.worker_day_fact_approved.dttm_work_end = datetime.combine(self.dt + timedelta(1), time(1, 2))
         self.worker_day_fact_approved.save()
         AttendanceRecords.objects.create(
             shop_id=self.worker_day_fact_approved.shop_id,
             user_id=self.worker_day_fact_approved.employee.user_id,
-            dttm=datetime.combine(self.dt, time(1, 5)),
+            dttm=datetime.combine(self.dt + timedelta(1), time(1, 5)),
             type=AttendanceRecords.TYPE_LEAVING,
         )
         self.assertEqual(WorkerDay.objects.filter(is_fact=True, is_approved=True).count(), 1)
-        self.assertEqual(WorkerDay.objects.filter(is_fact=True, is_approved=True).first().dttm_work_end, datetime.combine(self.dt, time(1, 5)))
+        self.assertEqual(WorkerDay.objects.filter(is_fact=True, is_approved=True).first().dttm_work_end,
+                         datetime.combine(self.dt + timedelta(1), time(1, 5)))
 
     def test_create_att_record_and_update_not_approved(self):
         AttendanceRecords.objects.create(
@@ -2311,6 +2315,90 @@ class TestAttendanceRecords(TestsHelperMixin, APITestCase):
         self.assertEqual(total, 11.4)
         self.assertEqual(day, 11.4)
         self.assertEqual(night, 0.0)
+
+    def test_two_facts_created_when_there_are_two_plans(self):
+        self.worker_day_fact_approved.delete()
+        self.worker_day_fact_not_approved.delete()
+        WorkerDayFactory(
+            dt=self.dt,
+            employee_id=self.employment2.employee_id,
+            employment=self.employment2,
+            is_approved=True,
+            is_fact=False,
+            type=WorkerDay.TYPE_WORKDAY,
+            shop=self.shop,
+            dttm_work_start=datetime.combine(self.dt, time(10)),
+            dttm_work_end=datetime.combine(self.dt, time(13)),
+        )
+        WorkerDayFactory(
+            dt=self.dt,
+            employee_id=self.employment2.employee_id,
+            employment=self.employment2,
+            is_approved=True,
+            is_fact=False,
+            type=WorkerDay.TYPE_WORKDAY,
+            shop=self.shop,
+            dttm_work_start=datetime.combine(self.dt, time(19)),
+            dttm_work_end=datetime.combine(self.dt, time(22)),
+        )
+
+        dttm_start1 = datetime.combine(self.dt, time(9, 54))
+        AttendanceRecords.objects.create(
+            shop=self.shop,
+            user=self.user2,
+            dttm=dttm_start1,
+            type=AttendanceRecords.TYPE_COMING,
+        )
+        dttm_end1 = datetime.combine(self.dt, time(13, 2))
+        AttendanceRecords.objects.create(
+            shop=self.shop,
+            user=self.user2,
+            dttm=dttm_end1,
+            type=AttendanceRecords.TYPE_LEAVING,
+        )
+        self.assertTrue(WorkerDay.objects.filter(
+            employee_id=self.employment2.employee_id,
+            dt=self.dt,
+            dttm_work_start=dttm_start1,
+            dttm_work_end=dttm_end1,
+            is_fact=True,
+            is_approved=True,
+        ).exists())
+
+        dttm_start2 = datetime.combine(self.dt, time(18, 56))
+        AttendanceRecords.objects.create(
+            shop=self.shop,
+            user=self.user2,
+            dttm=dttm_start2,
+            type=AttendanceRecords.TYPE_COMING,
+        )
+        dttm_end2 = datetime.combine(self.dt, time(22, 6))
+        AttendanceRecords.objects.create(
+            shop=self.shop,
+            user=self.user2,
+            dttm=dttm_end2,
+            type=AttendanceRecords.TYPE_LEAVING,
+        )
+        self.assertTrue(WorkerDay.objects.filter(
+            employee_id=self.employment2.employee_id,
+            dt=self.dt,
+            dttm_work_start=dttm_start2,
+            dttm_work_end=dttm_end2,
+            is_fact=True,
+            is_approved=True,
+        ).exists())
+        self.assertEqual(WorkerDay.objects.filter(
+            employee_id=self.employment2.employee_id,
+            dt=self.dt,
+            is_fact=True,
+            is_approved=True,
+        ).count(), 2)
+        self.assertEqual(WorkerDay.objects.filter(
+            employee_id=self.employment2.employee_id,
+            dt=self.dt,
+            is_fact=True,
+            is_approved=False,
+        ).count(), 2)
 
 
 class TestVacancy(TestsHelperMixin, APITestCase):

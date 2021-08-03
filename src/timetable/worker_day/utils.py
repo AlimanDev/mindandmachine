@@ -261,6 +261,7 @@ def create_fact_from_attendance_records(dt_from, dt_to, shop_ids=None):
             'is_fact': True,
             'shop_id__in': attrs.values_list('shop_id', flat=True),
             'created_by__isnull': True,
+            # TODO: 'last_edited_by__isnull': True + тест
         }
         # удаляем весь факт не созданный вручную
         WorkerDay.objects.filter(**wds_filter).delete()
