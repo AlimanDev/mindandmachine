@@ -1,11 +1,13 @@
 from datetime import timedelta
 
 from django.db import transaction
+from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError, NotFound
 
 from src.base.models import Employment, User, Shop, Employee, Network
+from src.base.models import NetworkConnect
 from src.base.serializers import UserShorSerializer, NetworkSerializer
 from src.base.shop.serializers import ShopSerializer
 from src.conf.djconfig import QOS_DATE_FORMAT
@@ -201,7 +203,12 @@ class WorkerDaySerializer(serializers.ModelSerializer, UnaccountedOvertimeMixin)
                 attrs['shop_id'] = shops[0].id
             else:
                 self.fail('no_shop', amount=len(shops), code=shop_code)
-        elif attrs.get('shop_id') and not Shop.objects.filter(id=attrs.get('shop_id'), network_id=self.context['request'].user.network_id).exists():
+        elif attrs.get('shop_id') and not Shop.objects.filter(
+                Q(network_id=self.context['request'].user.network_id) |
+                Q(network_id__in=NetworkConnect.objects.filter(
+                    outsourcing_id=self.context['request'].user.network_id).values_list('client_id', flat=True)),
+                id=attrs.get('shop_id'),
+        ).exists():
             self.fail('no_such_shop_in_network')
 
         if (attrs.get('employee_id') is None) and ('username' in attrs):
