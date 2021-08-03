@@ -3595,6 +3595,45 @@ class TestAditionalFunctions(TestsHelperMixin, APITestCase):
         self.assertEquals(WorkerDay.objects.filter(is_vacancy=True, shop_id=self.shop.id, is_outsource=False).count(), 10)
         self.assertEquals(WorkerDayCashboxDetails.objects.count(), 20)
 
+    def test_change_list_errors(self):
+        dt_from = date(2021, 1, 1)
+        dt_to = date(2021, 1, 2)
+        data = {
+            'shop_id': self.shop.id,
+            'type': WorkerDay.TYPE_WORKDAY,
+            'dt_from': dt_from,
+            'dt_to': dt_to,
+        }
+        url = f'{self.url}change_list/'
+        # no tm_start
+        response = self.client.post(url, data, format='json')
+        self.assertEquals(response.status_code, 400)
+        self.assertEquals(response.json(), {'tm_work_start': ['Это поле обязательно.']})
+        data['tm_work_start'] = '10:00:00'
+        # no tm_end
+        response = self.client.post(url, data, format='json')
+        self.assertEquals(response.status_code, 400)
+        self.assertEquals(response.json(), {'tm_work_end': ['Это поле обязательно.']})
+        data['tm_work_end'] = '20:00:00'
+        # no cashbox_details
+        response = self.client.post(url, data, format='json')
+        self.assertEquals(response.status_code, 400)
+        self.assertEquals(response.json(), {'cashbox_details': ['Это поле обязательно.']})
+        data['cashbox_details'] = [
+            {
+                'work_type_id': self.work_type.id,
+                'work_part': 1,
+            }
+        ]
+        # no employee_id
+        response = self.client.post(url, data, format='json')
+        self.assertEquals(response.status_code, 400)
+        self.assertEquals(response.json(), {'employee_id': ['Это поле обязательно.']})
+        data['type'] = WorkerDay.TYPE_VACATION
+        response = self.client.post(url, data, format='json')
+        self.assertEquals(response.status_code, 400)
+        self.assertEquals(response.json(), {'employee_id': ['Это поле обязательно.']})
+
     def test_recalc(self):
         today = date.today()
         wd = WorkerDayFactory(

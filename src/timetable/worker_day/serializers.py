@@ -437,21 +437,23 @@ class ChangeListSerializer(serializers.Serializer):
             self.validated_data['employee_id'] = None
             self.validated_data['outsources'] = Network.objects.filter(id__in=self.validated_data.get('outsources', []))
         else:
-            if not self.validated_data['type'] in WorkerDay.TYPES_WITH_TM_RANGE:
+            if not WorkerDay.is_type_with_tm_range(self.validated_data['type']):
                 self.validated_data['shop_id'] = None 
             self.validated_data['outsources'] = []
         if WorkerDay.is_type_with_tm_range(self.validated_data['type']):
             if not self.validated_data.get('tm_work_start'):
-                self.tm_work_start.fail('required')
+                raise ValidationError(detail={'tm_work_start': [self.error_messages['required']]})
             if not self.validated_data.get('tm_work_end'):
-                self.tm_work_end.fail('required')
+                raise ValidationError(detail={'tm_work_end': [self.error_messages['required']]})
             if not self.validated_data.get('shop_id'):
-                self.shop_id.fail('required')
+                raise ValidationError(detail={'shop_id': [self.error_messages['required']]})
             if not self.validated_data.get('cashbox_details'):
-                self.cashbox_details.fail('required')
+                raise ValidationError(detail={'cashbox_details': [self.error_messages['required']]})
+            if not self.validated_data.get('is_vacancy') and not self.validated_data.get('employee_id'):
+                raise ValidationError(detail={'employee_id': [self.error_messages['required']]})
         else:
             if not self.validated_data.get('employee_id'):
-                self.employee_id.fail('required')
+                raise ValidationError(detail={'employee_id': [self.error_messages['required']]})
             self.validated_data['cashbox_details'] = []
         if self.validated_data['dt_from'] > self.validated_data['dt_to']:
             self.fail('check_dates')
