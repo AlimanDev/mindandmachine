@@ -276,8 +276,20 @@ class WorkerDaySerializer(serializers.ModelSerializer, UnaccountedOvertimeMixin)
                 wdays_qs = wdays_qs.exclude(id=instance.id)
             wdays_qs.delete()
 
+            outsourcing_network_qs = NetworkConnect.objects.filter(
+                client=self.context['request'].user.network_id,
+            ).values_list('outsourcing_id', flat=True)
             employee_active_empl = Employment.objects.get_active_empl_by_priority(
-                network_id=self.context['request'].user.network_id,
+                extra_q=Q(
+                    Q(
+                        employee__user__network_id=self.context['request'].user.network_id,
+                        shop__network_id=self.context['request'].user.network_id,
+                    ) |
+                    Q(
+                        employee__user__network_id__in=outsourcing_network_qs,
+                        shop__network_id__in=outsourcing_network_qs,
+                    )
+                ),
                 employee_id=employee_id,
                 dt=validated_data.get('dt'),
                 priority_shop_id=validated_data.get('shop_id'),
