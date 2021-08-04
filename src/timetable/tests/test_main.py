@@ -13,7 +13,19 @@ from django.utils.timezone import now
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from src.base.models import Break, FunctionGroup, Network, Employment, Region, ShopSchedule, Shop, Employee, User, WorkerPosition
+from src.base.models import (
+    Break,
+    FunctionGroup,
+    Network,
+    Employment,
+    Region,
+    ShopSchedule,
+    Shop,
+    Employee,
+    User,
+    WorkerPosition,
+    NetworkConnect,
+)
 from src.events.models import EventType
 from src.notifications.models.event_notification import EventEmailNotification
 from src.timetable.events import VACANCY_CONFIRMED_TYPE
@@ -1321,6 +1333,41 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
             resp.json()[0],
             'Невозможно создать рабочий день, так как пользователь в этот период не трудоустроен',
         )
+
+    def test_can_create_workday_for_user_from_outsourcing_network(self):
+        outsource_network = Network.objects.create(
+            name='outsource',
+            code='outsource',
+        )
+        NetworkConnect.objects.create(
+            client_id=self.user2.network_id,
+            outsourcing=outsource_network,
+        )
+        WorkerDay.objects_with_excluded.filter(employee=self.employee2).delete()
+        outsource_shop = Shop.objects.create(
+            network=outsource_network,
+            name='oursource_shop',
+            region=self.region,
+        )
+        User.objects.filter(id=self.user2.id).update(network=outsource_network)
+        Employment.objects.filter(employee__user=self.user2).update(shop=outsource_shop)
+        dt = self.dt - timedelta(days=60)
+        data = {
+            "shop_id": self.shop.id,
+            "employee_id": self.employee2.id,
+            "dt": dt,
+            "is_fact": False,
+            "is_approved": True,
+            "type": WorkerDay.TYPE_WORKDAY,
+            "dttm_work_start": datetime.combine(dt, time(10, 0, 0)),
+            "dttm_work_end": datetime.combine(dt, time(20, 0, 0)),
+            "worker_day_details": [{
+                "work_part": 1.0,
+                "work_type_id": self.work_type.id}
+            ]
+        }
+        resp = self.client.post(self.url, data, format='json')
+        self.assertEqual(resp.status_code, 201)
 
     def test_wd_created_as_vacancy_for_other_shop_and_employment_was_set(self):
         data = {
