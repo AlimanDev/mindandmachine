@@ -501,7 +501,7 @@ def prepare_load_template_request(load_template_id, shop_id, dt_from, dt_to):
             o_type['type'] = 'O'
     data['change_workload_between'] = [
         [
-            str(rel.base_name), str(rel.depended_name), rel.threshold, rel.max_value, rel.days_of_week_list 
+            rel.base_name, rel.depended_name, rel.threshold, rel.max_value, rel.days_of_week_list 
         ]
         for rel in OperationTypeRelation.objects.filter(
             base__load_template_id=load_template_id,
