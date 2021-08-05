@@ -608,22 +608,22 @@ class WorkerDayViewSet(BaseModelViewSet):
                         is_approved=True,
                     )
 
-                    if request.user.network.only_fact_hours_that_in_approved_plan:
-                        wd_ids = list(WorkerDay.objects.filter(
-                            employee_days_q,
-                            is_fact=True,
-                            type__in=WorkerDay.TYPES_WITH_TM_RANGE,
-                        ).values_list('id', flat=True))
-                        if wd_ids:
-                            transaction.on_commit(lambda wd_ids=wd_ids: recalc_wdays.delay(id__in=wd_ids))
-                    if settings.ZKTECO_INTEGRATION: # если используем терминалы
-                        transaction.on_commit(
-                            lambda: recalc_fact_from_records.delay(
-                                serializer.validated_data['dt_from'], 
-                                serializer.validated_data['dt_to'], 
-                                shop_ids=[serializer.data['shop_id']]
-                            )
-                        )
+                    # TODO: рефакторинг
+                    # if request.user.network.only_fact_hours_that_in_approved_plan:
+                    #     wd_ids = list(WorkerDay.objects.filter(
+                    #         employee_days_q,
+                    #         is_fact=True,
+                    #         type__in=WorkerDay.TYPES_WITH_TM_RANGE,
+                    #     ).values_list('id', flat=True))
+                    #     if wd_ids:
+                    #         transaction.on_commit(lambda wd_ids=wd_ids: recalc_wdays.delay(id__in=wd_ids))
+                    # transaction.on_commit(
+                    #     lambda: recalc_fact_from_records.delay(
+                    #         serializer.validated_data['dt_from'],
+                    #         serializer.validated_data['dt_to'],
+                    #         shop_ids=[serializer.data['shop_id']],
+                    #     )
+                    # )
                     
                     transaction.on_commit(lambda: vacancies_create_and_cancel_for_shop.delay(serializer.validated_data['shop_id']))
                     if not has_permission_to_change_protected_wdays:

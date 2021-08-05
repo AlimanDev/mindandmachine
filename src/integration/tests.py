@@ -864,8 +864,9 @@ class TestIntegration(APITestCase):
         self.assertEqual(WorkerDay.objects.filter(is_fact=True, is_approved=True, dt=date.today()).first().dttm_work_start, dttm_third)
         self.assertEqual(WorkerDay.objects.filter(is_fact=True, is_approved=True, dt=date.today()).first().dttm_work_end, dttm_fourth)
 
-    @override_settings(ZKTECO_MAX_DIFF_IN_SECONDS=4*60*60)
     def test_import_urv_tick_in_middle_of_shift_with_bad_diff(self):
+        self.network.max_plan_diff_in_seconds = 4*60*60
+        self.network.save()
         ShopExternalCode.objects.create(
             external_system=self.ext_system,
             shop=self.shop,

@@ -6,7 +6,6 @@ from calendar import monthrange
 import pandas as pd
 from celery import chain
 from dateutil.relativedelta import relativedelta
-from django.apps import apps
 from django.conf import settings
 from django.contrib.auth.models import (
     AbstractUser as DjangoAbstractUser,
@@ -34,6 +33,7 @@ from src.base.models_abstract import (
     AbstractCodeNamedModel,
 )
 from src.conf.djconfig import QOS_TIME_FORMAT
+from src.util.mixins.qs import AnnotateValueEqualityQSMixin
 
 
 class Network(AbstractActiveModel):
@@ -175,6 +175,17 @@ class Network(AbstractActiveModel):
     # при рассчете фактических часов, будут рассчитываться штрафы
     # пример значения можно найти в src.timetable.tests.test_main.TestFineLogic
     fines_settings = models.TextField(default='{}', verbose_name=_('Fines settings'))
+    max_work_shift_seconds = models.PositiveIntegerField(
+        verbose_name=_('Maximum shift length (in seconds)'), default=60 * 60 * 24)
+    skip_leaving_tick = models.BooleanField(
+        verbose_name=_('Skip the creation of a departure mark if more than '
+                       'the Maximum shift length has passed since the opening of the previous shift'),
+        default=False,
+    )
+    max_plan_diff_in_seconds = models.PositiveIntegerField(
+        verbose_name=_('Max difference between the start or end time to "pull" to the planned work day'),
+        default=3600 * 5,
+    )
 
     @property
     def settings_values_prop(self):
@@ -1066,13 +1077,7 @@ class WorkerPosition(AbstractActiveNetworkSpecificCodeNamedModel):
         return None
 
 
-class EmploymentQuerySet(QuerySet):
-    def annotate_value_equality(self, annotate_name, field_name, value):
-        return self.annotate(**{annotate_name: Case(
-            When(**{field_name: value}, then=True),
-            default=False, output_field=models.BooleanField()
-        )})
-
+class EmploymentQuerySet(AnnotateValueEqualityQSMixin, QuerySet):
     def last_hired(self):
         last_hired_subq = self.filter(user_id=OuterRef('user_id')).order_by('-dt_hired').values('id')[:1]
         return self.filter(

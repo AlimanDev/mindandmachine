@@ -419,12 +419,6 @@ REBUILD_TIMETABLE_MIN_DELTA = 2
 # например, для Ортеки для отображения в отчете нужны показатели только по продавцам-кассирам
 UPDATE_SHOP_STATS_WORK_TYPES_CODES = None
 
-MAX_WORK_SHIFT_SECONDS = 60 * 60 * 16  # максимальная длина смены (в секундах)
-
-# пропускать создание отметки об уходе,
-# если с момент открытия предыдущей незакрытой смены прошло более MAX_WORK_SHIFT_SECONDS
-MDA_SKIP_LEAVING_TICK = False
-
 # docker volume create jod_converter_conf
 # docker run \
 # 	--memory 512m \
@@ -445,9 +439,6 @@ ZKTECO_DEPARTMENT_CODE = 1 # код отдела из zkteco к которому
 
 # Используем ли интеграцию в проекте
 ZKTECO_INTEGRATION = False
-# Максимальная разность между временем начала 
-# или окончания для "притягивания" к рабочему дню
-ZKTECO_MAX_DIFF_IN_SECONDS = 3600 * 5
 # Игнорировать отметки без подтвержденного планового рабочего дня
 ZKTECO_IGNORE_TICKS_WITHOUT_WORKER_DAY = True
 # смещение id пользователя в ZKTeco чтобы не пересекались

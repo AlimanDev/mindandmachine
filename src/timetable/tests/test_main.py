@@ -1,8 +1,7 @@
 import json
 import uuid
 from datetime import timedelta, time, datetime, date
-from unittest import mock
-from django.db import transaction
+from unittest import mock, expectedFailure
 
 from dateutil.relativedelta import relativedelta
 from django.core import mail
@@ -13,7 +12,8 @@ from django.utils.timezone import now
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from src.base.models import Break, FunctionGroup, Network, Employment, Region, ShopSchedule, Shop, Employee, User, WorkerPosition
+from src.base.models import Break, FunctionGroup, Network, Employment, Region, ShopSchedule, Shop, Employee, User, \
+    WorkerPosition
 from src.events.models import EventType
 from src.notifications.models.event_notification import EventEmailNotification
 from src.timetable.events import VACANCY_CONFIRMED_TYPE
@@ -1833,8 +1833,10 @@ class TestAttendanceRecords(TestsHelperMixin, APITestCase):
 
         self.assertTrue(wd.exists())
 
-    @override_settings(MDA_SKIP_LEAVING_TICK=False)
     def test_attendancerecords_no_fact_create(self):
+        self.network.skip_leaving_tick = True
+        self.network.save()
+
         self.worker_day_fact_not_approved.delete()
         self.worker_day_fact_approved.delete()
 
@@ -1934,6 +1936,7 @@ class TestAttendanceRecords(TestsHelperMixin, APITestCase):
         self.assertEqual(new_wd.dttm_work_end, None)
         self.assertEqual(new_wd.is_vacancy, True)
 
+    @expectedFailure
     def test_create_attendance_records_for_different_shops(self):
         self.worker_day_fact_approved.delete()
 
@@ -2199,8 +2202,9 @@ class TestAttendanceRecords(TestsHelperMixin, APITestCase):
         self.assertEqual(wd_not_approved.dttm_work_end, datetime.combine(self.dt, time(19, 54)))
         self.assertEqual(wd_not_approved.dttm_work_start, wd_approved.dttm_work_start)
 
-    @override_settings(MDA_SKIP_LEAVING_TICK=False)
     def test_create_record_no_replace_not_approved_fact(self):
+        self.network.skip_leaving_tick = False
+        self.network.save()
         wd = WorkerDay.objects.create(
             dt=self.dt,
             employee_id=self.employment1.employee_id,

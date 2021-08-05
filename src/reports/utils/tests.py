@@ -9,7 +9,6 @@ from src.timetable.models import WorkerDay, AttendanceRecords
 from django.test import override_settings
 
 
-@override_settings(MDA_SKIP_LEAVING_TICK=True)
 class TestUrvFiles(APITestCase):
     USER_USERNAME = "user1"
     USER_EMAIL = "q@q.q"
@@ -51,7 +50,8 @@ class TestUrvFiles(APITestCase):
             datetime.combine(self.dt, time(8, 54)),
             AttendanceRecords.TYPE_COMING,
         )
-
+        self.network.skip_leaving_tick = True
+        self.network.save()
 
     def _create_worker_day(self, employment, dt=None, is_fact=False, is_approved=False, dttm_work_start=None, dttm_work_end=None, type=WorkerDay.TYPE_WORKDAY):
         if not dt:

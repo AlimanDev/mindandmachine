@@ -11,7 +11,7 @@ from django.db.models import (
     Subquery, OuterRef, Max, Q, Case, When, Value, FloatField, F, IntegerField, Exists
 )
 from django.db.models import UniqueConstraint
-from django.db.models.functions import Abs, Cast, Extract, Least
+from django.db.models.functions import Abs, Cast, Extract, Least, ExtractSecond
 from django.db.models.query import QuerySet
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
@@ -25,6 +25,7 @@ from src.events.signals import event_signal
 from src.recognition.events import EMPLOYEE_WORKING_NOT_ACCORDING_TO_PLAN
 from src.tasks.models import Task
 from src.timetable.exceptions import WorkTimeOverlap, WorkDayTaskViolation
+from src.util.mixins.qs import AnnotateValueEqualityQSMixin
 from src.util.time import _time_to_float
 
 
@@ -262,7 +263,7 @@ class WorkerConstraint(AbstractModel):
         return self.employment.shop
 
 
-class WorkerDayQuerySet(QuerySet):
+class WorkerDayQuerySet(AnnotateValueEqualityQSMixin, QuerySet):
     def get_plan_approved(self, **kwargs):
         return self.filter(is_fact=False, is_approved=True, **kwargs)
 
@@ -712,7 +713,7 @@ class WorkerDay(AbstractModel):
         help_text='Доступен для изменения/подтверждения только определенным группам доступа (настраивается)',
     )
     closest_plan_approved = models.ForeignKey(
-        'self', null=True, blank=True, on_delete=models.CASCADE,
+        'self', null=True, blank=True, on_delete=models.SET_NULL,
         help_text='Используется в факте подтвержденном (созданном на основе отметок) для связи с планом подтвержденным')
 
     objects = WorkerDayManager.from_queryset(WorkerDayQuerySet)()  # исключает раб. дни у которых employment_id is null
@@ -873,7 +874,7 @@ class WorkerDay(AbstractModel):
                 F('dttm_work_end_diff'),
             ),
         ).filter(
-            dttm_diff_min__lt=settings.ZKTECO_MAX_DIFF_IN_SECONDS,
+            dttm_diff_min__lt=F('shop__network__max_plan_diff_in_seconds')
         )
 
         order_by = []
@@ -1570,16 +1571,26 @@ class AttendanceRecords(AbstractModel):
             return res
 
         with transaction.atomic():
-            closest_plan_approved_q = Q(closest_plan_approved=closest_plan_approved)
+            base_fact_approved_qs = WorkerDay.objects.annotate_value_equality(
+                'is_closest_plan_approved_equal', 'closest_plan_approved', closest_plan_approved,
+            ).annotate(
+                diff_between_tick_and_work_start_seconds=Cast(
+                    Extract(self.dttm - F('dttm_work_start'), 'epoch'), IntegerField()),
+            )
+            fact_approved_extra_q = Q(closest_plan_approved=closest_plan_approved)
             if self.type == self.TYPE_LEAVING:
-                closest_plan_approved_q |= Q(dttm_work_start__isnull=False, dttm_work_end__isnull=True)
-            fact_approved = WorkerDay.objects.filter(
-                closest_plan_approved_q,
+                fact_approved_extra_q |= Q(
+                    dttm_work_start__isnull=False,
+                    diff_between_tick_and_work_start_seconds__lte=F('shop__network__max_work_shift_seconds'),
+                )
+            fact_approved = base_fact_approved_qs.filter(
+                fact_approved_extra_q,
                 dt=self.dt,
                 employee_id=self.employee_id,
+                shop_id=self.shop_id,
                 is_fact=True,
                 is_approved=True,
-            ).select_for_update().first()
+            ).order_by('-is_closest_plan_approved_equal').first()
 
             if fact_approved:
                 # если это отметка о приходе, то не перезаписываем время начала работы в графике
@@ -1597,31 +1608,28 @@ class AttendanceRecords(AbstractModel):
                 self._create_or_update_not_approved_fact(fact_approved)
             else:
                 if self.type == self.TYPE_LEAVING:
-                    prev_fa_wd = WorkerDay.objects.filter(
-                        closest_plan_approved_q,
+                    prev_fa_wd = base_fact_approved_qs.filter(
+                        fact_approved_extra_q,
                         shop_id=self.shop_id,
                         employee_id=self.employee_id,
                         dt__lt=self.dt,
                         is_fact=True,
                         is_approved=True,
-                    ).order_by('dt').last()
+                    ).order_by('dt', 'is_closest_plan_approved_equal').last()
 
-                    # Если предыдущая смена начата.
-                    if prev_fa_wd and prev_fa_wd.dttm_work_start:
-                        close_prev_work_shift_cond = (
-                            self.dttm - prev_fa_wd.dttm_work_start).total_seconds() < settings.MAX_WORK_SHIFT_SECONDS
-                        # Если с момента открытия предыдущей смены прошло менее MAX_WORK_SHIFT_SECONDS,
-                        # то закрываем предыдущую смену.
-                        if close_prev_work_shift_cond:
-                            setattr(prev_fa_wd, self.TYPE_2_DTTM_FIELD[self.type], self.dttm)
-                            setattr(prev_fa_wd, 'type', WorkerDay.TYPE_WORKDAY)
-                            prev_fa_wd.save()
-                            self.dt = prev_fa_wd.dt # логично дату предыдущую ставить, так как это значение в отчетах используется
-                            super(AttendanceRecords, self).save(update_fields=['dt',])
-                            self._create_or_update_not_approved_fact(prev_fa_wd)
-                            return
+                    # Если предыдущая смена начата и с момента открытия предыдущей смены прошло менее макс. длины смены,
+                    # то обновляем время окончания предыдущей смены. (условие в closest_plan_approved_q)
+                    if prev_fa_wd:
+                        setattr(prev_fa_wd, self.TYPE_2_DTTM_FIELD[self.type], self.dttm)
+                        setattr(prev_fa_wd, 'type', WorkerDay.TYPE_WORKDAY)
+                        prev_fa_wd.save()
+                        # логично дату предыдущую ставить, так как это значение в отчетах используется
+                        self.dt = prev_fa_wd.dt
+                        super(AttendanceRecords, self).save(update_fields=['dt',])
+                        self._create_or_update_not_approved_fact(prev_fa_wd)
+                        return
 
-                    if settings.MDA_SKIP_LEAVING_TICK:
+                    if self.shop.network.skip_leaving_tick:
                         return
 
                 fact_approved, _wd_created = WorkerDay.objects.update_or_create(
