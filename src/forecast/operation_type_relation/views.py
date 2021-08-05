@@ -7,6 +7,7 @@ from django_filters.rest_framework import FilterSet
 from django.utils.translation import gettext_lazy as _
 
 from rest_framework import serializers, status
+from rest_framework.exceptions import ValidationError
 from rest_framework.validators import UniqueTogetherValidator
 from rest_framework.response import Response
 from rest_framework.pagination import LimitOffsetPagination
@@ -27,7 +28,7 @@ class OperationTypeRelationSerializer(serializers.ModelSerializer):
         "not_same_template": _("Base and depended demand models cannot have different templates."),
         "error_in_formula": _("Error in formula: {formula}."),
         "base_not_formula": _("Base model not formula."),
-        "const_cant_be_base": _("Constant operation can\'t be base."),
+        "both_not_work_type": _("Both templates should be work type for 'Change workload between' relation."),
         "bad_steps":_("Depended must have same or bigger forecast step, got {} -> {}"),
         "bad_day_of_week": _("Bad day of week, possible values: 0, 1, 2, 3, 4, 5, 6")
     }
@@ -77,7 +78,7 @@ class OperationTypeRelationSerializer(serializers.ModelSerializer):
         if self.validated_data['depended_id'] == self.validated_data['base_id']:
             raise FieldError(self.error_messages["depended_base_same"])
 
-        depended = OperationTypeTemplate.objects.get(pk=self.validated_data['depended_id'])
+        depended = OperationTypeTemplate.objects.select_related('operation_type_name').get(pk=self.validated_data['depended_id'])
         base = OperationTypeTemplate.objects.select_related('operation_type_name').get(pk=self.validated_data['base_id'])
         self.validated_data['depended'] = depended
         self.validated_data['base'] = base
@@ -86,14 +87,17 @@ class OperationTypeRelationSerializer(serializers.ModelSerializer):
            (depended.forecast_step == timedelta(minutes=30) and not (base.forecast_step in [timedelta(minutes=30)])):
             raise FieldError(self.error_messages["bad_steps"].format(depended.forecast_step, base.forecast_step))
 
-        if not (base.const_value is None):
-            raise FieldError(self.error_messages["const_cant_be_base"], 'base')
-
         if base.operation_type_name.do_forecast != OperationTypeName.FORECAST_FORMULA:
             raise FieldError(self.error_messages["base_not_formula"], 'base')
 
         if (depended.load_template_id != base.load_template_id):
             raise FieldError(self.error_messages["not_same_template"])
+
+        if self.validated_data.get('type', 'F') == OperationTypeRelation.TYPE_CHANGE_WORKLOAD_BETWEEN:
+            if any([depended.operation_type_name.work_type_name_id is None, base.operation_type_name.work_type_name_id is None]):
+                raise ValidationError(self.error_messages["both_not_work_type"])
+            else:
+                return True
 
         if OperationTypeRelation.objects.filter(base=depended, depended=base).exists():
             raise FieldError(self.error_messages["reversed_relation"], 'base')
