@@ -201,6 +201,7 @@ class TestOperationTypeRelation(APITestCase):
         self.assertEqual(operation_type_relataion, data)
 
     def test_create_change_workload_between(self):
+        self.maxDiff = None
         load_template = LoadTemplate.objects.create(
             name='TEST'
         )
@@ -210,7 +211,7 @@ class TestOperationTypeRelation(APITestCase):
         )
         op_temp2 = OperationTypeTemplate.objects.create(
             load_template=load_template,
-            operation_type_name=self.operation_type_name2,
+            operation_type_name=self.operation_type_name3,
         )
         data = {
             'base_id': op_temp1.id,
@@ -244,11 +245,11 @@ class TestOperationTypeRelation(APITestCase):
                 'id': op_temp2.id, 
                 'load_template_id': load_template.id, 
                 'operation_type_name': {
-                    'id': self.operation_type_name2.id, 
-                    'name': 'Строительные работы', 
+                    'id': self.operation_type_name3.id, 
+                    'name': self.operation_type_name3.name, 
                     'code': None,
-                    'work_type_name_id': None, 
-                    'do_forecast': self.operation_type_name2.do_forecast, 
+                    'work_type_name_id': self.work_type_name2.id, 
+                    'do_forecast': self.operation_type_name3.do_forecast, 
                 },
                 'tm_from': None,
                 'tm_to': None,
@@ -262,6 +263,81 @@ class TestOperationTypeRelation(APITestCase):
             'days_of_week': [1, 2, 3]
         }
         self.assertEqual(operation_type_relataion, data)
+        data = {
+            'base_id': op_temp2.id,
+            'depended_id': op_temp1.id,
+            'type': OperationTypeRelation.TYPE_CHANGE_WORKLOAD_BETWEEN,
+            'max_value': 1.0,
+            'threshold': 0.5,
+            'days_of_week': [1, 2, 4],
+        }
+        response = self.client.post(self.url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        operation_type_relataion = response.json()
+        data = {
+            'id': operation_type_relataion['id'], 
+            'base': {
+                'id': op_temp2.id, 
+                'load_template_id': load_template.id, 
+                'operation_type_name': {
+                    'id': self.operation_type_name3.id, 
+                    'name': self.operation_type_name3.name, 
+                    'code': None,
+                    'work_type_name_id': self.work_type_name2.id, 
+                    'do_forecast': self.operation_type_name3.do_forecast, 
+                },
+                'tm_from': None,
+                'tm_to': None,
+                'forecast_step': '01:00:00',
+                'const_value': None,
+            }, 
+            'depended': {
+                'id': op_temp1.id, 
+                'load_template_id': load_template.id, 
+                'operation_type_name': {
+                    'id': self.operation_type_name1.id, 
+                    'name': self.operation_type_name1.name, 
+                    'code': None,
+                    'work_type_name_id': self.work_type_name1.id, 
+                    'do_forecast': self.operation_type_name1.do_forecast, 
+                },
+                'tm_from': None,
+                'tm_to': None,
+                'forecast_step': '01:00:00',
+                'const_value': None,
+            }, 
+            'formula': None,
+            'type': 'C',
+            'max_value': 1.0,
+            'threshold': 0.5,
+            'days_of_week': [1, 2, 4]
+        }
+        self.assertEqual(operation_type_relataion, data)
+
+    def test_create_change_workload_between_no_work_type(self):
+        self.maxDiff = None
+        load_template = LoadTemplate.objects.create(
+            name='TEST'
+        )
+        op_temp1 = OperationTypeTemplate.objects.create(
+            load_template=load_template,
+            operation_type_name=self.operation_type_name1,
+        )
+        op_temp2 = OperationTypeTemplate.objects.create(
+            load_template=load_template,
+            operation_type_name=self.operation_type_name2,
+        )
+        data = {
+            'base_id': op_temp1.id,
+            'depended_id': op_temp2.id,
+            'type': OperationTypeRelation.TYPE_CHANGE_WORKLOAD_BETWEEN,
+            'max_value': 1.0,
+            'threshold': 0.3,
+            'days_of_week': [1, 2, 3],
+        }
+        response = self.client.post(self.url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.json(), ["Оба шаблона должны быть типами работ для взаимосвязи 'Перекидывание типов работ'"])
 
     def test_update(self):
         data = {
@@ -304,27 +380,6 @@ class TestOperationTypeRelation(APITestCase):
             OperationType.objects.get(operation_type_name=self.operation_type_name1).status,
             OperationType.UPDATED,
         )
-    
-    def test_const_cant_be_base(self):
-        load_template = LoadTemplate.objects.create(
-            name='TEST'
-        )
-        op_temp1 = OperationTypeTemplate.objects.create(
-            load_template=load_template,
-            operation_type_name=self.operation_type_name1,
-            const_value=1.0,
-        )
-        op_temp2 = OperationTypeTemplate.objects.create(
-            load_template=load_template,
-            operation_type_name=self.operation_type_name2,
-        )
-        data = {
-            'base_id': op_temp1.id,
-            'depended_id': op_temp2.id,
-            'formula': 'a + a * 2'
-        }
-        response = self.client.post(self.url, data, format='json')
-        self.assertEqual(response.json(),{'base': "Операция с постоянным значением не может иметь зависимости."})
 
 
     def test_bad_steps(self):

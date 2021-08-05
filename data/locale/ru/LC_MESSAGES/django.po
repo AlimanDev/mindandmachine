@@ -12,7 +12,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Django REST framework\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2021-08-17 05:43+0000\n"
+"POT-Creation-Date: 2021-09-01 13:24+0000\n"
 "PO-Revision-Date: 2017-08-03 14:58+0000\n"
 "Last-Translator: Grigory Mishchenko <grishkokot@gmail.com>\n"
 "Language-Team: Russian (http://www.transifex.com/django-rest-framework-1/"
@@ -53,27 +53,27 @@ msgstr "Настройки графика"
 msgid "Integration settings"
 msgstr "Настройки интеграции"
 
-#: src/base/admin.py:90
+#: src/base/admin.py:95
 msgid "Default settings"
 msgstr "Настройки по умолчанию"
 
-#: src/base/admin.py:91 src/base/admin.py:147
+#: src/base/admin.py:96 src/base/admin.py:153
 msgid "Other"
 msgstr "Прочее"
 
-#: src/base/admin.py:142
+#: src/base/admin.py:148
 msgid "Personal info"
 msgstr "Персональные данные"
 
-#: src/base/admin.py:143
+#: src/base/admin.py:149
 msgid "Permissions"
 msgstr "Доступы"
 
-#: src/base/admin.py:146
+#: src/base/admin.py:152
 msgid "Important dates"
 msgstr "Важные даты"
 
-#: src/base/admin.py:172
+#: src/base/admin.py:178
 #, python-format
 msgid "%(name)s object with primary key %(key)r does not exist."
 msgstr ""
@@ -267,7 +267,7 @@ msgstr "Отображать блок биометрии в деталях со�
 msgid "Fines settings"
 msgstr "Настройки штрафов"
 
-#: src/base/models.py:280 src/base/models.py:286
+#: src/base/models.py:288 src/base/models.py:294
 #, python-brace-format
 msgid ""
 "Bad break triplet format {triplet}, should be [[int, int, [int, int,]],]."
@@ -275,38 +275,38 @@ msgstr ""
 "Некорректный формат перерыва {triplet}, должно быть [[int, int, [int, "
 "int,]],]."
 
-#: src/base/models.py:283
+#: src/base/models.py:291
 #, python-brace-format
 msgid "First value of period can not be greater then second value: {triplet}"
 msgstr ""
 "Первое значение периода не может быть больше второго значения: {triplet}"
 
-#: src/base/models.py:289
+#: src/base/models.py:297
 #, python-brace-format
 msgid "Value of break can not be greater than value of period: {triplet}"
 msgstr "Значение перерыва не может быть больше значения периода: {triplet}"
 
-#: src/base/models.py:473
+#: src/base/models.py:481
 #, python-brace-format
 msgid "Shop with parent_code={code} not found"
 msgstr "Подразделение с parent_code={code} не найдено"
 
-#: src/base/models.py:575
+#: src/base/models.py:583
 msgid "Keys of open times and close times are different."
 msgstr "Ключи в времени открытия и времени закрытия различаются."
 
-#: src/base/models.py:577
+#: src/base/models.py:585
 msgid "'All' and individual days cannot be specified."
 msgstr "Нельзя указывать all и отдельные дни."
 
-#: src/base/models.py:590
+#: src/base/models.py:598
 msgid ""
 "It is not possible to change the load template as it is in the calculation "
 "process."
 msgstr ""
 "Невозможно изменить шаблон нагрузки, так как он находится в процессе расчета."
 
-#: src/base/models.py:1163
+#: src/base/models.py:1188
 msgid ""
 "Unable to define worker access group. Assign an access group to him or a "
 "position associated with an access group."
@@ -318,38 +318,38 @@ msgstr ""
 msgid "shop_id should be defined"
 msgstr "Произошла ошибка. Попробуйте перезагрузить страницу."
 
-#: src/base/serializers.py:206
+#: src/base/serializers.py:207
 msgid "Passwords are mismatched."
 msgstr "Пароли не совпадают."
 
-#: src/base/serializers.py:207
+#: src/base/serializers.py:208
 msgid "Password is wrong."
 msgstr "Неверный пароль."
 
-#: src/base/serializers.py:278
+#: src/base/serializers.py:279
 #, python-brace-format
 msgid "Employment from {dt_hired} to {dt_fired} already exists."
 msgstr ""
 "В этом магазине уже заведено трудоустройство с {dt_hired} по {dt_fired}."
 
-#: src/base/serializers.py:279 src/timetable/worker_day/serializers.py:124
+#: src/base/serializers.py:280 src/timetable/worker_day/serializers.py:124
 #, python-brace-format
 msgid "There is {amount} models of user with username: {username}."
 msgstr ""
 "Существует {amount} моделей пользователя с именем пользователя: {username}."
 
-#: src/base/serializers.py:280
+#: src/base/serializers.py:281
 #, python-brace-format
 msgid "There is {amount} models of user with user_id: {user_id}."
 msgstr "Существует {amount} моделей пользователя с user_id: {user_id}."
 
-#: src/base/serializers.py:281 src/tasks/serializers.py:19
+#: src/base/serializers.py:282 src/tasks/serializers.py:19
 #: src/tasks/serializers.py:20
 #, python-brace-format
 msgid "There is {amount} models of shop with code: {code}."
 msgstr "Есть {amount} магазинов с кодом: {code}."
 
-#: src/base/serializers.py:282
+#: src/base/serializers.py:283
 #, python-brace-format
 msgid "There is {amount} models of position with code: {code}."
 msgstr "Есть {amount} должностей с кодом: {code}."
@@ -390,7 +390,7 @@ msgid ""
 msgstr ""
 "Биометрия уже создана. Для создания новой биометрии сначала удалите нынешнюю."
 
-#: src/forecast/load_template/utils.py:520
+#: src/forecast/load_template/utils.py:535
 #, python-brace-format
 msgid "These operation types do not exist: {types}."
 msgstr "Данные типы операций не существуют: {types}."
@@ -416,40 +416,48 @@ msgstr "Название с кодом {code} уже существует."
 msgid "The name {name} is already in the system"
 msgstr "Название {name} уже есть в системе"
 
-#: src/forecast/operation_type_relation/views.py:24
+#: src/forecast/operation_type_relation/views.py:25
 msgid "Base and depended demand models cannot be the same."
 msgstr "Базовая и зависимая модели нагрузки не могут совпадать."
 
-#: src/forecast/operation_type_relation/views.py:25
+#: src/forecast/operation_type_relation/views.py:26
 msgid "Demand model cannot depend on itself."
 msgstr "Циклическая зависимость: операция зависит сама от себя."
 
-#: src/forecast/operation_type_relation/views.py:26
+#: src/forecast/operation_type_relation/views.py:27
 msgid "Backward dependency already exists."
 msgstr "Уже существует обратная зависимость"
 
-#: src/forecast/operation_type_relation/views.py:27
+#: src/forecast/operation_type_relation/views.py:28
 msgid "Base and depended demand models cannot have different templates."
 msgstr "Базовая и зависимая модели не могут иметь разный шаблон нагрузки"
 
-#: src/forecast/operation_type_relation/views.py:28
+#: src/forecast/operation_type_relation/views.py:29
 #, python-brace-format
 msgid "Error in formula: {formula}."
 msgstr "Ошибка в формуле: {formula}"
 
-#: src/forecast/operation_type_relation/views.py:29
+#: src/forecast/operation_type_relation/views.py:30
 msgid "Base model not formula."
 msgstr "У базовой модели тип расчета должен быть формула"
 
-#: src/forecast/operation_type_relation/views.py:30
-msgid "Constant operation can't be base."
-msgstr "Операция с постоянным значением не может иметь зависимости."
-
 #: src/forecast/operation_type_relation/views.py:31
+msgid ""
+"Both templates should be work type for 'Change workload between' relation."
+msgstr ""
+"Оба шаблона должны быть типами работ для взаимосвязи 'Перекидывание типов "
+"работ'"
+
+#: src/forecast/operation_type_relation/views.py:32
 msgid "Depended must have same or bigger forecast step, got {} -> {}"
 msgstr ""
 "Зависимая операция должна иметь одинаковый или больший шаг прогноза, имеется "
 "{} -> {}"
+
+#: src/forecast/operation_type_relation/views.py:33
+msgid "Bad day of week, possible values: 0, 1, 2, 3, 4, 5, 6"
+msgstr ""
+"Некорректное значение дня недели, возможные значения: 0, 1, 2, 3, 4, 5, 6"
 
 #: src/forecast/operation_type_template/views.py:19
 msgid "This operation type depends on operations with less forecast steps."
@@ -549,7 +557,7 @@ msgstr "Отметка не существует"
 msgid "Day"
 msgstr "День"
 
-#: src/reports/utils/overtimes_undertimes.py:176
+#: src/reports/utils/overtimes_undertimes.py:178
 #: src/timetable/worker_day/timetable.py:498
 #: src/timetable/worker_day/timetable.py:517
 #: src/timetable/worker_day/timetable.py:523
@@ -557,7 +565,7 @@ msgstr "День"
 msgid "Full name"
 msgstr "ФИО"
 
-#: src/reports/utils/overtimes_undertimes.py:177
+#: src/reports/utils/overtimes_undertimes.py:179
 #: src/timetable/attendance_records/views.py:50
 #: src/timetable/worker_day/timetable.py:497
 #: src/timetable/worker_day/timetable.py:517
@@ -566,35 +574,35 @@ msgstr "ФИО"
 msgid "Employee id"
 msgstr "Табельный номер"
 
-#: src/reports/utils/overtimes_undertimes.py:178
+#: src/reports/utils/overtimes_undertimes.py:180
 msgid "The norm for the accounting period"
 msgstr "Норма за учетный период"
 
-#: src/reports/utils/overtimes_undertimes.py:179
+#: src/reports/utils/overtimes_undertimes.py:181
 msgid "Worked out for today ({})"
 msgstr "Отработано на сегодня ({})"
 
-#: src/reports/utils/overtimes_undertimes.py:180
+#: src/reports/utils/overtimes_undertimes.py:182
 msgid "Total overtimes/undertimes ({})"
 msgstr "Всего переработки/недоработки ({})"
 
-#: src/reports/utils/overtimes_undertimes.py:183
+#: src/reports/utils/overtimes_undertimes.py:185
 msgid "The norm of hours"
 msgstr "Норма часов"
 
-#: src/reports/utils/overtimes_undertimes.py:184
+#: src/reports/utils/overtimes_undertimes.py:186
 msgid "Hours worked"
 msgstr "Отработано часов"
 
-#: src/reports/utils/overtimes_undertimes.py:185
+#: src/reports/utils/overtimes_undertimes.py:187
 msgid "Total overtimes/undertimes"
 msgstr "Всего переработки/недоработки"
 
-#: src/reports/utils/overtimes_undertimes.py:186
+#: src/reports/utils/overtimes_undertimes.py:188
 msgid "Overtimes/undertimes in celebrations"
 msgstr "Переработки/недоработки: отработано часов в праздники"
 
-#: src/reports/utils/overtimes_undertimes.py:187
+#: src/reports/utils/overtimes_undertimes.py:189
 msgid "Planned work hours"
 msgstr "Плановое количество часов"
 
@@ -1433,6 +1441,9 @@ msgstr "Файл не был загружен."
 #: src/util/upload.py:28
 msgid "Files with this extension are not supported."
 msgstr "Файлы с таким расширением не поддерживается."
+
+#~ msgid "Constant operation can't be base."
+#~ msgstr "Операция с постоянным значением не может иметь зависимости."
 
 #~ msgid "Invalid basic header. No credentials provided."
 #~ msgstr "Недопустимый заголовок. Не предоставлены учетные данные."
