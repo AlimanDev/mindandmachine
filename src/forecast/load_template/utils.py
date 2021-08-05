@@ -535,6 +535,7 @@ def upload_load_template(template_file, form, lang='ru'):
         raise serializers.ValidationError(_('These operation types do not exist: {types}.').format(types=undefined_o_types))
     lt = LoadTemplate.objects.create(name=form['name'], network_id=network_id)
     df = df.fillna('')
+    df[DAYS_OF_WEEK_COL] = df[DAYS_OF_WEEK_COL].astype(str).str.replace('.', ',')
     forecast_steps = {
         '1h': datetime.timedelta(hours=1),
         '30min': datetime.timedelta(minutes=30),
