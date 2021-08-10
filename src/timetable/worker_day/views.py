@@ -534,13 +534,25 @@ class WorkerDayViewSet(BaseModelViewSet):
                         transaction.on_commit(
                             lambda f_json_data=json_data: send_doctors_schedule_to_mis.delay(json_data=f_json_data))
 
-                WorkerDay.objects_with_excluded.filter(
+                wdays_to_delete = WorkerDay.objects_with_excluded.filter(
                     employee_days_q, is_fact=serializer.data['is_fact'],
                 ).exclude(
                     id__in=wdays_to_approve.values_list('id', flat=True)
                 ).exclude(
                     employee_id__isnull=True,
-                ).delete()
+                )
+
+                # если план
+                if not serializer.data['is_fact']:
+                    # удаляется факт автоматический, связанный с удаляемым планом
+                    WorkerDay.objects.filter(
+                        created_by__isnull=True,
+                        last_edited_by__isnull=True,
+                        closest_plan_approved__in=wdays_to_delete,
+                    ).delete()
+
+                wdays_to_delete.delete()
+
                 list_wd = list(
                     wdays_to_approve.select_related(
                         'shop',
@@ -554,6 +566,34 @@ class WorkerDayViewSet(BaseModelViewSet):
                 )
 
                 wdays_to_approve.update(is_approved=True)
+
+                delta_in_secs = 60 * 70
+                # проставляется closest_plan_approved в ручной факт подтв., где не проставлен, для пар (сотрудник, даты)
+                # ищем план для факта, чтобы отклонения времени начала и времени окончания не превышала какую-то дельту,
+                # TODO: сделать настройку для delta_in_secs
+                # TODO: функция должна быть переиспользуемой (т.к еще возможно будет использоваться в других местах)
+                WorkerDay.objects.filter(
+                    employee_days_q,
+                    is_fact=True,
+                    is_approved=True,
+                    last_edited_by__isnull=False,
+                    closest_plan_approved__isnull=True,
+                ).update(
+                    closest_plan_approved=Subquery(WorkerDay.objects.filter(
+                        Q(dttm_work_start__gte=OuterRef('dttm_work_start') - datetime.timedelta(
+                            seconds=delta_in_secs)) &
+                        Q(dttm_work_start__lte=OuterRef('dttm_work_start') + datetime.timedelta(
+                            seconds=delta_in_secs)),
+                        Q(dttm_work_end__gte=OuterRef('dttm_work_end') - datetime.timedelta(
+                            seconds=delta_in_secs)) &
+                        Q(dttm_work_end__lte=OuterRef('dttm_work_end') + datetime.timedelta(
+                            seconds=delta_in_secs)),
+                        employee_id=OuterRef('employee_id'),
+                        dt=OuterRef('dt'),
+                        is_fact=False,
+                        is_approved=True,
+                    ).values('id')[:1])
+                )
 
                 wds = WorkerDay.objects.bulk_create(
                     [
@@ -608,22 +648,7 @@ class WorkerDayViewSet(BaseModelViewSet):
                         is_approved=True,
                     )
 
-                    # TODO: рефакторинг
-                    # if request.user.network.only_fact_hours_that_in_approved_plan:
-                    #     wd_ids = list(WorkerDay.objects.filter(
-                    #         employee_days_q,
-                    #         is_fact=True,
-                    #         type__in=WorkerDay.TYPES_WITH_TM_RANGE,
-                    #     ).values_list('id', flat=True))
-                    #     if wd_ids:
-                    #         transaction.on_commit(lambda wd_ids=wd_ids: recalc_wdays.delay(id__in=wd_ids))
-                    # transaction.on_commit(
-                    #     lambda: recalc_fact_from_records.delay(
-                    #         serializer.validated_data['dt_from'],
-                    #         serializer.validated_data['dt_to'],
-                    #         shop_ids=[serializer.data['shop_id']],
-                    #     )
-                    # )
+                    # TODO: запуск пересчета факта на основе отметок для пар (сотрудник, даты)
                     
                     transaction.on_commit(lambda: vacancies_create_and_cancel_for_shop.delay(serializer.validated_data['shop_id']))
                     if not has_permission_to_change_protected_wdays:

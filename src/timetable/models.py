@@ -712,8 +712,8 @@ class WorkerDay(AbstractModel):
         verbose_name='Защищенный день',
         help_text='Доступен для изменения/подтверждения только определенным группам доступа (настраивается)',
     )
-    closest_plan_approved = models.ForeignKey(
-        'self', null=True, blank=True, on_delete=models.SET_NULL,
+    closest_plan_approved = models.OneToOneField(
+        'self', null=True, blank=True, on_delete=models.SET_NULL, related_name='related_fact_approved',
         help_text='Используется в факте подтвержденном (созданном на основе отметок) для связи с планом подтвержденным')
 
     objects = WorkerDayManager.from_queryset(WorkerDayQuerySet)()  # исключает раб. дни у которых employment_id is null
@@ -897,7 +897,7 @@ class WorkerDay(AbstractModel):
 
     @classmethod
     def check_work_time_overlap(cls, employee_days_q=None, employee_id=None, employee_id__in=None, user_id=None,
-                                user_id__in=None, dt=None, dt__in=None, raise_exc=True, exc_cls=None):
+                                user_id__in=None, dt=None, dt__in=None, is_fact=None, raise_exc=True, exc_cls=None):
         """
         Проверка наличия пересечения рабочего времени
         """
@@ -907,6 +907,9 @@ class WorkerDay(AbstractModel):
         lookup = {
             'type__in': WorkerDay.TYPES_WITH_TM_RANGE,
         }
+        if is_fact is not None:
+            lookup['is_fact'] = is_fact
+
         if employee_id:
             lookup['employee__user__employees__id'] = employee_id
 
@@ -1404,7 +1407,7 @@ class AttendanceRecords(AbstractModel):
         TYPE_LEAVING: 'dttm_work_end',
     }
 
-    dt = models.DateField()  # TODO-devx: может быть лучше сделать fk на WorkerDay?
+    dt = models.DateField()
     dttm = models.DateTimeField()
     type = models.CharField(max_length=1, choices=RECORD_TYPES)
     user = models.ForeignKey(User, on_delete=models.PROTECT)
@@ -1423,7 +1426,7 @@ class AttendanceRecords(AbstractModel):
 
         closest_plan_approved, calculated_record_type = WorkerDay.get_closest_plan_approved(
             user_id=user.id,
-            shop_id=shop.id,
+            shop_id=shop.id,  # TODO: искать план по магазину или нет должно определяться настройкой возможности создания нескольких workerday или отдельной? (может быть просто искать в приоритете с таким shop_id?)
             dttm=dttm,
             record_type=initial_record_type,
         )
@@ -1459,16 +1462,9 @@ class AttendanceRecords(AbstractModel):
 
         return employee_id, employment, dt, record_type, closest_plan_approved
 
-    def _create_wd_details(self, dt, fact_approved, active_user_empl):
-        plan_approved = WorkerDay.objects.filter(
-            dt=dt,
-            employee=active_user_empl.employee,
-            is_fact=False,
-            is_approved=True,
-            worker_day_details__isnull=False,
-        ).first()
-        if plan_approved:
-            if fact_approved.shop_id == plan_approved.shop_id:
+    def _create_wd_details(self, dt, fact_approved, active_user_empl, closest_plan_approved):
+        if closest_plan_approved:
+            if fact_approved.shop_id == closest_plan_approved.shop_id:
                 WorkerDayCashboxDetails.objects.bulk_create(
                     [
                         WorkerDayCashboxDetails(
@@ -1476,7 +1472,7 @@ class AttendanceRecords(AbstractModel):
                             worker_day=fact_approved,
                             work_type_id=details.work_type_id,
                         )
-                        for details in plan_approved.worker_day_details.all()
+                        for details in closest_plan_approved.worker_day_details.all()
                     ]
                 )
             else:
@@ -1490,7 +1486,7 @@ class AttendanceRecords(AbstractModel):
                                 work_type_name_id=details.work_type.work_type_name_id,
                             ).first(),
                         )
-                        for details in plan_approved.worker_day_details.select_related('work_type')
+                        for details in closest_plan_approved.worker_day_details.select_related('work_type')
                     ]
                 )
         elif active_user_empl:
@@ -1502,59 +1498,76 @@ class AttendanceRecords(AbstractModel):
                     worker_day=fact_approved,
                     work_type_id=employment_work_type.work_type_id,
                 )
-    
+
     def _create_or_update_not_approved_fact(self, fact_approved):
-        try:
-            not_approved = WorkerDay.objects.get(
-                dt=fact_approved.dt,
-                employee_id=fact_approved.employee_id,
-                is_fact=fact_approved.is_fact,
-                is_approved=False,
-                closest_plan_approved=fact_approved.closest_plan_approved,
-            )
-        except WorkerDay.DoesNotExist:
-            not_approved = WorkerDay.objects.create(
-                shop=fact_approved.shop,
-                employee_id=fact_approved.employee_id,
-                employment=fact_approved.employment,
-                dttm_work_start=fact_approved.dttm_work_start,
-                dttm_work_end=fact_approved.dttm_work_end,
-                dt=fact_approved.dt,
-                is_fact=fact_approved.is_fact,
-                is_approved=False,
-                type=fact_approved.type,
-                is_vacancy=fact_approved.is_vacancy,
-                is_outsource=fact_approved.is_outsource,
-                closest_plan_approved=fact_approved.closest_plan_approved,
-            )
-            WorkerDayCashboxDetails.objects.bulk_create(
-                [
-                    WorkerDayCashboxDetails(
-                        work_part=details.work_part,
-                        worker_day=not_approved,
-                        work_type_id=details.work_type_id,
+        # TODO: попробовать найти вариант без удаления workerday?
+        WorkerDay.objects.filter(
+            dt=fact_approved.dt,
+            employee_id=fact_approved.employee_id,
+            is_fact=True,
+            is_approved=False,
+            last_edited_by__isnull=True,
+        ).delete()
+
+        other_facts_approved = list(WorkerDay.objects.filter(
+            dt=fact_approved.dt,
+            employee_id=fact_approved.employee_id,
+            is_fact=True,
+            is_approved=True,
+            last_edited_by__isnull=True,
+        ).exclude(
+            id=fact_approved.id,
+        ))
+        facts_approved_to_copy = other_facts_approved + [fact_approved]
+        for fact_approved_to_copy in facts_approved_to_copy:
+            try:
+                with transaction.atomic():
+                    not_approved = WorkerDay.objects.create(
+                        shop=fact_approved_to_copy.shop,
+                        employee_id=fact_approved_to_copy.employee_id,
+                        employment=fact_approved_to_copy.employment,
+                        dttm_work_start=fact_approved_to_copy.dttm_work_start,
+                        dttm_work_end=fact_approved_to_copy.dttm_work_end,
+                        dt=fact_approved_to_copy.dt,
+                        is_fact=fact_approved_to_copy.is_fact,
+                        is_approved=False,
+                        type=fact_approved_to_copy.type,
+                        is_vacancy=fact_approved_to_copy.is_vacancy,
+                        is_outsource=fact_approved_to_copy.is_outsource,
                     )
-                    for details in fact_approved.worker_day_details.all()
-                ]
+                    WorkerDay.check_work_time_overlap(
+                        employee_id=fact_approved.employee_id, dt=fact_approved.dt, is_fact=True)
+            except WorkTimeOverlap as e:
+                pass
+                # TODO: запись в debug лог + тест
+            else:
+                WorkerDayCashboxDetails.objects.bulk_create(
+                    [
+                        WorkerDayCashboxDetails(
+                            work_part=details.work_part,
+                            worker_day=not_approved,
+                            work_type_id=details.work_type_id,
+                        )
+                        for details in fact_approved_to_copy.worker_day_details.all()
+                    ]
+                )
+
+    def _get_base_fact_approved_qs(self, closest_plan_approved):
+        return WorkerDay.objects.annotate_value_equality(
+            'is_closest_plan_approved_equal', 'closest_plan_approved', closest_plan_approved,
+        ).annotate(
+            diff_between_tick_and_work_start_seconds=Cast(
+                Extract(self.dttm - F('dttm_work_start'), 'epoch'), IntegerField()),
+        )
+
+    def _get_fact_approved_extra_q(self, closest_plan_approved):
+        fact_approved_extra_q = Q(closest_plan_approved=closest_plan_approved)
+        if self.type == self.TYPE_LEAVING:
+            fact_approved_extra_q |= Q(
+                dttm_work_start__isnull=False,
+                diff_between_tick_and_work_start_seconds__lte=F('shop__network__max_work_shift_seconds'),
             )
-            return
-        
-        if not not_approved.created_by_id:
-            not_approved.dttm_work_start = fact_approved.dttm_work_start
-            not_approved.dttm_work_end = fact_approved.dttm_work_end
-            not_approved.save()
-        
-        if fact_approved.worker_day_details.exists() and not not_approved.worker_day_details.exists():
-            WorkerDayCashboxDetails.objects.bulk_create(
-                [
-                    WorkerDayCashboxDetails(
-                        work_part=details.work_part,
-                        worker_day=not_approved,
-                        work_type_id=details.work_type_id,
-                    )
-                    for details in fact_approved.worker_day_details.all()
-                ]
-            )
+        return fact_approved_extra_q
 
     def save(self, *args, **kwargs):
         """
@@ -1571,23 +1584,13 @@ class AttendanceRecords(AbstractModel):
             return res
 
         with transaction.atomic():
-            base_fact_approved_qs = WorkerDay.objects.annotate_value_equality(
-                'is_closest_plan_approved_equal', 'closest_plan_approved', closest_plan_approved,
-            ).annotate(
-                diff_between_tick_and_work_start_seconds=Cast(
-                    Extract(self.dttm - F('dttm_work_start'), 'epoch'), IntegerField()),
-            )
-            fact_approved_extra_q = Q(closest_plan_approved=closest_plan_approved)
-            if self.type == self.TYPE_LEAVING:
-                fact_approved_extra_q |= Q(
-                    dttm_work_start__isnull=False,
-                    diff_between_tick_and_work_start_seconds__lte=F('shop__network__max_work_shift_seconds'),
-                )
+            base_fact_approved_qs = self._get_base_fact_approved_qs(closest_plan_approved)
+            fact_approved_extra_q = self._get_fact_approved_extra_q(closest_plan_approved)
             fact_approved = base_fact_approved_qs.filter(
                 fact_approved_extra_q,
                 dt=self.dt,
                 employee_id=self.employee_id,
-                shop_id=self.shop_id,
+                shop_id=self.shop_id,  # TODO: опционально (в зависимости от настройки, которая разрешает несколько workerday на 1 дату для 1 сотрудника)
                 is_fact=True,
                 is_approved=True,
             ).order_by('-is_closest_plan_approved_equal').first()
@@ -1603,7 +1606,7 @@ class AttendanceRecords(AbstractModel):
                 setattr(fact_approved, self.TYPE_2_DTTM_FIELD[self.type], self.dttm)
                 setattr(fact_approved, 'type', WorkerDay.TYPE_WORKDAY)
                 if not fact_approved.worker_day_details.exists():
-                    self._create_wd_details(self.dt, fact_approved, active_user_empl)
+                    self._create_wd_details(self.dt, fact_approved, active_user_empl, closest_plan_approved)
                 fact_approved.save()
                 self._create_or_update_not_approved_fact(fact_approved)
             else:
@@ -1647,7 +1650,7 @@ class AttendanceRecords(AbstractModel):
                     }
                 )
                 if _wd_created or not fact_approved.worker_day_details.exists():
-                    self._create_wd_details(self.dt, fact_approved, active_user_empl)
+                    self._create_wd_details(self.dt, fact_approved, active_user_empl, closest_plan_approved)
                 if _wd_created:
                     if not closest_plan_approved:
                         transaction.on_commit(lambda: event_signal.send(

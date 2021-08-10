@@ -11,11 +11,9 @@ def fill_closest_plan_approved(apps, schema_editor):
     WorkerDay = apps.get_model('timetable', 'WorkerDay')
     WorkerDay.objects.filter(closest_plan_approved__isnull=False).update(closest_plan_approved=None)
     WorkerDay.objects.filter(
-        dt__gte=dt_now - timedelta(days=60),  # TODO: на какой период?
+        dt__gte=dt_now - timedelta(days=180),
         is_fact=True,
         is_approved=True,
-        created_by__isnull=True,  # TODO: возможно во всех надо заполнять?
-        last_edited_by__isnull=True,
     ).update(
         closest_plan_approved=Subquery(
             WorkerDay.objects.filter(

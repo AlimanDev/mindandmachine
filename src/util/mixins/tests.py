@@ -157,3 +157,31 @@ class TestsHelperMixin:
         network_settings = json.loads(network.settings_values)
         network_settings[key] = value
         network.settings_values = json.dumps(network_settings)
+
+    def _change_wd_data(self, wd_id, data_to_change, auth_user=None):
+        self.client.force_authenticate(user=auth_user or self.user1)
+        resp = self.client.get(self.get_url('WorkerDay-detail', pk=wd_id))
+        wd_data = resp.json()
+        wd_data.update(data_to_change)
+        resp = self.client.put(
+            self.get_url('WorkerDay-detail', pk=wd_id),
+            data=self.dump_data(wd_data),
+            content_type='application/json',
+        )
+        return resp
+
+    def _approve(self, shop_id, is_fact, dt_from, dt_to, wd_types=None, employee_ids=None):
+        approve_data = {
+            'shop_id': shop_id,
+            'is_fact': is_fact,
+            'dt_from': dt_from,
+            'dt_to': dt_to,
+        }
+        if wd_types:
+            approve_data['wd_types'] = wd_types
+        if employee_ids:
+            approve_data['employee_ids'] = employee_ids
+
+        resp = self.client.post(
+            self.get_url('WorkerDay-approve'), data=self.dump_data(approve_data), content_type='application/json')
+        return resp

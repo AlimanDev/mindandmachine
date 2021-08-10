@@ -14,6 +14,6 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='workerday',
             name='closest_plan_approved',
-            field=models.ForeignKey(blank=True, help_text='Используется в факте подтвержденном (созданном на основе отметок) для связи с планом подтвержденным', null=True, on_delete=django.db.models.deletion.CASCADE, to='timetable.WorkerDay'),
+            field=models.OneToOneField(blank=True, help_text='Используется в факте подтвержденном (созданном на основе отметок) для связи с планом подтвержденным', null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='related_fact_approved', to='timetable.WorkerDay'),
         ),
     ]

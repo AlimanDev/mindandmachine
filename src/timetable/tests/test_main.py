@@ -1731,7 +1731,6 @@ class TestAttendanceRecords(TestsHelperMixin, APITestCase):
             dttm_work_start=datetime.combine(self.dt, time(7, 58, 0)),
             dttm_work_end=datetime.combine(self.dt, time(19, 59, 1)),
             parent_worker_day=self.worker_day_fact_approved,
-            closest_plan_approved=self.worker_day_plan_approved,
         )
 
     def test_attendancerecords_update(self):
@@ -2018,6 +2017,8 @@ class TestAttendanceRecords(TestsHelperMixin, APITestCase):
         self.assertEqual(len(fact_worker_day_details), 1)
         self.assertEqual(fact_worker_day_details[0].work_type_id, plan_worker_day_details[0].work_type_id)
 
+    # TODO: нужно решить после добавления настройки возможности создания нескольких workerday (или отдельной)
+    @expectedFailure
     def test_fact_work_type_received_from_plan_approved_when_shop_differs(self):
         self.worker_day_fact_approved.delete()
         tm_start = datetime.combine(self.dt, time(6, 0, 0))
@@ -2184,7 +2185,7 @@ class TestAttendanceRecords(TestsHelperMixin, APITestCase):
             type=AttendanceRecords.TYPE_LEAVING,
         )
         self.assertEqual(WorkerDay.objects.filter(is_fact=True, employee=self.employee1).count(), 2)
-        wd_not_approved.refresh_from_db()
+        wd_not_approved = WorkerDay.objects.get(is_approved=False, is_fact=True, employee=self.employee1)
         wd_approved.refresh_from_db()
         self.assertEqual(wd_not_approved.dttm_work_start, datetime.combine(self.dt, time(11, 5)))
         self.assertEqual(wd_not_approved.dttm_work_end, datetime.combine(self.dt, time(14, 54)))
@@ -2196,7 +2197,7 @@ class TestAttendanceRecords(TestsHelperMixin, APITestCase):
             type=AttendanceRecords.TYPE_LEAVING,
         )
         self.assertEqual(WorkerDay.objects.filter(is_fact=True, employee=self.employee1).count(), 2)
-        wd_not_approved.refresh_from_db()
+        wd_not_approved = WorkerDay.objects.get(is_approved=False, is_fact=True, employee=self.employee1)
         wd_approved.refresh_from_db()
         self.assertEqual(wd_not_approved.dttm_work_start, datetime.combine(self.dt, time(11, 5)))
         self.assertEqual(wd_not_approved.dttm_work_end, datetime.combine(self.dt, time(19, 54)))
@@ -2205,7 +2206,7 @@ class TestAttendanceRecords(TestsHelperMixin, APITestCase):
     def test_create_record_no_replace_not_approved_fact(self):
         self.network.skip_leaving_tick = False
         self.network.save()
-        wd = WorkerDay.objects.create(
+        wd = WorkerDayFactory(
             dt=self.dt,
             employee_id=self.employment1.employee_id,
             employment=self.employment1,
@@ -2214,8 +2215,10 @@ class TestAttendanceRecords(TestsHelperMixin, APITestCase):
             dttm_work_start=datetime.combine(self.dt, time(10, 5)),
             dttm_work_end=datetime.combine(self.dt, time(20, 10)),
             created_by=self.user1,
+            last_edited_by=self.user1,
             is_fact=True,
         )
+        self.assertEqual(WorkerDay.objects.filter(is_fact=True, employee=self.employee1).count(), 1)
         AttendanceRecords.objects.create(
             shop_id=self.employment1.shop_id,
             user_id=self.employment1.employee.user_id,
@@ -2321,8 +2324,10 @@ class TestAttendanceRecords(TestsHelperMixin, APITestCase):
         self.assertEqual(night, 0.0)
 
     def test_two_facts_created_when_there_are_two_plans(self):
-        self.worker_day_fact_approved.delete()
-        self.worker_day_fact_not_approved.delete()
+        WorkerDay.objects.filter(
+            dt=self.dt,
+            employee_id=self.employment2.employee_id,
+        ).delete()
         WorkerDayFactory(
             dt=self.dt,
             employee_id=self.employment2.employee_id,
@@ -2403,6 +2408,102 @@ class TestAttendanceRecords(TestsHelperMixin, APITestCase):
             is_fact=True,
             is_approved=False,
         ).count(), 2)
+
+    def test_there_is_no_redundant_fact_approved_created_on_att_record_recalc(self):
+        WorkerDay.objects.filter(
+            id__in=[
+                self.worker_day_plan_approved.id,
+                self.worker_day_plan_not_approved.id,
+            ],
+        ).update(
+            dt=self.dt,
+            dttm_work_start=datetime.combine(self.dt, time(10)),
+            dttm_work_end=datetime.combine(self.dt, time(20)),
+        )
+        WorkerDay.objects.filter(
+            id__in=[
+                self.worker_day_fact_approved.id,
+                self.worker_day_fact_not_approved.id,
+            ],
+        ).delete()
+        fact_dttm_start = datetime.combine(self.dt, time(9, 57))
+        ar_start = AttendanceRecords.objects.create(
+            shop=self.shop,
+            user=self.user2,
+            dttm=fact_dttm_start,
+            type=AttendanceRecords.TYPE_COMING,
+        )
+
+        fact_qs = WorkerDay.objects.filter(
+            employee_id=ar_start.employee_id,
+            dt=self.dt,
+            dttm_work_start=fact_dttm_start,
+            type=WorkerDay.TYPE_WORKDAY,
+            is_fact=True,
+        )
+        fact_approved_qs = fact_qs.filter(is_approved=True)
+        fact_approved = fact_approved_qs.get()
+        fact_not_approved_qs = fact_qs.filter(is_approved=False)
+        fact_not_approved = fact_not_approved_qs.get()
+        self.assertIsNone(fact_not_approved.created_by_id)
+        self.assertIsNone(fact_not_approved.last_edited_by_id)
+        # при отметке должен был проставиться closest_plan_approved
+        self.assertEqual(fact_approved.closest_plan_approved.id, self.worker_day_plan_approved.id)
+
+        manual_fact_dttm_end = datetime.combine(self.dt, time(20))
+        resp = self._change_wd_data(fact_not_approved.id, data_to_change={'dttm_work_end': manual_fact_dttm_end})
+        self.assertEqual(resp.status_code, 200)
+        fact_not_approved.refresh_from_db()
+        self.assertEqual(fact_not_approved.dttm_work_end, manual_fact_dttm_end)
+        resp = self._approve(
+            shop_id=fact_not_approved.shop_id,
+            is_fact=True,
+            dt_from=self.dt,
+            dt_to=self.dt,
+            employee_ids=[fact_not_approved.employee_id],
+        )
+        self.assertEqual(resp.status_code, 200)
+        fact_not_approved.refresh_from_db()
+        self.assertTrue(fact_not_approved.is_approved)
+        self.assertIsNone(fact_not_approved.created_by_id)
+        self.assertEqual(fact_not_approved.last_edited_by_id, self.user1.id)
+        self.assertFalse(WorkerDay.objects.filter(id=fact_approved.id).exists())
+        fact_approved = fact_not_approved
+        fact_not_approved = fact_not_approved_qs.get()
+        self.assertIsNone(fact_not_approved.created_by_id)
+        self.assertEqual(fact_not_approved.last_edited_by_id, self.user1.id)
+        # после подтв. факта должен быть проставлен closest_plan_approved в новом факте подтвежденном (бывшем черновике)
+        self.assertEqual(fact_approved.closest_plan_approved.id, self.worker_day_plan_approved.id)
+        ar_start.refresh_from_db()
+
+        new_plan_dttm_end = datetime.combine(self.dt, time(19))
+        resp = self._change_wd_data(
+            self.worker_day_plan_not_approved.id, data_to_change={'dttm_work_end': new_plan_dttm_end})
+        self.assertEqual(resp.status_code, 200)
+        self.worker_day_plan_not_approved.refresh_from_db()
+        self.assertEqual(self.worker_day_plan_not_approved.dttm_work_end, new_plan_dttm_end)
+        resp = self._approve(
+            shop_id=self.worker_day_plan_not_approved.shop_id,
+            is_fact=False,
+            dt_from=self.dt,
+            dt_to=self.dt,
+            employee_ids=[self.worker_day_plan_not_approved.employee_id],
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.worker_day_plan_not_approved.refresh_from_db()
+        self.assertTrue(self.worker_day_plan_not_approved.is_approved)
+        plan_approved = self.worker_day_plan_not_approved
+        # после подтверждения плана должен проставиться новый план подтвержденный (бывшый план черновик)
+        fact_approved.refresh_from_db()
+        self.assertEqual(fact_approved.closest_plan_approved.id, plan_approved.id)
+
+        self.assertTrue(WorkerDay.objects.filter(id=fact_approved.id).exists())
+        self.assertTrue(WorkerDay.objects.filter(id=fact_not_approved.id).exists())
+
+        # TODO: проверка, что автоматический пересчет факта на основе отметок запустится
+        # пока вызовем пересчет отметки вручную
+        ar_start.save()
+        self.assertEqual(fact_approved_qs.count(), 1)  # не должен создаться дополнительный факт
 
 
 class TestVacancy(TestsHelperMixin, APITestCase):

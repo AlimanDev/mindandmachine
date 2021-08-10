@@ -13,16 +13,16 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='network',
             name='max_plan_diff_in_seconds',
-            field=models.PositiveIntegerField(default=18000, verbose_name='Макс. разность между временем начала или окончания для "притягивания" к плановому рабочему дню'),
+            field=models.PositiveIntegerField(default=18000, verbose_name='Max difference between the start or end time to "pull" to the planned work day'),
         ),
         migrations.AddField(
             model_name='network',
             name='max_work_shift_seconds',
-            field=models.PositiveIntegerField(default=86400, verbose_name='Максимальная длина смены (в секундах)'),
+            field=models.PositiveIntegerField(default=57600, verbose_name='Maximum shift length (in seconds)'),
         ),
         migrations.AddField(
             model_name='network',
             name='skip_leaving_tick',
-            field=models.BooleanField(default=False, verbose_name='Пропускать создание отметки об уходе, если с момент открытия предыдущей смены прошло более Максимальной длины смены'),
+            field=models.BooleanField(default=False, verbose_name='Skip the creation of a departure mark if more than the Maximum shift length has passed since the opening of the previous shift'),
         ),
     ]

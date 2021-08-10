@@ -176,7 +176,7 @@ class Network(AbstractActiveModel):
     # пример значения можно найти в src.timetable.tests.test_main.TestFineLogic
     fines_settings = models.TextField(default='{}', verbose_name=_('Fines settings'))
     max_work_shift_seconds = models.PositiveIntegerField(
-        verbose_name=_('Maximum shift length (in seconds)'), default=60 * 60 * 24)
+        verbose_name=_('Maximum shift length (in seconds)'), default=3600 * 16)
     skip_leaving_tick = models.BooleanField(
         verbose_name=_('Skip the creation of a departure mark if more than '
                        'the Maximum shift length has passed since the opening of the previous shift'),
