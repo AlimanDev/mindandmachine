@@ -347,8 +347,9 @@ class WorkerDayViewSet(BaseModelViewSet):
             employee_filter = {}
             if serializer.data.get('employee_ids'):
                 employee_filter['employee_id__in'] = serializer.data['employee_ids']
+            shop = Shop.objects.filter(id=serializer.data['shop_id']).select_related('network').get()
             employee_ids = Employment.objects.get_active(
-                Shop.objects.get(id=serializer.data['shop_id']).network_id,
+                network_id=shop.network_id,
                 dt_from=serializer.data['dt_from'],
                 dt_to=serializer.data['dt_to'],
                 shop_id=serializer.data['shop_id'],
@@ -403,11 +404,13 @@ class WorkerDayViewSet(BaseModelViewSet):
                 wdays_to_approve.values_list('employee_id', 'dt').order_by('employee_id', 'dt').distinct())
             worker_dates_dict = {}
             for employee_id, dates_grouper in groupby(employee_dt_pairs_list, key=lambda i: i[0]):
-                worker_dates_dict[employee_id] = [i[1] for i in list(dates_grouper)]
+                worker_dates_dict[employee_id] = tuple(i[1] for i in list(dates_grouper))
             if employee_dt_pairs_list:
+                employee_days_set = set()
                 employee_days_q = Q()
                 for employee_id, dates in worker_dates_dict.items():
                     employee_days_q |= Q(employee_id=employee_id, dt__in=dates)
+                    employee_days_set.add((employee_id, dates))
 
                 # если у пользователя нет группы с наличием прав на изменение защищенных дней, то проверяем,
                 # что в списке подтверждаемых дней нету защищенных дней, если есть, то выдаем ошибку
@@ -567,11 +570,11 @@ class WorkerDayViewSet(BaseModelViewSet):
 
                 wdays_to_approve.update(is_approved=True)
 
-                delta_in_secs = 60 * 70
                 # проставляется closest_plan_approved в ручной факт подтв., где не проставлен, для пар (сотрудник, даты)
                 # ищем план для факта, чтобы отклонения времени начала и времени окончания не превышала какую-то дельту,
-                # TODO: сделать настройку для delta_in_secs
+                # TODO: тест для delta_in_secs
                 # TODO: функция должна быть переиспользуемой (т.к еще возможно будет использоваться в других местах)
+                # TODO: что будет если время начала или время конца null?
                 WorkerDay.objects.filter(
                     employee_days_q,
                     is_fact=True,
@@ -581,13 +584,13 @@ class WorkerDayViewSet(BaseModelViewSet):
                 ).update(
                     closest_plan_approved=Subquery(WorkerDay.objects.filter(
                         Q(dttm_work_start__gte=OuterRef('dttm_work_start') - datetime.timedelta(
-                            seconds=delta_in_secs)) &
+                            seconds=shop.network.set_closest_plan_approved_delta_for_manual_fact)) &
                         Q(dttm_work_start__lte=OuterRef('dttm_work_start') + datetime.timedelta(
-                            seconds=delta_in_secs)),
+                            seconds=shop.network.set_closest_plan_approved_delta_for_manual_fact)),
                         Q(dttm_work_end__gte=OuterRef('dttm_work_end') - datetime.timedelta(
-                            seconds=delta_in_secs)) &
+                            seconds=shop.network.set_closest_plan_approved_delta_for_manual_fact)) &
                         Q(dttm_work_end__lte=OuterRef('dttm_work_end') + datetime.timedelta(
-                            seconds=delta_in_secs)),
+                            seconds=shop.network.set_closest_plan_approved_delta_for_manual_fact)),
                         employee_id=OuterRef('employee_id'),
                         dt=OuterRef('dt'),
                         is_fact=False,
@@ -648,8 +651,10 @@ class WorkerDayViewSet(BaseModelViewSet):
                         is_approved=True,
                     )
 
-                    # TODO: запуск пересчета факта на основе отметок для пар (сотрудник, даты)
-                    
+                    # TODO: можем не вызывать пересчет факта если включена настройка учитывать только пересечения плана и факта?
+                    if shop.network.run_recalc_fact_from_att_records_on_plan_approve:
+                        transaction.on_commit(lambda: recalc_fact_from_records(employee_days_list=list(employee_days_set)))
+
                     transaction.on_commit(lambda: vacancies_create_and_cancel_for_shop.delay(serializer.validated_data['shop_id']))
                     if not has_permission_to_change_protected_wdays:
                         WorkerDay.check_tasks_violations(

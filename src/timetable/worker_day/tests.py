@@ -874,8 +874,8 @@ class TestCreateFactFromAttendanceRecords(TestsHelperMixin, APITestCase):
 
         create_fact_from_attendance_records(dt, dt)
 
-        self.assertEqual(WorkerDay.objects.filter(is_fact=True, is_approved=True).count(), 3) # два факта не пересчиталось, так как отметки не с терминалов
-        self.assertEqual(WorkerDay.objects.filter(is_fact=True, is_approved=False).count(), 3)
+        self.assertEqual(WorkerDay.objects.filter(is_fact=True, is_approved=True).count(), 2)
+        self.assertEqual(WorkerDay.objects.filter(is_fact=True, is_approved=False).count(), 2)
         wd_night_shift = WorkerDay.objects.get(is_fact=True, is_approved=True, employee_id=self.employment2.employee_id)
         self.assertEqual(wd_night_shift.dt, dt)
         self.assertEqual(wd_night_shift.dttm_work_start, datetime.combine(dt, time(20, 56)))

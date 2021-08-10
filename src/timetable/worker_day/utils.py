@@ -247,31 +247,58 @@ def copy_as_excel_cells(main_worker_days, to_employee_id, to_dates, created_by=N
 
     return created_wds, work_types
 
-def create_fact_from_attendance_records(dt_from, dt_to, shop_ids=None):
-    attrs = AttendanceRecords.objects.filter(
-        dt__gte=dt_from,
-        dt__lte=dt_to + datetime.timedelta(1),
-    ).order_by('user_id', 'dttm')
-    if shop_ids:
-        attrs = attrs.filter(shop_id__in=shop_ids)
-    with transaction.atomic():
-        wds_filter = {
-            'dt__gte': dt_from,
-            'dt__lte': dt_to + datetime.timedelta(1),
-            'is_fact': True,
-            'shop_id__in': attrs.values_list('shop_id', flat=True),
-            'created_by__isnull': True,
-            # TODO: 'last_edited_by__isnull': True + тест
-        }
-        # удаляем весь факт не созданный вручную
-        WorkerDay.objects.filter(**wds_filter).delete()
 
-        for record in attrs:
+def create_fact_from_attendance_records(dt_from=None, dt_to=None, shop_ids=None, employee_days_list=None):
+    assert (dt_from and dt_to) or employee_days_list
+    if employee_days_list is not None:
+        q = Q()
+        employee_days_q = Q()
+        for employee_id, days in employee_days_list:
+            # добавляем соседнюю даты из будущего,
+            # т.к. отметка может относиться к соседней дате (при ночных сменах, например)
+            extended_dates = list(days)
+            for day in days:
+                next_dt = day + datetime.timedelta(days=1)
+                if next_dt not in extended_dates:
+                    extended_dates.append(next_dt)
+
+            employee_days_q |= Q(employee_id=employee_id, dt__in=extended_dates)
+        q &= employee_days_q
+    else:
+        q = Q(
+            dt__gte=dt_from,
+            dt__lte=dt_to + datetime.timedelta(1),
+        )
+        if shop_ids:
+            q &= Q(shop_id__in=shop_ids)
+    att_records = AttendanceRecords.objects.filter(q).order_by('user_id', 'dttm')
+
+    with transaction.atomic():
+        wds_q = Q(
+            last_edited_by__isnull=True,  # TODO: тест, что ручные изменения не удаляются
+            is_fact=True,
+            shop_id__in=att_records.values_list('shop_id', flat=True),  # TODO: правильно?
+        )
+        if employee_days_list is not None:
+            wds_q &= employee_days_q
+        else:
+            wds_q &= Q(
+                dt__gte=dt_from,
+                dt__lte=dt_to + datetime.timedelta(1),
+            )
+            if shop_ids:
+                q &= Q(shop_id__in=shop_ids)
+
+        # удаляем факт не созданный вручную
+        WorkerDay.objects.filter(wds_q).delete()
+
+        for record in att_records:
+            record.type = None  # проставляем None для всех, т.к. пользователь тоже мог ошибиться, TODO: проверить + тесты
             if record.terminal:
-                record.type = None
                 record.employee_id = None
             record.save()
-       
+
+
 def create_worker_days_range(dates, type=WorkerDay.TYPE_WORKDAY, shop_id=None, employee_id=None, tm_work_start=None, tm_work_end=None, work_type_id=None, is_approved=False, is_vacancy=False, outsources=[], created_by=None):
     with transaction.atomic():
         created_wds = []

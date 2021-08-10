@@ -414,8 +414,10 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
         self.assertEqual(WorkerDay.objects.get(id=self.worker_day_fact_not_approved.id).is_approved, True)
         self.assertFalse(WorkerDay.objects.filter(id=self.worker_day_fact_approved.id).exists())
 
-    @override_settings(ZKTECO_INTEGRATION=True, CELERY_TASK_ALWAYS_EAGER=True)
+    @override_settings(CELERY_TASK_ALWAYS_EAGER=True)
     def test_recalc_fact_from_records_after_approve(self):
+        self.network.run_recalc_fact_from_att_records_on_plan_approve = True
+        self.network.save()
         def create_att_record(type, dttm, user_id, employee_id, shop_id, terminal=True):
             return AttendanceRecords.objects.create(
                 dttm=dttm,

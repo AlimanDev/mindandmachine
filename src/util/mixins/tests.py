@@ -2,8 +2,10 @@ import json
 import random
 from calendar import Calendar
 from datetime import datetime, timedelta, time
+from unittest import mock
 
 from django.core.serializers.json import DjangoJSONEncoder
+from django.db import transaction
 from django.urls import reverse
 
 from src.base.models import Employment, FunctionGroup
@@ -163,11 +165,12 @@ class TestsHelperMixin:
         resp = self.client.get(self.get_url('WorkerDay-detail', pk=wd_id))
         wd_data = resp.json()
         wd_data.update(data_to_change)
-        resp = self.client.put(
-            self.get_url('WorkerDay-detail', pk=wd_id),
-            data=self.dump_data(wd_data),
-            content_type='application/json',
-        )
+        with mock.patch.object(transaction, 'on_commit', lambda t: t()):
+            resp = self.client.put(
+                self.get_url('WorkerDay-detail', pk=wd_id),
+                data=self.dump_data(wd_data),
+                content_type='application/json',
+            )
         return resp
 
     def _approve(self, shop_id, is_fact, dt_from, dt_to, wd_types=None, employee_ids=None):
@@ -182,6 +185,7 @@ class TestsHelperMixin:
         if employee_ids:
             approve_data['employee_ids'] = employee_ids
 
-        resp = self.client.post(
-            self.get_url('WorkerDay-approve'), data=self.dump_data(approve_data), content_type='application/json')
+        with mock.patch.object(transaction, 'on_commit', lambda t: t()):
+            resp = self.client.post(
+                self.get_url('WorkerDay-approve'), data=self.dump_data(approve_data), content_type='application/json')
         return resp

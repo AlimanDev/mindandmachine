@@ -30,9 +30,11 @@ def recalc_wdays(**kwargs):
 
 
 @app.task
-def recalc_fact_from_records(dt_from, dt_to, shop_ids=None):
-    if type(dt_from) == str:
+def recalc_fact_from_records(dt_from=None, dt_to=None, shop_ids=None, employee_days_list=None):
+    assert (dt_from and dt_to) or employee_days_list
+    if dt_from and type(dt_from) == str:
         dt_from = datetime.strptime(dt_from, settings.QOS_DATETIME_FORMAT).date()
-    if type(dt_to) == str:
+    if dt_to and type(dt_to) == str:
         dt_to = datetime.strptime(dt_to, settings.QOS_DATETIME_FORMAT).date()
-    create_fact_from_attendance_records(dt_from, dt_to, shop_ids=shop_ids)
+    create_fact_from_attendance_records(
+        dt_from=dt_from, dt_to=dt_to, shop_ids=shop_ids, employee_days_list=employee_days_list)
