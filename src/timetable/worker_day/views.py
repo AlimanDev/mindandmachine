@@ -1438,7 +1438,7 @@ class WorkerDayViewSet(BaseModelViewSet):
             create_worker_days_range(
                 data['dates'], 
                 type=data['type'], 
-                employee_id=data['employee_id'], 
+                employee_id=data.get('employee_id'), 
                 shop_id=data['shop_id'],
                 tm_work_start=data.get('tm_work_start'),
                 tm_work_end=data.get('tm_work_end'),
