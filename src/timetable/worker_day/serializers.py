@@ -34,6 +34,7 @@ class UnaccountedOvertimeMixin:
             )
         return unaccounted_overtime / 60
 
+
 class RequestApproveSerializer(serializers.Serializer):
     shop_id = serializers.IntegerField()
     comment = serializers.CharField(allow_blank=True, required=False)
@@ -147,6 +148,8 @@ class WorkerDaySerializer(serializers.ModelSerializer, UnaccountedOvertimeMixin)
     outsources_ids = serializers.ListField(required=False, child=serializers.IntegerField(), allow_null=True, allow_empty=True, write_only=True)
     unaccounted_overtime = serializers.SerializerMethodField()
 
+    _employee_active_empl = None
+
     class Meta:
         model = WorkerDay
         fields = ['id', 'employee_id', 'shop_id', 'employment_id', 'type', 'dt', 'dttm_work_start', 'dttm_work_end',
@@ -235,6 +238,20 @@ class WorkerDaySerializer(serializers.ModelSerializer, UnaccountedOvertimeMixin)
                     "employment": self.error_messages['user_mismatch']
                 })
 
+        if attrs.get('employee_id'):
+            employee_active_empl = Employment.objects.get_active_empl_by_priority(
+                network_id=self.context['request'].user.network_id,
+                employee_id=attrs.get('employee_id'),
+                dt=attrs.get('dt'),
+                priority_shop_id=attrs.get('shop_id'),
+                priority_employment_id=attrs.get('employment_id'),
+            ).first()
+            if not employee_active_empl:
+                raise self.fail('no_active_employments')
+
+            attrs['employment_id'] = employee_active_empl.id
+            self._employee_active_empl = employee_active_empl
+
         outsources_ids = attrs.pop('outsources_ids', []) or []
         if attrs.get('is_outsource'):
             if not attrs.get('is_vacancy'):
@@ -268,20 +285,8 @@ class WorkerDaySerializer(serializers.ModelSerializer, UnaccountedOvertimeMixin)
                 wdays_qs = wdays_qs.exclude(id=instance.id)
             wdays_qs.delete()
 
-            employee_active_empl = Employment.objects.get_active_empl_by_priority(
-                network_id=self.context['request'].user.network_id,
-                employee_id=employee_id,
-                dt=validated_data.get('dt'),
-                priority_shop_id=validated_data.get('shop_id'),
-                priority_employment_id=validated_data.get('employment_id'),
-            ).first()
-
-            if not employee_active_empl:
-                raise self.fail('no_active_employments')
-
-            validated_data['employment_id'] = employee_active_empl.id
             validated_data['is_vacancy'] = validated_data.get('is_vacancy') \
-                or not employee_active_empl.is_equal_shops
+                or not self._employee_active_empl.is_equal_shops
 
     def _check_overlap(self, employee_id, dt):
         WorkerDay.check_work_time_overlap(employee_id=employee_id, dt=dt, exc_cls=ValidationError)

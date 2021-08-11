@@ -2,6 +2,7 @@ import json
 import uuid
 from datetime import timedelta, time, datetime, date
 from unittest import mock, expectedFailure
+import time as time_module
 
 from dateutil.relativedelta import relativedelta
 from django.core import mail
@@ -1320,7 +1321,7 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
         resp = self.client.post(self.url, data, format='json')
         self.assertEqual(resp.status_code, 400)
         self.assertEqual(
-            resp.json()[0],
+            resp.json()["non_field_errors"][0],
             'Невозможно создать рабочий день, так как пользователь в этот период не трудоустроен',
         )
 
@@ -1513,6 +1514,74 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
         response = self.client.post(self.url, data, format='json')
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(response.json(), {'non_field_errors': ['Дата начала должна быть меньше чем дата окончания.']})
+
+    def test_batch_create_or_update_worker_days(self):
+        WorkerDay.objects.all().delete()
+        data = {
+           'data':  [
+                {
+                    "shop_id": self.shop.id,
+                    "employee_id": self.employee2.id,
+                    "dt": self.dt,
+                    "is_fact": False,
+                    "is_approved": False,
+                    "type": WorkerDay.TYPE_WORKDAY,
+                    "dttm_work_start": datetime.combine(self.dt, time(11)),
+                    "dttm_work_end": datetime.combine(self.dt, time(14)),
+                    "worker_day_details": [{
+                        "work_part": 1.0,
+                        "work_type_id": self.work_type.id}
+                    ]
+                },
+                {
+                    "shop_id": self.shop.id,
+                    "employee_id": self.employee2.id,
+                    "dt": self.dt,
+                    "is_fact": False,
+                    "is_approved": False,
+                    "type": WorkerDay.TYPE_WORKDAY,
+                    "dttm_work_start": datetime.combine(self.dt, time(18)),
+                    "dttm_work_end": datetime.combine(self.dt, time(21)),
+                    "worker_day_details": [{
+                        "work_part": 1.0,
+                        "work_type_id": self.work_type.id}
+                    ]
+                },
+            ],
+        }
+
+        resp = self.client.post(
+            self.get_url('WorkerDay-batch-update-or-create'), self.dump_data(data), content_type='application/json')
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        resp_data = resp.json()
+        id1 = resp_data.get('data')[0]['id']
+        dttm_modified1 = resp_data.get('data')[0]['dttm_modified']
+
+        self.assertEqual(len(resp_data.get('data')), 2)
+        wdays_qs = WorkerDay.objects.filter(
+            dt=self.dt,
+            shop=self.shop,
+            employee_id=self.employee2.id,
+            is_approved=False,
+            is_fact=False,
+        )
+        self.assertEqual(wdays_qs.count(), 2)
+        self.assertEqual(WorkerDayCashboxDetails.objects.filter(worker_day__in=wdays_qs).count(), 2)
+        time_module.sleep(0.1)
+        resp_data.get('data').pop(1)
+        resp = self.client.post(
+            self.get_url('WorkerDay-batch-update-or-create'), self.dump_data(resp_data), content_type='application/json')
+
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        resp_data = resp.json()
+        resp_data.get('data')[0]["dttm_work_start"] = datetime.combine(self.dt, time(9))
+        id2 = resp_data.get('data')[0]['id']
+        dttm_modified2 = resp_data.get('data')[0]['dttm_modified']
+        self.assertEqual(len(resp_data.get('data')), 1)
+        self.assertEqual(wdays_qs.count(), 1)
+        self.assertEqual(WorkerDayCashboxDetails.objects.filter(worker_day__in=wdays_qs).count(), 1)
+        self.assertEqual(id1, id2)
+        self.assertNotEqual(dttm_modified1, dttm_modified2)  # проверка, что время обновляется
 
 
 class TestCropSchedule(TestsHelperMixin, APITestCase):

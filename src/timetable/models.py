@@ -384,6 +384,11 @@ class WorkerDayManager(models.Manager):
         return current_worker_day
 
 
+class WorkerDayOutsourceNetwork(AbstractModel):
+    workerday = models.ForeignKey('timetable.WorkerDay', on_delete=models.CASCADE)
+    network = models.ForeignKey('base.Network', on_delete=models.CASCADE)
+
+
 class WorkerDay(AbstractModel):
     """
     Ключевая сущность, которая определяет, что делает сотрудник в определенный момент времени (работает, на выходном и тд)
@@ -526,6 +531,27 @@ class WorkerDay(AbstractModel):
 
     def __repr__(self):
         return self.__str__()
+
+    @classmethod
+    def _get_batch_create_extra_kwargs(cls):
+        return {
+            'need_count_wh': True,
+        }
+
+    @classmethod
+    def _get_rel_objs_mapping(cls):
+        return {
+            'worker_day_details': (WorkerDayCashboxDetails, 'worker_day_id'),
+            'outsources': (WorkerDayOutsourceNetwork, 'workerday_id'),
+        }
+
+    @classmethod
+    def _get_batch_update_select_related_fields(cls):
+        return ['employee', 'shop']
+
+    @classmethod
+    def _get_batch_delete_others_scope(cls):
+        return ['dt', 'employee_id', 'is_fact', 'is_approved']
 
     def calc_day_and_night_work_hours(self):
         # TODO: нужно учитывать работу в праздничные дни? -- сейчас is_celebration в ProductionDay всегда False
@@ -704,7 +730,10 @@ class WorkerDay(AbstractModel):
     dttm_added = models.DateTimeField(default=timezone.now)
     canceled = models.BooleanField(default=False)
     is_outsource = models.BooleanField(default=False, db_index=True)
-    outsources = models.ManyToManyField(Network, help_text='Аутсорс компании, которые могут откликнуться на данную вакансию')
+    outsources = models.ManyToManyField(
+        Network, through=WorkerDayOutsourceNetwork,
+        help_text='Аутсорс сети, которые могут откликнуться на данную вакансию', blank=True,
+    )
     crop_work_hours_by_shop_schedule = models.BooleanField(
         default=True, verbose_name='Обрезать рабочие часы по времени работы магазина')
     is_blocked = models.BooleanField(

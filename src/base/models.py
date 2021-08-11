@@ -1408,6 +1408,7 @@ class FunctionGroup(AbstractModel):
         ('WorkerDay_unblock', 'Разблокировать рабочий день (Создать)'),
         ('WorkerDay_generate_upload_example', 'Скачать шаблон графика (Получить)'),
         ('WorkerDay_recalc', 'Пересчитать часы (Создать)'),
+        ('WorkerDay_batch_update_or_create', 'Массовое создание/обновление дней сотрудников (Создать/Обновить)'),
         ('WorkerPosition', 'Должность'),
         ('WorkTypeName', 'Название типа работ'),
         ('WorkType', 'Тип работ'),

@@ -206,6 +206,7 @@ class TestURVTicks(MultipleActiveEmploymentsSupportMixin, APITestCase):
         fact_approved = fact_approved_list[0]
         self.assertEqual(fact_approved.employment_id, self.employment2_2_3.id)
 
+    # падает в 00:20+
     def test_get_employment_by_max_norm_work_hours_when_multiple_active_empls_in_the_same_shop(self):
         """
         Получение трудоустройства с наибольшей ставкой
@@ -224,7 +225,7 @@ class TestURVTicks(MultipleActiveEmploymentsSupportMixin, APITestCase):
         1 рабочий день с 09:00 до 15:00
         2 рабочий день с 15:01 до 20:00
 
-        Если сотрудник закончит по 1 смене чуть раньше в 15:40 и переоткроет смену,
+        Если сотрудник закончит по 1 смене чуть раньше в 14:40 и переоткроет смену,
         то должны привязаться к началу следующего дня
         """
         self.client.force_authenticate(user=self.user1)
