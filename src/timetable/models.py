@@ -1676,6 +1676,9 @@ class AttendanceRecords(AbstractModel):
                         'type': WorkerDay.TYPE_WORKDAY,
                         self.TYPE_2_DTTM_FIELD[self.type]: self.dttm,
                         'is_vacancy': active_user_empl.shop_id != self.shop_id if active_user_empl else False,
+                        # TODO: пока не стал проставлять is_outsource, т.к. придется делать доп. действие в интерфейсе,
+                        # чтобы посмотреть что за сотрудник при правке факта из отдела аутсорс-клиента
+                        #'is_outsource': active_user_empl.shop.network_id != self.shop.network_id,
                     }
                 )
                 if _wd_created or not fact_approved.worker_day_details.exists():

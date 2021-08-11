@@ -1,12 +1,15 @@
 from datetime import timedelta
+from src.base.exceptions import FieldError
 import pandas as pd
 
 from django.db import transaction
+from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError, NotFound
 
 from src.base.models import Employment, User, Shop, Employee, Network
+from src.base.models import NetworkConnect
 from src.base.serializers import UserShorSerializer, NetworkSerializer
 from src.base.shop.serializers import ShopSerializer
 from src.conf.djconfig import QOS_DATE_FORMAT
@@ -204,7 +207,12 @@ class WorkerDaySerializer(serializers.ModelSerializer, UnaccountedOvertimeMixin)
                 attrs['shop_id'] = shops[0].id
             else:
                 self.fail('no_shop', amount=len(shops), code=shop_code)
-        elif attrs.get('shop_id') and not Shop.objects.filter(id=attrs.get('shop_id'), network_id=self.context['request'].user.network_id).exists():
+        elif attrs.get('shop_id') and not Shop.objects.filter(
+                Q(network_id=self.context['request'].user.network_id) |
+                Q(network_id__in=NetworkConnect.objects.filter(
+                    outsourcing_id=self.context['request'].user.network_id).values_list('client_id', flat=True)),
+                id=attrs.get('shop_id'),
+        ).exists():
             self.fail('no_such_shop_in_network')
 
         if (attrs.get('employee_id') is None) and ('username' in attrs):
@@ -239,7 +247,20 @@ class WorkerDaySerializer(serializers.ModelSerializer, UnaccountedOvertimeMixin)
                 })
 
         if attrs.get('employee_id'):
+            outsourcing_network_qs = NetworkConnect.objects.filter(
+                client=self.context['request'].user.network_id,
+            ).values_list('outsourcing_id', flat=True)
             employee_active_empl = Employment.objects.get_active_empl_by_priority(
+                extra_q=Q(
+                    Q(
+                        employee__user__network_id=self.context['request'].user.network_id,
+                        shop__network_id=self.context['request'].user.network_id,
+                    ) |
+                    Q(
+                        employee__user__network_id__in=outsourcing_network_qs,
+                        shop__network_id__in=outsourcing_network_qs,
+                    )
+                ),
                 network_id=self.context['request'].user.network_id,
                 employee_id=attrs.get('employee_id'),
                 dt=attrs.get('dt'),
@@ -420,7 +441,7 @@ class ChangeListSerializer(serializers.Serializer):
     type = serializers.CharField()
     tm_work_start = serializers.TimeField(required=False)
     tm_work_end = serializers.TimeField(required=False)
-    work_type_id = serializers.IntegerField(required=False)
+    cashbox_details = WorkerDayCashboxDetailsSerializer(many=True, required=False)
     is_vacancy = serializers.BooleanField(default=False)
     dt_from = serializers.DateField()
     dt_to = serializers.DateField()
@@ -442,21 +463,24 @@ class ChangeListSerializer(serializers.Serializer):
             self.validated_data['employee_id'] = None
             self.validated_data['outsources'] = Network.objects.filter(id__in=self.validated_data.get('outsources', []))
         else:
-            if not self.validated_data['type'] in WorkerDay.TYPES_WITH_TM_RANGE:
+            if not WorkerDay.is_type_with_tm_range(self.validated_data['type']):
                 self.validated_data['shop_id'] = None 
             self.validated_data['outsources'] = []
         if WorkerDay.is_type_with_tm_range(self.validated_data['type']):
             if not self.validated_data.get('tm_work_start'):
-                self.tm_work_start.fail('required')
+                raise FieldError(self.error_messages['required'], 'tm_work_start')
             if not self.validated_data.get('tm_work_end'):
-                self.tm_work_end.fail('required')
+                raise FieldError(self.error_messages['required'], 'tm_work_end')
             if not self.validated_data.get('shop_id'):
-                self.shop_id.fail('required')
-            if not self.validated_data.get('work_type_id'):
-                self.work_type_id.fail('required')
+                raise FieldError(self.error_messages['required'], 'shop_id')
+            if not self.validated_data.get('cashbox_details'):
+                raise FieldError(self.error_messages['required'], 'cashbox_details')
+            if not self.validated_data.get('is_vacancy') and not self.validated_data.get('employee_id'):
+                raise FieldError(self.error_messages['required'], 'employee_id')
         else:
             if not self.validated_data.get('employee_id'):
-                self.employee_id.fail('required')
+                raise FieldError(self.error_messages['required'], 'employee_id')
+            self.validated_data['cashbox_details'] = []
         if self.validated_data['dt_from'] > self.validated_data['dt_to']:
             self.fail('check_dates')
         self.validated_data['dates'] = self._generate_dates(
