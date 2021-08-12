@@ -361,7 +361,7 @@ class TestWorkShiftViewSet(TestsHelperMixin, APITestCase):
         self.employee2.save()
         self.shop.timezone = 'Asia/Vladivostok'
         self.shop.save()
-        if datetime.now().hour <= 14:
+        if datetime.now().hour <= 13:
             self.today -= timedelta(1)
         position = WorkerPosition.objects.create(
             name='Работник',
