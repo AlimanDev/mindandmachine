@@ -637,3 +637,14 @@ class RecalcWdaysSerializer(serializers.Serializer):
     dt_from = serializers.DateField(format=QOS_DATE_FORMAT)
     dt_to = serializers.DateField(format=QOS_DATE_FORMAT)
     employee_id__in = serializers.ListField(child=serializers.IntegerField(), required=False)
+
+class OvertimesUndertimesReportSerializer(serializers.Serializer):
+    employee_id__in = serializers.CharField(required=False)
+    shop_id = serializers.IntegerField(required=False)
+
+    def is_valid(self, *atgs, **kwargs):
+        super().is_valid(*atgs, **kwargs)
+        if not self.validated_data.get('shop_id') and not self.validated_data.get('employee_id__in'):
+            raise ValidationError(_('Shop or employees should be defined.'))
+        if self.validated_data.get('employee_id__in'):
+            self.validated_data['employee_id__in'] = self.validated_data['employee_id__in'].split(',')
