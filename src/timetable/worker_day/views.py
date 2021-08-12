@@ -1,6 +1,7 @@
 import datetime
 import json
 from itertools import groupby
+from src.reports.utils.overtimes_undertimes import overtimes_undertimes_xlsx
 
 import pandas as pd
 from django.conf import settings
@@ -41,6 +42,7 @@ from src.timetable.timesheet.tasks import calc_timesheets
 from src.timetable.vacancy.utils import cancel_vacancies, cancel_vacancy, confirm_vacancy
 from src.timetable.vacancy.tasks import vacancies_create_and_cancel_for_shop
 from src.timetable.worker_day.serializers import (
+    OvertimesUndertimesReportSerializer,
     ChangeListSerializer,
     WorkerDaySerializer,
     WorkerDayApproveSerializer,
@@ -1411,6 +1413,24 @@ class WorkerDayViewSet(BaseModelViewSet):
             raise ValidationError({'detail': _('No employees satisfying the conditions.')})
         recalc_wdays.delay(employee_id__in=employee_ids)
         return Response({'detail': _('Hours recalculation started successfully.')})
+
+    @action(detail=False, methods=['get'])
+    def overtimes_undertimes_report(self, request):
+        data = OvertimesUndertimesReportSerializer(data=request.query_params)
+        data.is_valid(raise_exception=True)
+        data = data.validated_data
+        output = overtimes_undertimes_xlsx(
+            period_step=request.user.network.accounting_period_length, 
+            employee_id__in=data.get('employee_id__in'), 
+            shop_ids=[data.get('shop_id')] if data.get('shop_id') else None,
+            in_memory=True,
+        )
+        response = HttpResponse(
+            output['file'],
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        response['Content-Disposition'] = 'attachment; filename="{}.xlsx"'.format(escape_uri_path('Overtimes_undertimes'))
+        return response
     
     @swagger_auto_schema(
         request_body=ChangeListSerializer,
