@@ -47,6 +47,7 @@ from src.base.models import (
     NetworkConnect,
 )
 from src.timetable.models import GroupWorkerDayPermission
+from src.recognition.admin import RelatedOnlyDropdownNameOrderedFilter
 
 
 class FunctionGroupResource(resources.ModelResource):
@@ -339,7 +340,10 @@ class FunctionGroupAdmin(ImportMixin, ExportActionMixin, admin.ModelAdmin):
 class EmploymentAdmin(admin.ModelAdmin):
     list_display = ('id', 'shop', 'employee', 'function_group', 'dt_hired_formated', 'dt_fired_formated')
     list_select_related = ('employee', 'employee__user', 'shop', 'function_group')
-    list_filter = ('shop', 'employee')
+    list_filter = [
+        ('shop', RelatedOnlyDropdownNameOrderedFilter),
+    ]
+    # list_filter = ('shop', 'employee')
     search_fields = ('employee__user__first_name', 'employee__user__last_name', 'shop__name', 'shop__parent__name',
                      'employee__tabel_code')
     raw_id_fields = ('shop', 'employee', 'position')
