@@ -1563,6 +1563,9 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
 
     def test_batch_create_or_update_worker_days(self):
         WorkerDay.objects.all().delete()
+        options = {
+            'return_response': True,
+        }
         data = {
            'data':  [
                 {
@@ -1594,6 +1597,7 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
                     ]
                 },
             ],
+            'options': options,
         }
 
         resp = self.client.post(
@@ -1615,6 +1619,7 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
         self.assertEqual(WorkerDayCashboxDetails.objects.filter(worker_day__in=wdays_qs).count(), 2)
         time_module.sleep(0.1)
         resp_data.get('data').pop(1)
+        resp_data['options'] = options
         resp = self.client.post(
             self.get_url('WorkerDay-batch-update-or-create'), self.dump_data(resp_data), content_type='application/json')
 
@@ -1628,6 +1633,40 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
         self.assertEqual(WorkerDayCashboxDetails.objects.filter(worker_day__in=wdays_qs).count(), 1)
         self.assertEqual(id1, id2)
         self.assertNotEqual(dttm_modified1, dttm_modified2)  # проверка, что время обновляется
+
+        wd_data = resp_data.get('data').pop(0)
+        # при отправке пустого списка нам нужно передать "разрез" данных
+        # в рамках которого мы будем определять какие объекты нам нужно удалить
+        # например: мы редактируем расписание и хотим удалить все дни на дату для сотрудника в плане черновике
+        # в этом случае мы педеаем пустой список в данных и передаем "разрез" по сотруднику, дате, is_fact, is_approved
+        resp_data['data'] = []
+        options['delete_scope_values_list'] = [
+            {
+                'employee_id': wd_data['employee_id'],
+                'dt': wd_data['dt'],
+                'is_fact': wd_data['is_fact'],
+                'is_approved': wd_data['is_approved'],
+            },
+        ]
+        options.pop('return_response')
+        resp_data['options'] = options
+        resp = self.client.post(
+            self.get_url('WorkerDay-batch-update-or-create'), self.dump_data(resp_data),
+            content_type='application/json')
+        resp_data = resp.json()
+        self.assertDictEqual(
+            resp_data,
+            {
+                'stats': {
+                    "WorkerDay": {
+                        "deleted": 1
+                    },
+                    "WorkerDayCashboxDetails": {
+                        "deleted": 1
+                    }
+                },
+            }
+        )
 
 
 class TestCropSchedule(TestsHelperMixin, APITestCase):

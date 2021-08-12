@@ -21,10 +21,13 @@ class GetObjectByCodeMixin:
         return super().get_object()
 
 
-class BatchUpdateOrCreateParamsSerializer(serializers.Serializer):
+class BatchUpdateOrCreateOptionsSerializer(serializers.Serializer):
     update_key_field = serializers.CharField(required=False, allow_blank=False, allow_null=False)
-    delete_others_scope = serializers.ListField(
+    delete_scope_fields_list = serializers.ListField(
         child=serializers.CharField(), required=False, allow_empty=False, allow_null=False)
+    delete_scope_values_list = serializers.ListField(
+        child=serializers.DictField(), required=False, allow_empty=False, allow_null=False)
+    return_response = serializers.BooleanField(required=False, allow_null=False)
 
 
 def _patch_obj_serializer(obj_serializer, update_key_field=None):
@@ -45,13 +48,13 @@ class BatchUpdateOrCreateMixin:
 
         class BatchUpdateOrCreateSerializer(serializers.Serializer):
             data = obj_serializer_сls(many=True)
-            params = BatchUpdateOrCreateParamsSerializer(required=False)
+            options = BatchUpdateOrCreateOptionsSerializer(required=False)
 
             def __init__(self, *args, **kwargs):
                 super(BatchUpdateOrCreateSerializer, self).__init__(*args, **kwargs)
                 _patch_obj_serializer(
                     obj_serializer=self.fields['data'],
-                    update_key_field=this.request.data.get('params', {}).get('update_key_field', None)
+                    update_key_field=this.request.data.get('options', {}).get('update_key_field', None)
                 )
 
         return BatchUpdateOrCreateSerializer
@@ -73,9 +76,21 @@ class BatchUpdateOrCreateMixin:
         serializer = self.get_batch_update_or_create_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        objects = self._get_model_from_serializer(serializer).batch_update_or_create(
-            data=serializer.validated_data.get('data'), **serializer.validated_data.get('params', {}))
-        return Response(self.get_batch_update_or_create_serializer(instance={'data': objects}).data)
+        return_response = serializer.validated_data.get('options', {}).pop('return_response', False)
+
+        objects, stats = self._get_model_from_serializer(serializer).batch_update_or_create(
+            data=serializer.validated_data.get('data'), **serializer.validated_data.get('options', {}))
+
+        res = {
+            'stats': stats,
+        }
+        if return_response:  # скорее всего нужно для перерендеринга на фронте
+            res['data'] = self.get_batch_update_or_create_serializer(
+                instance={
+                    'data': objects,
+                },
+            ).data['data']
+        return Response(res)
 
 
 class BaseModelViewSet(BatchUpdateOrCreateMixin, ModelViewSet):

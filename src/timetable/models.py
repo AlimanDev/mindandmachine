@@ -550,7 +550,7 @@ class WorkerDay(AbstractModel):
         return ['employee', 'shop']
 
     @classmethod
-    def _get_batch_delete_others_scope(cls):
+    def _get_batch_delete_scope_fields_list(cls):
         return ['dt', 'employee_id', 'is_fact', 'is_approved']
 
     def calc_day_and_night_work_hours(self):

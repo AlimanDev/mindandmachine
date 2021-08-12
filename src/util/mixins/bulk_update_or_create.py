@@ -21,7 +21,7 @@ class BatchUpdateOrCreateModelMixin:
         return []
 
     @classmethod
-    def _get_batch_delete_others_scope(cls):
+    def _get_batch_delete_scope_fields_list(cls):
         return None
 
     @classmethod
@@ -41,7 +41,7 @@ class BatchUpdateOrCreateModelMixin:
         return rel_objs_to_create_or_update
 
     @classmethod
-    def _batch_update_or_create_rel_objs(cls, rel_objs_data, objs, rel_objs_mapping):
+    def _batch_update_or_create_rel_objs(cls, rel_objs_data, objs, rel_objs_mapping, stats):
         all_rel_objs_mapped_by_type = {}
         for idx, rel_objs_to_create_or_update in rel_objs_data.items():
             obj = objs[idx]
@@ -54,11 +54,13 @@ class BatchUpdateOrCreateModelMixin:
 
         for rel_obj_key, rel_obj_data_list in all_rel_objs_mapped_by_type.items():
             rel_obj_cls, rel_obj_reverse_fk_field = rel_objs_mapping.get(rel_obj_key)
-            # TODO: удаление других объектов по _rel_obj_reverse_fk_field ?
-            rel_obj_cls.batch_update_or_create(data=rel_obj_data_list, delete_others_scope=[rel_obj_reverse_fk_field])
+            rel_obj_cls.batch_update_or_create(
+                data=rel_obj_data_list, delete_scope_fields_list=[rel_obj_reverse_fk_field], stats=stats)
 
     @classmethod
-    def batch_update_or_create(cls, data: list, update_key_field: str = 'id', delete_others_scope: list = None):
+    def batch_update_or_create(
+            cls, data: list, update_key_field: str = 'id', delete_scope_fields_list: list = None,
+            delete_scope_values_list: list = None, stats=None):
         """
         Функция для массового создания и/или обновления объектов
 
@@ -82,14 +84,16 @@ class BatchUpdateOrCreateModelMixin:
                 если в словаре значение по этому ключу None, то будет создан новый объект.
                 если в словаре значение по этому ключу найдено среди существующих, то объект будет обновлен
                 если в словаре значение по этому ключу не найдено среди существующих, то объект будет создан
-            delete_others_scope: список полей, по которым будет определяться какие объекты будут удалены
+            delete_scope_fields_list: список полей, по которым будет определяться какие объекты будут удалены
                 после массового создания/обновления (если None, то удалены не будут)
+            delete_scope_values_list: список словарей с значениями для полей из delete_scope_fields_list,
+                по которым будут определяться объекты, которые будут удалены
 
         # TODO: Обновление связанных fk объектов?
         # TODO: Оптимистичный лок? Версия объектов? Пример: изменяем один и тот же WorkerDay в разных вкладках,
             должна быть ошибка если объект был изменен?
         # TODO: Проверка доступа к созданию/обновлению объектов (в т.ч. связанных)?
-        # TODO: Настройка, которая определяет сколько объектов может быть создано в рамках delete_others_scope?
+        # TODO: Настройка, которая определяет сколько объектов может быть создано в рамках delete_scope_fields_list?
         # TODO: Проверки в рамках транзакции (настраиваемые для моделей), например проверка пересечения времени в WorkerDay для 1 пользователя
         # TODO: Сигналы для post/pre bulk_update и bulk_create ?
         """
@@ -99,8 +103,15 @@ class BatchUpdateOrCreateModelMixin:
                 f'Not allowed update key field: "{update_key_field}", allowed fields: {allowed_update_key_fields}')
 
         with transaction.atomic():
-            delete_others_scope = delete_others_scope or cls._get_batch_delete_others_scope()
-            delete_others_set = set()
+            stats = stats or {}
+            delete_scope_fields_list = delete_scope_fields_list or cls._get_batch_delete_scope_fields_list()
+            delete_scope_values_set = set()
+            if delete_scope_values_list:
+                for delete_scope_values in delete_scope_values_list:
+                    delete_scope_values_set.add(
+                        tuple((delete_scope_field, delete_scope_values.get(delete_scope_field)) for delete_scope_field in
+                            delete_scope_fields_list)
+                    )
             to_create = []
             to_update = []
             update_keys = []
@@ -129,14 +140,8 @@ class BatchUpdateOrCreateModelMixin:
                     objs_data=to_create, rel_objs_mapping=rel_objs_mapping)
                 objs_to_create = [cls(**obj_dict, **cls._get_batch_create_extra_kwargs()) for obj_dict in to_create]
                 cls.objects.bulk_create(objs_to_create)  # в объектах будут проставлены id (только в postgres)
-
-                if delete_others_scope:
-                    for obj_to_create in objs_to_create:
-                        delete_others_tuple = tuple((k, getattr(obj_to_create, k)) for k in delete_others_scope)
-                        delete_others_set.add(delete_others_tuple)
-
                 cls._batch_update_or_create_rel_objs(
-                    rel_objs_data=rel_objs_data, objs=objs_to_create, rel_objs_mapping=rel_objs_mapping)
+                    rel_objs_data=rel_objs_data, objs=objs_to_create, rel_objs_mapping=rel_objs_mapping, stats=stats)
 
             update_fields = {"dttm_modified"}
             if to_update:
@@ -149,25 +154,43 @@ class BatchUpdateOrCreateModelMixin:
                     obj.update(update_dict=update_dict, save=False)
                     objs_to_update.append(obj)
                 cls.objects.bulk_update(objs_to_update, update_fields)
-
-                if delete_others_scope:
-                    for obj_to_update in objs_to_update:
-                        delete_others_tuple = tuple((k, getattr(obj_to_update, k)) for k in delete_others_scope)
-                        delete_others_set.add(delete_others_tuple)
-
                 cls._batch_update_or_create_rel_objs(
-                    rel_objs_data=rel_objs_data, objs=objs_to_update, rel_objs_mapping=rel_objs_mapping)
+                    rel_objs_data=rel_objs_data, objs=objs_to_update, rel_objs_mapping=rel_objs_mapping, stats=stats)
 
             objs = objs_to_create + objs_to_update
 
-            if delete_others_set:
-                q_for_delete = Q()
-                for delete_others_tuples in delete_others_set:
-                    q_for_delete |= Q(**dict(delete_others_tuples))
+            deleted_dict = {}
+            if delete_scope_fields_list:
+                for obj_to_update in objs_to_update:
+                    delete_scope_values_tuple = tuple((k, getattr(obj_to_update, k)) for k in delete_scope_fields_list)
+                    delete_scope_values_set.add(delete_scope_values_tuple)
 
-                cls.objects.filter(q_for_delete).exclude(id__in=list(obj.id for obj in objs)).delete()
+                for obj_to_create in objs_to_create:
+                    delete_scope_values_tuple = tuple((k, getattr(obj_to_create, k)) for k in delete_scope_fields_list)
+                    delete_scope_values_set.add(delete_scope_values_tuple)
 
-        return objs
+                if delete_scope_values_set:
+                    q_for_delete = Q()
+                    for delete_scope_values_tuples in delete_scope_values_set:
+                        q_for_delete |= Q(**dict(delete_scope_values_tuples))
+
+                    _total_deleted_count, deleted_dict = cls.objects.filter(
+                        q_for_delete).exclude(id__in=list(obj.id for obj in objs)).delete()
+
+            cls_name = cls.__name__
+            cls_stats = stats.setdefault(cls_name, {})
+            if objs_to_create:
+                cls_stats['created'] = cls_stats.get('created', 0) + len(objs_to_create)
+            if objs_to_update:
+                cls_stats['updated'] = cls_stats.get('updated', 0) + len(objs_to_update)
+            for original_deleted_cls_name, deleted_count in deleted_dict.items():
+                if deleted_count:
+                    deleted_cls_name = original_deleted_cls_name.split('.')[1]
+                    deleted_cls_stats = stats.setdefault(deleted_cls_name, {})
+                    deleted_cls_stats['deleted'] = deleted_cls_stats.get('deleted', 0) + deleted_dict.get(
+                        original_deleted_cls_name)
+
+        return objs, stats
 
     def update(self, update_dict=None, save=True, **kwargs):
         if not update_dict:
