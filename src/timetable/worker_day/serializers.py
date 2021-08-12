@@ -261,7 +261,6 @@ class WorkerDaySerializer(serializers.ModelSerializer, UnaccountedOvertimeMixin)
                         shop__network_id__in=outsourcing_network_qs,
                     )
                 ),
-                network_id=self.context['request'].user.network_id,
                 employee_id=attrs.get('employee_id'),
                 dt=attrs.get('dt'),
                 priority_shop_id=attrs.get('shop_id'),
