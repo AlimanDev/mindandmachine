@@ -1,3 +1,6 @@
+from dateutil.relativedelta import relativedelta
+from src.base.models import Employee
+from src.reports.utils.overtimes_undertimes import overtimes_undertimes
 from rest_framework.test import APITestCase
 from src.reports.utils.create_urv_stat import urv_stat_v1
 from src.reports.utils.urv_violators import urv_violators_report, urv_violators_report_xlsx, urv_violators_report_xlsx_v2
@@ -397,3 +400,94 @@ class TestUnaccountedOvertime(APITestCase):
         }
         self.assertEquals(dict(df.iloc[0]), data1)
         self.assertEquals(dict(df.iloc[1]), data2)
+
+
+class TestOvertimesUndertimes(APITestCase):
+    USER_USERNAME = "user1"
+    USER_EMAIL = "q@q.q"
+    USER_PASSWORD = "4242"
+
+    def setUp(self):
+        super().setUp()
+        create_departments_and_users(self)
+        self.dt = date.today()
+        self._create_worker_day(
+            self.employment1,
+            dttm_work_start=datetime.combine(self.dt, time(14)),
+            dttm_work_end=datetime.combine(self.dt, time(20)),
+            is_approved=True,
+        )
+        self._create_worker_day(
+            self.employment2,
+            dttm_work_start=datetime.combine(self.dt, time(13)),
+            dttm_work_end=datetime.combine(self.dt + timedelta(1), time(1)),
+            is_approved=True,
+        )
+        self._create_worker_day(
+            self.employment3,
+            dttm_work_start=datetime.combine(self.dt, time(8)),
+            dttm_work_end=datetime.combine(self.dt, time(20)),
+            is_approved=True,
+        )
+        self._create_worker_day(
+            self.employment4,
+            dttm_work_start=datetime.combine(self.dt, time(8)),
+            dttm_work_end=datetime.combine(self.dt, time(20)),
+            is_approved=True,
+        )
+        # меньше часа переработка
+        self._create_worker_day(
+            self.employment1,
+            dttm_work_start=datetime.combine(self.dt, time(13, 45)),
+            dttm_work_end=datetime.combine(self.dt, time(20, 15)),
+            is_approved=True,
+            is_fact=True,
+        )
+        # переработка 3 часа
+        self._create_worker_day(
+            self.employment2,
+            dttm_work_start=datetime.combine(self.dt, time(12)),
+            dttm_work_end=datetime.combine(self.dt + timedelta(1), time(3)),
+            is_approved=True,
+            is_fact=True,
+        )
+        # нет переработки
+        self._create_worker_day(
+            self.employment3,
+            dttm_work_start=datetime.combine(self.dt, time(8)),
+            dttm_work_end=datetime.combine(self.dt, time(20)),
+            is_approved=True,
+            is_fact=True,
+        )
+        # переработка 1 час
+        self._create_worker_day(
+            self.employment4,
+            dttm_work_start=datetime.combine(self.dt, time(7)),
+            dttm_work_end=datetime.combine(self.dt, time(20, 30)),
+            is_approved=True,
+            is_fact=True,
+        )
+
+
+    def _create_worker_day(self, employment, dt=None, is_fact=False, is_approved=False, dttm_work_start=None, dttm_work_end=None, type=WorkerDay.TYPE_WORKDAY):
+        if not dt:
+            dt = self.dt
+        return WorkerDay.objects.create(
+            shop_id=employment.shop_id,
+            type=type,
+            employment=employment,
+            employee=employment.employee,
+            dt=dt,
+            dttm_work_start=dttm_work_start,
+            dttm_work_end=dttm_work_end,
+            is_fact=is_fact,
+            is_approved=is_approved,
+            created_by=self.user1,
+        )
+
+    def test_overtimes_undertimes(self):
+        data = overtimes_undertimes(period_step=3)
+        self.assertCountEqual(data['employees'], Employee.objects.all())
+        self.network.accounting_period_length = 3
+        dt_from, dt_to = self.network.get_acc_period_range(date.today())
+        self.assertEquals(data['months'], [(dt_from + relativedelta(months=i)).month for i in range(3)])

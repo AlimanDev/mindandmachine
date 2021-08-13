@@ -89,10 +89,15 @@ def fill_days(from_date, to_date, region_id, file_name='etc/scripts/work_data.cs
             month_data = year_data[month_name.title()].replace('+', '').split(',')
             total_days = monthrange(year, month_num)[1]
             short_days = [day.replace('*', '') for day in month_data if '*' in day]
+            celebrations = [day.replace('^', '') for day in month_data if '^' in day]
             for day in range(total_days):
                 dt = datetime.date(year, month_num, day + 1)
+                is_celebration = False
                 if str(dt.day) in short_days:
                     day_type = ProductionDay.TYPE_SHORT_WORK
+                elif str(dt.day) in celebrations:
+                    day_type = ProductionDay.TYPE_HOLIDAY
+                    is_celebration = True
                 elif str(dt.day) in month_data:
                     day_type = ProductionDay.TYPE_HOLIDAY
                 else:
@@ -102,7 +107,7 @@ def fill_days(from_date, to_date, region_id, file_name='etc/scripts/work_data.cs
                     region_id=region_id,
                     defaults={
                         'type': day_type,
-                        'is_celebration': False,  # нужно проставлять?
+                        'is_celebration': is_celebration,
                     }
                 )
 

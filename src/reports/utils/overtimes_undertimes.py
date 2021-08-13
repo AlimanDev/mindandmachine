@@ -1,15 +1,14 @@
 from calendar import monthrange
 from datetime import date
 import io
+from src.reports.helpers import RoundWithPlaces
 from dateutil.relativedelta import relativedelta
 from django.utils.translation import gettext as _
 
 import xlsxwriter
-from src.base.models import Employee, Employment
-from django.db.models.aggregates import Sum
-from django.db.models.fields import FloatField
-from django.db.models.functions.comparison import Coalesce
-from django.db.models.query_utils import Q
+from src.base.models import Employee, Employment, ProductionDay
+from django.db.models import Sum, Q
+from django.db.models.functions import Coalesce
 from src.timetable.models import PlanAndFactHours, ProdCal, WorkerDay
 
 def overtimes_undertimes(period_step=6, employee_id__in=None, shop_ids=None):
@@ -22,7 +21,7 @@ def overtimes_undertimes(period_step=6, employee_id__in=None, shop_ids=None):
     start_month = end_month - (period_step - 1)
     dt_from, dt_to = date(year, start_month, 1), \
         date(year, end_month, monthrange(year, end_month)[1])
-    print(dt_from, dt_to)
+    celebration_dates = ProductionDay.objects.filter(dt__gte=dt_from, dt__lte=dt_to, is_celebration=True).values_list('dt', flat=True)
     employee_filter = {}
     if shop_ids:
         employee_filter['id__in'] = Employment.objects.get_active(
@@ -35,28 +34,36 @@ def overtimes_undertimes(period_step=6, employee_id__in=None, shop_ids=None):
         dt__gte=dt_from,
         dt__lte=dt_to,
         employee__in=employees,
+    ).exclude(
+        dt__in=celebration_dates,
     ).values(
         'employee_id',
         'dt__month',
     ).annotate(
         plan=Coalesce(
-            Sum(
-                'plan_work_hours',
-                filter=Q(
-                    plan_work_hours__gte=0,
-                    wd_type__in=WorkerDay.TYPES_WITH_TM_RANGE
-                ),
-            output_field=FloatField()), 
+            RoundWithPlaces(
+                Sum(
+                    'plan_work_hours',
+                    filter=Q(
+                        plan_work_hours__gte=0,
+                        wd_type__in=WorkerDay.TYPES_WITH_TM_RANGE
+                    ),
+                ), 
+                1,
+            ),
             0
         ),
         fact=Coalesce(
-            Sum(
-                'fact_work_hours',
-                filter=Q(
-                    fact_work_hours__gte=0,
-                    wd_type__in=WorkerDay.TYPES_WITH_TM_RANGE
-                ),
-            output_field=FloatField()), 
+            RoundWithPlaces(
+                Sum(
+                    'fact_work_hours',
+                    filter=Q(
+                        fact_work_hours__gte=0,
+                        wd_type__in=WorkerDay.TYPES_WITH_TM_RANGE
+                    ),
+                ), 
+                1,
+            ),
             0
         )
     ).order_by('employee__tabel_code')
@@ -65,12 +72,14 @@ def overtimes_undertimes(period_step=6, employee_id__in=None, shop_ids=None):
         dt__gte=dt_from,
         dt__lte=dt_to,
         employee__in=employees,
+    ).exclude(
+        dt__in=celebration_dates,
     ).values(
         'employee_id',
         'dt__month',
     ).annotate(
         norm=Coalesce(
-            Sum('norm_hours'), 
+            RoundWithPlaces(Sum('norm_hours'), 1), 
             0
         ),
     ).order_by('employee__tabel_code')
