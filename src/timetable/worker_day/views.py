@@ -1536,7 +1536,14 @@ class WorkerDayViewSet(BaseModelViewSet):
         recalc_wdays.delay(employee_id__in=employee_ids)
         return Response({'detail': _('Hours recalculation started successfully.')})
 
-    @action(detail=False, methods=['get'])
+    @swagger_auto_schema(
+        query_serializer=OvertimesUndertimesReportSerializer,
+        responses={200: None},
+        operation_description='''
+        Скачать отчет о переработках/недоработках.
+        '''
+    )
+    @action(detail=False, methods=['get'], filterset_class=None)
     def overtimes_undertimes_report(self, request):
         data = OvertimesUndertimesReportSerializer(data=request.query_params)
         data.is_valid(raise_exception=True)
