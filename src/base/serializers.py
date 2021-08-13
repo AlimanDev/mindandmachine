@@ -48,6 +48,7 @@ class NetworkSerializer(serializers.ModelSerializer):
     default_stats = serializers.SerializerMethodField()
     show_tabel_graph = serializers.SerializerMethodField()
     unaccounted_overtime_threshold = serializers.SerializerMethodField()
+    show_remaking_choice = serializers.SerializerMethodField()
 
     def get_default_stats(self, obj: Network):
         default_stats = json.loads(obj.settings_values).get('default_stats', {})
@@ -65,6 +66,9 @@ class NetworkSerializer(serializers.ModelSerializer):
 
     def get_unaccounted_overtime_threshold(self, obj:Network):
         return obj.settings_values_prop.get('unaccounted_overtime_threshold', 60)
+
+    def get_show_remaking_choice(self, obj: Network):
+        return obj.settings_values_prop.get('show_remaking_choice', False)
 
     def get_logo_url(self, obj) -> str:
         if obj.logo:
@@ -90,6 +94,7 @@ class NetworkSerializer(serializers.ModelSerializer):
             'show_worker_day_tasks',
             'show_user_biometrics_block',
             'unaccounted_overtime_threshold',
+            'show_remaking_choice',
         ]
 
 
