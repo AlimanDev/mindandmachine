@@ -540,6 +540,9 @@ class WorkerDay(AbstractModel):
 
     @classmethod
     def _get_rel_objs_mapping(cls):
+        # TODO: добавить условие, только при выполнении которого, действия над связанными объектами выполняются, например
+        #    детали рабочего дня только если тип "РД"
+        #    аутсорс только если план и is_vacancy=True и is_outsource=True
         return {
             'worker_day_details': (WorkerDayCashboxDetails, 'worker_day_id'),
             'outsources': (WorkerDayOutsourceNetwork, 'workerday_id'),

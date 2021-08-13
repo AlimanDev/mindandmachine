@@ -2985,7 +2985,6 @@ class TestVacancy(TestsHelperMixin, APITestCase):
         self.assertEqual(resp.json()['results'][0]['dt'], self.dt_now.strftime('%Y-%m-%d'))
 
 
-
 class TestAditionalFunctions(TestsHelperMixin, APITestCase):
     USER_USERNAME = "user1"
     USER_EMAIL = "q@q.q"
@@ -4024,6 +4023,24 @@ class TestAditionalFunctions(TestsHelperMixin, APITestCase):
                 data=self.dump_data(data), content_type='application/json',
             )
         self.assertContains(resp2, 'Не найдено сотрудников удовлетворяющих условиям запроса.', status_code=400)
+
+    def test_duplicate_for_multiple_wdays_on_one_date(self):
+        dt_from = date.today()
+        self.create_worker_days(self.employment2, dt_from, 5, 10, 14, True)
+        self.create_worker_days(self.employment2, dt_from, 5, 18, 22, True)
+        self.create_worker_days(self.employment3, dt_from, 4, 10, 14, False)
+        self.create_worker_days(self.employment3, dt_from, 4, 18, 22, False)
+        self.assertEqual(WorkerDay.objects.filter(employee=self.employee3, is_approved=False).count(), 8)
+        data = {
+            'from_workerday_ids': list(WorkerDay.objects.filter(employee=self.employee2).values_list('id', flat=True)),
+            'to_employee_id': self.employee3.id,
+            'to_dates': [Converter.convert_date(dt_from + timedelta(i)) for i in range(5)],
+        }
+        url = f'{self.url}duplicate/'
+        response = self.client.post(url, data, format='json')
+        self.assertEqual(len(response.json()), 10)
+        self.assertEqual(WorkerDay.objects.filter(employee=self.employee3, is_approved=False).count(), 10)
+
 
 class TestFineLogic(APITestCase):
     USER_USERNAME = "user1"

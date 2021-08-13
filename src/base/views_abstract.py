@@ -79,7 +79,10 @@ class BatchUpdateOrCreateMixin:
         return_response = serializer.validated_data.get('options', {}).pop('return_response', False)
 
         objects, stats = self._get_model_from_serializer(serializer).batch_update_or_create(
-            data=serializer.validated_data.get('data'), **serializer.validated_data.get('options', {}))
+            data=serializer.validated_data.get('data'),
+            user=self.request.user if self.request.user.is_authenticated else None,
+            **serializer.validated_data.get('options', {}),
+        )
 
         res = {
             'stats': stats,

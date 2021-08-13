@@ -777,7 +777,7 @@ class EmploymentManager(models.Manager):
             q &= extra_q
         return self.filter(q, **kwargs)
 
-    def get_active_empl_by_priority(
+    def get_active_empl_by_priority(  # TODO: переделать, чтобы можно было в 1 запросе получать активные эмплойменты для пар (сотрудник, даты)?
             self, network_id=None, dt=None, priority_shop_id=None, priority_employment_id=None,
             priority_work_type_id=None, priority_by_visible=True, extra_q=None, **kwargs):
         qs = self.get_active(network_id=network_id, dt_from=dt, dt_to=dt, extra_q=extra_q, **kwargs)

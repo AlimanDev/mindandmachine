@@ -1,6 +1,6 @@
 import datetime
 import json
-from src.util.models_converter import Converter
+from collections import OrderedDict
 
 from django.conf import settings
 from django.contrib.postgres.aggregates import StringAgg
@@ -22,6 +22,7 @@ from src.timetable.models import (
     WorkerDay,
     WorkerDayCashboxDetails,
 )
+from src.util.models_converter import Converter
 
 
 def exchange(data, error_messages):
@@ -192,54 +193,63 @@ def copy_as_excel_cells(main_worker_days, to_employee_id, to_dates, created_by=N
 
     created_wds = []
     wdcds_list_to_create = []
+    main_worker_days_grouped_by_dt = OrderedDict()  # TODO: тест для копирования нескольких дней на 1 дату
+    for main_worker_day in main_worker_days:
+        key = main_worker_day.dt
+        main_worker_days_grouped_by_dt.setdefault(key, []).append(main_worker_day)
+    main_worker_days_lists = list(main_worker_days_grouped_by_dt.values())
+
     length_main_wds = len(main_worker_days)
     for i, dt in enumerate(to_dates):
         i = i % length_main_wds
-        blank_day = main_worker_days[i]
 
-        worker_active_empl = Employment.objects.get_active_empl_by_priority(
-            network_id=blank_day.employee.user.network_id, employee_id=to_employee_id,
-            dt=dt,
-            priority_shop_id=blank_day.shop_id,
-        ).select_related(
-            'position__breaks',
-        ).first()
+        blank_days = main_worker_days_lists[i]
+        if blank_days:
+            worker_active_empl = Employment.objects.get_active_empl_by_priority(
+                network_id=blank_days[0].employee.user.network_id, employee_id=to_employee_id,
+                dt=dt,
+                priority_shop_id=blank_days[0].shop_id,
+            ).select_related(
+                'position__breaks',
+            ).first()
 
-        # не создавать день, если нету активного трудоустройства на эту дату
-        if not worker_active_empl:
-            raise ValidationError(
-                _('It is not possible to create days on the selected dates. '
-                'Please check whether the employee has active employment.')
-            )
-        dt_to = dt
-        if blank_day.dttm_work_end and blank_day.dttm_work_start and blank_day.dttm_work_end.date() > blank_day.dttm_work_start.date():
-            dt_to = dt + datetime.timedelta(days=1)
-
-        new_wd = WorkerDay.objects.create(
-            employee_id=worker_active_empl.employee_id,
-            employment=worker_active_empl,
-            dt=dt,
-            shop=blank_day.shop,
-            type=blank_day.type,
-            dttm_work_start=datetime.datetime.combine(
-                dt, blank_day.dttm_work_start.timetz()) if blank_day.dttm_work_start else None,
-            dttm_work_end=datetime.datetime.combine(
-                dt_to, blank_day.dttm_work_end.timetz()) if blank_day.dttm_work_end else None,
-            is_approved=False,
-            is_fact=False,
-            created_by_id=created_by,
-        )
-        created_wds.append(new_wd)
-
-        new_wdcds = main_worker_days_details.get(blank_day.id, [])
-        for new_wdcd in new_wdcds:
-            wdcds_list_to_create.append(
-                WorkerDayCashboxDetails(
-                    worker_day=new_wd,
-                    work_type_id=new_wdcd.work_type_id,
-                    work_part=new_wdcd.work_part,
+            # не создавать день, если нету активного трудоустройства на эту дату
+            if not worker_active_empl:
+                raise ValidationError(
+                    _('It is not possible to create days on the selected dates. '
+                      'Please check whether the employee has active employment.')
                 )
-            )
+
+            for blank_day in blank_days:
+                dt_to = dt
+                if blank_day.dttm_work_end and blank_day.dttm_work_start and blank_day.dttm_work_end.date() > blank_day.dttm_work_start.date():
+                    dt_to = dt + datetime.timedelta(days=1)
+
+                new_wd = WorkerDay.objects.create(
+                    employee_id=worker_active_empl.employee_id,
+                    employment=worker_active_empl,
+                    dt=dt,
+                    shop=blank_day.shop,
+                    type=blank_day.type,
+                    dttm_work_start=datetime.datetime.combine(
+                        dt, blank_day.dttm_work_start.timetz()) if blank_day.dttm_work_start else None,
+                    dttm_work_end=datetime.datetime.combine(
+                        dt_to, blank_day.dttm_work_end.timetz()) if blank_day.dttm_work_end else None,
+                    is_approved=False,
+                    is_fact=False,
+                    created_by_id=created_by,
+                )
+                created_wds.append(new_wd)
+
+                new_wdcds = main_worker_days_details.get(blank_day.id, [])
+                for new_wdcd in new_wdcds:
+                    wdcds_list_to_create.append(
+                        WorkerDayCashboxDetails(
+                            worker_day=new_wd,
+                            work_type_id=new_wdcd.work_type_id,
+                            work_part=new_wdcd.work_part,
+                        )
+                    )
 
     WorkerDayCashboxDetails.objects.bulk_create(wdcds_list_to_create)
 

@@ -1,3 +1,4 @@
+from django.core.exceptions import FieldDoesNotExist
 from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
@@ -22,11 +23,35 @@ class BatchUpdateOrCreateModelMixin:
 
     @classmethod
     def _get_batch_delete_scope_fields_list(cls):
-        return None
+        raise NotImplementedError
 
     @classmethod
     def _get_allowed_update_key_fields(cls):
         return ['id']
+
+    @classmethod
+    def _check_batch_create_or_update_objs_perms(cls, user, create_or_update_qs, raise_exception=False, exc_cls=None):
+        """
+        Проверка прав на сохранение/обновление списка объектов
+            (для объектов, которые создаем -- можем использовать только список еще не созданных объектов)
+        """
+        pass
+
+    @classmethod
+    def _check_batch_create_or_update_qs_perms(cls, user, create_or_update_objs, raise_exception=False, exc_cls=None):
+        """
+        Проверка прав на сохранение/обновление объектов на основе qs
+            (для объектов, которые обновляем -- можем использовать qs)
+        """
+        pass
+
+    @classmethod
+    def _check_batch_delete_qs_perms(cls, user, delete_qs, raise_exception=False, exc_cls=None):
+        """
+        Првоерка прав на удаление объектов на основе qs
+            (для объектов, которые удаляем -- можем использовать qs)
+        """
+        pass
 
     @classmethod
     def _pop_rel_objs_data(cls, objs_data, rel_objs_mapping):
@@ -58,9 +83,18 @@ class BatchUpdateOrCreateModelMixin:
                 data=rel_obj_data_list, delete_scope_fields_list=[rel_obj_reverse_fk_field], stats=stats)
 
     @classmethod
+    def _is_field_exist(cls, field_name):
+        try:
+            cls._meta.get_field(field_name)
+        except FieldDoesNotExist:
+            return False
+
+        return True
+
+    @classmethod
     def batch_update_or_create(
             cls, data: list, update_key_field: str = 'id', delete_scope_fields_list: list = None,
-            delete_scope_values_list: list = None, stats=None):
+            delete_scope_values_list: list = None, stats=None, user=None):
         """
         Функция для массового создания и/или обновления объектов
 
@@ -75,6 +109,7 @@ class BatchUpdateOrCreateModelMixin:
                     или поштучно с сбором ошибок при сохранении объектов?
         В чем плюсы:
             скорость выполнения
+                (количество запросов к бд не растет с увеличением числа создаваемых/обновляемых/удаляемых объектов)
             единый интерфейс для всех объектов при массовом создании/обновлении объектов
             можно использовать существующие сериализаторы drf для валидации данных
 
@@ -84,10 +119,12 @@ class BatchUpdateOrCreateModelMixin:
                 если в словаре значение по этому ключу None, то будет создан новый объект.
                 если в словаре значение по этому ключу найдено среди существующих, то объект будет обновлен
                 если в словаре значение по этому ключу не найдено среди существующих, то объект будет создан
+                    # TODO: сейчас так? -- нужен тест
             delete_scope_fields_list: список полей, по которым будет определяться какие объекты будут удалены
                 после массового создания/обновления (если None, то удалены не будут)
             delete_scope_values_list: список словарей с значениями для полей из delete_scope_fields_list,
                 по которым будут определяться объекты, которые будут удалены
+            user: пользователь, который инициировал вызов функции, используется для проверки прав доступа
 
         # TODO: Обновление связанных fk объектов?
         # TODO: Оптимистичный лок? Версия объектов? Пример: изменяем один и тот же WorkerDay в разных вкладках,
@@ -95,7 +132,9 @@ class BatchUpdateOrCreateModelMixin:
         # TODO: Проверка доступа к созданию/обновлению объектов (в т.ч. связанных)?
         # TODO: Настройка, которая определяет сколько объектов может быть создано в рамках delete_scope_fields_list?
         # TODO: Проверки в рамках транзакции (настраиваемые для моделей), например проверка пересечения времени в WorkerDay для 1 пользователя
-        # TODO: Сигналы для post/pre bulk_update и bulk_create ?
+        # TODO: Сигналы post_batch_update, post_batch_create ?
+        # TODO: Проверка прав доступа для WorkerDay при создании/изменеии
+        # TODO: Проверка на наличие активного трудоустройства у сотрудника на создаваемые даты
         """
         allowed_update_key_fields = cls._get_allowed_update_key_fields()
         if update_key_field not in allowed_update_key_fields:
@@ -109,53 +148,60 @@ class BatchUpdateOrCreateModelMixin:
             if delete_scope_values_list:
                 for delete_scope_values in delete_scope_values_list:
                     delete_scope_values_set.add(
-                        tuple((delete_scope_field, delete_scope_values.get(delete_scope_field)) for delete_scope_field in
+                        tuple(
+                            (delete_scope_field, delete_scope_values.get(delete_scope_field)) for delete_scope_field in
                             delete_scope_fields_list)
                     )
             to_create = []
-            to_update = []
+            to_update_dict = {}
             update_keys = []
             objs_to_create = []
             objs_to_update = []
             rel_objs_mapping = cls._get_rel_objs_mapping()
+            now = timezone.now()
             for obj_dict in data:
+                obj_dict['dttm_modified'] = now
+
+                keys_to_delete = [k for k in (obj_dict.keys()) if not cls._is_field_exist(k)]
+                for k in keys_to_delete:
+                    del obj_dict[k]
+
                 update_key = obj_dict.get(update_key_field)
                 if update_key is None:
                     to_create.append(obj_dict)
                 else:
                     update_keys.append(update_key)
-                    to_update.append(obj_dict)
+                    to_update_dict[update_key] = obj_dict
 
             filter_kwargs = {
                 f"{update_key_field}__in": update_keys,
             }
+            update_qs = cls.objects.filter(**filter_kwargs).select_related(
+                *cls._get_batch_update_select_related_fields())
+            cls._check_batch_create_or_update_qs_perms(user, update_qs)
             existing_objs = {
-                getattr(obj, update_key_field): obj
-                for obj in cls.objects.filter(**filter_kwargs).select_related(
-                    *cls._get_batch_update_select_related_fields())
+                getattr(obj, update_key_field): obj for obj in update_qs
             }
+            for update_key in update_keys:
+                if update_key not in existing_objs:
+                    to_create.append(to_update_dict.pop(update_key))
 
             if to_create:
-                rel_objs_data = cls._pop_rel_objs_data(
+                create_rel_objs_data = cls._pop_rel_objs_data(
                     objs_data=to_create, rel_objs_mapping=rel_objs_mapping)
                 objs_to_create = [cls(**obj_dict, **cls._get_batch_create_extra_kwargs()) for obj_dict in to_create]
-                cls.objects.bulk_create(objs_to_create)  # в объектах будут проставлены id (только в postgres)
-                cls._batch_update_or_create_rel_objs(
-                    rel_objs_data=rel_objs_data, objs=objs_to_create, rel_objs_mapping=rel_objs_mapping, stats=stats)
 
             update_fields = {"dttm_modified"}
-            if to_update:
-                rel_objs_data = cls._pop_rel_objs_data(
+            if to_update_dict:
+                to_update = list(to_update_dict.values())
+                update_rel_objs_data = cls._pop_rel_objs_data(
                     objs_data=to_update, rel_objs_mapping=rel_objs_mapping)
                 for update_dict in to_update:
                     update_key = update_dict.get(update_key_field)
                     obj = existing_objs.get(update_key)
-                    update_fields.update(set(f for f in update_dict.keys() if f != update_key_field))
+                    update_fields.update(set(f for f in update_dict.keys() if f != cls._meta.pk.name))
                     obj.update(update_dict=update_dict, save=False)
                     objs_to_update.append(obj)
-                cls.objects.bulk_update(objs_to_update, update_fields)
-                cls._batch_update_or_create_rel_objs(
-                    rel_objs_data=rel_objs_data, objs=objs_to_update, rel_objs_mapping=rel_objs_mapping, stats=stats)
 
             objs = objs_to_create + objs_to_update
 
@@ -175,7 +221,17 @@ class BatchUpdateOrCreateModelMixin:
                         q_for_delete |= Q(**dict(delete_scope_values_tuples))
 
                     _total_deleted_count, deleted_dict = cls.objects.filter(
-                        q_for_delete).exclude(id__in=list(obj.id for obj in objs)).delete()
+                        q_for_delete).exclude(id__in=list(obj.id for obj in objs if obj.id)).delete()
+
+            if objs_to_create:
+                cls.objects.bulk_create(objs_to_create)  # в объектах будут проставлены id (только в postgres)
+                cls._batch_update_or_create_rel_objs(
+                    rel_objs_data=create_rel_objs_data, objs=objs_to_create, rel_objs_mapping=rel_objs_mapping, stats=stats)
+
+            if objs_to_update:
+                cls.objects.bulk_update(objs_to_update, update_fields)
+                cls._batch_update_or_create_rel_objs(
+                    rel_objs_data=update_rel_objs_data, objs=objs_to_update, rel_objs_mapping=rel_objs_mapping, stats=stats)
 
             cls_name = cls.__name__
             cls_stats = stats.setdefault(cls_name, {})
@@ -195,7 +251,6 @@ class BatchUpdateOrCreateModelMixin:
     def update(self, update_dict=None, save=True, **kwargs):
         if not update_dict:
             update_dict = kwargs
-        update_dict.update({'dttm_modified': timezone.now()})
         update_fields = {"dttm_modified"}
         for k, v in update_dict.items():
             setattr(self, k, v)
