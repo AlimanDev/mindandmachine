@@ -1,6 +1,8 @@
 from calendar import monthrange
 from datetime import date
 import io
+from dateutil.relativedelta import relativedelta
+from django.utils.translation import gettext as _
 
 import xlsxwriter
 from src.base.models import Employee, Employment
@@ -88,11 +90,37 @@ def overtimes_undertimes(period_step=6, employee_id__in=None, shop_ids=None):
     res = {
         'data': employee_dict,
         'employees': employees,
+        'months': [(dt_from + relativedelta(months=i)).month for i in range(period_step)]
     }
 
     return res
 
 def overtimes_undertimes_xlsx(period_step=6, employee_id__in=None, shop_ids=None, title=None, in_memory=False):
+    month_names = {
+        1: _('January'),
+        2: _('February'),
+        3: _('March'),
+        4: _('April'),
+        5: _('May'),
+        6: _('June'),
+        7: _('July'),
+        8: _('August'),
+        9: _('September'),
+        10: _('October'),
+        11: _('November'),
+        12: _('December'),
+    }
+    def _generate_months_stat(worksheet: xlsxwriter.Workbook.worksheet_class, start, months, title, format):
+        worksheet.merge_range(0, start, 0, start + len(months) - 1, title, format)
+        for i, month in enumerate(months):
+            worksheet.write_string(1, start + i, month_names.get(month), format)
+            worksheet.set_column(start + i, start + i, 10)
+        return start + len(months)
+
+    def _fill_month_stat(worksheet: xlsxwriter.Workbook.worksheet_class, start, row, months, data_getter, format):
+        for i, month in enumerate(months):
+            worksheet.write_string(row, start + i, str(data_getter(month)), format)
+    
     if not title:
         title = f'Overtimes_undertimes.xlsx'
 
@@ -124,19 +152,25 @@ def overtimes_undertimes_xlsx(period_step=6, employee_id__in=None, shop_ids=None
         'valign': 'vcenter',
         'align': 'center',
     })
-    worksheet.write_string(0, FIO, 'ФИО', header_format)
-    worksheet.write_string(0, TABEL_CODE, 'Табельный номер', header_format)
-    worksheet.write_string(0, NORM_PERIOD, 'Норма за учетный период', header_format)
-    worksheet.write_string(0, FACT_PERIOD, 'Отработано на сегодня ({})'.format(date.today().strftime('%d.%m.%Y')), header_format)
-    worksheet.write_string(0, DIFF_PERIOD, 'Всего переработки/недоработки ({})'.format(date.today().strftime('%d.%m.%Y')), header_format)
     worksheet.write_string(0, SPACE, '')
-    # worksheet.set_column(SHOP_CODE, SHOP_CODE, 10)
-    # worksheet.set_column(SHOP, SHOP, 12)
-    # worksheet.set_column(TABEL_CODE, TABEL_CODE, 15)
-    # worksheet.set_column(DATE, DATE, 15)
-    # worksheet.set_column(FIO, FIO, 20)
-    # worksheet.set_column(OVERTIME, OVERTIME, 15)
-    row = 1
+    worksheet.merge_range(0, FIO, 1, FIO, _('Full name'), header_format)
+    worksheet.merge_range(0, TABEL_CODE, 1, TABEL_CODE, _('Employee id'), header_format)
+    worksheet.merge_range(0, NORM_PERIOD, 1, NORM_PERIOD, _('The norm for the accounting period'), header_format) 
+    worksheet.merge_range(0, FACT_PERIOD, 1, FACT_PERIOD, _('Worked out for today ({})').format(date.today().strftime('%d.%m.%Y')), header_format)
+    worksheet.merge_range(0, DIFF_PERIOD, 1, DIFF_PERIOD, _('Total overtimes/undertimes ({})').format(date.today().strftime('%d.%m.%Y')), header_format)
+    months = data['months']
+    NORM_STATS_START = SPACE + 1
+    FACT_STATS_START = _generate_months_stat(worksheet, NORM_STATS_START, months, _('The norm of hours'), header_format)
+    DIFF_STATS_START = _generate_months_stat(worksheet, FACT_STATS_START, months, _('Hours worked'), header_format)
+    PLAN_STATS_START = _generate_months_stat(worksheet, DIFF_STATS_START, months, _('Total overtimes/undertimes'), header_format)
+    _generate_months_stat(worksheet, PLAN_STATS_START, months, _('Planned work hours'), header_format)
+    worksheet.set_column(FIO, FIO, 20)
+    worksheet.set_column(TABEL_CODE, TABEL_CODE, 15)
+    worksheet.set_column(NORM_PERIOD, NORM_PERIOD, 15)
+    worksheet.set_column(FACT_PERIOD, FACT_PERIOD, 15)
+    worksheet.set_column(DIFF_PERIOD, DIFF_PERIOD, 25)
+    worksheet.set_row(0, 50)
+    row = 2
     employees = data['employees']
     data = data['data']
     for employee in employees:
@@ -145,6 +179,17 @@ def overtimes_undertimes_xlsx(period_step=6, employee_id__in=None, shop_ids=None
         worksheet.write_string(row, NORM_PERIOD, str(data.get(employee.id, {}).get('norm_sum', 0)), def_format)
         worksheet.write_string(row, FACT_PERIOD, str(data.get(employee.id, {}).get('fact_sum', 0)), def_format)
         worksheet.write_string(row, DIFF_PERIOD, str(data.get(employee.id, {}).get('fact_sum', 0) - data.get(employee.id, {}).get('norm_sum', 0)), def_format)
+        _fill_month_stat(worksheet, NORM_STATS_START, row, months, lambda month: data.get(employee.id, {}).get(month, {}).get('norm', 0), def_format)
+        _fill_month_stat(worksheet, FACT_STATS_START, row, months, lambda month: data.get(employee.id, {}).get(month, {}).get('fact', 0), def_format)
+        _fill_month_stat(
+            worksheet, 
+            DIFF_STATS_START, 
+            row, 
+            months, 
+            lambda month: data.get(employee.id, {}).get(month, {}).get('fact', 0) - data.get(employee.id, {}).get(month, {}).get('norm', 0), 
+            def_format,
+        )
+        _fill_month_stat(worksheet, PLAN_STATS_START, row, months, lambda month: data.get(employee.id, {}).get(month, {}).get('plan', 0), def_format)
         row += 1
 
     workbook.close()
