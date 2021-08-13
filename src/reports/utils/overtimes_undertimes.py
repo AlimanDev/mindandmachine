@@ -1,13 +1,14 @@
 from calendar import monthrange
 from datetime import date
 import io
+from src.reports.helpers import RoundWithPlaces
 from dateutil.relativedelta import relativedelta
 from django.utils.translation import gettext as _
 
 import xlsxwriter
 from src.base.models import Employee, Employment, ProductionDay
-from django.db.models import Sum, FloatField, Q
-from django.db.models.functions import Coalesce, Round
+from django.db.models import Sum, Q
+from django.db.models.functions import Coalesce
 from src.timetable.models import PlanAndFactHours, ProdCal, WorkerDay
 
 def overtimes_undertimes(period_step=6, employee_id__in=None, shop_ids=None):
@@ -40,7 +41,7 @@ def overtimes_undertimes(period_step=6, employee_id__in=None, shop_ids=None):
         'dt__month',
     ).annotate(
         plan=Coalesce(
-            Round(
+            RoundWithPlaces(
                 Sum(
                     'plan_work_hours',
                     filter=Q(
@@ -53,7 +54,7 @@ def overtimes_undertimes(period_step=6, employee_id__in=None, shop_ids=None):
             0
         ),
         fact=Coalesce(
-            Round(
+            RoundWithPlaces(
                 Sum(
                     'fact_work_hours',
                     filter=Q(
@@ -78,7 +79,7 @@ def overtimes_undertimes(period_step=6, employee_id__in=None, shop_ids=None):
         'dt__month',
     ).annotate(
         norm=Coalesce(
-            Round(Sum('norm_hours'), 1), 
+            RoundWithPlaces(Sum('norm_hours'), 1), 
             0
         ),
     ).order_by('employee__tabel_code')
