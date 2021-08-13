@@ -1,6 +1,8 @@
 from calendar import monthrange
 from datetime import date
 import io
+
+from django.db.models.fields import FloatField
 from src.reports.helpers import RoundWithPlaces
 from dateutil.relativedelta import relativedelta
 from django.utils.translation import gettext as _
@@ -48,6 +50,7 @@ def overtimes_undertimes(period_step=6, employee_id__in=None, shop_ids=None):
                         plan_work_hours__gte=0,
                         wd_type__in=WorkerDay.TYPES_WITH_TM_RANGE
                     ),
+                    output_field=FloatField(),
                 ), 
                 1,
             ),
@@ -61,6 +64,7 @@ def overtimes_undertimes(period_step=6, employee_id__in=None, shop_ids=None):
                         fact_work_hours__gte=0,
                         wd_type__in=WorkerDay.TYPES_WITH_TM_RANGE
                     ),
+                    output_field=FloatField(),
                 ), 
                 1,
             ),
