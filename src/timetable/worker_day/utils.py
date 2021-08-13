@@ -193,18 +193,19 @@ def copy_as_excel_cells(main_worker_days, to_employee_id, to_dates, created_by=N
 
     created_wds = []
     wdcds_list_to_create = []
-    main_worker_days_grouped_by_dt = OrderedDict()  # TODO: тест для копирования нескольких дней на 1 дату
-    for main_worker_day in main_worker_days:
-        key = main_worker_day.dt
-        main_worker_days_grouped_by_dt.setdefault(key, []).append(main_worker_day)
-    main_worker_days_lists = list(main_worker_days_grouped_by_dt.values())
+    if main_worker_days:
+        main_worker_days_grouped_by_dt = OrderedDict()
+        for main_worker_day in main_worker_days:
+            key = main_worker_day.dt
+            main_worker_days_grouped_by_dt.setdefault(key, []).append(main_worker_day)
 
-    length_main_wds = len(main_worker_days)
-    for i, dt in enumerate(to_dates):
-        i = i % length_main_wds
+        main_worker_days_lists = list(main_worker_days_grouped_by_dt.values())
 
-        blank_days = main_worker_days_lists[i]
-        if blank_days:
+        length_main_wds = len(main_worker_days_lists)
+        for i, dt in enumerate(to_dates):
+            i = i % length_main_wds
+
+            blank_days = main_worker_days_lists[i]
             worker_active_empl = Employment.objects.get_active_empl_by_priority(
                 network_id=blank_days[0].employee.user.network_id, employee_id=to_employee_id,
                 dt=dt,
@@ -251,7 +252,8 @@ def copy_as_excel_cells(main_worker_days, to_employee_id, to_dates, created_by=N
                         )
                     )
 
-    WorkerDayCashboxDetails.objects.bulk_create(wdcds_list_to_create)
+    if wdcds_list_to_create:
+        WorkerDayCashboxDetails.objects.bulk_create(wdcds_list_to_create)
 
     work_types = [
         (wdcds.work_type.shop_id, wdcds.work_type_id)
