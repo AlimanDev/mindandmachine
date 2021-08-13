@@ -454,7 +454,6 @@ class ChangeListSerializer(serializers.Serializer):
         super().is_valid(*args, **kwargs)
         if self.validated_data['is_vacancy']:
             self.validated_data['type'] = WorkerDay.TYPE_WORKDAY
-            self.validated_data['employee_id'] = None
             self.validated_data['outsources'] = Network.objects.filter(id__in=self.validated_data.get('outsources', []))
         else:
             if not WorkerDay.is_type_with_tm_range(self.validated_data['type']):
