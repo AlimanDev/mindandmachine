@@ -111,7 +111,10 @@ def overtimes_undertimes_xlsx(period_step=6, employee_id__in=None, shop_ids=None
         12: _('December'),
     }
     def _generate_months_stat(worksheet: xlsxwriter.Workbook.worksheet_class, start, months, title, format):
-        worksheet.merge_range(0, start, 0, start + len(months) - 1, title, format)
+        if len(months) > 1:
+            worksheet.merge_range(0, start, 0, start + len(months) - 1, title, format)
+        else:
+            worksheet.write_string(0, start, title, format)
         for i, month in enumerate(months):
             worksheet.write_string(1, start + i, month_names.get(month), format)
             worksheet.set_column(start + i, start + i, 10)
