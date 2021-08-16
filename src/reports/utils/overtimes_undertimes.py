@@ -115,8 +115,11 @@ def overtimes_undertimes_xlsx(period_step=6, employee_id__in=None, shop_ids=None
             worksheet.merge_range(0, start, 0, start + len(months) - 1, title, format)
         else:
             worksheet.write_string(0, start, title, format)
+            worksheet.set_column(start, start, 22)
         for i, month in enumerate(months):
             worksheet.write_string(1, start + i, str(MONTH_NAMES[month]), format)
+            if len(months) <= 1:
+                continue
             worksheet.set_column(start + i, start + i, 10)
         return start + len(months)
 
