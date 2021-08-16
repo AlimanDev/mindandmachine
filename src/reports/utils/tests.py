@@ -1,3 +1,4 @@
+from src.util.dg.helpers import MONTH_NAMES
 from dateutil.relativedelta import relativedelta
 from src.base.models import Employee, ProductionDay
 from src.reports.utils.overtimes_undertimes import overtimes_undertimes, overtimes_undertimes_xlsx
@@ -10,7 +11,6 @@ import pandas as pd
 from datetime import date, datetime, time, timedelta
 from src.timetable.models import WorkerDay, AttendanceRecords
 from django.test import override_settings
-from django.utils.translation import gettext_lazy as _
 
 
 @override_settings(MDA_SKIP_LEAVING_TICK=True)
@@ -464,20 +464,6 @@ class TestOvertimesUndertimes(APITestCase):
             is_approved=True,
             is_fact=True,
         )
-        self.month_names = {
-            1: _('January'),
-            2: _('February'),
-            3: _('March'),
-            4: _('April'),
-            5: _('May'),
-            6: _('June'),
-            7: _('July'),
-            8: _('August'),
-            9: _('September'),
-            10: _('October'),
-            11: _('November'),
-            12: _('December'),
-        }
 
 
     def _create_worker_day(self, employment, dt=None, is_fact=False, is_approved=False, dttm_work_start=None, dttm_work_end=None, type=WorkerDay.TYPE_WORKDAY):
@@ -561,10 +547,10 @@ class TestOvertimesUndertimes(APITestCase):
                 f'Отработано на сегодня ({date.today().strftime("%d.%m.%Y")})': '', 
                 f'Всего переработки/недоработки ({date.today().strftime("%d.%m.%Y")})': '', 
                 'Unnamed: 5': '', 
-                'Норма часов': self.month_names[date.today().month], 
-                'Отработано часов': self.month_names[date.today().month], 
-                'Всего переработки/недоработки':self.month_names[date.today().month], 
-                'Плановое количество часов': self.month_names[date.today().month], 
+                'Норма часов': MONTH_NAMES[date.today().month], 
+                'Отработано часов': MONTH_NAMES[date.today().month], 
+                'Всего переработки/недоработки':MONTH_NAMES[date.today().month], 
+                'Плановое количество часов': MONTH_NAMES[date.today().month], 
             }, 
             {
                 'ФИО': 'Васнецов Иван', 

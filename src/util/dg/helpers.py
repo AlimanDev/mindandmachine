@@ -1,7 +1,7 @@
 import os
 
 from relatorio.templates.opendocument import Template
-from django.utils.translation import gettext as _
+from django.utils.translation import gettext_lazy as _
 
 def generate_document(template_path, data):
     basic = Template(source='', filepath=template_path)

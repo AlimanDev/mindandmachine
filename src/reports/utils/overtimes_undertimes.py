@@ -1,6 +1,7 @@
 from calendar import monthrange
 from datetime import date
 import io
+from src.util.dg.helpers import MONTH_NAMES
 
 from django.db.models.fields import FloatField
 from src.reports.helpers import RoundWithPlaces
@@ -109,27 +110,13 @@ def overtimes_undertimes(period_step=6, employee_id__in=None, shop_ids=None):
     return res
 
 def overtimes_undertimes_xlsx(period_step=6, employee_id__in=None, shop_ids=None, title=None, in_memory=False):
-    month_names = {
-        1: _('January'),
-        2: _('February'),
-        3: _('March'),
-        4: _('April'),
-        5: _('May'),
-        6: _('June'),
-        7: _('July'),
-        8: _('August'),
-        9: _('September'),
-        10: _('October'),
-        11: _('November'),
-        12: _('December'),
-    }
     def _generate_months_stat(worksheet: xlsxwriter.Workbook.worksheet_class, start, months, title, format):
         if len(months) > 1:
             worksheet.merge_range(0, start, 0, start + len(months) - 1, title, format)
         else:
             worksheet.write_string(0, start, title, format)
         for i, month in enumerate(months):
-            worksheet.write_string(1, start + i, month_names.get(month), format)
+            worksheet.write_string(1, start + i, str(MONTH_NAMES[month]), format)
             worksheet.set_column(start + i, start + i, 10)
         return start + len(months)
 

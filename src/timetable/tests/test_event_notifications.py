@@ -6,7 +6,6 @@ import pandas as pd
 from django_celery_beat.models import CrontabSchedule
 from django.core import mail
 from django.db import transaction
-from django.utils.translation import gettext_lazy as _
 from rest_framework import status
 from rest_framework.test import APITestCase
 
@@ -503,20 +502,6 @@ class TestOvertimesUndertimesReport(TestsHelperMixin, APITestCase):
         cls.fact_approved = cls._create_worker_day(cls, cls.employment_worker, datetime.combine(cls.dt, time(7)), datetime.combine(cls.dt, time(13)), is_fact=True, shop_id=cls.shop.id)
         cls.fact_approved_dir = cls._create_worker_day(cls, cls.employment_dir, datetime.combine(cls.dt, time(7)), datetime.combine(cls.dt, time(19)), is_fact=True, shop_id=cls.shop.id)
         cls.fact_approved2 = cls._create_worker_day(cls, cls.employment_worker2, datetime.combine(cls.dt, time(14)), datetime.combine(cls.dt, time(20)), is_fact=True, shop_id=cls.shop2.id)
-        cls.month_names = {
-            1: _('January'),
-            2: _('February'),
-            3: _('March'),
-            4: _('April'),
-            5: _('May'),
-            6: _('June'),
-            7: _('July'),
-            8: _('August'),
-            9: _('September'),
-            10: _('October'),
-            11: _('November'),
-            12: _('December'),
-        }
 
 
     def setUp(self):
