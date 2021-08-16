@@ -1,6 +1,6 @@
 from dateutil.relativedelta import relativedelta
-from src.base.models import Employee
-from src.reports.utils.overtimes_undertimes import overtimes_undertimes
+from src.base.models import Employee, ProductionDay
+from src.reports.utils.overtimes_undertimes import overtimes_undertimes, overtimes_undertimes_xlsx
 from rest_framework.test import APITestCase
 from src.reports.utils.create_urv_stat import urv_stat_v1
 from src.reports.utils.urv_violators import urv_violators_report, urv_violators_report_xlsx, urv_violators_report_xlsx_v2
@@ -10,6 +10,7 @@ import pandas as pd
 from datetime import date, datetime, time, timedelta
 from src.timetable.models import WorkerDay, AttendanceRecords
 from django.test import override_settings
+from django.utils.translation import gettext_lazy as _
 
 
 @override_settings(MDA_SKIP_LEAVING_TICK=True)
@@ -435,7 +436,6 @@ class TestOvertimesUndertimes(APITestCase):
             dttm_work_end=datetime.combine(self.dt, time(20)),
             is_approved=True,
         )
-        # меньше часа переработка
         self._create_worker_day(
             self.employment1,
             dttm_work_start=datetime.combine(self.dt, time(13, 45)),
@@ -443,7 +443,6 @@ class TestOvertimesUndertimes(APITestCase):
             is_approved=True,
             is_fact=True,
         )
-        # переработка 3 часа
         self._create_worker_day(
             self.employment2,
             dttm_work_start=datetime.combine(self.dt, time(12)),
@@ -451,7 +450,6 @@ class TestOvertimesUndertimes(APITestCase):
             is_approved=True,
             is_fact=True,
         )
-        # нет переработки
         self._create_worker_day(
             self.employment3,
             dttm_work_start=datetime.combine(self.dt, time(8)),
@@ -459,7 +457,6 @@ class TestOvertimesUndertimes(APITestCase):
             is_approved=True,
             is_fact=True,
         )
-        # переработка 1 час
         self._create_worker_day(
             self.employment4,
             dttm_work_start=datetime.combine(self.dt, time(7)),
@@ -467,6 +464,20 @@ class TestOvertimesUndertimes(APITestCase):
             is_approved=True,
             is_fact=True,
         )
+        self.month_names = {
+            1: _('January'),
+            2: _('February'),
+            3: _('March'),
+            4: _('April'),
+            5: _('May'),
+            6: _('June'),
+            7: _('July'),
+            8: _('August'),
+            9: _('September'),
+            10: _('October'),
+            11: _('November'),
+            12: _('December'),
+        }
 
 
     def _create_worker_day(self, employment, dt=None, is_fact=False, is_approved=False, dttm_work_start=None, dttm_work_end=None, type=WorkerDay.TYPE_WORKDAY):
@@ -485,9 +496,126 @@ class TestOvertimesUndertimes(APITestCase):
             created_by=self.user1,
         )
 
-    def test_overtimes_undertimes(self):
-        data = overtimes_undertimes(period_step=3)
-        self.assertCountEqual(data['employees'], Employee.objects.all())
-        self.network.accounting_period_length = 3
+    def _test_accounting_period(self, period_step):
+        data = overtimes_undertimes(period_step=period_step)
+        self.network.accounting_period_length = period_step
         dt_from, dt_to = self.network.get_acc_period_range(date.today())
-        self.assertEquals(data['months'], [(dt_from + relativedelta(months=i)).month for i in range(3)])
+        self.assertEquals(data['months'], [(dt_from + relativedelta(months=i)).month for i in range(period_step)])
+        self.assertCountEqual(list(data['data'].values())[0].keys(), [(dt_from + relativedelta(months=i)).month for i in range(period_step)] + ['plan_sum', 'fact_sum', 'norm_sum'])
+        return data
+
+    def _test_accounting_period_xlsx(self, period_step):
+        data = overtimes_undertimes_xlsx(period_step=period_step, in_memory=True)
+        df = pd.read_excel(data['file'])
+        df.fillna('', inplace=True)
+        self.assertEquals(len(df.columns[6:]), period_step * 4)
+        return df
+
+    def test_overtimes_undertimes(self):
+        data = self._test_accounting_period(3)
+        self.assertCountEqual(data['employees'], Employee.objects.all())
+        self.assertEquals(data['data'][self.employee1.id]['plan_sum'], 5.5)
+        self.assertEquals(data['data'][self.employee1.id]['fact_sum'], 5.5)
+        self.assertEquals(data['data'][self.employee1.id]['norm_sum'], 528.0)
+        self.assertEquals(data['data'][self.employee1.id][date.today().month], {'plan': 5.5, 'fact': 5.5, 'norm': 176.0})
+        self.assertEquals(data['data'][self.employee2.id]['plan_sum'], 10.8)
+        self.assertEquals(data['data'][self.employee2.id]['fact_sum'], 13.8)
+        self.assertEquals(data['data'][self.employee2.id]['norm_sum'], 528.0)
+        self.assertEquals(data['data'][self.employee2.id][date.today().month], {'plan': 10.8, 'fact': 13.8, 'norm': 176.0})
+        self.assertEquals(data['data'][self.employee3.id]['plan_sum'], 10.8)
+        self.assertEquals(data['data'][self.employee3.id]['fact_sum'], 10.8)
+        self.assertEquals(data['data'][self.employee3.id]['norm_sum'], 528.0)
+        self.assertEquals(data['data'][self.employee3.id][date.today().month], {'plan': 10.8, 'fact': 10.8, 'norm': 176.0})
+        self.assertEquals(data['data'][self.employee4.id]['plan_sum'], 10.8)
+        self.assertEquals(data['data'][self.employee4.id]['fact_sum'], 12.3)
+        self.assertEquals(data['data'][self.employee4.id]['norm_sum'], 528.0)
+        self.assertEquals(data['data'][self.employee4.id][date.today().month], {'plan': 10.8, 'fact': 12.3, 'norm': 176.0})
+        self._test_accounting_period(1)
+        self._test_accounting_period(6)
+        self._test_accounting_period(12)
+
+    def test_overtimes_undertimes_celebration_not_accounted(self):
+        self._create_worker_day(
+            self.employment1,
+            dttm_work_start=datetime.combine(self.dt - timedelta(1), time(12, 45)),
+            dttm_work_end=datetime.combine(self.dt - timedelta(1), time(18, 10)),
+            dt=self.dt - timedelta(1),
+            is_approved=True,
+            is_fact=True,
+        )
+        data = self._test_accounting_period(12)
+        self.assertEquals(data['data'][self.employee1.id]['plan_sum'], 5.5)
+        self.assertEquals(data['data'][self.employee1.id]['fact_sum'], 10.4) # может падать 1 января
+        ProductionDay.objects.filter(dt=self.dt - timedelta(1)).update(is_celebration=True)
+        data = self._test_accounting_period(12)
+        self.assertEquals(data['data'][self.employee1.id]['plan_sum'], 5.5)
+        self.assertEquals(data['data'][self.employee1.id]['fact_sum'], 5.5)
+
+    def test_overtimes_undertimes_xlsx(self):
+        data = self._test_accounting_period_xlsx(1)
+        assert_data = [
+            {
+                'ФИО': '', 
+                'Табельный номер': '', 
+                'Норма за учетный период': '', 
+                f'Отработано на сегодня ({date.today().strftime("%d.%m.%Y")})': '', 
+                f'Всего переработки/недоработки ({date.today().strftime("%d.%m.%Y")})': '', 
+                'Unnamed: 5': '', 
+                'Норма часов': self.month_names[date.today().month], 
+                'Отработано часов': self.month_names[date.today().month], 
+                'Всего переработки/недоработки':self.month_names[date.today().month], 
+                'Плановое количество часов': self.month_names[date.today().month], 
+            }, 
+            {
+                'ФИО': 'Васнецов Иван', 
+                'Табельный номер': '', 
+                'Норма за учетный период': 176.0, 
+                f'Отработано на сегодня ({date.today().strftime("%d.%m.%Y")})': 5.5, 
+                f'Всего переработки/недоработки ({date.today().strftime("%d.%m.%Y")})': -170.5, 
+                'Unnamed: 5': '', 
+                'Норма часов': '176.0', 
+                'Отработано часов': '5.5', 
+                'Всего переработки/недоработки': '-170.5', 
+                'Плановое количество часов': '5.5'
+            }, 
+            {
+                'ФИО': 'Иванов Иван2', 
+                'Табельный номер': 'employee2_tabel_code', 
+                'Норма за учетный период': 176.0, 
+                f'Отработано на сегодня ({date.today().strftime("%d.%m.%Y")})': 13.8, 
+                f'Всего переработки/недоработки ({date.today().strftime("%d.%m.%Y")})': -162.2, 
+                'Unnamed: 5': '', 
+                'Норма часов': '176.0', 
+                'Отработано часов': '13.8', 
+                'Всего переработки/недоработки': '-162.2', 
+                'Плановое количество часов': '10.8'
+            }, 
+            {
+                'ФИО': 'Сидоров Иван3', 
+                'Табельный номер': '', 
+                'Норма за учетный период': 176.0, 
+                f'Отработано на сегодня ({date.today().strftime("%d.%m.%Y")})': 10.8, 
+                f'Всего переработки/недоработки ({date.today().strftime("%d.%m.%Y")})': -165.2, 
+                'Unnamed: 5': '', 
+                'Норма часов': '176.0', 
+                'Отработано часов': '10.8', 
+                'Всего переработки/недоработки': '-165.2', 
+                'Плановое количество часов': '10.8'
+            }, 
+            {
+                'ФИО': 'Петров Иван4', 
+                'Табельный номер': '', 
+                'Норма за учетный период': 176.0, 
+                f'Отработано на сегодня ({date.today().strftime("%d.%m.%Y")})': 12.3, 
+                f'Всего переработки/недоработки ({date.today().strftime("%d.%m.%Y")})': -163.7, 
+                'Unnamed: 5': '', 
+                'Норма часов': '176.0', 
+                'Отработано часов': '12.3', 
+                'Всего переработки/недоработки': '-163.7', 
+                'Плановое количество часов': '10.8'
+            }
+        ]
+        self.assertEquals(data.to_dict('records')[:5], assert_data)
+        self._test_accounting_period_xlsx(3)
+        self._test_accounting_period_xlsx(6)
+        self._test_accounting_period_xlsx(12)
