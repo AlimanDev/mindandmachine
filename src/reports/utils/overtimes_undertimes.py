@@ -37,8 +37,6 @@ def overtimes_undertimes(period_step=6, employee_id__in=None, shop_ids=None):
         dt__gte=dt_from,
         dt__lte=dt_to,
         employee__in=employees,
-    ).exclude(
-        dt__in=celebration_dates,
     ).values(
         'employee_id',
         'dt__month',
@@ -50,7 +48,7 @@ def overtimes_undertimes(period_step=6, employee_id__in=None, shop_ids=None):
                     filter=Q(
                         plan_work_hours__gte=0,
                         wd_type__in=WorkerDay.TYPES_WITH_TM_RANGE
-                    ),
+                    ) & ~Q(dt__in=celebration_dates),
                     output_field=FloatField(),
                 ), 
                 1,
@@ -64,27 +62,43 @@ def overtimes_undertimes(period_step=6, employee_id__in=None, shop_ids=None):
                     filter=Q(
                         fact_work_hours__gte=0,
                         wd_type__in=WorkerDay.TYPES_WITH_TM_RANGE
-                    ),
+                    ) & ~Q(dt__in=celebration_dates),
                     output_field=FloatField(),
                 ), 
                 1,
             ),
             0
-        )
+        ),
+        fact_celebration=Coalesce(
+            RoundWithPlaces(
+                Sum(
+                    'fact_work_hours',
+                    filter=Q(
+                        fact_work_hours__gte=0,
+                        wd_type__in=WorkerDay.TYPES_WITH_TM_RANGE
+                    ) & Q(dt__in=celebration_dates),
+                    output_field=FloatField(),
+                ), 
+                1,
+            ),
+            0
+        ),
     ).order_by('employee__tabel_code')
 
     prod_cal_qs = ProdCal.objects.filter(
         dt__gte=dt_from,
         dt__lte=dt_to,
         employee__in=employees,
-    ).exclude(
-        dt__in=celebration_dates,
     ).values(
         'employee_id',
         'dt__month',
     ).annotate(
         norm=Coalesce(
-            RoundWithPlaces(Sum('norm_hours'), 1), 
+            RoundWithPlaces(Sum('norm_hours', filter=~Q(dt__in=celebration_dates)), 1), 
+            0
+        ),
+        norm_celebration=Coalesce(
+            RoundWithPlaces(Sum('norm_hours', filter=Q(dt__in=celebration_dates)), 1), 
             0
         ),
     ).order_by('employee__tabel_code')
@@ -94,11 +108,13 @@ def overtimes_undertimes(period_step=6, employee_id__in=None, shop_ids=None):
     for pf in plan_fact:
         employee_dict.setdefault(pf['employee_id'], {}).setdefault(pf['dt__month'], {})['plan'] = pf['plan']
         employee_dict.setdefault(pf['employee_id'], {}).setdefault(pf['dt__month'], {})['fact'] = pf['fact']
+        employee_dict.setdefault(pf['employee_id'], {}).setdefault(pf['dt__month'], {})['fact_celebration'] = pf['fact_celebration']
         employee_dict.setdefault(pf['employee_id'], {})['plan_sum'] = employee_dict.get(pf['employee_id'],{}).get('plan_sum', 0) + pf['plan']
         employee_dict.setdefault(pf['employee_id'], {})['fact_sum'] = employee_dict.get(pf['employee_id'],{}).get('fact_sum', 0) + pf['fact']
 
     for prod_cal in prod_cal_qs:
         employee_dict.setdefault(prod_cal['employee_id'], {}).setdefault(prod_cal['dt__month'], {})['norm'] = prod_cal['norm']
+        employee_dict.setdefault(prod_cal['employee_id'], {}).setdefault(prod_cal['dt__month'], {})['norm_celebration'] = prod_cal['norm_celebration']
         employee_dict.setdefault(prod_cal['employee_id'], {})['norm_sum'] = employee_dict.get(prod_cal['employee_id'],{}).get('norm_sum', 0) + prod_cal['norm']
 
     res = {
@@ -115,7 +131,7 @@ def overtimes_undertimes_xlsx(period_step=6, employee_id__in=None, shop_ids=None
             worksheet.merge_range(0, start, 0, start + len(months) - 1, title, format)
         else:
             worksheet.write_string(0, start, title, format)
-            worksheet.set_column(start, start, 22)
+            worksheet.set_column(start, start, 23)
         for i, month in enumerate(months):
             worksheet.write_string(1, start + i, str(MONTH_NAMES[month]), format)
             if len(months) <= 1:
@@ -168,7 +184,8 @@ def overtimes_undertimes_xlsx(period_step=6, employee_id__in=None, shop_ids=None
     NORM_STATS_START = SPACE + 1
     FACT_STATS_START = _generate_months_stat(worksheet, NORM_STATS_START, months, _('The norm of hours'), header_format)
     DIFF_STATS_START = _generate_months_stat(worksheet, FACT_STATS_START, months, _('Hours worked'), header_format)
-    PLAN_STATS_START = _generate_months_stat(worksheet, DIFF_STATS_START, months, _('Total overtimes/undertimes'), header_format)
+    DIFF_CELEBRATES_STATS_START = _generate_months_stat(worksheet, DIFF_STATS_START, months,  _('Total overtimes/undertimes'), header_format)
+    PLAN_STATS_START = _generate_months_stat(worksheet, DIFF_CELEBRATES_STATS_START, months, _('Overtimes/undertimes in celebrations'), header_format)
     _generate_months_stat(worksheet, PLAN_STATS_START, months, _('Planned work hours'), header_format)
     worksheet.set_column(FIO, FIO, 20)
     worksheet.set_column(TABEL_CODE, TABEL_CODE, 15)
@@ -193,6 +210,14 @@ def overtimes_undertimes_xlsx(period_step=6, employee_id__in=None, shop_ids=None
             row, 
             months, 
             lambda month: data.get(employee.id, {}).get(month, {}).get('fact', 0) - data.get(employee.id, {}).get(month, {}).get('norm', 0), 
+            def_format,
+        )
+        _fill_month_stat(
+            worksheet, 
+            DIFF_CELEBRATES_STATS_START, 
+            row, 
+            months, 
+            lambda month: data.get(employee.id, {}).get(month, {}).get('fact_celebration', 0) - data.get(employee.id, {}).get(month, {}).get('norm_celebration', 0), 
             def_format,
         )
         _fill_month_stat(worksheet, PLAN_STATS_START, row, months, lambda month: data.get(employee.id, {}).get(month, {}).get('plan', 0), def_format)
