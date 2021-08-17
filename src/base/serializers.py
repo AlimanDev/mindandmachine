@@ -95,6 +95,7 @@ class NetworkSerializer(serializers.ModelSerializer):
             'show_user_biometrics_block',
             'unaccounted_overtime_threshold',
             'show_remaking_choice',
+            'display_employee_tabs_in_the_schedule',
         ]
 
 

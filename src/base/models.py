@@ -175,6 +175,8 @@ class Network(AbstractActiveModel):
     # при рассчете фактических часов, будут рассчитываться штрафы
     # пример значения можно найти в src.timetable.tests.test_main.TestFineLogic
     fines_settings = models.TextField(default='{}', verbose_name=_('Fines settings'))
+    display_employee_tabs_in_the_schedule = models.BooleanField(
+        default=True, verbose_name='Отображать вкладки сотрудников в расписании')
 
     @property
     def settings_values_prop(self):
