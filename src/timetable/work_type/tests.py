@@ -38,6 +38,7 @@ class TestWorkType(APITestCase):
             name='Тип_кассы_2',
         )
         cls.work_type3 = WorkType.objects.create(shop=cls.shop, work_type_name=cls.work_type_name2)
+        cls.work_type4 = WorkType.objects.create(shop=cls.root_shop, work_type_name=cls.work_type_name1)
         cls.work_type_name3 = WorkTypeName.objects.create(
             name='Тип_кассы_3',
             code='25',
@@ -52,6 +53,8 @@ class TestWorkType(APITestCase):
     def test_get_list(self):
         response = self.client.get(f'{self.url}?shop_id={self.shop.id}')
         self.assertEqual(len(response.json()), 2)
+        response = self.client.get(f'{self.url}?shop_id__in={self.shop.id},{self.shop2.id}')
+        self.assertEqual(len(response.json()), 3)
 
     def test_get(self):
         response = self.client.get(f'{self.url}{self.work_type1.id}/')

@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from django_filters.rest_framework import FilterSet
+from django_filters.rest_framework import FilterSet, CharFilter
 from src.base.permissions import Permission
 from src.base.views_abstract import BaseModelViewSet
 from src.timetable.models import WorkType,WorkTypeName
@@ -59,6 +59,14 @@ class EfficiencySerializer(serializers.Serializer):
 
 
 class WorkTypeFilter(FilterSet):
+    shop_id__in = CharFilter(method='shop_id__in_filter',)
+
+    def shop_id__in_filter(self, queryset, name, value):
+        if value:
+            value = value.split(',')
+            queryset = queryset.filter(shop_id__in=value)
+        return queryset
+
     class Meta:
         model = WorkType
         fields = {

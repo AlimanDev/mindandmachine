@@ -25,7 +25,8 @@ def send_report_emails(report_config_id: int):
     context = {
         'dt_from': dates['dt_from'],
         'dt_to': dates['dt_to'],
-        'shop_ids': list(report_config.shops.all().values_list('id', flat=True))
+        'shop_ids': list(report_config.shops.all().values_list('id', flat=True)),
+        'period_step': report_config.get_acc_period()
     }
     if report_config.send_by_group_employments_shops:
         groups = list(report_config.groups.all())
