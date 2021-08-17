@@ -12,7 +12,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Django REST framework\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2021-08-13 06:33+0000\n"
+"POT-Creation-Date: 2021-08-17 05:43+0000\n"
 "PO-Revision-Date: 2017-08-03 14:58+0000\n"
 "Last-Translator: Grigory Mishchenko <grishkokot@gmail.com>\n"
 "Language-Team: Russian (http://www.transifex.com/django-rest-framework-1/"
@@ -549,55 +549,7 @@ msgstr "Отметка не существует"
 msgid "Day"
 msgstr "День"
 
-#: src/reports/utils/overtimes_undertimes.py:100 src/util/dg/helpers.py:18
-msgid "January"
-msgstr "Январь"
-
-#: src/reports/utils/overtimes_undertimes.py:101 src/util/dg/helpers.py:19
-msgid "February"
-msgstr "Февраль"
-
-#: src/reports/utils/overtimes_undertimes.py:102 src/util/dg/helpers.py:20
-msgid "March"
-msgstr "Март"
-
-#: src/reports/utils/overtimes_undertimes.py:103 src/util/dg/helpers.py:21
-msgid "April"
-msgstr "Апрель"
-
-#: src/reports/utils/overtimes_undertimes.py:104 src/util/dg/helpers.py:22
-msgid "May"
-msgstr "Май"
-
-#: src/reports/utils/overtimes_undertimes.py:105 src/util/dg/helpers.py:23
-msgid "June"
-msgstr "Июнь"
-
-#: src/reports/utils/overtimes_undertimes.py:106 src/util/dg/helpers.py:24
-msgid "July"
-msgstr "Июль"
-
-#: src/reports/utils/overtimes_undertimes.py:107 src/util/dg/helpers.py:25
-msgid "August"
-msgstr "Август"
-
-#: src/reports/utils/overtimes_undertimes.py:108 src/util/dg/helpers.py:26
-msgid "September"
-msgstr "Сентябрь"
-
-#: src/reports/utils/overtimes_undertimes.py:109 src/util/dg/helpers.py:27
-msgid "October"
-msgstr "Октябрь"
-
-#: src/reports/utils/overtimes_undertimes.py:110 src/util/dg/helpers.py:28
-msgid "November"
-msgstr "Ноябрь"
-
-#: src/reports/utils/overtimes_undertimes.py:111 src/util/dg/helpers.py:29
-msgid "December"
-msgstr "Декабрь"
-
-#: src/reports/utils/overtimes_undertimes.py:156
+#: src/reports/utils/overtimes_undertimes.py:176
 #: src/timetable/worker_day/timetable.py:498
 #: src/timetable/worker_day/timetable.py:517
 #: src/timetable/worker_day/timetable.py:523
@@ -605,7 +557,7 @@ msgstr "Декабрь"
 msgid "Full name"
 msgstr "ФИО"
 
-#: src/reports/utils/overtimes_undertimes.py:157
+#: src/reports/utils/overtimes_undertimes.py:177
 #: src/timetable/attendance_records/views.py:50
 #: src/timetable/worker_day/timetable.py:497
 #: src/timetable/worker_day/timetable.py:517
@@ -614,31 +566,35 @@ msgstr "ФИО"
 msgid "Employee id"
 msgstr "Табельный номер"
 
-#: src/reports/utils/overtimes_undertimes.py:158
+#: src/reports/utils/overtimes_undertimes.py:178
 msgid "The norm for the accounting period"
 msgstr "Норма за учетный период"
 
-#: src/reports/utils/overtimes_undertimes.py:159
+#: src/reports/utils/overtimes_undertimes.py:179
 msgid "Worked out for today ({})"
 msgstr "Отработано на сегодня ({})"
 
-#: src/reports/utils/overtimes_undertimes.py:160
+#: src/reports/utils/overtimes_undertimes.py:180
 msgid "Total overtimes/undertimes ({})"
 msgstr "Всего переработки/недоработки ({})"
 
-#: src/reports/utils/overtimes_undertimes.py:163
+#: src/reports/utils/overtimes_undertimes.py:183
 msgid "The norm of hours"
 msgstr "Норма часов"
 
-#: src/reports/utils/overtimes_undertimes.py:164
+#: src/reports/utils/overtimes_undertimes.py:184
 msgid "Hours worked"
 msgstr "Отработано часов"
 
-#: src/reports/utils/overtimes_undertimes.py:165
+#: src/reports/utils/overtimes_undertimes.py:185
 msgid "Total overtimes/undertimes"
 msgstr "Всего переработки/недоработки"
 
-#: src/reports/utils/overtimes_undertimes.py:166
+#: src/reports/utils/overtimes_undertimes.py:186
+msgid "Overtimes/undertimes in celebrations"
+msgstr "Переработки/недоработки: отработано часов в праздники"
+
+#: src/reports/utils/overtimes_undertimes.py:187
 msgid "Planned work hours"
 msgstr "Плановое количество часов"
 
@@ -1332,6 +1288,54 @@ msgstr "Пт"
 #: src/timetable/worker_day/xlsx_utils/timetable.py:268
 msgid "Sat"
 msgstr "Сб"
+
+#: src/util/dg/helpers.py:18
+msgid "January"
+msgstr "Январь"
+
+#: src/util/dg/helpers.py:19
+msgid "February"
+msgstr "Февраль"
+
+#: src/util/dg/helpers.py:20
+msgid "March"
+msgstr "Март"
+
+#: src/util/dg/helpers.py:21
+msgid "April"
+msgstr "Апрель"
+
+#: src/util/dg/helpers.py:22
+msgid "May"
+msgstr "Май"
+
+#: src/util/dg/helpers.py:23
+msgid "June"
+msgstr "Июнь"
+
+#: src/util/dg/helpers.py:24
+msgid "July"
+msgstr "Июль"
+
+#: src/util/dg/helpers.py:25
+msgid "August"
+msgstr "Август"
+
+#: src/util/dg/helpers.py:26
+msgid "September"
+msgstr "Сентябрь"
+
+#: src/util/dg/helpers.py:27
+msgid "October"
+msgstr "Октябрь"
+
+#: src/util/dg/helpers.py:28
+msgid "November"
+msgstr "Ноябрь"
+
+#: src/util/dg/helpers.py:29
+msgid "December"
+msgstr "Декабрь"
 
 #: src/util/dg/tabel.py:36 src/util/dg/tabel.py:135
 msgid "W"

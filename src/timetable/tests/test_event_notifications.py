@@ -520,7 +520,7 @@ class TestOvertimesUndertimesReport(TestsHelperMixin, APITestCase):
             dttm_work_end=dttm_work_end,
         )
 
-    def test_unaccounted_overtime_email_notification_sent(self):
+    def test_overtimes_undertimes_email_notification_sent(self):
         with self.settings(CELERY_TASK_ALWAYS_EAGER=True):
             subject = 'Отчет по переработкам/недоработкам'
             report_config = ReportConfig.objects.create(

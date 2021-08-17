@@ -494,7 +494,7 @@ class TestOvertimesUndertimes(APITestCase):
         data = overtimes_undertimes_xlsx(period_step=period_step, in_memory=True)
         df = pd.read_excel(data['file'])
         df.fillna('', inplace=True)
-        self.assertEquals(len(df.columns[6:]), period_step * 4)
+        self.assertEquals(len(df.columns[6:]), period_step * 5)
         return df
 
     def test_overtimes_undertimes(self):
@@ -503,24 +503,24 @@ class TestOvertimesUndertimes(APITestCase):
         self.assertEquals(data['data'][self.employee1.id]['plan_sum'], 5.5)
         self.assertEquals(data['data'][self.employee1.id]['fact_sum'], 5.5)
         self.assertEquals(data['data'][self.employee1.id]['norm_sum'], 528.0)
-        self.assertEquals(data['data'][self.employee1.id][date.today().month], {'plan': 5.5, 'fact': 5.5, 'norm': 176.0})
+        self.assertEquals(data['data'][self.employee1.id][date.today().month], {'plan': 5.5, 'fact': 5.5, 'norm': 176.0, 'fact_celebration': 0.0, 'norm_celebration': 0.0})
         self.assertEquals(data['data'][self.employee2.id]['plan_sum'], 10.8)
         self.assertEquals(data['data'][self.employee2.id]['fact_sum'], 13.8)
         self.assertEquals(data['data'][self.employee2.id]['norm_sum'], 528.0)
-        self.assertEquals(data['data'][self.employee2.id][date.today().month], {'plan': 10.8, 'fact': 13.8, 'norm': 176.0})
+        self.assertEquals(data['data'][self.employee2.id][date.today().month], {'plan': 10.8, 'fact': 13.8, 'norm': 176.0, 'fact_celebration': 0.0, 'norm_celebration': 0.0})
         self.assertEquals(data['data'][self.employee3.id]['plan_sum'], 10.8)
         self.assertEquals(data['data'][self.employee3.id]['fact_sum'], 10.8)
         self.assertEquals(data['data'][self.employee3.id]['norm_sum'], 528.0)
-        self.assertEquals(data['data'][self.employee3.id][date.today().month], {'plan': 10.8, 'fact': 10.8, 'norm': 176.0})
+        self.assertEquals(data['data'][self.employee3.id][date.today().month], {'plan': 10.8, 'fact': 10.8, 'norm': 176.0, 'fact_celebration': 0.0, 'norm_celebration': 0.0})
         self.assertEquals(data['data'][self.employee4.id]['plan_sum'], 10.8)
         self.assertEquals(data['data'][self.employee4.id]['fact_sum'], 12.3)
         self.assertEquals(data['data'][self.employee4.id]['norm_sum'], 528.0)
-        self.assertEquals(data['data'][self.employee4.id][date.today().month], {'plan': 10.8, 'fact': 12.3, 'norm': 176.0})
+        self.assertEquals(data['data'][self.employee4.id][date.today().month], {'plan': 10.8, 'fact': 12.3, 'norm': 176.0, 'fact_celebration': 0.0, 'norm_celebration': 0.0})
         self._test_accounting_period(1)
         self._test_accounting_period(6)
         self._test_accounting_period(12)
 
-    def test_overtimes_undertimes_celebration_not_accounted(self):
+    def test_overtimes_undertimes_celebration_accounted_in_other_column(self):
         self._create_worker_day(
             self.employment1,
             dttm_work_start=datetime.combine(self.dt - timedelta(1), time(12, 45)),
@@ -536,8 +536,11 @@ class TestOvertimesUndertimes(APITestCase):
         data = self._test_accounting_period(12)
         self.assertEquals(data['data'][self.employee1.id]['plan_sum'], 5.5)
         self.assertEquals(data['data'][self.employee1.id]['fact_sum'], 5.5)
+        month = date.today().month if not date.today().day == 1 else date.today().month - 1
+        self.assertEquals(data['data'][self.employee1.id][month]['fact_celebration'], 4.9)
 
     def test_overtimes_undertimes_xlsx(self):
+        self.maxDiff = None
         data = self._test_accounting_period_xlsx(1)
         assert_data = [
             {
@@ -550,6 +553,7 @@ class TestOvertimesUndertimes(APITestCase):
                 'Норма часов': MONTH_NAMES[date.today().month], 
                 'Отработано часов': MONTH_NAMES[date.today().month], 
                 'Всего переработки/недоработки':MONTH_NAMES[date.today().month], 
+                'Переработки/недоработки: отработано часов в праздники':MONTH_NAMES[date.today().month], 
                 'Плановое количество часов': MONTH_NAMES[date.today().month], 
             }, 
             {
@@ -562,6 +566,7 @@ class TestOvertimesUndertimes(APITestCase):
                 'Норма часов': '176.0', 
                 'Отработано часов': '5.5', 
                 'Всего переработки/недоработки': '-170.5', 
+                'Переработки/недоработки: отработано часов в праздники': '0.0', 
                 'Плановое количество часов': '5.5'
             }, 
             {
@@ -574,6 +579,7 @@ class TestOvertimesUndertimes(APITestCase):
                 'Норма часов': '176.0', 
                 'Отработано часов': '13.8', 
                 'Всего переработки/недоработки': '-162.2', 
+                'Переработки/недоработки: отработано часов в праздники': '0.0',
                 'Плановое количество часов': '10.8'
             }, 
             {
@@ -586,6 +592,7 @@ class TestOvertimesUndertimes(APITestCase):
                 'Норма часов': '176.0', 
                 'Отработано часов': '10.8', 
                 'Всего переработки/недоработки': '-165.2', 
+                'Переработки/недоработки: отработано часов в праздники': '0.0',
                 'Плановое количество часов': '10.8'
             }, 
             {
@@ -597,7 +604,8 @@ class TestOvertimesUndertimes(APITestCase):
                 'Unnamed: 5': '', 
                 'Норма часов': '176.0', 
                 'Отработано часов': '12.3', 
-                'Всего переработки/недоработки': '-163.7', 
+                'Всего переработки/недоработки': '-163.7',
+                'Переработки/недоработки: отработано часов в праздники': '0.0', 
                 'Плановое количество часов': '10.8'
             }
         ]
