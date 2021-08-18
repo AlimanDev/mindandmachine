@@ -674,6 +674,7 @@ def confirm_vacancy(vacancy_id, user, employee_id=None, exchange=False, reconfir
                     )
                 )
 
+                # TODO: тут ведь тоже надо поправить?
                 WorkerDay.objects_with_excluded.filter(
                     dt=vacancy.dt,
                     employee_id=vacancy.employee_id,
