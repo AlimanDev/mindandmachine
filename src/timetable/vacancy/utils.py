@@ -617,20 +617,22 @@ def confirm_vacancy(vacancy_id, user, employee_id=None, exchange=False, reconfir
                 res['status_code'] = 400
                 return res
 
-            employee_worker_day = WorkerDay.objects.get_plan_approved(
+            employee_worker_days_qs = WorkerDay.objects.get_plan_approved(
                 employee_id=active_employment.employee_id,
                 dt=vacancy.dt,
-            ).select_related('shop').first()
+            ).select_related('shop')
+            employee_worker_days = list(employee_worker_days_qs)
 
             # нельзя откликнуться на вакансию если для сотрудника не составлен график на этот день
-            if not employee_worker_day and not (vacancy.is_outsource and vacancy_shop.network_id != active_employment.shop.network_id):
+            if not employee_worker_days and not (
+                    vacancy.is_outsource and vacancy_shop.network_id != active_employment.shop.network_id):
                 res['text'] = messages['no_timetable']
                 res['status_code'] = 400
                 return res
 
-
             # откликаться на вакансию можно только в нерабочие/неоплачиваемые дни
-            update_condition = employee_worker_day.type not in WorkerDay.TYPES_PAID if employee_worker_day else True
+            update_condition = all(
+                wd.type not in WorkerDay.TYPES_PAID for wd in employee_worker_days if not wd.is_vacancy)
             if active_employment.shop_id != vacancy_shop.id and not exchange:
                 try:
                     tt = ShopMonthStat.objects.get(shop=vacancy_shop, dt=vacancy.dt.replace(day=1))
@@ -643,18 +645,26 @@ def confirm_vacancy(vacancy_id, user, employee_id=None, exchange=False, reconfir
                     update_condition = False
 
             if update_condition or exchange:
-                if employee_worker_day:
-                    employee_worker_day.delete()
-                if reconfirm:
+                if any(not wd.is_vacancy and wd.type not in WorkerDay.TYPES_PAID for wd in employee_worker_days):
+                    employee_worker_days_qs.filter(~Q(type__in=WorkerDay.TYPES_PAID), is_vacancy=False).delete()
+
+                prev_employee_id = vacancy.employee_id
+                if reconfirm and prev_employee_id:
+                    # возможно надо по-другому сделать (копировать всю подтв. версию в черновик?)
                     WorkerDay.objects.filter(
                         is_fact=False,
                         is_approved=False,
                         dt=vacancy.dt,
-                        employee_id=vacancy.employee_id,
+                        employee_id=prev_employee_id,
                         is_vacancy=True,
+                        dttm_work_start=vacancy.dttm_work_start,
+                        dttm_work_end=vacancy.dttm_work_end,
                     ).delete()
 
-                # TODO: добавить проверку на пересечение с рабочими днями у этого же пользователя
+                # TODO: проставлять сотруднику, у которого отменили вакансию, выходной,
+                #  если нет других вакансий и не аутсорс?
+                #  вызывать cancel_vacancy + поправить внутри логику?
+
                 vacancy.employee = active_employment.employee
                 vacancy.employment = active_employment
                 vacancy.save(
@@ -674,25 +684,30 @@ def confirm_vacancy(vacancy_id, user, employee_id=None, exchange=False, reconfir
                 vacancy_details = WorkerDayCashboxDetails.objects.filter(
                     worker_day=vacancy).values('work_type_id', 'work_part')
 
-                vacancy.id = None
-                vacancy.is_approved = False
-                vacancy.save()
+                try:
+                    with transaction.atomic():
+                        vacancy.id = None
+                        vacancy.is_approved = False
+                        vacancy.save()
 
-                WorkerDayCashboxDetails.objects.bulk_create(
-                    WorkerDayCashboxDetails(
-                        worker_day=vacancy,
-                        work_type_id=details['work_type_id'],
-                        work_part=details['work_part'],
-                    ) for details in vacancy_details
-                )
+                        WorkerDayCashboxDetails.objects.bulk_create(
+                            WorkerDayCashboxDetails(
+                                worker_day=vacancy,
+                                work_type_id=details['work_type_id'],
+                                work_part=details['work_part'],
+                            ) for details in vacancy_details
+                        )
+                        WorkerDay.check_work_time_overlap(
+                            employee_id=vacancy.employee_id, dt=vacancy.dt, is_fact=False, is_approved=False)
+                except WorkTimeOverlap:
+                    pass
 
                 # TODO: создать событие об отклике на вакансию
 
                 Event.objects.filter(worker_day=vacancy).delete()
                 res['text'] = messages['vacancy_success']
 
-                WorkerDay.check_work_time_overlap(employee_id=vacancy.employee_id, dt=vacancy.dt)
-
+                WorkerDay.check_work_time_overlap(employee_id=vacancy.employee_id, dt=vacancy.dt, is_fact=False)
             else:
                 res['text'] = messages['cant_apply_vacancy']
                 res['status_code'] = 400

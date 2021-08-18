@@ -929,7 +929,7 @@ class WorkerDay(AbstractModel):
 
     @classmethod
     def check_work_time_overlap(cls, employee_days_q=None, employee_id=None, employee_id__in=None, user_id=None,
-                                user_id__in=None, dt=None, dt__in=None, is_fact=None, raise_exc=True, exc_cls=None):
+                                user_id__in=None, dt=None, dt__in=None, is_fact=None, is_approved=None, raise_exc=True, exc_cls=None):
         """
         Проверка наличия пересечения рабочего времени
         """
@@ -941,6 +941,9 @@ class WorkerDay(AbstractModel):
         }
         if is_fact is not None:
             lookup['is_fact'] = is_fact
+
+        if is_approved is not None:
+            lookup['is_approved'] = is_approved
 
         if employee_id:
             lookup['employee__user__employees__id'] = employee_id

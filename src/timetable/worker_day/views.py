@@ -356,6 +356,8 @@ class WorkerDayViewSet(BaseModelViewSet):
                 **employee_filter,
             )
 
+            # TODO: если в черновике и в подтв. версии по два одинаковых РД (10-15, 18-22), один мы поменяли в черновике,
+            #  другой оставили как есть, подтвердили. Что будет? -- тест + *поправить логику
             wdays_to_approve = WorkerDay.objects.filter(
                 approve_condition,
             ).annotate(

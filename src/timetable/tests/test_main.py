@@ -2870,13 +2870,7 @@ class TestVacancy(TestsHelperMixin, APITestCase):
             dttm_status_change=now(),
             status=ShopMonthStat.READY,
         )
-        FunctionGroup.objects.create(
-            group=self.employee_group,
-            method='POST',
-            func='WorkerDay_confirm_vacancy',
-            level_up=1,
-            level_down=99,
-        )
+        self.add_group_perm(self.employee_group, 'WorkerDay_confirm_vacancy', 'POST')
         response = self.client.post(f'/rest_api/worker_day/{self.vacancy2.id}/confirm_vacancy/')
 
         self.assertEqual(response.status_code, 200)
@@ -2888,6 +2882,42 @@ class TestVacancy(TestsHelperMixin, APITestCase):
         self.assertEqual(mail.outbox[0].body, body)
 
         self.assertFalse(WorkerDay.objects.filter(id=pawd.id).exists())
+
+        # можно откликнуться на вакансию,
+        # если время не пересекается с другой вакансией на которую уже откликнулся или назначен
+        vacancy3 = WorkerDayFactory(
+            employee_id=None,
+            employment_id=None,
+            shop=self.shop,
+            dttm_work_start=datetime.combine(self.dt_now, time(18)),
+            dttm_work_end=datetime.combine(self.dt_now, time(22)),
+            type=WorkerDay.TYPE_WORKDAY,
+            dt=self.dt_now,
+            is_vacancy=True,
+            is_approved=True,
+            cashbox_details__work_type=self.work_type1,
+        )
+        response = self.client.post(f'/rest_api/worker_day/{vacancy3.id}/confirm_vacancy/')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {'result': 'Вакансия успешно принята.'})
+
+        # нельзя откликнуться на вакансию,
+        # если время вакансии пересекается с другой/другими днями
+        vacancy4 = WorkerDayFactory(
+            employee_id=None,
+            employment_id=None,
+            shop=self.shop,
+            dttm_work_start=datetime.combine(self.dt_now, time(12)),
+            dttm_work_end=datetime.combine(self.dt_now, time(22)),
+            type=WorkerDay.TYPE_WORKDAY,
+            dt=self.dt_now,
+            is_vacancy=True,
+            is_approved=True,
+            cashbox_details__work_type=self.work_type1,
+        )
+        response = self.client.post(f'/rest_api/worker_day/{vacancy4.id}/confirm_vacancy/')
+        self.assertContains(
+            response, text='Операция не может быть выполнена. Недопустимое пересечение времени', status_code=400)
 
     def test_approve_vacancy(self):
         WorkerDay.objects.filter(id=self.vacancy.id).update(employee_id=None, is_approved=False)
