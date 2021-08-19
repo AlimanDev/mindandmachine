@@ -15,6 +15,7 @@ from django.urls import path, reverse, resolve
 from django.utils.html import escape
 from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
+from django_admin_listfilter_dropdown.filters import ChoiceDropdownFilter
 from import_export import resources
 from import_export.admin import ExportActionMixin, ImportMixin
 from import_export.fields import Field
@@ -312,7 +313,12 @@ class GroupAdmin(admin.ModelAdmin):
 @admin.register(FunctionGroup)
 class FunctionGroupAdmin(ImportMixin, ExportActionMixin, admin.ModelAdmin):
     list_display = ('id', 'access_type', 'group', 'func', 'method', 'level_down', 'level_up')
-    list_filter = ('access_type', 'group', 'func')
+    list_filter = [
+        ('group', RelatedOnlyDropdownNameOrderedFilter),
+        ('func', ChoiceDropdownFilter),
+    ]
+    # list_filter = ('access_type', 'group', 'func')
+    list_select_related = ('group',)
     search_fields = ('id',)
     resource_class = FunctionGroupResource
 
@@ -339,11 +345,10 @@ class FunctionGroupAdmin(ImportMixin, ExportActionMixin, admin.ModelAdmin):
 @admin.register(Employment)
 class EmploymentAdmin(admin.ModelAdmin):
     list_display = ('id', 'shop', 'employee', 'function_group', 'dt_hired_formated', 'dt_fired_formated')
-    list_select_related = ('employee', 'employee__user', 'shop', 'function_group')
+    list_select_related = ('employee', 'employee__user', 'shop', 'shop__parent', 'function_group')
     list_filter = [
         ('shop', RelatedOnlyDropdownNameOrderedFilter),
     ]
-    # list_filter = ('shop', 'employee')
     search_fields = ('employee__user__first_name', 'employee__user__last_name', 'shop__name', 'shop__parent__name',
                      'employee__tabel_code')
     raw_id_fields = ('shop', 'employee', 'position')
