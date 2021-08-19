@@ -23,6 +23,7 @@ class ShopAdminForm(DefaultOverrideAdminWidgetsForm):
     json_fields = [
         'tm_open_dict',
         'tm_close_dict',
+        'load_template_settings',
     ]
 
 
