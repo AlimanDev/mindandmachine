@@ -221,6 +221,7 @@ class TestWorkShiftViewSet(TestsHelperMixin, APITestCase):
                 'show_worker_day_tasks': False,
                 'show_user_biometrics_block': False,
                 'unaccounted_overtime_threshold': 60,
+                'show_remaking_choice': False,
                 'url': None
             },
         }
@@ -345,6 +346,7 @@ class TestWorkShiftViewSet(TestsHelperMixin, APITestCase):
                 'show_worker_day_tasks': False,
                 'show_user_biometrics_block': False,
                 'unaccounted_overtime_threshold': 60,
+                'show_remaking_choice': False,
                 'url': None
             },
         }
@@ -361,7 +363,7 @@ class TestWorkShiftViewSet(TestsHelperMixin, APITestCase):
         self.employee2.save()
         self.shop.timezone = 'Asia/Vladivostok'
         self.shop.save()
-        if datetime.now().hour <= 14:
+        if datetime.now().hour <= 13:
             self.today -= timedelta(1)
         position = WorkerPosition.objects.create(
             name='Работник',
@@ -474,6 +476,7 @@ class TestWorkShiftViewSet(TestsHelperMixin, APITestCase):
                 'show_worker_day_tasks': False,
                 'show_user_biometrics_block': False,
                 'unaccounted_overtime_threshold': 60,
+                'show_remaking_choice': False,
                 'url': None
             },
         }

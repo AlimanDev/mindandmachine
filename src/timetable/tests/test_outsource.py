@@ -88,8 +88,8 @@ class TestOutsource(TestsHelperMixin, APITestCase):
             shop=cls.client_shop,
         )
         
-        NetworkConnect.objects.create(client=cls.client_network, outsourcing=cls.outsource_network)
-        NetworkConnect.objects.create(client=cls.client_network, outsourcing=cls.outsource_network2)
+        cls.network_connect = NetworkConnect.objects.create(client=cls.client_network, outsourcing=cls.outsource_network)
+        cls.network_connect2 = NetworkConnect.objects.create(client=cls.client_network, outsourcing=cls.outsource_network2)
         cls.dt_now = date.today()
         ShopMonthStat.objects.create(shop=cls.client_shop, is_approved=True, dt=cls.dt_now.replace(day=1), dttm_status_change=datetime.now())
 
@@ -160,10 +160,17 @@ class TestOutsource(TestsHelperMixin, APITestCase):
         self.assertEqual(not_created.json(), {'non_field_errors': ['Не переданы аутсорс сети, которые могут откликнуться на аутсорс вакансию.']})
 
     def test_create_vacancy_with_shop_from_other_network(self):
+        NetworkConnect.objects.filter(id=self.network_connect.id).delete()
         dt_now = self.dt_now
         self.client.force_authenticate(user=self.user1)
         not_created = self._create_vacancy(dt_now, datetime.combine(dt_now, time(8)), datetime.combine(dt_now, time(20)), is_outsource=False)
         self.assertEqual(not_created.json(), {'non_field_errors': ['В вашей сети нет такого магазина.']})
+
+    def test_can_create_vacancy_with_shop_from_other_network_but_from_outsource_client(self):
+        dt_now = self.dt_now
+        self.client.force_authenticate(user=self.user1)
+        resp = self._create_vacancy(dt_now, datetime.combine(dt_now, time(8)), datetime.combine(dt_now, time(20)), is_outsource=False)
+        self.assertEqual(resp.status_code, 201)
 
     def test_vacancy_creation_with_null_or_empty_outsourcings_ids(self):
         dt_now = self.dt_now
@@ -398,6 +405,7 @@ class TestOutsource(TestsHelperMixin, APITestCase):
                     'show_worker_day_tasks': False,
                     'show_user_biometrics_block': False,
                     'unaccounted_overtime_threshold': 60,
+                    'show_remaking_choice': False,
                 }
             }
         ]

@@ -158,6 +158,13 @@ class MdaIntegrationHelper:
             add_to_unload=Exists(Employment.objects.get_active(
                 dt_from=self.dt_now - timedelta(days=60), dt_to=self.dt_now,
                 employee__user_id=OuterRef('id'),
+                shop__in=Shop.objects.filter(  # выгружаем только юзеров только из неудаленных и незакрытых магазинов
+                    Q(dt_closed__isnull=True) | Q(
+                        dt_closed__gt=self.dt_now - timedelta(days=CLOSED_OR_DELETED_THRESHOLD_DAYS)),
+                    Q(dttm_deleted__isnull=True) | Q(
+                        dttm_deleted__gt=self.dt_now - timedelta(days=CLOSED_OR_DELETED_THRESHOLD_DAYS)),
+                    ~Q(code=''), code__isnull=False,
+                ),
             ))
         ).filter(
             add_to_unload=True,

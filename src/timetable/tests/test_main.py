@@ -13,7 +13,19 @@ from django.utils.timezone import now
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from src.base.models import Break, FunctionGroup, Network, Employment, Region, ShopSchedule, Shop, Employee, User, WorkerPosition
+from src.base.models import (
+    Break,
+    FunctionGroup,
+    Network,
+    Employment,
+    Region,
+    ShopSchedule,
+    Shop,
+    Employee,
+    User,
+    WorkerPosition,
+    NetworkConnect,
+)
 from src.events.models import EventType
 from src.notifications.models.event_notification import EventEmailNotification
 from src.timetable.events import VACANCY_CONFIRMED_TYPE
@@ -1321,6 +1333,41 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
             resp.json()[0],
             'Невозможно создать рабочий день, так как пользователь в этот период не трудоустроен',
         )
+
+    def test_can_create_workday_for_user_from_outsourcing_network(self):
+        outsource_network = Network.objects.create(
+            name='outsource',
+            code='outsource',
+        )
+        NetworkConnect.objects.create(
+            client_id=self.user2.network_id,
+            outsourcing=outsource_network,
+        )
+        WorkerDay.objects_with_excluded.filter(employee=self.employee2).delete()
+        outsource_shop = Shop.objects.create(
+            network=outsource_network,
+            name='oursource_shop',
+            region=self.region,
+        )
+        User.objects.filter(id=self.user2.id).update(network=outsource_network)
+        Employment.objects.filter(employee__user=self.user2).update(shop=outsource_shop)
+        dt = self.dt - timedelta(days=60)
+        data = {
+            "shop_id": self.shop.id,
+            "employee_id": self.employee2.id,
+            "dt": dt,
+            "is_fact": False,
+            "is_approved": True,
+            "type": WorkerDay.TYPE_WORKDAY,
+            "dttm_work_start": datetime.combine(dt, time(10, 0, 0)),
+            "dttm_work_end": datetime.combine(dt, time(20, 0, 0)),
+            "worker_day_details": [{
+                "work_part": 1.0,
+                "work_type_id": self.work_type.id}
+            ]
+        }
+        resp = self.client.post(self.url, data, format='json')
+        self.assertEqual(resp.status_code, 201)
 
     def test_wd_created_as_vacancy_for_other_shop_and_employment_was_set(self):
         data = {
@@ -3058,9 +3105,11 @@ class TestAditionalFunctions(TestsHelperMixin, APITestCase):
         self.create_worker_days(self.employment3, dt_from, 4, 9, 21, False)
         self.update_or_create_holidays(self.employment3, dt_from + timedelta(4), 1, False)
         data = {
-            'from_workerday_ids': list(WorkerDay.objects.filter(employee=self.employee2).values_list('id', flat=True)),
+            'from_employee_id': self.employee2.id,
+            'from_dates': [Converter.convert_date(dt_from + timedelta(i)) for i in range(5)],
             'to_employee_id': self.employee3.id,
             'to_dates': [Converter.convert_date(dt_from + timedelta(i)) for i in range(5)],
+            'is_approved': True,
         }
         url = f'{self.url}duplicate/'
         response = self.client.post(url, data, format='json')
@@ -3073,9 +3122,11 @@ class TestAditionalFunctions(TestsHelperMixin, APITestCase):
         self.create_worker_days(self.employment3, dt_from, 4, 9, 21, False)
         self.update_or_create_holidays(self.employment3, dt_from + timedelta(4), 1, False)
         data = {
-            'from_workerday_ids': list(WorkerDay.objects.filter(employee=self.employee2).values_list('id', flat=True)),
+            'from_employee_id': self.employee2.id,
+            'from_dates': [Converter.convert_date(dt_from + timedelta(i)) for i in range(5)],
             'to_employee_id': self.employee3.id,
             'to_dates': [Converter.convert_date(dt_from + timedelta(i)) for i in range(4)],
+            'is_approved': True,
         }
         url = f'{self.url}duplicate/'
         response = self.client.post(url, data, format='json')
@@ -3088,9 +3139,11 @@ class TestAditionalFunctions(TestsHelperMixin, APITestCase):
         self.create_worker_days(self.employment3, dt_from, 4, 9, 21, False)
         self.update_or_create_holidays(self.employment3, dt_from + timedelta(4), 1, False)
         data = {
-            'from_workerday_ids': list(WorkerDay.objects.filter(employee=self.employee2).values_list('id', flat=True)),
+            'from_employee_id': self.employee2.id,
+            'from_dates': [Converter.convert_date(dt_from + timedelta(i)) for i in range(10)],
             'to_employee_id': self.employee3.id,
             'to_dates': [Converter.convert_date(dt_from + timedelta(i)) for i in range(8)],
+            'is_approved': True,
         }
         url = f'{self.url}duplicate/'
         response = self.client.post(url, data, format='json')
@@ -3102,9 +3155,11 @@ class TestAditionalFunctions(TestsHelperMixin, APITestCase):
         dt_from2 = dt_from + timedelta(days=10)
         self.create_worker_days(self.employment2, dt_from, 5, 10, 20, True)
         data = {
-            'from_workerday_ids': list(WorkerDay.objects.filter(employee=self.employee2).values_list('id', flat=True)),
+            'from_employee_id': self.employee2.id,
+            'from_dates': [Converter.convert_date(dt_from + timedelta(i)) for i in range(5)],
             'to_employee_id': self.employee3.id,
             'to_dates': [Converter.convert_date(dt_from2 + timedelta(i)) for i in range(8)],
+            'is_approved': True,
         }
         url = f'{self.url}duplicate/'
         response = self.client.post(url, data, format='json')
@@ -3117,7 +3172,8 @@ class TestAditionalFunctions(TestsHelperMixin, APITestCase):
         self.update_or_create_holidays(self.employment2, dt_from, 1, False)
 
         data = {
-            'from_workerday_ids': list(WorkerDay.objects.filter(employee=self.employee2).values_list('id', flat=True)),
+            'from_employee_id': self.employee2.id,
+            'from_dates': [Converter.convert_date(dt_from + timedelta(i)) for i in range(1)],
             'to_employee_id': self.employee3.id,
             'to_dates': [Converter.convert_date(dt_from2 + timedelta(i)) for i in range(8)],
         }
@@ -3137,9 +3193,11 @@ class TestAditionalFunctions(TestsHelperMixin, APITestCase):
 
         self.create_worker_days(self.employment2, dt_from, 5, 10, 20, True)
         data = {
-            'from_workerday_ids': list(WorkerDay.objects.filter(employee=self.employee2).values_list('id', flat=True)),
+            'from_employee_id': self.employee2.id,
+            'from_dates': [Converter.convert_date(dt_from + timedelta(i)) for i in range(5)],
             'to_employee_id': self.employee3.id,
             'to_dates': [Converter.convert_date(dt_from2 + timedelta(i)) for i in range(8)],
+            'is_approved': True,
         }
         url = f'{self.url}duplicate/'
         response = self.client.post(url, data, format='json')
@@ -3157,9 +3215,11 @@ class TestAditionalFunctions(TestsHelperMixin, APITestCase):
         self.create_worker_days(self.employment3, dt_from, 4, 9, 21, False)
         self.update_or_create_holidays(self.employment3, dt_from + timedelta(4), 1, False)
         data = {
-            'from_workerday_ids': list(WorkerDay.objects.filter(employee=self.employee2).values_list('id', flat=True)),
+            'from_employee_id': self.employee2.id,
+            'from_dates': [Converter.convert_date(dt_from + timedelta(i)) for i in range(5)],
             'to_employee_id': self.employee3.id,
             'to_dates': [Converter.convert_date(dt_from + timedelta(i)) for i in range(5)],
+            'is_approved': True,
         }
         url = f'{self.url}duplicate/'
         response = self.client.post(url, data, format='json')
@@ -3197,7 +3257,8 @@ class TestAditionalFunctions(TestsHelperMixin, APITestCase):
         )
 
         data = {
-            'from_workerday_ids': [wd_dt_now.id, wd_dt_tomorrow.id],
+            'from_employee_id': self.employee2.id,
+            'from_dates': [wd_dt_now.dt, wd_dt_tomorrow.dt],
             'to_employee_id': self.employee3.id,
             'to_dates': [Converter.convert_date(dt_to + timedelta(days=i)) for i in range(2)],
         }
@@ -3392,6 +3453,57 @@ class TestAditionalFunctions(TestsHelperMixin, APITestCase):
             [self.employment2.employee.user_id, self.employment4.employee.user_id],
         )
 
+    def test_copy_range_types_and_more(self):
+        dt_from_first = date.today().replace(day=1)
+        dt_from_last = dt_from_first + timedelta(4)
+        dt_to_first = dt_from_last + timedelta(1)
+        dt_to_last = dt_to_first + timedelta(7)
+
+        for i in range(5):
+            # H,W,W,H,W
+            dt = dt_from_first + timedelta(i)
+            type = WorkerDay.TYPE_WORKDAY if i % 3 != 0 else WorkerDay.TYPE_HOLIDAY
+            WorkerDay.objects.create(
+                dt=dt,
+                shop_id=self.employment2.shop_id,
+                employee_id=self.employment2.employee_id,
+                employment=self.employment2,
+                type=type,
+                is_approved=True,
+            )
+        for i in range(8):
+            dt = dt_to_first + timedelta(i)
+            WorkerDay.objects.create(
+                dt=dt,
+                shop_id=self.employment2.shop_id,
+                employee_id=self.employment2.employee_id,
+                employment=self.employment2,
+                type=WorkerDay.TYPE_VACATION,
+                is_approved=False,
+            )
+
+        data = {
+            'employee_ids': [
+                self.employment2.employee_id,
+            ],
+            'from_copy_dt_from': dt_from_first,
+            'from_copy_dt_to': dt_from_last,
+            'to_copy_dt_from': dt_to_first,
+            'to_copy_dt_to': dt_to_last,
+            'worker_day_types': ['W'],
+        }
+        self.assertEqual(WorkerDay.objects.filter(is_approved=False).count(), 8)
+        self.assertEqual(WorkerDay.objects.filter(is_approved=True).count(), 5)
+        response = self.client.post(self.url + 'copy_range/', data=data)
+        response_data = response.json()
+
+        self.assertEqual(len(response_data), 5)
+        self.assertEqual(WorkerDay.objects.filter(is_fact=False, is_approved=False, dt__gte=dt_to_first, dt__lte=dt_to_last).count(), 8)
+        self.assertEqual(WorkerDay.objects.filter(is_fact=False, is_approved=False, dt__gte=dt_to_first, dt__lte=dt_to_last, type='V').count(), 3)
+        self.assertEqual(WorkerDay.objects.filter(is_fact=False, is_approved=False, dt__gte=dt_to_first, dt__lte=dt_to_last, type='W').count(), 5)
+        self.assertEqual(WorkerDay.objects.filter(is_fact=False, is_approved=False, dt__gte=dt_to_first, dt__lte=dt_to_last, type='H').count(), 0)
+        
+
     def test_copy_range_bad_dates(self):
         dt_from_first = date.today().replace(day=1)
         dt_from_last = dt_from_first + relativedelta(day=31)
@@ -3465,7 +3577,12 @@ class TestAditionalFunctions(TestsHelperMixin, APITestCase):
             'type': WorkerDay.TYPE_WORKDAY,
             'tm_work_start': '10:00:00',
             'tm_work_end': '22:00:00',
-            'work_type_id': self.work_type.id,
+            'cashbox_details': [
+                {
+                    'work_type_id': self.work_type.id,
+                    'work_part': 1,
+                }
+            ],
             'is_vacancy': True,
             'dt_from': dt_from,
             'dt_to': dt_from + timedelta(9),
@@ -3475,6 +3592,30 @@ class TestAditionalFunctions(TestsHelperMixin, APITestCase):
         data = response.json()
         self.assertEquals(len(data), 10)
         self.assertEquals(WorkerDay.objects.filter(is_vacancy=True, shop_id=self.shop.id, is_outsource=False).count(), 10)
+
+    def test_change_list_create_vacancy_with_employee(self):
+        dt_from = date.today()
+        data = {
+            'shop_id': self.shop.id,
+            'type': WorkerDay.TYPE_WORKDAY,
+            'employee_id': self.employee1.id,
+            'tm_work_start': '10:00:00',
+            'tm_work_end': '22:00:00',
+            'cashbox_details': [
+                {
+                    'work_type_id': self.work_type.id,
+                    'work_part': 1,
+                }
+            ],
+            'is_vacancy': True,
+            'dt_from': dt_from,
+            'dt_to': dt_from + timedelta(9),
+        }
+        url = f'{self.url}change_list/'
+        response = self.client.post(url, data, format='json')
+        data = response.json()
+        self.assertEquals(len(data), 10)
+        self.assertEquals(WorkerDay.objects.filter(is_vacancy=True, shop_id=self.shop.id, is_outsource=False, employee_id=self.employee1.id).count(), 10)
 
     def test_change_list_create_vacancy_with_outsources(self):
         dt_from = date.today()
@@ -3489,7 +3630,12 @@ class TestAditionalFunctions(TestsHelperMixin, APITestCase):
             'type': WorkerDay.TYPE_WORKDAY,
             'tm_work_start': '10:00:00',
             'tm_work_end': '22:00:00',
-            'work_type_id': self.work_type.id,
+            'cashbox_details': [
+                {
+                    'work_type_id': self.work_type.id,
+                    'work_part': 1,
+                }
+            ],
             'is_vacancy': True,
             'dt_from': dt_from,
             'dt_to': dt_from + timedelta(9),
@@ -3514,7 +3660,12 @@ class TestAditionalFunctions(TestsHelperMixin, APITestCase):
             'type': WorkerDay.TYPE_WORKDAY,
             'tm_work_start': '10:00:00',
             'tm_work_end': '22:00:00',
-            'work_type_id': self.work_type.id,
+            'cashbox_details': [
+                {
+                    'work_type_id': self.work_type.id,
+                    'work_part': 1,
+                }
+            ],
             'is_vacancy': True,
             'dt_from': dt_from,
             'dt_to': dt_from + timedelta(9),
@@ -3547,6 +3698,77 @@ class TestAditionalFunctions(TestsHelperMixin, APITestCase):
         data = response.json()
         self.assertEquals(len(data), 31)
         self.assertEquals(WorkerDay.objects.filter(employee_id=self.employee1.id, type=WorkerDay.TYPE_VACATION, dt__gte=dt_from, dt__lte=dt_to).count(), 31)
+
+    def test_change_list_create_vacancy_many_work_types(self):
+        dt_from = date.today()
+        work_type_name2 = WorkTypeName.objects.create(name='Магазин2', network=self.network)
+        work_type2 = WorkType.objects.create(
+            work_type_name=work_type_name2,
+            shop=self.shop)
+        data = {
+            'shop_id': self.shop.id,
+            'type': WorkerDay.TYPE_WORKDAY,
+            'tm_work_start': '10:00:00',
+            'tm_work_end': '22:00:00',
+            'cashbox_details': [
+                {
+                    'work_type_id': self.work_type.id,
+                    'work_part': 0.5,
+                },
+                {
+                    'work_type_id': work_type2.id,
+                    'work_part': 0.5,
+                }
+            ],
+            'is_vacancy': True,
+            'dt_from': dt_from,
+            'dt_to': dt_from + timedelta(9),
+        }
+        url = f'{self.url}change_list/'
+        response = self.client.post(url, data, format='json')
+        data = response.json()
+        self.assertEquals(len(data), 10)
+        self.assertEquals(WorkerDay.objects.filter(is_vacancy=True, shop_id=self.shop.id, is_outsource=False).count(), 10)
+        self.assertEquals(WorkerDayCashboxDetails.objects.count(), 20)
+
+    def test_change_list_errors(self):
+        dt_from = date(2021, 1, 1)
+        dt_to = date(2021, 1, 2)
+        data = {
+            'shop_id': self.shop.id,
+            'type': WorkerDay.TYPE_WORKDAY,
+            'dt_from': dt_from,
+            'dt_to': dt_to,
+        }
+        url = f'{self.url}change_list/'
+        # no tm_start
+        response = self.client.post(url, data, format='json')
+        self.assertEquals(response.status_code, 400)
+        self.assertEquals(response.json(), {'tm_work_start': 'Это поле обязательно.'})
+        data['tm_work_start'] = '10:00:00'
+        # no tm_end
+        response = self.client.post(url, data, format='json')
+        self.assertEquals(response.status_code, 400)
+        self.assertEquals(response.json(), {'tm_work_end': 'Это поле обязательно.'})
+        data['tm_work_end'] = '20:00:00'
+        # no cashbox_details
+        response = self.client.post(url, data, format='json')
+        self.assertEquals(response.status_code, 400)
+        self.assertEquals(response.json(), {'cashbox_details': 'Это поле обязательно.'})
+        data['cashbox_details'] = [
+            {
+                'work_type_id': self.work_type.id,
+                'work_part': 1,
+            }
+        ]
+        # no employee_id
+        response = self.client.post(url, data, format='json')
+        self.assertEquals(response.status_code, 400)
+        self.assertEquals(response.json(), {'employee_id': 'Это поле обязательно.'})
+        data['type'] = WorkerDay.TYPE_VACATION
+        response = self.client.post(url, data, format='json')
+        self.assertEquals(response.status_code, 400)
+        self.assertEquals(response.json(), {'employee_id': 'Это поле обязательно.'})
 
     def test_recalc(self):
         today = date.today()

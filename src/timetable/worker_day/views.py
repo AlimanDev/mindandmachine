@@ -1,6 +1,7 @@
 import datetime
 import json
 from itertools import groupby
+from src.reports.utils.overtimes_undertimes import overtimes_undertimes_xlsx
 
 import pandas as pd
 from django.conf import settings
@@ -41,6 +42,7 @@ from src.timetable.timesheet.tasks import calc_timesheets
 from src.timetable.vacancy.utils import cancel_vacancies, cancel_vacancy, confirm_vacancy
 from src.timetable.vacancy.tasks import vacancies_create_and_cancel_for_shop
 from src.timetable.worker_day.serializers import (
+    OvertimesUndertimesReportSerializer,
     ChangeListSerializer,
     WorkerDaySerializer,
     WorkerDayApproveSerializer,
@@ -64,7 +66,7 @@ from src.timetable.worker_day.serializers import (
 from src.timetable.worker_day.stat import count_daily_stat
 from src.timetable.worker_day.tasks import recalc_wdays, recalc_fact_from_records
 from src.timetable.worker_day.timetable import get_timetable_generator_cls
-from src.timetable.worker_day.utils import create_worker_days_range, exchange, copy_as_excel_cells
+from src.timetable.worker_day.utils import check_worker_day_permissions, create_worker_days_range, exchange, copy_as_excel_cells
 from src.util.dg.tabel import get_tabel_generator_cls
 from src.util.models_converter import Converter
 from src.util.openapi.responses import (
@@ -307,43 +309,17 @@ class WorkerDayViewSet(BaseModelViewSet):
             raise PermissionDenied()
 
         with transaction.atomic():
-            wd_perms = GroupWorkerDayPermission.objects.filter(
-                group__in=request.user.get_group_ids(Shop.objects.get(id=serializer.validated_data['shop_id'])),
-                worker_day_permission__action=WorkerDayPermission.APPROVE,
-                worker_day_permission__graph_type=WorkerDayPermission.FACT if
-                    serializer.validated_data['is_fact'] else WorkerDayPermission.PLAN,
-            ).select_related('worker_day_permission').values_list(
-                'worker_day_permission__wd_type', 'limit_days_in_past', 'limit_days_in_future',
-            ).distinct()
-            wd_perms_dict = {wdp[0]: wdp for wdp in wd_perms}
-
+            wd_perms = check_worker_day_permissions(
+                request.user, 
+                serializer.validated_data.get('shop_id'), 
+                WorkerDayPermission.APPROVE, 
+                WorkerDayPermission.FACT if serializer.validated_data['is_fact'] else WorkerDayPermission.PLAN,
+                serializer.validated_data.get('wd_types'),
+                serializer.validated_data.get('dt_from'),
+                serializer.validated_data.get('dt_to'),
+                self.error_messages,
+            )
             today = (datetime.datetime.now() + datetime.timedelta(hours=3)).date()
-            for wd_type in serializer.validated_data.get('wd_types'):
-                wdp = wd_perms_dict.get(wd_type)
-                wd_type_display_str = dict(WorkerDay.TYPES)[wd_type]
-                if wdp is None:
-                    raise PermissionDenied(
-                        self.error_messages['no_perm_to_approve_wd_types'].format(wd_type_str=wd_type_display_str))
-
-                limit_days_in_past = wdp[1]
-                limit_days_in_future = wdp[2]
-                date_limit_in_past = None
-                date_limit_in_future = None
-                if limit_days_in_past is not None:
-                    date_limit_in_past = today - datetime.timedelta(days=limit_days_in_past)
-                if limit_days_in_future is not None:
-                    date_limit_in_future = today + datetime.timedelta(days=limit_days_in_future)
-                if date_limit_in_past or date_limit_in_future:
-                    if (date_limit_in_past and serializer.validated_data.get('dt_from') < date_limit_in_past) or \
-                            (date_limit_in_future and serializer.validated_data.get('dt_to') > date_limit_in_future):
-                        dt_interval = f'с {Converter.convert_date(date_limit_in_past) or "..."} ' \
-                                      f'по {Converter.convert_date(date_limit_in_future) or "..."}'
-                        raise PermissionDenied(
-                            self.error_messages['approve_days_interval_restriction'].format(
-                                wd_type_str=wd_type_display_str,
-                                dt_interval=dt_interval,
-                            )
-                        )
             employee_filter = {}
             if serializer.data.get('employee_ids'):
                 employee_filter['employee_id__in'] = serializer.data['employee_ids']
@@ -1101,20 +1077,16 @@ class WorkerDayViewSet(BaseModelViewSet):
         data.is_valid(raise_exception=True)
         data = data.validated_data
         to_employee_id = data['to_employee_id']
+        from_employee_id = data['from_employee_id']
 
         with transaction.atomic():
-            main_worker_days = list(WorkerDay.objects.filter(
-                id__in=data['from_workerday_ids'],
-                is_fact=False,
-            ).select_related(
-                'employee__user',
-                'shop__settings__breaks',
-            ).order_by('dt'))
             created_wds, work_types = copy_as_excel_cells(
-                main_worker_days,
+                from_employee_id,
+                data['from_dates'],
                 to_employee_id,
                 data['to_dates'],
-                created_by=request.user.id
+                created_by=request.user.id,
+                is_approved=data['is_approved'],
             )
             for shop_id, work_type in set(work_types):
                 cancel_vacancies(shop_id, work_type)
@@ -1136,29 +1108,23 @@ class WorkerDayViewSet(BaseModelViewSet):
         data = CopyRangeSerializer(data=request.data, context={'request': request})
         data.is_valid(raise_exception=True)
         data = data.validated_data
-        from_dates = [
-            data['from_copy_dt_from'] + datetime.timedelta(i)
-            for i in range((data['from_copy_dt_to'] - data['from_copy_dt_from']).days + 1)
-        ]
-        to_dates = [
-            data['to_copy_dt_from'] + datetime.timedelta(i)
-            for i in range((data['to_copy_dt_to'] - data['to_copy_dt_from']).days + 1)
-        ]
-        employee_ids = data.get('employee_ids')
+        from_dates = data['from_dates']
+        to_dates = data['to_dates']
+        employee_ids = data.get('employee_ids', [])
         created_wds = []
         work_types = []
         with transaction.atomic():
             for employee_id in employee_ids:
-                main_worker_days = list(WorkerDay.objects.filter(
-                    employee_id=employee_id,
-                    dt__in=from_dates,
-                    is_fact=False,
-                    is_approved=data['is_approved'],
-                ).select_related(
-                    'employee__user',
-                    'shop__settings__breaks',
-                ).order_by('dt'))
-                wds, w_types = copy_as_excel_cells(main_worker_days, employee_id, to_dates, created_by=request.user.id)
+                wds, w_types = copy_as_excel_cells(
+                    employee_id, 
+                    from_dates, 
+                    employee_id, 
+                    to_dates, 
+                    created_by=request.user.id, 
+                    is_approved=data['is_approved'], 
+                    include_spaces=True,
+                    worker_day_types=data['worker_day_types'],
+                )
 
                 created_wds.extend(wds)
                 work_types.extend(w_types)
@@ -1437,12 +1403,37 @@ class WorkerDayViewSet(BaseModelViewSet):
             raise ValidationError({'detail': _('No employees satisfying the conditions.')})
         recalc_wdays.delay(employee_id__in=employee_ids)
         return Response({'detail': _('Hours recalculation started successfully.')})
+
+    @swagger_auto_schema(
+        query_serializer=OvertimesUndertimesReportSerializer,
+        responses={200: None},
+        operation_description='''
+        Скачать отчет о переработках/недоработках.
+        '''
+    )
+    @action(detail=False, methods=['get'], filterset_class=None)
+    def overtimes_undertimes_report(self, request):
+        data = OvertimesUndertimesReportSerializer(data=request.query_params)
+        data.is_valid(raise_exception=True)
+        data = data.validated_data
+        output = overtimes_undertimes_xlsx(
+            period_step=request.user.network.accounting_period_length, 
+            employee_id__in=data.get('employee_id__in'), 
+            shop_ids=[data.get('shop_id')] if data.get('shop_id') else None,
+            in_memory=True,
+        )
+        response = HttpResponse(
+            output['file'],
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        response['Content-Disposition'] = 'attachment; filename="{}.xlsx"'.format(escape_uri_path('Overtimes_undertimes'))
+        return response
     
     @swagger_auto_schema(
         request_body=ChangeListSerializer,
         responses={200: None},
         operation_description='''
-        Проставление типов дней (кроме РД) на промежуток для сотрудника
+        Проставление типов дней на промежуток для сотрудника
         '''
     )
     @action(detail=False, methods=['post'])
@@ -1450,47 +1441,27 @@ class WorkerDayViewSet(BaseModelViewSet):
         data = ChangeListSerializer(data=request.data, context={'request': request})
         data.is_valid(raise_exception=True)
         data = data.validated_data
-        wd_perm = GroupWorkerDayPermission.objects.filter(
-            group__in=request.user.get_group_ids(Shop.objects.get(id=data['shop_id']) if data['shop_id'] else None),
-            worker_day_permission__action=WorkerDayPermission.CREATE_OR_UPDATE,
-            worker_day_permission__graph_type=WorkerDayPermission.PLAN,
-            worker_day_permission__wd_type=data['type'],
-        ).first()
-        if not wd_perm:
-            raise PermissionDenied(
-                    self.error_messages['no_perm_to_approve_wd_types'].format(wd_type_str=dict(WorkerDay.TYPES)[data['type']]))
-
-        today = (datetime.datetime.now() + datetime.timedelta(hours=3)).date()
-        limit_days_in_past = wd_perm.limit_days_in_past
-        limit_days_in_future = wd_perm.limit_days_in_future
-        date_limit_in_past = None
-        date_limit_in_future = None
-        if limit_days_in_past is not None:
-            date_limit_in_past = today - datetime.timedelta(days=limit_days_in_past)
-        if limit_days_in_future is not None:
-            date_limit_in_future = today + datetime.timedelta(days=limit_days_in_future)
-        if date_limit_in_past or date_limit_in_future:
-            if (date_limit_in_past and data['dt_from'] < date_limit_in_past) or \
-                    (date_limit_in_future and data['dt_to'] > date_limit_in_future):
-                dt_interval = f'с {Converter.convert_date(date_limit_in_past) or "..."} ' \
-                            f'по {Converter.convert_date(date_limit_in_future) or "..."}'
-                raise PermissionDenied(
-                    self.error_messages['approve_days_interval_restriction'].format(
-                        wd_type_str=dict(WorkerDay.TYPES)[data['type']],
-                        dt_interval=dt_interval,
-                    )
-                )
+        check_worker_day_permissions(
+            request.user,
+            data['shop_id'],
+            WorkerDayPermission.CREATE_OR_UPDATE,
+            WorkerDayPermission.PLAN,
+            [data['type'],],
+            data['dt_from'],
+            data['dt_to'],
+            self.error_messages,
+        )
         response = WorkerDaySerializer(
             create_worker_days_range(
                 data['dates'], 
                 type=data['type'], 
-                employee_id=data['employee_id'], 
+                employee_id=data.get('employee_id'), 
                 shop_id=data['shop_id'],
                 tm_work_start=data.get('tm_work_start'),
                 tm_work_end=data.get('tm_work_end'),
                 is_vacancy=data['is_vacancy'],
                 outsources=data['outsources'],
-                work_type_id=data.get('work_type_id'),
+                cashbox_details=data.get('cashbox_details', []),
                 created_by=data['created_by'],
             ),
             many=True,
