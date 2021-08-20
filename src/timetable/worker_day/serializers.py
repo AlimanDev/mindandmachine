@@ -580,7 +580,7 @@ class CopyRangeSerializer(serializers.Serializer):
     from_copy_dt_to = serializers.DateField()
     to_copy_dt_from = serializers.DateField()
     to_copy_dt_to = serializers.DateField()
-    is_approved = serializers.BooleanField(default=True)
+    is_approved = serializers.BooleanField(default=False)
     worker_day_types = serializers.ListField(child=serializers.CharField(), default=['W', 'H', 'M'])
 
     def is_valid(self, *args, **kwargs):
