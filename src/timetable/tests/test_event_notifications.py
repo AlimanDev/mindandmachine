@@ -515,7 +515,7 @@ class TestOvertimesUndertimesReport(TestsHelperMixin, APITestCase):
             employment=employment,
             employee_id=employment.employee_id,
             dt=dttm_work_start.date(),
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dttm_work_start=dttm_work_start,
             dttm_work_end=dttm_work_end,
         )

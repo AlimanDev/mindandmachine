@@ -3794,13 +3794,13 @@ class TestAditionalFunctions(TestsHelperMixin, APITestCase):
         for i in range(5):
             # H,W,W,H,W
             dt = dt_from_first + timedelta(i)
-            type = WorkerDay.TYPE_WORKDAY if i % 3 != 0 else WorkerDay.TYPE_HOLIDAY
+            type_id = WorkerDay.TYPE_WORKDAY if i % 3 != 0 else WorkerDay.TYPE_HOLIDAY
             WorkerDay.objects.create(
                 dt=dt,
                 shop_id=self.employment2.shop_id,
                 employee_id=self.employment2.employee_id,
                 employment=self.employment2,
-                type=type,
+                type_id=type_id,
                 is_approved=False,
             )
         for i in range(8):
@@ -3810,7 +3810,7 @@ class TestAditionalFunctions(TestsHelperMixin, APITestCase):
                 shop_id=self.employment2.shop_id,
                 employee_id=self.employment2.employee_id,
                 employment=self.employment2,
-                type=WorkerDay.TYPE_VACATION,
+                type_id=WorkerDay.TYPE_VACATION,
                 is_approved=False,
             )
 
@@ -4151,9 +4151,11 @@ class TestAditionalFunctions(TestsHelperMixin, APITestCase):
         self.create_worker_days(self.employment3, dt_from, 4, 18, 22, False)
         self.assertEqual(WorkerDay.objects.filter(employee=self.employee3, is_approved=False).count(), 8)
         data = {
-            'from_workerday_ids': list(WorkerDay.objects.filter(employee=self.employee2).values_list('id', flat=True)),
+            'from_employee_id': self.employee2.id,
+            'from_dates': [Converter.convert_date(dt_from + timedelta(i)) for i in range(5)],
             'to_employee_id': self.employee3.id,
             'to_dates': [Converter.convert_date(dt_from + timedelta(i)) for i in range(5)],
+            'is_approved': True,
         }
         url = f'{self.url}duplicate/'
         response = self.client.post(url, data, format='json')

@@ -183,7 +183,7 @@ def copy_as_excel_cells(from_employee_id, from_dates, to_employee_id, to_dates, 
         'shop__settings__breaks',
     ).order_by('dt')
     if worker_day_types:
-        main_worker_days = main_worker_days.filter(type__in=worker_day_types)
+        main_worker_days = main_worker_days.filter(type_id__in=worker_day_types)
     main_worker_days_details_set = list(WorkerDayCashboxDetails.objects.filter(
         worker_day__in=main_worker_days,
     ).select_related('work_type'))
@@ -253,7 +253,7 @@ def copy_as_excel_cells(from_employee_id, from_dates, to_employee_id, to_dates, 
                     employment=worker_active_empl,
                     dt=dt,
                     shop=blank_day.shop,
-                    type=blank_day.type,
+                    type_id=blank_day.type_id,
                     dttm_work_start=datetime.datetime.combine(
                         dt, blank_day.dttm_work_start.timetz()) if blank_day.dttm_work_start else None,
                     dttm_work_end=datetime.datetime.combine(

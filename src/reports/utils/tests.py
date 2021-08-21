@@ -467,12 +467,12 @@ class TestOvertimesUndertimes(APITestCase):
         )
 
 
-    def _create_worker_day(self, employment, dt=None, is_fact=False, is_approved=False, dttm_work_start=None, dttm_work_end=None, type=WorkerDay.TYPE_WORKDAY):
+    def _create_worker_day(self, employment, dt=None, is_fact=False, is_approved=False, dttm_work_start=None, dttm_work_end=None, type_id=WorkerDay.TYPE_WORKDAY):
         if not dt:
             dt = self.dt
         return WorkerDay.objects.create(
             shop_id=employment.shop_id,
-            type=type,
+            type_id=type_id,
             employment=employment,
             employee=employment.employee,
             dt=dt,
