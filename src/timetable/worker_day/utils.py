@@ -1,6 +1,7 @@
 import datetime
 import json
 from collections import OrderedDict
+from collections import OrderedDict
 
 from django.conf import settings
 from django.contrib.postgres.aggregates import StringAgg
@@ -171,7 +172,18 @@ def exchange(data, error_messages):
     return new_wds
 
 
-def copy_as_excel_cells(main_worker_days, to_employee_id, to_dates, created_by=None):
+def copy_as_excel_cells(from_employee_id, from_dates, to_employee_id, to_dates, created_by=None, is_approved=False, worker_day_types=None, include_spaces=False):
+    main_worker_days = WorkerDay.objects.filter(
+        employee_id=from_employee_id,
+        dt__in=from_dates,
+        is_fact=False,
+        is_approved=is_approved,
+    ).select_related(
+        'employee__user',
+        'shop__settings__breaks',
+    ).order_by('dt')
+    if worker_day_types:
+        main_worker_days = main_worker_days.filter(type__in=worker_day_types)
     main_worker_days_details_set = list(WorkerDayCashboxDetails.objects.filter(
         worker_day__in=main_worker_days,
     ).select_related('work_type'))
@@ -183,27 +195,37 @@ def copy_as_excel_cells(main_worker_days, to_employee_id, to_dates, created_by=N
             main_worker_days_details[key] = []
         main_worker_days_details[key].append(detail)
 
-    trainee_worker_days = WorkerDay.objects_with_excluded.filter(
+
+    main_worker_days_grouped_by_dt = OrderedDict()
+    if include_spaces:
+        main_worker_days_grouped_by_dt = OrderedDict([(dt, []) for dt in from_dates])
+    for main_worker_day in list(main_worker_days):
+        key = main_worker_day.dt
+        main_worker_days_grouped_by_dt.setdefault(key, []).append(main_worker_day)
+
+    main_worker_days_lists = list(main_worker_days_grouped_by_dt.values())
+    length_main_wds = len(main_worker_days_lists)
+    delete_dates = to_dates
+    if include_spaces:
+        # удаляем только те даты на которые есть дни
+        delete_dates = [dt for i, dt in enumerate(to_dates) if main_worker_days_lists[i % length_main_wds]]
+
+    WorkerDay.objects_with_excluded.filter(
         employee_id=to_employee_id,
-        dt__in=to_dates,
+        dt__in=delete_dates,
         is_approved=False,
         is_fact=False,
-    )
-    trainee_worker_days.delete()
-
+    ).delete()
     created_wds = []
     wdcds_list_to_create = []
+
     if main_worker_days:
-        main_worker_days_grouped_by_dt = OrderedDict()
-        for main_worker_day in main_worker_days:
-            key = main_worker_day.dt
-            main_worker_days_grouped_by_dt.setdefault(key, []).append(main_worker_day)
-
-        main_worker_days_lists = list(main_worker_days_grouped_by_dt.values())
-
-        length_main_wds = len(main_worker_days_lists)
         for i, dt in enumerate(to_dates):
             i = i % length_main_wds
+
+            blank_days = main_worker_days_lists[i]
+            if not blank_days:
+                continue
 
             blank_days = main_worker_days_lists[i]
             worker_active_empl = Employment.objects.get_active_empl_by_priority(

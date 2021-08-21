@@ -645,6 +645,11 @@ if ZKTECO_INTEGRATION:
         'schedule': crontab(minute=0),
         'options': {'queue': BACKEND_QUEUE}
     }
+    CELERY_BEAT_SCHEDULE['task-sync-attendance-areas-zkteco'] = {
+        'task': 'src.integration.tasks.sync_att_area_zkteco',
+        'schedule': crontab(hour=0, minute=0),
+        'options': {'queue': BACKEND_QUEUE}
+    }
 
 if 'test' in sys.argv:
     # Disable migrations in test, fill the schema directly

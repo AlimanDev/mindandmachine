@@ -1,6 +1,7 @@
 import datetime
 import json
 from itertools import groupby
+from src.reports.utils.overtimes_undertimes import overtimes_undertimes_xlsx
 
 import pandas as pd
 from django.conf import settings
@@ -41,6 +42,7 @@ from src.timetable.timesheet.tasks import calc_timesheets
 from src.timetable.vacancy.utils import cancel_vacancies, cancel_vacancy, confirm_vacancy
 from src.timetable.vacancy.tasks import vacancies_create_and_cancel_for_shop
 from src.timetable.worker_day.serializers import (
+    OvertimesUndertimesReportSerializer,
     ChangeListSerializer,
     WorkerDaySerializer,
     WorkerDayApproveSerializer,
@@ -1107,20 +1109,16 @@ class WorkerDayViewSet(BaseModelViewSet):
         data.is_valid(raise_exception=True)
         data = data.validated_data
         to_employee_id = data['to_employee_id']
+        from_employee_id = data['from_employee_id']
 
         with transaction.atomic():
-            main_worker_days = list(WorkerDay.objects.filter(
-                id__in=data['from_workerday_ids'],
-                is_fact=False,
-            ).select_related(
-                'employee__user',
-                'shop__settings__breaks',
-            ).order_by('dt'))
             created_wds, work_types = copy_as_excel_cells(
-                main_worker_days,
+                from_employee_id,
+                data['from_dates'],
                 to_employee_id,
                 data['to_dates'],
-                created_by=request.user.id
+                created_by=request.user.id,
+                is_approved=data['is_approved'],
             )
             for shop_id, work_type in set(work_types):
                 cancel_vacancies(shop_id, work_type)
@@ -1142,29 +1140,23 @@ class WorkerDayViewSet(BaseModelViewSet):
         data = CopyRangeSerializer(data=request.data, context={'request': request})
         data.is_valid(raise_exception=True)
         data = data.validated_data
-        from_dates = [
-            data['from_copy_dt_from'] + datetime.timedelta(i)
-            for i in range((data['from_copy_dt_to'] - data['from_copy_dt_from']).days + 1)
-        ]
-        to_dates = [
-            data['to_copy_dt_from'] + datetime.timedelta(i)
-            for i in range((data['to_copy_dt_to'] - data['to_copy_dt_from']).days + 1)
-        ]
-        employee_ids = data.get('employee_ids')
+        from_dates = data['from_dates']
+        to_dates = data['to_dates']
+        employee_ids = data.get('employee_ids', [])
         created_wds = []
         work_types = []
         with transaction.atomic():
             for employee_id in employee_ids:
-                main_worker_days = list(WorkerDay.objects.filter(
-                    employee_id=employee_id,
-                    dt__in=from_dates,
-                    is_fact=False,
+                wds, w_types = copy_as_excel_cells(
+                    employee_id,
+                    from_dates,
+                    employee_id,
+                    to_dates,
+                    created_by=request.user.id,
                     is_approved=data['is_approved'],
-                ).select_related(
-                    'employee__user',
-                    'shop__settings__breaks',
-                ).order_by('dt'))
-                wds, w_types = copy_as_excel_cells(main_worker_days, employee_id, to_dates, created_by=request.user.id)
+                    include_spaces=True,
+                    worker_day_types=data['worker_day_types'],
+                )
 
                 created_wds.extend(wds)
                 work_types.extend(w_types)
@@ -1443,7 +1435,32 @@ class WorkerDayViewSet(BaseModelViewSet):
             raise ValidationError({'detail': _('No employees satisfying the conditions.')})
         recalc_wdays.delay(employee_id__in=employee_ids)
         return Response({'detail': _('Hours recalculation started successfully.')})
-    
+
+    @swagger_auto_schema(
+        query_serializer=OvertimesUndertimesReportSerializer,
+        responses={200: None},
+        operation_description='''
+        Скачать отчет о переработках/недоработках.
+        '''
+    )
+    @action(detail=False, methods=['get'], filterset_class=None)
+    def overtimes_undertimes_report(self, request):
+        data = OvertimesUndertimesReportSerializer(data=request.query_params)
+        data.is_valid(raise_exception=True)
+        data = data.validated_data
+        output = overtimes_undertimes_xlsx(
+            period_step=request.user.network.accounting_period_length,
+            employee_id__in=data.get('employee_id__in'),
+            shop_ids=[data.get('shop_id')] if data.get('shop_id') else None,
+            in_memory=True,
+        )
+        response = HttpResponse(
+            output['file'],
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        response['Content-Disposition'] = 'attachment; filename="{}.xlsx"'.format(escape_uri_path('Overtimes_undertimes'))
+        return response
+
     @swagger_auto_schema(
         request_body=ChangeListSerializer,
         responses={200: None},
@@ -1470,7 +1487,7 @@ class WorkerDayViewSet(BaseModelViewSet):
             create_worker_days_range(
                 data['dates'], 
                 type_id=data['type_id'],
-                employee_id=data['employee_id'], 
+                employee_id=data.get('employee_id'),
                 shop_id=data['shop_id'],
                 tm_work_start=data.get('tm_work_start'),
                 tm_work_end=data.get('tm_work_end'),

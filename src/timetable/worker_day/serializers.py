@@ -459,7 +459,6 @@ class ChangeListSerializer(serializers.Serializer):
         super().is_valid(*args, **kwargs)
         if self.validated_data['is_vacancy']:
             self.validated_data['type_id'] = WorkerDay.TYPE_WORKDAY
-            self.validated_data['employee_id'] = None
             self.validated_data['outsources'] = Network.objects.filter(id__in=self.validated_data.get('outsources', []))
         else:
             if not WorkerDay.is_type_with_tm_range(self.validated_data['type_id']):
@@ -537,13 +536,17 @@ class DuplicateSrializer(serializers.Serializer):
         'not_exist': _("Invalid pk \"{pk_value}\" - object does not exist.")
     }
     to_employee_id = serializers.IntegerField()
-    from_workerday_ids = serializers.ListField(child=serializers.IntegerField(), allow_null=False, allow_empty=False)
+    from_employee_id = serializers.IntegerField()
+    from_dates = serializers.ListField(child=serializers.DateField(format=QOS_DATE_FORMAT))
     to_dates = serializers.ListField(child=serializers.DateField(format=QOS_DATE_FORMAT))
+    is_approved = serializers.BooleanField(default=False)
 
     def is_valid(self, *args, **kwargs):
         super().is_valid(*args, **kwargs)
         if not Employee.objects.filter(id=self.data['to_employee_id']).exists():
             raise ValidationError({'to_employee_id': self.error_messages['not_exist'].format(pk_value=self.validated_data['to_employee_id'])})
+        if not Employee.objects.filter(id=self.data['from_employee_id']).exists():
+            raise ValidationError({'from_employee_id': self.error_messages['not_exist'].format(pk_value=self.validated_data['from_employee_id'])})
         return True
 
 
@@ -582,7 +585,8 @@ class CopyRangeSerializer(serializers.Serializer):
     from_copy_dt_to = serializers.DateField()
     to_copy_dt_from = serializers.DateField()
     to_copy_dt_to = serializers.DateField()
-    is_approved = serializers.BooleanField(default=True)
+    is_approved = serializers.BooleanField(default=False)
+    worker_day_types = serializers.ListField(child=serializers.CharField(), default=['W', 'H', 'M'])
 
     def is_valid(self, *args, **kwargs):
         super().is_valid(*args, **kwargs)
@@ -592,7 +596,17 @@ class CopyRangeSerializer(serializers.Serializer):
 
         if self.validated_data['from_copy_dt_from'] > self.validated_data['to_copy_dt_from']:
             raise serializers.ValidationError(self.error_messages['check_periods'])
-        
+
+        self.validated_data['from_dates'] = [
+            self.validated_data['from_copy_dt_from'] + timedelta(i)
+            for i in range((self.validated_data['from_copy_dt_to'] - self.validated_data['from_copy_dt_from']).days + 1)
+        ]
+
+        self.validated_data['to_dates'] = [
+            self.validated_data['to_copy_dt_from'] + timedelta(i)
+            for i in range((self.validated_data['to_copy_dt_to'] - self.validated_data['to_copy_dt_from']).days + 1)
+        ]
+
         return True
 
 
@@ -674,3 +688,14 @@ class RecalcWdaysSerializer(serializers.Serializer):
     dt_from = serializers.DateField(format=QOS_DATE_FORMAT)
     dt_to = serializers.DateField(format=QOS_DATE_FORMAT)
     employee_id__in = serializers.ListField(child=serializers.IntegerField(), required=False)
+
+class OvertimesUndertimesReportSerializer(serializers.Serializer):
+    employee_id__in = serializers.CharField(required=False)
+    shop_id = serializers.IntegerField(required=False)
+
+    def is_valid(self, *atgs, **kwargs):
+        super().is_valid(*atgs, **kwargs)
+        if not self.validated_data.get('shop_id') and not self.validated_data.get('employee_id__in'):
+            raise ValidationError(_('Shop or employees should be defined.'))
+        if self.validated_data.get('employee_id__in'):
+            self.validated_data['employee_id__in'] = self.validated_data['employee_id__in'].split(',')

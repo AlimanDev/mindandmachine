@@ -1,13 +1,13 @@
 import os
+from django.db.models.expressions import Exists, OuterRef
 from django.utils.timezone import now
 from datetime import datetime, timedelta, date
 
 from src.integration.zkteco import ZKTeco
 
 
-from django.db.models import F, Max, ObjectDoesNotExist
+from django.db.models import F, Max
 from src.base.models import (
-    Shop,
     Employment,
     User,
 )
@@ -28,10 +28,9 @@ os.environ.setdefault("DJANGO_SETTINGS_MODULE", "src.conf.djconfig")
 @app.task()
 def import_urv_zkteco():
     zkteco = ZKTeco()
-    try:
-        ext_system = ExternalSystem.objects.get(code='zkteco')
-    except:
-        raise ValueError('You need to create external system with code \'zkteco\'')
+    ext_system, _created = ExternalSystem.objects.get_or_create(code='zkteco')
+    if _created:
+        print('Created external system with code \'zkteco\'')
 
     max_date = AttendanceRecords.objects.aggregate(m=Max(F('dttm')))['m']
     if max_date:
@@ -45,6 +44,19 @@ def import_urv_zkteco():
     page = 0
     users = {}
 
+    wds = WorkerDay.objects.filter(
+        employee__user__in=users.keys(),
+        dt__gte=max_date - timedelta(1),
+        dt__lte=date.today() + timedelta(1),
+        is_fact=False,
+        is_approved=True,
+        type_id__in=WorkerDay.TYPES_WITH_TM_RANGE,
+    ).select_related('employee', 'shop')
+
+    worker_days = {}
+    for wd in wds:
+        worker_days.setdefault(wd.employee.user_id, {})[wd.dt] = wd
+
     while True:
         page += 1
         events = zkteco.get_events(page=page, dt_from=dt_from, dt_to=dt_to)
@@ -53,41 +65,39 @@ def import_urv_zkteco():
 
         for event in events['data']:
             try:
-                shop_token = ShopExternalCode.objects.get(
-                    code=event['accZone'],
-                    external_system=ext_system)
-            except ObjectDoesNotExist:
-                print(f"Shop for event {event} does not exist")
-                continue
-            shop = shop_token.shop
-
-            try:
                 user_token = UserExternalCode.objects.get(
                     code=event['pin'],
                     external_system=ext_system)
-            except ObjectDoesNotExist:
-                print(f"User for shop {shop} event {event}  does not exist")
+            except UserExternalCode.DoesNotExist:
+                print(f"User for event {event} does not exist")
                 continue
-            user = user_token.user
-
+            user_id = user_token.user_id
             dttm = datetime.strptime(event['eventTime'], "%Y-%m-%d %H:%M:%S")
+            wd = worker_days.get(user_id, {}).get(dttm.date)
+            if wd and ShopExternalCode.objects.filter(shop_id=wd.shop_id, attendance_area__code=event['accZone'], attendance_area__external_system=ext_system).exists():
+                shop = wd.shop
+            else:
+                shop_ids = Employment.objects.get_active(
+                    None,
+                    dttm, dttm,
+                    employee__user_id=user_id,
+                    position__isnull=False,
+                ).values_list('shop_id', flat=True)
+                shop_token = ShopExternalCode.objects.filter(
+                    attendance_area__code=event['accZone'],
+                    attendance_area__external_system=ext_system,
+                    shop_id__in=shop_ids,
+                ).first() or ShopExternalCode.objects.filter(
+                    attendance_area__code=event['accZone'],
+                    attendance_area__external_system=ext_system,
+                ).first()
+                if shop_token:
+                    shop = shop_token.shop
+                else:
+                    print(f"Shop for event {event} does not exist")
+                    continue
 
-            if user.id not in users:
-                users[user.id] = []
-            users[user.id].append((dttm, shop))
-
-    wds = WorkerDay.objects.filter(
-        employee__user__in=users.keys(),
-        dt__gte=max_date - timedelta(1),
-        dt__lte=date.today() + timedelta(1),
-        is_fact=False,
-        is_approved=True,
-        type_id__in=WorkerDay.TYPES_WITH_TM_RANGE,
-    ).select_related('employee')
-
-    worker_days = {}
-    for wd in wds:
-        worker_days.setdefault(wd.employee.user_id, {})[wd.dt] = wd
+            users.setdefault(user_id, []).append((dttm, shop))
 
     attrs = AttendanceRecords.objects.filter(
         user_id__in=users.keys(),
@@ -115,10 +125,9 @@ def import_urv_zkteco():
 @app.task()
 def export_workers_zkteco():
     zkteco=ZKTeco()
-    try:
-        ext_system = ExternalSystem.objects.get(code='zkteco')
-    except:
-        raise ValueError('You need to create external system with code \'zkteco\'')
+    ext_system, _created = ExternalSystem.objects.get_or_create(code='zkteco')
+    if _created:
+        print('Created external system with code \'zkteco\'')
     users = User.objects.all().exclude(userexternalcode__external_system=ext_system)
 
     for user in users:
@@ -131,32 +140,29 @@ def export_workers_zkteco():
             continue
         shop_ids = employments.values_list('shop_id')
 
-        shop_code = ShopExternalCode.objects.filter(
-            external_system=ext_system,
+        shop_codes = ShopExternalCode.objects.filter(
+            attendance_area__external_system=ext_system,
             shop__in=shop_ids
-        ).first()
+        )
 
-        if not shop_code:
+        if not shop_codes:
             print(f'no external shop for {user}')
             continue
 
-        e = employments.filter(
-            shop_id=shop_code.shop_id,
-        ).first()
-
         pin = user.id + settings.ZKTECO_USER_ID_SHIFT  # Чтобы не пересекалось с уже заведенными
-        res = zkteco.add_user(e, pin)
+        res = zkteco.add_user(user, pin)
         if 'code' in res and res['code'] == 0:
             user_code = UserExternalCode.objects.create(
                 user=user,
                 external_system=ext_system,
                 code=pin
             )
-            print(f'Added user {user} for employment{e} to zkteco with ext code {user_code.code}')
+            print(f'Added user {user} to zkteco with ext code {user_code.code}')
 
-            res_area = zkteco.add_personarea(user_code,shop_code)
-            if not('code' in res and res['code'] == 0):
-                print(f'Error in {res_area} while set area for user {user}to zkteco')
+            for shop_code in shop_codes:
+                res_area = zkteco.add_personarea(user_code, shop_code.attendance_area)
+                if not('code' in res and res['code'] == 0):
+                    print(f'Error in {res_area} while set area for user {user} to zkteco')
         else:
             print(f'Error in {res} while saving user {user} to zkteco')
 
@@ -164,10 +170,9 @@ def export_workers_zkteco():
 @app.task()
 def delete_workers_zkteco():
     zkteco = ZKTeco()
-    try:
-        ext_system = ExternalSystem.objects.get(code='zkteco')
-    except:
-        raise ValueError('You need to create external system with code \'zkteco\'')
+    ext_system, _created = ExternalSystem.objects.get_or_create(code='zkteco')
+    if _created:
+        print('Created external system with code \'zkteco\'')
     users = User.objects.filter(userexternalcode__external_system=ext_system)
 
     dt_max = now().date()
@@ -186,19 +191,54 @@ def delete_workers_zkteco():
             external_system=ext_system,
         )
 
-        employments = Employment.objects.filter(
+        employments = Employment.objects.annotate(
+            has_active_empl=Exists(
+                Employment.objects.get_active(
+                    employee_id=OuterRef('employee_id'),
+                    shop_id=OuterRef('shop_id')
+                )
+            )
+        ).filter(
             employee__user=user,
             dt_fired__lt=dt_max,
+            has_active_empl=False,
         )
 
         for e in employments:
-            shop_code = ShopExternalCode.objects.filter(
+            shop_codes = ShopExternalCode.objects.filter(
                 shop_id=e.shop_id,
-                external_system=ext_system).first()
-            if shop_code:
-                res = zkteco.delete_personarea(user_code, shop_code)
-                if 'code' in res and res['code'] == 0:
-                    user_code.delete()
-                    print(f"Delete area and userexternalcode for fired user {user} {e}")
-                else:
-                    print(f"Failed delete area and userexternalcode for fired user {e}: {res}")
+                attendance_area__external_system=ext_system,
+            ).select_related('attendance_area')
+            if shop_codes:
+                for shop_code in shop_codes:
+                    res = zkteco.delete_personarea(user_code, shop_code.attendance_area)
+                    if 'code' in res and res['code'] == 0:
+                        user_code.delete()
+                        print(f"Delete area and userexternalcode for fired user {user} {e}")
+                    else:
+                        print(f"Failed delete area and userexternalcode for fired user {e}: {res}")
+
+
+@app.task
+def sync_att_area_zkteco():
+    zkteco = ZKTeco()
+    ext_system, _created = ExternalSystem.objects.get_or_create(code='zkteco')
+    if _created:
+        print('Created external system with code \'zkteco\'')
+
+    page = 0
+
+    while True:
+        page += 1
+        areas = zkteco.get_attarea_list(page=page)
+        if not areas['data']:
+            break
+        for area in areas['data']:
+            area, _ = AttendanceArea.objects.update_or_create(
+                code=area["code"],
+                external_system=ext_system,
+                defaults={
+                    'name': area['name'],
+                }
+            )
+            print(f"Sync attendance area {area.name} with code {area.code}")

@@ -222,6 +222,7 @@ class TestWorkShiftViewSet(TestsHelperMixin, APITestCase):
                 'show_worker_day_tasks': False,
                 'show_user_biometrics_block': False,
                 'unaccounted_overtime_threshold': 60,
+                'show_remaking_choice': False,
                 'url': None
             },
         }
@@ -346,6 +347,7 @@ class TestWorkShiftViewSet(TestsHelperMixin, APITestCase):
                 'show_worker_day_tasks': False,
                 'show_user_biometrics_block': False,
                 'unaccounted_overtime_threshold': 60,
+                'show_remaking_choice': False,
                 'url': None
             },
         }
@@ -476,6 +478,7 @@ class TestWorkShiftViewSet(TestsHelperMixin, APITestCase):
                 'show_worker_day_tasks': False,
                 'show_user_biometrics_block': False,
                 'unaccounted_overtime_threshold': 60,
+                'show_remaking_choice': False,
                 'url': None
             },
         }

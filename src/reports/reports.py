@@ -8,6 +8,7 @@ URV_STAT_TODAY = 'urv_stat_today'
 URV_VIOLATORS_REPORT = 'urv_violators_report'
 URV_STAT_V2 = 'urv_stat_v2'
 UNACCOUNTED_OVERTIME = 'unaccounted_overtime'
+OVERTIMES_UNDERTIMES = 'overtimes_undertimes'
 
 class DatesReportMixin:
     @staticmethod
@@ -73,3 +74,11 @@ class UnaccountedOvertivmeReport(BaseRegisteredReport, DatesReportMixin):
         from src.reports.utils.unaccounted_overtime import unaccounted_overtimes_xlsx
         dt_from, dt_to = self.get_dates(self.context)
         return unaccounted_overtimes_xlsx(self.network_id, dt_from=dt_from, dt_to=dt_to, shop_ids=self.context.get('shop_ids', []), in_memory=True)
+
+class UndertimesOvertimesReport(BaseRegisteredReport):
+    name = 'Отчет по переработкам/недоработкам'
+    code = OVERTIMES_UNDERTIMES
+
+    def get_file(self):
+        from src.reports.utils.overtimes_undertimes import overtimes_undertimes_xlsx
+        return overtimes_undertimes_xlsx(period_step=self.context.get('period_step', 6), shop_ids=self.context.get('shop_ids', []), in_memory=True)

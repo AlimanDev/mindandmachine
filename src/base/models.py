@@ -1409,6 +1409,7 @@ class FunctionGroup(AbstractModel):
         ('WorkerDay_unblock', 'Разблокировать рабочий день (Создать) (worker_day/unblock/)'),
         ('WorkerDay_generate_upload_example', 'Скачать шаблон графика (Получить) (worker_day/generate_upload_example/)'),
         ('WorkerDay_recalc', 'Пересчитать часы (Создать) (worker_day/recalc/)'),
+        ('WorkerDay_overtimes_undertimes_report', 'Скачать отчет о переработках/недоработках (Получить) (worker_day/overtimes_undertimes_report/)'),
         ('WorkerDay_batch_update_or_create', 'Массовое создание/обновление дней сотрудников (Создать/Обновить) (worker_day/batch_update_or_create/)'),
         ('WorkerPosition', 'Должность (worker_position)'),
         ('WorkTypeName', 'Название типа работ (work_type_name)'),

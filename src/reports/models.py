@@ -94,6 +94,15 @@ class ReportConfig(models.Model):
 
         return {'dt_from': dt_from, 'dt_to': dt_to}
 
+    def get_acc_period(self):
+        acc_period_mapping = {
+            self.ACC_PERIOD_MONTH: 1,
+            self.ACC_PERIOD_QUARTER: 3,
+            self.ACC_PERIOD_HALF_YEAR: 6,
+            self.ACC_PERIOD_YEAR: 12,
+        }
+        return acc_period_mapping.get(self.period, 1)
+
     def get_file(self, context: dict):
         report_cls = ReportRegistryHolder.get_registry().get(self.report_type.code)
         if report_cls:
