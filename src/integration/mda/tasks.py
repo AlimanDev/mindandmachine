@@ -40,7 +40,7 @@ def create_mda_user_to_shop_relation(username, shop_code, debug_info=None):
 def sync_mda_user_to_shop_relation(dt=None, delay_sec=0.01):
     dt = dt or now().today()
     wdays = WorkerDay.objects.filter(
-        Q(is_vacancy=True) | Q(type=WorkerDay.TYPE_QUALIFICATION),
+        Q(is_vacancy=True) | Q(type_id=WorkerDay.TYPE_QUALIFICATION),
         is_fact=False, is_approved=True,
         shop__isnull=False, employee__isnull=False,
         dt=dt,

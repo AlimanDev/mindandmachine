@@ -20,11 +20,11 @@ class BaseTimesheetDivider:
         if not item_data:
             return True
 
-        if item_data.get('main_timesheet_type') is not None:
-            timesheet_type = item_data.get('main_timesheet_type')
+        if item_data.get('main_timesheet_type_id') is not None:
+            timesheet_type = item_data.get('main_timesheet_type_id')
             timesheet_total_hours = item_data.get('main_timesheet_total_hours')
         else:
-            timesheet_type = item_data.get('fact_timesheet_type')
+            timesheet_type = item_data.get('fact_timesheet_type_id')
             timesheet_total_hours = item_data.get('fact_timesheet_total_hours')
 
         if timesheet_type not in WorkerDay.TYPES_WITH_TM_RANGE or timesheet_total_hours == 0:
@@ -46,9 +46,9 @@ class BaseTimesheetDivider:
             ).values(
                 'employee_id',
                 'dt',
-                'fact_timesheet_type',
+                'fact_timesheet_type_id',
                 'fact_timesheet_total_hours',
-                'main_timesheet_type',
+                'main_timesheet_type_id',
                 'main_timesheet_total_hours',
             ).order_by(
                 'dt',
@@ -60,7 +60,7 @@ class BaseTimesheetDivider:
         data = self.fiscal_sheet_dict.get(dt)
         if data:
             data['additional_timesheet_hours'] = data['main_timesheet_total_hours']
-            data['main_timesheet_type'] = WorkerDay.TYPE_HOLIDAY
+            data['main_timesheet_type_id'] = WorkerDay.TYPE_HOLIDAY
             data.pop('main_timesheet_total_hours', None)
             data.pop('main_timesheet_day_hours', None)
             data.pop('main_timesheet_night_hours', None)
@@ -123,8 +123,8 @@ class BaseTimesheetDivider:
 
     def _fill_main_timesheet(self):
         for data in self.fiscal_sheet_list:
-            data['main_timesheet_type'] = data.get('fact_timesheet_type', '')
-            if data['main_timesheet_type'] in WorkerDay.TYPES_WITH_TM_RANGE:
+            data['main_timesheet_type_id'] = data.get('fact_timesheet_type_id', '')
+            if data['main_timesheet_type_id'] in WorkerDay.TYPES_WITH_TM_RANGE:
                 data['main_timesheet_total_hours'] = data.get('fact_timesheet_total_hours')
                 data['main_timesheet_day_hours'] = data.get('fact_timesheet_day_hours')
                 data['main_timesheet_night_hours'] = data.get('fact_timesheet_night_hours')
@@ -145,7 +145,7 @@ class BaseTimesheetDivider:
         (в приоритете за счет ночных часов)
         """
         hours_overflow = None
-        if data['main_timesheet_type'] in WorkerDay.TYPES_WITH_TM_RANGE:
+        if data['main_timesheet_type_id'] in WorkerDay.TYPES_WITH_TM_RANGE:
             hours_overflow = data.get('main_timesheet_total_hours') - threshold_hours
             if hours_overflow > 0:
                 logger.debug(f'dt: {data["dt"]} has overflow threshold_hours: {threshold_hours} hours_overflow: {hours_overflow}')
@@ -229,7 +229,7 @@ class BaseTimesheetDivider:
                 logger.debug('overtime_plan == 0.0, break')
                 break
 
-            if data.get('main_timesheet_type') not in WorkerDay.TYPES_WITH_TM_RANGE or data.get(
+            if data.get('main_timesheet_type_id') not in WorkerDay.TYPES_WITH_TM_RANGE or data.get(
                     'main_timesheet_total_hours') == 0.0:
                 continue
 

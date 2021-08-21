@@ -184,7 +184,7 @@ class VacancyFilter(FilterSetWithInitial):
                 employee__user_id=self.request.user.id,
                 is_approved=True,
                 is_fact=False,
-                type__in=WorkerDay.TYPES_PAID,
+                type_id__in=WorkerDay.TYPES_PAID,
             )
             return queryset.annotate(
                 approved_exists=Exists(approved_subq),

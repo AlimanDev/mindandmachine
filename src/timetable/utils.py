@@ -53,7 +53,7 @@ def wd_stat_count(worker_days, shop):
         breaktime_fact = Case(*whens, output_field=FloatField())
 
     return worker_days.filter(
-        type=WorkerDay.TYPE_WORKDAY
+        type_id=WorkerDay.TYPE_WORKDAY
     ).values('worker_id', 'employment_id', 'dt', 'dttm_work_start', 'dttm_work_end').annotate(
         coming=Min('worker__attendancerecords__dttm', filter=Q(
             worker__attendancerecords__shop=shop,
@@ -148,7 +148,7 @@ class CleanWdaysHelper:
         wdays_qs = WorkerDay.objects_with_excluded.exclude(
             employee__isnull=True,
         ).exclude(
-            type=WorkerDay.TYPE_EMPTY,
+            type_id=WorkerDay.TYPE_EMPTY,
         ).order_by('dt', 'employee', 'shop')
         if self.filter_kwargs:
             wdays_qs = wdays_qs.filter(**self.filter_kwargs)

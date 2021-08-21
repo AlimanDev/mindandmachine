@@ -55,7 +55,7 @@ class TestTimesheetMixin(TestsHelperMixin):
                 employment=cls.employment_worker,
                 employee=cls.employee_worker,
                 dt=dt,
-                type=WorkerDay.TYPE_WORKDAY,
+                type_id=WorkerDay.TYPE_WORKDAY,
                 dttm_work_start=datetime.combine(dt, time(10)),
                 dttm_work_end=datetime.combine(dt, time(20)),
             )

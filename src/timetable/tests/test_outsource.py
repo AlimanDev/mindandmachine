@@ -1,25 +1,24 @@
 from datetime import datetime, date, timedelta, time
 
 from django.core import mail
-from src.notifications.models.event_notification import EventEmailNotification
-from src.timetable.events import VACANCY_CONFIRMED_TYPE
-from src.events.models import EventType
-
 from django.test import override_settings
 from rest_framework.test import APITestCase
 
+from src.base.models import Shop, NetworkConnect, Network, User, Employee, Employment, Group, FunctionGroup
+from src.events.models import EventType
+from src.notifications.models.event_notification import EventEmailNotification
+from src.recognition.models import TickPoint, Tick
+from src.timetable.events import VACANCY_CONFIRMED_TYPE
+from src.timetable.models import ShopMonthStat
 from src.timetable.models import (
-    WorkerDay, 
-    WorkType, 
-    WorkTypeName, 
-    GroupWorkerDayPermission, 
+    WorkerDay,
+    WorkType,
+    WorkTypeName,
+    GroupWorkerDayPermission,
     WorkerDayPermission,
-    ShopMonthStat,
     AttendanceRecords,
 )
-from src.base.models import Shop, NetworkConnect, Network, User, Employee, Employment, Group, FunctionGroup
-from src.recognition.models import TickPoint, Tick
-from src.timetable.models import ShopMonthStat
+from src.timetable.tests.factories import WorkerDayFactory
 from src.util.mixins.tests import TestsHelperMixin
 
 
@@ -189,7 +188,8 @@ class TestOutsource(TestsHelperMixin, APITestCase):
         WorkerDay.objects.all().update(is_approved=True)
         response = self.client.get('/rest_api/worker_day/vacancy/?only_available=True&limit=10&offset=0')
         self.assertEqual(response.json()['count'], 2)
-        self.assertEqual(len(response.json()['results'][0]['outsources']), 1)
+        resp_data = sorted(response.json()['results'], key=lambda i: i['id'])
+        self.assertEqual(len(resp_data[0]['outsources']), 1)
         response = self.client.get('/rest_api/worker_day/vacancy/?limit=10&offset=0')
         self.assertEqual(response.json()['count'], 2)
         self.client.force_authenticate(user=self.client_user)
@@ -283,11 +283,12 @@ class TestOutsource(TestsHelperMixin, APITestCase):
         self.assertEqual(vacancy.employee_id, self.employee3.id)
         self.assertEqual(vacancy.employment_id, self.employment3.id)
         self.assertIsNone(WorkerDay.objects.filter(employee_id=self.employee2.id).first())
-        WorkerDay.objects.create(
+        WorkerDayFactory(
             dt=dt_now,
             is_fact=True,
             is_approved=True,
             employee_id=self.employee3.id,
+            type_id=WorkerDay.TYPE_WORKDAY,
         )
         response = self.client.post(
             f'/rest_api/worker_day/{vacancy.id}/reconfirm_vacancy_to_worker/',
@@ -306,7 +307,7 @@ class TestOutsource(TestsHelperMixin, APITestCase):
         WorkerDay.objects.all().update(is_approved=True)
         WorkerDay.objects.create(
             dt=dt_now,
-            type=WorkerDay.TYPE_HOLIDAY,
+            type_id=WorkerDay.TYPE_HOLIDAY,
             employee=self.client_employee,
             is_approved=True,
         )

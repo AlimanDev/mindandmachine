@@ -57,7 +57,7 @@ class BaseTabelDataGetter:
         self.dt_from = dt_from
         self.dt_to = dt_to
         self.type = type
-        self.type_field = 'fact_timesheet_type' if self.type == TabelSerializer.TYPE_FACT else 'main_timesheet_type' if self.type == TabelSerializer.TYPE_MAIN else False
+        self.type_field = 'fact_timesheet_type_id' if self.type == TabelSerializer.TYPE_FACT else 'main_timesheet_type_id' if self.type == TabelSerializer.TYPE_MAIN else False
         self.total_hours_field = 'fact_timesheet_total_hours' if self.type == TabelSerializer.TYPE_FACT else 'main_timesheet_total_hours' if self.type == TabelSerializer.TYPE_MAIN else 'additional_timesheet_hours'
 
     @cached_property
@@ -223,7 +223,7 @@ class MtsTabelDataGetter(BaseTabelDataGetter):
         if self.shop.network.settings_values_prop.get('tabel_include_other_shops_wdays', False):
             shop_q |= Q(
                 Q(
-                    Q(wd_type=WorkerDay.TYPE_WORKDAY) & ~Q(shop=self.shop)
+                    Q(wd_type_id=WorkerDay.TYPE_WORKDAY) & ~Q(shop=self.shop)
                 ) &
                 Q(employee__in=Employment.objects.get_active(
                     network_id=self.network.id,
@@ -236,7 +236,7 @@ class MtsTabelDataGetter(BaseTabelDataGetter):
         return {
             'plan_and_fact_hours': PlanAndFactHours.objects.filter(
                 shop_q,
-                wd_type__in=WorkerDay.TYPES_WITH_TM_RANGE,
+                wd_type_id__in=WorkerDay.TYPES_WITH_TM_RANGE,
                 dt__gte=self.dt_from,
                 dt__lte=self.dt_to,
             ).distinct(),

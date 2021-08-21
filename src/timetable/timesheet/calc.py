@@ -59,7 +59,7 @@ class TimesheetCalculator:
         return WorkerDay.objects.get_tabel(
             Q(is_fact=False) | Q(
                 is_fact=True,
-                type__in=WorkerDay.TYPES_WITH_TM_RANGE,
+                type_id__in=WorkerDay.TYPES_WITH_TM_RANGE,
                 dttm_work_start__isnull=False, dttm_work_end__isnull=False,
                 work_hours__gte=datetime.timedelta(0),
             ),
@@ -86,10 +86,10 @@ class TimesheetCalculator:
                 'employee_id': self.employee.id,
                 'dt': worker_day.dt,
                 'shop_id': worker_day.shop_id,
-                'fact_timesheet_type': worker_day.type,
+                'fact_timesheet_type_id': worker_day.type_id,
                 'fact_timesheet_source': Timesheet.SOURCE_TYPE_FACT if worker_day.is_fact else Timesheet.SOURCE_TYPE_PLAN,
             }
-            if worker_day.type in WorkerDay.TYPES_WITH_TM_RANGE:
+            if worker_day.type_id in WorkerDay.TYPES_WITH_TM_RANGE:
                 total_hours, day_hours, night_hours = worker_day.calc_day_and_night_work_hours()
                 wd_dict['fact_timesheet_dttm_work_start'] = worker_day.dttm_work_start_tabel
                 wd_dict['fact_timesheet_dttm_work_end'] = worker_day.dttm_work_end_tabel
@@ -105,7 +105,7 @@ class TimesheetCalculator:
             is_approved=True,
             is_fact=False,
         ).exclude(
-            type=WorkerDay.TYPE_EMPTY,
+            type_id=WorkerDay.TYPE_EMPTY,
         ).select_related(
             'employee__user',
             'shop__network',
@@ -125,7 +125,7 @@ class TimesheetCalculator:
                     'employee_id': self.employee.id,
                     'dt': dt,
                     'shop_id': None,
-                    'fact_timesheet_type': WorkerDay.TYPE_HOLIDAY,
+                    'fact_timesheet_type_id': WorkerDay.TYPE_HOLIDAY,
                     'fact_timesheet_source': Timesheet.SOURCE_TYPE_SYSTEM,
                 }
                 fact_timesheet_dict[empl_dt_key] = d
@@ -139,7 +139,7 @@ class TimesheetCalculator:
                     'employee_id': self.employee.id,
                     'dt': dt,
                     'shop_id': None if day_in_past else plan_wd.shop_id,
-                    'fact_timesheet_type': WorkerDay.TYPE_ABSENSE if day_in_past else plan_wd.type,
+                    'fact_timesheet_type_id': WorkerDay.TYPE_ABSENSE if day_in_past else plan_wd.type_id,
                     'fact_timesheet_source': Timesheet.SOURCE_TYPE_SYSTEM if day_in_past else Timesheet.SOURCE_TYPE_PLAN,
                 }
                 if not day_in_past:

@@ -73,7 +73,7 @@ class TestsHelperMixin:
                 is_workday = day.weekday() not in [5, 6]
                 kwargs = dict(
                     dt=day,
-                    type='W' if is_workday else 'H',
+                    type_id='W' if is_workday else 'H',
                     is_fact=False,
                     is_approved=True,
                     employee_id=empl.employee_id,

@@ -242,7 +242,7 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
             WorkerDay.objects.create(
                 employment_id=resp['id'],
                 employee=self.employee2,
-                type=WorkerDay.TYPE_WORKDAY,
+                type_id=WorkerDay.TYPE_WORKDAY,
                 dttm_work_start=datetime.combine(dt + timedelta(i), time(10)),
                 dttm_work_end=datetime.combine(dt + timedelta(i), time(20)),
                 shop=self.shop,
@@ -253,6 +253,7 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
                 employment_id=resp['id'],
                 employee=self.employee2,
                 dt=dt + timedelta(i + 3),
+                type_id=WorkerDay.TYPE_EMPTY,
             )
         self.assertEqual(WorkerDay.objects.get(employment_id=resp['id'], dt=dt).work_hours, timedelta(hours=9))
         self.assertEqual(WorkerDay.objects.get(employment_id=resp['id'], dt=dt + timedelta(1)).work_hours,
@@ -306,7 +307,7 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
                 employment=self.employment2,
                 dt=dt + timedelta(days=50),
                 is_fact=False,
-                type=WorkerDay.TYPE_WORKDAY,
+                type_id=WorkerDay.TYPE_WORKDAY,
                 dttm_work_start=datetime.combine(dt, time(8, 0, 0)),
                 dttm_work_end=datetime.combine(dt, time(20, 0, 0)),
                 is_approved=True,
@@ -317,7 +318,7 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
                 employment=self.employment2,
                 dt=dt + timedelta(days=25),
                 is_fact=False,
-                type=WorkerDay.TYPE_WORKDAY,
+                type_id=WorkerDay.TYPE_WORKDAY,
                 dttm_work_start=datetime.combine(dt, time(8, 0, 0)),
                 dttm_work_end=datetime.combine(dt, time(20, 0, 0)),
                 is_approved=True,
@@ -328,7 +329,7 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
                 employment=self.employment2,
                 dt=dt + timedelta(days=20),
                 is_fact=False,
-                type=WorkerDay.TYPE_HOLIDAY,
+                type_id=WorkerDay.TYPE_HOLIDAY,
                 is_approved=True,
             )
             wd_count_before_save = WorkerDay.objects.count()
@@ -531,7 +532,7 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
                     employee=self.employee2,
                     employment=empl1,
                     shop=self.shop2,
-                    type=WorkerDay.TYPE_WORKDAY,
+                    type_id=WorkerDay.TYPE_WORKDAY,
                     is_fact=False,
                     is_approved=True,
                 )
@@ -580,7 +581,7 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
             employee=self.employee2,
             employment=empl1,
             shop=self.shop2,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             is_fact=False,
             is_approved=True,
         )

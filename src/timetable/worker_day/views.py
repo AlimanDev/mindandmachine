@@ -187,7 +187,7 @@ class WorkerDayViewSet(BaseModelViewSet):
                     is_approved=True,
                     is_fact=False,
                 ).exclude(
-                    type=WorkerDay.TYPE_EMPTY,
+                    type_id=WorkerDay.TYPE_EMPTY,
                 ).select_related(
                     'employee__user',
                     'shop',
@@ -235,7 +235,7 @@ class WorkerDayViewSet(BaseModelViewSet):
                             continue
 
                         dt_now = timezone.now().date()
-                        if plan_wd and plan_wd.type in WorkerDay.TYPES_WITH_TM_RANGE:
+                        if plan_wd and plan_wd.type_id in WorkerDay.TYPES_WITH_TM_RANGE:
                             day_in_past = dt < dt_now
                             d = {
                                 "id": None,
@@ -348,7 +348,7 @@ class WorkerDayViewSet(BaseModelViewSet):
             approve_condition = Q(
                 wd_types_q,
                 Q(shop_id=serializer.data['shop_id']) |
-                Q(Q(shop__isnull=True) | Q(type=WorkerDay.TYPE_QUALIFICATION), employee_id__in=employee_ids),
+                Q(Q(shop__isnull=True) | Q(type_id=WorkerDay.TYPE_QUALIFICATION), employee_id__in=employee_ids),
                 dt__lte=serializer.data['dt_to'],
                 dt__gte=serializer.data['dt_from'],
                 is_fact=serializer.data['is_fact'],
@@ -370,7 +370,7 @@ class WorkerDayViewSet(BaseModelViewSet):
                         employee_id=OuterRef('employee_id'),
                         dt=OuterRef('dt'),
                         is_fact=OuterRef('is_fact'),
-                        type=OuterRef('type'),
+                        type_id=OuterRef('type_id'),
                         is_approved=True,
                     ),
                 ),
@@ -419,12 +419,12 @@ class WorkerDayViewSet(BaseModelViewSet):
                 if not serializer.data['is_fact'] and settings.SEND_DOCTORS_MIS_SCHEDULE_ON_CHANGE:
                     from src.celery.tasks import send_doctors_schedule_to_mis
                     mis_data_qs = wdays_to_approve.annotate(
-                        approved_wd_type=Subquery(WorkerDay.objects.filter(
+                        approved_wd_type_id=Subquery(WorkerDay.objects.filter(
                             dt=OuterRef('dt'),
                             employee_id=OuterRef('employee_id'),
                             is_fact=serializer.data['is_fact'],
                             is_approved=True,
-                        ).values('type')[:1]),
+                        ).values('type_id')[:1]),
                         approved_wd_has_doctor_work_type=Exists(WorkerDayCashboxDetails.objects.filter(
                             worker_day__dt=OuterRef('dt'),
                             worker_day__employee_id=OuterRef('employee_id'),
@@ -445,33 +445,33 @@ class WorkerDayViewSet(BaseModelViewSet):
                             is_approved=True,
                         ).values('dttm_work_end')[:1]),
                     ).filter(
-                        Q(type=WorkerDay.TYPE_WORKDAY) | Q(approved_wd_type=WorkerDay.TYPE_WORKDAY),
+                        Q(type_id=WorkerDay.TYPE_WORKDAY) | Q(approved_wd_type_id=WorkerDay.TYPE_WORKDAY),
                     ).annotate(
                         action=Case(
                             When(
                                 Q(
-                                    Q(approved_wd_type__isnull=True) | ~Q(approved_wd_type=WorkerDay.TYPE_WORKDAY),
-                                    type=WorkerDay.TYPE_WORKDAY,
+                                    Q(approved_wd_type_id__isnull=True) | ~Q(approved_wd_type_id=WorkerDay.TYPE_WORKDAY),
+                                    type_id=WorkerDay.TYPE_WORKDAY,
                                     work_types__work_type_name__code='doctor',
                                 ),
                                 then=Value('create', output_field=CharField())
                             ),
                             When(
                                 Q(
-                                    ~Q(type=WorkerDay.TYPE_WORKDAY),
-                                    approved_wd_type=WorkerDay.TYPE_WORKDAY,
+                                    ~Q(type_id=WorkerDay.TYPE_WORKDAY),
+                                    approved_wd_type_id=WorkerDay.TYPE_WORKDAY,
                                     approved_wd_has_doctor_work_type=True,
                                 ),
                                 then=Value('delete', output_field=CharField()),
                             ),
                             When(
-                                type=F('approved_wd_type'),
+                                type_id=F('approved_wd_type_id'),
                                 work_types__work_type_name__code='doctor',
                                 approved_wd_has_doctor_work_type=True,
                                 then=Value('update', output_field=CharField()),
                             ),
                             When(
-                                type=F('approved_wd_type'),
+                                type_id=F('approved_wd_type_id'),
                                 work_types__work_type_name__code='doctor',
                                 approved_wd_has_doctor_work_type=False,
                                 then=Value('create', output_field=CharField()),
@@ -479,7 +479,7 @@ class WorkerDayViewSet(BaseModelViewSet):
                             When(
                                 Q(
                                     ~Q(work_types__work_type_name__code='doctor'),
-                                    type=F('approved_wd_type'),
+                                    type_id=F('approved_wd_type_id'),
                                     approved_wd_has_doctor_work_type=True,
                                 ),
                                 then=Value('delete', output_field=CharField()),
@@ -925,7 +925,7 @@ class WorkerDayViewSet(BaseModelViewSet):
                     is_approved=range['is_approved'],
                     is_fact=range['is_fact'],
                 ).exclude(
-                    type=range['type'],
+                    type_id=range['type'],
                 ).delete()
 
                 existing_dates = list(WorkerDay.objects.filter(
@@ -934,7 +934,7 @@ class WorkerDayViewSet(BaseModelViewSet):
                     dt__lte=range['dt_to'],
                     is_approved=range['is_approved'],
                     is_fact=range['is_fact'],
-                    type=range['type'],
+                    type_id=range['type'],
                 ).values_list('dt', flat=True))
 
                 wdays_to_create = []
@@ -953,7 +953,7 @@ class WorkerDayViewSet(BaseModelViewSet):
                                     dt=dt,
                                     is_approved=range['is_approved'],
                                     is_fact=range['is_fact'],
-                                    type=range['type'],
+                                    type_id=range['type'],
                                     created_by=self.request.user,
                                 )
                             )
@@ -1461,7 +1461,7 @@ class WorkerDayViewSet(BaseModelViewSet):
             data['shop_id'],
             WorkerDayPermission.CREATE_OR_UPDATE,
             WorkerDayPermission.PLAN,
-            [data['type'],],
+            [data['type_id'],],
             data['dt_from'],
             data['dt_to'],
             self.error_messages,
@@ -1469,7 +1469,7 @@ class WorkerDayViewSet(BaseModelViewSet):
         response = WorkerDaySerializer(
             create_worker_days_range(
                 data['dates'], 
-                type=data['type'], 
+                type_id=data['type_id'],
                 employee_id=data['employee_id'], 
                 shop_id=data['shop_id'],
                 tm_work_start=data.get('tm_work_start'),

@@ -135,7 +135,7 @@ class TestAutoSettings(APITestCase):
             dt=dt,
             dttm_work_start=datetime.combine(dt, tm_from),
             dttm_work_end=datetime.combine(dt, tm_to),
-            type=WorkerDay.TYPE_WORKDAY
+            type_id=WorkerDay.TYPE_WORKDAY
         )
         self.assertEqual(len(wd), 1)
 
@@ -146,7 +146,7 @@ class TestAutoSettings(APITestCase):
 
         self.assertEqual(WorkerDay.objects.filter(
             employee=self.employee4,
-            type=WorkerDay.TYPE_HOLIDAY,
+            type_id=WorkerDay.TYPE_HOLIDAY,
             dt=dt,
             shop__isnull=True,
             dttm_work_start__isnull=True,
@@ -179,7 +179,7 @@ class TestAutoSettings(APITestCase):
             employment=self.employment2,
             dt=self.dt,
             is_fact=False,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dttm_work_start=datetime.combine(self.dt, tm_from),
             dttm_work_end = datetime.combine(self.dt, tm_to),
             is_approved=True,
@@ -189,7 +189,7 @@ class TestAutoSettings(APITestCase):
             employment=self.employment2,
             dt=self.dt,
             is_fact=False,
-            type=WorkerDay.TYPE_HOLIDAY,
+            type_id=WorkerDay.TYPE_HOLIDAY,
             parent_worker_day=self.wd1_plan_approved
         )
 
@@ -199,7 +199,7 @@ class TestAutoSettings(APITestCase):
             employment=self.employment3,
             dt=self.dt,
             is_fact=False,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dttm_work_start=datetime.combine(self.dt, tm_from),
             dttm_work_end = datetime.combine(self.dt, tm_to),
             is_approved=True,
@@ -210,7 +210,7 @@ class TestAutoSettings(APITestCase):
             employment=self.employment4,
             dt=self.dt,
             is_fact=False,
-            type=WorkerDay.TYPE_HOLIDAY,
+            type_id=WorkerDay.TYPE_HOLIDAY,
         )
 
         response = self.client.post(self.url, {
@@ -262,7 +262,7 @@ class TestAutoSettings(APITestCase):
             employee=self.employee2,
             dt=self.dt,
             is_fact=False,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dttm_work_start=datetime.combine(self.dt, tm_from),
             dttm_work_end = datetime.combine(self.dt, tm_to),
             is_approved=True,
@@ -275,7 +275,7 @@ class TestAutoSettings(APITestCase):
             dt=dt,
             dttm_work_start=datetime.combine(dt, tm_from),
             dttm_work_end=datetime.combine(dt, tm_to),
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             id=self.wd1_plan_not_approved.id,
             is_approved = False
         )
@@ -287,7 +287,7 @@ class TestAutoSettings(APITestCase):
             dt=dt,
             dttm_work_start=datetime.combine(dt, tm_from),
             dttm_work_end=datetime.combine(dt, tm_to),
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             parent_worker_day_id=self.wd2_plan_approved.id,
             is_approved=False
         )
@@ -295,7 +295,7 @@ class TestAutoSettings(APITestCase):
 
         self.assertEqual(WorkerDay.objects.filter(
             employee=self.employee4,
-            type=WorkerDay.TYPE_HOLIDAY,
+            type_id=WorkerDay.TYPE_HOLIDAY,
             dt=dt,
             dttm_work_start__isnull=True,
             dttm_work_end__isnull=True,
@@ -319,7 +319,7 @@ class TestAutoSettings(APITestCase):
                 employee=self.employment1.employee,
                 shop=self.employment1.shop,
                 dt=dt_from,
-                type=WorkerDay.TYPE_HOLIDAY,
+                type_id=WorkerDay.TYPE_HOLIDAY,
                 is_approved=False,
                 created_by=self.user1,
             )
@@ -331,7 +331,7 @@ class TestAutoSettings(APITestCase):
                 employee=self.employment1.employee,
                 shop=self.employment1.shop,
                 dt=dt_from,
-                type=WorkerDay.TYPE_WORKDAY,
+                type_id=WorkerDay.TYPE_WORKDAY,
                 dttm_work_start=datetime.combine(dt_from, time(9)),
                 dttm_work_end=datetime.combine(dt_from, time(22)),
                 is_approved=False,
@@ -355,7 +355,7 @@ class TestAutoSettings(APITestCase):
                 employee=self.employment1.employee,
                 shop=self.employment1.shop,
                 dt=dt_from,
-                type=WorkerDay.TYPE_HOLIDAY,
+                type_id=WorkerDay.TYPE_HOLIDAY,
                 is_approved=False,
                 created_by=self.user1,
             )
@@ -367,7 +367,7 @@ class TestAutoSettings(APITestCase):
                 employee=self.employment1.employee,
                 shop=self.employment1.shop,
                 dt=dt_from,
-                type=WorkerDay.TYPE_WORKDAY,
+                type_id=WorkerDay.TYPE_WORKDAY,
                 dttm_work_start=datetime.combine(dt_from, time(9)),
                 dttm_work_end=datetime.combine(dt_from, time(22)),
                 is_approved=False,
@@ -447,7 +447,7 @@ class TestAutoSettings(APITestCase):
                 employee=self.employment2.employee,
                 shop=self.employment2.shop,
                 dt=dt,
-                type=WorkerDay.TYPE_WORKDAY,
+                type_id=WorkerDay.TYPE_WORKDAY,
                 dttm_work_start=datetime.combine(dt, time(9)),
                 dttm_work_end=datetime.combine(dt, time(22)),
                 is_approved=False,
@@ -463,7 +463,7 @@ class TestAutoSettings(APITestCase):
                 employee=self.employment2.employee,
                 shop=self.employment2.shop,
                 dt=dt,
-                type=WorkerDay.TYPE_HOLIDAY,
+                type_id=WorkerDay.TYPE_HOLIDAY,
                 is_approved=False,
             )
         Employment.objects.filter(id=self.employment6.id).update(position_id=self.position.id)
@@ -473,7 +473,7 @@ class TestAutoSettings(APITestCase):
             employee_id=self.employment3.employee_id,
             shop=self.employment3.shop,
             dt=dt_to,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dttm_work_start=datetime.combine(dt_to, time(9)),
             dttm_work_end=datetime.combine(dt_to, time(22)),
             is_approved=False,
@@ -508,7 +508,7 @@ class TestAutoSettings(APITestCase):
                 employee=self.employment2.employee,
                 shop=self.employment2.shop if day % 2 == 0 else self.shop2,
                 dt=dt_from,
-                type=WorkerDay.TYPE_WORKDAY,
+                type_id=WorkerDay.TYPE_WORKDAY,
                 dttm_work_start=datetime.combine(dt_from, time(9)),
                 dttm_work_end=datetime.combine(dt_from, time(22)),
                 is_approved=False,
@@ -524,7 +524,7 @@ class TestAutoSettings(APITestCase):
                 employee=self.employment2.employee,
                 shop=self.employment2.shop,
                 dt=dt_from,
-                type=WorkerDay.TYPE_HOLIDAY,
+                type_id=WorkerDay.TYPE_HOLIDAY,
                 is_approved=False,
             )
         self.employment6.position = self.position
@@ -535,7 +535,7 @@ class TestAutoSettings(APITestCase):
             employee_id=self.employment3.employee_id,
             shop=self.employment3.shop,
             dt=dt_to,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dttm_work_start=datetime.combine(dt_from, time(9)),
             dttm_work_end=datetime.combine(dt_from, time(22)),
             is_approved=False,
@@ -575,7 +575,7 @@ class TestAutoSettings(APITestCase):
             employee=self.employee2,
             employment=self.employment2,
             dt=self.dt,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dttm_work_start=datetime.combine(self.dt, tm_from),
             dttm_work_end = datetime.combine(self.dt, tm_to),
         )
@@ -584,7 +584,7 @@ class TestAutoSettings(APITestCase):
             employment=self.employment2,
             dt=self.dt + timedelta(1),
             is_fact=False,
-            type=WorkerDay.TYPE_HOLIDAY,
+            type_id=WorkerDay.TYPE_HOLIDAY,
         )
 
         self.wd3 = WorkerDay.objects.create(
@@ -592,7 +592,7 @@ class TestAutoSettings(APITestCase):
             employee=self.employee2,
             employment=self.employment2,
             dt=self.dt + timedelta(2),
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dttm_work_start=datetime.combine(self.dt, tm_from),
             dttm_work_end = datetime.combine(self.dt, tm_to),
         )
@@ -602,7 +602,7 @@ class TestAutoSettings(APITestCase):
             employee=self.employee2,
             employment=self.employment2,
             dt=self.dt + timedelta(3),
-            type=WorkerDay.TYPE_EMPTY,
+            type_id=WorkerDay.TYPE_EMPTY,
         )
 
         response = self.client.post(self.url, {
@@ -660,14 +660,14 @@ class TestAutoSettings(APITestCase):
         self.assertEqual(WorkerDay.objects.filter(
             shop=self.shop,
             is_fact=False,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             is_approved=False,
         ).count(), 2)
 
         self.assertEqual(WorkerDay.objects.filter(
             shop=self.shop2,
             is_fact=False,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             is_approved=False,
         ).first().dt, self.dt + timedelta(2))
 
@@ -715,7 +715,7 @@ class TestAutoSettings(APITestCase):
                 employee=self.employment2.employee,
                 shop=self.employment2.shop,
                 dt=dt,
-                type=WorkerDay.TYPE_VACATION,
+                type_id=WorkerDay.TYPE_VACATION,
                 is_approved=False,
             )
 
@@ -737,7 +737,7 @@ class TestAutoSettings(APITestCase):
                 employee=self.employment2.employee,
                 shop=self.employment2.shop,
                 dt=dt,
-                type=WorkerDay.TYPE_VACATION,
+                type_id=WorkerDay.TYPE_VACATION,
                 is_approved=False,
             )
 
@@ -756,7 +756,7 @@ class TestAutoSettings(APITestCase):
                 employee=self.employment2.employee,
                 shop=self.employment2.shop,
                 dt=dt,
-                type=WorkerDay.TYPE_VACATION,
+                type_id=WorkerDay.TYPE_VACATION,
                 is_approved=True,
             )
         data = self._test_create_tt(dt_from, dt_to, use_not_approved=False)
@@ -775,7 +775,7 @@ class TestAutoSettings(APITestCase):
                 employee=self.employment2.employee,
                 shop=self.employment2.shop,
                 dt=dt,
-                type=WorkerDay.TYPE_VACATION,
+                type_id=WorkerDay.TYPE_VACATION,
                 is_approved=True,
             )
         data = self._test_create_tt(dt_from, dt_to, use_not_approved=False)
@@ -796,7 +796,7 @@ class TestAutoSettings(APITestCase):
                 employee=self.employment2.employee,
                 shop=self.employment2.shop,
                 dt=dt,
-                type=WorkerDay.TYPE_VACATION,
+                type_id=WorkerDay.TYPE_VACATION,
                 is_approved=True,
             )
         data = self._test_create_tt(dt_from, dt_to, use_not_approved=False)
@@ -814,7 +814,7 @@ class TestAutoSettings(APITestCase):
                 employee=self.employment2.employee,
                 shop=self.employment2.shop,
                 dt=dt,
-                type=WorkerDay.TYPE_VACATION,
+                type_id=WorkerDay.TYPE_VACATION,
             )
 
         dt_from = date(2021, 2, 1)
@@ -848,7 +848,7 @@ class TestAutoSettings(APITestCase):
                 employee=self.employment2.employee,
                 shop=self.employment2.shop,
                 dt=dt,
-                type=WorkerDay.TYPE_HOLIDAY,
+                type_id=WorkerDay.TYPE_HOLIDAY,
                 is_approved=True,
             )
 
@@ -867,7 +867,7 @@ class TestAutoSettings(APITestCase):
                 employee=self.employment2.employee,
                 shop=self.employment2.shop,
                 dt=dt,
-                type=WorkerDay.TYPE_WORKDAY,
+                type_id=WorkerDay.TYPE_WORKDAY,
                 dttm_work_start=datetime.combine(dt, time(9)),
                 dttm_work_end=datetime.combine(dt, time(22)),
                 is_approved=False,
@@ -935,7 +935,7 @@ class TestAutoSettings(APITestCase):
                 employee=self.employment2.employee,
                 shop=self.employment2.shop,
                 dt=dt,
-                type=WorkerDay.TYPE_WORKDAY,
+                type_id=WorkerDay.TYPE_WORKDAY,
                 dttm_work_start=datetime.combine(dt, time(10)),
                 dttm_work_end=datetime.combine(dt, time(21, 15)),
                 is_approved=True,
@@ -963,7 +963,7 @@ class TestAutoSettings(APITestCase):
                 employee=self.employment2.employee,
                 shop=self.employment2.shop,
                 dt=dt,
-                type=WorkerDay.TYPE_WORKDAY,
+                type_id=WorkerDay.TYPE_WORKDAY,
                 dttm_work_start=datetime.combine(dt, time(10)),
                 dttm_work_end=datetime.combine(dt, time(21, 15)),
                 is_approved=True,
@@ -980,7 +980,7 @@ class TestAutoSettings(APITestCase):
                 employee=self.employment2.employee,
                 shop=self.employment2.shop,
                 dt=dt,
-                type=WorkerDay.TYPE_VACATION,
+                type_id=WorkerDay.TYPE_VACATION,
                 is_approved=True,
                 is_fact=False,
             )
@@ -991,7 +991,7 @@ class TestAutoSettings(APITestCase):
                 employee=self.employment2.employee,
                 shop=self.employment2.shop,
                 dt=dt,
-                type=WorkerDay.TYPE_WORKDAY,
+                type_id=WorkerDay.TYPE_WORKDAY,
                 dttm_work_start=datetime.combine(dt, time(10)),
                 dttm_work_end=datetime.combine(dt, time(21, 15)),
                 is_approved=True,
@@ -1008,7 +1008,7 @@ class TestAutoSettings(APITestCase):
                 employee=self.employment2.employee,
                 shop=self.employment2.shop,
                 dt=dt,
-                type=WorkerDay.TYPE_HOLIDAY,
+                type_id=WorkerDay.TYPE_HOLIDAY,
                 is_approved=True,
                 is_fact=False,
             )
@@ -1030,7 +1030,7 @@ class TestAutoSettings(APITestCase):
                 employee=self.employment2.employee,
                 shop=self.employment2.shop,
                 dt=dt,
-                type=WorkerDay.TYPE_WORKDAY,
+                type_id=WorkerDay.TYPE_WORKDAY,
                 dttm_work_start=datetime.combine(dt, time(10)),
                 dttm_work_end=datetime.combine(dt, time(21, 15)),
                 is_approved=True,
@@ -1047,7 +1047,7 @@ class TestAutoSettings(APITestCase):
                 employee=self.employment2.employee,
                 shop=self.employment2.shop,
                 dt=dt,
-                type=WorkerDay.TYPE_VACATION,
+                type_id=WorkerDay.TYPE_VACATION,
                 is_approved=True,
                 is_fact=False,
             )
@@ -1058,7 +1058,7 @@ class TestAutoSettings(APITestCase):
                 employee=self.employment2.employee,
                 shop=self.employment2.shop,
                 dt=dt,
-                type=WorkerDay.TYPE_WORKDAY,
+                type_id=WorkerDay.TYPE_WORKDAY,
                 dttm_work_start=datetime.combine(dt, time(10)),
                 dttm_work_end=datetime.combine(dt, time(21, 15)),
                 is_approved=True,
@@ -1075,7 +1075,7 @@ class TestAutoSettings(APITestCase):
                 employee=self.employment2.employee,
                 shop=self.employment2.shop,
                 dt=dt,
-                type=WorkerDay.TYPE_HOLIDAY,
+                type_id=WorkerDay.TYPE_HOLIDAY,
                 is_approved=True,
                 is_fact=False,
             )
@@ -1097,7 +1097,7 @@ class TestAutoSettings(APITestCase):
                 employee=self.employment2.employee,
                 shop=self.employment2.shop,
                 dt=dt,
-                type=WorkerDay.TYPE_WORKDAY,
+                type_id=WorkerDay.TYPE_WORKDAY,
                 dttm_work_start=datetime.combine(dt, time(10)),
                 dttm_work_end=datetime.combine(dt, time(21, 15)),
                 is_approved=True,
@@ -1114,7 +1114,7 @@ class TestAutoSettings(APITestCase):
                 employee=self.employment2.employee,
                 shop=self.employment2.shop,
                 dt=dt,
-                type=WorkerDay.TYPE_WORKDAY,
+                type_id=WorkerDay.TYPE_WORKDAY,
                 dttm_work_start=datetime.combine(dt, time(10)),
                 dttm_work_end=datetime.combine(dt, time(21, 15)),
                 is_approved=True,
@@ -1130,7 +1130,7 @@ class TestAutoSettings(APITestCase):
             employee=self.employment2.employee,
             shop=self.employment2.shop,
             dt=date(2021, 2, 15),
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dttm_work_start=datetime.combine(date(2021, 2, 15), time(10)),
             dttm_work_end=datetime.combine(date(2021, 2, 15), time(22, 15)),
             is_approved=True,
@@ -1147,7 +1147,7 @@ class TestAutoSettings(APITestCase):
                 employee=self.employment2.employee,
                 shop=self.employment2.shop,
                 dt=dt,
-                type=WorkerDay.TYPE_WORKDAY,
+                type_id=WorkerDay.TYPE_WORKDAY,
                 dttm_work_start=datetime.combine(dt, time(10)),
                 dttm_work_end=datetime.combine(dt, time(21, 15)),
                 is_approved=True,
@@ -1163,7 +1163,7 @@ class TestAutoSettings(APITestCase):
             employee=self.employment2.employee,
             shop=self.employment2.shop,
             dt=date(2021, 3, 8),
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dttm_work_start=datetime.combine(date(2021, 3, 8), time(10)),
             dttm_work_end=datetime.combine(date(2021, 3, 8), time(23, 15)),
             is_approved=True,
@@ -1180,7 +1180,7 @@ class TestAutoSettings(APITestCase):
                 employee=self.employment2.employee,
                 shop=self.employment2.shop,
                 dt=dt,
-                type=WorkerDay.TYPE_HOLIDAY,
+                type_id=WorkerDay.TYPE_HOLIDAY,
                 is_approved=True,
                 is_fact=False,
             )
@@ -1200,7 +1200,7 @@ class TestAutoSettings(APITestCase):
                 employee=self.employment2.employee,
                 shop=self.employment2.shop,
                 dt=dt,
-                type=WorkerDay.TYPE_WORKDAY,
+                type_id=WorkerDay.TYPE_WORKDAY,
                 dttm_work_start=datetime.combine(dt, time(10)),
                 dttm_work_end=datetime.combine(dt, time(19)),
                 is_approved=True,
@@ -1216,7 +1216,7 @@ class TestAutoSettings(APITestCase):
                 employee=self.employment2.employee,
                 shop=self.employment2.shop,
                 dt=dt,
-                type=WorkerDay.TYPE_HOLIDAY,
+                type_id=WorkerDay.TYPE_HOLIDAY,
                 is_approved=True,
             )
 
@@ -1225,7 +1225,7 @@ class TestAutoSettings(APITestCase):
             employee=self.employment2.employee,
             shop=self.employment2.shop,
             dt=date(2021, 3, 3),
-            type=WorkerDay.TYPE_VACATION,
+            type_id=WorkerDay.TYPE_VACATION,
             is_approved=True,
         )
 
@@ -1243,7 +1243,7 @@ class TestAutoSettings(APITestCase):
                 employee=self.employment2.employee,
                 shop=self.employment2.shop,
                 dt=dt,
-                type=WorkerDay.TYPE_WORKDAY,
+                type_id=WorkerDay.TYPE_WORKDAY,
                 dttm_work_start=datetime.combine(dt, time(10)),
                 dttm_work_end=datetime.combine(dt, time(19)),
                 is_approved=False,
@@ -1258,7 +1258,7 @@ class TestAutoSettings(APITestCase):
             employee=self.employment2.employee,
             shop=self.employment2.shop,
             dt=date(2021, 3, 14),
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dttm_work_start=datetime.combine(dt, time(10)),
             dttm_work_end=datetime.combine(dt, time(21, 15)),
             is_approved=False,
@@ -1273,7 +1273,7 @@ class TestAutoSettings(APITestCase):
             employee=self.employment2.employee,
             shop=self.employment2.shop,
             dt=date(2021, 3, 24),
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dttm_work_start=datetime.combine(dt, time(10)),
             dttm_work_end=datetime.combine(dt, time(17)),
             is_approved=False,
@@ -1289,7 +1289,7 @@ class TestAutoSettings(APITestCase):
                 employee=self.employment2.employee,
                 shop=self.employment2.shop,
                 dt=dt,
-                type=WorkerDay.TYPE_HOLIDAY,
+                type_id=WorkerDay.TYPE_HOLIDAY,
                 is_approved=False,
             )
 
@@ -1299,7 +1299,7 @@ class TestAutoSettings(APITestCase):
                 employee=self.employment2.employee,
                 shop=self.employment2.shop,
                 dt=dt,
-                type=WorkerDay.TYPE_VACATION,
+                type_id=WorkerDay.TYPE_VACATION,
                 is_approved=False,
             )
 
@@ -1340,7 +1340,7 @@ class TestAutoSettings(APITestCase):
                 employee_id=self.employment8_old.employee_id,
                 shop=self.employment8_old.shop,
                 dt=dt,
-                type=WorkerDay.TYPE_WORKDAY,
+                type_id=WorkerDay.TYPE_WORKDAY,
                 dttm_work_start=datetime.combine(dt, time(10)),
                 dttm_work_end=datetime.combine(dt, time(19)),
                 is_approved=True,
@@ -1356,7 +1356,7 @@ class TestAutoSettings(APITestCase):
                 employee=self.employment8.employee,
                 shop=self.employment8.shop,
                 dt=dt,
-                type=WorkerDay.TYPE_WORKDAY,
+                type_id=WorkerDay.TYPE_WORKDAY,
                 dttm_work_start=datetime.combine(dt, time(10)),
                 dttm_work_end=datetime.combine(dt, time(19)),
                 is_approved=True,
@@ -1371,7 +1371,7 @@ class TestAutoSettings(APITestCase):
                 employment=self.employment8,
                 employee_id=self.employment8.employee_id,
                 dt=dt,
-                type=WorkerDay.TYPE_HOLIDAY,
+                type_id=WorkerDay.TYPE_HOLIDAY,
                 is_approved=True,
             )
 
@@ -1394,7 +1394,7 @@ class TestAutoSettings(APITestCase):
                 employee=self.employment2.employee,
                 shop=self.employment2.shop,
                 dt=dt,
-                type=WorkerDay.TYPE_WORKDAY,
+                type_id=WorkerDay.TYPE_WORKDAY,
                 dttm_work_start=datetime.combine(dt, time(9)),
                 dttm_work_end=datetime.combine(dt, time(22)),
                 is_approved=False,
@@ -1410,7 +1410,7 @@ class TestAutoSettings(APITestCase):
                 employee=self.employment2.employee,
                 shop=self.employment2.shop,
                 dt=dt,
-                type=WorkerDay.TYPE_HOLIDAY,
+                type_id=WorkerDay.TYPE_HOLIDAY,
                 is_approved=False,
             )
         self.employment2.dt_fired = date(2021, 2, 3)
@@ -1450,7 +1450,7 @@ class TestAutoSettings(APITestCase):
             employee=self.employee2,
             employment=self.employment2,
             dt=self.dt,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dttm_work_start=datetime.combine(self.dt, tm_from),
             dttm_work_end = datetime.combine(self.dt, tm_to),
         )
@@ -1484,10 +1484,10 @@ class TestAutoSettings(APITestCase):
         wd = WorkerDay.objects.filter(
             shop=self.shop,
             is_fact=False,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             is_approved=False,
         ).first()
 
         self.assertEqual(wd.employee_id, self.employee2.id)
         self.assertEqual(wd.shop_id, self.shop.id)
-        self.assertEqual(wd.type, WorkerDay.TYPE_WORKDAY)
+        self.assertEqual(wd.type_id, WorkerDay.TYPE_WORKDAY)

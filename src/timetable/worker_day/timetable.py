@@ -124,8 +124,8 @@ class BaseUploadDownloadTimeTable:
     def _get_worker_day_dict(self, shop_id, employee_qs, dt_from, dt_to, is_fact, is_approved):
         return {
             f'{wd.employee_id}_{wd.dt}': wd for wd in WorkerDay.objects.filter(
-                Q(Q(type__in=WorkerDay.TYPES_WITH_TM_RANGE) & Q(shop_id=shop_id)) |
-                ~Q(type__in=WorkerDay.TYPES_WITH_TM_RANGE),
+                Q(Q(type_id__in=WorkerDay.TYPES_WITH_TM_RANGE) & Q(shop_id=shop_id)) |
+                ~Q(type_id__in=WorkerDay.TYPES_WITH_TM_RANGE),
                 employee__in=employee_qs,
                 dt__gte=dt_from,
                 dt__lte=dt_to,
@@ -427,7 +427,7 @@ class UploadDownloadTimetableCells(BaseUploadDownloadTimeTable):
                     employment=employment,
                     dttm_work_start=dttm_work_start,
                     dttm_work_end=dttm_work_end,
-                    type=type_of_work,
+                    type_id=type_of_work,
                 )
                 if type_of_work == WorkerDay.TYPE_WORKDAY:
                     WorkerDayCashboxDetails.objects.create(
@@ -502,12 +502,12 @@ class UploadDownloadTimetableCells(BaseUploadDownloadTimeTable):
 
                 wd = wdays_dict.get(f'{employee.id}_{dt}')
                 if wd:
-                    if wd.type in WorkerDay.TYPES_WITH_TM_RANGE:
+                    if wd.type_id in WorkerDay.TYPES_WITH_TM_RANGE:
                         tm_start = wd.dttm_work_start.strftime('%H:%M')
                         tm_end = wd.dttm_work_end.strftime('%H:%M')
                         _cell_value = f'{tm_start}-{tm_end}'
                     else:
-                        _cell_value = self.wd_type_mapping.get(wd.type, '')
+                        _cell_value = self.wd_type_mapping.get(wd.type_id, '')
 
                 row_data[dt] = _cell_value
 
@@ -624,8 +624,8 @@ class UploadDownloadTimetableRows(BaseUploadDownloadTimeTable):
                     'fio': wd.employee.user.get_fio(),
                     'position': active_empl.position.name if active_empl.position else 'Не указано',
                     'dt': str(wd.dt),
-                    'start': wd.dttm_work_start.time().strftime('%H:%M') if wd.dttm_work_start else self.wd_type_mapping[wd.type],
-                    'end': wd.dttm_work_end.time().strftime('%H:%M') if wd.dttm_work_end else self.wd_type_mapping[wd.type],
+                    'start': wd.dttm_work_start.time().strftime('%H:%M') if wd.dttm_work_start else self.wd_type_mapping[wd.type_id],
+                    'end': wd.dttm_work_end.time().strftime('%H:%M') if wd.dttm_work_end else self.wd_type_mapping[wd.type_id],
                 }
             )
         
@@ -723,7 +723,7 @@ class UploadDownloadTimetableRows(BaseUploadDownloadTimeTable):
                     employment=employment,
                     dttm_work_start=dttm_work_start,
                     dttm_work_end=dttm_work_end,
-                    type=type_of_work,
+                    type_id=type_of_work,
                 )
                 if type_of_work == WorkerDay.TYPE_WORKDAY:
                     WorkerDayCashboxDetails.objects.create(
@@ -756,8 +756,8 @@ class UploadDownloadTimetableRows(BaseUploadDownloadTimeTable):
                 wd = wdays_dict.get(f'{employee.id}_{dt}')
                 
                 if wd:
-                    row_data['start'] = wd.dttm_work_start.strftime('%H:%M') if wd.type in WorkerDay.TYPES_WITH_TM_RANGE else self.wd_type_mapping.get(wd.type, '')
-                    row_data['end'] = wd.dttm_work_end.strftime('%H:%M') if wd.type in WorkerDay.TYPES_WITH_TM_RANGE else self.wd_type_mapping.get(wd.type, '')
+                    row_data['start'] = wd.dttm_work_start.strftime('%H:%M') if wd.type_id in WorkerDay.TYPES_WITH_TM_RANGE else self.wd_type_mapping.get(wd.type_id, '')
+                    row_data['end'] = wd.dttm_work_end.strftime('%H:%M') if wd.type_id in WorkerDay.TYPES_WITH_TM_RANGE else self.wd_type_mapping.get(wd.type_id, '')
                 rows.append(row_data)
 
         data = {

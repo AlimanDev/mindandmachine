@@ -674,7 +674,6 @@ class TestDepartment(TestsHelperMixin, APITestCase):
         shop_data.pop('parent_code')
         put_url = f'{self.url}{shop_data["code"]}/'
         response = self.client.put(put_url, shop_data, format='json')
-        self.print_resp(response)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         employment = Employment.objects.filter(
             employee__user_id=director_user.id,

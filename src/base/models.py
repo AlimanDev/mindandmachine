@@ -1272,7 +1272,7 @@ class Employment(AbstractActiveModel):
                         employment_id=self.id,
                         is_fact=False,
                         dt__gt=dt,
-                        type__in=WorkerDay.TYPES_WITH_TM_RANGE,
+                        type_id__in=WorkerDay.TYPES_WITH_TM_RANGE,
                     ):
                 wd.save()
 

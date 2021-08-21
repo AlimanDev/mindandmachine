@@ -73,7 +73,7 @@ class TestGenerateTabel(TestsHelperMixin, TestCase):
             employee=cls.outsource_employee,
             shop=cls.shop,
             employment=cls.outsource_employment,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dttm_work_start=datetime.combine(cls.dt_now, time(8, 0, 0)),
             dttm_work_end=datetime.combine(cls.dt_now, time(19, 30, 0)),
             cashbox_details__work_type=cls.work_type,
@@ -85,7 +85,7 @@ class TestGenerateTabel(TestsHelperMixin, TestCase):
             employee=cls.outsource_employee,
             shop=cls.shop,
             employment=cls.outsource_employment,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dttm_work_start=datetime.combine(cls.dt_now, time(7, 58, 0)),
             dttm_work_end=datetime.combine(cls.dt_now, time(19, 59, 1)),
             cashbox_details__work_type=cls.work_type,
@@ -178,16 +178,16 @@ class TestGenerateTabel(TestsHelperMixin, TestCase):
                     ).first()
                     assert_value = ''
                     if employee.id == self.outsource_employee.id:
-                        assert_value = ts.main_timesheet_type
+                        assert_value = ts.main_timesheet_type_id
                     self.assertEqual(
-                        ts.main_timesheet_type,
+                        ts.main_timesheet_type_id,
                         assert_value,
                     )
                     continue
-                type = self.types_mapping[values['code']]
-                wd = Timesheet.objects.filter(dt=dt, main_timesheet_type=type, employee=employee).first()
+                type_id = self.types_mapping[values['code']]
+                wd = Timesheet.objects.filter(dt=dt, main_timesheet_type_id=type_id, employee=employee).first()
                 self.assertIsNotNone(wd)
-                if wd.main_timesheet_type == WorkerDay.TYPE_WORKDAY:
+                if wd.main_timesheet_type_id == WorkerDay.TYPE_WORKDAY:
                     self.assertEqual(wd.main_timesheet_total_hours, values['value'])
                     if wd.dt.day <= 15:
                         first_half_month_wdays += 1
@@ -228,16 +228,16 @@ class TestGenerateTabel(TestsHelperMixin, TestCase):
                     ).first()
                     assert_value = ''
                     if employee.id == self.outsource_employee.id:
-                        assert_value = ts.fact_timesheet_type
+                        assert_value = ts.fact_timesheet_type_id
                     self.assertEqual(
-                        ts.fact_timesheet_type,
+                        ts.fact_timesheet_type_id,
                         assert_value,
                     )
                     continue
                 type = self.types_mapping[values['code']]
-                wd = Timesheet.objects.filter(dt=dt, fact_timesheet_type=type, employee=employee).first()
+                wd = Timesheet.objects.filter(dt=dt, fact_timesheet_type_id=type, employee=employee).first()
                 self.assertIsNotNone(wd)
-                if wd.fact_timesheet_type == WorkerDay.TYPE_WORKDAY:
+                if wd.fact_timesheet_type_id == WorkerDay.TYPE_WORKDAY:
                     self.assertEqual(wd.fact_timesheet_total_hours, values['value'])
                     if wd.dt.day <= 15:
                         first_half_month_wdays += 1

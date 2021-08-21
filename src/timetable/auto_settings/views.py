@@ -406,14 +406,14 @@ class AutoSettingsViewSet(viewsets.ViewSet):
             worker_days_mask = {}
             for wd in worker_days_db:
                 if ((wd['id'] in worker_days_mask) and wd['work_types__id']) or \
-                        ((prev_data == False) and (wd['type'] == WorkerDay.TYPE_HOLIDAY) and (
+                        ((prev_data is False) and (wd['type_id'] == WorkerDay.TYPE_HOLIDAY) and (
                                 wd['created_by_id'] is None)):
                     continue
 
                 worker_days_mask[wd['id']] = len(array)
                 wd_mod = WorkerDay(
                     id=wd['id'],
-                    type=wd['type'],
+                    type_id=wd['type_id'],
                     dttm_added=wd['dttm_added'],
                     dt=wd['dt'],
                     employee_id=wd['employee_id'],
@@ -435,12 +435,12 @@ class AutoSettingsViewSet(viewsets.ViewSet):
             dt__lte=dt_to,
             **new_worker_days_filter,
         ).exclude(
-            type=WorkerDay.TYPE_EMPTY,
+            type_id=WorkerDay.TYPE_EMPTY,
         ).order_by(
             'dt', 'employee_id'
         ).values(
             'id',
-            'type',
+            'type_id',
             'dttm_added',
             'dt',
             'employee_id',
@@ -459,12 +459,12 @@ class AutoSettingsViewSet(viewsets.ViewSet):
             dt__lt=dt_from, # не должны попадать дни за начало периода
             **new_worker_days_filter,
         ).exclude(
-            type=WorkerDay.TYPE_EMPTY,
+            type_id=WorkerDay.TYPE_EMPTY,
         ).order_by(
             'dt'
         ).values(
             'id',
-            'type',
+            'type_id',
             'dttm_added',
             'dt',
             'employee_id',
@@ -556,7 +556,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
                 worker_day[key] = []
             # дни отработанные в других отделах
             if worker_d.shop_id and worker_d.shop_id != shop_id:
-                worker_d.type = 'R'
+                worker_d.type_id = 'R'
             worker_day[key].append(worker_d)
 
         # Расписание за прошлую неделю от даты составления
@@ -608,7 +608,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
                         continue
                     else:
                         workers_month_days_new.append(WorkerDay(
-                            type=WorkerDay.TYPE_HOLIDAY,
+                            type_id=WorkerDay.TYPE_HOLIDAY,
                             dt=dt,
                             employee_id=employment.employee_id,
                         )
@@ -630,7 +630,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
                         wd_index += 1
                     else:
                         workers_month_days_new.append(WorkerDay(
-                            type=WorkerDay.TYPE_HOLIDAY,
+                            type_id=WorkerDay.TYPE_HOLIDAY,
                             dt=dt,
                             employee_id=employment.employee_id,
                         ))
@@ -643,7 +643,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
                 user_dt = dt_from
                 while user_dt != employment.dt_hired:
                     workers_month_days_new.append(WorkerDay(
-                        type=WorkerDay.TYPE_HOLIDAY,
+                        type_id=WorkerDay.TYPE_HOLIDAY,
                         dt=user_dt,
                         employee_id=employment.employee_id,
                     ))
@@ -888,7 +888,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
                             is_fact=False,
                             dt=dt,
                             employee_id=uid,
-                            type=wd['type']
+                            type_id=wd['type']
                         )
 
                         wdays = {w.is_approved: w for w in WorkerDay.objects.filter(
@@ -901,10 +901,10 @@ class AutoSettingsViewSet(viewsets.ViewSet):
                         if False in wdays:
                             wd_obj = wdays[False]
                             # дни отработанные в других магазинах
-                            if wd_obj.shop_id and wd_obj.shop_id != shop.id and wd_obj.type != WorkerDay.TYPE_EMPTY:
+                            if wd_obj.shop_id and wd_obj.shop_id != shop.id and wd_obj.type_id != WorkerDay.TYPE_EMPTY:
                                 continue
-                            if wd_obj.created_by_id is None or wd_obj.type == WorkerDay.TYPE_EMPTY:
-                                wd_obj.type = wd['type']
+                            if wd_obj.created_by_id is None or wd_obj.type_id == WorkerDay.TYPE_EMPTY:
+                                wd_obj.type_id = wd['type']
                                 wd_obj.created_by_id = None
                                 WorkerDayCashboxDetails.objects.filter(worker_day=wd_obj).delete()
                         elif True in wdays:
@@ -914,8 +914,8 @@ class AutoSettingsViewSet(viewsets.ViewSet):
                             wd_obj.shop = shop
                             wd_obj.employment = employments.get(uid)
 
-                        if wd_obj.created_by_id is None or wd_obj.type == WorkerDay.TYPE_EMPTY:
-                            if WorkerDay.is_type_with_tm_range(wd_obj.type):
+                        if wd_obj.created_by_id is None or wd_obj.type_id == WorkerDay.TYPE_EMPTY:
+                            if WorkerDay.is_type_with_tm_range(wd_obj.type_id):
                                 wd_obj.dttm_work_start = Converter.parse_datetime(wd['dttm_work_start']) # todo: rewrite with default instrument
                                 wd_obj.dttm_work_end = Converter.parse_datetime(wd['dttm_work_end'])  # todo: rewrite with default instrument
                                 # wd_obj.work_hours = WorkerDay.count_work_hours(break_triplets, wd_obj.dttm_work_start, wd_obj.dttm_work_end)
@@ -1047,7 +1047,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
         #     dttm_work_start=None,
         #     dttm_work_end=None,
         #     #employee_id=None, TODO: ???
-        #     type=WorkerDay.TYPE_EMPTY
+        #     type_id=WorkerDay.TYPE_EMPTY
 
         # )
 
@@ -1065,7 +1065,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
         # WorkerDay.objects.bulk_create(
         #     [WorkerDay(
         #         # employee_id=w.employee_id, TODO: ???
-        #         type=WorkerDay.TYPE_EMPTY,
+        #         type_id=WorkerDay.TYPE_EMPTY,
         #         dt=w.dt,
         #         parent_worker_day=w
         #     ) for w in wdays]
@@ -1107,7 +1107,7 @@ def count_prev_paid_days(dt_end, employments, region_id, dt_start=None, is_appro
 
     prev_info = list(Employment.objects.filter(
         Q(
-        #   Q(employee__worker_days__type__in=WorkerDay.TYPES_PAID)|
+        #   Q(employee__worker_days__type_id__in=WorkerDay.TYPES_PAID)|
         #   Q(employee__worker_days__type__in=[WorkerDay.TYPE_SELF_VACATION, WorkerDay.TYPE_VACATION, WorkerDay.TYPE_SICK, WorkerDay.TYPE_EMPTY]),
           Q(dt_fired__isnull=False) & Q(employee__worker_days__dt__lte=F('dt_fired')) | Q(dt_fired__isnull=True), #чтобы не попали рабочие дни после увольнения
           employee__worker_days__dt__gte=dt_start,
@@ -1117,10 +1117,10 @@ def count_prev_paid_days(dt_end, employments, region_id, dt_start=None, is_appro
         Q(employee__worker_days=None),  # for doing left join
         id__in=ids,
     ).values('id').annotate(
-        paid_days=Coalesce(Count('employee__worker_days', filter=Q(employee__worker_days__type__in=WorkerDay.TYPES_PAID)), 0),
-        paid_hours=Coalesce(Sum(Extract(F('employee__worker_days__work_hours'),'epoch') / 3600, filter=Q(employee__worker_days__type__in=WorkerDay.TYPES_PAID)), 0),
+        paid_days=Coalesce(Count('employee__worker_days', filter=Q(employee__worker_days__type_id__in=WorkerDay.TYPES_PAID)), 0),
+        paid_hours=Coalesce(Sum(Extract(F('employee__worker_days__work_hours'),'epoch') / 3600, filter=Q(employee__worker_days__type_id__in=WorkerDay.TYPES_PAID)), 0),
         vacations=Coalesce(Count('employee__worker_days', filter=Q(employee__worker_days__type__in=[WorkerDay.TYPE_SELF_VACATION, WorkerDay.TYPE_VACATION, WorkerDay.TYPE_SICK])), 0),
-        no_data=Coalesce(Count('employee__worker_days', filter=Q(employee__worker_days__type=WorkerDay.TYPE_EMPTY)), 0),
+        no_data=Coalesce(Count('employee__worker_days', filter=Q(employee__worker_days__type_id=WorkerDay.TYPE_EMPTY)), 0),
         all_days=Coalesce(Count('employee__worker_days'), 0),
     ).order_by('id'))
     prev_info = {e['id']: e for e in prev_info}

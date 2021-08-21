@@ -135,6 +135,7 @@ class BatchUpdateOrCreateModelMixin:
         # TODO: Сигналы post_batch_update, post_batch_create ?
         # TODO: Проверка прав доступа для WorkerDay при создании/изменеии
         # TODO: Проверка на наличие активного трудоустройства у сотрудника на создаваемые даты
+        # TODO: Не обновлять существующие объекты если ни 1 поле не изменилось ?
         """
         allowed_update_key_fields = cls._get_allowed_update_key_fields()
         if update_key_field not in allowed_update_key_fields:

@@ -144,24 +144,24 @@ class Timetable_xlsx(Tabel_xlsx):
                 if (it < n_workdays) and (workdays[it].employee_id == employment.employee_id) and (day + 1 == workdays[it].dt.day):
                     wd = workdays[it]
 
-                    if wd.type == WorkerDay.TYPE_WORKDAY:
+                    if wd.type_id == WorkerDay.TYPE_WORKDAY:
                         text = '{}-\n{}'.format(wd.dttm_work_start.time().strftime(QOS_SHORT_TIME_FORMAT),
                                                 wd.dttm_work_end.time().strftime(QOS_SHORT_TIME_FORMAT))
 
-                    elif wd.type == WorkerDay.TYPE_HOLIDAY_WORK:
+                    elif wd.type_id == WorkerDay.TYPE_HOLIDAY_WORK:
                         total_h = ceil(wd.work_hours)
                         text = 'В{}'.format(total_h)
 
-                    elif (wd.type in self.WORKERDAY_TYPE_CHANGE2HOLIDAY) \
+                    elif (wd.type_id in self.WORKERDAY_TYPE_CHANGE2HOLIDAY) \
                             and (self.prod_days[day].type == ProductionDay.TYPE_HOLIDAY):
-                        wd.type = WorkerDay.TYPE_HOLIDAY
-                        text = mapping[wd.type]
+                        wd.type_id = WorkerDay.TYPE_HOLIDAY
+                        text = mapping[wd.type_id]
 
                     else:
-                        text = mapping[wd.type]
+                        text = mapping[wd.type_id]
                     cell_format.update({
-                        'font_color': self.WORKERDAY_TYPE_COLORS[wd.type][0],
-                        'bg_color': self.WORKERDAY_TYPE_COLORS[wd.type][1],
+                        'font_color': self.WORKERDAY_TYPE_COLORS[wd.type_id][0],
+                        'bg_color': self.WORKERDAY_TYPE_COLORS[wd.type_id][1],
                     })
 
                     it += 1
@@ -298,7 +298,7 @@ class Timetable_xlsx(Tabel_xlsx):
                         work_end.append(Cell('', format_common if xdt.weekday() != 6 else format_common_bottom))
                         continue
 
-                    if wd.type == WorkerDay.TYPE_WORKDAY:
+                    if wd.type_id == WorkerDay.TYPE_WORKDAY:
                         work_begin.append(
                             Cell(wd.dttm_work_start.time(), format_time if xdt.weekday() != 6 else format_time_bottom))
                         work_end.append(
@@ -311,7 +311,7 @@ class Timetable_xlsx(Tabel_xlsx):
                         WorkerDay.TYPE_MATERNITY: _('MAT'),
                     }
 
-                    text = mapping.get(wd.type)
+                    text = mapping.get(wd.type_id)
                     work_begin.append(Cell('' if text is None else text,
                                            format_common if xdt.weekday() != 6 else format_common_bottom))
                     work_end.append(Cell('' if text is None else text,

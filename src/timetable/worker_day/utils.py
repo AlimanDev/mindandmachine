@@ -29,7 +29,7 @@ def exchange(data, error_messages):
     new_wds = []
     def create_worker_day(wd_target, wd_source):
         employment = wd_target.employment
-        if (wd_source.type == WorkerDay.TYPE_WORKDAY and employment is None):
+        if (wd_source.type_id == WorkerDay.TYPE_WORKDAY and employment is None):
             employment = Employment.objects.get_active_empl_by_priority(
                 network_id=wd_source.worker.network_id, employee_id=wd_target.employee_id,
                 dt=wd_source.dt,
@@ -38,7 +38,7 @@ def exchange(data, error_messages):
                 'position__breaks',
             ).first()
         wd_new = WorkerDay(
-            type=wd_source.type,
+            type_id=wd_source.type_id,
             dttm_work_start=wd_source.dttm_work_start,
             dttm_work_end=wd_source.dttm_work_end,
             employee_id=wd_target.employee_id,
@@ -119,18 +119,18 @@ def exchange(data, error_messages):
             # если смотреть по аналогии с подтверждением, то wd_target - подтв. версия wd_source - неподтв.
             def append_mis_data(mis_data, wd_target, wd_source):
                 action = None
-                if wd_target.type == WorkerDay.TYPE_WORKDAY or wd_source.type == WorkerDay.TYPE_WORKDAY:
+                if wd_target.type_id == WorkerDay.TYPE_WORKDAY or wd_source.type_id == WorkerDay.TYPE_WORKDAY:
                     wd_target_has_doctor_work_type = any(
                         wd_detail.work_type.work_type_name.code == 'doctor' for wd_detail in
                         wd_target.worker_day_details.all())
                     wd_source_has_doctor_work_type = any(
                         wd_detail.work_type.work_type_name.code == 'doctor' for wd_detail in
                         wd_source.worker_day_details.all())
-                    if wd_target.type != WorkerDay.TYPE_WORKDAY and wd_source.type == WorkerDay.TYPE_WORKDAY and wd_source_has_doctor_work_type:
+                    if wd_target.type_id != WorkerDay.TYPE_WORKDAY and wd_source.type_id == WorkerDay.TYPE_WORKDAY and wd_source_has_doctor_work_type:
                         action = 'create'
-                    elif wd_target.type == WorkerDay.TYPE_WORKDAY and wd_source.type != WorkerDay.TYPE_WORKDAY and wd_target_has_doctor_work_type:
+                    elif wd_target.type_id == WorkerDay.TYPE_WORKDAY and wd_source.type_id != WorkerDay.TYPE_WORKDAY and wd_target_has_doctor_work_type:
                         action = 'delete'
-                    elif wd_source.type == wd_target.type:
+                    elif wd_source.type_id == wd_target.type_id:
                         if wd_source_has_doctor_work_type and wd_target_has_doctor_work_type:
                             action = 'update'
                         elif wd_source_has_doctor_work_type and not wd_target_has_doctor_work_type:
@@ -314,7 +314,7 @@ def create_fact_from_attendance_records(dt_from=None, dt_to=None, shop_ids=None,
             record.save()
 
 
-def create_worker_days_range(dates, type=WorkerDay.TYPE_WORKDAY, shop_id=None, employee_id=None, tm_work_start=None, tm_work_end=None, cashbox_details=[], is_approved=False, is_vacancy=False, outsources=[], created_by=None):
+def create_worker_days_range(dates, type_id=WorkerDay.TYPE_WORKDAY, shop_id=None, employee_id=None, tm_work_start=None, tm_work_end=None, cashbox_details=[], is_approved=False, is_vacancy=False, outsources=[], created_by=None):
     with transaction.atomic():
         created_wds = []
         employment = None
@@ -329,7 +329,7 @@ def create_worker_days_range(dates, type=WorkerDay.TYPE_WORKDAY, shop_id=None, e
         if cashbox_details:
             priority_work_type_id = sorted(cashbox_details, key=lambda x: x['work_part'])[0]['work_type_id']
         for date in dates:
-            if employee_id and type == WorkerDay.TYPE_WORKDAY:
+            if employee_id and type_id == WorkerDay.TYPE_WORKDAY:
                 employment = Employment.objects.get_active_empl_by_priority(
                     network_id=None,
                     employee_id=employee_id,
@@ -355,12 +355,12 @@ def create_worker_days_range(dates, type=WorkerDay.TYPE_WORKDAY, shop_id=None, e
                 is_approved=is_approved,
                 dttm_work_start=datetime.datetime.combine(date, tm_work_start) if tm_work_start else None,
                 dttm_work_end=datetime.datetime.combine(date, tm_work_end) if tm_work_end else None,
-                type=type,
+                type_id=type_id,
                 is_outsource=bool(outsources),
                 created_by=created_by,
                 last_edited_by=created_by,
             )
-            if type == WorkerDay.TYPE_WORKDAY:
+            if type_id == WorkerDay.TYPE_WORKDAY:
                 if outsources and is_vacancy:
                     wd.outsources.add(*outsources)
                 for detail in cashbox_details:
@@ -379,14 +379,14 @@ def check_worker_day_permissions(user, shop_id, action, graph_type, wd_types, dt
         worker_day_permission__action=action,
         worker_day_permission__graph_type=graph_type,
     ).select_related('worker_day_permission').values_list(
-        'worker_day_permission__wd_type', 'limit_days_in_past', 'limit_days_in_future',
+        'worker_day_permission__wd_type_id', 'limit_days_in_past', 'limit_days_in_future',
     ).distinct()
     wd_perms_dict = {wdp[0]: wdp for wdp in wd_perms}
 
     today = (datetime.datetime.now() + datetime.timedelta(hours=3)).date()
-    for wd_type in wd_types:
-        wdp = wd_perms_dict.get(wd_type)
-        wd_type_display_str = dict(WorkerDay.TYPES)[wd_type]
+    for wd_type_id in wd_types:
+        wdp = wd_perms_dict.get(wd_type_id)
+        wd_type_display_str = dict(WorkerDay.TYPES)[wd_type_id]
         if wdp is None:
             raise PermissionDenied(
                 error_messages['no_perm_to_approve_wd_types'].format(wd_type_str=wd_type_display_str))

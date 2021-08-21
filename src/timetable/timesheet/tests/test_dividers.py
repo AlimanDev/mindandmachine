@@ -20,8 +20,8 @@ class TestNahodkaDivider(TestTimesheetMixin, TestCase):
     def test_48h_week_rest(self):
         self._calc_timesheets()
         self.assertEqual(Timesheet.objects.count(), 30)
-        self.assertEqual(Timesheet.objects.filter(fact_timesheet_type='W').count(), 7)
-        self.assertEqual(Timesheet.objects.filter(main_timesheet_type='W').count(), 5)
+        self.assertEqual(Timesheet.objects.filter(fact_timesheet_type_id='W').count(), 7)
+        self.assertEqual(Timesheet.objects.filter(main_timesheet_type_id='W').count(), 5)
         self.assertEqual(Timesheet.objects.filter(additional_timesheet_hours__gt=0).count(), 2)
 
     def test_12h_threshold(self):
@@ -33,7 +33,7 @@ class TestNahodkaDivider(TestTimesheetMixin, TestCase):
             employment=self.employment_worker,
             employee=self.employee_worker,
             dt=dt,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dttm_work_start=datetime.combine(dt, time(7)),
             dttm_work_end=datetime.combine(dt, time(22)),
         )
@@ -62,7 +62,7 @@ class TestNahodkaDivider(TestTimesheetMixin, TestCase):
                     employment=self.employment_worker,
                     employee=self.employee_worker,
                     dt=dt,
-                    type=WorkerDay.TYPE_WORKDAY,
+                    type_id=WorkerDay.TYPE_WORKDAY,
                     dttm_work_start=datetime.combine(dt, time(10)),
                     dttm_work_end=datetime.combine(dt, time(21)),
                 )
@@ -94,7 +94,7 @@ class TestNahodkaDivider(TestTimesheetMixin, TestCase):
                 employment=self.employment_worker,
                 employee=self.employee_worker,
                 dt=dt,
-                type=WorkerDay.TYPE_WORKDAY,
+                type_id=WorkerDay.TYPE_WORKDAY,
                 dttm_work_start=datetime.combine(dt, time(10)),
                 dttm_work_end=datetime.combine(dt, time(21)),
             )
@@ -129,7 +129,7 @@ class TestNahodkaDivider(TestTimesheetMixin, TestCase):
                     employment=self.employment_worker,
                     employee=self.employee_worker,
                     dt=dt,
-                    type=WorkerDay.TYPE_WORKDAY,
+                    type_id=WorkerDay.TYPE_WORKDAY,
                     dttm_work_start=datetime.combine(dt, time(8)),
                     dttm_work_end=datetime.combine(dt, time(22)),
                 )

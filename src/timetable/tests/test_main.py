@@ -75,7 +75,7 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
             employment=self.employment2,
             dt=self.dt,
             is_fact=False,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dttm_work_start=datetime.combine(self.dt, time(8, 0, 0)),
             dttm_work_end=datetime.combine(self.dt, time(20, 0, 0)),
             is_approved=True,
@@ -86,7 +86,7 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
             employment=self.employment2,
             dt=self.dt,
             is_fact=False,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dttm_work_start=datetime.combine(self.dt, time(8, 0, 0)),
             dttm_work_end=datetime.combine(self.dt, time(20, 0, 0)),
             parent_worker_day=self.worker_day_plan_approved
@@ -97,7 +97,7 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
             employment=self.employment2,
             dt=self.dt,
             is_fact=True,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dttm_work_start=datetime.combine(self.dt, time(8, 0, 0)),
             dttm_work_end=datetime.combine(self.dt, time(20, 30, 0)),
             is_approved=True,
@@ -109,7 +109,7 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
             employment=self.employment2,
             dt=self.dt,
             is_fact=True,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dttm_work_start=datetime.combine(self.dt, time(7, 58, 0)),
             dttm_work_end=datetime.combine(self.dt, time(19, 59, 1)),
             parent_worker_day=self.worker_day_fact_approved
@@ -272,7 +272,7 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
             worker_day_permission=WorkerDayPermission.objects.get(
                 action=WorkerDayPermission.APPROVE,
                 graph_type=WorkerDayPermission.PLAN,
-                wd_type=WorkerDay.TYPE_HOLIDAY,
+                wd_type_id=WorkerDay.TYPE_HOLIDAY,
             ),
             limit_days_in_past=3,
             limit_days_in_future=1,
@@ -447,7 +447,7 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
             dt=dt,
             dttm_work_start=datetime.combine(dt, time(18)),
             dttm_work_end=datetime.combine(dt + timedelta(1), time(1)),
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             shop=self.shop,
         )
         wd_plan2 = WorkerDay.objects.create(
@@ -456,7 +456,7 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
             dt=dt,
             dttm_work_start=datetime.combine(dt, time(12)),
             dttm_work_end=datetime.combine(dt, time(22)),
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             shop=self.shop,
         )
         create_att_record(AttendanceRecords.TYPE_COMING, datetime.combine(dt, time(17, 49)), self.user2.id, self.employee2.id, self.shop.id, terminal=False)
@@ -530,7 +530,7 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
                     shop=employment.shop,
                     dt=date,
                     is_approved=approved,
-                    type=WorkerDay.TYPE_WORKDAY,
+                    type_id=WorkerDay.TYPE_WORKDAY,
                     is_fact=False,
                     defaults=dict(
                         employment=employment,
@@ -556,7 +556,7 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
                     employee=employment.employee,
                     shop=employment.shop,
                     dt=dt,
-                    type=WorkerDay.TYPE_HOLIDAY,
+                    type_id=WorkerDay.TYPE_HOLIDAY,
                     is_approved=approved,
                     is_fact=False,
                     defaults=dict(
@@ -575,7 +575,7 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
             employee_id=self.employment1.employee_id,
             employment=self.employment1,
             dt=dt_now,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             shop_id=self.employment1.shop_id,
             is_fact=True,
             is_approved=True,
@@ -599,7 +599,7 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
 
         self.assertEqual(len(response.json()), 7)
         self.assertEqual(WorkerDay.objects.filter(is_approved=False, is_fact=True).count(), 7)
-        self.assertEqual(WorkerDay.objects.filter(is_approved=False, is_fact=True, type=WorkerDay.TYPE_HOLIDAY).count(), 0)
+        self.assertEqual(WorkerDay.objects.filter(is_approved=False, is_fact=True, type_id=WorkerDay.TYPE_HOLIDAY).count(), 0)
         self.assertEqual(WorkerDay.objects.filter(is_approved=False, employee_id=self.employment2.employee_id).count(), 0)
         self.assertEqual(WorkerDay.objects.filter(is_approved=False, dt=dt_now + timedelta(days=6)).count(), 0)
         wd_not_approved = WorkerDay.objects.get(is_approved=False, is_fact=True, dt=dt_now, employee_id=self.employment1.employee_id)
@@ -774,7 +774,7 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
     def test_S_type_plan_approved_returned_in_tabel_if_fact_approved_is_missing(self):
         WorkerDay.objects.filter(
             id=self.worker_day_plan_approved.id,
-        ).update(type=WorkerDay.TYPE_SICK)
+        ).update(type_id=WorkerDay.TYPE_SICK)
         WorkerDay.objects.filter(
             id=self.worker_day_fact_approved.id,  # не удаляется, поэтому обновим дату на другой день
         ).update(parent_worker_day=None, dt=self.dt - timedelta(days=365))
@@ -1210,7 +1210,7 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
             WorkerDayPermission.CREATE_OR_UPDATE, WorkerDayPermission.PLAN, WorkerDay.TYPE_HOLIDAY,
         )
         wd.refresh_from_db()
-        self.assertEqual(wd.type, WorkerDay.TYPE_HOLIDAY)
+        self.assertEqual(wd.type_id, WorkerDay.TYPE_HOLIDAY)
 
         # delete
         self._test_wd_perm(
@@ -1290,7 +1290,7 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
         )
         self.assertFalse(WorkerDay.objects.filter(id=self.worker_day_plan_approved.id).exists())
         self.assertEqual(
-            WorkerDay.objects.filter(employee__tabel_code=self.employee2.tabel_code, type=WorkerDay.TYPE_MATERNITY).count(),
+            WorkerDay.objects.filter(employee__tabel_code=self.employee2.tabel_code, type_id=WorkerDay.TYPE_MATERNITY).count(),
             21,
         )
 
@@ -1306,7 +1306,7 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
             dt=self.dt,
             is_fact=False,
             is_approved=True,
-            type=WorkerDay.TYPE_MATERNITY,
+            type_id=WorkerDay.TYPE_MATERNITY,
         ).last()
         self.assertIsNotNone(wd.created_by)
         self.assertEqual(wd.created_by.id, self.user1.id)
@@ -1528,7 +1528,7 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
             dt=dt,
             dttm_work_start=datetime.combine(dt, time(8)),
             dttm_work_end=datetime.combine(dt, time(20)),
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
         )
         self.assertEqual(wd.work_hours, timedelta(hours=10, minutes=45))
 
@@ -1704,7 +1704,7 @@ class TestCropSchedule(TestsHelperMixin, APITestCase):
             dt=self.dt_now,
             is_fact=True,
             is_approved=True,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dttm_work_start=datetime.combine(self.dt_now, time(work_start_h, 00, 0)) \
                 if isinstance(work_start_h, int) else work_start_h,
             dttm_work_end=datetime.combine(self.dt_now, time(work_end_h, 00, 0))
@@ -1848,7 +1848,7 @@ class TestAttendanceRecords(TestsHelperMixin, APITestCase):
             employment=self.employment2,
             dt=self.dt,
             is_fact=False,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dttm_work_start=datetime.combine(self.dt, time(8, 0, 0)),
             dttm_work_end=datetime.combine(self.dt, time(20, 0, 0)),
             is_approved=True,
@@ -1859,7 +1859,7 @@ class TestAttendanceRecords(TestsHelperMixin, APITestCase):
             employment=self.employment2,
             dt=self.dt,
             is_fact=False,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dttm_work_start=datetime.combine(self.dt, time(8, 0, 0)),
             dttm_work_end=datetime.combine(self.dt, time(20, 0, 0)),
             parent_worker_day=self.worker_day_plan_approved
@@ -1870,7 +1870,7 @@ class TestAttendanceRecords(TestsHelperMixin, APITestCase):
             employment=self.employment2,
             dt=self.dt,
             is_fact=True,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dttm_work_start=datetime.combine(self.dt, time(8, 12, 23)),
             dttm_work_end=datetime.combine(self.dt, time(20, 2, 1)),
             is_approved=True,
@@ -1883,7 +1883,7 @@ class TestAttendanceRecords(TestsHelperMixin, APITestCase):
             employment=self.employment2,
             dt=self.dt,
             is_fact=True,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dttm_work_start=datetime.combine(self.dt, time(7, 58, 0)),
             dttm_work_end=datetime.combine(self.dt, time(19, 59, 1)),
             parent_worker_day=self.worker_day_fact_approved,
@@ -2044,7 +2044,7 @@ class TestAttendanceRecords(TestsHelperMixin, APITestCase):
 
     def test_set_workday_type_for_existing_empty_types(self):
         WorkerDay.objects.filter(id=self.worker_day_fact_approved.id).update(
-            type=WorkerDay.TYPE_EMPTY,
+            type_id=WorkerDay.TYPE_EMPTY,
             dttm_work_start=None,
             dttm_work_end=None,
         )
@@ -2059,7 +2059,7 @@ class TestAttendanceRecords(TestsHelperMixin, APITestCase):
         )
 
         fact_approved = WorkerDay.objects.get(id=self.worker_day_fact_approved.id)
-        self.assertEqual(fact_approved.type, WorkerDay.TYPE_WORKDAY)
+        self.assertEqual(fact_approved.type_id, WorkerDay.TYPE_WORKDAY)
         self.assertEqual(fact_approved.dttm_work_start, tm_start)
         self.assertEqual(fact_approved.dttm_work_end, None)
         fact_worker_day_details = fact_approved.worker_day_details.all()
@@ -2086,7 +2086,7 @@ class TestAttendanceRecords(TestsHelperMixin, APITestCase):
             dttm_work_end=None,
             employee=self.employee8,
         ).last()
-        self.assertEqual(new_wd.type, WorkerDay.TYPE_WORKDAY)
+        self.assertEqual(new_wd.type_id, WorkerDay.TYPE_WORKDAY)
         self.assertEqual(new_wd.dttm_work_start, tm_start)
         self.assertEqual(new_wd.dttm_work_end, None)
         self.assertEqual(new_wd.is_vacancy, True)
@@ -2265,7 +2265,7 @@ class TestAttendanceRecords(TestsHelperMixin, APITestCase):
         self.worker_day_fact_approved.delete()
         self.worker_day_plan_approved.worker_day_details.all().delete()
         WorkerDay.objects.filter(id=self.worker_day_plan_approved.id).update(
-            type=WorkerDay.TYPE_HOLIDAY,
+            type_id=WorkerDay.TYPE_HOLIDAY,
             dttm_work_start=None,
             dttm_work_end=None,
         )
@@ -2367,7 +2367,7 @@ class TestAttendanceRecords(TestsHelperMixin, APITestCase):
             employee_id=self.employment1.employee_id,
             employment=self.employment1,
             shop_id=self.employment1.shop_id,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dttm_work_start=datetime.combine(self.dt, time(10, 5)),
             dttm_work_end=datetime.combine(self.dt, time(20, 10)),
             created_by=self.user1,
@@ -2403,7 +2403,7 @@ class TestAttendanceRecords(TestsHelperMixin, APITestCase):
             is_fact=False,
             defaults={
                 'employment': self.employment2,
-                'type': WorkerDay.TYPE_WORKDAY,
+                'type_id': WorkerDay.TYPE_WORKDAY,
                 'shop_id': self.employment2.shop_id,
                 'dttm_work_start': datetime.combine(self.dt, time(10, 5)),
                 'dttm_work_end': datetime.combine(self.dt, time(20, 10)),
@@ -2426,7 +2426,7 @@ class TestAttendanceRecords(TestsHelperMixin, APITestCase):
             is_fact=False,
             defaults={
                 'employment': self.employment2,
-                'type': WorkerDay.TYPE_WORKDAY,
+                'type_id': WorkerDay.TYPE_WORKDAY,
                 'shop': self.shop,
                 'dttm_work_start': datetime.combine(self.dt, time(10)),
                 'dttm_work_end': datetime.combine(self.dt, time(16)),
@@ -2446,7 +2446,7 @@ class TestAttendanceRecords(TestsHelperMixin, APITestCase):
             is_approved=True,
             is_fact=False,
             employment=self.second_employment,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             shop=self.shop,
             dttm_work_start=datetime.combine(self.dt, time(16)),
             dttm_work_end=datetime.combine(self.dt, time(22)),
@@ -2490,7 +2490,7 @@ class TestAttendanceRecords(TestsHelperMixin, APITestCase):
             employment=self.employment2,
             is_approved=True,
             is_fact=False,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             shop=self.shop,
             dttm_work_start=datetime.combine(self.dt, time(10)),
             dttm_work_end=datetime.combine(self.dt, time(13)),
@@ -2501,7 +2501,7 @@ class TestAttendanceRecords(TestsHelperMixin, APITestCase):
             employment=self.employment2,
             is_approved=True,
             is_fact=False,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             shop=self.shop,
             dttm_work_start=datetime.combine(self.dt, time(19)),
             dttm_work_end=datetime.combine(self.dt, time(22)),
@@ -2594,7 +2594,7 @@ class TestAttendanceRecords(TestsHelperMixin, APITestCase):
             employee_id=ar_start.employee_id,
             dt=self.dt,
             dttm_work_start=fact_dttm_start,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             is_fact=True,
         )
         fact_approved_qs = fact_qs.filter(is_approved=True)
@@ -2678,7 +2678,7 @@ class TestVacancy(TestsHelperMixin, APITestCase):
             employment=cls.employment1,
             dttm_work_start=datetime.combine(cls.dt_now, time(9)),
             dttm_work_end=datetime.combine(cls.dt_now, time(20)),
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dt=cls.dt_now,
             is_vacancy=True,
         )
@@ -2686,7 +2686,7 @@ class TestVacancy(TestsHelperMixin, APITestCase):
             shop=cls.shop,
             dttm_work_start=datetime.combine(cls.dt_now, time(9)),
             dttm_work_end=datetime.combine(cls.dt_now, time(17)),
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dt=cls.dt_now,
             is_vacancy=True,
             is_approved=True,
@@ -2844,7 +2844,7 @@ class TestVacancy(TestsHelperMixin, APITestCase):
             shop=self.shop,
             employee=self.employee2,
             employment=self.employment2,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dttm_work_start=datetime.combine(self.dt_now, time(hour=11, minute=30)),
             dttm_work_end=datetime.combine(self.dt_now, time(hour=20, minute=30)),
             dt=self.dt_now,
@@ -2859,7 +2859,7 @@ class TestVacancy(TestsHelperMixin, APITestCase):
             shop=self.shop,
             employee=self.employee2,
             employment=self.employment2,
-            type=WorkerDay.TYPE_HOLIDAY,
+            type_id=WorkerDay.TYPE_HOLIDAY,
             dt=self.dt_now,
             is_approved=True,
         )
@@ -2891,7 +2891,7 @@ class TestVacancy(TestsHelperMixin, APITestCase):
             shop=self.shop,
             dttm_work_start=datetime.combine(self.dt_now, time(18)),
             dttm_work_end=datetime.combine(self.dt_now, time(22)),
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dt=self.dt_now,
             is_vacancy=True,
             is_approved=True,
@@ -2909,7 +2909,7 @@ class TestVacancy(TestsHelperMixin, APITestCase):
             shop=self.shop,
             dttm_work_start=datetime.combine(self.dt_now, time(12)),
             dttm_work_end=datetime.combine(self.dt_now, time(22)),
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dt=self.dt_now,
             is_vacancy=True,
             is_approved=True,
@@ -2925,7 +2925,7 @@ class TestVacancy(TestsHelperMixin, APITestCase):
             shop=self.shop,
             employee=self.employee2,
             employment=self.employment2,
-            type=WorkerDay.TYPE_HOLIDAY,
+            type_id=WorkerDay.TYPE_HOLIDAY,
             dt=self.dt_now,
             is_approved=True,
         )
@@ -2960,7 +2960,7 @@ class TestVacancy(TestsHelperMixin, APITestCase):
         WorkerDay.objects.create(
             employee=self.employment1.employee,
             employment=self.employment1,
-            type=WorkerDay.TYPE_HOLIDAY,
+            type_id=WorkerDay.TYPE_HOLIDAY,
             dt=self.dt_now,
             is_approved=True,
         )
@@ -2968,7 +2968,7 @@ class TestVacancy(TestsHelperMixin, APITestCase):
             shop=self.shop,
             employee=self.employment1.employee,
             employment=self.employment1,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dttm_work_start=datetime.combine(self.dt_now + timedelta(1), time(hour=11, minute=30)),
             dttm_work_end=datetime.combine(self.dt_now + timedelta(1), time(hour=20, minute=30)),
             dt=self.dt_now + timedelta(1),
@@ -2978,7 +2978,7 @@ class TestVacancy(TestsHelperMixin, APITestCase):
             shop=self.shop,
             dttm_work_start=datetime.combine(self.dt_now + timedelta(1), time(9)),
             dttm_work_end=datetime.combine(self.dt_now + timedelta(1), time(17)),
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dt=self.dt_now + timedelta(1),
             is_vacancy=True,
             is_approved=True,
@@ -2987,7 +2987,7 @@ class TestVacancy(TestsHelperMixin, APITestCase):
             shop=self.shop,
             dttm_work_start=datetime.combine(self.dt_now + timedelta(2), time(9)),
             dttm_work_end=datetime.combine(self.dt_now + timedelta(2), time(17)),
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dt=self.dt_now + timedelta(2),
             is_vacancy=True,
             is_approved=True,
@@ -2995,7 +2995,7 @@ class TestVacancy(TestsHelperMixin, APITestCase):
         WorkerDay.objects.create(
             employee=self.employment1.employee,
             employment=self.employment1,
-            type=WorkerDay.TYPE_HOLIDAY,
+            type_id=WorkerDay.TYPE_HOLIDAY,
             dt=self.dt_now + timedelta(3),
             is_approved=True,
         )
@@ -3003,7 +3003,7 @@ class TestVacancy(TestsHelperMixin, APITestCase):
             shop=self.shop,
             dttm_work_start=datetime.combine(self.dt_now + timedelta(2), time(9)),
             dttm_work_end=datetime.combine(self.dt_now + timedelta(2), time(17)),
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dt=self.dt_now + timedelta(3),
             is_vacancy=True,
             is_approved=True,
@@ -3045,7 +3045,7 @@ class TestAditionalFunctions(TestsHelperMixin, APITestCase):
                 employment=employment,
                 shop=None,
                 dt=dt,
-                type=WorkerDay.TYPE_HOLIDAY,
+                type_id=WorkerDay.TYPE_HOLIDAY,
                 is_approved=approved,
                 parent_worker_day=parent_worker_day,
             )
@@ -3062,7 +3062,7 @@ class TestAditionalFunctions(TestsHelperMixin, APITestCase):
                 employee=employment.employee,
                 shop_id=shop_id or employment.shop_id,
                 dt=date,
-                type=WorkerDay.TYPE_WORKDAY,
+                type_id=WorkerDay.TYPE_WORKDAY,
                 dttm_work_start=datetime.combine(date, time(from_tm)),
                 dttm_work_end=datetime.combine(date_to, time(to_tm)),
                 is_approved=approved,
@@ -3228,33 +3228,33 @@ class TestAditionalFunctions(TestsHelperMixin, APITestCase):
                 WorkerDayFactory(
                     employment=self.employment2,
                     employee=self.employee2,
-                    type=WorkerDay.TYPE_WORKDAY, shop=self.shop, dt=dt_from - timedelta(days=2), is_approved=True,
+                    type_id=WorkerDay.TYPE_WORKDAY, shop=self.shop, dt=dt_from - timedelta(days=2), is_approved=True,
                     cashbox_details__work_type__work_type_name__name='Продавец-кассир',
                     cashbox_details__work_type__work_type_name__code='consult',
                 )
                 WorkerDayFactory(
                     employment=self.employment3,
                     employee=self.employee3,
-                    type=WorkerDay.TYPE_HOLIDAY, shop=self.shop, dt=dt_from - timedelta(days=2), is_approved=True,
+                    type_id=WorkerDay.TYPE_HOLIDAY, shop=self.shop, dt=dt_from - timedelta(days=2), is_approved=True,
                 )
 
                 wd_create_user3_and_delete_user2 = WorkerDayFactory(
                     employment=self.employment2,
                     employee=self.employee2,
-                    type=WorkerDay.TYPE_WORKDAY, shop=self.shop, dt=dt_from - timedelta(days=1), is_approved=True,
+                    type_id=WorkerDay.TYPE_WORKDAY, shop=self.shop, dt=dt_from - timedelta(days=1), is_approved=True,
                     cashbox_details__work_type__work_type_name__name='Врач',
                     cashbox_details__work_type__work_type_name__code='doctor',
                 )
                 WorkerDayFactory(
                     employment=self.employment3,
                     employee=self.employee3,
-                    type=WorkerDay.TYPE_HOLIDAY, shop=self.shop, dt=dt_from - timedelta(days=1), is_approved=True,
+                    type_id=WorkerDay.TYPE_HOLIDAY, shop=self.shop, dt=dt_from - timedelta(days=1), is_approved=True,
                 )
 
                 wd_update_user3 = WorkerDayFactory(
                     employment=self.employment2,
                     employee=self.employee2,
-                    type=WorkerDay.TYPE_WORKDAY, shop=self.shop, dt=dt_from, is_approved=True,
+                    type_id=WorkerDay.TYPE_WORKDAY, shop=self.shop, dt=dt_from, is_approved=True,
                     dttm_work_start=datetime.combine(dt_from, time(8, 0, 0)),
                     dttm_work_end=datetime.combine(dt_from, time(21, 0, 0)),
                     cashbox_details__work_type__work_type_name__name='Врач',
@@ -3263,7 +3263,7 @@ class TestAditionalFunctions(TestsHelperMixin, APITestCase):
                 wd_update_user2 = WorkerDayFactory(
                     employment=self.employment3,
                     employee=self.employee3,
-                    type=WorkerDay.TYPE_WORKDAY, shop=self.shop, dt=dt_from, is_approved=True,
+                    type_id=WorkerDay.TYPE_WORKDAY, shop=self.shop, dt=dt_from, is_approved=True,
                     dttm_work_start=datetime.combine(dt_from, time(8, 0, 0)),
                     dttm_work_end=datetime.combine(dt_from, time(20, 0, 0)),
                     cashbox_details__work_type__work_type_name__name='Врач',
@@ -3273,12 +3273,12 @@ class TestAditionalFunctions(TestsHelperMixin, APITestCase):
                 WorkerDayFactory(
                     employment=self.employment2,
                     employee=self.employee2,
-                    type=WorkerDay.TYPE_HOLIDAY, shop=self.shop, dt=dt_from + timedelta(days=1), is_approved=True,
+                    type_id=WorkerDay.TYPE_HOLIDAY, shop=self.shop, dt=dt_from + timedelta(days=1), is_approved=True,
                 )
                 wd_create_user2_and_delete_user3 = WorkerDayFactory(
                     employment=self.employment3,
                     employee=self.employee3,
-                    type=WorkerDay.TYPE_WORKDAY, shop=self.shop, dt=dt_from + timedelta(days=1), is_approved=True,
+                    type_id=WorkerDay.TYPE_WORKDAY, shop=self.shop, dt=dt_from + timedelta(days=1), is_approved=True,
                     dttm_work_start=datetime.combine(dt_from, time(11, 0, 0)),
                     dttm_work_end=datetime.combine(dt_from, time(21, 0, 0)),
                     cashbox_details__work_type__work_type_name__name='Врач',
@@ -3289,18 +3289,18 @@ class TestAditionalFunctions(TestsHelperMixin, APITestCase):
                 WorkerDayFactory(
                     employment=self.employment2,
                     employee=self.employee2,
-                    type=WorkerDay.TYPE_HOLIDAY, shop=self.shop, dt=dt_from + timedelta(days=2), is_approved=True,
+                    type_id=WorkerDay.TYPE_HOLIDAY, shop=self.shop, dt=dt_from + timedelta(days=2), is_approved=True,
                 )
                 WorkerDayFactory(
                     employment=self.employment3,
                     employee=self.employee3,
-                    type=WorkerDay.TYPE_VACATION, shop=self.shop, dt=dt_from + timedelta(days=2), is_approved=True,
+                    type_id=WorkerDay.TYPE_VACATION, shop=self.shop, dt=dt_from + timedelta(days=2), is_approved=True,
                 )
 
                 wd_create_user3_and_delete_user2_diff_work_types = WorkerDayFactory(
                     employment=self.employment2,
                     employee=self.employee2,
-                    type=WorkerDay.TYPE_WORKDAY, shop=self.shop, dt=dt_from + timedelta(days=3), is_approved=True,
+                    type_id=WorkerDay.TYPE_WORKDAY, shop=self.shop, dt=dt_from + timedelta(days=3), is_approved=True,
                     dttm_work_start=datetime.combine(dt_from + timedelta(days=3), time(8, 0, 0)),
                     dttm_work_end=datetime.combine(dt_from + timedelta(days=3), time(21, 0, 0)),
                     cashbox_details__work_type__work_type_name__name='Врач',
@@ -3309,7 +3309,7 @@ class TestAditionalFunctions(TestsHelperMixin, APITestCase):
                 WorkerDayFactory(
                     employment=self.employment3,
                     employee=self.employee3,
-                    type=WorkerDay.TYPE_WORKDAY, shop=self.shop, dt=dt_from + timedelta(days=3), is_approved=True,
+                    type_id=WorkerDay.TYPE_WORKDAY, shop=self.shop, dt=dt_from + timedelta(days=3), is_approved=True,
                     dttm_work_start=datetime.combine(dt_from + timedelta(days=3), time(8, 0, 0)),
                     dttm_work_end=datetime.combine(dt_from + timedelta(days=3), time(20, 0, 0)),
                     cashbox_details__work_type__work_type_name__name='Продавец-кассир',
@@ -3558,7 +3558,7 @@ class TestAditionalFunctions(TestsHelperMixin, APITestCase):
             employee=self.employee2,
             employment=self.employment2,
             dt=dt_tomorrow,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dttm_work_start=datetime.combine(dt_now, time(8, 0, 0)),
             dttm_work_end=datetime.combine(dt_now, time(20, 0, 0)),
             is_fact=False,
@@ -3569,7 +3569,7 @@ class TestAditionalFunctions(TestsHelperMixin, APITestCase):
             employee=self.employee2,
             employment=self.employment2,
             dt=dt_now,
-            type=WorkerDay.TYPE_HOLIDAY,
+            type_id=WorkerDay.TYPE_HOLIDAY,
             is_fact=False,
             is_approved=False,
         )
@@ -3587,7 +3587,7 @@ class TestAditionalFunctions(TestsHelperMixin, APITestCase):
             employee=self.employee3, is_approved=False, dt=dt_to, type='H'
         ).count(), 1)
         self.assertEqual(WorkerDay.objects.filter(
-            employee=self.employee3, is_approved=False, dt=dt_to + timedelta(days=1), type='W'
+            employee=self.employee3, is_approved=False, dt=dt_to + timedelta(days=1), type_id='W'
         ).count(), 1)
 
     def test_copy_approved(self):
@@ -3597,7 +3597,7 @@ class TestAditionalFunctions(TestsHelperMixin, APITestCase):
         WorkerDay.objects.create(
             employee_id=self.employment1.employee_id,
             employment=self.employment1,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             is_fact=True,
             is_approved=True,
             dt=dt_now + timedelta(1),
@@ -3637,7 +3637,7 @@ class TestAditionalFunctions(TestsHelperMixin, APITestCase):
             employee_id=self.employment1.employee_id,
             employment=self.employment1,
             dt=dt_now,
-            type=WorkerDay.TYPE_EMPTY,
+            type_id=WorkerDay.TYPE_EMPTY,
             shop_id=self.employment1.shop_id,
             is_fact=True,
         )
@@ -3657,7 +3657,7 @@ class TestAditionalFunctions(TestsHelperMixin, APITestCase):
 
         self.assertEqual(len(response.json()), 7)
         self.assertEqual(WorkerDay.objects.filter(is_approved=False, is_fact=True).count(), 7)
-        self.assertEqual(WorkerDay.objects.filter(is_approved=False, is_fact=True, type=WorkerDay.TYPE_HOLIDAY).count(), 0)
+        self.assertEqual(WorkerDay.objects.filter(is_approved=False, is_fact=True, type_id=WorkerDay.TYPE_HOLIDAY).count(), 0)
         self.assertEqual(WorkerDay.objects.filter(is_approved=False, employee_id=self.employment2.employee_id).count(), 0)
         self.assertEqual(WorkerDay.objects.filter(is_approved=False, dt=dt_now + timedelta(days=6)).count(), 0)
 
@@ -3670,7 +3670,7 @@ class TestAditionalFunctions(TestsHelperMixin, APITestCase):
         self.create_worker_days(self.employment3, dt_now, 4, 10, 20, True)
         self.update_or_create_holidays(self.employment3, dt_now + timedelta(days=4), 2, True)
         WorkerDay.objects.filter(
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
         ).update(
             is_fact=True,
         )
@@ -3690,7 +3690,7 @@ class TestAditionalFunctions(TestsHelperMixin, APITestCase):
 
         self.assertEqual(len(response.json()), 7)
         self.assertEqual(WorkerDay.objects.filter(is_approved=False, is_fact=True).count(), 7)
-        self.assertEqual(WorkerDay.objects.filter(is_approved=False, is_fact=True, type=WorkerDay.TYPE_HOLIDAY).count(), 0)
+        self.assertEqual(WorkerDay.objects.filter(is_approved=False, is_fact=True, type_id=WorkerDay.TYPE_HOLIDAY).count(), 0)
         self.assertEqual(WorkerDay.objects.filter(is_approved=False, employee_id=self.employment2.employee_id).count(), 0)
         self.assertEqual(WorkerDay.objects.filter(is_approved=False, dt=dt_now + timedelta(days=6)).count(), 0)
 
@@ -3702,13 +3702,13 @@ class TestAditionalFunctions(TestsHelperMixin, APITestCase):
 
         for i in range((dt_from_last - dt_from_first).days + 1):
             dt = dt_from_first + timedelta(i)
-            type = WorkerDay.TYPE_WORKDAY if i % 3 != 0 else WorkerDay.TYPE_HOLIDAY
+            type_id = WorkerDay.TYPE_WORKDAY if i % 3 != 0 else WorkerDay.TYPE_HOLIDAY
             WorkerDay.objects.create(
                 dt=dt,
                 shop_id=self.employment2.shop_id,
                 employee_id=self.employment2.employee_id,
                 employment=self.employment2,
-                type=type,
+                type_id=type_id,
                 is_approved=True,
             )
             if i % 2 == 0 and i < 28:
@@ -3717,7 +3717,7 @@ class TestAditionalFunctions(TestsHelperMixin, APITestCase):
                     shop_id=self.employment2.shop_id,
                     employee_id=self.employment2.employee_id,
                     employment=self.employment2,
-                    type=WorkerDay.TYPE_WORKDAY,
+                    type_id=WorkerDay.TYPE_WORKDAY,
                     is_approved=True,
                     is_fact=True,
                 )
@@ -3726,7 +3726,7 @@ class TestAditionalFunctions(TestsHelperMixin, APITestCase):
                 shop_id=self.employment3.shop_id,
                 employee_id=self.employment3.employee_id,
                 employment=self.employment3,
-                type=type,
+                type_id=type_id,
                 is_approved=True,
             )
             WorkerDay.objects.create(
@@ -3734,7 +3734,7 @@ class TestAditionalFunctions(TestsHelperMixin, APITestCase):
                 shop_id=self.employment4.shop_id,
                 employee_id=self.employment4.employee_id,
                 employment=self.employment4,
-                type=type,
+                type_id=type_id,
                 is_approved=True,
             )
 
@@ -3792,7 +3792,7 @@ class TestAditionalFunctions(TestsHelperMixin, APITestCase):
         dt_now = date.today()
         wd = WorkerDayFactory(
             dt=dt_now,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             is_approved=False,
             is_fact=True,
         )
@@ -3816,7 +3816,7 @@ class TestAditionalFunctions(TestsHelperMixin, APITestCase):
         dt_now = date.today()
         wd = WorkerDayFactory(
             dt=dt_now,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             is_approved=False,
             is_fact=True,
             is_blocked=True,
@@ -3939,7 +3939,7 @@ class TestAditionalFunctions(TestsHelperMixin, APITestCase):
         response = self.client.post(url, data, format='json')
         data = response.json()
         self.assertEquals(len(data), 31)
-        self.assertEquals(WorkerDay.objects.filter(employee_id=self.employee1.id, type=WorkerDay.TYPE_VACATION, dt__gte=dt_from, dt__lte=dt_to).count(), 31)
+        self.assertEquals(WorkerDay.objects.filter(employee_id=self.employee1.id, type_id=WorkerDay.TYPE_VACATION, dt__gte=dt_from, dt__lte=dt_to).count(), 31)
 
     def test_change_list_create_vacancy_many_work_types(self):
         dt_from = date.today()
@@ -4016,7 +4016,7 @@ class TestAditionalFunctions(TestsHelperMixin, APITestCase):
         today = date.today()
         wd = WorkerDayFactory(
             dt=today,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             employee=self.employee2,
             employment=self.employment2,
             shop=self.employment2.shop,
@@ -4137,7 +4137,7 @@ class TestFineLogic(APITestCase):
             is_approved=is_approved,
             dt=dttm_from.date(),
             shop=self.shop,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             defaults=dict(
                 dttm_work_start=dttm_from,
                 dttm_work_end=dttm_to,
@@ -4278,12 +4278,12 @@ class TestUnaccountedOvertimesAPI(APITestCase):
         )
         self.client.force_authenticate(self.user1)
 
-    def _create_worker_day(self, employment, dt=None, is_fact=False, is_approved=False, dttm_work_start=None, dttm_work_end=None, type=WorkerDay.TYPE_WORKDAY):
+    def _create_worker_day(self, employment, dt=None, is_fact=False, is_approved=False, dttm_work_start=None, dttm_work_end=None, type_id=WorkerDay.TYPE_WORKDAY):
         if not dt:
             dt = self.dt
         return WorkerDay.objects.create(
             shop_id=self.shop.id,
-            type=type,
+            type_id=type_id,
             employment=employment,
             employee=employment.employee,
             dt=dt,

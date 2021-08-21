@@ -71,7 +71,7 @@ class TestWorkShiftViewSet(TestsHelperMixin, APITestCase):
         wd = WorkerDay.objects.create(
             dttm_work_start=dttm_start,
             dttm_work_end=None,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             is_fact=True,
             is_approved=True,
             dt=self.dt_str,
@@ -126,7 +126,7 @@ class TestWorkShiftViewSet(TestsHelperMixin, APITestCase):
         wd1 = WorkerDay.objects.create(
             employee=self.employee2,
             employment=self.employment2,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dt=self.today,
             dttm_work_start=datetime.combine(self.today, time(8)),
             dttm_work_end=datetime.combine(self.today, time(14)),
@@ -136,7 +136,7 @@ class TestWorkShiftViewSet(TestsHelperMixin, APITestCase):
         wd2 = WorkerDay.objects.create(
             employee=self.second_employee,
             employment=emp,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dt=self.today,
             dttm_work_start=datetime.combine(self.today, time(15)),
             dttm_work_end=datetime.combine(self.today, time(20)),
@@ -146,7 +146,7 @@ class TestWorkShiftViewSet(TestsHelperMixin, APITestCase):
         WorkerDay.objects.create(
             employee=self.second_employee,
             employment=emp,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dt=self.today - timedelta(1),
             dttm_work_start=datetime.combine(self.today - timedelta(1), time(8)),
             dttm_work_end=datetime.combine(self.today - timedelta(1), time(14)),
@@ -157,6 +157,7 @@ class TestWorkShiftViewSet(TestsHelperMixin, APITestCase):
             self.get_url('TimeAttendanceWorkerDay-list'),
         )
         user2 = list(filter(lambda x: x['user_id'] == self.user2.id, resp.json()))[0]
+        user2['employees'] = sorted(user2['employees'], key=lambda i: i['id'])
         user2_data = {
             'user_id': self.user2.id, 
             'employees': [
@@ -227,7 +228,6 @@ class TestWorkShiftViewSet(TestsHelperMixin, APITestCase):
         self.assertEqual(len(resp.json()), 5)
         self.assertEqual(user2, user2_data)
 
-
     def test_get_worker_days_night_shift(self):
         self._authorize_tick_point()
         self.employee2.tabel_code = '1235'
@@ -250,7 +250,7 @@ class TestWorkShiftViewSet(TestsHelperMixin, APITestCase):
         wd1 = WorkerDay.objects.create(
             employee=self.employee2,
             employment=self.employment2,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dt=self.today - timedelta(1),
             dttm_work_start=datetime.combine(self.today - timedelta(1), time(22)),
             dttm_work_end=datetime.combine(self.today, time(8)),
@@ -260,7 +260,7 @@ class TestWorkShiftViewSet(TestsHelperMixin, APITestCase):
         wd2 = WorkerDay.objects.create(
             employee=self.second_employee,
             employment=emp,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dt=self.today,
             dttm_work_start=datetime.combine(self.today, time(15)),
             dttm_work_end=datetime.combine(self.today, time(20)),
@@ -270,7 +270,7 @@ class TestWorkShiftViewSet(TestsHelperMixin, APITestCase):
         WorkerDay.objects.create(
             employee=self.second_employee,
             employment=emp,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dt=self.today - timedelta(1),
             dttm_work_start=datetime.combine(self.today - timedelta(1), time(8)),
             dttm_work_end=datetime.combine(self.today - timedelta(1), time(14)),
@@ -281,6 +281,7 @@ class TestWorkShiftViewSet(TestsHelperMixin, APITestCase):
             self.get_url('TimeAttendanceWorkerDay-list'),
         )
         user2 = list(filter(lambda x: x['user_id'] == self.user2.id, resp.json()))[0]
+        user2['employees'] = sorted(user2['employees'], key=lambda i: i['id'])
         user2_data = {
             'user_id': self.user2.id, 
             'employees': [
@@ -379,7 +380,7 @@ class TestWorkShiftViewSet(TestsHelperMixin, APITestCase):
         wd1 = WorkerDay.objects.create(
             employee=self.employee2,
             employment=self.employment2,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dt=self.today,
             dttm_work_start=datetime.combine(self.today, time(22)),
             dttm_work_end=datetime.combine(self.today + timedelta(1), time(8)),
@@ -389,7 +390,7 @@ class TestWorkShiftViewSet(TestsHelperMixin, APITestCase):
         wd2 = WorkerDay.objects.create(
             employee=self.second_employee,
             employment=emp,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dt=self.today + timedelta(1),
             dttm_work_start=datetime.combine(self.today + timedelta(1), time(15)),
             dttm_work_end=datetime.combine(self.today + timedelta(1), time(20)),
@@ -399,7 +400,7 @@ class TestWorkShiftViewSet(TestsHelperMixin, APITestCase):
         WorkerDay.objects.create(
             employee=self.second_employee,
             employment=emp,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dt=self.today,
             dttm_work_start=datetime.combine(self.today, time(8)),
             dttm_work_end=datetime.combine(self.today, time(14)),
@@ -410,6 +411,7 @@ class TestWorkShiftViewSet(TestsHelperMixin, APITestCase):
             self.get_url('TimeAttendanceWorkerDay-list'),
         )
         user2 = list(filter(lambda x: x['user_id'] == self.user2.id, resp.json()))[0]
+        user2['employees'] = sorted(user2['employees'], key=lambda i: i['id'])
         user2_data = {
             'user_id': self.user2.id, 
             'employees': [

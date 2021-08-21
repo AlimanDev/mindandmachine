@@ -308,10 +308,10 @@ class WorkerDayQuerySet(AnnotateValueEqualityQSMixin, QuerySet):
             is_approved=True,
             *args,
             **kwargs,
-        ).exclude(type=WorkerDay.TYPE_EMPTY).order_by('-is_fact', '-work_hours').values_list('id')[:1]
+        ).exclude(type_id=WorkerDay.TYPE_EMPTY).order_by('-is_fact', '-work_hours').values_list('id')[:1]
         return self.filter(
             Q(is_fact=True) |
-            Q(~Q(type__in=WorkerDay.TYPES_WITH_TM_RANGE), is_fact=False),
+            Q(~Q(type_id__in=WorkerDay.TYPES_WITH_TM_RANGE), is_fact=False),
             is_approved=True,
             id=Subquery(ordered_subq),
             *args,
@@ -320,9 +320,9 @@ class WorkerDayQuerySet(AnnotateValueEqualityQSMixin, QuerySet):
 
 
 class WorkerDayManager(models.Manager):
-    def get_queryset(self):
-        return super().get_queryset().exclude(
-            type=WorkerDay.TYPE_WORKDAY, employment_id__isnull=True, employee_id__isnull=False)
+    # def get_queryset(self):
+    #     return super().get_queryset().exclude(
+    #         type__is_dayoff=False, type__is_work_hours=True, employment_id__isnull=True, employee_id__isnull=False)
 
     def qos_current_version(self, approved_only=False):
         if approved_only:
@@ -389,6 +389,40 @@ class WorkerDayOutsourceNetwork(AbstractModel):
     network = models.ForeignKey('base.Network', on_delete=models.CASCADE)
 
 
+class WorkerDayType(AbstractModel):
+    code = models.CharField(max_length=64, primary_key=True, verbose_name='Код', help_text='Первычный ключ')
+    name = models.CharField(max_length=64, verbose_name='Имя')
+    short_name = models.CharField('Для отображения в ячейке', max_length=8)
+    html_color = models.CharField(max_length=7)
+    use_in_plan = models.BooleanField('Используем ли в плане')
+    use_in_fact = models.BooleanField('Используем ли в факте')
+    excel_load_code = models.CharField(
+        'Текстовый код для загрузки и выгрузки в график/табель', max_length=8, unique=True)
+    is_dayoff = models.BooleanField(
+        'Нерабочий день',
+        help_text='Если не нерабочий день, то '
+                  'необходимо проставлять время и магазин и можно создавать несколько на 1 дату',
+    )
+    is_work_hours = models.BooleanField(
+        'Считать ли в сумму рабочих часов',
+        help_text='Если False, то не учитывается в сумме рабочих часов в статистике и не идет в белый табель')
+    is_reduce_norm = models.BooleanField('Снижает ли норму часов (отпуска, больничные и тд)')
+    is_system = models.BooleanField('Системный (нельзя удалять)', default=False)
+    show_stat_in_days = models.BooleanField(
+        'Отображать в статистике по сотрудникам количество дней отдельно для этого типа',
+        default=True,
+    )
+    show_stat_in_hours = models.BooleanField(
+        'Отображать в статистике по сотрудникам сумму часов отдельно для этого типа',
+        default=True,
+    )
+    ordering = models.PositiveSmallIntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+
+    class Meta(AbstractModel.Meta):
+        ordering = ['-ordering', 'name']
+
+
 class WorkerDay(AbstractModel):
     """
     Ключевая сущность, которая определяет, что делает сотрудник в определенный момент времени (работает, на выходном и тд)
@@ -400,13 +434,16 @@ class WorkerDay(AbstractModel):
     class Meta:
         verbose_name = 'Рабочий день сотрудника'
         verbose_name_plural = 'Рабочие дни сотрудников'
-        constraints = (
-            UniqueConstraint(
-                fields=['dt', 'employee', 'is_fact', 'is_approved'],
-                condition=~Q(type__in=['W', 'Q', 'T']),
-                name='unique_dt_employee_is_fact_is_approved_if_not_workday'
-            ),
+        unique_together = (
+            ('dt', 'employee', 'is_fact', 'is_approved'),
         )
+        # constraints = (
+        #     UniqueConstraint(
+        #         fields=['dt', 'employee', 'is_fact', 'is_approved'],
+        #         condition=Q(type__is_dayoff=True),
+        #         name='unique_dt_employee_is_fact_is_approved_if_not_workday'
+        #     ),
+        # )
 
     TYPE_HOLIDAY = 'H'
     TYPE_WORKDAY = 'W'
@@ -559,7 +596,7 @@ class WorkerDay(AbstractModel):
     def calc_day_and_night_work_hours(self):
         # TODO: нужно учитывать работу в праздничные дни? -- сейчас is_celebration в ProductionDay всегда False
 
-        if self.type not in self.TYPES_WITH_TM_RANGE:
+        if self.type.is_dayoff:
             return 0.0, 0.0, 0.0
 
         night_edges = self.shop.network.night_edges_tm_list
@@ -645,7 +682,7 @@ class WorkerDay(AbstractModel):
                     employee_id=self.employee_id,
                     is_fact=False,
                     is_approved=True,
-                    type__in=WorkerDay.TYPES_WITH_TM_RANGE,
+                    type_id__in=WorkerDay.TYPES_WITH_TM_RANGE,
                     dttm_work_start__isnull=False,
                     dttm_work_end__isnull=False,
                 ).first()
@@ -658,7 +695,7 @@ class WorkerDay(AbstractModel):
                         self.employment.position.wp_fines if self.employment and self.employment.position else None,
                     )
                 if self.shop.network.only_fact_hours_that_in_approved_plan and \
-                    self.type in WorkerDay.TYPES_WITH_TM_RANGE:
+                    self.type_id in WorkerDay.TYPES_WITH_TM_RANGE:
                     if plan_approved:
                         late_arrival_delta = self.shop.network.allowed_interval_for_late_arrival
                         allowed_late_arrival_cond = late_arrival_delta and \
@@ -716,7 +753,7 @@ class WorkerDay(AbstractModel):
     dttm_work_start_tabel = models.DateTimeField(null=True, blank=True)
     dttm_work_end_tabel = models.DateTimeField(null=True, blank=True)
 
-    type = models.CharField(choices=TYPES, max_length=2, default=TYPE_EMPTY)
+    type = models.ForeignKey('timetable.WorkerDayType', on_delete=models.PROTECT)
 
     work_types = models.ManyToManyField(WorkType, through='WorkerDayCashboxDetails')
 
@@ -725,7 +762,8 @@ class WorkerDay(AbstractModel):
     last_edited_by = models.ForeignKey(User, on_delete=models.PROTECT, blank=True, null=True, related_name='user_edited')
 
     comment = models.TextField(null=True, blank=True)
-    parent_worker_day = models.ForeignKey('self', on_delete=models.SET_NULL, blank=True, null=True, related_name='child') # todo: remove
+    parent_worker_day = models.ForeignKey(
+        'self', on_delete=models.SET_NULL, blank=True, null=True, related_name='child') # todo: remove
     work_hours = models.DurationField(default=datetime.timedelta(days=0))
 
     is_fact = models.BooleanField(default=False)  # плановое или фактическое расписание
@@ -854,12 +892,12 @@ class WorkerDay(AbstractModel):
         # запускаем пересчет часов для факта, если изменились часы в подтвержденном плане
         if self.shop and (self.shop.network.only_fact_hours_that_in_approved_plan or fines) and \
                 self.tracker.has_changed('work_hours') and \
-                self.type in WorkerDay.TYPES_WITH_TM_RANGE and self.is_plan and self.is_approved:
+                self.type_id in WorkerDay.TYPES_WITH_TM_RANGE and self.is_plan and self.is_approved:
             fact_qs = WorkerDay.objects.filter(
                 dt=self.dt,
                 employee_id=self.employee_id,
                 is_fact=True,
-                type__in=WorkerDay.TYPES_WITH_TM_RANGE
+                type_id__in=WorkerDay.TYPES_WITH_TM_RANGE
             ).select_related(
                 'shop',
                 'employment',
@@ -872,7 +910,7 @@ class WorkerDay(AbstractModel):
 
         # TODO: покрыть тестами
         if settings.MDA_SEND_USER_TO_SHOP_REL_ON_WD_SAVE and \
-                (self.is_vacancy or self.type == WorkerDay.TYPE_QUALIFICATION) and self.employee and self.shop:
+                (self.is_vacancy or self.type_id == WorkerDay.TYPE_QUALIFICATION) and self.employee and self.shop:
             from src.integration.mda.tasks import create_mda_user_to_shop_relation
             create_mda_user_to_shop_relation.delay(
                 username=self.employee.user.username,
@@ -897,7 +935,7 @@ class WorkerDay(AbstractModel):
             is_approved=True,
             is_fact=False,
             shop_id=shop_id,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
         ).annotate(
             dttm_work_start_diff=Abs(Cast(Extract(dttm - F('dttm_work_start'), 'epoch'), IntegerField())),
             dttm_work_end_diff=Abs(Cast(Extract(dttm - F('dttm_work_end'), 'epoch'), IntegerField())),
@@ -1054,14 +1092,14 @@ class WorkerDay(AbstractModel):
             ),
         ).filter(
             Q(
-                Q(type__in=WorkerDay.TYPES_WITH_TM_RANGE) &
+                Q(type_id__in=WorkerDay.TYPES_WITH_TM_RANGE) &
                 Q(
                     Q(dttm_work_start__gt=F('task_least_start_time')) |
                     Q(dttm_work_end__lt=F('task_greatest_end_time'))
                 )
             ) |
             Q(
-                ~Q(type__in=WorkerDay.TYPES_WITH_TM_RANGE) &
+                ~Q(type_id__in=WorkerDay.TYPES_WITH_TM_RANGE) &
                 Q(task_least_start_time__isnull=False)
             )
         ).values(
@@ -1109,7 +1147,9 @@ class Timesheet(AbstractModel):
         choices=SOURCE_TYPES, max_length=12, blank=True,
         verbose_name='Источник данных для фактического табеля',
     )
-    fact_timesheet_type = models.CharField(choices=WorkerDay.TYPES, max_length=2)
+    fact_timesheet_type = models.ForeignKey(
+        'timetable.WorkerDayType', on_delete=models.PROTECT, null=True, blank=True, related_name='fact_timesheet',
+    )
     fact_timesheet_dttm_work_start = models.DateTimeField(null=True, blank=True)
     fact_timesheet_dttm_work_end = models.DateTimeField(null=True, blank=True)
     # TODO: добавить или высчитывать через (fact_timesheet_dttm_work_end - fact_timesheet_dttm_work_start) - fact_timesheet_total_hours ?
@@ -1117,7 +1157,9 @@ class Timesheet(AbstractModel):
     fact_timesheet_total_hours = models.DecimalField(max_digits=4, decimal_places=2, null=True, blank=True)
     fact_timesheet_day_hours = models.DecimalField(max_digits=4, decimal_places=2, null=True, blank=True)
     fact_timesheet_night_hours = models.DecimalField(max_digits=4, decimal_places=2, null=True, blank=True)
-    main_timesheet_type = models.CharField(choices=WorkerDay.TYPES, max_length=2, blank=True)
+    main_timesheet_type = models.ForeignKey(
+        'timetable.WorkerDayType', on_delete=models.PROTECT, null=True, blank=True, related_name='main_timesheet',
+    )
     main_timesheet_total_hours = models.DecimalField(max_digits=4, decimal_places=2, null=True, blank=True)
     main_timesheet_day_hours = models.DecimalField(max_digits=4, decimal_places=2, null=True, blank=True)
     main_timesheet_night_hours = models.DecimalField(max_digits=4, decimal_places=2, null=True, blank=True)
@@ -1639,7 +1681,7 @@ class AttendanceRecords(AbstractModel):
                     return
 
                 setattr(fact_approved, self.TYPE_2_DTTM_FIELD[self.type], self.dttm)
-                setattr(fact_approved, 'type', WorkerDay.TYPE_WORKDAY)
+                setattr(fact_approved, 'type_id', WorkerDay.TYPE_WORKDAY)
                 if not fact_approved.worker_day_details.exists():
                     self._create_wd_details(self.dt, fact_approved, active_user_empl, closest_plan_approved)
                 fact_approved.save()
@@ -1659,7 +1701,7 @@ class AttendanceRecords(AbstractModel):
                     # то обновляем время окончания предыдущей смены. (условие в closest_plan_approved_q)
                     if prev_fa_wd:
                         setattr(prev_fa_wd, self.TYPE_2_DTTM_FIELD[self.type], self.dttm)
-                        setattr(prev_fa_wd, 'type', WorkerDay.TYPE_WORKDAY)
+                        setattr(prev_fa_wd, 'type_id', WorkerDay.TYPE_WORKDAY)
                         prev_fa_wd.save()
                         # логично дату предыдущую ставить, так как это значение в отчетах используется
                         self.dt = prev_fa_wd.dt
@@ -1679,7 +1721,7 @@ class AttendanceRecords(AbstractModel):
                     defaults={
                         'shop_id': self.shop_id,
                         'employment': active_user_empl,
-                        'type': WorkerDay.TYPE_WORKDAY,
+                        'type_id': closest_plan_approved.type_id if closest_plan_approved else WorkerDay.TYPE_WORKDAY,
                         self.TYPE_2_DTTM_FIELD[self.type]: self.dttm,
                         'is_vacancy': active_user_empl.shop_id != self.shop_id if active_user_empl else False,
                         # TODO: пока не стал проставлять is_outsource, т.к. придется делать доп. действие в интерфейсе,
@@ -1796,7 +1838,7 @@ class WorkerDayPermission(AbstractModel):
 
     action = models.CharField(choices=ACTIONS, max_length=2, verbose_name='Действие')
     graph_type = models.CharField(choices=GRAPH_TYPES, max_length=1, verbose_name='Тип графика')
-    wd_type = models.CharField(choices=WorkerDay.TYPES, max_length=2, verbose_name='Тип дня')
+    wd_type = models.ForeignKey('timetable.WorkerDayType', verbose_name='Тип дня', on_delete=models.PROTECT)
 
     class Meta:
         verbose_name = 'Разрешение для рабочего дня'
@@ -1805,7 +1847,7 @@ class WorkerDayPermission(AbstractModel):
         ordering = ('action', 'graph_type', 'wd_type')
 
     def __str__(self):
-        return f'{self.get_action_display()} {self.get_graph_type_display()} {self.get_wd_type_display()}'
+        return f'{self.get_action_display()} {self.get_graph_type_display()} {self.wd_type.name}'
 
 
 class GroupWorkerDayPermission(AbstractModel):
@@ -1854,7 +1896,7 @@ class PlanAndFactHours(models.Model):
     worker = models.ForeignKey('base.User', on_delete=models.DO_NOTHING)
     employee = models.ForeignKey('base.Employee', on_delete=models.DO_NOTHING)
     tabel_code = models.CharField(max_length=64)
-    wd_type = models.CharField(max_length=4, choices=WorkerDay.TYPES)
+    wd_type = models.ForeignKey('timetable.WorkerDayType', on_delete=models.DO_NOTHING)
     worker_fio = models.CharField(max_length=512, choices=WorkerDay.TYPES)
     fact_work_hours = models.DecimalField(max_digits=4, decimal_places=2)
     plan_work_hours = models.DecimalField(max_digits=4, decimal_places=2)

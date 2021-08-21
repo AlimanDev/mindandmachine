@@ -90,7 +90,7 @@ class TestSendUrvStatEventNotifications(TestsHelperMixin, APITestCase):
             employment=cls.employment_worker,
             employee=cls.employee_worker,
             dt=cls.dt,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
         )
         cls.plan_approved2 = WorkerDayFactory(
             is_approved=True,
@@ -99,7 +99,7 @@ class TestSendUrvStatEventNotifications(TestsHelperMixin, APITestCase):
             employment=cls.employment_worker2,
             employee=cls.employee_worker2,
             dt=cls.dt,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
         )
 
     def setUp(self):
@@ -261,7 +261,7 @@ class TestSendUrvStatTodayEventNotifications(TestsHelperMixin, APITestCase):
             employment=cls.employment_worker,
             employee=cls.employee_worker,
             dt=cls.dt,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
         )
         cls.plan_approved = WorkerDayFactory(
             is_approved=True,
@@ -270,7 +270,7 @@ class TestSendUrvStatTodayEventNotifications(TestsHelperMixin, APITestCase):
             employment=cls.employment_worker2,
             employee=cls.employee_worker2,
             dt=cls.dt,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
         )
 
     def setUp(self):
@@ -406,7 +406,7 @@ class TestSendUrvViolatorsEventNotifications(TestsHelperMixin, APITestCase):
             employment=cls.employment_worker,
             employee=cls.employee_worker,
             dt=cls.dt,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
         )
         cls.plan_approved_dir = WorkerDayFactory(
             is_approved=True,
@@ -415,7 +415,7 @@ class TestSendUrvViolatorsEventNotifications(TestsHelperMixin, APITestCase):
             employment=cls.employment_dir,
             employee=cls.employee_dir,
             dt=cls.dt,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
         )
         cls.plan_approved2 = WorkerDayFactory(
             is_approved=True,
@@ -424,7 +424,7 @@ class TestSendUrvViolatorsEventNotifications(TestsHelperMixin, APITestCase):
             employment=cls.employment_worker2,
             employee=cls.employee_worker2,
             dt=cls.dt,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
         )
 
         AttendanceRecords.objects.create(
@@ -739,7 +739,7 @@ class TestEmployeeNotCheckedEventNotifications(TestsHelperMixin, APITestCase):
             employment=cls.employment_worker,
             employee=cls.employee_worker,
             dt=cls.dt,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dttm_work_start=cls.now - timedelta(minutes=5),
             dttm_work_end=cls.now + timedelta(hours=6),
         )
@@ -750,7 +750,7 @@ class TestEmployeeNotCheckedEventNotifications(TestsHelperMixin, APITestCase):
             employment=cls.employment_dir,
             employee=cls.employee_dir,
             dt=cls.dt,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dttm_work_start=cls.now - timedelta(hours=6),
             dttm_work_end=cls.now - timedelta(minutes=5),
         )
@@ -907,7 +907,7 @@ class TestEmployeeWorkingNotAccordingToPlanEventNotifications(TestsHelperMixin, 
             employment=cls.employment_dir,
             employee=cls.employee_dir,
             dt=cls.dt,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dttm_work_start=datetime.combine(cls.dt, time(8)),
             dttm_work_end=datetime.combine(cls.dt, time(20)),
         )

@@ -86,7 +86,7 @@ class WorkerDayListSerializer(serializers.Serializer, UnaccountedOvertimeMixin):
     employee_id = serializers.IntegerField()
     shop_id = serializers.IntegerField()
     employment_id = serializers.IntegerField()
-    type = serializers.CharField()
+    type = serializers.CharField(source='type_id')
     dt = serializers.DateField()
     dttm_work_start = serializers.DateTimeField(default=None)
     dttm_work_end = serializers.DateTimeField(default=None)
@@ -140,7 +140,7 @@ class WorkerDaySerializer(serializers.ModelSerializer, UnaccountedOvertimeMixin)
     parent_worker_day_id = serializers.IntegerField(required=False, read_only=True)
     dttm_work_start = serializers.DateTimeField(default=None)
     dttm_work_end = serializers.DateTimeField(default=None)
-    type = serializers.CharField(required=True)
+    type = serializers.CharField(required=True, source='type_id')
     shop_code = serializers.CharField(required=False)
     user_login = serializers.CharField(required=False, read_only=True)
     employment_tabel_code = serializers.CharField(required=False, read_only=True)
@@ -180,7 +180,7 @@ class WorkerDaySerializer(serializers.ModelSerializer, UnaccountedOvertimeMixin)
             raise ValidationError({"error": "Нельзя менять подтвержденную версию."})
 
         is_fact = attrs['is_fact'] if 'is_fact' in attrs else getattr(self.instance, 'is_fact', None)
-        wd_type = attrs['type']
+        wd_type = attrs['type_id']
 
         if is_fact and wd_type not in WorkerDay.TYPES_WITH_TM_RANGE + (WorkerDay.TYPE_EMPTY,):
             raise ValidationError({
@@ -414,7 +414,7 @@ class VacancySerializer(serializers.Serializer):
     dttm_work_start = serializers.DateTimeField(default=None)
     dttm_work_end = serializers.DateTimeField(default=None)
     dt = serializers.DateField()
-    type = serializers.CharField()
+    type = serializers.CharField(source='type_id')
     is_outsource = serializers.BooleanField()
     avatar = serializers.SerializerMethodField('get_avatar_url')
     worker_shop = serializers.IntegerField(required=False, default=None)
@@ -437,7 +437,7 @@ class ChangeListSerializer(serializers.Serializer):
     }
     shop_id = serializers.IntegerField(required=False)
     employee_id = serializers.IntegerField(required=False)
-    type = serializers.CharField()
+    type = serializers.CharField(source='type_id')
     tm_work_start = serializers.TimeField(required=False)
     tm_work_end = serializers.TimeField(required=False)
     cashbox_details = WorkerDayCashboxDetailsSerializer(many=True, required=False)
@@ -458,14 +458,14 @@ class ChangeListSerializer(serializers.Serializer):
     def is_valid(self, *args, **kwargs):
         super().is_valid(*args, **kwargs)
         if self.validated_data['is_vacancy']:
-            self.validated_data['type'] = WorkerDay.TYPE_WORKDAY
+            self.validated_data['type_id'] = WorkerDay.TYPE_WORKDAY
             self.validated_data['employee_id'] = None
             self.validated_data['outsources'] = Network.objects.filter(id__in=self.validated_data.get('outsources', []))
         else:
-            if not WorkerDay.is_type_with_tm_range(self.validated_data['type']):
+            if not WorkerDay.is_type_with_tm_range(self.validated_data['type_id']):
                 self.validated_data['shop_id'] = None 
             self.validated_data['outsources'] = []
-        if WorkerDay.is_type_with_tm_range(self.validated_data['type']):
+        if WorkerDay.is_type_with_tm_range(self.validated_data['type_id']):
             if not self.validated_data.get('tm_work_start'):
                 raise FieldError(self.error_messages['required'], 'tm_work_start')
             if not self.validated_data.get('tm_work_end'):

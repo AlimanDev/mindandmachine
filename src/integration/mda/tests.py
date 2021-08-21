@@ -352,7 +352,7 @@ class TestVMdaUsers(TestsHelperMixin, TestCase):
             employee=employee_director1,
             employment=None,
             shop=self.shop1,
-            type=WorkerDay.TYPE_VACATION,
+            type_id=WorkerDay.TYPE_VACATION,
             is_fact=False,
             is_approved=True,
         )
@@ -373,7 +373,7 @@ class TestVMdaUsers(TestsHelperMixin, TestCase):
             employee=employee_director2,
             employment=None,
             shop=self.shop1,
-            type=WorkerDay.TYPE_VACATION,
+            type_id=WorkerDay.TYPE_VACATION,
             is_fact=False,
             is_approved=True,
         )
@@ -409,7 +409,7 @@ class TestVMdaUsers(TestsHelperMixin, TestCase):
             employee=employee_director,
             employment=None,
             shop=self.shop1,
-            type=WorkerDay.TYPE_SICK,
+            type_id=WorkerDay.TYPE_SICK,
             is_fact=False,
             is_approved=True,
         )

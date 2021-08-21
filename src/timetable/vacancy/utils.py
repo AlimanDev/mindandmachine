@@ -102,7 +102,7 @@ def search_candidates(vacancy, **kwargs):
         dttm_work_start__lte=vacancy.dttm_work_start,
         dttm_work_end__gte=vacancy.dttm_work_end,
         dt=vacancy.dt,
-        type=WorkerDay.TYPE_WORKDAY,
+        type_id=WorkerDay.TYPE_WORKDAY,
         child__id__isnull=True,
     )
 
@@ -148,7 +148,7 @@ def search_holiday_candidate(vacancy, max_working_hours, constraints, exclude_po
         workerdays_exists=Exists(
             WorkerDay.objects.filter(
                 employee_id=OuterRef('pk'),
-                type=WorkerDay.TYPE_HOLIDAY,
+                type_id=WorkerDay.TYPE_HOLIDAY,
                 dt=vacancy_dt,
                 is_fact=False,
                 is_approved=True,
@@ -170,7 +170,7 @@ def search_holiday_candidate(vacancy, max_working_hours, constraints, exclude_po
             employee_id=OuterRef('pk'),
             dt__gte=vacancy_dt.replace(day=1),
             dt__lte=vacancy_dt.replace(day=1) + relativedelta(months=+1) - timedelta(days=1),
-            type__in=WorkerDay.TYPES_PAID,
+            type__is_work_hours=True,
             is_fact=False,
             is_approved=True,
         ).order_by().values('employee__user_id').annotate(wh=Sum('work_hours')).values('wh'), output_field=DurationField()) + work_hours,
@@ -194,7 +194,7 @@ def search_holiday_candidate(vacancy, max_working_hours, constraints, exclude_po
             dt__lte=vacancy_dt + timedelta(days=2),
             employee_id=employee.id,
         ).order_by('dt'):
-            if worker_day.type == WorkerDay.TYPE_HOLIDAY:
+            if worker_day.type_id == WorkerDay.TYPE_HOLIDAY:
                 max_holidays += 1
                 tmp_obj['work_days'].append(True)
             else:
@@ -219,7 +219,7 @@ def search_holiday_candidate(vacancy, max_working_hours, constraints, exclude_po
             dt__lte=vacancy_dt + timedelta(days=7),
             employee_id=employee['employee'].id,
         ).order_by('dt'):
-            if worker_day.type in WorkerDay.TYPES_PAID:
+            if worker_day.type_id in WorkerDay.TYPES_PAID:
                 tmp_hours += worker_day.work_hours.seconds // 3600
             else:
                 if all(employee['work_days'][1:3]) and worker_day.dt + timedelta(days=1) == vacancy_dt:
@@ -252,7 +252,7 @@ def search_holiday_candidate(vacancy, max_working_hours, constraints, exclude_po
             dt__lte=vacancy_dt + timedelta(days=7),
             employee_id=employee['employee'].id,
         ).order_by('dt'):
-            if worker_day.type in WorkerDay.TYPES_PAID:
+            if worker_day.type_id in WorkerDay.TYPES_PAID:
                 tmp_hours += worker_day.work_hours.seconds // 3600
             else:
                 if worker_day.dt == vacancy_dt:
@@ -315,7 +315,7 @@ def do_shift_elongation(vacancy, max_working_hours):
                 Q(dttm_work_start__gt=vacancy.dttm_work_start) | 
                 Q(dttm_work_end__lt=vacancy.dttm_work_end),
                 employee=OuterRef('pk'), 
-                type=WorkerDay.TYPE_WORKDAY,
+                type_id=WorkerDay.TYPE_WORKDAY,
                 shop=shop,
                 dt=vacancy_dt,
                 work_types__work_type_name_id__in=work_types,
@@ -332,7 +332,7 @@ def do_shift_elongation(vacancy, max_working_hours):
             employee_id=OuterRef('pk'),
             dt__gte=vacancy_dt.replace(day=1),
             dt__lte=vacancy_dt.replace(day=1) + relativedelta(months=+1) - timedelta(days=1),
-            type__in=WorkerDay.TYPES_PAID,
+            type_id__in=WorkerDay.TYPES_PAID,
             is_fact=False,
             is_approved=True,
         ).order_by().values('employee__user_id').annotate(wh=Sum('work_hours')).values('wh'), output_field=DurationField()) + work_hours,
@@ -435,7 +435,7 @@ def cancel_vacancy(vacancy_id, auto=True):
                 dttm_work_start=None,
                 dttm_work_end=None,
                 shop_id=None,
-                type=WorkerDay.TYPE_HOLIDAY,
+                type_id=WorkerDay.TYPE_HOLIDAY,
                 employment=None,
                 is_vacancy=False,
                 is_outsource=False,
@@ -483,7 +483,7 @@ def create_vacancy(dttm_from, dttm_to, shop_id, work_type_id, outsources=[]):
     worker_day = WorkerDay.objects.create(
         dttm_work_start=dttm_from,
         dttm_work_end=dttm_to,
-        type=WorkerDay.TYPE_WORKDAY,
+        type_id=WorkerDay.TYPE_WORKDAY,
         is_vacancy=True,
         dt=dttm_from.date(),
         shop_id=shop_id,
@@ -646,7 +646,7 @@ def confirm_vacancy(vacancy_id, user, employee_id=None, exchange=False, reconfir
 
             if update_condition or exchange:
                 if any(not wd.is_vacancy and wd.type not in WorkerDay.TYPES_PAID for wd in employee_worker_days):
-                    employee_worker_days_qs.filter(~Q(type__in=WorkerDay.TYPES_PAID), is_vacancy=False).delete()
+                    employee_worker_days_qs.filter(~Q(type_id__in=WorkerDay.TYPES_PAID), is_vacancy=False).delete()
 
                 prev_employee_id = vacancy.employee_id
                 if reconfirm and prev_employee_id:
@@ -911,7 +911,6 @@ def cancel_vacancies(shop_id, work_type_id, dt_from=None, dt_to=None, approved=F
     df_stat['dttm'] = pandas.to_datetime(df_stat.dttm, format=QOS_DATETIME_FORMAT)
     df_stat.set_index(df_stat.dttm, inplace=True)
 
-
     vacancies = WorkerDay.objects.filter(
         (Q(employee__isnull=False) & Q(dttm_work_start__gte=min_dttm)) | Q(employee__isnull=True),
         dt__gte=from_dt,
@@ -1083,7 +1082,7 @@ def workers_exchange():
                         worker_day__is_vacancy=False,
                         worker_day__is_fact=False,
                         worker_day__is_approved=True,
-                        worker_day__type__in=WorkerDay.TYPES_PAID,
+                        worker_day__type_id__in=WorkerDay.TYPES_PAID,
                         work_type__work_type_name=work_type.work_type_name,
                         worker_day__canceled=False,
                     ).exclude(
@@ -1156,12 +1155,12 @@ def workers_exchange():
 
 
 def _lack_add(df, work_type_id, dttm_from, dttm_to, add):
-    cond = (df.work_type_id==work_type_id) & (df['dttm'] >= dttm_from) & (df['dttm'] < dttm_to)
+    cond = (df.work_type_id == work_type_id) & (df['dttm'] >= dttm_from) & (df['dttm'] < dttm_to)
     df.loc[cond, 'lack'] += add
 
 
 def _lack_calc(df, work_type_id, dttm_from, dttm_to):
-    cond = (df.work_type_id==work_type_id) & (df['dttm'] >= dttm_from) & (df['dttm'] < dttm_to)
+    cond = (df.work_type_id == work_type_id) & (df['dttm'] >= dttm_from) & (df['dttm'] < dttm_to)
     return df.loc[cond, 'lack'].apply(
-        lambda x:  x if (x < 1.0 and x >-1.0) else 1 if x >= 1 else -1
+        lambda x: x if (x < 1.0 and x > -1.0) else 1 if x >= 1 else -1
     ).mean()

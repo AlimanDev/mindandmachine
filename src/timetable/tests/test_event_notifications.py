@@ -108,7 +108,7 @@ class TestApproveEventNotifications(TestsHelperMixin, APITestCase):
             worker_day_permission=WorkerDayPermission.objects.get(
                 action=WorkerDayPermission.APPROVE,
                 graph_type=WorkerDayPermission.PLAN,
-                wd_type=WorkerDay.TYPE_WORKDAY,
+                wd_type_id=WorkerDay.TYPE_WORKDAY,
             ),
         )
         cls.employment_worker = EmploymentFactory(
@@ -129,7 +129,7 @@ class TestApproveEventNotifications(TestsHelperMixin, APITestCase):
             employment=cls.employment_worker,
             employee=cls.employee_worker,
             dt=cls.dt,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
         )
 
     def setUp(self):
@@ -169,7 +169,7 @@ class TestApproveEventNotifications(TestsHelperMixin, APITestCase):
                 worker_day_permission=WorkerDayPermission.objects.get(
                     action=WorkerDayPermission.APPROVE,
                     graph_type=WorkerDayPermission.PLAN,
-                    wd_type=WorkerDay.TYPE_WORKDAY,
+                    wd_type_id=WorkerDay.TYPE_WORKDAY,
                 ),
             )
             subject = 'График в магазине {{ shop.name }} был подтвержден'
@@ -257,7 +257,7 @@ class TestSendUnaccountedReport(TestsHelperMixin, APITestCase):
             employment=employment,
             employee_id=employment.employee_id,
             dt=dttm_work_start.date(),
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dttm_work_start=dttm_work_start,
             dttm_work_end=dttm_work_end,
         )

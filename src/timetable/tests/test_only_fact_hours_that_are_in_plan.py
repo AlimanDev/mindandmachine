@@ -52,7 +52,7 @@ class TestOnlyFactHoursThatInApprovedPlan(TestsHelperMixin, APITestCase):
             employee=self.employee,
             employment=self.employment,
             shop=self.shop,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dttm_work_start=datetime.combine(self.dt, time(8, 0, 0)),
             dttm_work_end=datetime.combine(self.dt, time(20, 0, 0)),
         )
@@ -66,7 +66,7 @@ class TestOnlyFactHoursThatInApprovedPlan(TestsHelperMixin, APITestCase):
             employee=self.employee,
             employment=self.employment,
             shop=self.shop,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dttm_work_start=datetime.combine(self.dt, time(9, 0, 0)),
             dttm_work_end=datetime.combine(self.dt, time(20, 0, 0)),
         )
@@ -77,7 +77,7 @@ class TestOnlyFactHoursThatInApprovedPlan(TestsHelperMixin, APITestCase):
             employee=self.employee,
             employment=self.employment,
             shop=self.shop,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dttm_work_start=datetime.combine(self.dt, time(8, 35, 0)),
             dttm_work_end=datetime.combine(self.dt, time(20, 25, 0)),
         )
@@ -91,7 +91,7 @@ class TestOnlyFactHoursThatInApprovedPlan(TestsHelperMixin, APITestCase):
             employee=self.employee,
             employment=self.employment,
             shop=self.shop,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dttm_work_start=datetime.combine(self.dt, time(9, 0, 0)),
             dttm_work_end=datetime.combine(self.dt, time(20, 0, 0)),
         )
@@ -102,7 +102,7 @@ class TestOnlyFactHoursThatInApprovedPlan(TestsHelperMixin, APITestCase):
             employee=self.employee,
             employment=self.employment,
             shop=self.shop,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dttm_work_start=datetime.combine(self.dt, time(8, 35, 0)),
             dttm_work_end=datetime.combine(self.dt, time(20, 25, 0)),
         )
@@ -116,7 +116,7 @@ class TestOnlyFactHoursThatInApprovedPlan(TestsHelperMixin, APITestCase):
             employee=self.employee,
             employment=self.employment,
             shop=self.shop,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dttm_work_start=datetime.combine(self.dt, time(8, 35, 0)),
             dttm_work_end=datetime.combine(self.dt, time(20, 25, 0)),
         )
@@ -127,7 +127,7 @@ class TestOnlyFactHoursThatInApprovedPlan(TestsHelperMixin, APITestCase):
             employee=self.employee,
             employment=self.employment,
             shop=self.shop,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dttm_work_start=datetime.combine(self.dt, time(9, 0, 0)),
             dttm_work_end=datetime.combine(self.dt, time(20, 0, 0)),
         )
@@ -142,7 +142,7 @@ class TestOnlyFactHoursThatInApprovedPlan(TestsHelperMixin, APITestCase):
             employee=self.employee,
             employment=self.employment,
             shop=self.shop,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dttm_work_start=datetime.combine(self.dt, time(9, 0, 0)),
             dttm_work_end=datetime.combine(self.dt, time(20, 0, 0)),
         )
@@ -154,7 +154,7 @@ class TestOnlyFactHoursThatInApprovedPlan(TestsHelperMixin, APITestCase):
             employee=self.employee,
             employment=self.employment,
             shop=self.shop,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dttm_work_start=datetime.combine(self.dt, time(8, 35, 0)),
             dttm_work_end=datetime.combine(self.dt, time(20, 25, 0)),
         )
@@ -167,7 +167,7 @@ class TestOnlyFactHoursThatInApprovedPlan(TestsHelperMixin, APITestCase):
             employee=self.employee,
             employment=self.employment,
             shop=self.shop,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dttm_work_start=datetime.combine(self.dt, time(9, 00, 0)),
             dttm_work_end=datetime.combine(self.dt, time(19, 00, 0)),
         )
@@ -192,7 +192,7 @@ class TestOnlyFactHoursThatInApprovedPlan(TestsHelperMixin, APITestCase):
             is_fact=False,
             is_approved=True,
             shop=self.shop,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dt=self.dt,
             dttm_work_start=datetime.combine(self.dt, time(12)),
             dttm_work_end=datetime.combine(self.dt, time(18)),
@@ -203,7 +203,7 @@ class TestOnlyFactHoursThatInApprovedPlan(TestsHelperMixin, APITestCase):
             is_fact=True,
             is_approved=True,
             shop=self.shop,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dt=self.dt,
             dttm_work_start=datetime.combine(self.dt, time(13, 2)),
             dttm_work_end=datetime.combine(self.dt, time(19, 4)),
@@ -219,7 +219,7 @@ class TestOnlyFactHoursThatInApprovedPlan(TestsHelperMixin, APITestCase):
             is_fact=False,
             is_approved=True,
             shop=self.shop,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dt=self.dt,
             dttm_work_start=datetime.combine(self.dt, time(13, 30)),
             dttm_work_end=datetime.combine(self.dt, time(13, 35)),

@@ -226,7 +226,7 @@ class TestWorkType(APITestCase):
         wd = WorkerDay.objects.create(
             dttm_work_start=datetime.combine(dt_now, time(hour=9)),
             dttm_work_end=datetime.combine(dt_now, time(hour=18)),
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dt=dt_now,
             shop=self.shop,
             employee=self.employee2,
@@ -239,7 +239,7 @@ class TestWorkType(APITestCase):
             work_type=self.work_type1,
         )
         WorkerDay.objects.create(
-            type=WorkerDay.TYPE_SICK,
+            type_id=WorkerDay.TYPE_SICK,
             dt=dt_now,
             employee=self.employee2,
             employment=self.employment2,
@@ -248,7 +248,7 @@ class TestWorkType(APITestCase):
         )
 
         WorkerDay.objects.create(
-            type=WorkerDay.TYPE_HOLIDAY,
+            type_id=WorkerDay.TYPE_HOLIDAY,
             dt=tomorrow,
             employee=self.employee2,
             employment=self.employment2,
@@ -258,7 +258,7 @@ class TestWorkType(APITestCase):
         wd2 = WorkerDay.objects.create(
             dttm_work_start=datetime.combine(tomorrow, time(hour=10)),
             dttm_work_end=datetime.combine(tomorrow, time(hour=22)),
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dt=tomorrow,
             shop=self.shop,
             employee=self.employee2,
@@ -274,7 +274,7 @@ class TestWorkType(APITestCase):
         wd3 = WorkerDay.objects.create(
             dttm_work_start=datetime.combine(after_tomorrow, time(hour=10)),
             dttm_work_end=datetime.combine(after_tomorrow, time(hour=15)),
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dt=after_tomorrow,
             shop=self.shop,
             employee=self.employee2,
@@ -289,7 +289,7 @@ class TestWorkType(APITestCase):
         wd4 = WorkerDay.objects.create(
             dttm_work_start=datetime.combine(after_tomorrow, time(hour=10)),
             dttm_work_end=datetime.combine(after_tomorrow, time(hour=22)),
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dt=after_tomorrow,
             shop=self.shop,
             employee=self.employee2,
@@ -305,7 +305,7 @@ class TestWorkType(APITestCase):
         open_vac = WorkerDay.objects.create(
             dttm_work_start=datetime.combine(dt_now, time(hour=10)),
             dttm_work_end=datetime.combine(dt_now, time(hour=22)),
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dt=dt_now,
             shop=self.shop,
             is_approved=True,
@@ -319,7 +319,7 @@ class TestWorkType(APITestCase):
         canceled_open_vac = WorkerDay.objects.create(
             dttm_work_start=datetime.combine(dt_now, time(hour=10)),
             dttm_work_end=datetime.combine(dt_now, time(hour=22)),
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dt=dt_now + timedelta(days=1),
             shop=self.shop,
             is_approved=True,
@@ -361,7 +361,7 @@ class TestWorkType(APITestCase):
         wd = WorkerDay.objects.create(
             dttm_work_start=datetime.combine(dt_now, time(hour=8)),
             dttm_work_end=datetime.combine(dt_now, time(hour=15)),
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dt=dt_now,
             shop=self.shop,
             employee=self.employee2,
@@ -375,7 +375,7 @@ class TestWorkType(APITestCase):
         )
         wd = WorkerDay.objects.create(
             dttm_work_start=datetime.combine(dt_now, time(hour=8)),
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dt=dt_now,
             shop=self.shop,
             employee=self.employee3,
@@ -390,7 +390,7 @@ class TestWorkType(APITestCase):
         wd = WorkerDay.objects.create(
             dttm_work_start=datetime.combine(dt_now, time(hour=9)),
             dttm_work_end=datetime.combine(dt_now, time(hour=18)),
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dt=dt_now,
             shop=self.shop,
             employee=self.employee2,
@@ -456,7 +456,7 @@ class TestWorkType(APITestCase):
         wd5 = WorkerDay.objects.create(
             dttm_work_start=datetime.combine(after_after_tomorrow, time(hour=10)),
             dttm_work_end=datetime.combine(after_after_tomorrow, time(hour=22)),
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dt=after_after_tomorrow,
             shop=self.shop,
             employee=self.employee2,

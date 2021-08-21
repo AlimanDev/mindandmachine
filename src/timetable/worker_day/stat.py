@@ -66,7 +66,7 @@ def count_daily_stat(data):
         is_fact=False,
         is_approved=True,
         employee_id=OuterRef('employee_id'),
-        type=WorkerDay.TYPE_WORKDAY,
+        type_id=WorkerDay.TYPE_WORKDAY,
     )
 
     not_approved_subq = WorkerDay.objects.filter(
@@ -84,7 +84,7 @@ def count_daily_stat(data):
         dt__gte=dt_start,
         dt__lte=dt_end,
         shop_id=shop_id,
-        type=WorkerDay.TYPE_WORKDAY,
+        type_id=WorkerDay.TYPE_WORKDAY,
         # employee_id__isnull=False,
     ).annotate(
         has_employee=Case(When(employee_id__isnull=True, then=Value(False)), default=Value(True),
@@ -399,37 +399,37 @@ class WorkersStatsGetter:
         ).annotate(
             work_days_selected_shop=Coalesce(Count('id', filter=Q(selected_period_q, shop_id=self.shop_id,
                                                                   work_hours__gte=timedelta(0),
-                                                                  type__in=WorkerDay.TYPES_WITH_TM_RANGE)), 0),
+                                                                  type_id__in=WorkerDay.TYPES_WITH_TM_RANGE)), 0),
             work_days_other_shops=Coalesce(Count('id', filter=Q(selected_period_q, ~Q(shop_id=self.shop_id),
                                                                 work_hours__gte=timedelta(0),
-                                                                type__in=WorkerDay.TYPES_WITH_TM_RANGE)), 0),
+                                                                type_id__in=WorkerDay.TYPES_WITH_TM_RANGE)), 0),
             work_days_selected_period=Coalesce(Count('id', filter=Q(selected_period_q, work_hours__gte=timedelta(0),
-                                                          type__in=WorkerDay.TYPES_WITH_TM_RANGE)), 0),
+                                                          type_id__in=WorkerDay.TYPES_WITH_TM_RANGE)), 0),
             work_hours_selected_shop=Coalesce(Sum(Extract(F('work_hours'), 'epoch') / 3600,
                                                   filter=Q(selected_period_q, shop_id=self.shop_id,
                                                            work_hours__gte=timedelta(0),
-                                                           type__in=WorkerDay.TYPES_WITH_TM_RANGE),
+                                                           type_id__in=WorkerDay.TYPES_WITH_TM_RANGE),
                                                   output_field=FloatField()), 0),
             work_hours_other_shops=Coalesce(Sum(Extract(F('work_hours'), 'epoch') / 3600,
                                                 filter=Q(selected_period_q, ~Q(shop_id=self.shop_id),
                                                          work_hours__gte=timedelta(0),
-                                                         type__in=WorkerDay.TYPES_WITH_TM_RANGE),
+                                                         type_id__in=WorkerDay.TYPES_WITH_TM_RANGE),
                                                 output_field=FloatField()), 0),
             work_hours_selected_period=Coalesce(Sum(Extract(F('work_hours'), 'epoch') / 3600,
                                           filter=Q(selected_period_q, work_hours__gte=timedelta(0),
-                                                   type__in=WorkerDay.TYPES_WITH_TM_RANGE),
+                                                   type_id__in=WorkerDay.TYPES_WITH_TM_RANGE),
                                           output_field=FloatField()), 0),
             work_hours_total=Coalesce(Sum(Extract(F('work_hours'), 'epoch') / 3600,
                                                 filter=Q(work_hours__gte=timedelta(0),
-                                                         type__in=WorkerDay.TYPES_WITH_TM_RANGE),
+                                                         type_id__in=WorkerDay.TYPES_WITH_TM_RANGE),
                                                 output_field=FloatField()), 0),
             work_hours_until_acc_period_end=Coalesce(Sum(Extract(F('work_hours'), 'epoch') / 3600,
                                                          filter=Q(until_acc_period_end_q, work_hours__gte=timedelta(0),
-                                                                  type__in=WorkerDay.TYPES_WITH_TM_RANGE),
+                                                                  type_id__in=WorkerDay.TYPES_WITH_TM_RANGE),
                                                          output_field=FloatField()), 0),
             work_hours_outside_of_selected_period=Coalesce(Sum(Extract(F('work_hours'), 'epoch') / 3600,
                                                          filter=Q(outside_of_selected_period_q, work_hours__gte=timedelta(0),
-                                                                  type__in=WorkerDay.TYPES_WITH_TM_RANGE),
+                                                                  type_id__in=WorkerDay.TYPES_WITH_TM_RANGE),
                                                          output_field=FloatField()), 0)
         ).order_by('employee_id', '-is_fact', '-is_approved')  # такая сортировка нужна для work_hours_prev_months
         for wd_dict in work_days:
@@ -522,14 +522,14 @@ class WorkersStatsGetter:
             'employment_id',
             'is_fact',
             'is_approved',
-            'type',
+            'type_id',
             'dt__month',
         ).annotate(
-            day_type_count=Count('type', filter=selected_period_q),
+            day_type_count=Count('type_id', filter=selected_period_q),
             any_day_count_outside_of_selected_period=Count(
-                'type', filter=outside_of_selected_period_q),
+                'type_id', filter=outside_of_selected_period_q),
             workdays_count_outside_of_selected_period=Count(
-                'type', filter=Q(outside_of_selected_period_q, Q(type__in=WorkerDay.TYPES_PAID + [WorkerDay.TYPE_HOLIDAY]))),
+                'type_id', filter=Q(outside_of_selected_period_q, Q(type_id__in=WorkerDay.TYPES_PAID + [WorkerDay.TYPE_HOLIDAY]))),
         )
         for wd_dict in work_days:
             data = res.setdefault(
@@ -542,7 +542,7 @@ class WorkersStatsGetter:
 
             if wd_dict['dt__month'] == curr_month:
                 day_type = data.setdefault('day_type', {})
-                day_type[wd_dict['type']] = wd_dict['day_type_count']
+                day_type[wd_dict['type_id']] = wd_dict['day_type_count']
 
             if not wd_dict['is_fact']:
                 days_count_outside_of_selected_period = data.setdefault('workdays_count_outside_of_selected_period', {})
@@ -569,7 +569,7 @@ class WorkersStatsGetter:
                 dt=OuterRef('dt'),
                 is_fact=False,
                 is_approved=True,
-                type__in=WorkerDay.TYPES_REDUCING_NORM_HOURS,
+                type_id__in=WorkerDay.TYPES_REDUCING_NORM_HOURS,
             )),
             vacation_or_sick_plan_approved_count=Count(Subquery(WorkerDay.objects.filter(
                 employee_id=OuterRef('employee_id'),
@@ -577,7 +577,7 @@ class WorkersStatsGetter:
                 dt=OuterRef('dt'),
                 is_fact=False,
                 is_approved=True,
-                type__in=WorkerDay.TYPES_REDUCING_NORM_HOURS,
+                type_id__in=WorkerDay.TYPES_REDUCING_NORM_HOURS,
             ).values('id'))),
             vacation_or_sick_plan_approved_count_selected_period=Count(Subquery(WorkerDay.objects.filter(
                 selected_period_q,
@@ -586,7 +586,7 @@ class WorkersStatsGetter:
                 dt=OuterRef('dt'),
                 is_fact=False,
                 is_approved=True,
-                type__in=WorkerDay.TYPES_REDUCING_NORM_HOURS,
+                type_id__in=WorkerDay.TYPES_REDUCING_NORM_HOURS,
             ).values('id'))),
             has_vacation_or_sick_plan_not_approved=Exists(WorkerDay.objects.filter(
                 employee_id=OuterRef('employee_id'),
@@ -594,7 +594,7 @@ class WorkersStatsGetter:
                 dt=OuterRef('dt'),
                 is_fact=False,
                 is_approved=False,
-                type__in=WorkerDay.TYPES_REDUCING_NORM_HOURS,
+                type_id__in=WorkerDay.TYPES_REDUCING_NORM_HOURS,
             )),
             vacation_or_sick_plan_not_approved_count=Count(Subquery(WorkerDay.objects.filter(
                 employee_id=OuterRef('employee_id'),
@@ -602,7 +602,7 @@ class WorkersStatsGetter:
                 dt=OuterRef('dt'),
                 is_fact=False,
                 is_approved=False,
-                type__in=WorkerDay.TYPES_REDUCING_NORM_HOURS,
+                type_id__in=WorkerDay.TYPES_REDUCING_NORM_HOURS,
             ).values('id'))),
             vacation_or_sick_plan_not_approved_count_selected_period=Count(Subquery(WorkerDay.objects.filter(
                 selected_period_q,
@@ -611,7 +611,7 @@ class WorkersStatsGetter:
                 dt=OuterRef('dt'),
                 is_fact=False,
                 is_approved=False,
-                type__in=WorkerDay.TYPES_REDUCING_NORM_HOURS,
+                type_id__in=WorkerDay.TYPES_REDUCING_NORM_HOURS,
             ).values('id'))),
             norm_hours_acc_period=Coalesce(
                 Sum('norm_hours'), 0),
