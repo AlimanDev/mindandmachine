@@ -1411,6 +1411,7 @@ class FunctionGroup(AbstractModel):
         ('WorkerDay_recalc', 'Пересчитать часы (Создать) (worker_day/recalc/)'),
         ('WorkerDay_overtimes_undertimes_report', 'Скачать отчет о переработках/недоработках (Получить) (worker_day/overtimes_undertimes_report/)'),
         ('WorkerDay_batch_update_or_create', 'Массовое создание/обновление дней сотрудников (Создать/Обновить) (worker_day/batch_update_or_create/)'),
+        ('WorkerDayType', 'Тип дня сотрудника (worker_day_type)'),
         ('WorkerPosition', 'Должность (worker_position)'),
         ('WorkTypeName', 'Название типа работ (work_type_name)'),
         ('WorkType', 'Тип работ ()work_type'),
