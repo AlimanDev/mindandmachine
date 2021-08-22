@@ -1,4 +1,5 @@
 from datetime import date, timedelta, datetime, time
+from unittest import expectedFailure
 
 from django.test import TestCase
 
@@ -12,6 +13,7 @@ from src.base.tests.factories import (
     WorkerPositionFactory,
     EmployeeFactory,
 )
+from src.timetable.models import WorkerDay
 from src.timetable.tests.factories import WorkerDayFactory
 from src.util.mixins.tests import TestsHelperMixin
 from .stat import WorkersStatsGetter
@@ -227,34 +229,33 @@ class TestWorkersStatsGetter(TestsHelperMixin, TestCase):
             1,
         )
 
-    # TODO: после правки констрейнтов раскомментить и проверить, что тест проходит
-    # def test_days_count_by_type_for_multiple_wdays_on_one_date(self):
-    #     new_wd_type = self._create_san_day()
-    #     dt = date(2021, 6, 1)
-    #     WorkerDayFactory(
-    #         is_approved=True,
-    #         is_fact=True,
-    #         shop=self.shop,
-    #         employment=self.employment,
-    #         employee=self.employee,
-    #         dt=self.dt_from,
-    #         type_id=new_wd_type.code,
-    #         dttm_work_start=datetime.combine(dt, time(10)),
-    #         dttm_work_end=datetime.combine(dt, time(14)),
-    #     )
-    #     WorkerDayFactory(
-    #         is_approved=True,
-    #         is_fact=True,
-    #         shop=self.shop,
-    #         employment=self.employment,
-    #         employee=self.employee,
-    #         dt=self.dt_from,
-    #         type_id=new_wd_type.code,
-    #         dttm_work_start=datetime.combine(dt, time(17)),
-    #         dttm_work_end=datetime.combine(dt, time(22)),
-    #     )
-    #     stats = self._get_worker_stats()
-    #     self.assertEqual(
-    #         stats[self.employee.id]['fact']['approved']['day_type']['SD'],
-    #         1,
-    #     )
+    @expectedFailure
+    def test_days_count_by_type_for_multiple_wdays_on_one_date(self):
+        dt = date(2021, 6, 1)
+        WorkerDayFactory(
+            is_approved=True,
+            is_fact=True,
+            shop=self.shop,
+            employment=self.employment,
+            employee=self.employee,
+            dt=self.dt_from,
+            type_id=WorkerDay.TYPE_WORKDAY,
+            dttm_work_start=datetime.combine(dt, time(10)),
+            dttm_work_end=datetime.combine(dt, time(14)),
+        )
+        WorkerDayFactory(
+            is_approved=True,
+            is_fact=True,
+            shop=self.shop,
+            employment=self.employment,
+            employee=self.employee,
+            dt=self.dt_from,
+            type_id=WorkerDay.TYPE_WORKDAY,
+            dttm_work_start=datetime.combine(dt, time(17)),
+            dttm_work_end=datetime.combine(dt, time(22)),
+        )
+        stats = self._get_worker_stats()
+        self.assertEqual(
+            stats[self.employee.id]['fact']['approved']['day_type'][WorkerDay.TYPE_WORKDAY],
+            1,  # TODO: логичней ведь, чтобы была 1 если 2 дня на 1 дату?
+        )

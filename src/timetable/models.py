@@ -320,9 +320,9 @@ class WorkerDayQuerySet(AnnotateValueEqualityQSMixin, QuerySet):
 
 
 class WorkerDayManager(models.Manager):
-    # def get_queryset(self):
-    #     return super().get_queryset().exclude(
-    #         type__is_dayoff=False, type__is_work_hours=True, employment_id__isnull=True, employee_id__isnull=False)
+    def get_queryset(self):
+        return super().get_queryset().exclude(
+            type__is_dayoff=False, employment_id__isnull=True, employee_id__isnull=False)
 
     def qos_current_version(self, approved_only=False):
         if approved_only:
@@ -439,16 +439,15 @@ class WorkerDay(AbstractModel):
     class Meta:
         verbose_name = 'Рабочий день сотрудника'
         verbose_name_plural = 'Рабочие дни сотрудников'
-        unique_together = (
-            ('dt', 'employee', 'is_fact', 'is_approved'),
+        constraints = (
+            UniqueConstraint(
+                fields=['dt', 'employee', 'is_fact', 'is_approved'],
+                # TODO: нельзя делать ограничения по джоинам, как быть?
+                #   пока захардкодил коды для типов, которые есть или будут is_dayoff=False
+                condition=~Q(type_id__in=['W', 'Q', 'T', 'SD', 'R']),
+                name='unique_dt_employee_is_fact_is_approved_if_not_workday'
+            ),
         )
-        # constraints = (
-        #     UniqueConstraint(
-        #         fields=['dt', 'employee', 'is_fact', 'is_approved'],
-        #         condition=Q(type__is_dayoff=True),
-        #         name='unique_dt_employee_is_fact_is_approved_if_not_workday'
-        #     ),
-        # )
 
     TYPE_HOLIDAY = 'H'
     TYPE_WORKDAY = 'W'
