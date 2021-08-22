@@ -200,6 +200,8 @@ class Network(AbstractActiveModel):
                      'при проставлении ближайшего плана в ручной факт (в секундах)',
         default=60 * 70,
     )
+    display_employee_tabs_in_the_schedule = models.BooleanField(
+        default=True, verbose_name='Отображать вкладки сотрудников в расписании')
 
     @property
     def settings_values_prop(self):
