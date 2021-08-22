@@ -23,6 +23,7 @@ from src.util.mixins.tests import TestsHelperMixin
 
 
 class TestOutsource(TestsHelperMixin, APITestCase):
+    maxDiff = None
 
     @classmethod
     def setUpTestData(cls):
@@ -328,6 +329,7 @@ class TestOutsource(TestsHelperMixin, APITestCase):
         self.client.force_authenticate(user=self.client_user)
         response = self.client.get('/rest_api/worker_day/vacancy/?limit=10&offset=0')
         self.assertEqual(response.json()['count'], 2)
+        response_data = sorted(response.json()['results'], key=lambda i: i['id'])
         data = {
             'id': vacancy['id'], 
             'first_name': self.user1.first_name, 
@@ -337,7 +339,7 @@ class TestOutsource(TestsHelperMixin, APITestCase):
             'worker_shop': self.employment1.shop_id, 
             'user_network_id': self.user1.network_id,
         }
-        response = response.json()['results'][0]
+        response = response_data[0]
         assert_response = {
             'id': response['id'], 
             'first_name': response['first_name'], 
@@ -390,8 +392,9 @@ class TestOutsource(TestsHelperMixin, APITestCase):
                     'primary_color': '', 
                     'secondary_color': '', 
                     'allowed_geo_distance_km': None, 
-                    'enable_camera_ticks': False, 
-                    'show_worker_day_additional_info': False, 
+                    'display_employee_tabs_in_the_schedule': True,
+                    'enable_camera_ticks': False,
+                    'show_worker_day_additional_info': False,
                     'allowed_interval_for_late_arrival': '00:00:00', 
                     'allowed_interval_for_early_departure': '00:00:00', 
                     'default_stats': {

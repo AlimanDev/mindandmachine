@@ -405,22 +405,27 @@ class WorkerDayType(AbstractModel):
     )
     is_work_hours = models.BooleanField(
         'Считать ли в сумму рабочих часов',
-        help_text='Если False, то не учитывается в сумме рабочих часов в статистике и не идет в белый табель')
-    is_reduce_norm = models.BooleanField('Снижает ли норму часов (отпуска, больничные и тд)')
+        help_text='Если False, то не учитывается в сумме рабочих часов в статистике и не идет в белый табель',
+        default=False,
+    )
+    is_reduce_norm = models.BooleanField('Снижает ли норму часов (отпуска, больничные и тд)', default=False)
     is_system = models.BooleanField('Системный (нельзя удалять)', default=False)
     show_stat_in_days = models.BooleanField(
         'Отображать в статистике по сотрудникам количество дней отдельно для этого типа',
-        default=True,
+        default=False,
     )
     show_stat_in_hours = models.BooleanField(
         'Отображать в статистике по сотрудникам сумму часов отдельно для этого типа',
-        default=True,
+        default=False,
     )
     ordering = models.PositiveSmallIntegerField(default=0)
     is_active = models.BooleanField(default=True)
 
     class Meta(AbstractModel.Meta):
         ordering = ['-ordering', 'name']
+
+    def __str__(self):
+        return '{} ({})'.format(self.name, self.code)
 
 
 class WorkerDay(AbstractModel):

@@ -60,6 +60,7 @@ class TestTimesheetMixin(TestsHelperMixin):
                 dttm_work_end=datetime.combine(dt, time(20)),
             )
         cls.add_group_perm(cls.group_worker, 'Timesheet', 'GET')
+        cls.add_group_perm(cls.group_worker, 'Timesheet_stats', 'GET')
         fill_calendar.fill_days('2021.01.1', '2021.12.31', cls.shop.region.id)
 
     def _calc_timesheets(self, dt_from=None, dt_to=None, dttm_now=None):
