@@ -5,7 +5,6 @@ from django.test import override_settings
 from rest_framework.test import APITestCase
 
 from src.base.tests.factories import EmployeeFactory
-from src.timetable.models import WorkerDayType
 from src.timetable.tests.factories import WorkerDayFactory
 from ._base import TestTimesheetMixin
 
@@ -47,19 +46,7 @@ class TestTimesheetApiView(TestTimesheetMixin, APITestCase):
         })
 
     def test_get_timesheet_stats_with_additional_types(self):
-        new_wd_type = WorkerDayType.objects.create(
-            code='SD',
-            name='Санитарный день',
-            short_name='САН',
-            html_color='white',
-            use_in_plan=True,
-            use_in_fact=True,
-            excel_load_code='СД',
-            is_dayoff=False,
-            is_work_hours=False,
-            is_reduce_norm=False,
-            show_stat_in_hours=True,
-        )
+        new_wd_type = self._create_san_day()
         dt = date(2021, 6, 1)
         WorkerDayFactory(
             is_approved=True,

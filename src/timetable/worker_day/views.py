@@ -1,7 +1,6 @@
 import datetime
 import json
 from itertools import groupby
-from src.reports.utils.overtimes_undertimes import overtimes_undertimes_xlsx
 
 import pandas as pd
 from django.conf import settings
@@ -27,20 +26,19 @@ from src.base.models import Employment, Shop, Group, User, Employee
 from src.base.permissions import WdPermission
 from src.base.views_abstract import BaseModelViewSet
 from src.events.signals import event_signal
+from src.reports.utils.overtimes_undertimes import overtimes_undertimes_xlsx
 from src.timetable.backends import MultiShopsFilterBackend
 from src.timetable.events import REQUEST_APPROVE_EVENT_TYPE, APPROVE_EVENT_TYPE, VACANCY_CONFIRMED_TYPE
 from src.timetable.filters import WorkerDayFilter, WorkerDayStatFilter, VacancyFilter
 from src.timetable.models import (
-    WorkType,
     WorkerDay,
     WorkerDayCashboxDetails,
     ShopMonthStat,
     WorkerDayPermission,
-    GroupWorkerDayPermission,
 )
 from src.timetable.timesheet.tasks import calc_timesheets
-from src.timetable.vacancy.utils import cancel_vacancies, cancel_vacancy, confirm_vacancy
 from src.timetable.vacancy.tasks import vacancies_create_and_cancel_for_shop
+from src.timetable.vacancy.utils import cancel_vacancies, cancel_vacancy, confirm_vacancy
 from src.timetable.worker_day.serializers import (
     OvertimesUndertimesReportSerializer,
     ChangeListSerializer,
@@ -66,7 +64,8 @@ from src.timetable.worker_day.serializers import (
 from src.timetable.worker_day.stat import count_daily_stat
 from src.timetable.worker_day.tasks import recalc_wdays, recalc_fact_from_records
 from src.timetable.worker_day.timetable import get_timetable_generator_cls
-from src.timetable.worker_day.utils import check_worker_day_permissions, create_worker_days_range, exchange, copy_as_excel_cells
+from src.timetable.worker_day.utils import check_worker_day_permissions, create_worker_days_range, exchange, \
+    copy_as_excel_cells
 from src.util.dg.tabel import get_tabel_generator_cls
 from src.util.models_converter import Converter
 from src.util.openapi.responses import (

@@ -21,7 +21,7 @@ from django.utils.functional import cached_property
 
 from src.base.models import Employment, Shop, ProductionDay, SAWHSettings
 from src.forecast.models import PeriodClients
-from src.timetable.models import WorkerDay, ProdCal
+from src.timetable.models import WorkerDay, ProdCal, WorkerDayType
 
 
 def count_daily_stat(data):
@@ -220,7 +220,8 @@ def get_month_range(year, month_num, return_days_in_month=False):
 
 
 class WorkersStatsGetter:
-    def __init__(self, dt_from, dt_to, employee_id=None, employee_id__in=None, network=None, shop_id=None):
+    def __init__(self, dt_from, dt_to, employee_id=None, employee_id__in=None, network=None, shop_id=None,
+                 hours_by_types: list = None):
         assert shop_id or network
         self.shop_id = shop_id
         self.dt_from = dt_from
@@ -229,6 +230,10 @@ class WorkersStatsGetter:
         self.employee_id__in = employee_id__in.split(',') if isinstance(employee_id__in, str) else employee_id__in
         self.year = dt_from.year
         self.month = dt_from.month
+        self.hours_by_types = hours_by_types or list(WorkerDayType.objects.filter(
+            is_active=True,
+            show_stat_in_hours=True,
+        ).values_list('code', flat=True))
         self._network = network
 
     @cached_property
@@ -432,6 +437,12 @@ class WorkersStatsGetter:
                                                                   type_id__in=WorkerDay.TYPES_WITH_TM_RANGE),
                                                          output_field=FloatField()), 0)
         ).order_by('employee_id', '-is_fact', '-is_approved')  # такая сортировка нужна для work_hours_prev_months
+        if self.hours_by_types:
+            work_days = work_days.annotate(**{
+                'hours_by_type_{}'.format(type_id): Coalesce(Sum(Extract(F('work_hours'), 'epoch') / 3600,
+                                          filter=Q(selected_period_q, work_hours__gte=timedelta(0), type_id=type_id),
+                                          output_field=FloatField()), 0) for type_id in self.hours_by_types
+            })
         for wd_dict in work_days:
             empl_dict = res.setdefault(
                 wd_dict['employee_id'], {}).setdefault('employments', {}).setdefault(wd_dict['employment_id'], {})
@@ -451,14 +462,17 @@ class WorkersStatsGetter:
 
             work_hours_dict = data.setdefault('work_hours', {})
             work_hours_dicts = [work_hours_dict]
-            # if wd_dict['employment__tabel_code']:
-            #     work_hours_dicts.append(data_tabel_code.setdefault('work_hours', {}))
             for work_hours in work_hours_dicts:
                 work_hours['selected_shop'] = work_hours.get('selected_shop', 0) + wd_dict['work_hours_selected_shop']
                 work_hours['other_shops'] = work_hours.get('other_shops', 0) + wd_dict['work_hours_other_shops']
                 work_hours['total'] = work_hours.get('total', 0) + wd_dict['work_hours_selected_period']
                 work_hours['until_acc_period_end'] = work_hours.get(
                     'until_acc_period_end', 0) + wd_dict['work_hours_until_acc_period_end']
+
+            if self.hours_by_types:
+                hours_by_type_dict = data.setdefault('hours_by_type', {})
+                for type_id in self.hours_by_types:
+                    hours_by_type_dict[type_id] = hours_by_type_dict.get(type_id, 0) + wd_dict[f'hours_by_type_{type_id}']
 
             # за прошлые месяцы отработанные часы берем из факта подтвержденного
             if wd_dict['is_fact'] and wd_dict['is_approved'] and wd_dict['dt__month'] in prev_months:

@@ -1,4 +1,4 @@
-from datetime import date, timedelta
+from datetime import date, timedelta, datetime, time
 
 from django.test import TestCase
 
@@ -201,3 +201,60 @@ class TestWorkersStatsGetter(TestsHelperMixin, TestCase):
             stats[self.employee.id]['plan']['approved']['norm_hours']['curr_month'],
             178.40000000000003,
         )
+
+    def test_get_hours_sum_and_days_count_by_type(self):
+        new_wd_type = self._create_san_day()
+        dt = date(2021, 6, 1)
+        WorkerDayFactory(
+            is_approved=True,
+            is_fact=True,
+            shop=self.shop,
+            employment=self.employment,
+            employee=self.employee,
+            dt=self.dt_from,
+            type_id=new_wd_type.code,
+            dttm_work_start=datetime.combine(dt, time(10)),
+            dttm_work_end=datetime.combine(dt, time(20)),
+        )
+        stats = self._get_worker_stats()
+        self.assertIn('hours_by_type', stats[self.employee.id]['fact']['approved'])
+        self.assertEqual(
+            stats[self.employee.id]['fact']['approved']['hours_by_type']['SD'],
+            9.0,
+        )
+        self.assertEqual(
+            stats[self.employee.id]['fact']['approved']['day_type']['SD'],
+            1,
+        )
+
+    # TODO: после правки констрейнтов раскомментить и проверить, что тест проходит
+    # def test_days_count_by_type_for_multiple_wdays_on_one_date(self):
+    #     new_wd_type = self._create_san_day()
+    #     dt = date(2021, 6, 1)
+    #     WorkerDayFactory(
+    #         is_approved=True,
+    #         is_fact=True,
+    #         shop=self.shop,
+    #         employment=self.employment,
+    #         employee=self.employee,
+    #         dt=self.dt_from,
+    #         type_id=new_wd_type.code,
+    #         dttm_work_start=datetime.combine(dt, time(10)),
+    #         dttm_work_end=datetime.combine(dt, time(14)),
+    #     )
+    #     WorkerDayFactory(
+    #         is_approved=True,
+    #         is_fact=True,
+    #         shop=self.shop,
+    #         employment=self.employment,
+    #         employee=self.employee,
+    #         dt=self.dt_from,
+    #         type_id=new_wd_type.code,
+    #         dttm_work_start=datetime.combine(dt, time(17)),
+    #         dttm_work_end=datetime.combine(dt, time(22)),
+    #     )
+    #     stats = self._get_worker_stats()
+    #     self.assertEqual(
+    #         stats[self.employee.id]['fact']['approved']['day_type']['SD'],
+    #         1,
+    #     )

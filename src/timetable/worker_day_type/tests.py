@@ -2,7 +2,7 @@ from rest_framework.test import APITestCase
 
 from src.base.tests.factories import UserFactory, EmploymentFactory, EmployeeFactory, ShopFactory, GroupFactory
 from src.util.mixins.tests import TestsHelperMixin
-from ..models import WorkerDayType
+from src.timetable.tests.factories import WorkerDayTypeFactory
 
 
 class TestWorkerDayTypeViewSet(TestsHelperMixin, APITestCase):
@@ -33,7 +33,7 @@ class TestWorkerDayTypeViewSet(TestsHelperMixin, APITestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(len(resp.json()), 11)
 
-        WorkerDayType.objects.create(
+        WorkerDayTypeFactory(
             code='SD',
             name='Санитарный день',
             short_name='C/Д',

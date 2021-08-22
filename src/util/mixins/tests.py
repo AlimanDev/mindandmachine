@@ -10,6 +10,7 @@ from django.urls import reverse
 
 from src.base.models import Employment, FunctionGroup
 from src.timetable.models import WorkerDay, WorkerDayCashboxDetails
+from src.timetable.tests.factories import WorkerDayTypeFactory
 from src.util.test import create_departments_and_users
 from src.util.utils import generate_user_token
 
@@ -189,3 +190,19 @@ class TestsHelperMixin:
             resp = self.client.post(
                 self.get_url('WorkerDay-approve'), data=self.dump_data(approve_data), content_type='application/json')
         return resp
+
+    def _create_san_day(self):
+        return WorkerDayTypeFactory(
+            code='SD',
+            name='Санитарный день',
+            short_name='САН',
+            html_color='white',
+            use_in_plan=True,
+            use_in_fact=True,
+            excel_load_code='СД',
+            is_dayoff=False,
+            is_work_hours=False,
+            is_reduce_norm=False,
+            show_stat_in_hours=True,
+            show_stat_in_days=True,
+        )
