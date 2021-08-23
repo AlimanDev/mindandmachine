@@ -200,6 +200,11 @@ def create_worker_day_types(apps, schema_editor):
     WorkerDayType.objects.bulk_create(wd_types_to_create)
 
 
+def set_blank_main_timesheet_as_null(apps, schema_editor):
+    Timesheet = apps.get_model('timetable', 'Timesheet')
+    Timesheet.objects.filter(main_timesheet_type='').update(main_timesheet_type=None)
+
+
 def drop_views(apps, schema_editor):
     schema_editor.execute(
         "drop view performance; drop view v_mda_users; drop view metabase_financial_stat; drop view plan_and_fact_hours; drop view timetable_plan_and_fact_hours; ")
@@ -428,6 +433,12 @@ class Migration(migrations.Migration):
             field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.PROTECT,
                                     related_name='fact_timesheet', to='timetable.WorkerDayType'),
         ),
+        migrations.AlterField(
+            model_name='timesheet',
+            name='main_timesheet_type',
+            field=models.CharField(blank=True, null=True, choices=[('H', 'Выходной'), ('W', 'Рабочий день'), ('V', 'Отпуск'), ('S', 'Больничный лист'), ('Q', 'Квалификация'), ('A', 'Неявка до выяснения обстоятельств'), ('M', 'Б/л по беременноси и родам'), ('T', 'Командировка'), ('O', 'Другое'), ('D', 'Удален'), ('E', 'Пусто'), ('HW', 'Работа в выходной день'), ('RA', 'Прогул на основании акта'), ('EV', 'Доп. отпуск'), ('SV', 'Учебный отпуск'), ('TV', 'Отпуск за свой счёт'), ('ST', 'Отпуск за свой счёт по уважительной причине'), ('G', 'Гос. обязанности'), ('HS', 'Спец. выходной'), ('MC', 'Отпуск по уходу за ребёнком до 3-х лет'), ('C', 'Выходные дни по уходу')], max_length=2),
+        ),
+        migrations.RunPython(set_blank_main_timesheet_as_null, migrations.RunPython.noop),
         migrations.AlterField(
             model_name='timesheet',
             name='main_timesheet_type',
