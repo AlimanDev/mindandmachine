@@ -175,6 +175,14 @@ class Network(AbstractActiveModel):
     # при рассчете фактических часов, будут рассчитываться штрафы
     # пример значения можно найти в src.timetable.tests.test_main.TestFineLogic
     fines_settings = models.TextField(default='{}', verbose_name=_('Fines settings'))
+    forbid_edit_employments_came_through_integration = models.BooleanField(
+        default=True, verbose_name='Запрещать редактировать трудоустройства, пришедшие через интеграцию',
+        help_text='У которых code не пустой',
+    )
+    ignore_shop_code_when_updating_employment_via_api = models.BooleanField(
+        default=False, verbose_name='Не учитывать shop_code при изменении трудоустройства через api',
+        help_text='Необходимо включить для случаев, когда привязка трудоустройств к отделам поддерживается вручную',
+    )
 
     @property
     def settings_values_prop(self):
