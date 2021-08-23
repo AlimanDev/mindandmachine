@@ -227,7 +227,6 @@ def copy_as_excel_cells(from_employee_id, from_dates, to_employee_id, to_dates, 
             if not blank_days:
                 continue
 
-            blank_days = main_worker_days_lists[i]
             worker_active_empl = Employment.objects.get_active_empl_by_priority(
                 network_id=blank_days[0].employee.user.network_id, employee_id=to_employee_id,
                 dt=dt,
