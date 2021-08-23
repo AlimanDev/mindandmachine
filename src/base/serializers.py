@@ -90,6 +90,7 @@ class NetworkSerializer(serializers.ModelSerializer):
             'show_worker_day_tasks',
             'show_user_biometrics_block',
             'unaccounted_overtime_threshold',
+            'forbid_edit_employments_came_through_integration',
         ]
 
 
