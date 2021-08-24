@@ -1,7 +1,7 @@
 import json
 import uuid
 from datetime import datetime, time, date, timedelta
-from unittest import skip
+from unittest import skip, expectedFailure
 from unittest.mock import patch
 
 import pandas as pd
@@ -15,6 +15,7 @@ from src.base.models import Break, WorkerPosition, Employment
 from src.forecast.models import OperationType, OperationTypeName
 from src.timetable.models import ShopMonthStat, WorkerDay, WorkerDayCashboxDetails, WorkType, WorkTypeName, \
     EmploymentWorkType
+from src.timetable.tests.factories import WorkerDayFactory
 from src.util.models_converter import Converter
 from src.util.test import create_departments_and_users
 
@@ -153,6 +154,7 @@ class TestAutoSettings(APITestCase):
             dttm_work_end__isnull=True
         ).count(), 1)
 
+    @expectedFailure
     def test_set_timetable_change_existed(self):
         timetable = ShopMonthStat.objects.create(
             shop=self.shop,
@@ -277,7 +279,7 @@ class TestAutoSettings(APITestCase):
             dttm_work_end=datetime.combine(dt, tm_to),
             type_id=WorkerDay.TYPE_WORKDAY,
             id=self.wd1_plan_not_approved.id,
-            is_approved = False
+            is_approved=False
         )
         self.assertEqual(len(wd1), 1)
 
@@ -288,6 +290,7 @@ class TestAutoSettings(APITestCase):
             dttm_work_start=datetime.combine(dt, tm_from),
             dttm_work_end=datetime.combine(dt, tm_to),
             type_id=WorkerDay.TYPE_WORKDAY,
+            # TODO: что за случай? -- почему подтвежденная версия становится черновиком?
             parent_worker_day_id=self.wd2_plan_approved.id,
             is_approved=False
         )
@@ -308,7 +311,6 @@ class TestAutoSettings(APITestCase):
             worker_day__in=[wd1[0], wd2[0]],
             work_type=self.work_type2,
         ).count(), 2)
-
 
     def test_delete_tt_created_by(self):
         dt_from = date.today() + timedelta(days=1)
@@ -1491,3 +1493,126 @@ class TestAutoSettings(APITestCase):
         self.assertEqual(wd.employee_id, self.employee2.id)
         self.assertEqual(wd.shop_id, self.shop.id)
         self.assertEqual(wd.type_id, WorkerDay.TYPE_WORKDAY)
+
+    def test_multiple_workerday_on_one_date_sent_to_algo(self):
+        dt = date(2021, 2, 1)
+        WorkerDayFactory(
+            employment=self.employment8,
+            employee=self.employment8.employee,
+            shop=self.employment8.shop,
+            dt=dt,
+            type_id=WorkerDay.TYPE_WORKDAY,
+            dttm_work_start=datetime.combine(dt, time(10)),
+            dttm_work_end=datetime.combine(dt, time(15)),
+            is_approved=True,
+            cashbox_details__work_type=self.work_type,
+        )
+        WorkerDayFactory(
+            employment=self.employment8,
+            employee=self.employment8.employee,
+            shop=self.employment8.shop,
+            dt=dt,
+            type_id=WorkerDay.TYPE_WORKDAY,
+            dttm_work_start=datetime.combine(dt, time(17)),
+            dttm_work_end=datetime.combine(dt, time(23)),
+            is_approved=True,
+            cashbox_details__work_type=self.work_type,
+        )
+
+        data = self._test_create_tt(dt, dt, use_not_approved=True, shop_id=self.employment8.shop_id)
+        employment2Info = list(filter(lambda x: x['general_info']['id'] == self.employee8.id, data['cashiers']))[0]
+        self.assertEqual(len(employment2Info['workdays']), 0)
+
+        data = self._test_create_tt(dt, dt, use_not_approved=False, shop_id=self.employment8.shop_id)
+        employment2Info = list(filter(lambda x: x['general_info']['id'] == self.employee8.id, data['cashiers']))[0]
+        self.assertEqual(len(employment2Info['workdays']), 2)
+        self.assertEqual(employment2Info['workdays'][0]['type'], 'W')
+        self.assertEqual(employment2Info['workdays'][0]['dt'], '2021-02-01')
+        self.assertEqual(employment2Info['workdays'][1]['type'], 'W')
+        self.assertEqual(employment2Info['workdays'][1]['dt'], '2021-02-01')
+
+    def test_multiple_workerday_received_from_algo(self):
+        timetable = ShopMonthStat.objects.create(
+            shop=self.shop,
+            dt=now().date().replace(day=1),
+            status=ShopMonthStat.PROCESSING,
+            dttm_status_change=now(),
+        )
+
+        dt = now().date()
+        tm_from1 = time(10, 0, 0)
+        tm_to1 = time(20, 0, 0)
+
+        tm_from2 = time(10, 0, 0)
+        tm_to2 = time(20, 0, 0)
+
+        response = self.client.post(self.url, {
+            'timetable_id': timetable.id,
+            'data': json.dumps({
+                'timetable_status': 'R',
+                'users': {
+                    self.employee2.id: {
+                        'workdays': [
+                            {
+                                'dt': Converter.convert_date(dt),
+                                'type': 'W',
+                                'dttm_work_start': Converter.convert_datetime(datetime.combine(dt, tm_from1)),
+                                'dttm_work_end': Converter.convert_datetime(datetime.combine(dt, tm_to1)),
+                                'details': [{
+                                    'work_type_id': self.work_type2.id,
+                                    'percent': 100,
+                                }]
+                            },
+                            {
+                                'dt': Converter.convert_date(dt),
+                                'type': 'W',
+                                'dttm_work_start': Converter.convert_datetime(datetime.combine(dt, tm_from2)),
+                                'dttm_work_end': Converter.convert_datetime(datetime.combine(dt, tm_to2)),
+                                'details': [{
+                                    'work_type_id': self.work_type2.id,
+                                    'percent': 100,
+                                }]
+                            },
+                            {
+                                'dt': Converter.convert_date(dt + timedelta(1)),
+                                'type': 'H',
+                                'dttm_work_start': None,
+                                'dttm_work_end': None,
+                                'details': [],
+                            },
+                            {
+                                'dt': Converter.convert_date(dt + timedelta(2)),
+                                'type': 'W',
+                                'dttm_work_start': Converter.convert_datetime(datetime.combine(dt + timedelta(2), tm_from1)),
+                                'dttm_work_end': Converter.convert_datetime(datetime.combine(dt + timedelta(2), tm_to2)),
+                                'details': [{
+                                    'work_type_id': self.work_type2.id,
+                                    'percent': 100,
+                                }]
+                            },
+                            {
+                                'dt': Converter.convert_date(dt + timedelta(3)),
+                                'type': 'W',
+                                'dttm_work_start': Converter.convert_datetime(datetime.combine(dt + timedelta(3), tm_from1)),
+                                'dttm_work_end': Converter.convert_datetime(datetime.combine(dt + timedelta(3), tm_to2)),
+                                'details': [{
+                                    'work_type_id': self.work_type2.id,
+                                    'percent': 100,
+                                }]
+                            },
+                        ]
+                    },
+                }
+            })
+        })
+
+        self.assertEqual(response.status_code, 200)
+
+        self.assertEqual(WorkerDay.objects.filter(
+            shop=self.shop,
+            is_fact=False,
+            type_id=WorkerDay.TYPE_WORKDAY,
+            is_approved=False,
+            dt=dt,
+            employee_id=self.employee2.id,
+        ).count(), 2)

@@ -150,12 +150,12 @@ class UserConverter(Converter):
 class WorkerDayConverter(Converter):
     @classmethod
     def convert_function(cls, obj, need_percentage=False):
-        # TODO: получать список по is_dayoff false?
-        workday_types = [WorkerDay.TYPE_WORKDAY]
-        workday_types.append('R') # дни отработанные в других магазинах
+        types_with_details = [WorkerDay.TYPE_WORKDAY]
+        # TODO: переделать на какой-то отдельный параметр? -- использовать существующее поле плохо
+        types_with_details.append('R')  # дни отработанные в других магазинах
 
         def __work_tm(__field):
-            return cls.convert_time(__field) if obj.type_id in workday_types else None
+            return cls.convert_time(__field) if (obj.type_id == 'R' or not obj.type.is_dayoff) else None
 
         data = {
             'id': obj.id,
@@ -171,7 +171,7 @@ class WorkerDayConverter(Converter):
                     'percent': wdds.work_part * 100,
                 }
                 for wdds in obj.worker_day_details.filter(work_part__gt=0)
-            ] if obj.id and obj.type_id in workday_types else [],
+            ] if obj.id and obj.type_id in types_with_details else [],
             'work_type': obj.work_type_id if hasattr(obj, 'work_type_id') else None,
             'created_by': obj.created_by_id,
             'comment': obj.comment,

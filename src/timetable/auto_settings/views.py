@@ -425,15 +425,10 @@ class AutoSettingsViewSet(viewsets.ViewSet):
                 wd_mod.work_type_id = wd['work_types__id'] if wd['work_types__id'] else None
                 array.append(wd_mod)
 
-        new_worker_days = []
-        new_worker_days_filter = {}
-        if form['use_not_approved']:
-            new_worker_days_filter['is_approved'] = False
-        worker_days_db = WorkerDay.objects.get_last_plan(
+        base_wd_qs = WorkerDay.objects.filter(
             employee_id__in=employee_ids,
-            dt__gte=dt_from,
-            dt__lte=dt_to,
-            **new_worker_days_filter,
+            is_fact=False,
+            is_approved=not form['use_not_approved'],
         ).exclude(
             type_id=WorkerDay.TYPE_EMPTY,
         ).order_by(
@@ -450,28 +445,17 @@ class AutoSettingsViewSet(viewsets.ViewSet):
             'created_by_id',
             'shop_id',
         )
+        new_worker_days = []
+        worker_days_db = base_wd_qs.filter(
+            dt__gte=dt_from,
+            dt__lte=dt_to,
+        )
         fill_wd_array(worker_days_db, new_worker_days, prev_data=form.get('is_remaking', False))
 
         prev_worker_days = []
-        worker_days_db = WorkerDay.objects.get_last_plan(
-            employee_id__in=employee_ids,
+        worker_days_db = base_wd_qs.filter(
             dt__gte=dt_from - timedelta(days=7),
-            dt__lt=dt_from, # не должны попадать дни за начало периода
-            **new_worker_days_filter,
-        ).exclude(
-            type_id=WorkerDay.TYPE_EMPTY,
-        ).order_by(
-            'dt'
-        ).values(
-            'id',
-            'type_id',
-            'dttm_added',
-            'dt',
-            'employee_id',
-            'dttm_work_start',
-            'dttm_work_end',
-            'work_types__id',
-            'created_by_id',
+            dt__lt=dt_from,  # не должны попадать дни за начало периода
         )
         fill_wd_array(worker_days_db, prev_worker_days, prev_data=True)
 
@@ -551,21 +535,18 @@ class AutoSettingsViewSet(viewsets.ViewSet):
         # Уже составленное расписание
         worker_day = {}
         for worker_d in new_worker_days:
-            key = worker_d.employee_id
-            if key not in worker_day:
-                worker_day[key] = []
             # дни отработанные в других отделах
             if worker_d.shop_id and worker_d.shop_id != shop_id:
                 worker_d.type_id = 'R'
-            worker_day[key].append(worker_d)
+
+            key = worker_d.employee_id
+            worker_day.setdefault(key, []).append(worker_d)
 
         # Расписание за прошлую неделю от даты составления
         prev_data = {}
         for worker_d in prev_worker_days:
             key = worker_d.employee_id
-            if key not in prev_data:
-                prev_data[key] = []
-            prev_data[key].append(worker_d)
+            prev_data.setdefault(key, []).append(worker_d)
 
         employment_stat_dict = count_prev_paid_days(dt_from - timedelta(days=1), employments, shop.region_id)
         # month_stat = count_prev_paid_days(dt_to + timedelta(days=1), employments, shop.region_id, dt_start=dt_from, is_approved=not form['use_not_approved'])
@@ -848,7 +829,6 @@ class AutoSettingsViewSet(viewsets.ViewSet):
             timetable = ShopMonthStat.objects.get(id=form['timetable_id'])
 
             shop = timetable.shop
-            # break_triplets = json.loads(shop.settings.break_triplets) if shop.settings else []
             timetable.status = data['timetable_status']
             timetable.status_message = (data.get('status_message') or '')[:256]
             timetable.save()
@@ -873,99 +853,67 @@ class AutoSettingsViewSet(viewsets.ViewSet):
                         is_visible=True,
                     )
                 }
+                workerdays_data = []
                 for uid, v in data['users'].items():
                     uid = int(uid)
                     for wd in v['workdays']:
-                        # todo: actually use a form here is better
-                        # todo: too much request to db
-
                         if wd['type'] == 'R':
                             continue
 
-                        dt = Converter.parse_date(wd['dt'])
-                        wd_obj = WorkerDay(
+                        wd_data = dict(
                             is_approved=False,
                             is_fact=False,
-                            dt=dt,
+                            dt=wd['dt'],
                             employee_id=uid,
-                            type_id=wd['type']
+                            type_id=wd['type'],
+                            created_by_id=None,
+                            last_edited_by_id=None,
                         )
 
-                        wdays = {w.is_approved: w for w in WorkerDay.objects.filter(
+                        plan_draft_wdays = list(WorkerDay.objects.filter(
+                            is_approved=False,
                             is_fact=False,
+                            dt=wd['dt'],
                             employee_id=uid,
-                            dt=dt,
-                        )}
-
-                        #неподтвержденная версия
-                        if False in wdays:
-                            wd_obj = wdays[False]
-                            # дни отработанные в других магазинах
-                            if wd_obj.shop_id and wd_obj.shop_id != shop.id and wd_obj.type_id != WorkerDay.TYPE_EMPTY:
+                        ).exclude(
+                            type_id=WorkerDay.TYPE_EMPTY,
+                        ).only('id', 'shop_id', 'type_id'))
+                        if plan_draft_wdays and len(plan_draft_wdays) == 1:
+                            plan_draft_wd = plan_draft_wdays[0]
+                            if plan_draft_wd.shop_id and plan_draft_wd.shop_id != shop.id:
                                 continue
-                            if wd_obj.created_by_id is None or wd_obj.type_id == WorkerDay.TYPE_EMPTY:
-                                wd_obj.type_id = wd['type']
-                                wd_obj.created_by_id = None
-                                WorkerDayCashboxDetails.objects.filter(worker_day=wd_obj).delete()
-                        elif True in wdays:
-                            wd_obj.parent_worker_day=wdays[True]
+                            wd_data['id'] = plan_draft_wd.id
 
                         if wd['type'] == WorkerDay.TYPE_WORKDAY:
-                            wd_obj.shop = shop
-                            wd_obj.employment = employments.get(uid)
+                            wd_data['shop_id'] = shop.id
+                            employment = employments.get(uid)
+                            wd_data['employment_id'] = employment.id if employment else None
 
-                        if wd_obj.created_by_id is None or wd_obj.type_id == WorkerDay.TYPE_EMPTY:
-                            if WorkerDay.is_type_with_tm_range(wd_obj.type_id):
-                                wd_obj.dttm_work_start = Converter.parse_datetime(wd['dttm_work_start']) # todo: rewrite with default instrument
-                                wd_obj.dttm_work_end = Converter.parse_datetime(wd['dttm_work_end'])  # todo: rewrite with default instrument
-                                # wd_obj.work_hours = WorkerDay.count_work_hours(break_triplets, wd_obj.dttm_work_start, wd_obj.dttm_work_end)
+                            wd_details = wd.get('details', [])
+                            for wdd_data in wd_details:
+                                percent = wdd_data.pop('percent')
+                                wdd_data['work_part'] = percent / 100
+                            wd_data['worker_day_details'] = wd_details
 
-                                if wd_obj.id is None:
-                                    WorkerDay.objects_with_excluded.filter(
-                                        is_approved=False,
-                                        is_fact=False,
-                                        dt=wd_obj.dt,
-                                        employee_id=wd_obj.employee_id,
-                                        employment_id=wd_obj.employment_id,
-                                    ).delete()
-                                wd_obj.save()
+                        if WorkerDay.is_type_with_tm_range(wd['type']):  # TODO: not is_dayoff
+                            wd_data['dttm_work_start'] = Converter.parse_datetime(wd['dttm_work_start'])
+                            wd_data['dttm_work_end'] = Converter.parse_datetime(wd['dttm_work_end'])
+                        else:
+                            wd_data['dttm_work_start'] = None
+                            wd_data['dttm_work_end'] = None
+                            wd_data['work_hours'] = timedelta(hours=0)
+                            wd_data['shop_id'] = None
+                            wd_data['employment_id'] = None
 
-                                wdd_list = []
+                        workerdays_data.append(wd_data)
 
-                                for wdd in wd['details']:
-                                    wdd_el = WorkerDayCashboxDetails(
-                                        worker_day=wd_obj,
-                                        work_part=wdd['percent'] / 100,
-                                        work_type_id=wdd['work_type_id'],
-                                    )
-                                    # if wdd['work_type_id'] > 0:
-                                    #     wdd_el.work_type_id = wdd['type']
-                                    # else:
-                                    #     wdd_el.status = WorkerDayCashboxDetails.TYPE_BREAK
-
-                                    wdd_list.append(wdd_el)
-                                WorkerDayCashboxDetails.objects.bulk_create(wdd_list)
-
-                            else:
-                                wd_obj.dttm_work_start = None
-                                wd_obj.dttm_work_end = None
-                                wd_obj.work_hours = timedelta(hours=0)
-                                wd_obj.shop = None
-                                wd_obj.employment = None
-                                if wd_obj.id is None:
-                                    WorkerDay.objects_with_excluded.filter(
-                                        is_approved=False,
-                                        is_fact=False,
-                                        dt=wd_obj.dt,
-                                        employee_id=wd_obj.employee_id,
-                                    ).delete()
-                                wd_obj.save()
+                _objs, stats = WorkerDay.batch_update_or_create(data=workerdays_data)
 
                 for work_type in shop.work_types.all():
                     cancel_shop_vacancies.apply_async((shop.id, work_type.id))
                     create_shop_vacancies_and_notify.apply_async((shop.id, work_type.id))
 
-        return Response({})
+        return Response({'stats': stats})
 
     @swagger_auto_schema(request_body=AutoSettingsDeleteSerializer, methods=['post'], responses={200: 'empty response'})
     @action(detail=False, methods=['post'])
@@ -1085,6 +1033,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
         # )
 
         return Response()
+
 
 def count_prev_paid_days(dt_end, employments, region_id, dt_start=None, is_approved=True):
     """
