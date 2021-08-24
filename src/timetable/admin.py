@@ -21,6 +21,7 @@ from src.timetable.models import (
     Event,
     WorkerDay,
     WorkTypeName,
+    WorkerDayType,
 )
 
 
@@ -274,3 +275,28 @@ class EventAdmin(admin.ModelAdmin):
 class WorkTypeNameAdmin(admin.ModelAdmin):
     list_display = ('id', 'name')
     search_fields = ('name',)
+
+
+@admin.register(WorkerDayType)
+class WorkerDayTypeAdmin(admin.ModelAdmin):
+    list_display = (
+        'code',
+        'name',
+        'use_in_plan',
+        'use_in_plan',
+        'excel_load_code',
+        'is_dayoff',
+        'is_work_hours',
+        'is_reduce_norm',
+        'is_system',
+        'show_stat_in_days',
+        'show_stat_in_hours',
+        'ordering',
+        'is_active',
+    )
+    search_fields = ('name', 'short_name', 'code')
+
+    def has_delete_permission(self, request, obj=None):
+        if obj and obj.is_system:
+            return False
+        return super(WorkerDayTypeAdmin, self).has_delete_permission(request, obj=obj)

@@ -409,7 +409,7 @@ class WorkerDayType(AbstractModel):
         default=False,
     )
     is_reduce_norm = models.BooleanField('Снижает ли норму часов (отпуска, больничные и тд)', default=False)
-    is_system = models.BooleanField('Системный (нельзя удалять)', default=False)
+    is_system = models.BooleanField('Системный (нельзя удалять)', default=False, editable=False)
     show_stat_in_days = models.BooleanField(
         'Отображать в статистике по сотрудникам количество дней отдельно для этого типа',
         default=False,
@@ -423,6 +423,8 @@ class WorkerDayType(AbstractModel):
 
     class Meta(AbstractModel.Meta):
         ordering = ['-ordering', 'name']
+        verbose_name = 'Тип дня сотрудника'
+        verbose_name_plural = 'Типы дней сотрудников'
 
     def __str__(self):
         return '{} ({})'.format(self.name, self.code)
