@@ -445,9 +445,8 @@ class Shop(MPTTModel, AbstractActiveNetworkSpecificCodeNamedModel):
         fields=['tm_open_dict', 'tm_close_dict', 'load_template', 'latitude', 'longitude', 'fias_code', 'director_id'])
 
     def __str__(self):
-        return '{}, {}, {}, {}'.format(
+        return '{}, {}, {}'.format(
             self.name,
-            self.parent_title(),
             self.id,
             self.code,
         )

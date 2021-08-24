@@ -136,16 +136,16 @@ class WorkerDayAdmin(admin.ModelAdmin):
     )
     search_fields = ('employee__user__last_name', 'shop__name', 'shop__parent__name', 'id', 'dt')
     list_filter = (
-        ('dt', DateRangeFilter), 
-        'is_fact', 
-        'is_approved', 
-        ('shop', RelatedOnlyDropdownFilter), 
-        ('type', ChoiceDropdownFilter), 
-        ('dttm_modified', DateTimeRangeFilter), 
+        ('dt', DateRangeFilter),
+        'is_fact',
+        'is_approved',
+        ('shop', RelatedOnlyDropdownFilter),
+        ('type', ChoiceDropdownFilter),
+        ('dttm_modified', DateTimeRangeFilter),
         ('created_by', RelatedOnlyDropdownFilter),
     )
-    raw_id_fields = ('parent_worker_day', 'employment', 'created_by', 'last_edited_by', 'employee', 'shop')
-    list_select_related = ('employee__user', 'shop', 'created_by')
+    raw_id_fields = ('parent_worker_day', 'employment', 'created_by', 'last_edited_by', 'employee', 'shop', 'type', 'closest_plan_approved')
+    list_select_related = ('employee__user', 'shop', 'created_by', 'last_edited_by', 'parent_worker_day', 'type', 'closest_plan_approved')
     readonly_fields = ('dttm_modified',)
     change_list_template = 'worker_day_change_list.html'
 
