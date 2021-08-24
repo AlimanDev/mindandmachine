@@ -436,7 +436,8 @@ class EmploymentSerializer(serializers.ModelSerializer):
                 employee_id=instance.employee_id,
             ).update(is_visible=validated_data.get('is_visible', True))
 
-        if self.context['request'].user.network.ignore_shop_code_when_updating_employment_via_api:
+        if getattr(self.context['request'], 'by_code', False) and self.context[
+            'request'].user.network.ignore_shop_code_when_updating_employment_via_api:
             validated_data.pop('shop_id', None)
 
         return super().update(instance, validated_data, *args, **kwargs)
