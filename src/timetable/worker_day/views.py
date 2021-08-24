@@ -901,6 +901,55 @@ class WorkerDayViewSet(BaseModelViewSet):
             ])
         return Response(WorkerDaySerializer(editable_vacancy).data)
 
+    def _change_range(self, is_fact, is_approved, dt_from, dt_to, type_id, employee_tabel_code, res=None):
+        deleted = WorkerDay.objects.filter(
+            employee__tabel_code=employee_tabel_code,
+            dt__gte=dt_from,
+            dt__lte=dt_to,
+            is_approved=is_approved,
+            is_fact=is_fact,
+        ).exclude(
+            type_id=type_id,
+        ).delete()
+
+        existing_dates = list(WorkerDay.objects.filter(
+            employee__tabel_code=employee_tabel_code,
+            dt__gte=dt_from,
+            dt__lte=dt_to,
+            is_approved=is_approved,
+            is_fact=is_fact,
+            type_id=type_id,
+        ).values_list('dt', flat=True))
+
+        wdays_to_create = []
+        for dt in [d.date() for d in pd.date_range(dt_from, dt_to)]:
+            if dt not in existing_dates:
+                employment = Employment.objects.get_active_empl_by_priority(
+                    network_id=self.request.user.network_id,
+                    dt=dt,
+                    employee__tabel_code=employee_tabel_code,
+                ).first()
+                if employment:
+                    wdays_to_create.append(
+                        WorkerDay(
+                            employment=employment,
+                            employee_id=employment.employee_id,
+                            dt=dt,
+                            is_approved=is_approved,
+                            is_fact=is_fact,
+                            type_id=type_id,
+                            created_by=self.request.user,
+                        )
+                    )
+        WorkerDay.objects.bulk_create(wdays_to_create)
+
+        if res is not None:
+            employee_stats = res.setdefault(employee_tabel_code, {})
+            employee_stats['deleted_count'] = employee_stats.get(
+                'deleted_count', 0) + deleted[1].get('timetable.WorkerDay', 0)
+            employee_stats['existing_count'] = employee_stats.get('existing_count', 0) + len(existing_dates)
+            employee_stats['created_count'] = employee_stats.get('created_count', 0) + len(wdays_to_create)
+
     @swagger_auto_schema(
         request_body=ChangeRangeListSerializer,
         operation_description='''
@@ -911,60 +960,30 @@ class WorkerDayViewSet(BaseModelViewSet):
     )
     @action(detail=False, methods=['post'])
     def change_range(self, request):
-        serializer = ChangeRangeListSerializer(data=request.data, context=self.get_serializer_context())
-        serializer.is_valid(raise_exception=True)
+        with transaction.atomic():
+            serializer = ChangeRangeListSerializer(data=request.data, context=self.get_serializer_context())
+            serializer.is_valid(raise_exception=True)
 
-        res = {}
-        for range in serializer.validated_data['ranges']:
-            tabel_code = range['worker']
-
-            with transaction.atomic():
-                deleted = WorkerDay.objects.filter(
-                    employee__tabel_code=tabel_code,
-                    dt__gte=range['dt_from'],
-                    dt__lte=range['dt_to'],
+            res = {}
+            for range in serializer.validated_data['ranges']:
+                self._change_range(
+                    is_fact=False,  # всегда в план
                     is_approved=range['is_approved'],
-                    is_fact=range['is_fact'],
-                ).exclude(
+                    dt_from=range['dt_from'],
+                    dt_to=range['dt_to'],
                     type_id=range['type'],
-                ).delete()
-
-                existing_dates = list(WorkerDay.objects.filter(
-                    employee__tabel_code=tabel_code,
-                    dt__gte=range['dt_from'],
-                    dt__lte=range['dt_to'],
-                    is_approved=range['is_approved'],
-                    is_fact=range['is_fact'],
-                    type_id=range['type'],
-                ).values_list('dt', flat=True))
-
-                wdays_to_create = []
-                for dt in [d.date() for d in pd.date_range(range['dt_from'], range['dt_to'])]:
-                    if dt not in existing_dates:
-                        employment = Employment.objects.get_active_empl_by_priority(
-                            network_id=self.request.user.network_id,
-                            dt=dt,
-                            employee__tabel_code=tabel_code,
-                        ).first()
-                        if employment:
-                            wdays_to_create.append(
-                                WorkerDay(
-                                    employment=employment,
-                                    employee_id=employment.employee_id,
-                                    dt=dt,
-                                    is_approved=range['is_approved'],
-                                    is_fact=range['is_fact'],
-                                    type_id=range['type'],
-                                    created_by=self.request.user,
-                                )
-                            )
-                WorkerDay.objects.bulk_create(wdays_to_create)
-
-                res[tabel_code] = {
-                    'deleted_count': deleted[1].get('timetable.WorkerDay', 0),
-                    'existing_count': len(existing_dates),
-                    'created_count': len(wdays_to_create)
-                }
+                    employee_tabel_code=range['worker'],
+                    res=res,
+                )
+                if range['is_approved']:
+                    self._change_range(
+                        is_fact=False,  # всегда в план
+                        is_approved=False,
+                        dt_from=range['dt_from'],
+                        dt_to=range['dt_to'],
+                        type_id=range['type'],
+                        employee_tabel_code=range['worker'],
+                    )
 
         return Response(res)
 

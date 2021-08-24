@@ -488,8 +488,9 @@ class ChangeListSerializer(serializers.Serializer):
         )
         return True
 
+
 class ChangeRangeSerializer(serializers.Serializer):
-    is_fact = serializers.BooleanField()
+    #is_fact = serializers.BooleanField()
     is_approved = serializers.BooleanField()
     dt_from = serializers.DateField()
     dt_to = serializers.DateField()

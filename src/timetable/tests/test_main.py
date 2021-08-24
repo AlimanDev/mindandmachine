@@ -1277,7 +1277,7 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
               "dt_from": self.dt - timedelta(days=10),
               "dt_to": self.dt + timedelta(days=10),
               "type": WorkerDay.TYPE_MATERNITY,
-              "is_fact": False,
+              "is_fact": True,  # проверим, что наличие is_fact True не влияет (через этот метод всегда в план)
               "is_approved": True
             }
           ]
@@ -1290,7 +1290,21 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
         )
         self.assertFalse(WorkerDay.objects.filter(id=self.worker_day_plan_approved.id).exists())
         self.assertEqual(
-            WorkerDay.objects.filter(employee__tabel_code=self.employee2.tabel_code, type_id=WorkerDay.TYPE_MATERNITY).count(),
+            WorkerDay.objects.filter(
+                employee__tabel_code=self.employee2.tabel_code,
+                type_id=WorkerDay.TYPE_MATERNITY,
+                is_approved=True,
+                is_fact=False,
+            ).count(),
+            21,
+        )
+        self.assertEqual(
+            WorkerDay.objects.filter(
+                employee__tabel_code=self.employee2.tabel_code,
+                type_id=WorkerDay.TYPE_MATERNITY,
+                is_approved=False,
+                is_fact=False,
+            ).count(),
             21,
         )
 
