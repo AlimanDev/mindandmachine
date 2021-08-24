@@ -406,6 +406,7 @@ class Shop(MPTTModel, AbstractActiveNetworkSpecificCodeNamedModel):
 
     load_template = models.ForeignKey('forecast.LoadTemplate', on_delete=models.SET_NULL, null=True, related_name='shops', blank=True)
     load_template_status = models.CharField(max_length=1, default=LOAD_TEMPLATE_READY, choices=LOAD_TEMPLATE_STATUSES)
+    load_template_settings = models.TextField(default='{}')
     exchange_settings = models.ForeignKey('timetable.ExchangeSettings', on_delete=models.SET_NULL, null=True, related_name='shops', blank=True)
 
     staff_number = models.SmallIntegerField(default=0)
@@ -510,6 +511,10 @@ class Shop(MPTTModel, AbstractActiveNetworkSpecificCodeNamedModel):
     @property
     def close_times(self):
         return self._parse_times('tm_close_dict')
+
+    @property
+    def load_settings(self):
+        return json.loads(self.load_template_settings)
 
     @staticmethod
     def clean_time_dict(time_dict):
