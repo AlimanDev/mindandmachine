@@ -297,6 +297,7 @@ add_logger('send_doctors_schedule_to_mis')
 add_logger('calc_timesheets')
 add_logger('send_doctors_schedule_to_mis', extra_handlers=['mail_admins'])
 add_logger('mda_integration', extra_handlers=['mail_admins'])
+add_logger('algo_set_timetable', level='DEBUG' if DEBUG else 'INFO')
 
 # LOGGING USAGE:
 # import logging

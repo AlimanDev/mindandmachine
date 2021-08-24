@@ -1,9 +1,9 @@
 import json
+import logging
 from datetime import datetime, timedelta, date
-from dateutil.relativedelta import relativedelta
-from django.utils import timezone
 
 import requests
+from dateutil.relativedelta import relativedelta
 from django.conf import settings
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import transaction
@@ -13,15 +13,18 @@ from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from drf_yasg.utils import swagger_auto_schema
 from rest_framework import viewsets
-from rest_framework.authentication import BaseAuthentication
 from rest_framework.decorators import action
-from rest_framework.exceptions import ValidationError, AuthenticationFailed
+from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 
-from src.base.models import Shop, Employment, User, ProductionDay, ShopSettings, WorkerPosition, Employee
+from src.base.models import Shop, Employment, ProductionDay, ShopSettings, WorkerPosition, Employee
 from src.base.permissions import Permission
-from src.timetable.vacancy.tasks import create_shop_vacancies_and_notify, cancel_shop_vacancies
 from src.forecast.models import PeriodClients
+from src.timetable.auto_settings.serializers import (
+    AutoSettingsCreateSerializer,
+    AutoSettingsDeleteSerializer,
+    AutoSettingsSetSerializer,
+)
 from src.timetable.models import (
     ShopMonthStat,
     WorkType,
@@ -32,12 +35,7 @@ from src.timetable.models import (
     UserWeekdaySlot,
     WorkerDayType,
 )
-
-from src.timetable.auto_settings.serializers import (
-    AutoSettingsCreateSerializer,
-    AutoSettingsDeleteSerializer,
-    AutoSettingsSetSerializer,
-)
+from src.timetable.vacancy.tasks import create_shop_vacancies_and_notify, cancel_shop_vacancies
 from src.timetable.worker_day.stat import CalendarPaidDays, WorkersStatsGetter
 from src.util.models_converter import (
     WorkTypeConverter,
@@ -45,6 +43,8 @@ from src.util.models_converter import (
     WorkerDayConverter,
     Converter,
 )
+
+algo_set_timetable_logger = logging.getLogger('algo_set_timetable')
 
 
 class AutoSettingsViewSet(viewsets.ViewSet):
@@ -824,6 +824,8 @@ class AutoSettingsViewSet(viewsets.ViewSet):
         except:
             raise ValidationError('cannot parse json')
 
+        algo_set_timetable_logger.debug(form['data'])
+
         with transaction.atomic():
             timetable = ShopMonthStat.objects.get(id=form['timetable_id'])
 
@@ -885,11 +887,19 @@ class AutoSettingsViewSet(viewsets.ViewSet):
 
                         employee_key = f'{wd["dt"]}_{uid}'
                         plan_draft_wdays = plan_draft_wdays_cache.get(employee_key)
-                        if plan_draft_wdays and len(plan_draft_wdays) == 1:
-                            plan_draft_wd = plan_draft_wdays[0]
-                            if not plan_draft_wd.type.is_dayoff and plan_draft_wd.shop_id and plan_draft_wd.shop_id != shop.id:
+
+                        if plan_draft_wdays:
+                            # продпускаем даты, где есть ручные изменения
+                            if any((wd.created_by_id or wd.last_edited_by_id) for wd in plan_draft_wdays):  # TODO: тест
                                 continue
-                            wd_data['id'] = plan_draft_wd.id
+
+                            # если есть хотя бы 1 день из другого магазина, то пропускаем
+                            if any((not wd.type.is_dayoff and wd.shop_id and wd.shop_id) for wd in plan_draft_wdays):
+                                continue
+
+                            # если день на дату единственный, то обновляем его, а не удаляем + создаем новый
+                            if len(plan_draft_wdays) == 1:
+                                wd_data['id'] = plan_draft_wdays[0].id  # чтобы обновился существующий день
 
                         if wd['type'] == WorkerDay.TYPE_WORKDAY:
                             wd_data['shop_id'] = shop.id
@@ -1103,6 +1113,5 @@ def count_prev_paid_days(dt_end, employments, region_id, dt_start=None, is_appro
             employment_stat_dict[employment.id]['paid_hours'] = prev_info[employment.id]['paid_hours']
             employment_stat_dict[employment.id]['vacations'] = prev_info[employment.id]['vacations']
             employment_stat_dict[employment.id]['no_data'] = prev_info[employment.id]['no_data'] + ((dt_end - dt_start).days - prev_info[employment.id]['all_days'])
-
 
     return employment_stat_dict
