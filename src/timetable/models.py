@@ -11,7 +11,7 @@ from django.db.models import (
     Subquery, OuterRef, Max, Q, Case, When, Value, FloatField, F, IntegerField, Exists
 )
 from django.db.models import UniqueConstraint
-from django.db.models.functions import Abs, Cast, Extract, Least, ExtractSecond
+from django.db.models.functions import Abs, Cast, Extract, Least
 from django.db.models.query import QuerySet
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
@@ -428,6 +428,10 @@ class WorkerDayType(AbstractModel):
 
     def __str__(self):
         return '{} ({})'.format(self.name, self.code)
+
+    @classmethod
+    def get_is_dayoff_types(cls):
+        return set(cls.objects.filter(is_dayoff=True).values_list('code', flat=True))
 
 
 class WorkerDay(AbstractModel):

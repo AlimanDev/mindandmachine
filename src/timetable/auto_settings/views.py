@@ -28,9 +28,9 @@ from src.timetable.models import (
     WorkerConstraint,
     EmploymentWorkType,
     WorkerDay,
-    WorkerDayCashboxDetails,
     Slot,
     UserWeekdaySlot,
+    WorkerDayType,
 )
 
 from src.timetable.auto_settings.serializers import (
@@ -800,7 +800,6 @@ class AutoSettingsViewSet(viewsets.ViewSet):
 
         return Response()
 
-
     @swagger_auto_schema(request_body=AutoSettingsSetSerializer, methods=['post'], responses={200: '{}', 400: 'cannot parse json'})
     @action(detail=False, methods=['post'])
     def set_timetable(self, request):
@@ -835,7 +834,9 @@ class AutoSettingsViewSet(viewsets.ViewSet):
             if timetable.status != ShopMonthStat.READY and timetable.status_message:
                 return Response(timetable.status_message)
 
+            stats = {}
             if data['users']:
+                is_dayoff_types = WorkerDayType.get_is_dayoff_types()
                 dt_from = date.max
                 dt_to = date.min
                 for wd in list(data['users'].values())[0]['workdays']:
@@ -853,6 +854,18 @@ class AutoSettingsViewSet(viewsets.ViewSet):
                         is_visible=True,
                     )
                 }
+
+                plan_draft_wdays_cache = {}
+                for wd in WorkerDay.objects.filter(
+                            is_approved=False,
+                            is_fact=False,
+                            dt__gte=dt_from,
+                            dt__lte=dt_to,
+                            employee_id__in=data['users'].keys(),
+                        ).only('id', 'employee_id', 'dt', 'shop_id', 'type_id', 'type__is_dayoff'):
+                    employee_key = f'{wd.dt}_{wd.employee_id}'
+                    plan_draft_wdays_cache.setdefault(employee_key, []).append(wd)
+
                 workerdays_data = []
                 for uid, v in data['users'].items():
                     uid = int(uid)
@@ -870,17 +883,11 @@ class AutoSettingsViewSet(viewsets.ViewSet):
                             last_edited_by_id=None,
                         )
 
-                        plan_draft_wdays = list(WorkerDay.objects.filter(
-                            is_approved=False,
-                            is_fact=False,
-                            dt=wd['dt'],
-                            employee_id=uid,
-                        ).exclude(
-                            type_id=WorkerDay.TYPE_EMPTY,
-                        ).only('id', 'shop_id', 'type_id'))
+                        employee_key = f'{wd["dt"]}_{uid}'
+                        plan_draft_wdays = plan_draft_wdays_cache.get(employee_key)
                         if plan_draft_wdays and len(plan_draft_wdays) == 1:
                             plan_draft_wd = plan_draft_wdays[0]
-                            if plan_draft_wd.shop_id and plan_draft_wd.shop_id != shop.id:
+                            if not plan_draft_wd.type.is_dayoff and plan_draft_wd.shop_id and plan_draft_wd.shop_id != shop.id:
                                 continue
                             wd_data['id'] = plan_draft_wd.id
 
@@ -895,7 +902,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
                                 wdd_data['work_part'] = percent / 100
                             wd_data['worker_day_details'] = wd_details
 
-                        if WorkerDay.is_type_with_tm_range(wd['type']):  # TODO: not is_dayoff
+                        if wd['type'] not in is_dayoff_types:
                             wd_data['dttm_work_start'] = Converter.parse_datetime(wd['dttm_work_start'])
                             wd_data['dttm_work_end'] = Converter.parse_datetime(wd['dttm_work_end'])
                         else:
