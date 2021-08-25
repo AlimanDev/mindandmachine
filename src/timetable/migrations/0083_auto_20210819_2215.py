@@ -212,23 +212,22 @@ def drop_views(apps, schema_editor):
 
 def recreate_views(apps, schema_editor):
     schema_editor.execute("""create or replace view performance as
-    SELECT t.dt,
-        t.income,
-        COALESCE(( SELECT sum(GREATEST(pf."Фактические часы работы", 0))
-               FROM plan_and_fact_hours pf
-              WHERE pf."Дата" = t.dt AND pf."ID Магазина" = t.shop_id), 0::double precision) AS work_hours,
-        t.shop_id,
-        t.shop_code
-       FROM ( SELECT s.id AS shop_id,
-                s.code AS shop_code,
-                pc.dttm_forecast::date AS dt,
-                sum(pc.value) AS income
-               FROM forecast_periodclients pc
-                 JOIN forecast_operationtype ot ON pc.operation_type_id = ot.id
-                 JOIN forecast_operationtypename otn ON ot.operation_type_name_id = otn.id
-                 JOIN base_shop s ON ot.shop_id = s.id
-              WHERE pc.type::text = 'F'::text AND otn.code::text = 'income'::text
-              GROUP BY s.id, s.code, (pc.dttm_forecast::date)) t;""")
+        select pf."Дата"                         as dt,
+               (select sum(pc.value)
+                from forecast_periodclients pc
+                         join forecast_operationtype ot on pc.operation_type_id = ot.id
+                         join forecast_operationtypename otn on ot.operation_type_name_id = otn.id
+                         join base_shop s on ot.shop_id = s.id
+                where ot.shop_id = pf."ID Магазина"
+                  and pc.type = 'F'
+                  and otn.code = 'income'
+                  and (pc.dttm_forecast::date) = pf."Дата"
+               )                                 as income,
+               sum(pf."Фактические часы работы") as work_hours,
+               pf."ID Магазина"                  as shop_id,
+               pf."Код магазина"                 as shop_code
+        from plan_and_fact_hours pf
+        group by pf."Дата", pf."ID Магазина", pf."Код магазина";""")
 
     schema_editor.execute("""\
 CREATE OR REPLACE VIEW v_mda_users AS
