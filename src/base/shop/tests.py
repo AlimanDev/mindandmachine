@@ -11,8 +11,10 @@ from rest_framework.test import APITestCase
 
 from src.base.models import Shop, ShopSchedule, NetworkConnect, Network, Employment, Group, User
 from src.base.tests.factories import UserFactory, ShopFactory
+from src.forecast.models import OperationTypeName, OperationType
 from src.forecast.tests.factories import LoadTemplateFactory
 from src.timetable.models import ShopMonthStat
+from src.timetable.models import WorkTypeName, WorkType
 from src.util.mixins.tests import TestsHelperMixin
 
 
@@ -786,3 +788,54 @@ class TestDepartment(TestsHelperMixin, APITestCase):
         data.pop('director_code')
         data.pop('nonstandard_schedule')
         self.assertDictEqual(shop, data)
+
+    def test_set_shop_default_values_on_create(self):
+        otn_doctor = OperationTypeName.objects.create(
+            network=self.network,
+            name='Прием врача',
+            code='doctor',
+        )
+        otn_clients = OperationTypeName.objects.create(
+            network=self.network,
+            name='Количество вошедших',
+            code='clients',
+        )
+        wtn_doctor = WorkTypeName.objects.create(
+            network=self.network,
+            name='Прием врача',
+            code='doctor',
+        )
+        self.network.shop_default_values = self.dump_data({
+            '.*': {
+                'wtn_codes_with_otn_codes': [
+                    ('doctor', 'doctor'),
+                    (None, 'clients'),
+                ]
+            }
+        })
+        self.network.save()
+
+        shop = Shop.objects.create(
+            name='Тест',
+            parent=self.root_shop,
+            tm_open_dict='{"all":"07:00:00"}',
+            tm_close_dict='{"all":"23:00:00"}',
+            region=self.region,
+            settings=self.shop_settings,
+            network=self.network,
+        )
+
+        self.assertTrue(WorkType.objects.filter(
+            shop=shop,
+            work_type_name=wtn_doctor,
+        ).exists())
+        self.assertTrue(OperationType.objects.filter(
+            shop=shop,
+            work_type__work_type_name=wtn_doctor,
+            operation_type_name=otn_doctor,
+        ).exists())
+        self.assertTrue(OperationType.objects.filter(
+            shop=shop,
+            work_type__isnull=True,
+            operation_type_name=otn_clients,
+        ).exists())
