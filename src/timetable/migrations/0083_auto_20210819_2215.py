@@ -211,24 +211,24 @@ def drop_views(apps, schema_editor):
 
 
 def recreate_views(apps, schema_editor):
-    schema_editor.execute("""CREATE OR REPLACE VIEW performance AS
- SELECT t.dt,
-    t.income,
-    COALESCE(( SELECT date_part('epoch'::text, sum(GREATEST(wd.work_hours, '00:00:00'::interval))) / 3600::double precision
-           FROM timetable_workerday wd
-          WHERE wd.dt = t.dt AND wd.shop_id = t.shop_id AND wd.is_approved = true AND wd.is_fact = true AND NOT (wd.employment_id IS NULL AND wd.type_id::text = 'W'::text AND wd.employee_id IS NOT NULL)), 0::double precision) AS work_hours,
-    t.shop_id,
-    t.shop_code
-   FROM ( SELECT s.id AS shop_id,
-            s.code AS shop_code,
-            pc.dttm_forecast::date AS dt,
-            sum(pc.value) AS income
-           FROM forecast_periodclients pc
-             JOIN forecast_operationtype ot ON pc.operation_type_id = ot.id
-             JOIN forecast_operationtypename otn ON ot.operation_type_name_id = otn.id
-             JOIN base_shop s ON ot.shop_id = s.id
-          WHERE pc.type::text = 'F'::text AND otn.code::text = 'income'::text
-          GROUP BY s.id, s.code, (pc.dttm_forecast::date)) t;""")
+    schema_editor.execute("""create or replace view performance as
+    SELECT t.dt,
+        t.income,
+        COALESCE(( SELECT sum(GREATEST(pf."Фактические часы работы", 0))
+               FROM plan_and_fact_hours pf
+              WHERE pf."Дата" = t.dt AND pf."ID Магазина" = t.shop_id), 0::double precision) AS work_hours,
+        t.shop_id,
+        t.shop_code
+       FROM ( SELECT s.id AS shop_id,
+                s.code AS shop_code,
+                pc.dttm_forecast::date AS dt,
+                sum(pc.value) AS income
+               FROM forecast_periodclients pc
+                 JOIN forecast_operationtype ot ON pc.operation_type_id = ot.id
+                 JOIN forecast_operationtypename otn ON ot.operation_type_name_id = otn.id
+                 JOIN base_shop s ON ot.shop_id = s.id
+              WHERE pc.type::text = 'F'::text AND otn.code::text = 'income'::text
+              GROUP BY s.id, s.code, (pc.dttm_forecast::date)) t;""")
 
     schema_editor.execute("""\
 CREATE OR REPLACE VIEW v_mda_users AS
