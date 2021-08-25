@@ -298,13 +298,11 @@ class AutoSettingsViewSet(viewsets.ViewSet):
             # auto_timetable=True, чтобы все сотрудники были, так как пересоставляем иногда для 1
         ).select_related('employee__user', 'position')
 
-        employments_by_employee_id = {}
         employees_dict = {}
         for employment in employments:
-            employments_by_employee_id.setdefault(employment.employee_id, []).append(employment)
             employees_dict.setdefault(employment.employee_id, employment.employee)
 
-        employee_ids = list(employments_by_employee_id.keys())
+        employee_ids = employments.values_list('employee_id', flat=True)
 
         worker_stats_cls = WorkersStatsGetter(
             shop_id=shop_id,
@@ -894,7 +892,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
                         plan_draft_wdays = plan_draft_wdays_cache.get(employee_key)
 
                         if plan_draft_wdays:
-                            # продпускаем даты, где есть ручные изменения
+                            # пропускаем даты, где есть ручные изменения
                             if any((wd.created_by_id or wd.last_edited_by_id) for wd in plan_draft_wdays):  # TODO: тест
                                 continue
 
@@ -902,7 +900,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
                             if any((not wd.type.is_dayoff and wd.shop_id and wd.shop_id) for wd in plan_draft_wdays):
                                 continue
 
-                            # если день на дату единственный, то обновляем его, а не удаляем + создаем новый
+                            # если день на дату единственный, то обновляем его, а не (удаляем + создаем новый)
                             if len(plan_draft_wdays) == 1:
                                 wd_data['id'] = plan_draft_wdays[0].id  # чтобы обновился существующий день
 
