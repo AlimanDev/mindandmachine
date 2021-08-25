@@ -2,6 +2,7 @@ import json
 import logging
 from datetime import datetime, timedelta, date
 
+import pandas as pd
 import requests
 from dateutil.relativedelta import relativedelta
 from django.conf import settings
@@ -17,7 +18,7 @@ from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 
-from src.base.models import Shop, Employment, ProductionDay, ShopSettings, WorkerPosition, Employee
+from src.base.models import Shop, Employment, ProductionDay, ShopSettings, WorkerPosition
 from src.base.permissions import Permission
 from src.forecast.models import PeriodClients
 from src.timetable.auto_settings.serializers import (
@@ -297,18 +298,21 @@ class AutoSettingsViewSet(viewsets.ViewSet):
             # auto_timetable=True, чтобы все сотрудники были, так как пересоставляем иногда для 1
         ).select_related('employee__user', 'position')
 
-        employee_ids = employments.values_list('employee_id', flat=True)
+        employments_by_employee_id = {}
+        employees_dict = {}
+        for employment in employments:
+            employments_by_employee_id.setdefault(employment.employee_id, []).append(employment)
+            employees_dict.setdefault(employment.employee_id, employment.employee)
+
+        employee_ids = list(employments_by_employee_id.keys())
 
         worker_stats_cls = WorkersStatsGetter(
             shop_id=shop_id,
             dt_from=dt_from,
             dt_to=dt_to,
-            employee_id__in=list(employee_ids),
+            employee_id__in=employee_ids,
         )
         stats = worker_stats_cls.run()
-
-        employees = Employee.objects.filter(id__in=employee_ids)
-        employees_dict = {e.id: e for e in employees}
 
         period_step = shop.forecast_step_minutes.hour * 60 + shop.forecast_step_minutes.minute
 
@@ -539,14 +543,12 @@ class AutoSettingsViewSet(viewsets.ViewSet):
             if worker_d.shop_id and worker_d.shop_id != shop_id:
                 worker_d.type_id = 'R'
 
-            key = worker_d.employee_id
-            worker_day.setdefault(key, []).append(worker_d)
+            worker_day.setdefault(worker_d.employee_id, {}).setdefault(worker_d.dt, []).append(worker_d)
 
         # Расписание за прошлую неделю от даты составления
         prev_data = {}
         for worker_d in prev_worker_days:
-            key = worker_d.employee_id
-            prev_data.setdefault(key, []).append(worker_d)
+            prev_data.setdefault(worker_d.employee_id, []).append(worker_d)
 
         employment_stat_dict = count_prev_paid_days(dt_from - timedelta(days=1), employments, shop.region_id)
         # month_stat = count_prev_paid_days(dt_to + timedelta(days=1), employments, shop.region_id, dt_start=dt_from, is_approved=not form['use_not_approved'])
@@ -570,60 +572,57 @@ class AutoSettingsViewSet(viewsets.ViewSet):
                 employment_stat_dict[employment.id]['required_coupled_hol_in_hol'] = 0 if coupled_weekdays else 1
 
         ########### Корректировка рабочих ###########
-        dates = [dt_from + timedelta(days=i) for i in range((dt_to - dt_from).days + 1)]
+        dates = list(pd.date_range(dt_from, dt_to).date)
+        employees_month_days_new = {}
         for employment in employments:
+            employee_month_days_new = employees_month_days_new.setdefault(employment.employee_id, {})
+
             # Для уволенных сотрудников
             if employment.dt_fired:
-                workers_month_days = worker_day.get(employment.employee_id,
-                                                    [])  # Может случиться так что для этого работника еще никаким образом расписание не составлялось
-                workers_month_days.sort(key=lambda wd: wd.dt)
-                workers_month_days_new = []
-                wd_index = 0
                 for dt in dates:
-                    if (workers_month_days[wd_index].dt if \
-                            wd_index < len(
-                                workers_month_days) else None) == dt and dt <= employment.dt_fired:  # Если вернется пустой список, нужно исключать ошибку out of range
-                        workers_month_days_new.append(workers_month_days[wd_index])
-                        wd_index += 1
+                    employee_month_days_on_dt = worker_day.get(employment.employee_id, {}).get(dt, [])
+                    employee_month_days_new_on_dt = employee_month_days_new.setdefault(dt, [])
+
+                    if employee_month_days_on_dt and dt <= employment.dt_fired:
+                        for employee_day_on_dt in employee_month_days_on_dt:
+                            employee_month_days_new_on_dt.append(employee_day_on_dt)
                     elif dt <= employment.dt_fired and employment.auto_timetable:
                         continue
                     else:
-                        workers_month_days_new.append(WorkerDay(
-                            type_id=WorkerDay.TYPE_HOLIDAY,
-                            dt=dt,
-                            employee_id=employment.employee_id,
+                        employee_month_days_new_on_dt.append(
+                            WorkerDay(
+                                type_id=WorkerDay.TYPE_HOLIDAY,
+                                dt=dt,
+                                employee_id=employment.employee_id,
+                            )
                         )
-                        )
-                worker_day[employment.employee_id] = workers_month_days_new
-                # Если для сотрудника не составляем расписание, его все равно нужно учитывать, так как он покрывает спрос
+                worker_day[employment.employee_id] = employees_month_days_new.get(employment.employee_id, {})
+
+            # Если для сотрудника не составляем расписание, его все равно нужно учитывать, так как он покрывает спрос
             # Реализация через фиксированных сотрудников, чтобы не повторять функционал
             elif not employment.auto_timetable:
                 employment.is_fixed_hours = True
-                # Может случиться так что для этого работника еще никаким образом расписание не составлялось
-                workers_month_days = worker_day.get(employment.employee_id, [])
-                workers_month_days.sort(key=lambda wd: wd.dt)
-                workers_month_days_new = []
-                wd_index = 0
                 for dt in dates:
-                    if (workers_month_days[wd_index].dt if wd_index < len(workers_month_days) else None) == dt:
-                        # Если вернется пустой список, нужно исключать ошибку out of range
-                        workers_month_days_new.append(workers_month_days[wd_index])
-                        wd_index += 1
+                    employee_month_days_on_dt = worker_day.get(employment.employee_id, {}).get(dt, [])
+                    employee_month_days_new_on_dt = employee_month_days_new.setdefault(dt, [])
+
+                    if employee_month_days_on_dt:
+                        for employee_day_on_dt in employee_month_days_on_dt:
+                            employee_month_days_new_on_dt.append(employee_day_on_dt)
                     else:
-                        workers_month_days_new.append(WorkerDay(
-                            type_id=WorkerDay.TYPE_HOLIDAY,
-                            dt=dt,
-                            employee_id=employment.employee_id,
-                        ))
-                worker_day[employment.employee_id] = workers_month_days_new
+                        employee_month_days_new_on_dt.append(
+                            WorkerDay(
+                                type_id=WorkerDay.TYPE_HOLIDAY,
+                                dt=dt,
+                                employee_id=employment.employee_id,
+                            )
+                        )
+                worker_day[employment.employee_id] = employees_month_days_new.get(employment.employee_id, {})
+
             if employment.dt_hired > dt_from:
-                workers_month_days = worker_day.get(employment.employee_id, [])
-                workers_month_days.sort(key=lambda wd: wd.dt)
-                workers_month_days_new = []
-                wd_index = 0
                 user_dt = dt_from
                 while user_dt != employment.dt_hired:
-                    workers_month_days_new.append(WorkerDay(
+                    employee_month_days_new.setdefault(dt, []).append(WorkerDay(
                         type_id=WorkerDay.TYPE_HOLIDAY,
                         dt=user_dt,
                         employee_id=employment.employee_id,
@@ -631,13 +630,19 @@ class AutoSettingsViewSet(viewsets.ViewSet):
                     user_dt = user_dt + timedelta(days=1)
                 user_dt = employment.dt_hired
                 while user_dt <= dt_to:
-                    if (workers_month_days[wd_index].dt if \
-                            wd_index < len(workers_month_days) else None) == user_dt:
-                        workers_month_days_new.append(workers_month_days[wd_index])
-                        wd_index += 1
+                    employee_month_days_on_dt = worker_day.get(employment.employee_id, {}).get(user_dt, [])
+                    employee_month_days_new_on_dt = employee_month_days_new.setdefault(user_dt, [])
+                    if employee_month_days_on_dt:
+                        for employee_day_on_dt in employee_month_days_on_dt:
+                            employee_month_days_new_on_dt.append(employee_day_on_dt)
                     user_dt = user_dt + timedelta(days=1)
 
-                worker_day[employment.employee_id] = workers_month_days_new
+                worker_day[employment.employee_id] = employees_month_days_new.get(employment.employee_id, {})
+
+        # приведение дней по сотрудникам к плоскому списку для передачи на алгоритмы
+        for employee_id, employee_days_by_dt in worker_day.items():
+            worker_day[employee_id] = [item for sublist in employee_days_by_dt.values() for item in sublist]
+
         ##################################################################
 
         ########### Выборки из базы данных ###########

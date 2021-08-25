@@ -1421,7 +1421,7 @@ class TestAutoSettings(APITestCase):
         data = self._test_create_tt(dt_from, dt_to)
 
         employment2Info = list(filter(lambda x: x['general_info']['id'] == self.employee2.id, data['cashiers']))[0]
-        self.assertEqual(len(employment2Info['workdays']), 27)
+        self.assertEqual(len(employment2Info['workdays']), 27)  # почему 1 число не попадало?
         self.assertEqual(employment2Info['workdays'][1]['type'], 'W')
         self.assertEqual(employment2Info['workdays'][1]['dt'], '2021-02-03')
         self.assertEqual(employment2Info['workdays'][2]['type'], 'H')
@@ -1496,6 +1496,44 @@ class TestAutoSettings(APITestCase):
 
     def test_multiple_workerday_on_one_date_sent_to_algo(self):
         dt = date(2021, 2, 1)
+        WorkerDayFactory(
+            employment=self.employment8,
+            employee=self.employment8.employee,
+            shop=self.employment8.shop,
+            dt=dt,
+            type_id=WorkerDay.TYPE_WORKDAY,
+            dttm_work_start=datetime.combine(dt, time(10)),
+            dttm_work_end=datetime.combine(dt, time(15)),
+            is_approved=True,
+            cashbox_details__work_type=self.work_type,
+        )
+        WorkerDayFactory(
+            employment=self.employment8,
+            employee=self.employment8.employee,
+            shop=self.employment8.shop,
+            dt=dt,
+            type_id=WorkerDay.TYPE_WORKDAY,
+            dttm_work_start=datetime.combine(dt, time(17)),
+            dttm_work_end=datetime.combine(dt, time(23)),
+            is_approved=True,
+            cashbox_details__work_type=self.work_type,
+        )
+
+        data = self._test_create_tt(dt, dt, use_not_approved=True, shop_id=self.employment8.shop_id)
+        employment2Info = list(filter(lambda x: x['general_info']['id'] == self.employee8.id, data['cashiers']))[0]
+        self.assertEqual(len(employment2Info['workdays']), 0)
+
+        data = self._test_create_tt(dt, dt, use_not_approved=False, shop_id=self.employment8.shop_id)
+        employment2Info = list(filter(lambda x: x['general_info']['id'] == self.employee8.id, data['cashiers']))[0]
+        self.assertEqual(len(employment2Info['workdays']), 2)
+        self.assertEqual(employment2Info['workdays'][0]['type'], 'W')
+        self.assertEqual(employment2Info['workdays'][0]['dt'], '2021-02-01')
+        self.assertEqual(employment2Info['workdays'][1]['type'], 'W')
+        self.assertEqual(employment2Info['workdays'][1]['dt'], '2021-02-01')
+
+    def test_multiple_workerday_on_one_date_with_dt_fired_in_employment(self):
+        dt = date(2021, 2, 1)
+        Employment.objects.filter(id=self.employment8.id).update(dt_fired=date(3999, 12, 31))
         WorkerDayFactory(
             employment=self.employment8,
             employee=self.employment8.employee,
