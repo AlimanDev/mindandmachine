@@ -38,11 +38,10 @@ EXTERNAL_HOST = env.str('EXTERNAL_HOST', default=HOST)
 TIMETABLE_IP = env.str('TIMETABLE_IP', default='127.0.0.1:5000')
 
 # доменное имя проекта, используется в src.timetable.vacancy в письмах
-DOMAIN = '' 
+DOMAIN = ''
 
 SECRET_KEY = '2p7d00y99lhyh1xno9fgk6jd4bl8xsmkm23hq4vj811ku60g7dsac8dee5rn'
 MDAUDIT_AUTHTOKEN_SALT = 'DLKAXGKFPP57B2NEQ4NLB2TLDT3QR20I7QKAGE8I'
-
 
 MDA_SEND_USER_TO_SHOP_REL_ON_WD_SAVE = False  # отправлять ли запрос по связке юзера и магазина при сохранении workerday
 MDA_SYNC_USER_TO_SHOP_DAILY = False  # запускать таск, который будет отправлять все связки на текущий день

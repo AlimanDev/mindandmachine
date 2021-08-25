@@ -94,7 +94,7 @@ class NetworkAdmin(admin.ModelAdmin):
             'ignore_shop_code_when_updating_employment_via_api',
             'create_employment_on_set_or_update_director_code',
         )}),
-        (_('Default settings'), {'fields': ('breaks', 'load_template', 'exchange_settings', 'worker_position_default_values')}),
+        (_('Default settings'), {'fields': ('breaks', 'load_template', 'exchange_settings', 'worker_position_default_values', 'shop_default_values')}),
         (_('Other'), {'fields': (
             'settings_values',
             'show_user_biometrics_block',
