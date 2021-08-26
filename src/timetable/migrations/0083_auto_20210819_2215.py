@@ -211,24 +211,6 @@ def drop_views(apps, schema_editor):
 
 
 def recreate_views(apps, schema_editor):
-    schema_editor.execute("""create or replace view performance as
-        select pf."Дата"                         as dt,
-               (select sum(pc.value)
-                from forecast_periodclients pc
-                         join forecast_operationtype ot on pc.operation_type_id = ot.id
-                         join forecast_operationtypename otn on ot.operation_type_name_id = otn.id
-                         join base_shop s on ot.shop_id = s.id
-                where ot.shop_id = pf."ID Магазина"
-                  and pc.type = 'F'
-                  and otn.code = 'income'
-                  and (pc.dttm_forecast::date) = pf."Дата"
-               )                                 as income,
-               sum(pf."Фактические часы работы") as work_hours,
-               pf."ID Магазина"                  as shop_id,
-               pf."Код магазина"                 as shop_code
-        from plan_and_fact_hours pf
-        group by pf."Дата", pf."ID Магазина", pf."Код магазина";""")
-
     schema_editor.execute("""\
 CREATE OR REPLACE VIEW v_mda_users AS
   SELECT DISTINCT u.id,
@@ -338,8 +320,7 @@ CREATE OR REPLACE VIEW timetable_plan_and_fact_hours AS
   WHERE wd.is_approved IS TRUE AND NOT (wd.employment_id IS NULL AND wd.type_id::text = 'W'::text AND wd.employee_id IS NOT NULL) AND (wd.employee_id IN ( SELECT be.employee_id
            FROM base_employment be
           WHERE be.employee_id = wd.employee_id AND (be.dt_hired <= wd.dt OR be.dt_hired IS NULL) AND (be.dt_fired >= wd.dt OR be.dt_fired IS NULL)))
-  GROUP BY wd.dt, employee.user_id, employee.tabel_code, wd.type_id, u.username, (concat(u.last_name, ' ', u.first_name, ' ', u.middle_name)), wd.shop_id, s.name, s.code, (COALESCE(wd_details_wt_name.name, ''::character varying)), wd.employee_id, shop_network.id, user_network.id;"""
-                          )
+  GROUP BY wd.dt, employee.user_id, employee.tabel_code, wd.type_id, u.username, (concat(u.last_name, ' ', u.first_name, ' ', u.middle_name)), wd.shop_id, s.name, s.code, (COALESCE(wd_details_wt_name.name, ''::character varying)), wd.employee_id, shop_network.id, user_network.id;""")
 
     schema_editor.execute("""\
 CREATE OR REPLACE VIEW plan_and_fact_hours AS
@@ -397,8 +378,26 @@ UNION ALL
            FROM prod_cal pc2
           WHERE pc.employee_id = pc2.employee_id AND date_trunc('month'::text, pc.dt::timestamp with time zone) = date_trunc('month'::text, pc2.dt::timestamp with time zone)) AS "Норма часов (для суммы)"
    FROM prod_cal pc
-  WHERE pc.dt >= '2020-01-01'::date AND pc.dt < (now() + '2 mons'::interval);
-""")
+  WHERE pc.dt >= '2020-01-01'::date AND pc.dt < (now() + '2 mons'::interval);""")
+
+    schema_editor.execute("""\
+create or replace view performance as
+    select pf."Дата"                         as dt,
+           (select sum(pc.value)
+            from forecast_periodclients pc
+                     join forecast_operationtype ot on pc.operation_type_id = ot.id
+                     join forecast_operationtypename otn on ot.operation_type_name_id = otn.id
+                     join base_shop s on ot.shop_id = s.id
+            where ot.shop_id = pf."ID Магазина"
+              and pc.type = 'F'
+              and otn.code = 'income'
+              and (pc.dttm_forecast::date) = pf."Дата"
+           )                                 as income,
+           sum(pf."Фактические часы работы") as work_hours,
+           pf."ID Магазина"                  as shop_id,
+           pf."Код магазина"                 as shop_code
+    from plan_and_fact_hours pf
+    group by pf."Дата", pf."ID Магазина", pf."Код магазина";""")
 
     schema_editor.execute("""\
 CREATE OR REPLACE VIEW metabase_financial_stat AS
@@ -414,8 +413,7 @@ SELECT turnover.dt,
 FROM ((public.metabase_to turnover
     LEFT JOIN public.plan_and_fact_hours fot ON (((turnover.shop_id = fot."ID Магазина") AND (turnover.dt = fot."Дата"))))
     LEFT JOIN public.base_employment e ON (((e.shop_id = turnover.shop_id) AND (e.dt_hired <= turnover.dt) AND ((e.dt_fired IS NULL) OR (e.dt_fired >= turnover.dt)))))
-GROUP BY turnover.dt, turnover.shop_id, turnover.plan, turnover.fact;
-""")
+GROUP BY turnover.dt, turnover.shop_id, turnover.plan, turnover.fact;""")
 
 
 class Migration(migrations.Migration):
@@ -435,7 +433,18 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='timesheet',
             name='main_timesheet_type',
-            field=models.CharField(blank=True, null=True, choices=[('H', 'Выходной'), ('W', 'Рабочий день'), ('V', 'Отпуск'), ('S', 'Больничный лист'), ('Q', 'Квалификация'), ('A', 'Неявка до выяснения обстоятельств'), ('M', 'Б/л по беременноси и родам'), ('T', 'Командировка'), ('O', 'Другое'), ('D', 'Удален'), ('E', 'Пусто'), ('HW', 'Работа в выходной день'), ('RA', 'Прогул на основании акта'), ('EV', 'Доп. отпуск'), ('SV', 'Учебный отпуск'), ('TV', 'Отпуск за свой счёт'), ('ST', 'Отпуск за свой счёт по уважительной причине'), ('G', 'Гос. обязанности'), ('HS', 'Спец. выходной'), ('MC', 'Отпуск по уходу за ребёнком до 3-х лет'), ('C', 'Выходные дни по уходу')], max_length=2),
+            field=models.CharField(blank=True, null=True,
+                                   choices=[('H', 'Выходной'), ('W', 'Рабочий день'), ('V', 'Отпуск'),
+                                            ('S', 'Больничный лист'), ('Q', 'Квалификация'),
+                                            ('A', 'Неявка до выяснения обстоятельств'),
+                                            ('M', 'Б/л по беременноси и родам'), ('T', 'Командировка'), ('O', 'Другое'),
+                                            ('D', 'Удален'), ('E', 'Пусто'), ('HW', 'Работа в выходной день'),
+                                            ('RA', 'Прогул на основании акта'), ('EV', 'Доп. отпуск'),
+                                            ('SV', 'Учебный отпуск'), ('TV', 'Отпуск за свой счёт'),
+                                            ('ST', 'Отпуск за свой счёт по уважительной причине'),
+                                            ('G', 'Гос. обязанности'), ('HS', 'Спец. выходной'),
+                                            ('MC', 'Отпуск по уходу за ребёнком до 3-х лет'),
+                                            ('C', 'Выходные дни по уходу')], max_length=2),
         ),
         migrations.RunPython(set_blank_main_timesheet_as_null, migrations.RunPython.noop),
         migrations.AlterField(
