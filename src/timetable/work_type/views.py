@@ -203,4 +203,7 @@ class WorkTypeViewSet(BaseModelViewSet):
 
         data.is_valid(raise_exception=True)
 
-        return Response(ShopEfficiencyGetter(**data.validated_data).get(), status=200)
+        return Response(ShopEfficiencyGetter(
+            add_schedule_tabs_day_stats=self.request.user.network.display_employee_tabs_in_the_schedule,
+            **data.validated_data,
+        ).get(), status=200)

@@ -1,7 +1,7 @@
 import datetime
 
 import numpy as np
-from django.db.models import Q, F, Sum
+from django.db.models import Q, F, Sum, Exists, OuterRef
 from django.utils.functional import cached_property
 from rest_framework.exceptions import ValidationError
 
@@ -28,7 +28,8 @@ class ShopEfficiencyGetterError(ValidationError):
 
 class ShopEfficiencyGetter:
     def __init__(self, shop_id, from_dt, to_dt, graph_type='plan_approved', work_type_ids: list = None,
-                 consider_vacancies=False, efficiency=True, indicators=False, consider_canceled=False, **kwargs):
+                 consider_vacancies=False, efficiency=True, indicators=False, consider_canceled=False,
+                 add_schedule_tabs_day_stats=False, **kwargs):
         self.shop_id = shop_id
         self.dt_from = from_dt
         self.dt_to = to_dt + datetime.timedelta(days=1)  # To include last day in "x < to_dt" conds
@@ -36,6 +37,8 @@ class ShopEfficiencyGetter:
         self.work_type_ids = work_type_ids
         self.consider_vacancies = consider_vacancies  # для обратной совместимости
         self.consider_canceled = consider_canceled  # учитывать отмененные вакансии для автоматической биржи смен
+        # добавлять статистику по дням для вкладок в расписании
+        self.add_schedule_tabs_day_stats = add_schedule_tabs_day_stats
         self.efficiency = efficiency
         self.indicators = indicators
         self.lambda_index_periodclients = lambda x: [self._dttm2index(self.dt_from, x.dttm_forecast)]
@@ -118,7 +121,8 @@ class ShopEfficiencyGetter:
             operation_type__dttm_deleted__isnull=True,
         )
 
-    def _get_wdays_qs(self, consider_vacancies=False):
+    def _get_wdays_qs(self, consider_vacancies=False, only_open_vacancies=False, other_departments=False,
+                      selected_department=False):
         base_wd_q = Q(
             Q(employment__dt_fired__gte=self.dt_from) &
             Q(dt__lte=F('employment__dt_fired')) |
@@ -132,10 +136,25 @@ class ShopEfficiencyGetter:
         if not consider_vacancies:
             base_wd_q &= Q(employee__isnull=False)
 
+        if only_open_vacancies:
+            base_wd_q &= Q(employee__isnull=True)
+
         if not self.consider_canceled:
             base_wd_q &= Q(canceled=False)
 
         qs = WorkerDay.objects.filter(base_wd_q)
+
+        if other_departments or selected_department:
+            qs = qs.annotate(has_active_selected_shop_employment_on_selected_period=Exists(Employment.objects.get_active(
+                employee_id=OuterRef('employee_id'),
+                dt_from=self.dt_from,
+                dt_to=self.dt_to,
+                shop_id=self.shop_id,
+            )))
+            if other_departments:
+                qs = qs.filter(has_active_selected_shop_employment_on_selected_period=False)
+            if selected_department:
+                qs = qs.filter(has_active_selected_shop_employment_on_selected_period=True)
 
         if self.graph_type == 'plan_edit':
             qs = qs.get_plan_not_approved()
@@ -216,6 +235,28 @@ class ShopEfficiencyGetter:
             self.lambda_index_income,
             self.lambda_add_income,
         )
+        if self.add_schedule_tabs_day_stats:
+            self.wdays_with_only_open_vacancies_array = np.zeros(len(self.dttms))
+            self._fill_array(
+                self.wdays_with_only_open_vacancies_array,
+                self._get_wdays_qs(consider_vacancies=True, only_open_vacancies=True),
+                self.lambda_index_wdays,
+                self.lambda_add_wdays,
+            )
+            self.work_hours_other_departments_array = np.zeros(len(self.dttms))
+            self._fill_array(
+                self.work_hours_other_departments_array,
+                self._get_wdays_qs(other_departments=True),
+                self.lambda_index_work_hours,
+                self.lambda_add_work_hours,
+            )
+            self.work_hours_selected_department_array = np.zeros(len(self.dttms))
+            self._fill_array(
+                self.work_hours_selected_department_array,
+                self._get_wdays_qs(selected_department=True),
+                self.lambda_index_work_hours,
+                self.lambda_add_work_hours,
+            )
 
     def _calc_efficiency(self):
         day_stats = {}
@@ -230,6 +271,9 @@ class ShopEfficiencyGetter:
         wdays_with_open_vacancies_array_daily = self.wdays_with_open_vacancies_array.reshape(
             dts_for_day_stats_len, self.periods_in_day)
         predict_needs_array_daily = self.predict_needs_array.reshape(dts_for_day_stats_len, self.periods_in_day)
+        if self.add_schedule_tabs_day_stats:
+            wdays_with_only_open_vacancies_array_daily = self.wdays_with_only_open_vacancies_array.reshape(
+                dts_for_day_stats_len, self.periods_in_day)
 
         for i, dt in enumerate(dts_for_day_stats):
             dt_converted = Converter.convert_date(dt)
@@ -240,6 +284,10 @@ class ShopEfficiencyGetter:
             work_hours_for_dt = self.work_hours_array[i]
             work_days_for_dt = self.work_days_array[i]
             income_for_dt = self.income_array[i]
+            if self.add_schedule_tabs_day_stats:
+                wdays_with_only_open_vacancies_for_dt = wdays_with_only_open_vacancies_array_daily[i]
+                work_hours_other_departments_for_dt = self.work_hours_other_departments_array[i]
+                work_hours_selected_department_for_dt = self.work_hours_selected_department_array[i]
 
             covering = np.nan_to_num(
                 np.minimum(predict_needs_for_dt, wdays_array_for_dt).sum() / predict_needs_for_dt.sum())
@@ -262,6 +310,11 @@ class ShopEfficiencyGetter:
             day_stats.setdefault('work_days', {})[dt_converted] = work_days
             day_stats.setdefault('income', {})[dt_converted] = income
             day_stats.setdefault('perfomance', {})[dt_converted] = np.nan_to_num(income / work_hours)
+            if self.add_schedule_tabs_day_stats:
+                day_stats.setdefault('graph_hours_only_open_vacancies', {})[dt_converted] = int(
+                    (wdays_with_only_open_vacancies_for_dt * self.period_length_in_minutes / 60).sum())
+                day_stats.setdefault('work_hours_other_departments', {})[dt_converted] = np.nan_to_num(work_hours_other_departments_for_dt).sum()
+                day_stats.setdefault('work_hours_selected_department', {})[dt_converted] = np.nan_to_num(work_hours_selected_department_for_dt).sum()
 
         real_cashiers = []
         predict_cashier_needs = []
