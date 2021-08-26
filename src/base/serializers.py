@@ -1,5 +1,5 @@
-from datetime import timedelta
 import json
+from datetime import timedelta
 
 from django.conf import settings
 from django.contrib.auth.forms import SetPasswordForm
@@ -94,6 +94,7 @@ class NetworkSerializer(serializers.ModelSerializer):
             'show_worker_day_tasks',
             'show_user_biometrics_block',
             'unaccounted_overtime_threshold',
+            'forbid_edit_employments_came_through_integration',
             'show_remaking_choice',
             'display_employee_tabs_in_the_schedule',
         ]
@@ -181,10 +182,11 @@ class UserSerializer(BaseNetworkSerializer):
 class EmployeeSerializer(BaseNetworkSerializer):
     user = UserSerializer(read_only=True)
     user_id = serializers.IntegerField(required=False, write_only=True)
+    has_shop_employment = serializers.BooleanField(required=False, read_only=True)
 
     class Meta:
         model = Employee
-        fields = ['id', 'user', 'user_id', 'tabel_code', ]
+        fields = ['id', 'user', 'user_id', 'tabel_code', 'has_shop_employment']
         extra_kwargs = {
             'tabel_code': {
                 'required': False,
@@ -440,6 +442,11 @@ class EmploymentSerializer(serializers.ModelSerializer):
                 shop_id=instance.shop_id, 
                 employee_id=instance.employee_id,
             ).update(is_visible=validated_data.get('is_visible', True))
+
+        if getattr(self.context['request'], 'by_code', False) and self.context[
+            'request'].user.network.ignore_shop_code_when_updating_employment_via_api:
+            validated_data.pop('shop_id', None)
+
         return super().update(instance, validated_data, *args, **kwargs)
 
 

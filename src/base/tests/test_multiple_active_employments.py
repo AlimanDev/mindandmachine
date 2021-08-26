@@ -2,6 +2,7 @@ from datetime import date, time, datetime, timedelta
 from unittest import mock
 
 import pandas as pd
+from dateutil.relativedelta import relativedelta
 from django.test import override_settings
 from django.utils import timezone
 from rest_framework import status
@@ -127,7 +128,8 @@ class TestURVTicks(MultipleActiveEmploymentsSupportMixin, APITestCase):
         self.client.force_authenticate(user=user)
 
         with mock.patch('src.recognition.views.now') as _now_mock:
-            _now_mock.return_value = (dttm_coming - timedelta(hours=shop.get_tz_offset())) if dttm_coming else timezone.now()
+            _now_mock.return_value = (
+                        dttm_coming - timedelta(hours=shop.get_tz_offset())) if dttm_coming else timezone.now()
             resp_coming = self.client.post(
                 self.get_url('Tick-list'),
                 data=self.dump_data({
@@ -139,7 +141,8 @@ class TestURVTicks(MultipleActiveEmploymentsSupportMixin, APITestCase):
         self.assertEqual(resp_coming.status_code, status.HTTP_200_OK)
 
         with mock.patch('src.recognition.views.now') as _now_mock:
-            _now_mock.return_value = (dttm_leaving - timedelta(hours=shop.get_tz_offset())) if dttm_leaving else timezone.now()
+            _now_mock.return_value = (
+                        dttm_leaving - timedelta(hours=shop.get_tz_offset())) if dttm_leaving else timezone.now()
             resp_leaving = self.client.post(
                 self.get_url('Tick-list'),
                 data=self.dump_data({
@@ -1021,3 +1024,32 @@ class TestEmployeeAPI(MultipleActiveEmploymentsSupportMixin, APITestCase):
         BytesIO = pd.io.common.BytesIO
         df = pd.read_excel(BytesIO(resp.content), engine='xlrd')
         self.assertEqual(len(df.index), 0)
+
+    def test_other_deps_employees_with_wd_in_curr_shop_parameter(self):
+        self.client.force_authenticate(user=self.user1)
+        WorkerDayFactory(
+            is_fact=False,
+            is_approved=False,
+            dt=self.dt,
+            employee=self.employee3,
+            employment=self.employment3,
+            shop=self.shop1,
+            type_id=WorkerDay.TYPE_WORKDAY,
+            dttm_work_start=datetime.combine(self.dt, time(8, 0, 0)),
+            dttm_work_end=datetime.combine(self.dt, time(17, 0, 0)),
+        )
+
+        resp = self.client.get(self.get_url('Employee-list'), data={
+            'shop_id': self.shop1.id,
+            'employments__dt_from': self.dt.replace(day=1),
+            'employments__dt_to': (self.dt + relativedelta(months=1)).replace(day=1) - timedelta(days=1),
+            'other_deps_employees_with_wd_in_curr_shop': True,
+        })
+        self.assertEqual(resp.status_code, 200)
+        resp_data = resp.json()
+        self.assertEqual(len(resp_data), 3)
+        self.assertTrue(any(self.employee3.id == d['id'] for d in resp_data))
+        employee1_1_data = list(filter(lambda i: i['id'] == self.employee1_1.id, resp_data))[0]
+        self.assertTrue(employee1_1_data['has_shop_employment'])
+        employee3_data = list(filter(lambda i: i['id'] == self.employee3.id, resp_data))[0]
+        self.assertFalse(employee3_data['has_shop_employment'])

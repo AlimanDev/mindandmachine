@@ -222,6 +222,15 @@ def get_month_range(year, month_num, return_days_in_month=False):
 class WorkersStatsGetter:
     def __init__(self, dt_from, dt_to, employee_id=None, employee_id__in=None, network=None, shop_id=None,
                  hours_by_types: list = None):
+        """
+        :param dt_from:
+        :param dt_to:
+        :param employee_id:
+        :param employee_id__in:
+        :param network:
+        :param shop_id: для какого магазина статистика + для определения сотрудников
+            (если явно не переданы в employee_id или в employee_id__in)
+        """
         assert shop_id or network
         self.shop_id = shop_id
         self.dt_from = dt_from
@@ -339,9 +348,9 @@ class WorkersStatsGetter:
         # ).distinct()
         if self.employee_id:
             employments = employments.filter(employee_id=self.employee_id)
-        if self.employee_id__in:
+        elif self.employee_id__in:
             employments = employments.filter(employee_id__in=self.employee_id__in)
-        if self.shop_id:
+        elif self.shop_id:
             employments = employments.filter(employee__employments__shop_id=self.shop_id)
 
         return list(employments)

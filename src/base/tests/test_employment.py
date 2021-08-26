@@ -663,3 +663,40 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
             content_type='application/json',
         )
         self.assertEqual(response.json(), {'non_field_errors': ['Поля work_type_id, employment_id должны производить массив с уникальными значениями.']})
+
+    def test_ignore_shop_code_when_updating_employment_via_api(self):
+        self.network.ignore_shop_code_when_updating_employment_via_api = True
+        self.network.save()
+
+        self.shop2.code = str(self.shop2.id)
+        self.shop2.save()
+        self.user2.username = f'u-{self.user2.id}'
+        self.user2.save()
+
+        empl_code = f'{self.user2.username}:{uuid.uuid4()}:{uuid.uuid4()}'
+        put_data = {
+            'position_code': self.worker_position.code,
+            'dt_hired': (timezone.now() - timedelta(days=300)).strftime('%Y-%m-%d'),
+            'dt_fired': (timezone.now() + timedelta(days=300)).strftime('%Y-%m-%d'),
+            'shop_code': self.shop2.code,
+            'username': self.user2.username,
+            'code': empl_code,
+            'tabel_code': self.employee2.tabel_code,
+            'by_code': True,
+        }
+
+        resp = self.client.put(
+            path=self.get_url('Employment-detail', pk=empl_code),
+            data=self.dump_data(put_data),
+            content_type='application/json',
+        )
+        self.assertEqual(resp.status_code, 201)  # created
+
+        put_data['shop_code'] = self.shop3.code
+        resp = self.client.put(
+            path=self.get_url('Employment-detail', pk=empl_code),
+            data=self.dump_data(put_data),
+            content_type='application/json',
+        )
+        employment = Employment.objects.get(id=resp.json()['id'])
+        self.assertEqual(employment.shop_id, self.shop2.id)

@@ -202,6 +202,11 @@ class TestLoadTemplate(APITestCase):
                 'dt_to': dt_now + timedelta(days=1)
             }
             self.client.post(f'{self.url}apply/', data, format='json')
+            self.shop.refresh_from_db()
+            self.shop.load_template_settings = '{"reserve_coef": 0.2}'
+            self.shop.save()
+            self.shop.load_template_status = 'R'
+            self.shop.save()
 
             operation_type = OperationType.objects.get(shop=self.shop, operation_type_name=self.operation_type_name2)
 
@@ -215,6 +220,7 @@ class TestLoadTemplate(APITestCase):
                         type=PeriodClients.FACT_TYPE,
                     )
             request = prepare_load_template_request(self.load_template.id, self.shop.id, dt_from=dt_now, dt_to=dt_now + timedelta(days=1))
+            self.assertEqual(request['shop']['reserve_coef'], 0.2)
             self.assertEqual(len(request['timeserie'][str(self.operation_type_name2.id)]), 48)
             self.assertEqual(len(request['operation_types']), 2)
             self.assertEqual(len(request['operation_types'][0]['dependences']), 1)

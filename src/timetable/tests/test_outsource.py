@@ -409,6 +409,7 @@ class TestOutsource(TestsHelperMixin, APITestCase):
                     'show_worker_day_tasks': False,
                     'show_user_biometrics_block': False,
                     'unaccounted_overtime_threshold': 60,
+                    'forbid_edit_employments_came_through_integration': True,
                     'show_remaking_choice': False,
                 }
             }
