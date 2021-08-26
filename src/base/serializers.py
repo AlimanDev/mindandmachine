@@ -1,5 +1,5 @@
-from datetime import timedelta
 import json
+from datetime import timedelta
 
 from django.conf import settings
 from django.contrib.auth.forms import SetPasswordForm
@@ -181,10 +181,11 @@ class UserSerializer(BaseNetworkSerializer):
 class EmployeeSerializer(BaseNetworkSerializer):
     user = UserSerializer(read_only=True)
     user_id = serializers.IntegerField(required=False, write_only=True)
+    has_shop_employment = serializers.BooleanField(required=False, read_only=True)
 
     class Meta:
         model = Employee
-        fields = ['id', 'user', 'user_id', 'tabel_code', ]
+        fields = ['id', 'user', 'user_id', 'tabel_code', 'has_shop_employment']
         extra_kwargs = {
             'tabel_code': {
                 'required': False,
