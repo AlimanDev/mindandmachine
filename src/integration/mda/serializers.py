@@ -71,8 +71,11 @@ class UserDTOSerializer(serializers.ModelSerializer):
     surveyAdmin = serializers.BooleanField()
     lang = serializers.CharField(source='mda_lang')
     timeZoneId = serializers.CharField()
-    # groups = serializers.ListField(child=serializers.CharField())  # пока ничего не передаем
+    groups = serializers.SerializerMethodField()
     reports = serializers.SerializerMethodField()
+
+    def get_groups(self, user):
+        return [gr_name for gr_name in user.position_groups + user.function_groups if gr_name]
 
     def get_reports(self, _user):
         return ['REPORT_ALL']
@@ -99,6 +102,7 @@ class UserDTOSerializer(serializers.ModelSerializer):
             # 'password',
             'ldapLogin',
             'timeZoneId',
+            'groups',
             'reports',
         )
 

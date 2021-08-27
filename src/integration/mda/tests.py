@@ -174,7 +174,7 @@ class TestMdaIntegration(TestsHelperMixin, TestCase):
         director2_data = list(filter(lambda u: director2.employee.user_id == u['id'], users_data))[0]
         self.assertEqual(director2_data['shopDirector'], True)
 
-    def test_multiple_levels(self):
+    def test_multiple_levels_and_multiple_groups(self):
         region = ShopFactory(parent=self.division1, code='region')
         shop = ShopFactory(parent=region, code='shop')
         group_director = GroupFactory(name='Директор', code='director')
@@ -197,6 +197,7 @@ class TestMdaIntegration(TestsHelperMixin, TestCase):
         self.assertEqual(user_data['shopDirector'], True)
         self.assertEqual(user_data['orgLevel'], 'SHOP')
         self.assertEqual(user_data['userChecklistsOrganizer'], False)
+        self.assertListEqual(user_data['groups'], ['Директор', 'УРС'])
 
     def test_userChecklistsOrganizer(self):
         region = ShopFactory(parent=self.division1, code='region')
@@ -228,7 +229,7 @@ class TestMdaIntegration(TestsHelperMixin, TestCase):
         self.assertEqual(user_data['orgLevel'], 'COMPANY')
         self.assertEqual(user_data['orgUnits'],  None)
 
-    def test_surveyAdmin_for_admin_true_for_oters_false(self):
+    def test_surveyAdmin_for_admin_true_for_oters_false_and_correct_groups(self):
         group_admin = GroupFactory(name='Администратор', code='admin')
         group_worker = GroupFactory(name='Сотрудник', code='worker')
         user_admin = UserFactory()
@@ -246,10 +247,12 @@ class TestMdaIntegration(TestsHelperMixin, TestCase):
         user_admin_data = list(filter(lambda u: user_admin.id == u['id'], users_data))[0]
         self.assertEqual(user_admin_data['admin'], True)
         self.assertEqual(user_admin_data['surveyAdmin'],  True)
+        self.assertListEqual(user_admin_data['groups'],  ['Администратор'])
 
         user_worker_data = list(filter(lambda u: user_worker.id == u['id'], users_data))[0]
         self.assertEqual(user_worker_data['admin'], False)
         self.assertEqual(user_worker_data['surveyAdmin'],  False)
+        self.assertListEqual(user_worker_data['groups'],  ['Сотрудник'])
 
     def test_correct_regionId_in_data(self):
         shop = ShopFactory(parent=self.region1, code='shop')
