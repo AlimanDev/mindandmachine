@@ -94,6 +94,7 @@ class NetworkSerializer(serializers.ModelSerializer):
             'show_worker_day_tasks',
             'show_user_biometrics_block',
             'unaccounted_overtime_threshold',
+            'forbid_edit_employments_came_through_integration',
             'show_remaking_choice',
         ]
 
@@ -439,6 +440,11 @@ class EmploymentSerializer(serializers.ModelSerializer):
                 shop_id=instance.shop_id, 
                 employee_id=instance.employee_id,
             ).update(is_visible=validated_data.get('is_visible', True))
+
+        if getattr(self.context['request'], 'by_code', False) and self.context[
+            'request'].user.network.ignore_shop_code_when_updating_employment_via_api:
+            validated_data.pop('shop_id', None)
+
         return super().update(instance, validated_data, *args, **kwargs)
 
 

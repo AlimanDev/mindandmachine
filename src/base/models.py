@@ -151,6 +151,7 @@ class Network(AbstractActiveModel):
     # при создании новой должности будут проставляться соотв. значения
     # пример значения можно найти в src.base.tests.test_worker_position.TestSetWorkerPositionDefaultsModel
     worker_position_default_values = models.TextField(verbose_name=_('Worker position default values'), default='{}')
+    shop_default_values = models.TextField(verbose_name=_('Shop default values'), default='{}')
     descrease_employment_dt_fired_in_api = models.BooleanField(
         default=False, verbose_name=_('Descrease employment date fired in api'),
         help_text=_('Relevant for data received via the api'),
@@ -175,6 +176,14 @@ class Network(AbstractActiveModel):
     # при рассчете фактических часов, будут рассчитываться штрафы
     # пример значения можно найти в src.timetable.tests.test_main.TestFineLogic
     fines_settings = models.TextField(default='{}', verbose_name=_('Fines settings'))
+    forbid_edit_employments_came_through_integration = models.BooleanField(
+        default=True, verbose_name='Запрещать редактировать трудоустройства, пришедшие через интеграцию',
+        help_text='У которых code не пустой',
+    )
+    ignore_shop_code_when_updating_employment_via_api = models.BooleanField(
+        default=False, verbose_name='Не учитывать shop_code при изменении трудоустройства через api',
+        help_text='Необходимо включить для случаев, когда привязка трудоустройств к отделам поддерживается вручную',
+    )
 
     @property
     def settings_values_prop(self):
@@ -398,6 +407,7 @@ class Shop(MPTTModel, AbstractActiveNetworkSpecificCodeNamedModel):
 
     load_template = models.ForeignKey('forecast.LoadTemplate', on_delete=models.SET_NULL, null=True, related_name='shops', blank=True)
     load_template_status = models.CharField(max_length=1, default=LOAD_TEMPLATE_READY, choices=LOAD_TEMPLATE_STATUSES)
+    load_template_settings = models.TextField(default='{}')
     exchange_settings = models.ForeignKey('timetable.ExchangeSettings', on_delete=models.SET_NULL, null=True, related_name='shops', blank=True)
 
     staff_number = models.SmallIntegerField(default=0)
@@ -503,6 +513,10 @@ class Shop(MPTTModel, AbstractActiveNetworkSpecificCodeNamedModel):
     def close_times(self):
         return self._parse_times('tm_close_dict')
 
+    @property
+    def load_settings(self):
+        return json.loads(self.load_template_settings)
+
     @staticmethod
     def clean_time_dict(time_dict):
         new_dict = dict(time_dict)
@@ -569,7 +583,41 @@ class Shop(MPTTModel, AbstractActiveNetworkSpecificCodeNamedModel):
                     )
                 )
 
-    def save(self, *args, force_create_director_employment=False, **kwargs):
+    @cached_property
+    def shop_default_values_dict(self):
+        shop_default_values = json.loads(self.network.shop_default_values)
+        if shop_default_values:
+            for re_pattern, shop_default_values_dict in shop_default_values.items():
+                if re.search(re_pattern, self.name, re.IGNORECASE):
+                    return shop_default_values_dict
+
+    def _set_shop_defaults(self):
+        if self.shop_default_values_dict:
+            wtn_codes_with_otn_codes = self.shop_default_values_dict.get('wtn_codes_with_otn_codes')
+            if wtn_codes_with_otn_codes:
+                from src.timetable.models import WorkTypeName, WorkType
+                from src.forecast.models import OperationTypeName, OperationType
+                for wtn_code, otn_code in wtn_codes_with_otn_codes:
+                    work_type = None
+                    if wtn_code:
+                        wtn = WorkTypeName.objects.filter(
+                            network_id=self.network_id, code=wtn_code).first()
+                        if wtn:
+                            work_type, _wt_created = WorkType.objects.get_or_create(
+                                shop=self, work_type_name=wtn)
+                    if otn_code:
+                        otn = OperationTypeName.objects.filter(
+                            network_id=self.network_id, code=otn_code).first()
+                        if otn:
+                            _op_type, _ot_created = OperationType.objects.get_or_create(
+                                shop=self,
+                                operation_type_name=otn,
+                                defaults=dict(
+                                    work_type=work_type,
+                                )
+                            )
+
+    def save(self, *args, force_create_director_employment=False, force_set_defaults=False, **kwargs):
         is_new = self.id is None
         if self.open_times.keys() != self.close_times.keys():
             raise ValidationError(_('Keys of open times and close times are different.'))
@@ -635,6 +683,9 @@ class Shop(MPTTModel, AbstractActiveNetworkSpecificCodeNamedModel):
                         )
                         empls_to_delete_qs.update(dt_fired=timezone.now().date())
                         empls_to_delete_qs.delete()
+
+        if is_new or force_set_defaults:
+            self._set_shop_defaults()
 
         return res
 

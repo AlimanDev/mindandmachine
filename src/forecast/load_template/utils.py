@@ -438,6 +438,7 @@ def prepare_load_template_request(load_template_id, shop_id, dt_from, dt_to):
         'forecast_params': json.loads(shop.load_template.forecast_params),
         'round_delta': shop.load_template.round_delta,
     }
+    data['shop'].update(shop.load_settings)
     data['shop']['times'] = ShopSchedule.objects.filter(
         shop_id=shop_id,
         dt__gte=dt_from,

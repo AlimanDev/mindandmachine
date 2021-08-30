@@ -3430,6 +3430,7 @@ class TestAditionalFunctions(TestsHelperMixin, APITestCase):
             'from_copy_dt_to': dt_from_last,
             'to_copy_dt_from': dt_to_first,
             'to_copy_dt_to': dt_to_last,
+            'is_approved': True,
         }
         self.assertEqual(WorkerDay.objects.filter(is_approved=False).count(), 0)
         self.assertEqual(WorkerDay.objects.filter(is_approved=True).count(), ((dt_from_last - dt_from_first).days + 1) * 3 + 14)
@@ -3469,7 +3470,7 @@ class TestAditionalFunctions(TestsHelperMixin, APITestCase):
                 employee_id=self.employment2.employee_id,
                 employment=self.employment2,
                 type=type,
-                is_approved=True,
+                is_approved=False,
             )
         for i in range(8):
             dt = dt_to_first + timedelta(i)
@@ -3492,8 +3493,7 @@ class TestAditionalFunctions(TestsHelperMixin, APITestCase):
             'to_copy_dt_to': dt_to_last,
             'worker_day_types': ['W'],
         }
-        self.assertEqual(WorkerDay.objects.filter(is_approved=False).count(), 8)
-        self.assertEqual(WorkerDay.objects.filter(is_approved=True).count(), 5)
+        self.assertEqual(WorkerDay.objects.filter(is_approved=False).count(), 13)
         response = self.client.post(self.url + 'copy_range/', data=data)
         response_data = response.json()
 
