@@ -2,16 +2,16 @@ import uuid
 from calendar import monthrange
 from datetime import datetime, timedelta, time
 
-from django.test import override_settings
-from django.test import TestCase
+from django.test import TestCase, override_settings
 
 from src.base.models import Employment, Employee, NetworkConnect
 from src.base.tests.factories import NetworkFactory, ShopFactory, UserFactory, EmployeeFactory, EmploymentFactory
-from src.timetable.models import PlanAndFactHours, Timesheet, WorkTypeName, WorkType, WorkerDay
+from src.timetable.models import Timesheet, WorkTypeName, WorkType, WorkerDay, WorkerDayType
 from src.timetable.tests.factories import WorkerDayFactory
 from src.timetable.timesheet.tasks import calc_timesheets
 from src.util.dg.tabel import T13TabelDataGetter, MtsTabelDataGetter
 from src.util.mixins.tests import TestsHelperMixin
+
 
 @override_settings(FISCAL_SHEET_DIVIDER_ALIAS='nahodka')
 class TestGenerateTabel(TestsHelperMixin, TestCase):
@@ -91,11 +91,10 @@ class TestGenerateTabel(TestsHelperMixin, TestCase):
             cashbox_details__work_type=cls.work_type,
         )
         calc_timesheets()
-        cls.types_mapping = {
-            'В': WorkerDay.TYPE_HOLIDAY,
-            'Я': WorkerDay.TYPE_WORKDAY,
-            'Н': WorkerDay.TYPE_ABSENSE,
-        }
+        cls.types_mapping = dict(WorkerDayType.objects.values_list(
+            'excel_load_code',
+            'code',
+        ))
 
     def setUp(self) -> None:
         self.outsource_network.refresh_from_db()

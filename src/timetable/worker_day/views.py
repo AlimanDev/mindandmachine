@@ -349,6 +349,8 @@ class WorkerDayViewSet(BaseModelViewSet):
             approve_condition = Q(
                 wd_types_q,
                 Q(shop_id=serializer.data['shop_id']) |
+                # TODO: Как определять типы дней, которые мы можем подтверждать для своих сотрудников,
+                #  но в любых (других) магазинах (сейчас только обучение)?
                 Q(Q(shop__isnull=True) | Q(type_id=WorkerDay.TYPE_QUALIFICATION), employee_id__in=employee_ids),
                 dt__lte=serializer.data['dt_to'],
                 dt__gte=serializer.data['dt_from'],
@@ -901,7 +903,7 @@ class WorkerDayViewSet(BaseModelViewSet):
             ])
         return Response(WorkerDaySerializer(editable_vacancy).data)
 
-    def _change_range(self, is_fact, is_approved, dt_from, dt_to, type_id, employee_tabel_code, res=None):
+    def _change_range(self, is_fact, is_approved, dt_from, dt_to, wd_type, employee_tabel_code, res=None):
         deleted = WorkerDay.objects.filter(
             employee__tabel_code=employee_tabel_code,
             dt__gte=dt_from,
@@ -909,7 +911,7 @@ class WorkerDayViewSet(BaseModelViewSet):
             is_approved=is_approved,
             is_fact=is_fact,
         ).exclude(
-            type_id=type_id,
+            type=wd_type,
         ).delete()
 
         existing_dates = list(WorkerDay.objects.filter(
@@ -918,7 +920,7 @@ class WorkerDayViewSet(BaseModelViewSet):
             dt__lte=dt_to,
             is_approved=is_approved,
             is_fact=is_fact,
-            type_id=type_id,
+            type=wd_type,
         ).values_list('dt', flat=True))
 
         wdays_to_create = []
@@ -937,7 +939,7 @@ class WorkerDayViewSet(BaseModelViewSet):
                             dt=dt,
                             is_approved=is_approved,
                             is_fact=is_fact,
-                            type_id=type_id,
+                            type=wd_type,
                             created_by=self.request.user,
                         )
                     )
@@ -971,7 +973,7 @@ class WorkerDayViewSet(BaseModelViewSet):
                     is_approved=range['is_approved'],
                     dt_from=range['dt_from'],
                     dt_to=range['dt_to'],
-                    type_id=range['type'],
+                    wd_type=range['type'],
                     employee_tabel_code=range['worker'],
                     res=res,
                 )
@@ -981,7 +983,7 @@ class WorkerDayViewSet(BaseModelViewSet):
                         is_approved=False,
                         dt_from=range['dt_from'],
                         dt_to=range['dt_to'],
-                        type_id=range['type'],
+                        wd_type=range['type'],
                         employee_tabel_code=range['worker'],
                     )
 

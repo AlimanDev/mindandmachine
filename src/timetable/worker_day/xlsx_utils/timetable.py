@@ -13,6 +13,7 @@ from src.base.models import (
 from src.conf.djconfig import QOS_SHORT_TIME_FORMAT
 from src.timetable.models import (
     WorkerDay,
+    WorkerDayType,
 )
 from src.timetable.worker_day.xlsx_utils.colors import *
 from src.timetable.worker_day.xlsx_utils.tabel import Tabel_xlsx
@@ -148,9 +149,10 @@ class Timetable_xlsx(Tabel_xlsx):
                         text = '{}-\n{}'.format(wd.dttm_work_start.time().strftime(QOS_SHORT_TIME_FORMAT),
                                                 wd.dttm_work_end.time().strftime(QOS_SHORT_TIME_FORMAT))
 
-                    elif wd.type_id == WorkerDay.TYPE_HOLIDAY_WORK:
-                        total_h = ceil(wd.work_hours)
-                        text = 'В{}'.format(total_h)
+                    # TODO: нужно?
+                    # elif wd.type_id == WorkerDay.TYPE_HOLIDAY_WORK:
+                    #     total_h = ceil(wd.work_hours)
+                    #     text = 'В{}'.format(total_h)
 
                     elif (wd.type_id in self.WORKERDAY_TYPE_CHANGE2HOLIDAY) \
                             and (self.prod_days[day].type == ProductionDay.TYPE_HOLIDAY):
@@ -305,11 +307,10 @@ class Timetable_xlsx(Tabel_xlsx):
                             Cell(wd.dttm_work_end.time(), format_time if xdt.weekday() != 6 else format_time_bottom))
                         continue
 
-                    mapping = {
-                        WorkerDay.TYPE_HOLIDAY: _('H'),
-                        WorkerDay.TYPE_VACATION: _('V'),
-                        WorkerDay.TYPE_MATERNITY: _('MAT'),
-                    }
+                    # для чего был отдельный словарь?
+                    mapping = dict(WorkerDayType.objects.filter(
+                        is_dayoff=True,
+                    ).values_list('code', 'excel_load_code'))
 
                     text = mapping.get(wd.type_id)
                     work_begin.append(Cell('' if text is None else text,

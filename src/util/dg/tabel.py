@@ -8,7 +8,7 @@ from django.utils.functional import cached_property
 from django.utils.translation import gettext as _
 
 from src.base.models import Employment
-from src.timetable.models import Timesheet, WorkerDay, PlanAndFactHours
+from src.timetable.models import Timesheet, WorkerDay, PlanAndFactHours, WorkerDayType
 from src.timetable.worker_day.serializers import DownloadTabelSerializer as TabelSerializer
 from src.util.dg.helpers import MONTH_NAMES
 from .base import BaseDocGenerator
@@ -32,17 +32,7 @@ class DummyWdTypeMapper(BaseWdTypeMapper):
 class T13WdTypeMapper(BaseWdTypeMapper):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.wd_type_to_tabel_type_mapping = {
-            WorkerDay.TYPE_WORKDAY: _('W'),
-            WorkerDay.TYPE_HOLIDAY: _('H'),
-            WorkerDay.TYPE_BUSINESS_TRIP: _('BT'),
-            WorkerDay.TYPE_VACATION: _('V'),
-            WorkerDay.TYPE_SELF_VACATION: _('VO'),
-            WorkerDay.TYPE_MATERNITY: _('MAT'),
-            WorkerDay.TYPE_SICK: _('S'),
-            WorkerDay.TYPE_ABSENSE: _('ABS'),
-            # TODO: добавить оставльные
-        }
+        self.wd_type_to_tabel_type_mapping = dict(WorkerDayType.objects.values_list('code', 'excel_load_code'))
 
 
 class BaseTabelDataGetter:
@@ -80,7 +70,7 @@ class BaseTabelDataGetter:
 
             tabel_wdays = tabel_wdays.filter(
                 Q(
-                    **{self.type_field + '__in':[WorkerDay.TYPE_WORKDAY, WorkerDay.TYPE_QUALIFICATION, WorkerDay.TYPE_BUSINESS_TRIP]},
+                    **{self.type_field + '__is_dayoff': False},
                     shop=self.shop,
                 ) |
                 Q(

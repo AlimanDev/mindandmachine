@@ -27,6 +27,7 @@ from src.timetable.models import (
     WorkerDay,
     WorkerDayCashboxDetails,
     WorkType,
+    WorkerDayType,
 )
 from src.timetable.worker_day.stat import WorkersStatsGetter
 from src.timetable.worker_day.xlsx_utils.timetable import Timetable_xlsx
@@ -34,28 +35,10 @@ from src.util.models_converter import Converter
 
 SKIP_SYMBOLS = ['NAN', '']
 
-class BaseUploadDownloadTimeTable:
 
+class BaseUploadDownloadTimeTable:
     def __init__(self):
-        self.wd_type_mapping = {
-            WorkerDay.TYPE_BUSINESS_TRIP: _('BT'),
-            WorkerDay.TYPE_HOLIDAY: _('H'),
-            WorkerDay.TYPE_ABSENSE: _('ABS'),
-            WorkerDay.TYPE_REAL_ABSENCE: 'ПР',  # пока что нет на фронте
-            WorkerDay.TYPE_QUALIFICATION: _('ST'),
-            WorkerDay.TYPE_SICK: _('S'),
-            WorkerDay.TYPE_VACATION: _('V'),
-            WorkerDay.TYPE_EXTRA_VACATION: 'ОД',  # пока что нет на фронте
-            WorkerDay.TYPE_STUDY_VACATION: 'У',  # пока что нет на фронте
-            WorkerDay.TYPE_SELF_VACATION: _('VO'),
-            WorkerDay.TYPE_SELF_VACATION_TRUE: 'ОЗ',  # пока что нет на фронте
-            WorkerDay.TYPE_GOVERNMENT: 'Г',  # пока что нет на фронте
-            WorkerDay.TYPE_MATERNITY: _('MAT'),
-            WorkerDay.TYPE_MATERNITY_CARE: 'Р',  # пока что нет на фронте
-            WorkerDay.TYPE_DONOR_OR_CARE_FOR_DISABLED_PEOPLE: 'ОВ',  # пока что нет на фронте
-            WorkerDay.TYPE_ETC: '',
-            WorkerDay.TYPE_EMPTY: '',
-        }
+        self.wd_type_mapping = dict(WorkerDayType.objects.values_list('code', 'excel_load_code'))
         self.wd_type_mapping_reversed = dict((v, k) for k, v in self.wd_type_mapping.items())
 
     def _get_employment_qs(self, network_id, shop_id, dt_from=None, dt_to=None):

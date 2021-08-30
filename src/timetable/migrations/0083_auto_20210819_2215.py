@@ -126,7 +126,7 @@ def create_worker_day_types(apps, schema_editor):
             is_dayoff=True,
             is_work_hours=False,
             is_reduce_norm=False,
-            is_system=False,
+            is_system=True,
             show_stat_in_days=False,
             show_stat_in_hours=False,
             ordering=70,

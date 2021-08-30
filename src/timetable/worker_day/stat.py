@@ -552,7 +552,7 @@ class WorkersStatsGetter:
             any_day_count_outside_of_selected_period=Count(
                 'type_id', filter=outside_of_selected_period_q),
             workdays_count_outside_of_selected_period=Count(
-                'type_id', filter=Q(outside_of_selected_period_q, Q(type_id__in=WorkerDay.TYPES_PAID + [WorkerDay.TYPE_HOLIDAY]))),
+                'type_id', filter=Q(outside_of_selected_period_q, Q(Q(type__is_dayoff=False) | Q(type_id=WorkerDay.TYPE_HOLIDAY)))),
         )
         for wd_dict in work_days:
             data = res.setdefault(

@@ -102,7 +102,7 @@ class CleanWdaysHelper:
     Проходит по всем дням, которые находятся с учетом filter_kwargs и exclude_kwargs
     Алгоритм для каждого дня:
     1. Если нету активного трудоустройства:
-    1.1 Если тип дня один из [WorkerDay.TYPE_MATERNITY, WorkerDay.TYPE_VACATION, WorkerDay.TYPE_SICK], то КОНЕЦ.
+    1.1 Если тип дня -- выходной, то КОНЕЦ.
     1.2 В остальных случаях очищаем employment_id, КОНЕЦ.
     2. Если есть активное трудоустройство:
     2.1 Если employment в дне и в активном трудоустройстве не совпадают:
@@ -179,7 +179,7 @@ class CleanWdaysHelper:
                 ).first()
 
                 if not employee_active_empl:
-                    if wd.type in [WorkerDay.TYPE_MATERNITY, WorkerDay.TYPE_VACATION, WorkerDay.TYPE_SICK]:
+                    if wd.type.is_dayoff:
                         continue
 
                     self._log_wd(wd, 'no active empl empl_cleaned')

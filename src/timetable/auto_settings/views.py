@@ -1087,8 +1087,8 @@ def count_prev_paid_days(dt_end, employments, region_id, dt_start=None, is_appro
         id__in=ids,
     ).values('id').annotate(
         paid_days=Coalesce(Count('employee__worker_days', filter=Q(employee__worker_days__type_id__in=WorkerDay.TYPES_PAID)), 0),
-        paid_hours=Coalesce(Sum(Extract(F('employee__worker_days__work_hours'),'epoch') / 3600, filter=Q(employee__worker_days__type_id__in=WorkerDay.TYPES_PAID)), 0),
-        vacations=Coalesce(Count('employee__worker_days', filter=Q(employee__worker_days__type__in=[WorkerDay.TYPE_SELF_VACATION, WorkerDay.TYPE_VACATION, WorkerDay.TYPE_SICK])), 0),
+        paid_hours=Coalesce(Sum(Extract(F('employee__worker_days__work_hours'), 'epoch') / 3600, filter=Q(employee__worker_days__type_id__in=WorkerDay.TYPES_PAID)), 0),
+        vacations=Coalesce(Count('employee__worker_days', filter=Q(employee__worker_days__type__is_reduce_norm=True)), 0),
         no_data=Coalesce(Count('employee__worker_days', filter=Q(employee__worker_days__type_id=WorkerDay.TYPE_EMPTY)), 0),
         all_days=Coalesce(Count('employee__worker_days'), 0),
     ).order_by('id'))

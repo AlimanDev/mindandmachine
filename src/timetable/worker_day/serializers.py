@@ -1,13 +1,14 @@
 from datetime import timedelta
-from src.base.exceptions import FieldError
-import pandas as pd
 
+import pandas as pd
 from django.db import transaction
 from django.db.models import Q
+from django.utils.functional import cached_property
 from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError, NotFound
 
+from src.base.exceptions import FieldError
 from src.base.models import Employment, User, Shop, Employee, Network
 from src.base.models import NetworkConnect
 from src.base.serializers import UserShorSerializer, NetworkSerializer
@@ -17,6 +18,7 @@ from src.timetable.models import (
     WorkerDay,
     WorkerDayCashboxDetails,
     WorkType,
+    WorkerDayType,
 )
 
 
@@ -175,20 +177,33 @@ class WorkerDaySerializer(serializers.ModelSerializer, UnaccountedOvertimeMixin)
             },
         }
 
+    @cached_property
+    def wd_types_dict(self):
+        """
+        Закешируем типы для факта на уровне request, чтобы не делать запрос для каждого объекта
+        """
+        if hasattr(self.context['request'], 'allowed_fact_wd_types'):
+            return self.context['request'].allowed_fact_wd_types
+
+        wd_types_dict = {wd.code: wd for wd in WorkerDayType.objects.all()}
+        self.context['request'].wd_types_dict = wd_types_dict
+        return wd_types_dict
+
     def validate(self, attrs):
         if self.instance and self.instance.is_approved:
             raise ValidationError({"error": "Нельзя менять подтвержденную версию."})
 
         is_fact = attrs['is_fact'] if 'is_fact' in attrs else getattr(self.instance, 'is_fact', None)
         wd_type = attrs['type_id']
-
-        if is_fact and wd_type not in WorkerDay.TYPES_WITH_TM_RANGE + (WorkerDay.TYPE_EMPTY,):
+        wd_type_obj = self.wd_types_dict.get(wd_type)
+        if is_fact and not wd_type_obj.use_in_fact:
             raise ValidationError({
-                "error": "Для фактической неподтвержденной версии можно установить только 'Рабочий день',"
-                         " 'Обучение', 'Командировка' и 'НД'."
+                "error": "Для фактической неподтвержденной версии можно установить только {}".format(
+                    ", ".join([i.name for i in self.wd_types_dict.values() if i.use_in_fact])
+                )
             })
 
-        if not WorkerDay.is_type_with_tm_range(wd_type):
+        if wd_type_obj.is_dayoff:
             attrs['dttm_work_start'] = None
             attrs['dttm_work_end'] = None
         elif not (attrs.get('dttm_work_start') and attrs.get('dttm_work_end')):
@@ -494,19 +509,16 @@ class ChangeRangeSerializer(serializers.Serializer):
     is_approved = serializers.BooleanField()
     dt_from = serializers.DateField()
     dt_to = serializers.DateField()
-    type = serializers.ChoiceField(
-        choices=[
-            WorkerDay.TYPE_MATERNITY,
-            WorkerDay.TYPE_MATERNITY_CARE,
-            WorkerDay.TYPE_SICK,
-            WorkerDay.TYPE_VACATION,
-        ]
-    )
     worker = serializers.CharField(allow_null=False, allow_blank=False)  # табельный номер
+
+    def __init__(self, *args, **kwargs):
+        super(ChangeRangeSerializer, self).__init__(*args, **kwargs)
+        self.fields['type'] = serializers.PrimaryKeyRelatedField(queryset=WorkerDayType.objects.filter(is_dayoff=True))
 
     def validate(self, data):
         if not data['dt_to'] >= data['dt_from']:
             raise serializers.ValidationError("dt_to must be greater than or equal to dt_from")
+
         return data
 
 
