@@ -201,7 +201,6 @@ class TestOperationTypeRelation(APITestCase):
         self.assertEqual(operation_type_relataion, data)
 
     def test_create_change_workload_between(self):
-        self.maxDiff = None
         load_template = LoadTemplate.objects.create(
             name='TEST'
         )
@@ -269,7 +268,7 @@ class TestOperationTypeRelation(APITestCase):
             'type': OperationTypeRelation.TYPE_CHANGE_WORKLOAD_BETWEEN,
             'max_value': 1.0,
             'threshold': 0.5,
-            'days_of_week': [1, 2, 4],
+            'days_of_week': [0, 1, 2, 6],
         }
         response = self.client.post(self.url, data, format='json')
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
@@ -310,9 +309,38 @@ class TestOperationTypeRelation(APITestCase):
             'type': 'C',
             'max_value': 1.0,
             'threshold': 0.5,
-            'days_of_week': [1, 2, 4]
+            'days_of_week': [0, 1, 2, 6]
         }
         self.assertEqual(operation_type_relataion, data)
+
+    def test_create_bad_days_of_week(self):
+        self.maxDiff = None
+        load_template = LoadTemplate.objects.create(
+            name='TEST'
+        )
+        op_temp1 = OperationTypeTemplate.objects.create(
+            load_template=load_template,
+            operation_type_name=self.operation_type_name1,
+        )
+        op_temp2 = OperationTypeTemplate.objects.create(
+            load_template=load_template,
+            operation_type_name=self.operation_type_name3,
+        )
+        data = {
+            'base_id': op_temp1.id,
+            'depended_id': op_temp2.id,
+            'type': OperationTypeRelation.TYPE_CHANGE_WORKLOAD_BETWEEN,
+            'max_value': 1.0,
+            'threshold': 0.5,
+            'days_of_week': [-1, 0, 2],
+        }
+        response = self.client.post(self.url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.json(), {'days_of_week': "Некорректное значение дня недели, возможные значения: 0, 1, 2, 3, 4, 5, 6"})
+        data['days_of_week'] = [3, 4, 7]
+        response = self.client.post(self.url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.json(), {'days_of_week': "Некорректное значение дня недели, возможные значения: 0, 1, 2, 3, 4, 5, 6"})
 
     def test_create_change_workload_between_no_work_type(self):
         self.maxDiff = None

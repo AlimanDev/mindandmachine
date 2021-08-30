@@ -71,7 +71,7 @@ class OperationTypeRelationSerializer(serializers.ModelSerializer):
                 raise FieldError(self.error_messages['required'], 'days_of_week')
 
             days_of_week = self.validated_data.get('days_of_week', [])
-            if any([7 in days_of_week, 8 in days_of_week, 9 in days_of_week]):
+            if any([(i > 6) or (i < 0) for i in days_of_week]):
                 raise FieldError(self.error_messages['bad_day_of_week'], 'days_of_week')
             self.validated_data['days_of_week'] = list(set(days_of_week))
 

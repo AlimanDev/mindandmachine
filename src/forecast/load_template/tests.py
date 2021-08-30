@@ -275,7 +275,16 @@ class TestLoadTemplate(APITestCase):
             self.assertEqual(len(request['operation_types'][0]['dependences']), 1)
             self.assertEqual(len(request['operation_types'][1]['dependences']), 0)            
             self.assertEqual(len(request['change_workload_between']), 1)            
-            self.assertEqual(request['change_workload_between'][0], [self.operation_type_name1.id, self.operation_type_name3.id, 0.4, 1.0, [1, 2, 4]])            
+            self.assertEqual(
+                request['change_workload_between'][0], 
+                {
+                    'to_serie': self.operation_type_name1.id, 
+                    'from_serie': self.operation_type_name3.id, 
+                    'threshold': 0.4, 
+                    'max_value': 1.0, 
+                    'days_of_week': [1, 2, 4],
+                }
+            )            
 
 
     def test_prepare_load_template_request_shop_in_progress(self):
