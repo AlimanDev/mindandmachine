@@ -920,7 +920,7 @@ def cancel_vacancies(shop_id, work_type_id, dt_from=None, dt_to=None, approved=F
         is_fact=False,
         created_by__isnull=True,
         is_approved=approved,
-    ).order_by('dt')
+    ).order_by('dt', 'id')
 
     for vacancy in vacancies:
         cond = (df_stat['dttm'] >= vacancy.dttm_work_start) & (df_stat['dttm'] <= vacancy.dttm_work_end)
