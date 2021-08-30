@@ -1,7 +1,7 @@
-from datetime import datetime, date, timedelta
+from datetime import datetime, date, timedelta, time
 from unittest import mock
 
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.utils import timezone
 from rest_framework.test import APITestCase
 
@@ -15,6 +15,7 @@ from src.base.tests.factories import (
     WorkerPositionFactory,
 )
 from src.integration.mda.integration import MdaIntegrationHelper
+from src.integration.mda.tasks import sync_mda_user_to_shop_relation
 from src.integration.models import VMdaUsers
 from src.timetable.models import WorkerDay
 from src.timetable.tests.factories import WorkerDayFactory
@@ -319,6 +320,81 @@ class TestMdaIntegration(TestsHelperMixin, TestCase):
         mda_integration_helper = MdaIntegrationHelper()
         mda_integration_helper.sync_users()
         _logger.error.assert_called_with(errors_dict)
+
+    @mock.patch('src.integration.mda.tasks.create_mda_user_to_shop_relation.delay')
+    @override_settings(MDA_SEND_USER_TO_SHOP_REL_ON_WD_SAVE=True)
+    def test_mda_user_to_shop_relation(self, _create_mda_user_to_shop_relation_delay):
+        dt_now = timezone.now()
+        group_worker = GroupFactory(code='worker', name='Сотрудник')
+        position_worker = WorkerPositionFactory(group=group_worker, name='Директор', code='director')
+        user_worker = UserFactory()
+        employee_worker = EmployeeFactory(user=user_worker)
+        employment_worker = EmploymentFactory(employee=employee_worker, shop=self.shop1, position=position_worker)
+        vacancy = WorkerDay.objects.create(
+            dt=dt_now,
+            employee=employee_worker,
+            employment=employment_worker,
+            shop=self.shop2,
+            type_id=WorkerDay.TYPE_WORKDAY,
+            is_fact=False,
+            is_approved=True,
+            is_vacancy=True,
+        )
+        _create_mda_user_to_shop_relation_delay.assert_called_once_with(
+            debug_info={
+                'wd_id': vacancy.id,
+                'approved': True,
+                'is_new': True,
+            },
+            shop_code=vacancy.shop.code,
+            username=vacancy.employee.user.username,
+        )
+
+    @mock.patch('src.integration.mda.tasks.create_mda_user_to_shop_relation.delay')
+    @override_settings(MDA_SEND_USER_TO_SHOP_REL_ON_WD_SAVE=True)
+    def test_mda_user_to_shop_relation_didnt_called_for_the_same_shop(self, _create_mda_user_to_shop_relation_delay):
+        dt_now = timezone.now()
+        group_worker = GroupFactory(code='worker', name='Сотрудник')
+        position_worker = WorkerPositionFactory(group=group_worker, name='Директор', code='director')
+        user_worker = UserFactory()
+        employee_worker = EmployeeFactory(user=user_worker)
+        employment_worker = EmploymentFactory(employee=employee_worker, shop=self.shop1, position=position_worker)
+        WorkerDay.objects.create(
+            dt=dt_now,
+            employee=employee_worker,
+            employment=employment_worker,
+            shop=self.shop1,
+            type_id=WorkerDay.TYPE_WORKDAY,
+            is_fact=False,
+            is_approved=True,
+        )
+        _create_mda_user_to_shop_relation_delay.assert_not_called()
+
+    @mock.patch('src.integration.mda.tasks.create_mda_user_to_shop_relation')
+    def test_sync_mda_user_to_shop_relation(self, _create_mda_user_to_shop_relation):
+        dt_now = timezone.now()
+        group_worker = GroupFactory(code='worker', name='Сотрудник')
+        position_worker = WorkerPositionFactory(group=group_worker, name='Директор', code='director')
+        user_worker = UserFactory()
+        employee_worker = EmployeeFactory(user=user_worker)
+        employment_worker = EmploymentFactory(employee=employee_worker, shop=self.shop1, position=position_worker)
+        vacancy = WorkerDay.objects.create(
+            dt=dt_now,
+            employee=employee_worker,
+            employment=employment_worker,
+            shop=self.shop2,
+            type_id=WorkerDay.TYPE_WORKDAY,
+            dttm_work_start=datetime.combine(dt_now, time(8)),
+            dttm_work_end=datetime.combine(dt_now, time(20)),
+            is_fact=False,
+            is_approved=True,
+            is_vacancy=True,
+        )
+        sync_mda_user_to_shop_relation()
+        _create_mda_user_to_shop_relation.assert_called_once_with(
+            shop_code=vacancy.shop.code,
+            username=vacancy.employee.user.username,
+        )
 
 
 class TestVMdaUsers(TestsHelperMixin, TestCase):

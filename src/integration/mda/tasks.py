@@ -3,7 +3,7 @@ import time as time_in_secs
 
 import requests
 from django.conf import settings
-from django.db.models import Q
+from django.db.models import Q, F
 from django.utils.timezone import now
 
 from src.celery.celery import app
@@ -39,10 +39,13 @@ def create_mda_user_to_shop_relation(username, shop_code, debug_info=None):
 @app.task
 def sync_mda_user_to_shop_relation(dt=None, delay_sec=0.01):
     dt = dt or now().today()
-    wdays = WorkerDay.objects.filter(
-        Q(is_vacancy=True) | Q(type_id=WorkerDay.TYPE_QUALIFICATION),
+    wdays = WorkerDay.objects.annotate_value_equality(
+        'is_equal_shops', 'shop_id', F('employment__shop_id'),
+    ).filter(
+        Q(is_vacancy=True) | Q(is_equal_shops=False),
+        type__is_dayoff=False,
         is_fact=False, is_approved=True,
-        shop__isnull=False, employee__isnull=False,
+        shop__isnull=False, employee__isnull=False, employment__isnull=False,
         dt=dt,
     ).values('employee__user__username', 'shop__code').distinct()
     for wd in wdays:

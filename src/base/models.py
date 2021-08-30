@@ -1339,7 +1339,7 @@ class Employment(AbstractActiveModel):
             }
             if is_new:
                 kwargs['filter_kwargs'] = {
-                    'type': WorkerDay.TYPE_WORKDAY,
+                    'type__is_dayoff': False,
                     'employee_id': self.employee_id,
                 }
                 if self.dt_hired:
@@ -1353,7 +1353,7 @@ class Employment(AbstractActiveModel):
                 else:
                     dt__gte = self.dt_hired
                 kwargs['filter_kwargs'] = {
-                    'type': WorkerDay.TYPE_WORKDAY,
+                    'type__is_dayoff': False,
                     'employee_id': self.employee_id,
                     'dt__gte': Converter.convert_date(dt__gte),
                 }
