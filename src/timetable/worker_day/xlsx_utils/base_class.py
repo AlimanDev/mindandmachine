@@ -34,28 +34,19 @@ class Xlsx_base:
         self.shop = shop
         self.month = datetime.date(dt.year, dt.month, 1)
         self.prod_days = prod_days
-        q = Q(
-            Q(region_id=self.shop.region_id) | Q(region__children__id=self.shop.region_id),
-            dt__year=self.month.year,
-            dt__month=self.month.month,
-        )
-        prod_cal_subq = ProductionDay.objects.filter(q, dt=OuterRef('dt')).annotate(
-            is_equal_regions=Case(
-                When(region_id=Value(self.shop.region_id), then=True),
-                default=False, output_field=BooleanField()
-            ),
-        ).order_by('-is_equal_regions')
-        prod_days_qs = ProductionDay.objects.filter(
-            q,
-            id=Subquery(prod_cal_subq.values_list('id', flat=True)[:1])
-        )
 
         if prod_days is None:
-            self.prod_days = list(prod_days_qs.order_by('dt'))
-        prod_cal_subq = prod_cal_subq.filter(type__in=ProductionDay.WORK_TYPES)
-        self.prod_month = ProductionDay.objects.filter(
-            q,
-            id=Subquery(prod_cal_subq.values_list('id', flat=True)[:1]),
+            self.prod_days = list(
+                ProductionDay.get_prod_days_for_region(
+                    self.shop.region_id,
+                    dt__year=self.month.year,
+                    dt__month=self.month.month,
+                ).order_by('dt')
+            )
+        self.prod_month = ProductionDay.get_prod_days_for_region(
+            self.shop.region_id,
+            dt__year=self.month.year,
+            dt__month=self.month.month,
             type__in=ProductionDay.WORK_TYPES,
         ).annotate(
             work_hours=Case(
