@@ -620,7 +620,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
             if employment.dt_hired > dt_from:
                 user_dt = dt_from
                 while user_dt != employment.dt_hired:
-                    employee_month_days_new.setdefault(dt, []).append(WorkerDay(
+                    employee_month_days_new.setdefault(user_dt, []).append(WorkerDay(
                         type_id=WorkerDay.TYPE_HOLIDAY,
                         dt=user_dt,
                         employee_id=employment.employee_id,

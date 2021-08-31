@@ -214,9 +214,8 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(Employment.objects.get_active(self.network, shop=self.shop, auto_timetable=False).count(), 2)
         self.assertEqual(list(
-            Employment.objects.get_active(self.network, shop=self.shop, auto_timetable=False).values_list('id',
-                                                                                                          flat=True)),
-            employment_ids)
+            Employment.objects.get_active(self.network, shop=self.shop, auto_timetable=False).values_list('id', flat=True).order_by('id')),
+            sorted(employment_ids))
 
     def test_work_hours_change_on_update_position(self):
         dt = date.today()
