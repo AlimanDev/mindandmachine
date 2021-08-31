@@ -218,8 +218,8 @@ def search_holiday_candidate(vacancy, max_working_hours, constraints, exclude_po
             dt__gte=vacancy_dt - timedelta(days=7),
             dt__lte=vacancy_dt + timedelta(days=7),
             employee_id=employee['employee'].id,
-        ).order_by('dt'):
-            if worker_day.type_id in WorkerDay.TYPES_PAID:
+        ).select_related('type').order_by('dt'):
+            if worker_day.type.is_work_hours:
                 tmp_hours += worker_day.work_hours.seconds // 3600
             else:
                 if all(employee['work_days'][1:3]) and worker_day.dt + timedelta(days=1) == vacancy_dt:
@@ -251,8 +251,8 @@ def search_holiday_candidate(vacancy, max_working_hours, constraints, exclude_po
             dt__gte=vacancy_dt - timedelta(days=7),
             dt__lte=vacancy_dt + timedelta(days=7),
             employee_id=employee['employee'].id,
-        ).order_by('dt'):
-            if worker_day.type_id in WorkerDay.TYPES_PAID:
+        ).select_related('type').order_by('dt'):
+            if worker_day.type.is_work_hours:
                 tmp_hours += worker_day.work_hours.seconds // 3600
             else:
                 if worker_day.dt == vacancy_dt:
@@ -332,7 +332,7 @@ def do_shift_elongation(vacancy, max_working_hours):
             employee_id=OuterRef('pk'),
             dt__gte=vacancy_dt.replace(day=1),
             dt__lte=vacancy_dt.replace(day=1) + relativedelta(months=+1) - timedelta(days=1),
-            type_id__in=WorkerDay.TYPES_PAID,
+            type__is_work_hours=True,
             is_fact=False,
             is_approved=True,
         ).order_by().values('employee__user_id').annotate(wh=Sum('work_hours')).values('wh'), output_field=DurationField()) + work_hours,
@@ -632,7 +632,7 @@ def confirm_vacancy(vacancy_id, user, employee_id=None, exchange=False, reconfir
 
             # откликаться на вакансию можно только в нерабочие/неоплачиваемые дни
             update_condition = all(
-                wd.type_id not in WorkerDay.TYPES_PAID for wd in employee_worker_days if not wd.is_vacancy)
+                 not wd.type.is_work_hours for wd in employee_worker_days if not wd.is_vacancy)
             if active_employment.shop_id != vacancy_shop.id and not exchange:
                 try:
                     tt = ShopMonthStat.objects.get(shop=vacancy_shop, dt=vacancy.dt.replace(day=1))
@@ -645,8 +645,8 @@ def confirm_vacancy(vacancy_id, user, employee_id=None, exchange=False, reconfir
                     update_condition = False
 
             if update_condition or exchange:
-                if any(not wd.is_vacancy and wd.type_id not in WorkerDay.TYPES_PAID for wd in employee_worker_days):
-                    employee_worker_days_qs.filter(~Q(type_id__in=WorkerDay.TYPES_PAID), is_vacancy=False).delete()
+                if any((not wd.is_vacancy and not wd.type.is_work_hours) for wd in employee_worker_days):
+                    employee_worker_days_qs.filter(type__is_work_hours=False, is_vacancy=False).delete()
                 elif exchange:
                     # TODO: ???
                     employee_worker_days_qs.filter(last_edited_by__isnull=True).delete()
@@ -1085,7 +1085,7 @@ def workers_exchange():
                         worker_day__is_vacancy=False,
                         worker_day__is_fact=False,
                         worker_day__is_approved=True,
-                        worker_day__type_id__in=WorkerDay.TYPES_PAID,
+                        worker_day__type__is_work_hours=True,
                         work_type__work_type_name=work_type.work_type_name,
                         worker_day__canceled=False,
                     ).exclude(

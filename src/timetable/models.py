@@ -521,14 +521,6 @@ class WorkerDay(AbstractModel):
         TYPE_ETC,
         TYPE_EMPTY,
     ]
-    TYPES_PAID = [
-        TYPE_WORKDAY,
-        TYPE_QUALIFICATION,
-        TYPE_BUSINESS_TRIP,
-        TYPE_HOLIDAY_WORK,
-        TYPE_EXTRA_VACATION,
-        TYPE_STUDY_VACATION,
-    ]
 
     TYPES_WITH_TM_RANGE = (
         TYPE_WORKDAY,
