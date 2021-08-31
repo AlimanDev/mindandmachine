@@ -647,6 +647,9 @@ def confirm_vacancy(vacancy_id, user, employee_id=None, exchange=False, reconfir
             if update_condition or exchange:
                 if any(not wd.is_vacancy and wd.type_id not in WorkerDay.TYPES_PAID for wd in employee_worker_days):
                     employee_worker_days_qs.filter(~Q(type_id__in=WorkerDay.TYPES_PAID), is_vacancy=False).delete()
+                elif exchange:
+                    # TODO: ???
+                    employee_worker_days_qs.filter(last_edited_by__isnull=True).delete()
 
                 prev_employee_id = vacancy.employee_id
                 if reconfirm and prev_employee_id:
