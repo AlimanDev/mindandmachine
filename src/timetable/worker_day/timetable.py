@@ -13,6 +13,7 @@ from django.db.models import Q, F
 from django.utils.translation import gettext as _
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
+from dateutil.parser import parse
 import xlsxwriter
 
 from src.base.models import (
@@ -25,6 +26,7 @@ from src.base.models import (
     Employee,
 )
 from src.timetable.models import (
+    EmploymentWorkType,
     WorkerDay,
     WorkerDayCashboxDetails,
     WorkType,
@@ -34,7 +36,7 @@ from src.timetable.worker_day.xlsx_utils.timetable import Timetable_xlsx
 from src.util.models_converter import Converter
 
 SKIP_SYMBOLS = ['NAN', '']
-DIVIDERS = ['-', ' ', '\n']
+DIVIDERS = ['-', '.', ',', '\n', ' ']
 
 class BaseUploadDownloadTimeTable:
 
@@ -60,11 +62,32 @@ class BaseUploadDownloadTimeTable:
         }
         self.wd_type_mapping_reversed = dict((v, k) for k, v in self.wd_type_mapping.items())
 
-    # TODO define and parse time
     def _get_times(self, time_str: str):
+        time_str = time_str.strip()
         for divider in DIVIDERS:
             if divider in time_str:
-                return time_str.split(divider)
+                times = time_str.split(divider)
+                return parse(times[0]).time(), parse(times[1]).time()
+
+    def _get_employment_work_types(self, users, shop_id):
+        default_work_type = WorkType.objects.filter(shop_id=shop_id, dttm_deleted__isnull=True).first()
+        if not default_work_type:
+            raise ValidationError({"message": _('There are no active work types in this shop.')})
+        employments = list(map(lambda x: x[1].id, users))
+        priority_subq = EmploymentWorkType.objects.filter(
+            employment_id=OuterRef('employment_id'),
+            is_active=True,
+        ).order_by('priority')
+        work_types = EmploymentWorkType.objects.filter(
+            employment_id__in=employments,
+            is_active=True,
+            id=Subquery(priority_subq.values_list('id', flat=True)[:1]),
+        )
+        employment_work_type = dict.fromkeys(employments, default_work_type.id)
+        for wt in work_types:
+            employment_work_type[wt.employment_id] = wt.work_type_id
+        
+        return employment_work_type
 
     def _get_employment_qs(self, network_id, shop_id, dt_from=None, dt_to=None):
         if not dt_from:
@@ -168,7 +191,7 @@ class BaseUploadDownloadTimeTable:
                         employee__user__middle_name=names[2] if len(names) > 2 else None
                     ).select_related('employee').order_by('dt_hired').first()
                 else:
-                    raise ValidationError(_('The employee id and full name are not specified on line {}.').format(index + 2))
+                    continue
                 
                 if not employment:
                     if number_cond:
@@ -222,7 +245,7 @@ class BaseUploadDownloadTimeTable:
                 if not position:
                     raise ValidationError({"message": _('There is no such position {position}.').format(position=data[position_column])})
                 names = data[name_column].split()
-                tabel_code = str(data[number_column]).split('.')[0]
+                tabel_code = str(data[number_column]).split('.')[0].strip()
                 created = False
                 user_data = {
                     'first_name': names[1] if len(names) > 1 else '',
@@ -404,14 +427,7 @@ class UploadDownloadTimetableCells(BaseUploadDownloadTimeTable):
         if not len(dates):
             return Response()
 
-        work_types = {
-            w.work_type_name.name.lower(): w
-            for w in WorkType.objects.select_related('work_type_name').filter(shop_id=shop_id, dttm_deleted__isnull=True)
-        }
-        if (len(work_types) == 0):
-            raise ValidationError({"message": _('There are no active work types in this shop.')})
-
-        first_type = next(iter(work_types.values()))
+        employment_work_types = self._get_employment_work_types(users, shop_id)
         timetable_df = df[df.columns[:3 + len(dates)]]
 
         timetable_df[number_column] = timetable_df[number_column].astype(str)
@@ -431,6 +447,7 @@ class UploadDownloadTimetableCells(BaseUploadDownloadTimeTable):
                 index_shift += 1
                 continue
             employee, employment = users[index - index_shift]
+            work_type = employment_work_types[employment.id]
             for i, dt in enumerate(dates):
                 dttm_work_start = None
                 dttm_work_end = None
@@ -439,15 +456,13 @@ class UploadDownloadTimetableCells(BaseUploadDownloadTimeTable):
                     if cell_data.replace(' ', '').replace('\n', '') in SKIP_SYMBOLS:
                         continue
                     if not (cell_data in self.wd_type_mapping_reversed):
-                        splited_cell = data[i + 3].replace('\n', '').strip().split()
-                        work_type = work_types.get(data[position_column].upper(), first_type) if len(splited_cell) == 1 else work_types.get(splited_cell[1].upper(), first_type)
-                        times = splited_cell[0].split('-')
+                        tm_work_start, tm_work_end = self._get_times(data[i + 3])
                         type_of_work = WorkerDay.TYPE_WORKDAY
                         dttm_work_start = datetime.datetime.combine(
-                            dt, Converter.parse_time(times[0] + ':00')
+                            dt, tm_work_start
                         )
                         dttm_work_end = datetime.datetime.combine(
-                            dt, Converter.parse_time(times[1] + ':00')
+                            dt, tm_work_end
                         )
                         if dttm_work_end < dttm_work_start:
                             dttm_work_end += datetime.timedelta(days=1)
@@ -482,7 +497,7 @@ class UploadDownloadTimetableCells(BaseUploadDownloadTimeTable):
                 if type_of_work == WorkerDay.TYPE_WORKDAY:
                     WorkerDayCashboxDetails.objects.create(
                         worker_day=new_wd,
-                        work_type=work_type,
+                        work_type_id=work_type,
                     )
 
         return Response()
@@ -709,11 +724,7 @@ class UploadDownloadTimetableRows(BaseUploadDownloadTimeTable):
         for data in users:
             employees[data[0].tabel_code] = data
         
-        
-        work_type = WorkType.objects.select_related('work_type_name').filter(shop_id=shop_id, dttm_deleted__isnull=True).first()
-
-        if not work_type:
-            raise ValidationError({"message": _('There are no active work types in this shop.')})
+        employment_work_types = self._get_employment_work_types(users, shop_id)
         
         with transaction.atomic():
             for i, data in df.iterrows():
@@ -725,7 +736,8 @@ class UploadDownloadTimetableRows(BaseUploadDownloadTimeTable):
                 position_cond = data[position_column] != 'nan'
                 if not number_cond and (not name_cond or not position_cond):
                     continue
-                employee, employment = employees[str(data[number_column]).split('.')[0]]
+                employee, employment = employees[str(data[number_column]).split('.')[0].strip()]
+                work_type = employment_work_types[employment.id]
                 dttm_work_start = None
                 dttm_work_end = None
                 if _get_str_data(data[start_column]) in SKIP_SYMBOLS:
@@ -740,10 +752,10 @@ class UploadDownloadTimetableRows(BaseUploadDownloadTimeTable):
                         start, end = _get_str_data(data[start_column]), _get_str_data(data[end_column])
                         type_of_work = WorkerDay.TYPE_WORKDAY
                         dttm_work_start = datetime.datetime.combine(
-                            dt, Converter.parse_time(start + ':00')
+                            dt, parse(start).time()
                         )
                         dttm_work_end = datetime.datetime.combine(
-                            dt, Converter.parse_time(end + ':00')
+                            dt, parse(end).time()
                         )
                         if dttm_work_end < dttm_work_start:
                             dttm_work_end += datetime.timedelta(days=1)
@@ -778,7 +790,7 @@ class UploadDownloadTimetableRows(BaseUploadDownloadTimeTable):
                 if type_of_work == WorkerDay.TYPE_WORKDAY:
                     WorkerDayCashboxDetails.objects.create(
                         worker_day=new_wd,
-                        work_type=work_type,
+                        work_type_id=work_type,
                     )
 
         return Response()      
