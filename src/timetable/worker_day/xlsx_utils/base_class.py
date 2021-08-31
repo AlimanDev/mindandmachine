@@ -1,8 +1,9 @@
 import datetime
+
 from src.base.models import ProductionDay
 from src.timetable.worker_day.xlsx_utils.colors import *
 from src.util.models_converter import Converter
-from django.db.models import Case, When, Sum, Value, IntegerField
+from django.db.models import Case, When, Sum, Value, IntegerField, Q, BooleanField, Subquery, OuterRef
 
 class Xlsx_base:
     WEEKDAY_TRANSLATION = [
@@ -22,8 +23,6 @@ class Xlsx_base:
         if worksheet:
             self.worksheet = worksheet
 
-        # fucking formatting
-
         self.default_text_settings = {
             'font_size': 10,
             'font_name': 'Arial',
@@ -37,16 +36,18 @@ class Xlsx_base:
         self.prod_days = prod_days
 
         if prod_days is None:
-            self.prod_days = list(ProductionDay.objects.filter(
-                dt__year=self.month.year,
-                dt__month=self.month.month,
-                region_id=self.shop.region_id,
-            ).order_by('dt'))
-        self.prod_month = ProductionDay.objects.filter(
-            dt__month=self.month.month,
+            self.prod_days = list(
+                ProductionDay.get_prod_days_for_region(
+                    self.shop.region_id,
+                    dt__year=self.month.year,
+                    dt__month=self.month.month,
+                ).order_by('dt')
+            )
+        self.prod_month = ProductionDay.get_prod_days_for_region(
+            self.shop.region_id,
             dt__year=self.month.year,
+            dt__month=self.month.month,
             type__in=ProductionDay.WORK_TYPES,
-            region_id=self.shop.region_id,
         ).annotate(
             work_hours=Case(
                 When(type=ProductionDay.TYPE_WORK, then=Value(ProductionDay.WORK_NORM_HOURS[ProductionDay.TYPE_WORK])),
