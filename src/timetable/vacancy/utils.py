@@ -632,7 +632,7 @@ def confirm_vacancy(vacancy_id, user, employee_id=None, exchange=False, reconfir
 
             # откликаться на вакансию можно только в нерабочие/неоплачиваемые дни
             update_condition = all(
-                wd.type not in WorkerDay.TYPES_PAID for wd in employee_worker_days if not wd.is_vacancy)
+                wd.type_id not in WorkerDay.TYPES_PAID for wd in employee_worker_days if not wd.is_vacancy)
             if active_employment.shop_id != vacancy_shop.id and not exchange:
                 try:
                     tt = ShopMonthStat.objects.get(shop=vacancy_shop, dt=vacancy.dt.replace(day=1))
@@ -645,7 +645,7 @@ def confirm_vacancy(vacancy_id, user, employee_id=None, exchange=False, reconfir
                     update_condition = False
 
             if update_condition or exchange:
-                if any(not wd.is_vacancy and wd.type not in WorkerDay.TYPES_PAID for wd in employee_worker_days):
+                if any(not wd.is_vacancy and wd.type_id not in WorkerDay.TYPES_PAID for wd in employee_worker_days):
                     employee_worker_days_qs.filter(~Q(type_id__in=WorkerDay.TYPES_PAID), is_vacancy=False).delete()
 
                 prev_employee_id = vacancy.employee_id
