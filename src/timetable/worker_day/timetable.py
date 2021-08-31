@@ -16,6 +16,7 @@ from rest_framework.response import Response
 import xlsxwriter
 
 from src.base.models import (
+    Network,
     User,
     Shop,
     Employment,
@@ -33,6 +34,7 @@ from src.timetable.worker_day.xlsx_utils.timetable import Timetable_xlsx
 from src.util.models_converter import Converter
 
 SKIP_SYMBOLS = ['NAN', '']
+DIVIDERS = ['-', ' ', '\n']
 
 class BaseUploadDownloadTimeTable:
 
@@ -57,6 +59,12 @@ class BaseUploadDownloadTimeTable:
             WorkerDay.TYPE_EMPTY: '',
         }
         self.wd_type_mapping_reversed = dict((v, k) for k, v in self.wd_type_mapping.items())
+
+    # TODO define and parse time
+    def _get_times(self, time_str: str):
+        for divider in DIVIDERS:
+            if divider in time_str:
+                return time_str.split(divider)
 
     def _get_employment_qs(self, network_id, shop_id, dt_from=None, dt_to=None):
         if not dt_from:
@@ -134,6 +142,49 @@ class BaseUploadDownloadTimeTable:
             )
         }
 
+    def _get_users(self, df, number_column, name_column, position_column, shop_id, network_id):
+        network = Network.objects.get(id=network_id)
+        if not network.add_users_from_excel:
+            users = []
+            for index, data in df.iterrows():
+                if data[number_column].startswith('*') or data[name_column].startswith('*') or data[position_column].startswith('*'):
+                    continue
+                number_cond = data[number_column] != 'nan'
+                name_cond = data[name_column] != 'nan'
+                employment = None
+                tabel_code = ''
+                if number_cond:
+                    tabel_code = str(data[number_column]).split('.')[0]
+                    employment = Employment.objects.filter(
+                        employee__tabel_code=tabel_code, 
+                        shop_id=shop_id,
+                    ).select_related('employee').order_by('dt_hired').first()
+                elif name_cond:
+                    names = data[name_column].split()
+                    employment = Employment.objects.filter(
+                        shop_id=shop_id,
+                        employee__user__first_name=names[1] if len(names) > 1 else '',
+                        employee__user__last_name=names[0],
+                        employee__user__middle_name=names[2] if len(names) > 2 else None
+                    ).select_related('employee').order_by('dt_hired').first()
+                else:
+                    raise ValidationError(_('The employee id and full name are not specified on line {}.').format(index + 2))
+                
+                if not employment:
+                    if number_cond:
+                        raise ValidationError(_('The employee with number {} does not exist in the current shop.').format(tabel_code))
+                    else:
+                        raise ValidationError(_('The employee with the full name {} does not exist in the current shop.').format(data[name_cond]))
+                
+                users.append([
+                    employment.employee,
+                    employment,
+                ])
+            return users
+        else:
+            return self._upload_employments(df, number_column, name_column, position_column, shop_id, network_id)
+
+
     def _upload_employments(self, df, number_column, name_column, position_column, shop_id, network_id):
         groups = {
             f.name.lower(): f
@@ -169,7 +220,6 @@ class BaseUploadDownloadTimeTable:
                     continue
                 position = positions.get(data[position_column].lower().strip())
                 if not position:
-                    # Нет такой должности {position}
                     raise ValidationError({"message": _('There is no such position {position}.').format(position=data[position_column])})
                 names = data[name_column].split()
                 tabel_code = str(data[number_column]).split('.')[0]
@@ -293,7 +343,7 @@ class BaseUploadDownloadTimeTable:
             users_df[name_column] = users_df[name_column].astype(str)
             users_df[position_column] = users_df[position_column].astype(str)
 
-            users = self._upload_employments(users_df, number_column, name_column, position_column, shop_id, form['network_id'])
+            users = self._get_users(users_df, number_column, name_column, position_column, shop_id, form['network_id'])
 
             res = self._upload(df, users, form, is_fact)
 

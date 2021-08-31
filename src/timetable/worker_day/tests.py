@@ -692,6 +692,8 @@ class TestUploadDownload(APITestCase):
 
         WorkType.objects.create(work_type_name=WorkTypeName.objects.create(name='Кассы'), shop_id=self.shop.id)
         self.url = '/rest_api/worker_day/'
+        self.network.add_users_from_excel = True
+        self.network.save()
         self.client.force_authenticate(user=self.user1)
 
     def test_upload_timetable_match_tabel_code(self):
