@@ -1,8 +1,9 @@
 import datetime
+
 from src.base.models import ProductionDay
 from src.timetable.worker_day.xlsx_utils.colors import *
 from src.util.models_converter import Converter
-from django.db.models import Case, When, Sum, Value, IntegerField
+from django.db.models import Case, When, Sum, Value, IntegerField, Q, BooleanField, Subquery, OuterRef
 
 class Xlsx_base:
     WEEKDAY_TRANSLATION = [
@@ -22,8 +23,6 @@ class Xlsx_base:
         if worksheet:
             self.worksheet = worksheet
 
-        # fucking formatting
-
         self.default_text_settings = {
             'font_size': 10,
             'font_name': 'Arial',
@@ -35,18 +34,29 @@ class Xlsx_base:
         self.shop = shop
         self.month = datetime.date(dt.year, dt.month, 1)
         self.prod_days = prod_days
+        q = Q(
+            Q(region_id=self.shop.region_id) | Q(region__children__id=self.shop.region_id),
+            dt__year=self.month.year,
+            dt__month=self.month.month,
+        )
+        prod_cal_subq = ProductionDay.objects.filter(q, dt=OuterRef('dt')).annotate(
+            is_equal_regions=Case(
+                When(region_id=Value(self.shop.region_id), then=True),
+                default=False, output_field=BooleanField()
+            ),
+        ).order_by('-is_equal_regions')
+        prod_days_qs = ProductionDay.objects.filter(
+            q,
+            id=Subquery(prod_cal_subq.values_list('id', flat=True)[:1])
+        )
 
         if prod_days is None:
-            self.prod_days = list(ProductionDay.objects.filter(
-                dt__year=self.month.year,
-                dt__month=self.month.month,
-                region_id=self.shop.region_id,
-            ).order_by('dt'))
+            self.prod_days = list(prod_days_qs.order_by('dt'))
+        prod_cal_subq = prod_cal_subq.filter(type__in=ProductionDay.WORK_TYPES)
         self.prod_month = ProductionDay.objects.filter(
-            dt__month=self.month.month,
-            dt__year=self.month.year,
+            q,
+            id=Subquery(prod_cal_subq.values_list('id', flat=True)[:1]),
             type__in=ProductionDay.WORK_TYPES,
-            region_id=self.shop.region_id,
         ).annotate(
             work_hours=Case(
                 When(type=ProductionDay.TYPE_WORK, then=Value(ProductionDay.WORK_NORM_HOURS[ProductionDay.TYPE_WORK])),
