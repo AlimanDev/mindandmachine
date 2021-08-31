@@ -302,18 +302,22 @@ class WorkerDayQuerySet(AnnotateValueEqualityQSMixin, QuerySet):
         raise NotImplementedError
 
     def get_tabel(self, *args, **kwargs):
-        ordered_subq = self.filter(
-            dt=OuterRef('dt'),
-            employee_id=OuterRef('employee_id'),
-            is_approved=True,
-            *args,
-            **kwargs,
-        ).exclude(type_id=WorkerDay.TYPE_EMPTY).order_by('-is_fact', '-work_hours').values_list('id')[:1]
-        return self.filter(
+        return self.annotate(
+            has_fact_approved_on_dt=Exists(WorkerDay.objects.filter(
+                employee_id=OuterRef('employee_id'),
+                dt=OuterRef('dt'),
+                is_fact=True,
+                is_approved=True,
+                type__is_dayoff=False,
+                dttm_work_start__isnull=False, dttm_work_end__isnull=False,
+                work_hours__gte=datetime.timedelta(0),
+            ).exclude(
+                type_id=WorkerDay.TYPE_EMPTY,
+            ))
+        ).filter(
             Q(is_fact=True) |
-            Q(type__is_dayoff=True, is_fact=False),
+            Q(type__is_dayoff=True, is_fact=False, has_fact_approved_on_dt=False),
             is_approved=True,
-            id=Subquery(ordered_subq),
             *args,
             **kwargs,
         )
