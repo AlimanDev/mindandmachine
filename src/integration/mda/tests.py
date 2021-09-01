@@ -197,7 +197,7 @@ class TestMdaIntegration(TestsHelperMixin, TestCase):
         self.assertEqual(user_data['shopDirector'], True)
         self.assertEqual(user_data['orgLevel'], 'SHOP')
         self.assertEqual(user_data['userChecklistsOrganizer'], False)
-        self.assertListEqual(user_data['groups'], ['Директор', 'УРС'])
+        self.assertListEqual(sorted(user_data['groups']), sorted(['Директор', 'УРС']))
 
     def test_userChecklistsOrganizer(self):
         region = ShopFactory(parent=self.division1, code='region')
@@ -247,12 +247,21 @@ class TestMdaIntegration(TestsHelperMixin, TestCase):
         user_admin_data = list(filter(lambda u: user_admin.id == u['id'], users_data))[0]
         self.assertEqual(user_admin_data['admin'], True)
         self.assertEqual(user_admin_data['surveyAdmin'],  True)
-        self.assertListEqual(user_admin_data['groups'],  ['Администратор'])
+        self.assertListEqual(user_admin_data['groups'],  [])
 
         user_worker_data = list(filter(lambda u: user_worker.id == u['id'], users_data))[0]
         self.assertEqual(user_worker_data['admin'], False)
         self.assertEqual(user_worker_data['surveyAdmin'],  False)
-        self.assertListEqual(user_worker_data['groups'],  ['Сотрудник'])
+        self.assertListEqual(user_worker_data['groups'],  [])
+
+        with self.settings(MDA_INTEGRATION_INCLUDE_FUNCTION_GROUPS=True):
+            mda_integration_helper = MdaIntegrationHelper()
+            users_data = mda_integration_helper._get_users_data()
+            user_admin_data = list(filter(lambda u: user_admin.id == u['id'], users_data))[0]
+            self.assertListEqual(user_admin_data['groups'], ['Администратор'])
+
+            user_worker_data = list(filter(lambda u: user_worker.id == u['id'], users_data))[0]
+            self.assertListEqual(user_worker_data['groups'], ['Сотрудник'])
 
     def test_correct_regionId_in_data(self):
         shop = ShopFactory(parent=self.region1, code='shop')

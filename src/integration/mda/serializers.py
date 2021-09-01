@@ -1,3 +1,4 @@
+from django.conf import settings
 from rest_framework import serializers
 
 from src.base.models import Shop, User
@@ -75,7 +76,10 @@ class UserDTOSerializer(serializers.ModelSerializer):
     reports = serializers.SerializerMethodField()
 
     def get_groups(self, user):
-        return [gr_name for gr_name in user.position_groups if gr_name]
+        groups = user.position_groups
+        if getattr(settings, 'MDA_INTEGRATION_INCLUDE_FUNCTION_GROUPS', False):
+            groups += user.function_groups
+        return list(set(gr_name for gr_name in groups if gr_name))
 
     def get_reports(self, _user):
         return ['REPORT_ALL']
