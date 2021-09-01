@@ -390,7 +390,7 @@ msgid ""
 msgstr ""
 "Биометрия уже создана. Для создания новой биометрии сначала удалите нынешнюю."
 
-#: src/forecast/load_template/utils.py:520
+#: src/forecast/load_template/utils.py:535
 #, python-brace-format
 msgid "These operation types do not exist: {types}."
 msgstr "Данные типы операций не существуют: {types}."
@@ -416,40 +416,45 @@ msgstr "Название с кодом {code} уже существует."
 msgid "The name {name} is already in the system"
 msgstr "Название {name} уже есть в системе"
 
-#: src/forecast/operation_type_relation/views.py:24
+#: src/forecast/operation_type_relation/views.py:25
 msgid "Base and depended demand models cannot be the same."
 msgstr "Базовая и зависимая модели нагрузки не могут совпадать."
 
-#: src/forecast/operation_type_relation/views.py:25
+#: src/forecast/operation_type_relation/views.py:26
 msgid "Demand model cannot depend on itself."
 msgstr "Циклическая зависимость: операция зависит сама от себя."
 
-#: src/forecast/operation_type_relation/views.py:26
+#: src/forecast/operation_type_relation/views.py:27
 msgid "Backward dependency already exists."
 msgstr "Уже существует обратная зависимость"
 
-#: src/forecast/operation_type_relation/views.py:27
+#: src/forecast/operation_type_relation/views.py:28
 msgid "Base and depended demand models cannot have different templates."
 msgstr "Базовая и зависимая модели не могут иметь разный шаблон нагрузки"
 
-#: src/forecast/operation_type_relation/views.py:28
+#: src/forecast/operation_type_relation/views.py:29
 #, python-brace-format
 msgid "Error in formula: {formula}."
 msgstr "Ошибка в формуле: {formula}"
 
-#: src/forecast/operation_type_relation/views.py:29
+#: src/forecast/operation_type_relation/views.py:30
 msgid "Base model not formula."
 msgstr "У базовой модели тип расчета должен быть формула"
 
-#: src/forecast/operation_type_relation/views.py:30
-msgid "Constant operation can't be base."
-msgstr "Операция с постоянным значением не может иметь зависимости."
-
 #: src/forecast/operation_type_relation/views.py:31
+msgid ""
+"Both templates should be work type for 'Change workload between' relation."
+msgstr "Оба шаблона должны быть типами работ для взаимосвязи 'Перекидывание типов работ'"
+
+#: src/forecast/operation_type_relation/views.py:32
 msgid "Depended must have same or bigger forecast step, got {} -> {}"
 msgstr ""
 "Зависимая операция должна иметь одинаковый или больший шаг прогноза, имеется "
 "{} -> {}"
+
+#: src/forecast/operation_type_relation/views.py:33
+msgid "Bad day of week, possible values: 0, 1, 2, 3, 4, 5, 6"
+msgstr "Некорректное значение дня недели, возможные значения: 0, 1, 2, 3, 4, 5, 6"
 
 #: src/forecast/operation_type_template/views.py:19
 msgid "This operation type depends on operations with less forecast steps."
@@ -1433,6 +1438,9 @@ msgstr "Файл не был загружен."
 #: src/util/upload.py:28
 msgid "Files with this extension are not supported."
 msgstr "Файлы с таким расширением не поддерживается."
+
+#~ msgid "Constant operation can't be base."
+#~ msgstr "Операция с постоянным значением не может иметь зависимости."
 
 #~ msgid "Invalid basic header. No credentials provided."
 #~ msgstr "Недопустимый заголовок. Не предоставлены учетные данные."
