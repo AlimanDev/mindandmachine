@@ -75,7 +75,7 @@ class UserDTOSerializer(serializers.ModelSerializer):
     reports = serializers.SerializerMethodField()
 
     def get_groups(self, user):
-        return [gr_name for gr_name in user.position_groups + user.function_groups if gr_name]
+        return [gr_name for gr_name in user.position_groups if gr_name]
 
     def get_reports(self, _user):
         return ['REPORT_ALL']
