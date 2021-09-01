@@ -1,6 +1,5 @@
 import datetime
 import json
-
 from django.conf import settings
 from django.contrib.auth.models import (
     UserManager
@@ -522,12 +521,11 @@ class WorkerDay(AbstractModel):
         return self.__str__()
 
     def calc_day_and_night_work_hours(self):
+        from src.util.models_converter import Converter
         # TODO: нужно учитывать работу в праздничные дни? -- сейчас is_celebration в ProductionDay всегда False
 
         if self.type not in self.TYPES_WITH_TM_RANGE:
             return 0.0, 0.0, 0.0
-
-        night_edges = self.shop.network.night_edges_tm_list
 
         if self.work_hours > datetime.timedelta(0):
             work_seconds = self.work_hours.seconds
@@ -540,6 +538,10 @@ class WorkerDay(AbstractModel):
             return 0.0, 0.0, 0.0
 
         work_hours = round(work_seconds / 3600, 2)
+
+        night_edges = [Converter.parse_time(t) for t in Network.DEFAULT_NIGHT_EDGES]
+        if self.shop and self.shop.network:
+            night_edges = self.shop.network.night_edges_tm_list
 
         if work_end.time() <= night_edges[0] and work_start.date() == work_end.date():
             work_hours_day = work_hours

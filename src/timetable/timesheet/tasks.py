@@ -37,5 +37,8 @@ def calc_timesheets(employee_id__in: list = None, dt_from=None, dt_to=None):
         dt_fired=Max('employments__dt_fired'),
     )
     for employee in qs:
-        TimesheetCalculator(employee=employee, dt_from=dt_from, dt_to=dt_to).calc()
+        try:
+            TimesheetCalculator(employee=employee, dt_from=dt_from, dt_to=dt_to).calc()
+        except Exception as e:
+            logger.exception(e)
     logger.info('finish calc_timesheets')
