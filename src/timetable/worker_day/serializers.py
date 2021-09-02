@@ -109,6 +109,7 @@ class WorkerDayListSerializer(serializers.Serializer, UnaccountedOvertimeMixin):
     dttm_modified = serializers.DateTimeField(read_only=True)
     is_blocked = serializers.BooleanField(read_only=True)
     unaccounted_overtime = serializers.SerializerMethodField()
+    closest_plan_approved_id = serializers.IntegerField(read_only=True, required=False)
 
     def get_unaccounted_overtime(self, obj):
         return self.unaccounted_overtime_getter(obj)
@@ -152,6 +153,7 @@ class WorkerDaySerializer(serializers.ModelSerializer, UnaccountedOvertimeMixin)
     outsources = NetworkSerializer(many=True, read_only=True)
     outsources_ids = serializers.ListField(required=False, child=serializers.IntegerField(), allow_null=True, allow_empty=True, write_only=True)
     unaccounted_overtime = serializers.SerializerMethodField()
+    closest_plan_approved_id = serializers.IntegerField(required=False, read_only=True)
 
     _employee_active_empl = None
 
@@ -161,8 +163,9 @@ class WorkerDaySerializer(serializers.ModelSerializer, UnaccountedOvertimeMixin)
                   'comment', 'is_approved', 'worker_day_details', 'is_fact', 'work_hours', 'parent_worker_day_id',
                   'is_outsource', 'is_vacancy', 'shop_code', 'user_login', 'username', 'created_by', 'last_edited_by',
                   'crop_work_hours_by_shop_schedule', 'dttm_work_start_tabel', 'dttm_work_end_tabel', 'is_blocked',
-                  'employment_tabel_code', 'outsources', 'outsources_ids', 'unaccounted_overtime']
-        read_only_fields = ['work_hours', 'parent_worker_day_id', 'is_blocked']
+                  'employment_tabel_code', 'outsources', 'outsources_ids', 'unaccounted_overtime',
+                  'closest_plan_approved_id']
+        read_only_fields = ['work_hours', 'parent_worker_day_id', 'is_blocked', 'closest_plan_approved_id']
         create_only_fields = ['is_fact']
         ref_name = 'WorkerDaySerializer'
         extra_kwargs = {
