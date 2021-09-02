@@ -589,6 +589,7 @@ class WorkerDay(AbstractModel):
     def _run_batch_update_or_create_transaction_checks(cls, *args, **kwargs):
         cls.check_work_time_overlap(employee_days_q=kwargs.get('employee_days_q'), exc_cls=ValidationError)
         cls.check_multiple_workday_types(employee_days_q=kwargs.get('employee_days_q'), exc_cls=ValidationError)
+        # TODO: проверка, что может быть только 1 день на дату если включена настройка в сети пользователя?
 
     def calc_day_and_night_work_hours(self):
         # TODO: нужно учитывать работу в праздничные дни? -- сейчас is_celebration в ProductionDay всегда False

@@ -1445,6 +1445,7 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
         self.assertFalse(wd.is_vacancy)
 
     def test_inactive_employment_replaced_by_active(self):
+        WorkerDay.objects.all().delete()
         Employment.objects.filter(id=self.employment2.id).update(
             dt_hired=self.dt - timedelta(days=100),
             dt_fired=self.dt - timedelta(days=1),

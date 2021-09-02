@@ -309,25 +309,12 @@ class WorkerDaySerializer(serializers.ModelSerializer, UnaccountedOvertimeMixin)
     def _create_update_clean(self, validated_data, instance=None):
         employee_id = validated_data.get('employee_id', instance.employee_id if instance else None)
         if employee_id:
-            wdays_qs = WorkerDay.objects_with_excluded.filter(
-                employee_id=employee_id,
-                dt=validated_data.get('dt'),
-                is_approved=validated_data.get(
-                    'is_approved',
-                    instance.is_approved if instance else WorkerDay._meta.get_field('is_approved').default,
-                ),
-                is_fact=validated_data.get(
-                    'is_fact', instance.is_fact if instance else WorkerDay._meta.get_field('is_fact').default),
-            )
-            if instance:
-                wdays_qs = wdays_qs.exclude(id=instance.id)
-            wdays_qs.delete()
-
             validated_data['is_vacancy'] = validated_data.get('is_vacancy') \
                 or not self._employee_active_empl.is_equal_shops
 
-    def _check_overlap(self, employee_id, dt):
+    def _run_transaction_checks(self, employee_id, dt):
         WorkerDay.check_work_time_overlap(employee_id=employee_id, dt=dt, exc_cls=ValidationError)
+        WorkerDay.check_multiple_workday_types(employee_id=employee_id, dt=dt, exc_cls=ValidationError)
 
     def create(self, validated_data):
         with transaction.atomic():
@@ -377,7 +364,7 @@ class WorkerDaySerializer(serializers.ModelSerializer, UnaccountedOvertimeMixin)
             if outsources:
                 worker_day.outsources.set(outsources)
 
-            self._check_overlap(employee_id=worker_day.employee_id, dt=worker_day.dt)
+            self._run_transaction_checks(employee_id=worker_day.employee_id, dt=worker_day.dt)
 
             return worker_day
 
@@ -395,7 +382,7 @@ class WorkerDaySerializer(serializers.ModelSerializer, UnaccountedOvertimeMixin)
 
             res = super().update(instance, validated_data)
 
-            self._check_overlap(employee_id=instance.employee_id, dt=instance.dt)
+            self._run_transaction_checks(employee_id=instance.employee_id, dt=instance.dt)
 
             return res
 
