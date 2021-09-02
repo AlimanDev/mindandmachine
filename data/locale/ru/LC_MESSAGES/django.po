@@ -12,7 +12,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Django REST framework\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2021-08-30 09:10+0000\n"
+"POT-Creation-Date: 2021-09-02 07:04+0000\n"
 "PO-Revision-Date: 2017-08-03 14:58+0000\n"
 "Last-Translator: Grigory Mishchenko <grishkokot@gmail.com>\n"
 "Language-Team: Russian (http://www.transifex.com/django-rest-framework-1/"
@@ -314,7 +314,7 @@ msgid ""
 msgstr ""
 "Невозможно изменить шаблон нагрузки, так как он находится в процессе расчета."
 
-#: src/base/models.py:1215
+#: src/base/models.py:1232
 msgid ""
 "Unable to define worker access group. Assign an access group to him or a "
 "position associated with an access group."
@@ -398,7 +398,7 @@ msgid ""
 msgstr ""
 "Биометрия уже создана. Для создания новой биометрии сначала удалите нынешнюю."
 
-#: src/forecast/load_template/utils.py:521
+#: src/forecast/load_template/utils.py:540
 #, python-brace-format
 msgid "These operation types do not exist: {types}."
 msgstr "Данные типы операций не существуют: {types}."
@@ -424,40 +424,48 @@ msgstr "Название с кодом {code} уже существует."
 msgid "The name {name} is already in the system"
 msgstr "Название {name} уже есть в системе"
 
-#: src/forecast/operation_type_relation/views.py:24
+#: src/forecast/operation_type_relation/views.py:25
 msgid "Base and depended demand models cannot be the same."
 msgstr "Базовая и зависимая модели нагрузки не могут совпадать."
 
-#: src/forecast/operation_type_relation/views.py:25
+#: src/forecast/operation_type_relation/views.py:26
 msgid "Demand model cannot depend on itself."
 msgstr "Циклическая зависимость: операция зависит сама от себя."
 
-#: src/forecast/operation_type_relation/views.py:26
+#: src/forecast/operation_type_relation/views.py:27
 msgid "Backward dependency already exists."
 msgstr "Уже существует обратная зависимость"
 
-#: src/forecast/operation_type_relation/views.py:27
+#: src/forecast/operation_type_relation/views.py:28
 msgid "Base and depended demand models cannot have different templates."
 msgstr "Базовая и зависимая модели не могут иметь разный шаблон нагрузки"
 
-#: src/forecast/operation_type_relation/views.py:28
+#: src/forecast/operation_type_relation/views.py:29
 #, python-brace-format
 msgid "Error in formula: {formula}."
 msgstr "Ошибка в формуле: {formula}"
 
-#: src/forecast/operation_type_relation/views.py:29
+#: src/forecast/operation_type_relation/views.py:30
 msgid "Base model not formula."
 msgstr "У базовой модели тип расчета должен быть формула"
 
-#: src/forecast/operation_type_relation/views.py:30
-msgid "Constant operation can't be base."
-msgstr "Операция с постоянным значением не может иметь зависимости."
-
 #: src/forecast/operation_type_relation/views.py:31
+msgid ""
+"Both templates should be work type for 'Change workload between' relation."
+msgstr ""
+"Оба шаблона должны быть типами работ для взаимосвязи 'Перекидывание типов "
+"работ'"
+
+#: src/forecast/operation_type_relation/views.py:32
 msgid "Depended must have same or bigger forecast step, got {} -> {}"
 msgstr ""
 "Зависимая операция должна иметь одинаковый или больший шаг прогноза, имеется "
 "{} -> {}"
+
+#: src/forecast/operation_type_relation/views.py:33
+msgid "Bad day of week, possible values: 0, 1, 2, 3, 4, 5, 6"
+msgstr ""
+"Некорректное значение дня недели, возможные значения: 0, 1, 2, 3, 4, 5, 6"
 
 #: src/forecast/operation_type_template/views.py:19
 msgid "This operation type depends on operations with less forecast steps."
@@ -483,7 +491,7 @@ msgid ""
 msgstr "Нет такого типа работ или он не связан с типом операций {work_type}"
 
 #: src/forecast/period_clients/utils.py:108
-#: src/timetable/worker_day/timetable.py:328
+#: src/timetable/worker_day/timetable.py:358
 msgid "Failed to open active sheet."
 msgstr "Не удалось открыть активный лист."
 
@@ -558,19 +566,19 @@ msgid "Day"
 msgstr "День"
 
 #: src/reports/utils/overtimes_undertimes.py:178
-#: src/timetable/worker_day/timetable.py:541
-#: src/timetable/worker_day/timetable.py:560
-#: src/timetable/worker_day/timetable.py:566
-#: src/timetable/worker_day/timetable.py:611 src/util/dg/tabel.py:297
+#: src/timetable/worker_day/timetable.py:563
+#: src/timetable/worker_day/timetable.py:582
+#: src/timetable/worker_day/timetable.py:588
+#: src/timetable/worker_day/timetable.py:633 src/util/dg/tabel.py:297
 msgid "Full name"
 msgstr "ФИО"
 
 #: src/reports/utils/overtimes_undertimes.py:179
 #: src/timetable/attendance_records/views.py:50
-#: src/timetable/worker_day/timetable.py:540
-#: src/timetable/worker_day/timetable.py:560
-#: src/timetable/worker_day/timetable.py:566
-#: src/timetable/worker_day/timetable.py:609 src/util/dg/tabel.py:300
+#: src/timetable/worker_day/timetable.py:562
+#: src/timetable/worker_day/timetable.py:582
+#: src/timetable/worker_day/timetable.py:588
+#: src/timetable/worker_day/timetable.py:631 src/util/dg/tabel.py:300
 msgid "Employee id"
 msgstr "Табельный номер"
 
@@ -747,43 +755,43 @@ msgid ""
 "задачам. ({task_violation_str})"
 msgstr ""
 
-#: src/timetable/models.py:487 src/timetable/worker_day/timetable.py:42
+#: src/timetable/models.py:487 src/timetable/worker_day/timetable.py:45
 #: src/util/dg/tabel.py:38
 msgid "BT"
 msgstr "К"
 
-#: src/timetable/models.py:488 src/timetable/worker_day/timetable.py:43
+#: src/timetable/models.py:488 src/timetable/worker_day/timetable.py:46
 #: src/timetable/worker_day/xlsx_utils/timetable.py:128
 #: src/timetable/worker_day/xlsx_utils/timetable.py:309 src/util/dg/tabel.py:37
 msgid "H"
 msgstr "В"
 
-#: src/timetable/models.py:489 src/timetable/worker_day/timetable.py:44
+#: src/timetable/models.py:489 src/timetable/worker_day/timetable.py:47
 #: src/util/dg/tabel.py:43
 msgid "ABS"
 msgstr "Н"
 
-#: src/timetable/models.py:491 src/timetable/worker_day/timetable.py:46
+#: src/timetable/models.py:491 src/timetable/worker_day/timetable.py:49
 msgid "ST"
 msgstr "КВ"
 
-#: src/timetable/models.py:492 src/timetable/worker_day/timetable.py:47
+#: src/timetable/models.py:492 src/timetable/worker_day/timetable.py:50
 #: src/util/dg/tabel.py:42
 msgid "S"
 msgstr "Б"
 
-#: src/timetable/models.py:493 src/timetable/worker_day/timetable.py:48
+#: src/timetable/models.py:493 src/timetable/worker_day/timetable.py:51
 #: src/timetable/worker_day/xlsx_utils/timetable.py:129
 #: src/timetable/worker_day/xlsx_utils/timetable.py:310 src/util/dg/tabel.py:39
 msgid "V"
 msgstr "ОТ"
 
-#: src/timetable/models.py:496 src/timetable/worker_day/timetable.py:51
+#: src/timetable/models.py:496 src/timetable/worker_day/timetable.py:54
 #: src/util/dg/tabel.py:40
 msgid "VO"
 msgstr "ДО"
 
-#: src/timetable/models.py:499 src/timetable/worker_day/timetable.py:54
+#: src/timetable/models.py:499 src/timetable/worker_day/timetable.py:57
 #: src/timetable/worker_day/xlsx_utils/timetable.py:311 src/util/dg/tabel.py:41
 msgid "MAT"
 msgstr "ОЖ"
@@ -1026,40 +1034,40 @@ msgstr ""
 msgid "Shop or employees should be defined."
 msgstr "Для получения отчета нужно передать магазин или сотрудников."
 
-#: src/timetable/worker_day/timetable.py:164
-msgid "The employee id and full name are not specified on line {}."
-msgstr "У сотрудника на строке {} не указаны ФИО и табельный номер."
+#: src/timetable/worker_day/timetable.py:75
+msgid "There are no active work types in this shop."
+msgstr "В данном магазине нет активных типов работ"
 
-#: src/timetable/worker_day/timetable.py:168
+#: src/timetable/worker_day/timetable.py:198
 msgid "The employee with number {} does not exist in the current shop."
 msgstr "Сотрудник с табельным номером {} не существует в текущем магазине."
 
-#: src/timetable/worker_day/timetable.py:170
+#: src/timetable/worker_day/timetable.py:200
 msgid "The employee with the full name {} does not exist in the current shop."
 msgstr "Сотрудник с ФИО {} не существует в текущем магазине."
 
-#: src/timetable/worker_day/timetable.py:202
+#: src/timetable/worker_day/timetable.py:232
 msgid "tabel code "
 msgstr "номер "
 
-#: src/timetable/worker_day/timetable.py:204
+#: src/timetable/worker_day/timetable.py:234
 msgid "full name "
 msgstr "ФИО "
 
-#: src/timetable/worker_day/timetable.py:206
+#: src/timetable/worker_day/timetable.py:236
 msgid "position "
 msgstr "должность "
 
-#: src/timetable/worker_day/timetable.py:207
+#: src/timetable/worker_day/timetable.py:237
 msgid "The employee's {} are not recognized or specified on the line {}."
 msgstr "У сотрудника не распознаны или не указаны {} на строке {}."
 
-#: src/timetable/worker_day/timetable.py:216
+#: src/timetable/worker_day/timetable.py:246
 #, python-brace-format
 msgid "There is no such position {position}."
 msgstr "Нет такой должности {position}."
 
-#: src/timetable/worker_day/timetable.py:234
+#: src/timetable/worker_day/timetable.py:264
 msgid ""
 "The employee on the line {} with the table number {} has the last name {} in "
 "the system, but in the file {}."
@@ -1067,12 +1075,7 @@ msgstr ""
 "У сотрудника на строке {} с табельным номером {} в системе фамилия {}, а в "
 "файле {}."
 
-#: src/timetable/worker_day/timetable.py:405
-#: src/timetable/worker_day/timetable.py:709
-msgid "There are no active work types in this shop."
-msgstr "В данном магазине нет активных типов работ"
-
-#: src/timetable/worker_day/timetable.py:454
+#: src/timetable/worker_day/timetable.py:476
 #, python-brace-format
 msgid ""
 "The employee {user.first_name} {user.last_name} in the cell for {dt} has the "
@@ -1081,45 +1084,45 @@ msgstr ""
 "У сотрудника {user.first_name} {user.last_name}  в ячейке за {dt} "
 "неправильное значение: {value}."
 
-#: src/timetable/worker_day/timetable.py:484
-#: src/timetable/worker_day/timetable.py:679
+#: src/timetable/worker_day/timetable.py:506
+#: src/timetable/worker_day/timetable.py:701
 msgid "Timetable for signature."
 msgstr "Расписание на подпись."
 
-#: src/timetable/worker_day/timetable.py:527
-#: src/timetable/worker_day/timetable.py:633
+#: src/timetable/worker_day/timetable.py:549
+#: src/timetable/worker_day/timetable.py:655
 msgid "Timetable_for_shop_{}_from_{}.xlsx"
 msgstr "Расписание_для_подразделения_{}_от_{}.xlsx"
 
-#: src/timetable/worker_day/timetable.py:542
-#: src/timetable/worker_day/timetable.py:560
-#: src/timetable/worker_day/timetable.py:566
-#: src/timetable/worker_day/timetable.py:613 src/util/dg/tabel.py:307
+#: src/timetable/worker_day/timetable.py:564
+#: src/timetable/worker_day/timetable.py:582
+#: src/timetable/worker_day/timetable.py:588
+#: src/timetable/worker_day/timetable.py:635 src/util/dg/tabel.py:307
 msgid "Position"
 msgstr "Должность"
 
-#: src/timetable/worker_day/timetable.py:563
-#: src/timetable/worker_day/timetable.py:810
+#: src/timetable/worker_day/timetable.py:585
+#: src/timetable/worker_day/timetable.py:829
 msgid "Timetable"
 msgstr "Расписание"
 
-#: src/timetable/worker_day/timetable.py:615 src/util/dg/tabel.py:310
+#: src/timetable/worker_day/timetable.py:637 src/util/dg/tabel.py:310
 msgid "Date"
 msgstr "Дата"
 
-#: src/timetable/worker_day/timetable.py:617
+#: src/timetable/worker_day/timetable.py:639
 msgid "Shift start"
 msgstr "Начало смены"
 
-#: src/timetable/worker_day/timetable.py:619
+#: src/timetable/worker_day/timetable.py:641
 msgid "Shift end"
 msgstr "Окончание смены"
 
-#: src/timetable/worker_day/timetable.py:729
+#: src/timetable/worker_day/timetable.py:748
 msgid "Can not parse date value {} on row {}."
 msgstr "Дата {} на строке {} указана в неверном формате."
 
-#: src/timetable/worker_day/timetable.py:750
+#: src/timetable/worker_day/timetable.py:769
 #, python-brace-format
 msgid ""
 "The employee {user.first_name} {user.last_name} in the row {i} has the wrong "
@@ -1450,6 +1453,9 @@ msgstr "Файл не был загружен."
 #: src/util/upload.py:28
 msgid "Files with this extension are not supported."
 msgstr "Файлы с таким расширением не поддерживается."
+
+#~ msgid "The employee id and full name are not specified on line {}."
+#~ msgstr "У сотрудника на строке {} не указаны ФИО и табельный номер."
 
 #~ msgid "Wrong dates format."
 #~ msgstr "Неправильный формат дат."

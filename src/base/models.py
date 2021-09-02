@@ -902,6 +902,23 @@ class ProductionDay(AbstractModel):
         return '(dt {}, type {}, id {})'.format(self.dt, self.type, self.id)
 
     @classmethod
+    def get_prod_days_for_region(cls, region_id, **kwargs):
+        q = Q(
+            Q(region_id=region_id) | Q(region__children__id=region_id),
+            **kwargs,
+        )
+        prod_cal_subq = cls.objects.filter(q, dt=OuterRef('dt')).annotate(
+            is_equal_regions=Case(
+                When(region_id=Value(region_id), then=True),
+                default=False, output_field=models.BooleanField()
+            ),
+        ).order_by('-is_equal_regions')
+        return cls.objects.filter(
+            q,
+            id=Subquery(prod_cal_subq.values_list('id', flat=True)[:1])
+        )
+
+    @classmethod
     def get_norm_work_hours(cls, region_id, year, month=None):
         """
         Получение нормы часов по производственному календарю для региона.
