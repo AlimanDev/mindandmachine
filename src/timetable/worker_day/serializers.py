@@ -343,15 +343,6 @@ class WorkerDaySerializer(serializers.ModelSerializer, UnaccountedOvertimeMixin)
                     **validated_data,
                 )
                 worker_day.refresh_from_db()
-            elif validated_data.get('employee_id'):
-                worker_day, _created = WorkerDay.objects.update_or_create(
-                    dt=validated_data.get('dt'),
-                    employee_id=validated_data.get('employee_id'),
-                    employment_id=validated_data.get('employment_id'),
-                    is_fact=validated_data.get('is_fact'),
-                    is_approved=validated_data.get('is_approved'),
-                    defaults=validated_data,
-                )
             else:
                 worker_day = WorkerDay.objects.create(
                     **validated_data,

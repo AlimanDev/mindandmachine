@@ -233,6 +233,7 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
 
         # edit not approved plan
         data = {
+            "id": plan_id,
             "shop_id": self.shop.id,
             "employee_id": self.employee2.id,
             "employment_id": self.employment2.id,
@@ -330,6 +331,7 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
         response = self.client.post(self.url, data, format='json')
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         fact_id = response.json()['id']
+        data['id'] = fact_id
 
         # edit not approved fact
         data['dttm_work_start'] = Converter.convert_datetime(datetime.combine(dt, time(7, 48, 0)))
@@ -366,14 +368,14 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(WorkerDay.objects.get(id=fact_id).is_approved, True)
 
-        # create approved plan
+        # cant create approved plan again
         data['is_fact'] = False
+        data.pop('id')
         response = self.client.post(f"{self.url}", data, format='json')
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        new_plan_id = response.json()['id']
-        new_plan = WorkerDay.objects.get(id=new_plan_id)
-        self.assertNotEqual(new_plan_id, plan_id)
-        self.assertEqual(response.json()['type'], data['type'])
+        self.assertContains(
+            response, 'Операция не может быть выполнена. Недопустимое пересечение времени работы',
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
 
         # # create approved plan again
         # response = self.client.post(f"{self.url}", data, format='json')
@@ -386,14 +388,10 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
 
         data['is_fact'] = True
         response = self.client.post(f"{self.url}", data, format='json')
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-
-        res = response.json()
-        new_fact_id = res['id']
-        new_fact = WorkerDay.objects.get(id=new_fact_id)
-        self.assertNotEqual(new_fact_id, fact_id)
-        self.assertEqual(res['dttm_work_start'], data['dttm_work_start'])
-        self.assertEqual(res['dttm_work_end'], data['dttm_work_end'])
+        self.assertContains(
+            response, 'Операция не может быть выполнена. Недопустимое пересечение времени работы',
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
 
         # # create approved fact again
         # response = self.client.post(f"{self.url}", data, format='json')
@@ -1109,6 +1107,7 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
         self.assertEqual(response.status_code, 200)
 
     def test_can_create_and_update_not_approved_fact_only_with_empty_or_workday_type(self):
+        WorkerDay.objects.all().delete()
         dt = now().date()
         data = {
             "shop_code": self.shop.code,
