@@ -776,6 +776,16 @@ class TestUploadDownload(APITestCase):
         self.assertEqual(tabel[tabel.columns[1]][0], 'Магазин: Shop1') #fails with python > 3.6
         self.assertEqual(tabel[tabel.columns[1]][12], 'Иванов Иван Иванович')
         self.assertEqual(tabel[tabel.columns[27]][15], 'В')
+        self.network.set_settings_value('download_timetable_norm_field', 'sawh_hours')
+        self.network.save()
+        response = self.client.get(
+            f'{self.url}download_timetable/?shop_id={self.shop.id}&dt_from=2020-04-01&is_approved=False')
+        tabel = pandas.read_excel(io.BytesIO(response.content))
+        print(tabel)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(tabel[tabel.columns[1]][0], 'Магазин: Shop1') #fails with python > 3.6
+        self.assertEqual(tabel[tabel.columns[1]][12], 'Иванов Иван Иванович')
+        self.assertEqual(tabel[tabel.columns[27]][15], 'В')
 
     def test_download_timetable_with_child_region(self):
         fill_calendar('2020.4.1', '2021.12.31', self.region.id)
