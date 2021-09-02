@@ -61,6 +61,7 @@ class Timetable_xlsx(Tabel_xlsx):
             'align': 'center',
             'valign': 'vcenter',
             'border': 1,
+            'text_wrap': True,
         }
 
     def format_cells(self, users_len):
@@ -178,6 +179,7 @@ class Timetable_xlsx(Tabel_xlsx):
                     text,
                     self.workbook.add_format(cell_format)
                 )
+            self.worksheet.set_row(row_s + row_shift, 35)
 
             format_holiday_debt = self.workbook.add_format(fmt(font_size=10, border=1, bg_color='#FEFF99'))
 
