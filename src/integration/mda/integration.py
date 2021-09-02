@@ -165,7 +165,19 @@ class MdaIntegrationHelper:
                         dttm_deleted__gt=self.dt_now - timedelta(days=CLOSED_OR_DELETED_THRESHOLD_DAYS)),
                     ~Q(code=''), code__isnull=False,
                 ),
-            ))
+            )),
+            position_groups=ArrayAgg(
+                    'employees__employments__position__group__name', distinct=True,
+                    filter=Q(
+                        employees__employments__id__in=active_employments_qs.values_list('id', flat=True),
+                    ),
+            ),
+            function_groups=ArrayAgg(
+                    'employees__employments__function_group__name', distinct=True,
+                    filter=Q(
+                        employees__employments__id__in=active_employments_qs.values_list('id', flat=True),
+                    ),
+            ),
         ).filter(
             add_to_unload=True,
         )
