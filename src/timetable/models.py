@@ -24,7 +24,11 @@ from src.base.models_abstract import AbstractModel, AbstractActiveModel, Abstrac
 from src.events.signals import event_signal
 from src.recognition.events import EMPLOYEE_WORKING_NOT_ACCORDING_TO_PLAN
 from src.tasks.models import Task
-from src.timetable.exceptions import WorkTimeOverlap, WorkDayTaskViolation
+from src.timetable.exceptions import (
+    WorkTimeOverlap,
+    WorkDayTaskViolation,
+    MultipleWDTypesOnOneDateForOneEmployee,
+)
 from src.util.mixins.qs import AnnotateValueEqualityQSMixin
 from src.util.time import _time_to_float
 
@@ -575,6 +579,17 @@ class WorkerDay(AbstractModel):
     def _get_batch_delete_scope_fields_list(cls):
         return ['dt', 'employee_id', 'is_fact', 'is_approved']
 
+    @classmethod
+    def _get_batch_update_or_create_transaction_checks_kwargs(cls, **kwargs):
+        return {
+            'employee_days_q': kwargs.get('q_for_delete')
+        }
+
+    @classmethod
+    def _run_batch_update_or_create_transaction_checks(cls, *args, **kwargs):
+        cls.check_work_time_overlap(employee_days_q=kwargs.get('employee_days_q'), exc_cls=ValidationError)
+        cls.check_multiple_workday_types(employee_days_q=kwargs.get('employee_days_q'), exc_cls=ValidationError)
+
     def calc_day_and_night_work_hours(self):
         # TODO: нужно учитывать работу в праздничные дни? -- сейчас is_celebration в ProductionDay всегда False
 
@@ -961,7 +976,7 @@ class WorkerDay(AbstractModel):
             return
 
         lookup = {
-            'type__in': WorkerDay.TYPES_WITH_TM_RANGE,
+            'type__is_dayoff': False,
         }
         if is_fact is not None:
             lookup['is_fact'] = is_fact
@@ -1030,6 +1045,70 @@ class WorkerDay(AbstractModel):
             raise original_exc
 
         return overlaps
+
+    @classmethod
+    def check_multiple_workday_types(cls, employee_days_q=None, employee_id=None, employee_id__in=None, user_id=None,
+                                user_id__in=None, dt=None, dt__in=None, is_fact=None, is_approved=None, raise_exc=True,
+                                exc_cls=None):
+        """
+        Проверка, что нету различных типов рабочих дней на 1 дату для 1 сотрудника
+        """
+        if not (employee_days_q or employee_id or employee_id__in or user_id or user_id__in):
+            return
+
+        lookup = {}
+        if is_fact is not None:
+            lookup['is_fact'] = is_fact
+
+        if is_approved is not None:
+            lookup['is_approved'] = is_approved
+
+        if employee_id:
+            lookup['employee__user__employees__id'] = employee_id
+
+        if employee_id__in:
+            lookup['employee__user__employees__id__in'] = employee_id__in
+
+        if user_id:
+            lookup['employee__user_id'] = user_id
+
+        if user_id__in:
+            lookup['employee__user_id__in'] = user_id__in
+
+        if dt:
+            lookup['dt'] = dt
+
+        if dt__in:
+            lookup['dt__in'] = dt__in
+
+        q = Q(**lookup)
+        if employee_days_q:
+            q &= employee_days_q
+
+        has_multiple_workday_types_qs = cls.objects.filter(q).annotate(
+            has_multiple_workday_types=Exists(
+                WorkerDay.objects.filter(
+                    ~Q(id=OuterRef('id')),
+                    ~Q(type_id=OuterRef('type_id')),
+                    employee_id=OuterRef('employee_id'),
+                    dt=OuterRef('dt'),
+                    is_fact=OuterRef('is_fact'),
+                    is_approved=OuterRef('is_approved'),
+                )
+            )
+        ).filter(
+            has_multiple_workday_types=True,
+        ).values('employee__user__last_name', 'employee__user__first_name', 'dt').distinct()
+
+        multiple_workday_types_data = list(has_multiple_workday_types_qs)
+
+        if multiple_workday_types_data and raise_exc:
+            original_exc = MultipleWDTypesOnOneDateForOneEmployee(multiple_workday_types_data=multiple_workday_types_data)
+            if exc_cls:
+                raise exc_cls(str(original_exc))
+            raise original_exc
+
+        return multiple_workday_types_data
 
     @classmethod
     def check_tasks_violations(cls, is_fact, is_approved, employee_days_q=None, employee_id=None, employee_id__in=None, user_id=None, user_id__in=None, dt=None,

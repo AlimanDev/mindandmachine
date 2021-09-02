@@ -1579,9 +1579,9 @@ class TestAutoSettings(APITestCase):
 
         dt = now().date()
         tm_from1 = time(10, 0, 0)
-        tm_to1 = time(20, 0, 0)
+        tm_to1 = time(14, 0, 0)
 
-        tm_from2 = time(10, 0, 0)
+        tm_from2 = time(16, 0, 0)
         tm_to2 = time(20, 0, 0)
 
         response = self.client.post(self.url, {

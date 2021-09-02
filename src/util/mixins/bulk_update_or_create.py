@@ -30,15 +30,23 @@ class BatchUpdateOrCreateModelMixin:
         return ['id']
 
     @classmethod
-    def _check_batch_create_or_update_objs_perms(cls, user, create_or_update_qs, raise_exception=False, exc_cls=None):
+    def _get_batch_update_or_create_transaction_checks_kwargs(cls, **kwargs):
+        return {}
+
+    @classmethod
+    def _run_batch_update_or_create_transaction_checks(cls, **kwargs):
+        pass
+
+    @classmethod
+    def _check_batch_create_objs_perms(cls, user, create_objs, raise_exception=False, exc_cls=None):
         """
-        Проверка прав на сохранение/обновление списка объектов
+        Проверка прав на сохранение списка объектов
             (для объектов, которые создаем -- можем использовать только список еще не созданных объектов)
         """
         pass
 
     @classmethod
-    def _check_batch_create_or_update_qs_perms(cls, user, create_or_update_objs, raise_exception=False, exc_cls=None):
+    def _check_batch_update_qs_perms(cls, user, update_qs, raise_exception=False, exc_cls=None):
         """
         Проверка прав на сохранение/обновление объектов на основе qs
             (для объектов, которые обновляем -- можем использовать qs)
@@ -179,7 +187,6 @@ class BatchUpdateOrCreateModelMixin:
             }
             update_qs = cls.objects.filter(**filter_kwargs).select_related(
                 *cls._get_batch_update_select_related_fields())
-            cls._check_batch_create_or_update_qs_perms(user, update_qs)
             existing_objs = {
                 getattr(obj, update_key_field): obj for obj in update_qs
             }
@@ -207,6 +214,7 @@ class BatchUpdateOrCreateModelMixin:
             objs = objs_to_create + objs_to_update
 
             deleted_dict = {}
+            q_for_delete = Q()
             if delete_scope_fields_list:
                 for obj_to_update in objs_to_update:
                     delete_scope_values_tuple = tuple((k, getattr(obj_to_update, k)) for k in delete_scope_fields_list)
@@ -217,7 +225,6 @@ class BatchUpdateOrCreateModelMixin:
                     delete_scope_values_set.add(delete_scope_values_tuple)
 
                 if delete_scope_values_set:
-                    q_for_delete = Q()
                     for delete_scope_values_tuples in delete_scope_values_set:
                         q_for_delete |= Q(**dict(delete_scope_values_tuples))
 
@@ -246,6 +253,10 @@ class BatchUpdateOrCreateModelMixin:
                     deleted_cls_stats = stats.setdefault(deleted_cls_name, {})
                     deleted_cls_stats['deleted'] = deleted_cls_stats.get('deleted', 0) + deleted_dict.get(
                         original_deleted_cls_name)
+
+            transaction_checks_kwargs = cls._get_batch_update_or_create_transaction_checks_kwargs(
+                data=data, q_for_delete=q_for_delete)
+            cls._run_batch_update_or_create_transaction_checks(**transaction_checks_kwargs)
 
         return objs, stats
 

@@ -29,3 +29,19 @@ class WorkDayTaskViolation(Exception):
             'Операция не может быть выполнена. Нарушены ограничения по запланированным задачам. ({task_violation_str})').format(
             task_violation_str=task_violation_str
         )
+
+
+class MultipleWDTypesOnOneDateForOneEmployee(Exception):
+    def __init__(self, multiple_workday_types_data):
+        self.multiple_workday_types_data = multiple_workday_types_data
+
+    def __str__(self, *args, **kwargs):
+        error_str = ', '.join(
+            f'{error_data["employee__user__last_name"]} {error_data["employee__user__first_name"]} - {error_data["dt"]}'
+            for error_data in self.multiple_workday_types_data
+        )
+        return gettext(
+                'Операция не может быть выполнена. '
+                'Невозможно создать разные типы дней на одну дату для одного сотрудника. ({error_str})').format(
+            error_str=error_str
+        )
