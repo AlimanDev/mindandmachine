@@ -175,29 +175,45 @@ class TestMdaIntegration(TestsHelperMixin, TestCase):
         self.assertEqual(director2_data['shopDirector'], True)
 
     def test_multiple_levels_and_multiple_groups(self):
-        region = ShopFactory(parent=self.division1, code='region')
-        shop = ShopFactory(parent=region, code='shop')
-        group_director = GroupFactory(name='Директор', code='director')
-        group_urs = GroupFactory(name='УРС', code='urs')
-        position_director = WorkerPositionFactory(name='Директор', group=group_director)
-        position_urs = WorkerPositionFactory(name='Директор', group=group_urs)
-        user = UserFactory()
-        employee = EmployeeFactory(user=user)
-        _region_director = EmploymentFactory(employee=employee, shop=region, position=position_urs)
-        shop_director = EmploymentFactory(employee=employee, shop=shop, position=position_director)
+        with self.settings(MDA_INTEGRATION_TRANSFER_GROUPS_FIELD=True):
+            region = ShopFactory(parent=self.division1, code='region')
+            shop = ShopFactory(parent=region, code='shop')
+            group_director = GroupFactory(name='Директор', code='director')
+            group_urs = GroupFactory(name='УРС', code='urs')
+            position_director = WorkerPositionFactory(name='Директор', group=group_director)
+            position_urs = WorkerPositionFactory(name='Директор', group=group_urs)
+            user = UserFactory()
+            employee = EmployeeFactory(user=user)
+            _region_director = EmploymentFactory(employee=employee, shop=region, position=position_urs)
+            shop_director = EmploymentFactory(employee=employee, shop=shop, position=position_director)
 
+            mda_integration_helper = MdaIntegrationHelper()
+            orgstruct_data = mda_integration_helper._get_orgstruct_data()
+            s_orgstruct_data = list(filter(lambda s: shop.id == s['id'], orgstruct_data['shops']))[0]
+            self.assertEqual(s_orgstruct_data['directorLogin'], shop_director.employee.user.username)
+
+            users_data = mda_integration_helper._get_users_data()
+            self.assertEqual(len(users_data), 5)
+            user_data = list(filter(lambda u: user.id == u['id'], users_data))[0]
+            self.assertEqual(user_data['shopDirector'], True)
+            self.assertEqual(user_data['orgLevel'], 'SHOP')
+            self.assertEqual(user_data['userChecklistsOrganizer'], False)
+            self.assertListEqual(sorted(user_data['groups']), sorted(['Директор', 'УРС']))
+
+    def test_no_gropus_in_response_if_groups_transfer_not_enabled(self):
+        group_worker = GroupFactory(name='Директор', code='director')
+        position_worker = WorkerPositionFactory(name='Директор', group=group_worker)
+        shop = ShopFactory(parent=self.region1, code='shop')
+        worker = EmploymentFactory(shop=shop, position=position_worker)
         mda_integration_helper = MdaIntegrationHelper()
-        orgstruct_data = mda_integration_helper._get_orgstruct_data()
-        s_orgstruct_data = list(filter(lambda s: shop.id == s['id'], orgstruct_data['shops']))[0]
-        self.assertEqual(s_orgstruct_data['directorLogin'], shop_director.employee.user.username)
-
         users_data = mda_integration_helper._get_users_data()
-        self.assertEqual(len(users_data), 5)
-        user_data = list(filter(lambda u: user.id == u['id'], users_data))[0]
-        self.assertEqual(user_data['shopDirector'], True)
-        self.assertEqual(user_data['orgLevel'], 'SHOP')
-        self.assertEqual(user_data['userChecklistsOrganizer'], False)
-        self.assertListEqual(sorted(user_data['groups']), sorted(['Директор', 'УРС']))
+        worker_data = list(filter(lambda u: worker.employee.user_id == u['id'], users_data))[0]
+        self.assertNotIn('groups', worker_data)
+
+        with self.settings(MDA_INTEGRATION_TRANSFER_GROUPS_FIELD=True):
+            users_data = mda_integration_helper._get_users_data()
+            worker_data = list(filter(lambda u: worker.employee.user_id == u['id'], users_data))[0]
+            self.assertListEqual(worker_data['groups'],  ['Директор'])
 
     def test_userChecklistsOrganizer(self):
         region = ShopFactory(parent=self.division1, code='region')
@@ -230,38 +246,39 @@ class TestMdaIntegration(TestsHelperMixin, TestCase):
         self.assertEqual(user_data['orgUnits'],  None)
 
     def test_surveyAdmin_for_admin_true_for_oters_false_and_correct_groups(self):
-        group_admin = GroupFactory(name='Администратор', code='admin')
-        group_worker = GroupFactory(name='Сотрудник', code='worker')
-        user_admin = UserFactory()
-        user_worker = UserFactory()
-        employee_admin = EmployeeFactory(user=user_admin)
-        employee_worker = EmployeeFactory(user=user_worker)
-        _admin_employment = EmploymentFactory(
-            employee=employee_admin, shop=self.base_shop, function_group=group_admin)
-        _worker_employment = EmploymentFactory(
-            employee=employee_worker, shop=self.base_shop, function_group=group_worker)
+        with self.settings(MDA_INTEGRATION_TRANSFER_GROUPS_FIELD=True):
+            group_admin = GroupFactory(name='Администратор', code='admin')
+            group_worker = GroupFactory(name='Сотрудник', code='worker')
+            user_admin = UserFactory()
+            user_worker = UserFactory()
+            employee_admin = EmployeeFactory(user=user_admin)
+            employee_worker = EmployeeFactory(user=user_worker)
+            _admin_employment = EmploymentFactory(
+                employee=employee_admin, shop=self.base_shop, function_group=group_admin)
+            _worker_employment = EmploymentFactory(
+                employee=employee_worker, shop=self.base_shop, function_group=group_worker)
 
-        mda_integration_helper = MdaIntegrationHelper()
-        users_data = mda_integration_helper._get_users_data()
-        self.assertEqual(len(users_data), 6)
-        user_admin_data = list(filter(lambda u: user_admin.id == u['id'], users_data))[0]
-        self.assertEqual(user_admin_data['admin'], True)
-        self.assertEqual(user_admin_data['surveyAdmin'],  True)
-        self.assertListEqual(user_admin_data['groups'],  [])
-
-        user_worker_data = list(filter(lambda u: user_worker.id == u['id'], users_data))[0]
-        self.assertEqual(user_worker_data['admin'], False)
-        self.assertEqual(user_worker_data['surveyAdmin'],  False)
-        self.assertListEqual(user_worker_data['groups'],  [])
-
-        with self.settings(MDA_INTEGRATION_INCLUDE_FUNCTION_GROUPS=True):
             mda_integration_helper = MdaIntegrationHelper()
             users_data = mda_integration_helper._get_users_data()
+            self.assertEqual(len(users_data), 6)
             user_admin_data = list(filter(lambda u: user_admin.id == u['id'], users_data))[0]
-            self.assertListEqual(user_admin_data['groups'], ['Администратор'])
+            self.assertEqual(user_admin_data['admin'], True)
+            self.assertEqual(user_admin_data['surveyAdmin'],  True)
+            self.assertListEqual(user_admin_data['groups'],  [])
 
             user_worker_data = list(filter(lambda u: user_worker.id == u['id'], users_data))[0]
-            self.assertListEqual(user_worker_data['groups'], ['Сотрудник'])
+            self.assertEqual(user_worker_data['admin'], False)
+            self.assertEqual(user_worker_data['surveyAdmin'],  False)
+            self.assertListEqual(user_worker_data['groups'],  [])
+
+            with self.settings(MDA_INTEGRATION_INCLUDE_FUNCTION_GROUPS=True):
+                mda_integration_helper = MdaIntegrationHelper()
+                users_data = mda_integration_helper._get_users_data()
+                user_admin_data = list(filter(lambda u: user_admin.id == u['id'], users_data))[0]
+                self.assertListEqual(user_admin_data['groups'], ['Администратор'])
+
+                user_worker_data = list(filter(lambda u: user_worker.id == u['id'], users_data))[0]
+                self.assertListEqual(user_worker_data['groups'], ['Сотрудник'])
 
     def test_correct_regionId_in_data(self):
         shop = ShopFactory(parent=self.region1, code='shop')

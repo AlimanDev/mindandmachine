@@ -72,7 +72,6 @@ class UserDTOSerializer(serializers.ModelSerializer):
     surveyAdmin = serializers.BooleanField()
     lang = serializers.CharField(source='mda_lang')
     timeZoneId = serializers.CharField()
-    groups = serializers.SerializerMethodField()
     reports = serializers.SerializerMethodField()
 
     def get_groups(self, user):
@@ -106,7 +105,6 @@ class UserDTOSerializer(serializers.ModelSerializer):
             # 'password',
             'ldapLogin',
             'timeZoneId',
-            'groups',
             'reports',
         )
 
@@ -124,3 +122,8 @@ class UserDTOSerializer(serializers.ModelSerializer):
                 'source': 'ldap_login',
             },
         }
+
+    def __init__(self, *args, **kwargs):
+        super(UserDTOSerializer, self).__init__(*args, **kwargs)
+        if getattr(settings, 'MDA_INTEGRATION_TRANSFER_GROUPS_FIELD', False):
+            self.fields['groups'] = serializers.SerializerMethodField()
