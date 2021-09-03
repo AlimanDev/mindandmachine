@@ -1183,6 +1183,19 @@ class WorkerDay(AbstractModel):
         return task_violations
 
     @classmethod
+    def get_closest_plan_approved_q(cls, employee_id, dt, dttm_work_start, dttm_work_end, delta_in_secs):
+        return WorkerDay.objects.filter(
+            Q(dttm_work_start__gte=dttm_work_start - datetime.timedelta(seconds=delta_in_secs)) &
+            Q(dttm_work_start__lte=dttm_work_start + datetime.timedelta(seconds=delta_in_secs)),
+            Q(dttm_work_end__gte=dttm_work_end - datetime.timedelta(seconds=delta_in_secs)) &
+            Q(dttm_work_end__lte=dttm_work_end + datetime.timedelta(seconds=delta_in_secs)),
+            employee_id=employee_id,
+            dt=dt,
+            is_fact=False,
+            is_approved=True,
+        )
+
+    @classmethod
     def set_closest_plan_approved(cls, q_obj, is_approved, delta_in_secs):
         """
         Метод проставления closest_plan_approved в факте
@@ -1199,15 +1212,12 @@ class WorkerDay(AbstractModel):
                 last_edited_by__isnull=False,  # вспомнить, почему только ручные?? -- забыл)
                 closest_plan_approved__isnull=True,
             ).update(
-                closest_plan_approved=Subquery(WorkerDay.objects.filter(
-                    Q(dttm_work_start__gte=OuterRef('dttm_work_start') - datetime.timedelta(seconds=delta_in_secs)) &
-                    Q(dttm_work_start__lte=OuterRef('dttm_work_start') + datetime.timedelta(seconds=delta_in_secs)),
-                    Q(dttm_work_end__gte=OuterRef('dttm_work_end') - datetime.timedelta(seconds=delta_in_secs)) &
-                    Q(dttm_work_end__lte=OuterRef('dttm_work_end') + datetime.timedelta(seconds=delta_in_secs)),
+                closest_plan_approved=Subquery(cls.get_closest_plan_approved_q(
                     employee_id=OuterRef('employee_id'),
                     dt=OuterRef('dt'),
-                    is_fact=False,
-                    is_approved=True,
+                    dttm_work_start=OuterRef('dttm_work_start'),
+                    dttm_work_end=OuterRef('dttm_work_end'),
+                    delta_in_secs=delta_in_secs,
                 ).values('id')[:1])
             )
 

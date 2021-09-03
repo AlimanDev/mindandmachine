@@ -290,6 +290,17 @@ class WorkerDaySerializer(serializers.ModelSerializer, UnaccountedOvertimeMixin)
             attrs['employment_id'] = employee_active_empl.id
             self._employee_active_empl = employee_active_empl
 
+            if is_fact and not wd_type_obj.is_dayoff:
+                closest_plan_approved = WorkerDay.get_closest_plan_approved_q(
+                    employee_id=attrs['employee_id'],
+                    dt=attrs['dt'],
+                    dttm_work_start=attrs['dttm_work_start'],
+                    dttm_work_end=attrs['dttm_work_end'],
+                    delta_in_secs=self.context['request'].user.network.set_closest_plan_approved_delta_for_manual_fact,
+                ).only('id').first()
+                if closest_plan_approved:
+                    attrs['closest_plan_approved_id'] = closest_plan_approved.id
+
         outsources_ids = attrs.pop('outsources_ids', []) or []
         if attrs.get('is_outsource'):
             if not attrs.get('is_vacancy'):

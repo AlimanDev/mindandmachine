@@ -553,7 +553,7 @@ class WorkerDayViewSet(BaseModelViewSet):
                 #   что будет если время начала или время конца null?
                 WorkerDay.set_closest_plan_approved(
                     q_obj=employee_days_q,
-                    is_approved=True,  # TODO: в черновик тоже нунжо ?
+                    is_approved=True,
                     delta_in_secs=shop.network.set_closest_plan_approved_delta_for_manual_fact,
                 )
 
