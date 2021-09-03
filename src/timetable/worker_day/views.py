@@ -577,6 +577,7 @@ class WorkerDayViewSet(BaseModelViewSet):
                             canceled=wd.canceled,
                             need_count_wh=True,
                             is_blocked=wd.is_blocked,
+                            closest_plan_approved_id=wd.closest_plan_approved_id,
                         )
                         for wd in list_wd if wd.employee_id  # не копируем день без сотрудника (вакансию) в неподтв. версию
                     ]
@@ -595,7 +596,7 @@ class WorkerDayViewSet(BaseModelViewSet):
                             worker_day=search_wds[wd.employee_id][wd.dt],
                             work_type_id=details.work_type_id,
                         )
-                        for wd in list_wd if wd.employee_id  # TODO: написать тест
+                        for wd in list_wd if wd.employee_id  # TODO: тест
                         for details in wd.worker_day_details.all()
                     ]
                 )

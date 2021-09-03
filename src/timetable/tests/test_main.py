@@ -103,6 +103,7 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
             is_approved=True,
             parent_worker_day=self.worker_day_plan_approved,
             closest_plan_approved=self.worker_day_plan_approved,
+            last_edited_by=self.user1,
         )
         self.worker_day_fact_not_approved = WorkerDay.objects.create(
             shop=self.shop,
@@ -115,6 +116,7 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
             dttm_work_end=datetime.combine(self.dt, time(19, 59, 1)),
             parent_worker_day=self.worker_day_fact_approved,
             closest_plan_approved=self.worker_day_plan_approved,
+            last_edited_by=self.user1,
         )
 
         self.client.force_authenticate(user=self.user1)
@@ -178,7 +180,6 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
             'dt_from': self.dt,
             'dt_to': self.dt + timedelta(days=2),
             'is_fact': False,
-            # 'wd_types': WorkerDay.TYPES_USED,  # временно
         }
         response = self.client.post(self.url_approve, data, format='json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -192,23 +193,16 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(WorkerDay.objects.get(id=self.worker_day_plan_not_approved.id).is_approved, True)
 
-        # self.assertIsNone(WorkerDay.objects.get(id=self.worker_day_plan_not_approved.id).parent_worker_day_id)
         self.assertFalse(WorkerDay.objects.filter(id=self.worker_day_plan_approved.id).exists())
-        # self.assertEqual(WorkerDay.objects.get(id=self.worker_day_fact_approved.id).parent_worker_day_id,
-        #                  self.worker_day_plan_not_approved.id)
 
         # Approve fact
         data['is_fact'] = True
 
-        # plan(approved) <- fact0(approved) <- fact1(not approved) ==> plan(approved) <- fact1(approved)
         response = self.client.post(self.url_approve, data, format='json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        # id = response.json()['id']
         self.assertEqual(WorkerDay.objects.get(id=self.worker_day_fact_not_approved.id).is_approved, True)
         self.assertFalse(WorkerDay.objects.filter(id=self.worker_day_fact_approved.id).exists())
         self.assertTrue(WorkerDay.objects.filter(id=self.worker_day_plan_not_approved.id).exists())
-        # self.assertEqual(WorkerDay.objects.get(id=self.worker_day_fact_not_approved.id).parent_worker_day_id,
-        #                  self.worker_day_plan_not_approved.id)
 
     # Последовательное создание и подтверждение P1 -> A1 -> P2 -> F1 -> A2 -> F2
     def test_create_and_approve(self):
