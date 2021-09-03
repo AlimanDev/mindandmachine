@@ -290,25 +290,25 @@ class TestUnaccountedOvertime(APITestCase):
         self.dt = date.today()
         self.network.only_fact_hours_that_in_approved_plan = True
         self.network.save()
-        self._create_worker_day(
+        pa1 = self._create_worker_day(
             self.employment1,
             dttm_work_start=datetime.combine(self.dt, time(14)),
             dttm_work_end=datetime.combine(self.dt, time(20)),
             is_approved=True,
         )
-        self._create_worker_day(
+        pa2 = self._create_worker_day(
             self.employment2,
             dttm_work_start=datetime.combine(self.dt, time(13)),
             dttm_work_end=datetime.combine(self.dt + timedelta(1), time(1)),
             is_approved=True,
         )
-        self._create_worker_day(
+        pa3 = self._create_worker_day(
             self.employment3,
             dttm_work_start=datetime.combine(self.dt, time(8)),
             dttm_work_end=datetime.combine(self.dt, time(20)),
             is_approved=True,
         )
-        self._create_worker_day(
+        pa4 = self._create_worker_day(
             self.employment4,
             dttm_work_start=datetime.combine(self.dt, time(8)),
             dttm_work_end=datetime.combine(self.dt, time(20)),
@@ -321,6 +321,7 @@ class TestUnaccountedOvertime(APITestCase):
             dttm_work_end=datetime.combine(self.dt, time(20, 15)),
             is_approved=True,
             is_fact=True,
+            closest_plan_approved_id=pa1.id,
         )
         # переработка 3 часа
         self._create_worker_day(
@@ -329,6 +330,7 @@ class TestUnaccountedOvertime(APITestCase):
             dttm_work_end=datetime.combine(self.dt + timedelta(1), time(3)),
             is_approved=True,
             is_fact=True,
+            closest_plan_approved_id=pa2.id,
         )
         # нет переработки
         self._create_worker_day(
@@ -337,6 +339,7 @@ class TestUnaccountedOvertime(APITestCase):
             dttm_work_end=datetime.combine(self.dt, time(20)),
             is_approved=True,
             is_fact=True,
+            closest_plan_approved_id=pa3.id,
         )
         # переработка 1 час
         self._create_worker_day(
@@ -345,10 +348,12 @@ class TestUnaccountedOvertime(APITestCase):
             dttm_work_end=datetime.combine(self.dt, time(20, 30)),
             is_approved=True,
             is_fact=True,
+            closest_plan_approved_id=pa4.id,
         )
 
 
-    def _create_worker_day(self, employment, dt=None, is_fact=False, is_approved=False, dttm_work_start=None, dttm_work_end=None, type_id=WorkerDay.TYPE_WORKDAY):
+    def _create_worker_day(
+            self, employment, dt=None, is_fact=False, is_approved=False, dttm_work_start=None, dttm_work_end=None, type_id=WorkerDay.TYPE_WORKDAY, closest_plan_approved_id=None):
         if not dt:
             dt = self.dt
         return WorkerDay.objects.create(
@@ -362,6 +367,7 @@ class TestUnaccountedOvertime(APITestCase):
             is_fact=is_fact,
             is_approved=is_approved,
             created_by=self.user1,
+            closest_plan_approved_id=closest_plan_approved_id,
         )
 
     def test_unaccounted_overtimes(self):

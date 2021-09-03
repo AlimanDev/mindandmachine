@@ -102,6 +102,7 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
             dttm_work_end=datetime.combine(self.dt, time(20, 30, 0)),
             is_approved=True,
             parent_worker_day=self.worker_day_plan_approved,
+            closest_plan_approved=self.worker_day_plan_approved,
         )
         self.worker_day_fact_not_approved = WorkerDay.objects.create(
             shop=self.shop,
@@ -112,7 +113,8 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
             type_id=WorkerDay.TYPE_WORKDAY,
             dttm_work_start=datetime.combine(self.dt, time(7, 58, 0)),
             dttm_work_end=datetime.combine(self.dt, time(19, 59, 1)),
-            parent_worker_day=self.worker_day_fact_approved
+            parent_worker_day=self.worker_day_fact_approved,
+            closest_plan_approved=self.worker_day_plan_approved,
         )
 
         self.client.force_authenticate(user=self.user1)
@@ -4309,7 +4311,7 @@ class TestFineLogic(APITestCase):
         )
         return user, employee, employment
 
-    def _create_or_update_worker_day(self, employment, dttm_from, dttm_to, is_fact=False, is_approved=True):
+    def _create_or_update_worker_day(self, employment, dttm_from, dttm_to, is_fact=False, is_approved=True, closest_plan_approved_id=None):
         wd, _ =  WorkerDay.objects.update_or_create(
             employee_id=employment.employee_id,
             is_fact=is_fact,
@@ -4321,7 +4323,8 @@ class TestFineLogic(APITestCase):
                 dttm_work_start=dttm_from,
                 dttm_work_end=dttm_to,
                 employment=employment,
-            )
+            ),
+            closest_plan_approved_id=closest_plan_approved_id,
         )
         return wd
 
@@ -4329,40 +4332,40 @@ class TestFineLogic(APITestCase):
         dt = date.today()
         plan_wd_dir = self._create_or_update_worker_day(self.dir[2], datetime.combine(dt, time(10)), datetime.combine(dt, time(20)))
         self.assertEquals(plan_wd_dir.work_hours, timedelta(hours=9, minutes=30))
-        fact_wd_dir = self._create_or_update_worker_day(self.dir[2], datetime.combine(dt, time(9, 53)), datetime.combine(dt, time(20, 10)), is_fact=True)
+        fact_wd_dir = self._create_or_update_worker_day(self.dir[2], datetime.combine(dt, time(9, 53)), datetime.combine(dt, time(20, 10)), is_fact=True, closest_plan_approved_id=plan_wd_dir.id)
         self.assertEquals(fact_wd_dir.work_hours, timedelta(hours=9, minutes=47))
-        fact_wd_dir_bad = self._create_or_update_worker_day(self.dir[2], datetime.combine(dt, time(9, 56)), datetime.combine(dt, time(20)), is_fact=True)
+        fact_wd_dir_bad = self._create_or_update_worker_day(self.dir[2], datetime.combine(dt, time(9, 56)), datetime.combine(dt, time(20)), is_fact=True, closest_plan_approved_id=plan_wd_dir.id)
         self.assertEquals(fact_wd_dir_bad.work_hours, timedelta(hours=7, minutes=34))
 
         plan_wd_cashier = self._create_or_update_worker_day(self.cashier[2], datetime.combine(dt, time(10)), datetime.combine(dt, time(20)))
         self.assertEquals(plan_wd_cashier.work_hours, timedelta(hours=9, minutes=30))
-        fact_wd_cashier = self._create_or_update_worker_day(self.cashier[2], datetime.combine(dt, time(9, 55)), datetime.combine(dt, time(20, 10)), is_fact=True)
+        fact_wd_cashier = self._create_or_update_worker_day(self.cashier[2], datetime.combine(dt, time(9, 55)), datetime.combine(dt, time(20, 10)), is_fact=True, closest_plan_approved_id=plan_wd_cashier.id)
         self.assertEquals(fact_wd_cashier.work_hours, timedelta(hours=9, minutes=45))
-        fact_wd_cashier_bad = self._create_or_update_worker_day(self.cashier[2], datetime.combine(dt, time(9, 56)), datetime.combine(dt, time(20)), is_fact=True)
+        fact_wd_cashier_bad = self._create_or_update_worker_day(self.cashier[2], datetime.combine(dt, time(9, 56)), datetime.combine(dt, time(20)), is_fact=True, closest_plan_approved_id=plan_wd_cashier.id)
         self.assertEquals(fact_wd_cashier_bad.work_hours, timedelta(hours=8, minutes=34))
 
         plan_wd_courier = self._create_or_update_worker_day(self.courier[2], datetime.combine(dt, time(10)), datetime.combine(dt, time(20)))
         self.assertEquals(plan_wd_courier.work_hours, timedelta(hours=9, minutes=30))
-        fact_wd_courier = self._create_or_update_worker_day(self.courier[2], datetime.combine(dt, time(9, 55)), datetime.combine(dt, time(20, 11)), is_fact=True)
+        fact_wd_courier = self._create_or_update_worker_day(self.courier[2], datetime.combine(dt, time(9, 55)), datetime.combine(dt, time(20, 11)), is_fact=True, closest_plan_approved_id=plan_wd_courier.id)
         self.assertEquals(fact_wd_courier.work_hours, timedelta(hours=9, minutes=46))
-        fact_wd_courier_bad = self._create_or_update_worker_day(self.courier[2], datetime.combine(dt, time(10, 1)), datetime.combine(dt, time(19, 50)), is_fact=True)
+        fact_wd_courier_bad = self._create_or_update_worker_day(self.courier[2], datetime.combine(dt, time(10, 1)), datetime.combine(dt, time(19, 50)), is_fact=True, closest_plan_approved_id=plan_wd_courier.id)
         self.assertEquals(fact_wd_courier_bad.work_hours, timedelta(hours=8, minutes=19))
 
         plan_wd_cleaner = self._create_or_update_worker_day(self.cleaner[2], datetime.combine(dt, time(10)), datetime.combine(dt, time(20)))
         self.assertEquals(plan_wd_cleaner.work_hours, timedelta(hours=9, minutes=30))
-        fact_wd_cleaner = self._create_or_update_worker_day(self.cleaner[2], datetime.combine(dt, time(9, 55)), datetime.combine(dt, time(20, 10)), is_fact=True)
+        fact_wd_cleaner = self._create_or_update_worker_day(self.cleaner[2], datetime.combine(dt, time(9, 55)), datetime.combine(dt, time(20, 10)), is_fact=True, closest_plan_approved_id=plan_wd_cleaner.id)
         self.assertEquals(fact_wd_cleaner.work_hours, timedelta(hours=9, minutes=45))
-        fact_wd_cleaner_bad = self._create_or_update_worker_day(self.cleaner[2], datetime.combine(dt, time(10, 5)), datetime.combine(dt, time(19, 50)), is_fact=True)
+        fact_wd_cleaner_bad = self._create_or_update_worker_day(self.cleaner[2], datetime.combine(dt, time(10, 5)), datetime.combine(dt, time(19, 50)), is_fact=True, closest_plan_approved_id=plan_wd_cleaner.id)
         self.assertEquals(fact_wd_cleaner_bad.work_hours, timedelta(hours=9, minutes=15))
 
     def test_facts_work_hours_recalculated_on_plan_change(self):
         dt = date.today()
         plan_approved = self._create_or_update_worker_day(self.dir[2], datetime.combine(dt, time(9)), datetime.combine(dt, time(20)))
 
-        fact_approved = self._create_or_update_worker_day(self.dir[2], datetime.combine(dt, time(8, 35)), datetime.combine(dt, time(20, 25)), is_fact=True)
+        fact_approved = self._create_or_update_worker_day(self.dir[2], datetime.combine(dt, time(8, 35)), datetime.combine(dt, time(20, 25)), is_fact=True, closest_plan_approved_id=plan_approved.id)
         self.assertEqual(fact_approved.work_hours.total_seconds(), 11 * 3600 + 20 * 60)
 
-        fact_not_approved = self._create_or_update_worker_day(self.dir[2], datetime.combine(dt, time(9)), datetime.combine(dt, time(19)), is_approved=False, is_fact=True)
+        fact_not_approved = self._create_or_update_worker_day(self.dir[2], datetime.combine(dt, time(9)), datetime.combine(dt, time(19)), is_approved=False, is_fact=True, closest_plan_approved_id=plan_approved.id)
         self.assertEqual(fact_not_approved.work_hours.total_seconds(), 6 * 3600 + 30 * 60)
 
         plan_approved.dttm_work_start = datetime.combine(dt, time(11, 00, 0))
@@ -4380,9 +4383,9 @@ class TestFineLogic(APITestCase):
         dt = date.today()
         plan_wd_dir = self._create_or_update_worker_day(self.dir[2], datetime.combine(dt, time(10)), datetime.combine(dt, time(20)))
         self.assertEquals(plan_wd_dir.work_hours, timedelta(hours=9, minutes=30))
-        fact_wd_dir = self._create_or_update_worker_day(self.dir[2], datetime.combine(dt, time(9, 53)), datetime.combine(dt, time(20, 10)), is_fact=True)
+        fact_wd_dir = self._create_or_update_worker_day(self.dir[2], datetime.combine(dt, time(9, 53)), datetime.combine(dt, time(20, 10)), is_fact=True, closest_plan_approved_id=plan_wd_dir.id)
         self.assertEquals(fact_wd_dir.work_hours, timedelta(hours=9, minutes=30))
-        fact_wd_dir_bad = self._create_or_update_worker_day(self.dir[2], datetime.combine(dt, time(9, 56)), datetime.combine(dt, time(20)), is_fact=True)
+        fact_wd_dir_bad = self._create_or_update_worker_day(self.dir[2], datetime.combine(dt, time(9, 56)), datetime.combine(dt, time(20)), is_fact=True, closest_plan_approved_id=plan_wd_dir.id)
         self.assertEquals(fact_wd_dir_bad.work_hours, timedelta(hours=7, minutes=30))
 
     def test_fine_settings_crop_work_hours_by_shop_schedule(self):
@@ -4397,10 +4400,11 @@ class TestFineLogic(APITestCase):
         )
         plan_wd_dir = self._create_or_update_worker_day(self.dir[2], datetime.combine(dt, time(10)), datetime.combine(dt, time(20)))
         self.assertEquals(plan_wd_dir.work_hours, timedelta(hours=9, minutes=30))
-        fact_wd_dir = self._create_or_update_worker_day(self.dir[2], datetime.combine(dt, time(9, 53)), datetime.combine(dt, time(20, 10)), is_fact=True)
+        fact_wd_dir = self._create_or_update_worker_day(self.dir[2], datetime.combine(dt, time(9, 53)), datetime.combine(dt, time(20, 10)), is_fact=True, closest_plan_approved_id=plan_wd_dir.id)
         self.assertEquals(fact_wd_dir.work_hours, timedelta(hours=9, minutes=30))
-        fact_wd_dir_bad = self._create_or_update_worker_day(self.dir[2], datetime.combine(dt, time(9, 56)), datetime.combine(dt, time(20)), is_fact=True)
+        fact_wd_dir_bad = self._create_or_update_worker_day(self.dir[2], datetime.combine(dt, time(9, 56)), datetime.combine(dt, time(20)), is_fact=True, closest_plan_approved_id=plan_wd_dir.id)
         self.assertEquals(fact_wd_dir_bad.work_hours, timedelta(hours=7, minutes=30))
+
 
 class TestUnaccountedOvertimesAPI(APITestCase):
     USER_USERNAME = "user1"
@@ -4413,19 +4417,19 @@ class TestUnaccountedOvertimesAPI(APITestCase):
         self.dt = date.today()
         self.network.only_fact_hours_that_in_approved_plan = True
         self.network.save()
-        self._create_worker_day(
+        pa1 = self._create_worker_day(
             self.employment2,
             dttm_work_start=datetime.combine(self.dt, time(13)),
             dttm_work_end=datetime.combine(self.dt + timedelta(1), time(1)),
             is_approved=True,
         )
-        self._create_worker_day(
+        pa2 = self._create_worker_day(
             self.employment3,
             dttm_work_start=datetime.combine(self.dt, time(8)),
             dttm_work_end=datetime.combine(self.dt, time(20)),
             is_approved=True,
         )
-        self._create_worker_day(
+        pa3 = self._create_worker_day(
             self.employment4,
             dttm_work_start=datetime.combine(self.dt, time(8)),
             dttm_work_end=datetime.combine(self.dt, time(20)),
@@ -4438,6 +4442,7 @@ class TestUnaccountedOvertimesAPI(APITestCase):
             dttm_work_end=datetime.combine(self.dt + timedelta(1), time(3)),
             is_approved=True,
             is_fact=True,
+            closest_plan_approved_id=pa1.id,
         )
         # нет переработки
         self._create_worker_day(
@@ -4446,6 +4451,7 @@ class TestUnaccountedOvertimesAPI(APITestCase):
             dttm_work_end=datetime.combine(self.dt, time(20)),
             is_approved=True,
             is_fact=True,
+            closest_plan_approved_id=pa2.id,
         )
         # переработка 1 час
         self.wd = self._create_worker_day(
@@ -4454,10 +4460,11 @@ class TestUnaccountedOvertimesAPI(APITestCase):
             dttm_work_end=datetime.combine(self.dt, time(20, 30)),
             is_approved=True,
             is_fact=True,
+            closest_plan_approved_id=pa3.id,
         )
         self.client.force_authenticate(self.user1)
 
-    def _create_worker_day(self, employment, dt=None, is_fact=False, is_approved=False, dttm_work_start=None, dttm_work_end=None, type_id=WorkerDay.TYPE_WORKDAY):
+    def _create_worker_day(self, employment, dt=None, is_fact=False, is_approved=False, dttm_work_start=None, dttm_work_end=None, type_id=WorkerDay.TYPE_WORKDAY, closest_plan_approved_id=None):
         if not dt:
             dt = self.dt
         return WorkerDay.objects.create(
@@ -4471,6 +4478,7 @@ class TestUnaccountedOvertimesAPI(APITestCase):
             is_fact=is_fact,
             is_approved=is_approved,
             created_by=self.user1,
+            closest_plan_approved_id=closest_plan_approved_id,
         )
 
     def test_get_list(self):

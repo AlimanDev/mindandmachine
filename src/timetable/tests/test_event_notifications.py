@@ -241,15 +241,14 @@ class TestSendUnaccountedReport(TestsHelperMixin, APITestCase):
         cls.plan_approved = cls._create_worker_day(cls, cls.employment_worker, datetime.combine(cls.dt, time(8)), datetime.combine(cls.dt, time(14)), shop_id=cls.shop.id)
         cls.plan_approved_dir = cls._create_worker_day(cls, cls.employment_dir, datetime.combine(cls.dt, time(8)), datetime.combine(cls.dt, time(16)), shop_id=cls.shop.id)
         cls.plan_approved2 = cls._create_worker_day(cls, cls.employment_worker2, datetime.combine(cls.dt, time(15)), datetime.combine(cls.dt, time(20)), shop_id=cls.shop2.id)
-        cls.fact_approved = cls._create_worker_day(cls, cls.employment_worker, datetime.combine(cls.dt, time(7)), datetime.combine(cls.dt, time(13)), is_fact=True, shop_id=cls.shop.id)
-        cls.fact_approved_dir = cls._create_worker_day(cls, cls.employment_dir, datetime.combine(cls.dt, time(7)), datetime.combine(cls.dt, time(19)), is_fact=True, shop_id=cls.shop.id)
-        cls.fact_approved2 = cls._create_worker_day(cls, cls.employment_worker2, datetime.combine(cls.dt, time(14)), datetime.combine(cls.dt, time(20)), is_fact=True, shop_id=cls.shop2.id)
-
+        cls.fact_approved = cls._create_worker_day(cls, cls.employment_worker, datetime.combine(cls.dt, time(7)), datetime.combine(cls.dt, time(13)), is_fact=True, shop_id=cls.shop.id, closest_plan_approved_id=cls.plan_approved.id)
+        cls.fact_approved_dir = cls._create_worker_day(cls, cls.employment_dir, datetime.combine(cls.dt, time(7)), datetime.combine(cls.dt, time(19)), is_fact=True, shop_id=cls.shop.id, closest_plan_approved_id=cls.plan_approved_dir.id)
+        cls.fact_approved2 = cls._create_worker_day(cls, cls.employment_worker2, datetime.combine(cls.dt, time(14)), datetime.combine(cls.dt, time(20)), is_fact=True, shop_id=cls.shop2.id, closest_plan_approved_id=cls.plan_approved2.id)
 
     def setUp(self):
         self.client.force_authenticate(user=self.user_dir)
 
-    def _create_worker_day(self, employment, dttm_work_start, dttm_work_end, is_fact=False, is_approved=True, shop_id=None):
+    def _create_worker_day(self, employment, dttm_work_start, dttm_work_end, is_fact=False, is_approved=True, shop_id=None, closest_plan_approved_id=None):
         return WorkerDayFactory(
             is_approved=is_approved,
             is_fact=is_fact,
@@ -260,6 +259,7 @@ class TestSendUnaccountedReport(TestsHelperMixin, APITestCase):
             type_id=WorkerDay.TYPE_WORKDAY,
             dttm_work_start=dttm_work_start,
             dttm_work_end=dttm_work_end,
+            closest_plan_approved_id=closest_plan_approved_id,
         )
 
     def test_unaccounted_overtime_email_notification_sent(self):
@@ -384,11 +384,10 @@ class TestSendUnaccountedReport(TestsHelperMixin, APITestCase):
             employment_worker = EmploymentFactory(
                 employee=employee_worker, shop=shop, function_group=self.group_worker,
             )
-            self._create_worker_day(employment_worker, datetime.combine(self.dt, time(8)), datetime.combine(self.dt, time(14)), shop_id=shop.id)
-            self._create_worker_day(employment_dir, datetime.combine(self.dt, time(8)), datetime.combine(self.dt, time(16)), shop_id=shop.id)
-            self._create_worker_day(employment_worker, datetime.combine(self.dt, time(7)), datetime.combine(self.dt, time(15)), is_fact=True, shop_id=shop.id)
-            self._create_worker_day(employment_dir, datetime.combine(self.dt, time(8)), datetime.combine(self.dt, time(19)), is_fact=True, shop_id=shop.id)
-
+            pa1 = self._create_worker_day(employment_worker, datetime.combine(self.dt, time(8)), datetime.combine(self.dt, time(14)), shop_id=shop.id)
+            pa2 = self._create_worker_day(employment_dir, datetime.combine(self.dt, time(8)), datetime.combine(self.dt, time(16)), shop_id=shop.id)
+            self._create_worker_day(employment_worker, datetime.combine(self.dt, time(7)), datetime.combine(self.dt, time(15)), is_fact=True, shop_id=shop.id, closest_plan_approved_id=pa1.id)
+            self._create_worker_day(employment_dir, datetime.combine(self.dt, time(8)), datetime.combine(self.dt, time(19)), is_fact=True, shop_id=shop.id, closest_plan_approved_id=pa2.id)
 
             cron_report()
 

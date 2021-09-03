@@ -675,19 +675,13 @@ class WorkerDay(AbstractModel):
             break_time = None
             fine = 0
             if self.is_fact:
-                plan_approved = WorkerDay.objects.filter(
-                    dt=self.dt,
-                    employee_id=self.employee_id,
-                    is_fact=False,
-                    is_approved=True,
-                    type_id__in=WorkerDay.TYPES_WITH_TM_RANGE,
-                    dttm_work_start__isnull=False,
-                    dttm_work_end__isnull=False,
-                ).first()
+                plan_approved = None
+                if self.closest_plan_approved_id:
+                    plan_approved = WorkerDay.objects.get(id=self.closest_plan_approved_id)
                 if plan_approved:
                     fine = self.get_fine(
-                        _dttm_work_start, 
-                        _dttm_work_end, 
+                        _dttm_work_start,
+                        _dttm_work_end,
                         plan_approved.dttm_work_start,
                         plan_approved.dttm_work_end,
                         self.employment.position.wp_fines if self.employment and self.employment.position else None,
@@ -780,9 +774,9 @@ class WorkerDay(AbstractModel):
         verbose_name='Защищенный день',
         help_text='Доступен для изменения/подтверждения только определенным группам доступа (настраивается)',
     )
-    closest_plan_approved = models.OneToOneField(
-        'self', null=True, blank=True, on_delete=models.SET_NULL, related_name='related_fact_approved',
-        help_text='Используется в факте подтвержденном (созданном на основе отметок) для связи с планом подтвержденным')
+    closest_plan_approved = models.ForeignKey(
+        'self', null=True, blank=True, on_delete=models.SET_NULL, related_name='related_facts',
+        help_text='Используется в факте (и в черновике и подтв. версии) для связи с планом подтвержденным')
 
     objects = WorkerDayManager.from_queryset(WorkerDayQuerySet)()  # исключает раб. дни у которых employment_id is null
     objects_with_excluded = models.Manager.from_queryset(WorkerDayQuerySet)()
@@ -1187,6 +1181,35 @@ class WorkerDay(AbstractModel):
             raise original_exc
 
         return task_violations
+
+    @classmethod
+    def set_closest_plan_approved(cls, q_obj, is_approved, delta_in_secs):
+        """
+        Метод проставления closest_plan_approved в факте
+
+        :param q_obj: Q объект для фильтрации дней, в которых нужно проставить closest_plan_approved
+        :param is_approved: проставляем в подтвержденной версии факта или в черновике
+        :param delta_in_secs: максимальное отклонения в секундах времени начала и времени окончания в плане и в факте
+        """
+        if q_obj:
+            cls.objects.filter(
+                q_obj,
+                is_fact=True,
+                is_approved=is_approved,
+                last_edited_by__isnull=False,  # вспомнить, почему только ручные?? -- забыл)
+                closest_plan_approved__isnull=True,
+            ).update(
+                closest_plan_approved=Subquery(WorkerDay.objects.filter(
+                    Q(dttm_work_start__gte=OuterRef('dttm_work_start') - datetime.timedelta(seconds=delta_in_secs)) &
+                    Q(dttm_work_start__lte=OuterRef('dttm_work_start') + datetime.timedelta(seconds=delta_in_secs)),
+                    Q(dttm_work_end__gte=OuterRef('dttm_work_end') - datetime.timedelta(seconds=delta_in_secs)) &
+                    Q(dttm_work_end__lte=OuterRef('dttm_work_end') + datetime.timedelta(seconds=delta_in_secs)),
+                    employee_id=OuterRef('employee_id'),
+                    dt=OuterRef('dt'),
+                    is_fact=False,
+                    is_approved=True,
+                ).values('id')[:1])
+            )
 
 
 class Timesheet(AbstractModel):

@@ -549,32 +549,12 @@ class WorkerDayViewSet(BaseModelViewSet):
 
                 wdays_to_approve.update(is_approved=True)
 
-                # проставляется closest_plan_approved в ручной факт подтв., где не проставлен, для пар (сотрудник, даты)
-                # ищем план для факта, чтобы отклонения времени начала и времени окончания не превышала какую-то дельту,
-                # TODO: тест для delta_in_secs
-                # TODO: функция должна быть переиспользуемой (т.к еще возможно будет использоваться в других местах)
-                # TODO: что будет если время начала или время конца null?
-                WorkerDay.objects.filter(
-                    employee_days_q,
-                    is_fact=True,
-                    is_approved=True,
-                    last_edited_by__isnull=False,
-                    closest_plan_approved__isnull=True,
-                ).update(
-                    closest_plan_approved=Subquery(WorkerDay.objects.filter(
-                        Q(dttm_work_start__gte=OuterRef('dttm_work_start') - datetime.timedelta(
-                            seconds=shop.network.set_closest_plan_approved_delta_for_manual_fact)) &
-                        Q(dttm_work_start__lte=OuterRef('dttm_work_start') + datetime.timedelta(
-                            seconds=shop.network.set_closest_plan_approved_delta_for_manual_fact)),
-                        Q(dttm_work_end__gte=OuterRef('dttm_work_end') - datetime.timedelta(
-                            seconds=shop.network.set_closest_plan_approved_delta_for_manual_fact)) &
-                        Q(dttm_work_end__lte=OuterRef('dttm_work_end') + datetime.timedelta(
-                            seconds=shop.network.set_closest_plan_approved_delta_for_manual_fact)),
-                        employee_id=OuterRef('employee_id'),
-                        dt=OuterRef('dt'),
-                        is_fact=False,
-                        is_approved=True,
-                    ).values('id')[:1])
+                # TODO: тесты
+                #   что будет если время начала или время конца null?
+                WorkerDay.set_closest_plan_approved(
+                    q_obj=employee_days_q,
+                    is_approved=True,  # TODO: в черновик тоже нунжо ?
+                    delta_in_secs=shop.network.set_closest_plan_approved_delta_for_manual_fact,
                 )
 
                 wds = WorkerDay.objects.bulk_create(
