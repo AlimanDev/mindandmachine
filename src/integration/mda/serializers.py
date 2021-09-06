@@ -1,3 +1,4 @@
+from django.conf import settings
 from rest_framework import serializers
 
 from src.base.models import Shop, User
@@ -71,8 +72,13 @@ class UserDTOSerializer(serializers.ModelSerializer):
     surveyAdmin = serializers.BooleanField()
     lang = serializers.CharField(source='mda_lang')
     timeZoneId = serializers.CharField()
-    # groups = serializers.ListField(child=serializers.CharField())  # пока ничего не передаем
     reports = serializers.SerializerMethodField()
+
+    def get_groups(self, user):
+        groups = user.position_groups
+        if getattr(settings, 'MDA_INTEGRATION_INCLUDE_FUNCTION_GROUPS', False):
+            groups += user.function_groups
+        return list(set(gr_name for gr_name in groups if gr_name))
 
     def get_reports(self, _user):
         return ['REPORT_ALL']
@@ -116,3 +122,8 @@ class UserDTOSerializer(serializers.ModelSerializer):
                 'source': 'ldap_login',
             },
         }
+
+    def __init__(self, *args, **kwargs):
+        super(UserDTOSerializer, self).__init__(*args, **kwargs)
+        if getattr(settings, 'MDA_INTEGRATION_TRANSFER_GROUPS_FIELD', False):
+            self.fields['groups'] = serializers.SerializerMethodField()

@@ -13,7 +13,7 @@ from django.utils.timezone import now
 from rest_framework.test import APITestCase
 
 from etc.scripts.fill_calendar import main as fill_calendar
-from src.base.models import Employee, User, WorkerPosition
+from src.base.models import Employee, ProductionDay, Region, User, WorkerPosition
 from src.forecast.models import PeriodClients, OperationType, OperationTypeName
 from src.timetable.models import AttendanceRecords, WorkerDay, WorkType, WorkTypeName
 from src.tasks.models import Task
@@ -766,6 +766,31 @@ class TestUploadDownload(APITestCase):
 
     def test_download_timetable(self):
         fill_calendar('2020.4.1', '2021.12.31', self.region.id)
+        file = open('etc/scripts/timetable.xlsx', 'rb')
+        self.client.post(f'{self.url}upload/', {'shop_id': self.shop.id, 'file': file}, HTTP_ACCEPT_LANGUAGE='ru')
+        file.close()
+        response = self.client.get(
+            f'{self.url}download_timetable/?shop_id={self.shop.id}&dt_from=2020-04-01&is_approved=False')
+        tabel = pandas.read_excel(io.BytesIO(response.content))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(tabel[tabel.columns[1]][0], 'Магазин: Shop1') #fails with python > 3.6
+        self.assertEqual(tabel[tabel.columns[1]][12], 'Иванов Иван Иванович')
+        self.assertEqual(tabel[tabel.columns[27]][15], 'В')
+
+    def test_download_timetable_with_child_region(self):
+        fill_calendar('2020.4.1', '2021.12.31', self.region.id)
+        child_region = Region.objects.create(
+            name='Child',
+            parent=self.region,
+            code='child',
+        )
+        ProductionDay.objects.create(
+            dt='2020-04-04',
+            type=ProductionDay.TYPE_WORK,
+            region=child_region,
+        )
+        self.shop.region = child_region
+        self.shop.save()
         file = open('etc/scripts/timetable.xlsx', 'rb')
         self.client.post(f'{self.url}upload/', {'shop_id': self.shop.id, 'file': file}, HTTP_ACCEPT_LANGUAGE='ru')
         file.close()
