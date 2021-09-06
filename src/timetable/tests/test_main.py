@@ -1967,10 +1967,10 @@ class TestAttendanceRecords(TestsHelperMixin, APITestCase):
             employment=self.employment2,
             dt=self.dt,
             is_fact=False,
+            is_approved=True,
             type_id=WorkerDay.TYPE_WORKDAY,
             dttm_work_start=datetime.combine(self.dt, time(8, 0, 0)),
             dttm_work_end=datetime.combine(self.dt, time(20, 0, 0)),
-            is_approved=True,
         )
         self.worker_day_plan_not_approved = WorkerDayFactory(
             shop=self.shop,
@@ -1978,10 +1978,10 @@ class TestAttendanceRecords(TestsHelperMixin, APITestCase):
             employment=self.employment2,
             dt=self.dt,
             is_fact=False,
+            is_approved=False,
             type_id=WorkerDay.TYPE_WORKDAY,
             dttm_work_start=datetime.combine(self.dt, time(8, 0, 0)),
             dttm_work_end=datetime.combine(self.dt, time(20, 0, 0)),
-            parent_worker_day=self.worker_day_plan_approved
         )
         self.worker_day_fact_approved = WorkerDayFactory(
             shop=self.shop,
@@ -1989,10 +1989,10 @@ class TestAttendanceRecords(TestsHelperMixin, APITestCase):
             employment=self.employment2,
             dt=self.dt,
             is_fact=True,
+            is_approved=True,
             type_id=WorkerDay.TYPE_WORKDAY,
             dttm_work_start=datetime.combine(self.dt, time(8, 12, 23)),
             dttm_work_end=datetime.combine(self.dt, time(20, 2, 1)),
-            is_approved=True,
             parent_worker_day=self.worker_day_plan_approved,
             closest_plan_approved=self.worker_day_plan_approved,
         )
@@ -2002,10 +2002,11 @@ class TestAttendanceRecords(TestsHelperMixin, APITestCase):
             employment=self.employment2,
             dt=self.dt,
             is_fact=True,
+            is_approved=False,
             type_id=WorkerDay.TYPE_WORKDAY,
             dttm_work_start=datetime.combine(self.dt, time(7, 58, 0)),
             dttm_work_end=datetime.combine(self.dt, time(19, 59, 1)),
-            parent_worker_day=self.worker_day_fact_approved,
+            closest_plan_approved=self.worker_day_plan_approved,
         )
 
     def test_attendancerecords_update(self):
@@ -2730,6 +2731,7 @@ class TestAttendanceRecords(TestsHelperMixin, APITestCase):
         self.assertEqual(resp.status_code, 200)
         fact_not_approved.refresh_from_db()
         self.assertEqual(fact_not_approved.dttm_work_end, manual_fact_dttm_end)
+        self.assertEqual(fact_not_approved.closest_plan_approved_id, self.worker_day_plan_approved.id)
         resp = self._approve(
             shop_id=fact_not_approved.shop_id,
             is_fact=True,

@@ -323,9 +323,11 @@ class WorkerDaySerializer(serializers.ModelSerializer, UnaccountedOvertimeMixin)
             validated_data['is_vacancy'] = validated_data.get('is_vacancy') \
                 or not self._employee_active_empl.is_equal_shops
 
-    def _run_transaction_checks(self, employee_id, dt):
-        WorkerDay.check_work_time_overlap(employee_id=employee_id, dt=dt, exc_cls=ValidationError)
-        WorkerDay.check_multiple_workday_types(employee_id=employee_id, dt=dt, exc_cls=ValidationError)
+    def _run_transaction_checks(self, employee_id, dt, is_fact, is_approved):
+        WorkerDay.check_work_time_overlap(
+            employee_id=employee_id, dt=dt, is_fact=is_fact, is_approved=is_approved, exc_cls=ValidationError)
+        WorkerDay.check_multiple_workday_types(
+            employee_id=employee_id, dt=dt, is_fact=is_fact, is_approved=is_approved, exc_cls=ValidationError)
 
     def create(self, validated_data):
         with transaction.atomic():
@@ -366,7 +368,10 @@ class WorkerDaySerializer(serializers.ModelSerializer, UnaccountedOvertimeMixin)
             if outsources:
                 worker_day.outsources.set(outsources)
 
-            self._run_transaction_checks(employee_id=worker_day.employee_id, dt=worker_day.dt)
+            self._run_transaction_checks(
+                employee_id=worker_day.employee_id, dt=worker_day.dt,
+                is_fact=worker_day.is_fact, is_approved=worker_day.is_approved,
+            )
 
             return worker_day
 
@@ -384,7 +389,10 @@ class WorkerDaySerializer(serializers.ModelSerializer, UnaccountedOvertimeMixin)
 
             res = super().update(instance, validated_data)
 
-            self._run_transaction_checks(employee_id=instance.employee_id, dt=instance.dt)
+            self._run_transaction_checks(
+                employee_id=instance.employee_id, dt=instance.dt,
+                is_fact=instance.is_fact, is_approved=instance.is_approved,
+            )
 
             return res
 

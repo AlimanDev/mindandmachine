@@ -359,9 +359,7 @@ class WorkerDayViewSet(BaseModelViewSet):
                 **employee_filter,
             )
 
-            # TODO: если в черновике и в подтв. версии по два одинаковых РД (10-15, 18-22), один мы поменяли в черновике,
-            #  другой оставили как есть, подтвердили. Что будет? -- тест + *поправить логику
-            wdays_to_approve = WorkerDay.objects.filter(
+            draft_wdays_with_changes = WorkerDay.objects.filter(
                 approve_condition,
             ).annotate(
                 same_approved_exists=Exists(
@@ -380,7 +378,7 @@ class WorkerDayViewSet(BaseModelViewSet):
             ).filter(same_approved_exists=False)
 
             employee_dt_pairs_list = list(
-                wdays_to_approve.values_list('employee_id', 'dt').order_by('employee_id', 'dt').distinct())
+                draft_wdays_with_changes.values_list('employee_id', 'dt').order_by('employee_id', 'dt').distinct())
             worker_dates_dict = {}
             for employee_id, dates_grouper in groupby(employee_dt_pairs_list, key=lambda i: i[0]):
                 worker_dates_dict[employee_id] = tuple(i[1] for i in list(dates_grouper))
@@ -402,7 +400,7 @@ class WorkerDayViewSet(BaseModelViewSet):
                         employee_days_q, is_fact=serializer.data['is_fact'],
                         is_blocked=True,
                     ).exclude(
-                        id__in=wdays_to_approve.values_list('id', flat=True),
+                        id__in=draft_wdays_with_changes.values_list('id', flat=True),
                     ).annotate(
                         employee_user_fio=Concat(
                             F('employee__user__last_name'), Value(' '),
@@ -421,7 +419,7 @@ class WorkerDayViewSet(BaseModelViewSet):
 
                 if not serializer.data['is_fact'] and settings.SEND_DOCTORS_MIS_SCHEDULE_ON_CHANGE:
                     from src.celery.tasks import send_doctors_schedule_to_mis
-                    mis_data_qs = wdays_to_approve.annotate(
+                    mis_data_qs = draft_wdays_with_changes.annotate(
                         approved_wd_type_id=Subquery(WorkerDay.objects.filter(
                             dt=OuterRef('dt'),
                             employee_id=OuterRef('employee_id'),
@@ -516,8 +514,14 @@ class WorkerDayViewSet(BaseModelViewSet):
                         transaction.on_commit(
                             lambda f_json_data=json_data: send_doctors_schedule_to_mis.delay(json_data=f_json_data))
 
+                wdays_to_approve = WorkerDay.objects.filter(
+                    employee_days_q,
+                    is_approved=False,
+                    is_fact=serializer.validated_data['is_fact'],
+                )
+
                 wdays_to_delete = WorkerDay.objects_with_excluded.filter(
-                    employee_days_q, is_fact=serializer.data['is_fact'],
+                    employee_days_q, is_fact=serializer.validated_data['is_fact'],
                 ).exclude(
                     id__in=wdays_to_approve.values_list('id', flat=True)
                 ).exclude(
@@ -535,7 +539,7 @@ class WorkerDayViewSet(BaseModelViewSet):
 
                 wdays_to_delete.delete()
 
-                list_wd = list(
+                approved_wds_list = list(
                     wdays_to_approve.select_related(
                         'shop',
                         'employment',
@@ -557,47 +561,46 @@ class WorkerDayViewSet(BaseModelViewSet):
                     delta_in_secs=shop.network.set_closest_plan_approved_delta_for_manual_fact,
                 )
 
-                wds = WorkerDay.objects.bulk_create(
+                not_approved_wds_list = WorkerDay.objects.bulk_create(
                     [
                         WorkerDay(
-                            shop=wd.shop,
-                            employee_id=wd.employee_id,
-                            employment=wd.employment,
-                            dttm_work_start=wd.dttm_work_start,
-                            dttm_work_end=wd.dttm_work_end,
-                            dt=wd.dt,
-                            is_fact=wd.is_fact,
+                            shop=approved_wd.shop,
+                            employee_id=approved_wd.employee_id,
+                            employment=approved_wd.employment,
+                            dttm_work_start=approved_wd.dttm_work_start,
+                            dttm_work_end=approved_wd.dttm_work_end,
+                            dt=approved_wd.dt,
+                            is_fact=approved_wd.is_fact,
                             is_approved=False,
-                            type=wd.type,
-                            created_by_id=wd.created_by_id,
-                            last_edited_by_id=wd.last_edited_by_id,
-                            is_vacancy=wd.is_vacancy,
-                            is_outsource=wd.is_outsource,
-                            comment=wd.comment,
-                            canceled=wd.canceled,
+                            type=approved_wd.type,
+                            created_by_id=approved_wd.created_by_id,
+                            last_edited_by_id=approved_wd.last_edited_by_id,
+                            is_vacancy=approved_wd.is_vacancy,
+                            is_outsource=approved_wd.is_outsource,
+                            comment=approved_wd.comment,
+                            canceled=approved_wd.canceled,
                             need_count_wh=True,
-                            is_blocked=wd.is_blocked,
-                            closest_plan_approved_id=wd.closest_plan_approved_id,
+                            is_blocked=approved_wd.is_blocked,
+                            closest_plan_approved_id=approved_wd.closest_plan_approved_id,
+                            parent_worker_day_id=approved_wd.id,
                         )
-                        for wd in list_wd if wd.employee_id  # не копируем день без сотрудника (вакансию) в неподтв. версию
+                        for approved_wd in approved_wds_list if approved_wd.employee_id
+                        # не копируем день без сотрудника (вакансию) в неподтв. версию
                     ]
                 )
                 search_wds = {}
-                for wd in wds:
-                    key_employee = wd.employee_id
-                    if not key_employee in search_wds:
-                        search_wds[key_employee] = {}
-                    search_wds[key_employee][wd.dt] = wd
+                for not_approved_wd in not_approved_wds_list:
+                    search_wds[not_approved_wd.parent_worker_day_id] = not_approved_wd
 
                 WorkerDayCashboxDetails.objects.bulk_create(
                     [
                         WorkerDayCashboxDetails(
                             work_part=details.work_part,
-                            worker_day=search_wds[wd.employee_id][wd.dt],
+                            worker_day=search_wds[approved_wd.id],
                             work_type_id=details.work_type_id,
                         )
-                        for wd in list_wd if wd.employee_id  # TODO: тест
-                        for details in wd.worker_day_details.all()
+                        for approved_wd in approved_wds_list if approved_wd.employee_id  # TODO: тест
+                        for details in approved_wd.worker_day_details.all()
                     ]
                 )
 
@@ -605,7 +608,7 @@ class WorkerDayViewSet(BaseModelViewSet):
                 if not serializer.data['is_fact']:
                     # отмечаем, что график подтвержден
                     ShopMonthStat.objects.filter(
-                        shop_id=serializer.data['shop_id'],
+                        shop_id=serializer.validated_data['shop_id'],
                         dt=serializer.validated_data['dt_from'].replace(day=1),
                     ).update(
                         is_approved=True,
@@ -620,7 +623,7 @@ class WorkerDayViewSet(BaseModelViewSet):
                         WorkerDay.check_tasks_violations(
                             employee_days_q=employee_days_q,
                             is_approved=True,
-                            is_fact=serializer.data['is_fact'],
+                            is_fact=serializer.validated_data['is_fact'],
                             exc_cls=ValidationError,
                         )
 

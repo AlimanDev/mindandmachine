@@ -755,7 +755,10 @@ class WorkerDay(AbstractModel):
 
     comment = models.TextField(null=True, blank=True)
     parent_worker_day = models.ForeignKey(
-        'self', on_delete=models.SET_NULL, blank=True, null=True, related_name='child') # todo: remove
+        'self', on_delete=models.SET_NULL, blank=True, null=True, related_name='child',
+        help_text='Используется в подтверждении рабочих дней для того, '
+                  'чтобы понимать каким днем из подтв. версии был порожден день в черновике, '
+                  'чтобы можно было сопоставить и создать детали рабочего дня')
     work_hours = models.DurationField(default=datetime.timedelta(days=0))
 
     is_fact = models.BooleanField(default=False)  # плановое или фактическое расписание

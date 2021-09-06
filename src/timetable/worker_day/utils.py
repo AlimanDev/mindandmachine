@@ -394,6 +394,7 @@ def create_worker_days_range(dates, type_id=WorkerDay.TYPE_WORKDAY, shop_id=None
 
         return created_wds
 
+
 def check_worker_day_permissions(user, shop_id, action, graph_type, wd_types, dt_from, dt_to, error_messages):
     wd_perms = GroupWorkerDayPermission.objects.filter(
         group__in=user.get_group_ids(Shop.objects.get(id=shop_id) if shop_id else None),
