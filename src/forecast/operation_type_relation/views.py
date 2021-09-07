@@ -7,6 +7,7 @@ from django_filters.rest_framework import FilterSet
 from django.utils.translation import gettext_lazy as _
 
 from rest_framework import serializers, status
+from rest_framework.exceptions import ValidationError
 from rest_framework.validators import UniqueTogetherValidator
 from rest_framework.response import Response
 from rest_framework.pagination import LimitOffsetPagination
@@ -27,19 +28,21 @@ class OperationTypeRelationSerializer(serializers.ModelSerializer):
         "not_same_template": _("Base and depended demand models cannot have different templates."),
         "error_in_formula": _("Error in formula: {formula}."),
         "base_not_formula": _("Base model not formula."),
-        "const_cant_be_base": _("Constant operation can\'t be base."),
+        "both_not_work_type": _("Both templates should be work type for 'Change workload between' relation."),
         "bad_steps":_("Depended must have same or bigger forecast step, got {} -> {}"),
+        "bad_day_of_week": _("Bad day of week, possible values: 0, 1, 2, 3, 4, 5, 6")
     }
 
-    formula = serializers.CharField()
+    formula = serializers.CharField(required=False)
     depended = OperationTypeTemplateSerializer(read_only=True)
     base = OperationTypeTemplateSerializer(read_only=True)
     depended_id = serializers.IntegerField(write_only=True)
     base_id = serializers.IntegerField(write_only=True)
+    days_of_week = serializers.ListField(required=False, allow_null=True, allow_empty=True, child=serializers.IntegerField(), write_only=True)
 
     class Meta:
         model = OperationTypeRelation
-        fields = ['id', 'base', 'depended', 'formula', 'depended_id', 'base_id', 'type']
+        fields = ['id', 'base', 'depended', 'formula', 'depended_id', 'base_id', 'type', 'max_value', 'threshold', 'days_of_week']
         validators = [
             UniqueTogetherValidator(
                 queryset=OperationTypeRelation.objects.all(),
@@ -55,14 +58,27 @@ class OperationTypeRelationSerializer(serializers.ModelSerializer):
         lambda_check = r'^(if|else|\+|-|\*|/|\s|a|[0-9]|=|>|<|\.)*'
         if self.validated_data.get('type', 'F') == OperationTypeRelation.TYPE_PREDICTION:
             self.validated_data['formula'] = 'a'
-        if not re.fullmatch(lambda_check, self.validated_data['formula']):
+        if self.validated_data.get('type', 'F') == OperationTypeRelation.TYPE_FORMULA and not re.fullmatch(lambda_check, self.validated_data.get('formula', '')):
             raise FieldError(self.error_messages["error_in_formula"].format(formula=self.validated_data['formula']), 'formula')
 
-        # self.validated_data['formula'] = "lambda a: " + self.validated_data['formula']
+        if self.validated_data.get('type', 'F') == OperationTypeRelation.TYPE_CHANGE_WORKLOAD_BETWEEN:
+            self.validated_data['formula'] = None
+            if not self.validated_data.get('max_value'):
+                raise FieldError(self.error_messages['required'], 'max_value')
+            if not self.validated_data.get('threshold'):
+                raise FieldError(self.error_messages['required'], 'threshold')
+            if not self.validated_data.get('days_of_week'):
+                raise FieldError(self.error_messages['required'], 'days_of_week')
+
+            days_of_week = self.validated_data.get('days_of_week', [])
+            if any([(i > 6) or (i < 0) for i in days_of_week]):
+                raise FieldError(self.error_messages['bad_day_of_week'], 'days_of_week')
+            self.validated_data['days_of_week'] = list(set(days_of_week))
+
         if self.validated_data['depended_id'] == self.validated_data['base_id']:
             raise FieldError(self.error_messages["depended_base_same"])
 
-        depended = OperationTypeTemplate.objects.get(pk=self.validated_data['depended_id'])
+        depended = OperationTypeTemplate.objects.select_related('operation_type_name').get(pk=self.validated_data['depended_id'])
         base = OperationTypeTemplate.objects.select_related('operation_type_name').get(pk=self.validated_data['base_id'])
         self.validated_data['depended'] = depended
         self.validated_data['base'] = base
@@ -71,14 +87,17 @@ class OperationTypeRelationSerializer(serializers.ModelSerializer):
            (depended.forecast_step == timedelta(minutes=30) and not (base.forecast_step in [timedelta(minutes=30)])):
             raise FieldError(self.error_messages["bad_steps"].format(depended.forecast_step, base.forecast_step))
 
-        if not (base.const_value is None):
-            raise FieldError(self.error_messages["const_cant_be_base"], 'base')
-
         if base.operation_type_name.do_forecast != OperationTypeName.FORECAST_FORMULA:
             raise FieldError(self.error_messages["base_not_formula"], 'base')
 
         if (depended.load_template_id != base.load_template_id):
             raise FieldError(self.error_messages["not_same_template"])
+
+        if self.validated_data.get('type', 'F') == OperationTypeRelation.TYPE_CHANGE_WORKLOAD_BETWEEN:
+            if any([depended.operation_type_name.work_type_name_id is None, base.operation_type_name.work_type_name_id is None]):
+                raise ValidationError(self.error_messages["both_not_work_type"])
+            else:
+                return True
 
         if OperationTypeRelation.objects.filter(base=depended, depended=base).exists():
             raise FieldError(self.error_messages["reversed_relation"], 'base')
@@ -100,6 +119,11 @@ class OperationTypeRelationSerializer(serializers.ModelSerializer):
                     raise FieldError(self.error_messages["cycle_relation"],'base')
                 else:
                     self.check_relations(base_id, relation['depended'].id)
+
+    def to_representation(self, instance: OperationTypeRelation):
+        data = super().to_representation(instance)
+        data['days_of_week'] = instance.days_of_week_list
+        return data
 
 
 class OperationTypeRelationFilter(FilterSet):

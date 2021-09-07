@@ -438,6 +438,7 @@ def prepare_load_template_request(load_template_id, shop_id, dt_from, dt_to):
         'forecast_params': json.loads(shop.load_template.forecast_params),
         'round_delta': shop.load_template.round_delta,
     }
+    data['shop'].update(shop.load_settings)
     data['shop']['times'] = ShopSchedule.objects.filter(
         shop_id=shop_id,
         dt__gte=dt_from,
@@ -450,6 +451,7 @@ def prepare_load_template_request(load_template_id, shop_id, dt_from, dt_to):
     relations = {}
     for rel in OperationTypeRelation.objects.filter(
             base__load_template_id=load_template_id,
+            type=OperationTypeRelation.TYPE_FORMULA,
         ).annotate(
             base_name=F('base__operation_type_name_id'),
             depended_name=F('depended__operation_type_name_id'),
@@ -498,7 +500,22 @@ def prepare_load_template_request(load_template_id, shop_id, dt_from, dt_to):
             o_type['type'] = 'F'
         else:
             o_type['type'] = 'O'
-        
+    data['change_workload_between'] = [
+        {
+            'to_serie': rel.base_name, 
+            'from_serie': rel.depended_name, 
+            'threshold': rel.threshold, 
+            'max_value': rel.max_value, 
+            'days_of_week': rel.days_of_week_list,
+        }
+        for rel in OperationTypeRelation.objects.filter(
+            base__load_template_id=load_template_id,
+            type=OperationTypeRelation.TYPE_CHANGE_WORKLOAD_BETWEEN,
+        ).annotate(
+            base_name=F('base__operation_type_name_id'),
+            depended_name=F('depended__operation_type_name_id'),
+        )
+    ]
     return data
 
 
@@ -510,16 +527,20 @@ def upload_load_template(template_file, form, lang='ru'):
     DEPENDENCY_COL = df.columns[1]
     FORMULA_COL = df.columns[2]
     CONSTANT_COL = df.columns[3]
-    TIMESTEP_COL = df.columns[4]
-    TM_START_COL = df.columns[5]
-    TM_END_COL = df.columns[6]
-    WORK_TYPE_COL = df.columns[7]
+    MAX_VALUE_COL = df.columns[4]
+    THRESHOLD_COL = df.columns[5]
+    DAYS_OF_WEEK_COL = df.columns[6]
+    TIMESTEP_COL = df.columns[7]
+    TM_START_COL = df.columns[8]
+    TM_END_COL = df.columns[9]
+    WORK_TYPE_COL = df.columns[10]
     o_types_db_set = set(o_types.keys())
     undefined_o_types = set(df[O_TYPE_COL].dropna()).difference(o_types_db_set)
     if len(undefined_o_types):
         raise serializers.ValidationError(_('These operation types do not exist: {types}.').format(types=undefined_o_types))
     lt = LoadTemplate.objects.create(name=form['name'], network_id=network_id)
     df = df.fillna('')
+    df[DAYS_OF_WEEK_COL] = df[DAYS_OF_WEEK_COL].astype(str).str.replace('.', ',')
     forecast_steps = {
         '1h': datetime.timedelta(hours=1),
         '30min': datetime.timedelta(minutes=30),
@@ -548,10 +569,23 @@ def upload_load_template(template_file, form, lang='ru'):
             name = row[O_TYPE_COL]
             prev_name = name
         if not row[DEPENDENCY_COL] == '':
+            max_value = None
+            threshold = None
+            days_of_week = []
+            type = OperationTypeRelation.TYPE_FORMULA
+            if row[FORMULA_COL] == '':
+                type = OperationTypeRelation.TYPE_CHANGE_WORKLOAD_BETWEEN
+                max_value = row[MAX_VALUE_COL]
+                threshold = row[THRESHOLD_COL]
+                days_of_week = list(map(int, row[DAYS_OF_WEEK_COL].split(',')))
             OperationTypeRelation.objects.create(
                 base=created_templates[name],
                 depended=created_templates[row[DEPENDENCY_COL]],
                 formula=row[FORMULA_COL],
+                max_value=max_value,
+                threshold=threshold,
+                type=type,
+                days_of_week=days_of_week,
             )
     return Response()
             
@@ -569,7 +603,7 @@ def download_load_template(request, workbook, load_template_id):
         ).annotate(
             base_name=F('base__operation_type_name_id'),
             depended_name=F('depended__operation_type_name__name'),
-        ).values('type', 'formula', 'depended_name', 'base_name'):
+        ).values('type', 'formula', 'depended_name', 'base_name', 'max_value', 'threshold', 'days_of_week'):
         key = rel.get('base_name')
         if not key in relations:
             relations[key] = []
@@ -592,26 +626,31 @@ def download_load_template(request, workbook, load_template_id):
     worksheet.write(0, 1, 'Зависимости')
     worksheet.write(0, 2, 'Формула')
     worksheet.write(0, 3, 'Константа')
-    worksheet.write(0, 4, 'Шаг прогноза')
-    worksheet.write(0, 5, 'Время начала')
-    worksheet.write(0, 6, 'Время окончания')
-    worksheet.write(0, 7, 'Тип работ')
+    worksheet.write(0, 4, 'Максимальное значение')
+    worksheet.write(0, 5, 'Порог')
+    worksheet.write(0, 6, 'Дни недели (через запятую)')
+    worksheet.write(0, 7, 'Шаг прогноза')
+    worksheet.write(0, 8, 'Время начала')
+    worksheet.write(0, 9, 'Время окончания')
+    worksheet.write(0, 10, 'Тип работ')
     index = 0
-    data = []
     for ot in operation_types:
         index += 1
         worksheet.write(index, 0, ot['operation_type_name'])
         worksheet.write(index, 3, ot['const_value'])
-        worksheet.write(index, 4, ot['forecast_step'])
-        worksheet.write(index, 5, str(ot['tm_from']))
-        worksheet.write(index, 6, str(ot['tm_to']))
-        worksheet.write(index, 7, ot['work_type_name'])
+        worksheet.write(index, 7, ot['forecast_step'])
+        worksheet.write(index, 8, str(ot['tm_from']))
+        worksheet.write(index, 9, str(ot['tm_to']))
+        worksheet.write(index, 10, ot['work_type_name'])
         if len(ot['dependences']):
             index -= 1
             for dependency in ot['dependences']:
                 index += 1            
                 worksheet.write(index, 1, dependency['depended_name'])
-                worksheet.write(index, 2, dependency['formula'])   
+                worksheet.write(index, 2, dependency['formula'] or '')
+                worksheet.write(index, 4, dependency['max_value'] or '')
+                worksheet.write(index, 5, dependency['threshold'] or '')
+                days_of_week = json.loads(dependency['days_of_week'] or '[]')
+                worksheet.write(index, 6, ','.join(list(map(str,days_of_week))))
             
-                         
     return workbook, 'Load_template'

@@ -15,6 +15,7 @@ from django.urls import path, reverse, resolve
 from django.utils.html import escape
 from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
+from django_admin_listfilter_dropdown.filters import ChoiceDropdownFilter
 from import_export import resources
 from import_export.admin import ExportActionMixin, ImportMixin
 from import_export.fields import Field
@@ -47,6 +48,7 @@ from src.base.models import (
     NetworkConnect,
 )
 from src.timetable.models import GroupWorkerDayPermission
+from src.recognition.admin import RelatedOnlyDropdownNameOrderedFilter
 
 
 class FunctionGroupResource(resources.ModelResource):
@@ -86,11 +88,17 @@ class NetworkAdmin(admin.ModelAdmin):
         (_('Vacancy settings'), {'fields': ('need_symbol_for_vacancy', 'allow_workers_confirm_outsource_vacancy')}),
         (_('Format settings'), {'fields': ('download_tabel_template', 'convert_tabel_to', 'timetable_format')}),
         (_('Timetable settings'), {'fields': ('show_worker_day_additional_info', 'show_worker_day_tasks', 'copy_plan_to_fact_crossing')}),
-        (_('Integration settings'), {'fields': ('descrease_employment_dt_fired_in_api', 'ignore_parent_code_when_updating_department_via_api', 'create_employment_on_set_or_update_director_code',)}),
-        (_('Default settings'), {'fields': ('breaks', 'load_template', 'exchange_settings', 'worker_position_default_values')}),
+        (_('Integration settings'), {'fields': (
+            'descrease_employment_dt_fired_in_api',
+            'ignore_parent_code_when_updating_department_via_api',
+            'ignore_shop_code_when_updating_employment_via_api',
+            'create_employment_on_set_or_update_director_code',
+        )}),
+        (_('Default settings'), {'fields': ('breaks', 'load_template', 'exchange_settings', 'worker_position_default_values', 'shop_default_values')}),
         (_('Other'), {'fields': (
             'settings_values',
             'show_user_biometrics_block',
+            'forbid_edit_employments_came_through_integration',
         )}),
     )
 
@@ -311,7 +319,12 @@ class GroupAdmin(admin.ModelAdmin):
 @admin.register(FunctionGroup)
 class FunctionGroupAdmin(ImportMixin, ExportActionMixin, admin.ModelAdmin):
     list_display = ('id', 'access_type', 'group', 'func', 'method', 'level_down', 'level_up')
-    list_filter = ('access_type', 'group', 'func')
+    list_filter = [
+        ('group', RelatedOnlyDropdownNameOrderedFilter),
+        ('func', ChoiceDropdownFilter),
+    ]
+    # list_filter = ('access_type', 'group', 'func')
+    list_select_related = ('group',)
     search_fields = ('id',)
     resource_class = FunctionGroupResource
 
@@ -338,8 +351,10 @@ class FunctionGroupAdmin(ImportMixin, ExportActionMixin, admin.ModelAdmin):
 @admin.register(Employment)
 class EmploymentAdmin(admin.ModelAdmin):
     list_display = ('id', 'shop', 'employee', 'function_group', 'dt_hired_formated', 'dt_fired_formated')
-    list_select_related = ('employee', 'employee__user', 'shop', 'function_group')
-    list_filter = ('shop', 'employee')
+    list_select_related = ('employee', 'employee__user', 'shop', 'shop__parent', 'function_group')
+    list_filter = [
+        ('shop', RelatedOnlyDropdownNameOrderedFilter),
+    ]
     search_fields = ('employee__user__first_name', 'employee__user__last_name', 'shop__name', 'shop__parent__name',
                      'employee__tabel_code')
     raw_id_fields = ('shop', 'employee', 'position')
