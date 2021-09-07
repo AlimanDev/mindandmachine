@@ -98,6 +98,9 @@ class NetworkSerializer(serializers.ModelSerializer):
             'show_remaking_choice',
         ]
 
+class NetworkListSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    name = serializers.CharField()
 
 class NetworkWithOutsourcingsAndClientsSerializer(NetworkSerializer):
     outsourcings = OutsourceClientNetworkSerializer(many=True)
