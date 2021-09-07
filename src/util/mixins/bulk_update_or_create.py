@@ -38,27 +38,19 @@ class BatchUpdateOrCreateModelMixin:
         pass
 
     @classmethod
-    def _check_batch_create_objs_perms(cls, user, create_objs, raise_exception=False, exc_cls=None):
-        """
-        Проверка прав на сохранение списка объектов
-            (для объектов, которые создаем -- можем использовать только список еще не созданных объектов)
-        """
-        pass
-
-    @classmethod
-    def _check_batch_update_qs_perms(cls, user, update_qs, raise_exception=False, exc_cls=None):
-        """
-        Проверка прав на сохранение/обновление объектов на основе qs
-            (для объектов, которые обновляем -- можем использовать qs)
-        """
-        pass
-
-    @classmethod
-    def _check_batch_delete_qs_perms(cls, user, delete_qs, raise_exception=False, exc_cls=None):
+    def _check_batch_delete_qs_perms(cls, user, delete_qs, raise_exception=True, exc_cls=None):
         """
         Првоерка прав на удаление объектов на основе qs
             (для объектов, которые удаляем -- можем использовать qs)
         """
+        pass
+
+    @classmethod
+    def _enrich_create_or_update_perms_data(cls, create_or_update_perms_data, obj_dict):
+        pass
+
+    @classmethod
+    def _check_create_or_update_perms(cls, user, create_or_update_perms_data):
         pass
 
     @classmethod
@@ -133,16 +125,13 @@ class BatchUpdateOrCreateModelMixin:
             delete_scope_values_list: список словарей с значениями для полей из delete_scope_fields_list,
                 по которым будут определяться объекты, которые будут удалены
             user: пользователь, который инициировал вызов функции, используется для проверки прав доступа
+                если None, то проверки доступа не производятся (считаем, что запуск производится системой)
 
         # TODO: Обновление связанных fk объектов?
         # TODO: Оптимистичный лок? Версия объектов? Пример: изменяем один и тот же WorkerDay в разных вкладках,
             должна быть ошибка если объект был изменен?
-        # TODO: Проверка доступа к созданию/обновлению объектов (в т.ч. связанных)?
-        # TODO: Настройка, которая определяет сколько объектов может быть создано в рамках delete_scope_fields_list?
-        # TODO: Проверки в рамках транзакции (настраиваемые для моделей), например проверка пересечения времени в WorkerDay для 1 пользователя
+        # TODO: Настройка, которая определяет сколько объектов может быть создано в рамках delete_scope_fields_list? -- ???
         # TODO: Сигналы post_batch_update, post_batch_create ?
-        # TODO: Проверка прав доступа для WorkerDay при создании/изменеии
-        # TODO: Проверка на наличие активного трудоустройства у сотрудника на создаваемые даты
         # TODO: Не обновлять существующие объекты если ни 1 поле не изменилось ?
         """
         allowed_update_key_fields = cls._get_allowed_update_key_fields()
@@ -151,6 +140,7 @@ class BatchUpdateOrCreateModelMixin:
                 f'Not allowed update key field: "{update_key_field}", allowed fields: {allowed_update_key_fields}')
 
         with transaction.atomic():
+            create_or_update_perms_data = {}
             stats = stats or {}
             delete_scope_fields_list = delete_scope_fields_list or cls._get_batch_delete_scope_fields_list()
             delete_scope_values_set = set()
@@ -181,6 +171,12 @@ class BatchUpdateOrCreateModelMixin:
                 else:
                     update_keys.append(update_key)
                     to_update_dict[update_key] = obj_dict
+
+                if user:
+                    cls._enrich_create_or_update_perms_data(create_or_update_perms_data, obj_dict)
+
+            if user:
+                cls._check_create_or_update_perms(user, create_or_update_perms_data)
 
             filter_kwargs = {
                 f"{update_key_field}__in": update_keys,
@@ -228,8 +224,11 @@ class BatchUpdateOrCreateModelMixin:
                     for delete_scope_values_tuples in delete_scope_values_set:
                         q_for_delete |= Q(**dict(delete_scope_values_tuples))
 
-                    _total_deleted_count, deleted_dict = cls.objects.filter(
-                        q_for_delete).exclude(id__in=list(obj.id for obj in objs if obj.id)).delete()
+                    delete_qs = cls.objects.filter(
+                        q_for_delete).exclude(id__in=list(obj.id for obj in objs if obj.id))
+                    if user:
+                        cls._check_batch_delete_qs_perms(user, delete_qs)
+                    _total_deleted_count, deleted_dict = delete_qs.delete()
 
             if objs_to_create:
                 cls.objects.bulk_create(objs_to_create)  # в объектах будут проставлены id (только в postgres)

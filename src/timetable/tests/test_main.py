@@ -1752,6 +1752,102 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
         self.assertContains(
             resp, 'Операция не может быть выполнена. Недопустимое пересечение времени работы.', status_code=400)
 
+    def test_batch_create_or_update_wd_perms(self):
+        GroupWorkerDayPermission.objects.all().delete()
+        WorkerDay.objects.all().delete()
+        wd_data = {
+            "shop_id": self.shop.id,
+            "employee_id": self.employee2.id,
+            "dt": self.dt,
+            "is_fact": False,
+            "is_approved": False,
+            "type": WorkerDay.TYPE_WORKDAY,
+            "dttm_work_start": datetime.combine(self.dt, time(11)),
+            "dttm_work_end": datetime.combine(self.dt, time(15)),
+            "worker_day_details": [{
+                "work_part": 1.0,
+                "work_type_id": self.work_type.id}
+            ]
+        }
+        data = {
+            'data': [
+                wd_data,
+            ],
+        }
+        resp = self.client.post(
+            self.get_url('WorkerDay-batch-update-or-create'), self.dump_data(data), content_type='application/json')
+        self.assertContains(resp, 'У вас нет прав на подтверждение типа дня', status_code=403)
+
+        create_or_update_plan_workday_perm = WorkerDayPermission.objects.get(
+            action=WorkerDayPermission.CREATE_OR_UPDATE,
+            graph_type=WorkerDayPermission.PLAN,
+            wd_type_id=WorkerDay.TYPE_WORKDAY,
+        )
+        gwdp = GroupWorkerDayPermission.objects.create(
+            group=self.admin_group,
+            worker_day_permission=create_or_update_plan_workday_perm,
+            limit_days_in_past=1,
+            limit_days_in_future=1,
+        )
+
+        resp = self.client.post(
+            self.get_url('WorkerDay-batch-update-or-create'), self.dump_data(data), content_type='application/json')
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(WorkerDay.objects.count(), 1)
+
+        wd_data['dt'] = self.dt - timedelta(days=2)
+        wd_data['dttm_work_start'] = datetime.combine(self.dt - timedelta(days=2), time(11))
+        wd_data['dttm_work_end'] = datetime.combine(self.dt - timedelta(days=2), time(15))
+        resp = self.client.post(
+            self.get_url('WorkerDay-batch-update-or-create'), self.dump_data(data), content_type='application/json')
+        self.assertContains(resp, 'Необходимо изменить интервал для подтверждения', status_code=403)
+
+        wd_data['dt'] = self.dt + timedelta(days=2)
+        wd_data['dttm_work_start'] = datetime.combine(self.dt + timedelta(days=2), time(11))
+        wd_data['dttm_work_end'] = datetime.combine(self.dt + timedelta(days=2), time(15))
+        resp = self.client.post(
+            self.get_url('WorkerDay-batch-update-or-create'), self.dump_data(data), content_type='application/json')
+        self.assertContains(resp, 'Необходимо изменить интервал для подтверждения', status_code=403)
+
+        gwdp.limit_days_in_past = None
+        gwdp.limit_days_in_future = None
+        gwdp.save()
+
+        resp = self.client.post(
+            self.get_url('WorkerDay-batch-update-or-create'), self.dump_data(data), content_type='application/json')
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(WorkerDay.objects.count(), 2)
+
+        # попытка удалить день
+        data['data'] = []
+        options = {'delete_scope_values_list': [
+            {
+                'employee_id': wd_data['employee_id'],
+                'dt': wd_data['dt'],
+                'is_fact': wd_data['is_fact'],
+                'is_approved': wd_data['is_approved'],
+            },
+        ]}
+        data['options'] = options
+        resp = self.client.post(
+            self.get_url('WorkerDay-batch-update-or-create'), self.dump_data(data), content_type='application/json')
+        self.assertEqual(resp.status_code, 403)
+
+        delete_plan_workday_perm = WorkerDayPermission.objects.get(
+            action=WorkerDayPermission.DELETE,
+            graph_type=WorkerDayPermission.PLAN,
+            wd_type_id=WorkerDay.TYPE_WORKDAY,
+        )
+        GroupWorkerDayPermission.objects.create(
+            group=self.admin_group,
+            worker_day_permission=delete_plan_workday_perm,
+        )
+
+        resp = self.client.post(
+            self.get_url('WorkerDay-batch-update-or-create'), self.dump_data(data), content_type='application/json')
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(WorkerDay.objects.count(), 1)
+
 
 class TestCropSchedule(TestsHelperMixin, APITestCase):
     @classmethod

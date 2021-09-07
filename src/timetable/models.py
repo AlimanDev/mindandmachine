@@ -586,6 +586,50 @@ class WorkerDay(AbstractModel):
         }
 
     @classmethod
+    def _enrich_create_or_update_perms_data(cls, create_or_update_perms_data, obj_dict):
+        action = WorkerDayPermission.CREATE_OR_UPDATE
+        graph_type = WorkerDayPermission.FACT if obj_dict.get('is_fact') else WorkerDayPermission.PLAN
+        wd_type_id = obj_dict.get('type_id')
+        dt = obj_dict.get('dt')
+        shop_id = obj_dict.get('shop_id')
+        k = f'{graph_type}_{action}_{wd_type_id}_{shop_id}'
+        create_or_update_perms_data.setdefault(k, set()).add(dt)
+
+    @classmethod
+    def _check_batch_delete_qs_perms(cls, user, delete_qs, raise_exception=False, exc_cls=None):
+        from src.timetable.worker_day.utils import check_worker_day_permissions
+        from src.timetable.worker_day.views import WorkerDayViewSet
+        action = WorkerDayPermission.DELETE
+        for is_fact, wd_type_id, dt, shop_id in delete_qs.values_list('is_fact', 'type_id', 'dt', 'shop_id').distinct():
+            check_worker_day_permissions(
+                user=user,
+                shop_id=shop_id,
+                action=action,
+                graph_type=WorkerDayPermission.FACT if is_fact else WorkerDayPermission.PLAN,
+                wd_types=[wd_type_id],
+                dt_from=dt,
+                dt_to=dt,
+                error_messages=WorkerDayViewSet.error_messages,
+            )
+
+    @classmethod
+    def _check_create_or_update_perms(cls, user, create_or_update_perms_data):
+        from src.timetable.worker_day.utils import check_worker_day_permissions
+        from src.timetable.worker_day.views import WorkerDayViewSet
+        for k, dates_set in create_or_update_perms_data.items():
+            graph_type, action, wd_type_id, shop_id = k.split('_')
+            check_worker_day_permissions(
+                user=user,
+                shop_id=shop_id,
+                action=action,
+                graph_type=graph_type,
+                wd_types=[wd_type_id],
+                dt_from=min(dates_set),
+                dt_to=max(dates_set),
+                error_messages=WorkerDayViewSet.error_messages,
+            )
+
+    @classmethod
     def _run_batch_update_or_create_transaction_checks(cls, *args, **kwargs):
         cls.check_work_time_overlap(employee_days_q=kwargs.get('employee_days_q'), exc_cls=ValidationError)
         cls.check_multiple_workday_types(employee_days_q=kwargs.get('employee_days_q'), exc_cls=ValidationError)

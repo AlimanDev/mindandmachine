@@ -40,7 +40,7 @@ def _patch_obj_serializer(obj_serializer, update_key_field=None):
         obj_serializer.child.fields['dttm_modified'] = serializers.DateTimeField(read_only=True)
 
 
-class BatchUpdateOrCreateMixin:
+class BatchUpdateOrCreateViewMixin:
     batch_update_or_create_serializer_cls = None
 
     def get_batch_update_or_create_serializer_cls(self):
@@ -97,7 +97,7 @@ class BatchUpdateOrCreateMixin:
         return Response(res)
 
 
-class BaseModelViewSet(BatchUpdateOrCreateMixin, ModelViewSet):
+class BaseModelViewSet(BatchUpdateOrCreateViewMixin, ModelViewSet):
     http_method_names = ['get', 'post', 'put', 'delete']
 
 
