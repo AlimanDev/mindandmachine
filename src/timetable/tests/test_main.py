@@ -1613,6 +1613,13 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
 
         resp = self.client.post(
             self.get_url('WorkerDay-batch-update-or-create'), self.dump_data(data), content_type='application/json')
+        self.assertContains(
+            resp, 'Создание нескольких дней на одну дату для одного сотрудника запрещено.', status_code=400)
+
+        self.network.allow_creation_several_wdays_for_one_employee_for_one_date = True
+        self.network.save()
+        resp = self.client.post(
+            self.get_url('WorkerDay-batch-update-or-create'), self.dump_data(data), content_type='application/json')
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
         resp_data = resp.json()
         id1 = resp_data.get('data')[0]['id']
@@ -1712,6 +1719,45 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
         self.assertContains(
             resp, 'Операция не может быть выполнена. '
                   'Невозможно создать разные типы дней на одну дату для одного сотрудника.', status_code=400)
+
+    def test_cant_create_multiple_wdays_on_one_date_if_setting_is_enabled(self):
+        WorkerDay.objects.all().delete()
+        data = {
+            'data': [
+                {
+                    "shop_id": self.shop.id,
+                    "employee_id": self.employee2.id,
+                    "dt": self.dt,
+                    "is_fact": False,
+                    "is_approved": False,
+                    "type": WorkerDay.TYPE_WORKDAY,
+                    "dttm_work_start": datetime.combine(self.dt, time(11)),
+                    "dttm_work_end": datetime.combine(self.dt, time(17)),
+                    "worker_day_details": [{
+                        "work_part": 1.0,
+                        "work_type_id": self.work_type.id}
+                    ]
+                },
+                {
+                    "shop_id": self.shop.id,
+                    "employee_id": self.employee2.id,
+                    "dt": self.dt,
+                    "is_fact": False,
+                    "is_approved": False,
+                    "type": WorkerDay.TYPE_WORKDAY,
+                    "dttm_work_start": datetime.combine(self.dt, time(19)),
+                    "dttm_work_end": datetime.combine(self.dt, time(22)),
+                    "worker_day_details": [{
+                        "work_part": 1.0,
+                        "work_type_id": self.work_type.id}
+                    ]
+                },
+            ],
+        }
+        resp = self.client.post(
+            self.get_url('WorkerDay-batch-update-or-create'), self.dump_data(data), content_type='application/json')
+        self.assertContains(
+            resp, 'Создание нескольких дней на одну дату для одного сотрудника запрещено.', status_code=400)
 
     def test_batch_create_or_update_workerdays_user_work_time_overlap_validation(self):
         WorkerDay.objects.all().delete()

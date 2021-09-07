@@ -254,7 +254,7 @@ class BatchUpdateOrCreateModelMixin:
                         original_deleted_cls_name)
 
             transaction_checks_kwargs = cls._get_batch_update_or_create_transaction_checks_kwargs(
-                data=data, q_for_delete=q_for_delete)
+                data=data, q_for_delete=q_for_delete, user=user)
             cls._run_batch_update_or_create_transaction_checks(**transaction_checks_kwargs)
 
         return objs, stats

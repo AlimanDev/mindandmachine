@@ -28,6 +28,7 @@ from src.timetable.exceptions import (
     WorkTimeOverlap,
     WorkDayTaskViolation,
     MultipleWDTypesOnOneDateForOneEmployee,
+    HasAnotherWdayOnDate,
 )
 from src.util.mixins.qs import AnnotateValueEqualityQSMixin
 from src.util.time import _time_to_float
@@ -580,12 +581,6 @@ class WorkerDay(AbstractModel):
         return ['dt', 'employee_id', 'is_fact', 'is_approved']
 
     @classmethod
-    def _get_batch_update_or_create_transaction_checks_kwargs(cls, **kwargs):
-        return {
-            'employee_days_q': kwargs.get('q_for_delete')
-        }
-
-    @classmethod
     def _enrich_create_or_update_perms_data(cls, create_or_update_perms_data, obj_dict):
         action = WorkerDayPermission.CREATE_OR_UPDATE
         graph_type = WorkerDayPermission.FACT if obj_dict.get('is_fact') else WorkerDayPermission.PLAN
@@ -630,10 +625,19 @@ class WorkerDay(AbstractModel):
             )
 
     @classmethod
+    def _get_batch_update_or_create_transaction_checks_kwargs(cls, **kwargs):
+        return {
+            'employee_days_q': kwargs.get('q_for_delete'),
+            'user': kwargs.get('user'),
+        }
+
+    @classmethod
     def _run_batch_update_or_create_transaction_checks(cls, *args, **kwargs):
         cls.check_work_time_overlap(employee_days_q=kwargs.get('employee_days_q'), exc_cls=ValidationError)
         cls.check_multiple_workday_types(employee_days_q=kwargs.get('employee_days_q'), exc_cls=ValidationError)
-        # TODO: проверка, что может быть только 1 день на дату если включена настройка в сети пользователя?
+        user = kwargs.get('user')
+        if user and user.network_id and not user.network.allow_creation_several_wdays_for_one_employee_for_one_date:
+            cls.check_only_one_wday_on_date(employee_days_q=kwargs.get('employee_days_q'), exc_cls=ValidationError)
 
     def calc_day_and_night_work_hours(self):
         # TODO: нужно учитывать работу в праздничные дни? -- сейчас is_celebration в ProductionDay всегда False
@@ -1228,6 +1232,70 @@ class WorkerDay(AbstractModel):
             raise original_exc
 
         return task_violations
+
+    # TODO: рефакторинг: не дублировать код в проверках -- вынести в классы?
+    @classmethod
+    def check_only_one_wday_on_date(cls, employee_days_q=None, employee_id=None, employee_id__in=None, user_id=None,
+                                user_id__in=None, dt=None, dt__in=None, is_fact=None, is_approved=None, raise_exc=True,
+                                exc_cls=None):
+        """
+        Проверка, что на 1 дату у сотрудника не создается несколько дней
+        """
+        if not (employee_days_q or employee_id or employee_id__in or user_id or user_id__in):
+            return
+
+        lookup = {}
+        if is_fact is not None:
+            lookup['is_fact'] = is_fact
+
+        if is_approved is not None:
+            lookup['is_approved'] = is_approved
+
+        if employee_id:
+            lookup['employee__user__employees__id'] = employee_id
+
+        if employee_id__in:
+            lookup['employee__user__employees__id__in'] = employee_id__in
+
+        if user_id:
+            lookup['employee__user_id'] = user_id
+
+        if user_id__in:
+            lookup['employee__user_id__in'] = user_id__in
+
+        if dt:
+            lookup['dt'] = dt
+
+        if dt__in:
+            lookup['dt__in'] = dt__in
+
+        q = Q(**lookup)
+        if employee_days_q:
+            q &= employee_days_q
+
+        has_another_wday_on_date_qs = cls.objects.filter(q).annotate(
+            has_another_wday_on_date=Exists(
+                WorkerDay.objects.filter(
+                    ~Q(id=OuterRef('id')),
+                    employee_id=OuterRef('employee_id'),
+                    dt=OuterRef('dt'),
+                    is_fact=OuterRef('is_fact'),
+                    is_approved=OuterRef('is_approved'),
+                )
+            )
+        ).filter(
+            has_another_wday_on_date=True,
+        ).values('employee__user__last_name', 'employee__user__first_name', 'dt').distinct()
+
+        exc_data = list(has_another_wday_on_date_qs)
+
+        if exc_data and raise_exc:
+            original_exc = HasAnotherWdayOnDate(exc_data=exc_data)
+            if exc_cls:
+                raise exc_cls(str(original_exc))
+            raise original_exc
+
+        return exc_data
 
     @classmethod
     def get_closest_plan_approved_q(cls, employee_id, dt, dttm_work_start, dttm_work_end, delta_in_secs):
