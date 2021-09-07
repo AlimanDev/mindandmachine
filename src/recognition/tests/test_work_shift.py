@@ -201,6 +201,7 @@ class TestWorkShiftViewSet(TestsHelperMixin, APITestCase):
             'avatar': None,
             'network': {
                 'allowed_geo_distance_km': None,
+                'allow_creation_several_wdays_for_one_employee_for_one_date': False,
                 'allowed_interval_for_early_departure': '00:00:00',
                 'allowed_interval_for_late_arrival': '00:00:00',
                 'default_stats': {
@@ -328,6 +329,7 @@ class TestWorkShiftViewSet(TestsHelperMixin, APITestCase):
             'avatar': None,
             'network': {
                 'allowed_geo_distance_km': None,
+                'allow_creation_several_wdays_for_one_employee_for_one_date': False,
                 'allowed_interval_for_early_departure': '00:00:00',
                 'allowed_interval_for_late_arrival': '00:00:00',
                 'default_stats': {
@@ -461,6 +463,7 @@ class TestWorkShiftViewSet(TestsHelperMixin, APITestCase):
             'avatar': None,
             'network': {
                 'allowed_geo_distance_km': None,
+                'allow_creation_several_wdays_for_one_employee_for_one_date': False,
                 'allowed_interval_for_early_departure': '00:00:00',
                 'allowed_interval_for_late_arrival': '00:00:00',
                 'default_stats': {

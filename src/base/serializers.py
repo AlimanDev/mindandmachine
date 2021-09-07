@@ -97,6 +97,7 @@ class NetworkSerializer(serializers.ModelSerializer):
             'forbid_edit_employments_came_through_integration',
             'show_remaking_choice',
             'display_employee_tabs_in_the_schedule',
+            'allow_creation_several_wdays_for_one_employee_for_one_date',
         ]
 
 
