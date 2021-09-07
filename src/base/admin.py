@@ -97,7 +97,12 @@ class NetworkAdmin(admin.ModelAdmin):
         }),
         (_('Vacancy settings'), {'fields': ('need_symbol_for_vacancy', 'allow_workers_confirm_outsource_vacancy')}),
         (_('Format settings'), {'fields': ('download_tabel_template', 'convert_tabel_to', 'timetable_format')}),
-        (_('Timetable settings'), {'fields': ('show_worker_day_additional_info', 'show_worker_day_tasks', 'copy_plan_to_fact_crossing')}),
+        (_('Timetable settings'), {'fields': (
+            'show_worker_day_additional_info',
+            'show_worker_day_tasks',
+            'copy_plan_to_fact_crossing',
+            'display_employee_tabs_in_the_schedule',
+        )}),
         (_('Integration settings'), {'fields': (
             'descrease_employment_dt_fired_in_api',
             'ignore_parent_code_when_updating_department_via_api',
@@ -109,6 +114,10 @@ class NetworkAdmin(admin.ModelAdmin):
             'settings_values',
             'show_user_biometrics_block',
             'forbid_edit_employments_came_through_integration',
+            'allow_creation_several_wdays_for_one_employee_for_one_date',
+            'consider_department_in_att_records',
+            'run_recalc_fact_from_att_records_on_plan_approve',
+            'set_closest_plan_approved_delta_for_manual_fact',
         )}),
     )
 
