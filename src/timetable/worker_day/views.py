@@ -1077,20 +1077,16 @@ class WorkerDayViewSet(BaseModelViewSet):
         data.is_valid(raise_exception=True)
         data = data.validated_data
         to_employee_id = data['to_employee_id']
+        from_employee_id = data['from_employee_id']
 
         with transaction.atomic():
-            main_worker_days = list(WorkerDay.objects.filter(
-                id__in=data['from_workerday_ids'],
-                is_fact=False,
-            ).select_related(
-                'employee__user',
-                'shop__settings__breaks',
-            ).order_by('dt'))
             created_wds, work_types = copy_as_excel_cells(
-                main_worker_days,
+                from_employee_id,
+                data['from_dates'],
                 to_employee_id,
                 data['to_dates'],
-                created_by=request.user.id
+                created_by=request.user.id,
+                is_approved=data['is_approved'],
             )
             for shop_id, work_type in set(work_types):
                 cancel_vacancies(shop_id, work_type)
@@ -1112,29 +1108,23 @@ class WorkerDayViewSet(BaseModelViewSet):
         data = CopyRangeSerializer(data=request.data, context={'request': request})
         data.is_valid(raise_exception=True)
         data = data.validated_data
-        from_dates = [
-            data['from_copy_dt_from'] + datetime.timedelta(i)
-            for i in range((data['from_copy_dt_to'] - data['from_copy_dt_from']).days + 1)
-        ]
-        to_dates = [
-            data['to_copy_dt_from'] + datetime.timedelta(i)
-            for i in range((data['to_copy_dt_to'] - data['to_copy_dt_from']).days + 1)
-        ]
-        employee_ids = data.get('employee_ids')
+        from_dates = data['from_dates']
+        to_dates = data['to_dates']
+        employee_ids = data.get('employee_ids', [])
         created_wds = []
         work_types = []
         with transaction.atomic():
             for employee_id in employee_ids:
-                main_worker_days = list(WorkerDay.objects.filter(
-                    employee_id=employee_id,
-                    dt__in=from_dates,
-                    is_fact=False,
-                    is_approved=data['is_approved'],
-                ).select_related(
-                    'employee__user',
-                    'shop__settings__breaks',
-                ).order_by('dt'))
-                wds, w_types = copy_as_excel_cells(main_worker_days, employee_id, to_dates, created_by=request.user.id)
+                wds, w_types = copy_as_excel_cells(
+                    employee_id, 
+                    from_dates, 
+                    employee_id, 
+                    to_dates, 
+                    created_by=request.user.id, 
+                    is_approved=data['is_approved'], 
+                    include_spaces=True,
+                    worker_day_types=data['worker_day_types'],
+                )
 
                 created_wds.extend(wds)
                 work_types.extend(w_types)

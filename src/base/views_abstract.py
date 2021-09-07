@@ -14,6 +14,7 @@ class GetObjectByCodeMixin:
         if by_code:
             self.lookup_field = self.get_object_field
             self.kwargs[self.get_object_field] = self.kwargs['pk']
+        self.request.by_code = by_code
         return super().get_object()
 
 

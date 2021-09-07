@@ -745,7 +745,7 @@ class WorkersStatsGetter:
                             self.year, month_num, return_days_in_month=True)
                         empl_days_count = empl_dict.get('empl_days_count').get(month_num, 0)
                         empl_dict.setdefault('sawh_hours_by_months', {})[
-                            month_num] = empl_days_count / days_in_month * empl.sawh_hours_by_months.get(
+                            month_num] = (empl_days_count / days_in_month) * (empl.norm_work_hours / 100) * empl.sawh_hours_by_months.get(
                             f'm{month_num}', prod_cal_norm_hours)
                 else:
                     empl_dict['sawh_hours_by_months'] = norm_hours_by_months

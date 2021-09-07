@@ -1,6 +1,8 @@
 from dateutil.relativedelta import relativedelta
 from django.db import models
 from django.db.models.aggregates import Max, Min
+from django.utils.functional import cached_property
+import json
 
 from src.base import models_utils
 import datetime
@@ -132,22 +134,38 @@ class OperationTypeRelation(AbstractModel):
 
     TYPE_FORMULA = 'F'
     TYPE_PREDICTION = 'P'
+    TYPE_CHANGE_WORKLOAD_BETWEEN = 'C'
     TYPES = [
         (TYPE_FORMULA, 'Формула'),
         (TYPE_PREDICTION, 'Прогнозирование'),
+        (TYPE_CHANGE_WORKLOAD_BETWEEN, 'Перекидывание нагрузки между типами работ'),
     ]
 
     base = models.ForeignKey(OperationTypeTemplate, on_delete=models.CASCADE, related_name='depends') # child
     depended = models.ForeignKey(OperationTypeTemplate, on_delete=models.CASCADE, related_name='bases') # parent
-    formula = models.CharField(max_length=1024)
+    formula = models.CharField(max_length=1024, null=True, blank=True)
     type = models.CharField(max_length=1, default=TYPE_FORMULA)
+    max_value = models.FloatField(null=True, blank=True)
+    threshold = models.FloatField(null=True, blank=True)
+    days_of_week = models.CharField(max_length=48, null=True, blank=True, default='[0, 1, 2, 3, 4, 5, 6]')
 
     def __str__(self):
-        return 'base_id {}, depended_id: {}, formula: {}'.format(
+        text = 'base_id {}, depended_id: {},'.format(
             self.base_id,
             self.depended_id,
-            self.formula,
         )
+        if self.formula:
+            text += f' formula: {self.formula}'
+        else:
+            text += f' max_value: {self.max_value}, threshold: {self.threshold}, days_of_week: {self.days_of_week}'
+        return text
+
+    @cached_property
+    def days_of_week_list(self):
+        data = self.days_of_week
+        if isinstance(data, str):
+            data = json.loads(data or '[]')
+        return data or []
 
 
 class OperationTemplate(AbstractActiveNetworkSpecificCodeNamedModel):

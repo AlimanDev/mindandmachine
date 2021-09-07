@@ -95,12 +95,13 @@ class CashboxAdmin(admin.ModelAdmin):
 @admin.register(EmploymentWorkType)
 class WorkerCashboxInfoAdmin(admin.ModelAdmin):
     list_display = ('worker', 'work_type_name', 'id')
-    search_fields = ('employment__user__last_name', 'work_type__name', 'id')
+    search_fields = ('employment__employee__user__last_name', 'work_type__work_type_name__name', 'id')
     list_filter = ('work_type__shop',)
+    list_select_related = ('work_type', 'work_type__shop', 'employment__employee__user')
 
     @staticmethod
     def worker(instance: EmploymentWorkType):
-        user = instance.employment.user
+        user = instance.employment.employee.user
         return f"({user.id}) {user.last_name} {user.first_name}"
 
     @staticmethod
