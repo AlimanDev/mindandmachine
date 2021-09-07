@@ -355,12 +355,12 @@ class WorkerDayViewSet(BaseModelViewSet):
                 dt__lte=serializer.data['dt_to'],
                 dt__gte=serializer.data['dt_from'],
                 is_fact=serializer.data['is_fact'],
-                is_approved=False,
                 **employee_filter,
             )
 
             draft_wdays_with_changes = WorkerDay.objects.filter(
                 approve_condition,
+                is_approved=False,
             ).annotate(
                 same_approved_exists=Exists(
                     WorkerDay.objects.filter(
@@ -375,10 +375,30 @@ class WorkerDayViewSet(BaseModelViewSet):
                         is_approved=True,
                     ),
                 ),
-            ).filter(same_approved_exists=False)
+            ).filter(same_approved_exists=False).only('id', 'employee_id', 'dt')
 
+            approved_without_same_draft = WorkerDay.objects.filter(
+                approve_condition,
+                is_approved=True,
+            ).annotate(
+                same_draft_exists=Exists(
+                    WorkerDay.objects.filter(
+                        Q(shop_id=OuterRef('shop_id')) | Q(shop__isnull=True),
+                        Q(dttm_work_start=OuterRef('dttm_work_start')),
+                        Q(dttm_work_end=OuterRef('dttm_work_end')),
+                        Q(work_types=OuterRef('work_types')) | Q(work_types__isnull=True),
+                        employee_id=OuterRef('employee_id'),
+                        dt=OuterRef('dt'),
+                        is_fact=OuterRef('is_fact'),
+                        type_id=OuterRef('type_id'),
+                        is_approved=False,
+                    ),
+                ),
+            ).filter(same_draft_exists=False).only('id', 'employee_id', 'dt')
+
+            employee_dates_to_approve = draft_wdays_with_changes.union(approved_without_same_draft)
             employee_dt_pairs_list = list(
-                draft_wdays_with_changes.values_list('employee_id', 'dt').order_by('employee_id', 'dt').distinct())
+                employee_dates_to_approve.values_list('employee_id', 'dt').order_by('employee_id', 'dt').distinct())
             worker_dates_dict = {}
             for employee_id, dates_grouper in groupby(employee_dt_pairs_list, key=lambda i: i[0]):
                 worker_dates_dict[employee_id] = tuple(i[1] for i in list(dates_grouper))
@@ -388,6 +408,12 @@ class WorkerDayViewSet(BaseModelViewSet):
                 for employee_id, dates in worker_dates_dict.items():
                     employee_days_q |= Q(employee_id=employee_id, dt__in=dates)
                     employee_days_set.add((employee_id, dates))
+
+                wdays_to_approve = WorkerDay.objects.filter(
+                    employee_days_q,
+                    is_approved=False,
+                    is_fact=serializer.validated_data['is_fact'],
+                )
 
                 # если у пользователя нет группы с наличием прав на изменение защищенных дней, то проверяем,
                 # что в списке подтверждаемых дней нету защищенных дней, если есть, то выдаем ошибку
@@ -400,7 +426,7 @@ class WorkerDayViewSet(BaseModelViewSet):
                         employee_days_q, is_fact=serializer.data['is_fact'],
                         is_blocked=True,
                     ).exclude(
-                        id__in=draft_wdays_with_changes.values_list('id', flat=True),
+                        id__in=wdays_to_approve.values_list('id', flat=True),
                     ).annotate(
                         employee_user_fio=Concat(
                             F('employee__user__last_name'), Value(' '),
@@ -419,7 +445,7 @@ class WorkerDayViewSet(BaseModelViewSet):
 
                 if not serializer.data['is_fact'] and settings.SEND_DOCTORS_MIS_SCHEDULE_ON_CHANGE:
                     from src.celery.tasks import send_doctors_schedule_to_mis
-                    mis_data_qs = draft_wdays_with_changes.annotate(
+                    mis_data_qs = wdays_to_approve.annotate(
                         approved_wd_type_id=Subquery(WorkerDay.objects.filter(
                             dt=OuterRef('dt'),
                             employee_id=OuterRef('employee_id'),
@@ -513,12 +539,6 @@ class WorkerDayViewSet(BaseModelViewSet):
                         json_data = json.dumps(mis_data, cls=DjangoJSONEncoder)
                         transaction.on_commit(
                             lambda f_json_data=json_data: send_doctors_schedule_to_mis.delay(json_data=f_json_data))
-
-                wdays_to_approve = WorkerDay.objects.filter(
-                    employee_days_q,
-                    is_approved=False,
-                    is_fact=serializer.validated_data['is_fact'],
-                )
 
                 wdays_to_delete = WorkerDay.objects_with_excluded.filter(
                     employee_days_q, is_fact=serializer.validated_data['is_fact'],

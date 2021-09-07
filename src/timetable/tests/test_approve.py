@@ -181,3 +181,53 @@ class TestWorkerDayApprove(TestsHelperMixin, APITestCase):
 
         wd1.refresh_from_db()
         self.assertTrue(wd1.is_approved)
+
+    def test_days_approved_when_one_day_in_draft_and_two_wdays_in_approved_version(self):
+        WorkerDayFactory(
+            dt=self.dt_now,
+            employee=self.employee,
+            employment=self.employment,
+            shop=self.shop,
+            type_id=WorkerDay.TYPE_WORKDAY,
+            is_fact=False,
+            is_approved=True,
+            dttm_work_start=datetime.combine(self.dt_now, time(10)),
+            dttm_work_end=datetime.combine(self.dt_now, time(14)),
+            last_edited_by=self.user,
+        )
+        WorkerDayFactory(
+            dt=self.dt_now,
+            employee=self.employee,
+            employment=self.employment,
+            shop=self.shop,
+            type_id=WorkerDay.TYPE_WORKDAY,
+            is_fact=False,
+            is_approved=True,
+            dttm_work_start=datetime.combine(self.dt_now, time(18)),
+            dttm_work_end=datetime.combine(self.dt_now, time(22)),
+            last_edited_by=self.user,
+        )
+        WorkerDayFactory(
+            dt=self.dt_now,
+            employee=self.employee,
+            employment=self.employment,
+            shop=self.shop,
+            type_id=WorkerDay.TYPE_WORKDAY,
+            is_fact=False,
+            is_approved=False,
+            dttm_work_start=datetime.combine(self.dt_now, time(10)),
+            dttm_work_end=datetime.combine(self.dt_now, time(14)),
+            last_edited_by=self.user,
+        )
+
+        resp = self._approve(
+            self.shop.id,
+            is_fact=False,
+            dt_from=self.dt_now,
+            dt_to=self.dt_now,
+            wd_types=[WorkerDay.TYPE_WORKDAY],
+        )
+        self.assertEqual(resp.status_code, 200)
+        # день, которого нету в подтв. версии должен удалиться
+        self.assertEqual(WorkerDay.objects.filter(is_fact=False, is_approved=True).count(), 1)
+        self.assertEqual(WorkerDay.objects.filter(is_fact=False, is_approved=False).count(), 1)
