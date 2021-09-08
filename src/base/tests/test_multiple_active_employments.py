@@ -1033,7 +1033,7 @@ class TestEmployeeAPI(MultipleActiveEmploymentsSupportMixin, APITestCase):
             employee=self.employee3,
             employment=self.employment3,
             shop=self.shop1,
-            type_id=WorkerDay.TYPE_WORKDAY,
+            type=WorkerDay.TYPE_WORKDAY,
             dttm_work_start=datetime.combine(self.dt, time(8, 0, 0)),
             dttm_work_end=datetime.combine(self.dt, time(17, 0, 0)),
         )
