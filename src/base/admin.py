@@ -118,6 +118,7 @@ class NetworkAdmin(admin.ModelAdmin):
             'consider_department_in_att_records',
             'run_recalc_fact_from_att_records_on_plan_approve',
             'set_closest_plan_approved_delta_for_manual_fact',
+            'clean_wdays_on_employment_dt_change',
         )}),
     )
 
