@@ -99,6 +99,9 @@ class NetworkSerializer(serializers.ModelSerializer):
             'display_employee_tabs_in_the_schedule',
         ]
 
+class NetworkListSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    name = serializers.CharField()
 
 class NetworkWithOutsourcingsAndClientsSerializer(NetworkSerializer):
     outsourcings = OutsourceClientNetworkSerializer(many=True)

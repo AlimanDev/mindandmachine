@@ -220,6 +220,10 @@ class ShopSerializer(serializers.ModelSerializer):
         return shop
 
 
+class ShopListSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    name = serializers.CharField()
+
 class ShopStatSerializer(serializers.Serializer):
     id = serializers.IntegerField()
     parent_id = serializers.IntegerField()
