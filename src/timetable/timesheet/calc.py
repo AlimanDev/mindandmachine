@@ -9,7 +9,7 @@ from django.utils import timezone
 
 from src.base.models import Employee
 from .dividers import FISCAL_SHEET_DIVIDERS_MAPPING
-from ..models import WorkerDay, Timesheet
+from ..models import WorkerDay, Timesheet, WorkerDayType
 
 logger = logging.getLogger('calc_timesheets')
 
@@ -47,10 +47,11 @@ def _get_calc_periods(dt_hired=None, dt_fired=None, dt_from=None, dt_to=None):
 
 
 class TimesheetCalculator:
-    def __init__(self, employee: Employee, dt_from=None, dt_to=None):
+    def __init__(self, employee: Employee, dt_from=None, dt_to=None, wd_types_dict=None):
         self.employee = employee
         self.dt_from = dt_from
         self.dt_to = dt_to
+        self.wd_types_dict = wd_types_dict or WorkerDayType.get_wd_types_dict()
 
     def _get_timesheet_wdays_qs(self, employee, dt_start, dt_end):
         return WorkerDay.objects.get_tabel(
@@ -203,6 +204,7 @@ class TimesheetCalculator:
                     employee=self.employee,
                     fiscal_sheet_dict=fiscal_sheet_dict,
                     dt_start=dt_start, dt_end=dt_end,
+                    wd_types_dict=self.wd_types_dict,
                 ).divide()
 
         with transaction.atomic():

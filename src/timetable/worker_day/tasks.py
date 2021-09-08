@@ -21,7 +21,7 @@ def clean_wdays(filter_kwargs: dict = None, exclude_kwargs: dict = None, only_lo
 
 @app.task
 def recalc_wdays(**kwargs):
-    wdays_qs = WorkerDay.objects.filter(type_id__in=WorkerDay.TYPES_WITH_TM_RANGE, **kwargs)
+    wdays_qs = WorkerDay.objects.filter(type__is_dayoff=False, **kwargs)
     for wd_id in wdays_qs.values_list('id', flat=True):
         with transaction.atomic():
             wd_obj = WorkerDay.objects.filter(id=wd_id).select_for_update().first()

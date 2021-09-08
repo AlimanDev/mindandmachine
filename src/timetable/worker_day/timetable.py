@@ -107,14 +107,14 @@ class BaseUploadDownloadTimeTable:
     def _get_worker_day_dict(self, shop_id, employee_qs, dt_from, dt_to, is_fact, is_approved):
         return {
             f'{wd.employee_id}_{wd.dt}': wd for wd in WorkerDay.objects.filter(
-                Q(Q(type_id__in=WorkerDay.TYPES_WITH_TM_RANGE) & Q(shop_id=shop_id)) |
-                ~Q(type_id__in=WorkerDay.TYPES_WITH_TM_RANGE),
+                Q(Q(type__is_dayoff=False) & Q(shop_id=shop_id)) |
+                ~Q(type__is_dayoff=False),
                 employee__in=employee_qs,
                 dt__gte=dt_from,
                 dt__lte=dt_to,
                 is_fact=is_fact,
                 is_approved=is_approved,
-            )
+            ).select_related('type')
         }
 
     def _upload_employments(self, df, number_column, name_column, position_column, shop_id, network_id):
@@ -485,7 +485,7 @@ class UploadDownloadTimetableCells(BaseUploadDownloadTimeTable):
 
                 wd = wdays_dict.get(f'{employee.id}_{dt}')
                 if wd:
-                    if wd.type_id in WorkerDay.TYPES_WITH_TM_RANGE:
+                    if not wd.type.is_dayoff:
                         tm_start = wd.dttm_work_start.strftime('%H:%M')
                         tm_end = wd.dttm_work_end.strftime('%H:%M')
                         _cell_value = f'{tm_start}-{tm_end}'
@@ -739,8 +739,8 @@ class UploadDownloadTimetableRows(BaseUploadDownloadTimeTable):
                 wd = wdays_dict.get(f'{employee.id}_{dt}')
                 
                 if wd:
-                    row_data['start'] = wd.dttm_work_start.strftime('%H:%M') if wd.type_id in WorkerDay.TYPES_WITH_TM_RANGE else self.wd_type_mapping.get(wd.type_id, '')
-                    row_data['end'] = wd.dttm_work_end.strftime('%H:%M') if wd.type_id in WorkerDay.TYPES_WITH_TM_RANGE else self.wd_type_mapping.get(wd.type_id, '')
+                    row_data['start'] = wd.dttm_work_start.strftime('%H:%M') if not wd.type.is_dayoff else self.wd_type_mapping.get(wd.type_id, '')
+                    row_data['end'] = wd.dttm_work_end.strftime('%H:%M') if not wd.type.is_dayoff else self.wd_type_mapping.get(wd.type_id, '')
                 rows.append(row_data)
 
         data = {

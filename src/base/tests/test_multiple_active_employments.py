@@ -308,6 +308,7 @@ class TestConfirmVacancy(MultipleActiveEmploymentsSupportMixin, APITestCase):
             is_approved=True,
             cashbox_details__work_type=self.work_type1_cachier,
         )
+        WorkerDay.check_work_time_overlap(employee_id=self.employee1_1.id)
         self.client.force_authenticate(user=self.user1)
         resp = self.client.post(self.get_url('WorkerDay-confirm-vacancy', pk=vacancy.pk))
         self.assertEqual(resp.status_code, 200)

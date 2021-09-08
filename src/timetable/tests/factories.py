@@ -46,10 +46,10 @@ class WorkerDayFactory(factory.django.DjangoModelFactory):
     dt = factory.Faker('date_between', start_date='-120d', end_date='+30d')
     employee = factory.SubFactory('src.base.tests.factories.EmployeeFactory')
     dttm_work_start = factory.LazyAttribute(
-        lambda wd: datetime.combine(wd.dt, time(10, 0, 0)) if WorkerDay.is_type_with_tm_range(wd.type_id) else None
+        lambda wd: datetime.combine(wd.dt, time(10, 0, 0)) if wd.type_id == WorkerDay.TYPE_WORKDAY else None
     )
     dttm_work_end = factory.LazyAttribute(
-        lambda wd: datetime.combine(wd.dt, time(20, 0, 0)) if WorkerDay.is_type_with_tm_range(wd.type_id) else None
+        lambda wd: datetime.combine(wd.dt, time(20, 0, 0)) if wd.type_id == WorkerDay.TYPE_WORKDAY else None
     )
 
     class Meta:

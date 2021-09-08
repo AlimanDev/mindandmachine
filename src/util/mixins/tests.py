@@ -9,7 +9,7 @@ from django.db import transaction
 from django.urls import reverse
 
 from src.base.models import Employment, FunctionGroup
-from src.timetable.models import WorkerDay, WorkerDayCashboxDetails
+from src.timetable.models import WorkerDay, WorkerDayCashboxDetails, WorkerDayType
 from src.timetable.tests.factories import WorkerDayTypeFactory
 from src.util.test import create_departments_and_users
 from src.util.utils import generate_user_token
@@ -206,3 +206,7 @@ class TestsHelperMixin:
             show_stat_in_hours=True,
             show_stat_in_days=True,
         )
+
+    @property
+    def wd_types_dict(self):
+        return WorkerDayType.get_wd_types_dict()

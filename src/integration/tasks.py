@@ -50,7 +50,7 @@ def import_urv_zkteco():
         dt__lte=date.today() + timedelta(1),
         is_fact=False,
         is_approved=True,
-        type_id__in=WorkerDay.TYPES_WITH_TM_RANGE,
+        type__is_dayoff=False,
     ).select_related('employee', 'shop')
 
     worker_days = {}

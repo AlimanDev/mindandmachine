@@ -44,12 +44,12 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
     def setUp(self):
         self.client.force_authenticate(user=self.user1)
 
-    def create_worker_day(self, type_id='W', shop=None, dt=None, employee=None, employment=None, is_fact=False,
+    def create_worker_day(self, type_id=WorkerDay.TYPE_WORKDAY, shop=None, dt=None, employee=None, employment=None, is_fact=False,
                           is_approved=False, parent_worker_day=None, is_vacancy=False, is_blocked=False, dttm_work_start=None,
                           dttm_work_end=None, last_edited_by_id=None):
         shop = shop if shop else self.shop
         employment = employment if employment else self.employment2
-        if not type_id == 'W':
+        if not type_id == WorkerDay.TYPE_WORKDAY:
             shop = None
         dt = dt if dt else self.dt
         employee = employee if employee else self.employee2
@@ -62,8 +62,8 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
             is_fact=is_fact,
             is_approved=is_approved,
             type_id=type_id,
-            dttm_work_start=(dttm_work_start or datetime.combine(dt, time(8, 0, 0))) if type_id in WorkerDay.TYPES_WITH_TM_RANGE else None,
-            dttm_work_end=(dttm_work_end or datetime.combine(dt, time(20, 0, 0))) if type_id in WorkerDay.TYPES_WITH_TM_RANGE else None,
+            dttm_work_start=(dttm_work_start or datetime.combine(dt, time(8, 0, 0))) if type_id == WorkerDay.TYPE_WORKDAY else None,
+            dttm_work_end=(dttm_work_end or datetime.combine(dt, time(20, 0, 0))) if type_id == WorkerDay.TYPE_WORKDAY else None,
             parent_worker_day=parent_worker_day,
             work_hours=datetime.combine(dt, time(20, 0, 0)) - datetime.combine(dt, time(8, 0, 0)),
             is_vacancy=is_vacancy,

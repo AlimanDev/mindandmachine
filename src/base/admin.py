@@ -300,18 +300,10 @@ class GroupWorkerDayPermissionInline(admin.TabularInline):
 
 @admin.register(Group)
 class GroupAdmin(admin.ModelAdmin):
-    list_dispaly = ('id', 'dttm_added', 'name', 'subordinates')
-    list_filter = ('id', 'name')
-    inlines = (
-        GroupWorkerDayPermissionInline,
-    )
+    list_display = ('id', 'name', 'code', 'network',)
+    list_filter = ('network',)
+    search_fields = ('name', 'code',)
     save_as = True
-
-    def get_actions(self, request):
-        from src.util.wd_perms.utils import WdPermsHelper
-        actions = super().get_actions(request)
-        actions.update(WdPermsHelper.get_preset_actions())
-        return actions
 
     def save_model(self, request, obj, form, change):
         obj.save()
@@ -331,6 +323,19 @@ class GroupAdmin(admin.ModelAdmin):
                         level_up=f.level_up,
                     )
                     for f in funcs
+                ]
+            )
+            from src.timetable.models import GroupWorkerDayPermission
+            gwdps = GroupWorkerDayPermission.objects.filter(group_id=original_pk)
+            GroupWorkerDayPermission.objects.bulk_create(
+                [
+                    GroupWorkerDayPermission(
+                        group=obj,
+                        worker_day_permission=gwdp.worker_day_permission,
+                        limit_days_in_past=gwdp.limit_days_in_past,
+                        limit_days_in_future=gwdp.limit_days_in_future,
+                    )
+                    for gwdp in gwdps
                 ]
             )
 

@@ -1,11 +1,16 @@
-from src.timetable.forms import ExchangeSettingsForm
 from django.contrib import admin
+from django.forms import Form
 from django.utils.translation import gettext as _
+from django_admin_listfilter_dropdown.filters import RelatedOnlyDropdownFilter, ChoiceDropdownFilter
+from import_export.admin import ExportActionMixin, ImportMixin
 from rangefilter.filter import DateRangeFilter, DateTimeRangeFilter
-from django_admin_listfilter_dropdown.filters import RelatedOnlyDropdownFilter, DropdownFilter, ChoiceDropdownFilter
 
-
-
+from src.base.forms import (
+    CustomImportFunctionGroupForm,
+    CustomConfirmImportFunctionGroupForm,
+)
+from src.recognition.admin import RelatedOnlyDropdownNameOrderedFilter
+from src.timetable.forms import ExchangeSettingsForm
 from src.timetable.models import (
     Cashbox,
     EmploymentWorkType,
@@ -22,7 +27,10 @@ from src.timetable.models import (
     WorkerDay,
     WorkTypeName,
     WorkerDayType,
+    GroupWorkerDayPermission,
+    WorkerDayPermission,
 )
+from .resources import GroupWorkerDayPermissionResource
 
 
 @admin.register(Slot)
@@ -300,3 +308,50 @@ class WorkerDayTypeAdmin(admin.ModelAdmin):
         if obj and obj.is_system:
             return False
         return super(WorkerDayTypeAdmin, self).has_delete_permission(request, obj=obj)
+
+
+@admin.register(WorkerDayPermission)
+class WorkerDayPermissionAdmin(admin.ModelAdmin):
+    list_display = ('id', 'action', 'graph_type', 'wd_type')
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(GroupWorkerDayPermission)
+class GroupWorkerDayPermissionAdmin(ImportMixin, ExportActionMixin, admin.ModelAdmin):
+    list_display = ('id', 'group', 'worker_day_permission', 'limit_days_in_past', 'limit_days_in_future')
+    list_editable = ('limit_days_in_past', 'limit_days_in_future')
+    list_filter = [
+        ('group', RelatedOnlyDropdownNameOrderedFilter),
+        'worker_day_permission__action',
+        'worker_day_permission__graph_type',
+        'worker_day_permission__wd_type',
+    ]
+    list_select_related = ('group', 'worker_day_permission__wd_type')
+    resource_class = GroupWorkerDayPermissionResource
+
+    def get_import_form(self):
+        return CustomImportFunctionGroupForm
+
+    def get_confirm_import_form(self):
+        return CustomConfirmImportFunctionGroupForm
+
+    def get_form_kwargs(self, form, *args, **kwargs):
+        if isinstance(form, Form) and form.is_valid():
+            groups = form.cleaned_data['groups']
+            kwargs.update({'groups': groups.values_list('id', flat=True)})
+        return kwargs
+
+    def get_import_data_kwargs(self, request, *args, **kwargs):
+        form = kwargs.get('form')
+        if form and form.is_valid():
+            groups = form.cleaned_data['groups']
+            kwargs.update({'groups': groups.values_list('id', flat=True)})
+        return super().get_import_data_kwargs(request, *args, **kwargs)

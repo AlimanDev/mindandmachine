@@ -862,7 +862,6 @@ class EmploymentManager(models.Manager):
         return qs.order_by(*order_by)
 
 
-
 class Group(AbstractActiveNetworkSpecificCodeNamedModel):
     class Meta(AbstractActiveNetworkSpecificCodeNamedModel.Meta):
         verbose_name = 'Группа пользователей'
@@ -877,7 +876,8 @@ class Group(AbstractActiveNetworkSpecificCodeNamedModel):
         return '{}, {}, {}'.format(
             self.id,
             self.name,
-            self.subordinates.all() if self.subordinates.all() else ''
+            self.code,
+            # ', '.join(list(self.subordinates.values_list('name', flat=True)))
         )
 
 
@@ -1341,7 +1341,7 @@ class Employment(AbstractActiveModel):
                         employment_id=self.id,
                         is_fact=False,
                         dt__gt=dt,
-                        type_id__in=WorkerDay.TYPES_WITH_TM_RANGE,
+                        type__is_dayoff=False,
                     ):
                 wd.save()
 

@@ -47,6 +47,7 @@ class CustomImportFunctionGroupForm(ImportForm):
         super().__init__(*args, **kwargs)
         self.fields['groups'] = forms.ModelMultipleChoiceField(queryset=Group.objects.all(), required=True)
 
+
 class CustomConfirmImportFunctionGroupForm(ConfirmImportForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

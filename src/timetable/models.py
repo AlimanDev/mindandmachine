@@ -442,6 +442,10 @@ class WorkerDayType(AbstractModel):
     def get_is_dayoff_types(cls):
         return set(cls.objects.filter(is_dayoff=True).values_list('code', flat=True))
 
+    @classmethod
+    def get_wd_types_dict(cls):
+        return {wdt.code: wdt for wdt in cls.objects.all()}
+
 
 class WorkerDay(AbstractModel):
     """
@@ -472,22 +476,9 @@ class WorkerDay(AbstractModel):
     TYPE_ABSENSE = 'A'
     TYPE_MATERNITY = 'M'
     TYPE_BUSINESS_TRIP = 'T'
-
     TYPE_ETC = 'O'
-    TYPE_DELETED = 'D'
     TYPE_EMPTY = 'E'
-
-    TYPE_HOLIDAY_WORK = 'HW'
-    TYPE_REAL_ABSENCE = 'RA'
-    TYPE_EXTRA_VACATION = 'EV'
-    TYPE_STUDY_VACATION = 'SV'
     TYPE_SELF_VACATION = 'TV'  # TV, а не SV, потому что так написали в документации
-    TYPE_SELF_VACATION_TRUE = 'ST'
-    TYPE_GOVERNMENT = 'G'
-    TYPE_HOLIDAY_SPECIAL = 'HS'
-
-    TYPE_MATERNITY_CARE = 'MC'
-    TYPE_DONOR_OR_CARE_FOR_DISABLED_PEOPLE = 'C'
 
     TYPES = [
         (TYPE_HOLIDAY, 'Выходной'),
@@ -499,18 +490,8 @@ class WorkerDay(AbstractModel):
         (TYPE_MATERNITY, 'Б/л по беременноси и родам'),
         (TYPE_BUSINESS_TRIP, 'Командировка'),
         (TYPE_ETC, 'Другое'),
-        (TYPE_DELETED, 'Удален'),
         (TYPE_EMPTY, 'Пусто'),
-        (TYPE_HOLIDAY_WORK, 'Работа в выходной день'),
-        (TYPE_REAL_ABSENCE, 'Прогул на основании акта'),
-        (TYPE_EXTRA_VACATION, 'Доп. отпуск'),
-        (TYPE_STUDY_VACATION, 'Учебный отпуск'),
         (TYPE_SELF_VACATION, 'Отпуск за свой счёт'),
-        (TYPE_SELF_VACATION_TRUE, 'Отпуск за свой счёт по уважительной причине'),
-        (TYPE_GOVERNMENT, 'Гос. обязанности'),
-        (TYPE_HOLIDAY_SPECIAL, 'Спец. выходной'),
-        (TYPE_MATERNITY_CARE, 'Отпуск по уходу за ребёнком до 3-х лет'),
-        (TYPE_DONOR_OR_CARE_FOR_DISABLED_PEOPLE, 'Выходные дни по уходу'),
     ]
 
     TYPES_USED = [
@@ -526,20 +507,6 @@ class WorkerDay(AbstractModel):
         TYPE_ETC,
         TYPE_EMPTY,
     ]
-
-    TYPES_WITH_TM_RANGE = (
-        TYPE_WORKDAY,
-        TYPE_QUALIFICATION,
-        TYPE_BUSINESS_TRIP,
-    )
-
-    TYPES_REDUCING_NORM_HOURS = (
-        TYPE_VACATION,
-        TYPE_SICK,
-        TYPE_SELF_VACATION,
-        TYPE_MATERNITY,
-        TYPE_MATERNITY_CARE,
-    )
 
     def __str__(self):
         return '{}, {}, {}, {}, {}, {}, {}, {}'.format(
@@ -734,8 +701,7 @@ class WorkerDay(AbstractModel):
                         plan_approved.dttm_work_end,
                         self.employment.position.wp_fines if self.employment and self.employment.position else None,
                     )
-                if self.shop.network.only_fact_hours_that_in_approved_plan and \
-                    self.type_id in WorkerDay.TYPES_WITH_TM_RANGE:
+                if self.shop.network.only_fact_hours_that_in_approved_plan and not self.type.is_dayoff:
                     if plan_approved:
                         late_arrival_delta = self.shop.network.allowed_interval_for_late_arrival
                         allowed_late_arrival_cond = late_arrival_delta and \
@@ -846,10 +812,6 @@ class WorkerDay(AbstractModel):
     def is_draft(self):
         return not self.is_approved
 
-    @classmethod
-    def is_type_with_tm_range(cls, t):
-        return t in cls.TYPES_WITH_TM_RANGE
-
     @staticmethod
     def count_work_hours(break_triplets, dttm_work_start, dttm_work_end, break_time=None, fine=0):
         work_hours = ((dttm_work_end - dttm_work_start).total_seconds() / 60) - fine
@@ -935,12 +897,13 @@ class WorkerDay(AbstractModel):
         # запускаем пересчет часов для факта, если изменились часы в подтвержденном плане
         if self.shop and (self.shop.network.only_fact_hours_that_in_approved_plan or fines) and \
                 self.tracker.has_changed('work_hours') and \
-                self.type_id in WorkerDay.TYPES_WITH_TM_RANGE and self.is_plan and self.is_approved:
+                not self.type.is_dayoff and \
+                self.is_plan and self.is_approved:
             fact_qs = WorkerDay.objects.filter(
                 dt=self.dt,
                 employee_id=self.employee_id,
                 is_fact=True,
-                type_id__in=WorkerDay.TYPES_WITH_TM_RANGE
+                type__is_dayoff=False
             ).select_related(
                 'shop',
                 'employment',
@@ -1203,14 +1166,14 @@ class WorkerDay(AbstractModel):
             ),
         ).filter(
             Q(
-                Q(type_id__in=WorkerDay.TYPES_WITH_TM_RANGE) &
+                Q(type__is_dayoff=False) &
                 Q(
                     Q(dttm_work_start__gt=F('task_least_start_time')) |
                     Q(dttm_work_end__lt=F('task_greatest_end_time'))
                 )
             ) |
             Q(
-                ~Q(type_id__in=WorkerDay.TYPES_WITH_TM_RANGE) &
+                ~Q(type__is_dayoff=False) &
                 Q(task_least_start_time__isnull=False)
             )
         ).values(
@@ -2111,7 +2074,7 @@ class PlanAndFactHours(models.Model):
     employee = models.ForeignKey('base.Employee', on_delete=models.DO_NOTHING)
     tabel_code = models.CharField(max_length=64)
     wd_type = models.ForeignKey('timetable.WorkerDayType', on_delete=models.DO_NOTHING)
-    worker_fio = models.CharField(max_length=512, choices=WorkerDay.TYPES)
+    worker_fio = models.CharField(max_length=512)
     fact_work_hours = models.DecimalField(max_digits=4, decimal_places=2)
     plan_work_hours = models.DecimalField(max_digits=4, decimal_places=2)
     late_arrival = models.PositiveSmallIntegerField()

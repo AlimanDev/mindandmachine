@@ -58,9 +58,10 @@ class WorkerDayApproveSerializer(serializers.Serializer):
     dt_from = serializers.DateField()
     dt_to = serializers.DateField()
     wd_types = serializers.ListField(
-        child=serializers.ChoiceField(choices=WorkerDay.TYPES),
-        # required=True,
-        default=WorkerDay.TYPES_USED,  # временно для Ортеки
+        child=serializers.CharField(),
+        required=False,
+        allow_empty=False,
+        allow_null=False,
     )
     employee_ids = serializers.ListField(
         child=serializers.IntegerField(),
@@ -472,14 +473,16 @@ class ChangeListSerializer(serializers.Serializer):
 
     def is_valid(self, *args, **kwargs):
         super().is_valid(*args, **kwargs)
+
+        wd_types_dict = self.context.get('wd_types_dict') or WorkerDayType.get_wd_types_dict()
         if self.validated_data['is_vacancy']:
             self.validated_data['type_id'] = WorkerDay.TYPE_WORKDAY
             self.validated_data['outsources'] = Network.objects.filter(id__in=self.validated_data.get('outsources', []))
         else:
-            if not WorkerDay.is_type_with_tm_range(self.validated_data['type_id']):
+            if wd_types_dict.get(self.validated_data['type_id']).is_dayoff:
                 self.validated_data['shop_id'] = None 
             self.validated_data['outsources'] = []
-        if WorkerDay.is_type_with_tm_range(self.validated_data['type_id']):
+        if not wd_types_dict.get(self.validated_data['type_id']).is_dayoff:
             if not self.validated_data.get('tm_work_start'):
                 raise FieldError(self.error_messages['required'], 'tm_work_start')
             if not self.validated_data.get('tm_work_end'):

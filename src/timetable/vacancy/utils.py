@@ -711,7 +711,8 @@ def confirm_vacancy(vacancy_id, user, employee_id=None, exchange=False, reconfir
                 Event.objects.filter(worker_day=vacancy).delete()
                 res['text'] = messages['vacancy_success']
 
-                WorkerDay.check_work_time_overlap(employee_id=vacancy.employee_id, dt=vacancy.dt, is_fact=False)
+                WorkerDay.check_work_time_overlap(
+                    employee_id=vacancy.employee_id, dt=vacancy.dt, is_fact=False, is_approved=True)
             else:
                 res['text'] = messages['cant_apply_vacancy']
                 res['status_code'] = 400
