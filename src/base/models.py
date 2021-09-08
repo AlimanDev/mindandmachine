@@ -118,6 +118,7 @@ class Network(AbstractActiveModel):
         max_length=64, verbose_name=_('Timetable format'),
         choices=TIMETABLE_FORMAT_CHOICES, default='cell_format',
     )
+    add_users_from_excel = models.BooleanField(default=False, verbose_name=_('Upload employments from excel'),)
     convert_tabel_to = models.CharField(
         max_length=64, verbose_name=_('Convert tabel to'),
         null=True, blank=True,
@@ -184,6 +185,8 @@ class Network(AbstractActiveModel):
         default=False, verbose_name='Не учитывать shop_code при изменении трудоустройства через api',
         help_text='Необходимо включить для случаев, когда привязка трудоустройств к отделам поддерживается вручную',
     )
+    display_employee_tabs_in_the_schedule = models.BooleanField(
+        default=True, verbose_name='Отображать вкладки сотрудников в расписании')
 
     @property
     def settings_values_prop(self):

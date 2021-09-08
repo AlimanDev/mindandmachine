@@ -96,6 +96,7 @@ class NetworkSerializer(serializers.ModelSerializer):
             'unaccounted_overtime_threshold',
             'forbid_edit_employments_came_through_integration',
             'show_remaking_choice',
+            'display_employee_tabs_in_the_schedule',
         ]
 
 
