@@ -36,7 +36,7 @@ class IntegrationDataExportView(APIView):
                 'orgstruct': mda_integration_helper._get_orgstruct_data(threshold_seconds=threshold_seconds),
             }
             response = HttpResponse(
-                json.dumps(data),
+                json.dumps(data, indent=4, ensure_ascii=False),
                 content_type='application/json',
             )
         else:
