@@ -310,20 +310,6 @@ class WorkerDayTypeAdmin(admin.ModelAdmin):
         return super(WorkerDayTypeAdmin, self).has_delete_permission(request, obj=obj)
 
 
-@admin.register(WorkerDayPermission)
-class WorkerDayPermissionAdmin(admin.ModelAdmin):
-    list_display = ('id', 'action', 'graph_type', 'wd_type')
-
-    def has_delete_permission(self, request, obj=None):
-        return False
-
-    def has_add_permission(self, request):
-        return False
-
-    def has_change_permission(self, request, obj=None):
-        return False
-
-
 @admin.register(GroupWorkerDayPermission)
 class GroupWorkerDayPermissionAdmin(ImportMixin, ExportActionMixin, admin.ModelAdmin):
     list_display = ('id', 'group', 'worker_day_permission', 'limit_days_in_past', 'limit_days_in_future')

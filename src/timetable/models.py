@@ -2015,7 +2015,7 @@ class WorkerDayPermission(AbstractModel):
 
     action = models.CharField(choices=ACTIONS, max_length=2, verbose_name='Действие')
     graph_type = models.CharField(choices=GRAPH_TYPES, max_length=1, verbose_name='Тип графика')
-    wd_type = models.ForeignKey('timetable.WorkerDayType', verbose_name='Тип дня', on_delete=models.PROTECT)
+    wd_type = models.ForeignKey('timetable.WorkerDayType', verbose_name='Тип дня', on_delete=models.CASCADE)
 
     class Meta:
         verbose_name = 'Разрешение для рабочего дня'
