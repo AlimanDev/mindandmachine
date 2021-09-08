@@ -402,6 +402,7 @@ class TestOutsource(TestsHelperMixin, APITestCase):
                         'day_bottom': 'deadtime'
                     }, 
                     'show_tabel_graph': True, 
+                    'display_employee_tabs_in_the_schedule': True,
                     'show_worker_day_tasks': False,
                     'show_user_biometrics_block': False,
                     'unaccounted_overtime_threshold': 60,
