@@ -36,7 +36,7 @@ from src.timetable.worker_day.xlsx_utils.timetable import Timetable_xlsx
 from src.util.models_converter import Converter
 
 SKIP_SYMBOLS = ['NAN', '']
-DIVIDERS = ['-', '.', ',', '\n', ' ']
+DIVIDERS = ['-', '.', ',', '\n', '\r', ' ']
 
 class BaseUploadDownloadTimeTable:
 
