@@ -331,23 +331,23 @@ class TestOutsource(TestsHelperMixin, APITestCase):
         self.assertEqual(response.json()['count'], 2)
         response_data = sorted(response.json()['results'], key=lambda i: i['id'])
         data = {
-            'id': vacancy['id'], 
-            'first_name': self.user1.first_name, 
-            'last_name': self.user1.last_name, 
-            'is_outsource': True, 
-            'avatar': None, 
-            'worker_shop': self.employment1.shop_id, 
+            'id': vacancy['id'],
+            'first_name': self.user1.first_name,
+            'last_name': self.user1.last_name,
+            'is_outsource': True,
+            'avatar': None,
+            'worker_shop': self.employment1.shop_id,
             'user_network_id': self.user1.network_id,
         }
         response = response_data[0]
         assert_response = {
-            'id': response['id'], 
-            'first_name': response['first_name'], 
-            'last_name': response['last_name'], 
-            'is_outsource': response['is_outsource'], 
-            'avatar': response['avatar'], 
-            'worker_shop': response['worker_shop'], 
-            'user_network_id': response['user_network_id'], 
+            'id': response['id'],
+            'first_name': response['first_name'],
+            'last_name': response['last_name'],
+            'is_outsource': response['is_outsource'],
+            'avatar': response['avatar'],
+            'worker_shop': response['worker_shop'],
+            'user_network_id': response['user_network_id'],
         }
         self.assertEqual(assert_response, data)
         # получаем список отделов с аутсорс организациями
@@ -396,7 +396,7 @@ class TestOutsource(TestsHelperMixin, APITestCase):
                     'display_employee_tabs_in_the_schedule': True,
                     'enable_camera_ticks': False,
                     'show_worker_day_additional_info': False,
-                    'allowed_interval_for_late_arrival': '00:00:00', 
+                    'allowed_interval_for_late_arrival': '00:00:00',
                     'allowed_interval_for_early_departure': '00:00:00', 
                     'default_stats': {
                         'timesheet_employee_top': 'fact_total_hours_sum', 

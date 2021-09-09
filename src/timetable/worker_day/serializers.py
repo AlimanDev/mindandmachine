@@ -11,8 +11,8 @@ from rest_framework.exceptions import ValidationError, NotFound
 from src.base.exceptions import FieldError
 from src.base.models import Employment, User, Shop, Employee, Network
 from src.base.models import NetworkConnect
-from src.base.serializers import UserShorSerializer, NetworkSerializer
-from src.base.shop.serializers import ShopSerializer
+from src.base.serializers import NetworkListSerializer, UserShorSerializer, NetworkSerializer
+from src.base.shop.serializers import ShopListSerializer, ShopSerializer
 from src.conf.djconfig import QOS_DATE_FORMAT
 from src.timetable.models import (
     WorkerDay,
@@ -435,11 +435,8 @@ class VacancySerializer(serializers.Serializer):
     avatar = serializers.SerializerMethodField('get_avatar_url')
     worker_shop = serializers.IntegerField(required=False, default=None)
     user_network_id = serializers.IntegerField(required=False)
-    outsources = NetworkSerializer(many=True, read_only=True)
-
-    def __init__(self, *args, **kwargs):
-        super(VacancySerializer, self).__init__(*args, **kwargs)
-        self.fields['shop'] = ShopSerializer(context=self.context)
+    outsources = NetworkListSerializer(many=True, read_only=True)
+    shop = ShopListSerializer()
 
     def get_avatar_url(self, obj) -> str:
         if obj.employee_id and obj.employee.user_id and obj.employee.user.avatar:

@@ -100,6 +100,9 @@ class NetworkSerializer(serializers.ModelSerializer):
             'allow_creation_several_wdays_for_one_employee_for_one_date',
         ]
 
+class NetworkListSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    name = serializers.CharField()
 
 class NetworkWithOutsourcingsAndClientsSerializer(NetworkSerializer):
     outsourcings = OutsourceClientNetworkSerializer(many=True)
