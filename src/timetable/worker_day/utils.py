@@ -290,10 +290,13 @@ def create_fact_from_attendance_records(dt_from=None, dt_to=None, shop_ids=None,
         q = Q()
         employee_days_q = Q()
         for employee_id, days in employee_days_list:
-            # добавляем соседнюю даты из будущего,
+            # добавляем соседние даты,
             # т.к. отметка может относиться к соседней дате (при ночных сменах, например)
             extended_dates = list(days)
             for day in days:
+                prev_dt = day - datetime.timedelta(days=1)
+                if prev_dt not in extended_dates:
+                    extended_dates.append(prev_dt)
                 next_dt = day + datetime.timedelta(days=1)
                 if next_dt not in extended_dates:
                     extended_dates.append(next_dt)

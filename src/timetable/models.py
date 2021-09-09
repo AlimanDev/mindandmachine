@@ -692,7 +692,7 @@ class WorkerDay(AbstractModel):
             if self.is_fact:
                 plan_approved = None
                 if self.closest_plan_approved_id:
-                    plan_approved = WorkerDay.objects.get(id=self.closest_plan_approved_id)
+                    plan_approved = WorkerDay.objects.filter(id=self.closest_plan_approved_id).first()
                 if plan_approved:
                     fine = self.get_fine(
                         _dttm_work_start,
