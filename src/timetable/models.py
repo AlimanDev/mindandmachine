@@ -8,7 +8,7 @@ from django.contrib.auth.models import (
 from django.db import models
 from django.db import transaction
 from django.db.models import (
-    Subquery, OuterRef, Max, Q, Case, When, Value, FloatField, F, IntegerField, Exists
+    Subquery, OuterRef, Max, Q, Case, When, Value, FloatField, F, IntegerField, Exists, BooleanField
 )
 from django.db.models import UniqueConstraint
 from django.db.models.functions import Abs, Cast, Extract, Least
@@ -935,7 +935,7 @@ class WorkerDay(AbstractModel):
         return res
 
     @classmethod
-    def get_closest_plan_approved(cls, user_id, shop_id, dttm, record_type=None):
+    def get_closest_plan_approved(cls, user_id, priority_shop_id, dttm, record_type=None):
         dt = dttm.date()
 
         plan_approved_wdays = cls.objects.filter(
@@ -944,9 +944,12 @@ class WorkerDay(AbstractModel):
             dt__lte=dt + datetime.timedelta(1),
             is_approved=True,
             is_fact=False,
-            shop_id=shop_id,
             type_id=WorkerDay.TYPE_WORKDAY,
         ).annotate(
+            is_equal_shops=Case(
+                When(shop_id=priority_shop_id, then=True),
+                default=False, output_field=BooleanField()
+            ),
             dttm_work_start_diff=Abs(Cast(Extract(dttm - F('dttm_work_start'), 'epoch'), IntegerField())),
             dttm_work_end_diff=Abs(Cast(Extract(dttm - F('dttm_work_end'), 'epoch'), IntegerField())),
             dttm_diff_min=Least(
@@ -957,7 +960,7 @@ class WorkerDay(AbstractModel):
             dttm_diff_min__lt=F('shop__network__max_plan_diff_in_seconds')
         )
 
-        order_by = []
+        order_by = ['-is_equal_shops']
         if record_type == AttendanceRecords.TYPE_COMING:
             order_by.append('dttm_work_start_diff')
         if record_type == AttendanceRecords.TYPE_LEAVING:
@@ -1678,22 +1681,23 @@ class AttendanceRecords(AbstractModel):
     def get_day_data(dttm: datetime.datetime, user, shop, initial_record_type=None):
         dt = dttm.date()
 
+        employment = Employment.objects.get_active_empl_by_priority(
+            network_id=user.network_id, employee__user=user,
+            dt=dt,
+            priority_shop_id=shop.id,
+        ).first()
+        if not employment:
+            raise ValidationError(_('You have no active employment'))
+        employee_id = employment.employee_id
+
         closest_plan_approved, calculated_record_type = WorkerDay.get_closest_plan_approved(
             user_id=user.id,
-            shop_id=shop.id,  # TODO: искать план по магазину или нет должно определяться настройкой возможности создания нескольких workerday или отдельной? (может быть просто искать в приоритете с таким shop_id?)
+            priority_shop_id=shop.id,
             dttm=dttm,
             record_type=initial_record_type,
         )
 
         if closest_plan_approved is None:
-            employment = Employment.objects.get_active_empl_by_priority(
-                network_id=user.network_id, employee__user=user,
-                dt=dt,
-                priority_shop_id=shop.id,
-            ).first()
-            if not employment:
-                raise ValidationError(_('You have no active employment'))
-            employee_id = employment.employee_id
             if not initial_record_type:
                 record_type = AttendanceRecords.TYPE_COMING
                 record = AttendanceRecords.objects.filter(
@@ -1806,9 +1810,11 @@ class AttendanceRecords(AbstractModel):
                     ]
                 )
 
-    def _get_base_fact_approved_qs(self, closest_plan_approved):
+    def _get_base_fact_approved_qs(self, closest_plan_approved, shop_id):
         return WorkerDay.objects.annotate_value_equality(
             'is_closest_plan_approved_equal', 'closest_plan_approved', closest_plan_approved,
+        ).annotate_value_equality(
+            'is_equal_shops', 'shop_id', shop_id,
         ).annotate(
             diff_between_tick_and_work_start_seconds=Cast(
                 Extract(self.dttm - F('dttm_work_start'), 'epoch'), IntegerField()),
@@ -1838,16 +1844,15 @@ class AttendanceRecords(AbstractModel):
             return res
 
         with transaction.atomic():
-            base_fact_approved_qs = self._get_base_fact_approved_qs(closest_plan_approved)
+            base_fact_approved_qs = self._get_base_fact_approved_qs(closest_plan_approved, shop_id=self.shop_id)
             fact_approved_extra_q = self._get_fact_approved_extra_q(closest_plan_approved)
             fact_approved = base_fact_approved_qs.filter(
                 fact_approved_extra_q,
                 dt=self.dt,
                 employee_id=self.employee_id,
-                shop_id=self.shop_id,  # TODO: опционально (в зависимости от настройки, которая разрешает несколько workerday на 1 дату для 1 сотрудника)
                 is_fact=True,
                 is_approved=True,
-            ).order_by('-is_closest_plan_approved_equal').first()
+            ).order_by('-is_equal_shops', '-is_closest_plan_approved_equal').first()
 
             if fact_approved:
                 # если это отметка о приходе, то не перезаписываем время начала работы в графике
@@ -1867,12 +1872,11 @@ class AttendanceRecords(AbstractModel):
                 if self.type == self.TYPE_LEAVING:
                     prev_fa_wd = base_fact_approved_qs.filter(
                         fact_approved_extra_q,
-                        shop_id=self.shop_id,
                         employee_id=self.employee_id,
                         dt__lt=self.dt,
                         is_fact=True,
                         is_approved=True,
-                    ).order_by('dt', 'is_closest_plan_approved_equal').last()
+                    ).order_by('-is_equal_shops', '-is_closest_plan_approved_equal', '-dt').first()
 
                     # Если предыдущая смена начата и с момента открытия предыдущей смены прошло менее макс. длины смены,
                     # то обновляем время окончания предыдущей смены. (условие в closest_plan_approved_q)

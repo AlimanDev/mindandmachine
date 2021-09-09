@@ -2494,9 +2494,9 @@ class TestAttendanceRecords(TestsHelperMixin, APITestCase):
         self.assertEqual(new_wd.dttm_work_end, None)
         self.assertEqual(new_wd.is_vacancy, True)
 
-    @expectedFailure
     def test_create_attendance_records_for_different_shops(self):
         self.worker_day_fact_approved.delete()
+        self.worker_day_plan_approved.delete()
 
         tm_start = datetime.combine(self.dt, time(6, 0, 0))
         ar = AttendanceRecords.objects.create(
@@ -2512,7 +2512,7 @@ class TestAttendanceRecords(TestsHelperMixin, APITestCase):
             dt=tm_start.date()
         ).first()
         self.assertIsNotNone(wd)
-        self.assertEqual(wd.type, WorkerDay.TYPE_WORKDAY)
+        self.assertEqual(wd.type_id, WorkerDay.TYPE_WORKDAY)
         self.assertEqual(wd.dttm_work_start, tm_start)
         self.assertEqual(wd.dttm_work_end, None)
         self.assertEqual(wd.is_vacancy, True)
@@ -2525,7 +2525,7 @@ class TestAttendanceRecords(TestsHelperMixin, APITestCase):
             user=self.user2
         )
         wd.refresh_from_db()
-        self.assertEqual(wd.type, WorkerDay.TYPE_WORKDAY)
+        self.assertEqual(wd.type_id, WorkerDay.TYPE_WORKDAY)
         self.assertEqual(wd.dttm_work_start, tm_start)
         self.assertEqual(wd.dttm_work_end, tm_end)
         self.assertEqual(wd.is_vacancy, True)
@@ -2538,7 +2538,7 @@ class TestAttendanceRecords(TestsHelperMixin, APITestCase):
             user=self.user2
         )
         wd.refresh_from_db()
-        self.assertEqual(wd.type, WorkerDay.TYPE_WORKDAY)
+        self.assertEqual(wd.type_id, WorkerDay.TYPE_WORKDAY)
         self.assertEqual(wd.dttm_work_start, tm_start)
         self.assertEqual(wd.dttm_work_end, tm_end)
         self.assertEqual(wd.is_vacancy, True)
@@ -2551,7 +2551,7 @@ class TestAttendanceRecords(TestsHelperMixin, APITestCase):
             user=self.user2
         )
         wd.refresh_from_db()
-        self.assertEqual(wd.type, WorkerDay.TYPE_WORKDAY)
+        self.assertEqual(wd.type_id, WorkerDay.TYPE_WORKDAY)
         self.assertEqual(wd.dttm_work_start, tm_start)
         self.assertEqual(wd.dttm_work_end, tm_end2)
         self.assertEqual(wd.is_vacancy, True)
@@ -2576,8 +2576,6 @@ class TestAttendanceRecords(TestsHelperMixin, APITestCase):
         self.assertEqual(len(fact_worker_day_details), 1)
         self.assertEqual(fact_worker_day_details[0].work_type_id, plan_worker_day_details[0].work_type_id)
 
-    # TODO: нужно решить после добавления настройки возможности создания нескольких workerday (или отдельной)
-    @expectedFailure
     def test_fact_work_type_received_from_plan_approved_when_shop_differs(self):
         self.worker_day_fact_approved.delete()
         tm_start = datetime.combine(self.dt, time(6, 0, 0))
