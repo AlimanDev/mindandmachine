@@ -1829,7 +1829,7 @@ class AttendanceRecords(AbstractModel):
         """
         employee_id, active_user_empl, dt, record_type, closest_plan_approved = self.get_day_data(
             self.dttm, self.user, self.shop, self.type)
-        self.dt = self.dt or dt
+        self.dt = dt
         self.type = self.type or record_type
         self.employee_id = self.employee_id or employee_id
         res = super(AttendanceRecords, self).save(*args, **kwargs)

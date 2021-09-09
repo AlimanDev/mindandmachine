@@ -421,19 +421,21 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
         self.assertEqual(WorkerDay.objects.get(id=self.worker_day_fact_not_approved.id).is_approved, True)
         self.assertFalse(WorkerDay.objects.filter(id=self.worker_day_fact_approved.id).exists())
 
+    @staticmethod
+    def _create_att_record(type, dttm, user_id, employee_id, shop_id, terminal=True):
+        return AttendanceRecords.objects.create(
+            dttm=dttm,
+            shop_id=shop_id,
+            user_id=user_id,
+            employee_id=employee_id,
+            type=type,
+            terminal=terminal,
+        )
+
     @override_settings(CELERY_TASK_ALWAYS_EAGER=True)
     def test_recalc_fact_from_records_after_approve(self):
         self.network.run_recalc_fact_from_att_records_on_plan_approve = True
         self.network.save()
-        def create_att_record(type, dttm, user_id, employee_id, shop_id, terminal=True):
-            return AttendanceRecords.objects.create(
-                dttm=dttm,
-                shop_id=shop_id,
-                user_id=user_id,
-                employee_id=employee_id,
-                type=type,
-                terminal=terminal,
-            )
         WorkerDay.objects.all().delete()
         dt = date.today()
         wd_plan1 = WorkerDay.objects.create(
@@ -454,10 +456,10 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
             type_id=WorkerDay.TYPE_WORKDAY,
             shop=self.shop,
         )
-        create_att_record(AttendanceRecords.TYPE_COMING, datetime.combine(dt, time(17, 49)), self.user2.id, self.employee2.id, self.shop.id, terminal=False)
-        create_att_record(AttendanceRecords.TYPE_COMING, datetime.combine(dt + timedelta(1), time(1, 5)), self.user2.id, self.employee2.id, self.shop.id)
-        create_att_record(AttendanceRecords.TYPE_COMING, datetime.combine(dt, time(11, 56)), self.user3.id, self.employee3.id, self.shop.id, terminal=False)
-        create_att_record(AttendanceRecords.TYPE_LEAVING, datetime.combine(dt, time(23, 1)), self.user3.id, self.employee3.id, self.shop.id)
+        self._create_att_record(AttendanceRecords.TYPE_COMING, datetime.combine(dt, time(17, 49)), self.user2.id, self.employee2.id, self.shop.id, terminal=False)
+        self._create_att_record(AttendanceRecords.TYPE_COMING, datetime.combine(dt + timedelta(1), time(1, 5)), self.user2.id, self.employee2.id, self.shop.id)
+        self._create_att_record(AttendanceRecords.TYPE_COMING, datetime.combine(dt, time(11, 56)), self.user3.id, self.employee3.id, self.shop.id, terminal=False)
+        self._create_att_record(AttendanceRecords.TYPE_LEAVING, datetime.combine(dt, time(23, 1)), self.user3.id, self.employee3.id, self.shop.id)
 
         self.assertEqual(WorkerDay.objects.filter(is_fact=False, is_approved=True).count(), 0)
         self.assertEqual(WorkerDay.objects.filter(is_fact=True, is_approved=True).count(), 3)
@@ -477,6 +479,145 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
         self.assertEqual(wd_night_shift.dttm_work_end, datetime.combine(dt + timedelta(1), time(1, 5)))
         self.assertEqual(AttendanceRecords.objects.filter(type=AttendanceRecords.TYPE_COMING).count(), 2)
         self.assertEqual(AttendanceRecords.objects.filter(type=AttendanceRecords.TYPE_LEAVING).count(), 2)
+
+    @override_settings(CELERY_TASK_ALWAYS_EAGER=True)
+    def test_recalc_fact_from_records_after_approve_with_multiple_wdays_in_plan(self):
+        """
+        Отметки:
+        10:11 приход
+        14:14 уход
+        18:25 приход
+        22:12 уход
+
+        1. Сначала нету плана -> 1 workeday в факте
+        2. Добавляем план подтверждаем -> происходит пересчет факта на основе отметок, создается 2 wd в факте
+        """
+        self.network.run_recalc_fact_from_att_records_on_plan_approve = True
+        self.network.save()
+        WorkerDay.objects.all().delete()
+
+        dt = date.today()
+        self._create_att_record(AttendanceRecords.TYPE_COMING, datetime.combine(dt, time(10, 11)), self.user2.id,
+                          self.employee2.id, self.shop.id, terminal=False)
+        self._create_att_record(AttendanceRecords.TYPE_LEAVING, datetime.combine(dt, time(14, 14)), self.user2.id,
+                          self.employee2.id, self.shop.id, terminal=False)
+        self._create_att_record(AttendanceRecords.TYPE_COMING, datetime.combine(dt, time(18, 25)), self.user2.id,
+                          self.employee2.id, self.shop.id, terminal=False)
+        self._create_att_record(AttendanceRecords.TYPE_LEAVING, datetime.combine(dt, time(22, 12)), self.user2.id,
+                          self.employee2.id, self.shop.id, terminal=False)
+
+        self.assertEqual(WorkerDay.objects.filter(is_fact=False, is_approved=True).count(), 0)
+        self.assertEqual(WorkerDay.objects.filter(is_fact=True, is_approved=True).count(), 1)
+
+        wd = WorkerDay.objects.filter(is_fact=True, is_approved=True).first()
+        self.assertEqual(wd.dttm_work_start, datetime.combine(dt, time(10, 11)))
+        self.assertEqual(wd.dttm_work_end, datetime.combine(dt, time(22, 12)))
+
+        WorkerDayFactory(
+            employee=self.employee2,
+            employment=self.employment2,
+            dt=dt,
+            dttm_work_start=datetime.combine(dt, time(10)),
+            dttm_work_end=datetime.combine(dt, time(14)),
+            type_id=WorkerDay.TYPE_WORKDAY,
+            shop=self.shop,
+            is_approved=False,
+            is_fact=False,
+        )
+        WorkerDayFactory(
+            employee=self.employee2,
+            employment=self.employment2,
+            dt=dt,
+            dttm_work_start=datetime.combine(dt, time(18)),
+            dttm_work_end=datetime.combine(dt, time(22)),
+            type_id=WorkerDay.TYPE_WORKDAY,
+            shop=self.shop,
+            is_approved=False,
+            is_fact=False,
+        )
+
+        data = {
+            'shop_id': self.shop.id,
+            'dt_from': dt,
+            'dt_to': dt,
+            'is_fact': False,
+        }
+        with mock.patch.object(transaction, 'on_commit', lambda t: t()):
+            response = self.client.post(self.url_approve, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(WorkerDay.objects.filter(is_fact=False, is_approved=True).count(), 2)
+        self.assertEqual(WorkerDay.objects.filter(is_fact=True, is_approved=True).count(), 2)
+
+    def test_fact_date_fixed_after_plan_approve(self):
+        """
+        1. план есть только на вчера
+        2. происходят отметки сегодня, но ближайших план найден на вчера (факт крепится к вчерашнему дню)
+        3. проиходит исправление плана -> факт должен перецепиться на сегодня
+        """
+        self.network.run_recalc_fact_from_att_records_on_plan_approve = True
+        self.network.save()
+        WorkerDay.objects.all().delete()
+        today = date.today()
+        yesterday = today - timedelta(days=1)
+        WorkerDayFactory(
+            employee=self.employee2,
+            employment=self.employment2,
+            dt=yesterday,
+            dttm_work_start=datetime.combine(yesterday, time(14)),
+            dttm_work_end=datetime.combine(yesterday, time(23)),
+            type_id=WorkerDay.TYPE_WORKDAY,
+            shop=self.shop,
+            is_approved=True,
+            is_fact=False,
+        )
+
+        self._create_att_record(AttendanceRecords.TYPE_COMING, datetime.combine(today, time(1, 14)), self.user2.id,
+                          self.employee2.id, self.shop.id, terminal=False)
+        self._create_att_record(AttendanceRecords.TYPE_LEAVING, datetime.combine(today, time(17, 3)), self.user2.id,
+                          self.employee2.id, self.shop.id, terminal=False)
+
+        self.assertEqual(WorkerDay.objects.filter(is_fact=True, is_approved=True).count(), 1)
+
+        wd = WorkerDay.objects.filter(is_fact=True, is_approved=True).first()
+        self.assertEqual(wd.dt, yesterday)
+
+        WorkerDayFactory(
+            employee=self.employee2,
+            employment=self.employment2,
+            dt=yesterday,
+            type_id=WorkerDay.TYPE_HOLIDAY,
+            is_approved=False,
+            is_fact=False,
+        )
+        WorkerDayFactory(
+            employee=self.employee2,
+            employment=self.employment2,
+            dt=today,
+            dttm_work_start=datetime.combine(yesterday, time(1)),
+            dttm_work_end=datetime.combine(yesterday, time(17)),
+            type_id=WorkerDay.TYPE_WORKDAY,
+            shop=self.shop,
+            is_approved=False,
+            is_fact=False,
+        )
+
+        approve_data = {
+            'shop_id': self.shop.id,
+            'dt_from': yesterday,
+            'dt_to': today,
+            'is_fact': False,
+        }
+        with mock.patch.object(transaction, 'on_commit', lambda t: t()):
+            response = self.client.post(self.url_approve, self.dump_data(approve_data), content_type='application/json')
+
+        self.assertEqual(response.status_code, 200)
+
+        self.assertEqual(WorkerDay.objects.filter(is_fact=False, is_approved=False).count(), 2)
+        self.assertEqual(WorkerDay.objects.filter(is_fact=False, is_approved=True).count(), 2)
+        self.assertEqual(WorkerDay.objects.filter(is_fact=True, is_approved=True).count(), 1)
+
+        wd = WorkerDay.objects.filter(is_fact=True, is_approved=True).first()
+        self.assertEqual(wd.dt, today)
 
     def test_empty_params(self):
         data = {

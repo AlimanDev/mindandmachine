@@ -332,8 +332,8 @@ def create_fact_from_attendance_records(dt_from=None, dt_to=None, shop_ids=None,
         WorkerDay.objects.filter(wds_q).delete()
 
         for record in att_records:
-            record.type = None  # проставляем None для всех, т.к. пользователь тоже мог ошибиться, TODO: проверить + тесты
             if record.terminal:
+                record.type = None
                 record.employee_id = None
             record.save()
 
