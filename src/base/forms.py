@@ -15,6 +15,7 @@ class NetworkAdminForm(DefaultOverrideAdminWidgetsForm):
     json_fields = [
         'settings_values',
         'worker_position_default_values',
+        'shop_default_values',
         'fines_settings',
     ]
 
@@ -23,6 +24,7 @@ class ShopAdminForm(DefaultOverrideAdminWidgetsForm):
     json_fields = [
         'tm_open_dict',
         'tm_close_dict',
+        'load_template_settings',
     ]
 
 

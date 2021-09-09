@@ -1,5 +1,4 @@
-from datetime import datetime, timedelta, time
-from unittest import skip
+from datetime import datetime, timedelta, time, date
 
 from dateutil.relativedelta import relativedelta
 from rest_framework import status
@@ -175,9 +174,8 @@ class TestWorkType(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         self.assertIsNotNone(WorkType.objects.get(id=self.work_type1.id).dttm_deleted)
 
-    @skip('В разные месяцы разные результаты, надо поправить')
     def test_get_efficiency(self):
-        dt_now = datetime.now().date().replace(day=1)
+        dt_now = date(2021, 6, 1)
         tomorrow = dt_now + timedelta(days=1)
         after_tomorrow = dt_now + timedelta(days=2)
         after_after_tomorrow = dt_now + timedelta(days=3)
@@ -189,13 +187,23 @@ class TestWorkType(APITestCase):
         op_name3 = OperationTypeName.objects.create(
             name='Test3',
         )
+        op_name_income = OperationTypeName.objects.create(
+            name='Income',
+            code='income',
+        )
         op_type = OperationType.objects.create(
+            shop=self.shop,
             work_type=self.work_type1,
             operation_type_name=op_name,
         )
         op_type3 = OperationType.objects.create(
+            shop=self.shop,
             work_type=self.work_type3,
             operation_type_name=op_name3,
+        )
+        op_type_income = OperationType.objects.create(
+            shop=self.shop,
+            operation_type_name=op_name_income,
         )
 
         for i in range(3):
@@ -211,12 +219,19 @@ class TestWorkType(APITestCase):
                     operation_type=op_type3,
                     dttm_forecast=datetime.combine(dt, time(j)),
                 )
+                PeriodClients.objects.create(
+                    value=100,
+                    type=PeriodClients.FACT_TYPE,
+                    operation_type=op_type_income,
+                    dttm_forecast=datetime.combine(dt, time(j)),
+                )
 
         wd = WorkerDay.objects.create(
             dttm_work_start=datetime.combine(dt_now, time(hour=9)),
             dttm_work_end=datetime.combine(dt_now, time(hour=18)),
             type=WorkerDay.TYPE_WORKDAY,
             dt=dt_now,
+            shop=self.shop,
             employee=self.employee2,
             employment=self.employment2,
             is_approved=True,
@@ -248,6 +263,7 @@ class TestWorkType(APITestCase):
             dttm_work_end=datetime.combine(tomorrow, time(hour=22)),
             type=WorkerDay.TYPE_WORKDAY,
             dt=tomorrow,
+            shop=self.shop,
             employee=self.employee2,
             employment=self.employment2,
             is_approved=False,
@@ -263,6 +279,7 @@ class TestWorkType(APITestCase):
             dttm_work_end=datetime.combine(after_tomorrow, time(hour=15)),
             type=WorkerDay.TYPE_WORKDAY,
             dt=after_tomorrow,
+            shop=self.shop,
             employee=self.employee2,
             employment=self.employment2,
             is_approved=True,
@@ -277,6 +294,7 @@ class TestWorkType(APITestCase):
             dttm_work_end=datetime.combine(after_tomorrow, time(hour=22)),
             type=WorkerDay.TYPE_WORKDAY,
             dt=after_tomorrow,
+            shop=self.shop,
             employee=self.employee2,
             employment=self.employment2,
             is_approved=False,
@@ -287,6 +305,36 @@ class TestWorkType(APITestCase):
             work_type=self.work_type3,
         )
 
+        open_vac = WorkerDay.objects.create(
+            dttm_work_start=datetime.combine(dt_now, time(hour=10)),
+            dttm_work_end=datetime.combine(dt_now, time(hour=22)),
+            type=WorkerDay.TYPE_WORKDAY,
+            dt=dt_now,
+            shop=self.shop,
+            is_approved=True,
+            is_fact=False,
+            is_vacancy=True,
+        )
+        WorkerDayCashboxDetails.objects.create(
+            worker_day=open_vac,
+            work_type=self.work_type1,
+        )
+        canceled_open_vac = WorkerDay.objects.create(
+            dttm_work_start=datetime.combine(dt_now, time(hour=10)),
+            dttm_work_end=datetime.combine(dt_now, time(hour=22)),
+            type=WorkerDay.TYPE_WORKDAY,
+            dt=dt_now + timedelta(days=1),
+            shop=self.shop,
+            is_approved=True,
+            is_fact=False,
+            is_vacancy=True,
+            canceled=True,
+        )
+        WorkerDayCashboxDetails.objects.create(
+            worker_day=canceled_open_vac,
+            work_type=self.work_type1,
+        )
+
         url = f'{self.url}efficiency/'
 
         get_params = {
@@ -294,6 +342,10 @@ class TestWorkType(APITestCase):
             'from_dt': Converter.convert_date(dt_now),
             'to_dt': Converter.convert_date(dt_now + timedelta(days=2)),
         }
+        self.shop.network.set_settings_value('income_code', 'income')
+        self.shop.network.display_employee_tabs_in_the_schedule = True
+        self.shop.network.save()
+
         response = self.client.get(url, data=get_params)
         data = response.json()
         self.assertEqual(len(data['tt_periods']['real_cashiers']), 72)
@@ -301,15 +353,24 @@ class TestWorkType(APITestCase):
         self.assertEqual(data['tt_periods']['real_cashiers'][9]['amount'], 1.0)
         self.assertEqual(data['tt_periods']['real_cashiers'][34]['amount'], 0.0)
         day_stats = data['day_stats']
-        self.assertEqual(day_stats['covering'][Converter.convert_date(dt_now)], 0.17647058823529413)
-        self.assertEqual(day_stats['predict_hours'][Converter.convert_date(dt_now)], 51.0)
+        self.assertEqual(day_stats['covering'][Converter.convert_date(dt_now)], 0.125)
+        self.assertEqual(day_stats['predict_hours'][Converter.convert_date(dt_now)], 72.0)
         self.assertEqual(day_stats['graph_hours'][Converter.convert_date(dt_now)], 9.0)
+        self.assertEqual(day_stats['graph_hours_with_open_vacancies'][Converter.convert_date(dt_now)], 21.0)
+        self.assertEqual(day_stats['work_hours'][Converter.convert_date(dt_now)], 8.0)
+        self.assertEqual(day_stats['work_days'][Converter.convert_date(dt_now)], 1.0)
+        self.assertEqual(day_stats['income'][Converter.convert_date(dt_now)], 2400.0)
+        self.assertEqual(day_stats['perfomance'][Converter.convert_date(dt_now)], 300.0)
+        self.assertEqual(day_stats['graph_hours_only_open_vacancies'][Converter.convert_date(dt_now)], 12.0)
+        self.assertEqual(day_stats['work_hours_other_departments'][Converter.convert_date(dt_now)], 0.0)
+        self.assertEqual(day_stats['work_hours_selected_department'][Converter.convert_date(dt_now)], 8.0)
 
         wd = WorkerDay.objects.create(
             dttm_work_start=datetime.combine(dt_now, time(hour=8)),
             dttm_work_end=datetime.combine(dt_now, time(hour=15)),
             type=WorkerDay.TYPE_WORKDAY,
             dt=dt_now,
+            shop=self.shop,
             employee=self.employee2,
             employment=self.employment2,
             is_approved=True,
@@ -323,6 +384,7 @@ class TestWorkType(APITestCase):
             dttm_work_start=datetime.combine(dt_now, time(hour=8)),
             type=WorkerDay.TYPE_WORKDAY,
             dt=dt_now,
+            shop=self.shop,
             employee=self.employee3,
             employment=self.employment3,
             is_approved=True,
@@ -337,6 +399,7 @@ class TestWorkType(APITestCase):
             dttm_work_end=datetime.combine(dt_now, time(hour=18)),
             type=WorkerDay.TYPE_WORKDAY,
             dt=dt_now,
+            shop=self.shop,
             employee=self.employee2,
             employment=self.employment2,
             is_approved=False,
@@ -355,8 +418,8 @@ class TestWorkType(APITestCase):
         self.assertEqual(data['tt_periods']['real_cashiers'][8]['amount'], 1.0)
         self.assertEqual(data['tt_periods']['real_cashiers'][15]['amount'], 0.0)
         day_stats = data['day_stats']
-        self.assertEqual(day_stats['covering'][Converter.convert_date(dt_now)], 0.13725490196078433)
-        self.assertEqual(day_stats['predict_hours'][Converter.convert_date(dt_now)], 51.0)
+        self.assertEqual(day_stats['covering'][Converter.convert_date(dt_now)], 0.09722222222222222)
+        self.assertEqual(day_stats['predict_hours'][Converter.convert_date(dt_now)], 72.0)
         self.assertEqual(day_stats['graph_hours'][Converter.convert_date(dt_now)], 7.0)
 
         get_params['graph_type'] = 'fact_edit'
@@ -367,8 +430,8 @@ class TestWorkType(APITestCase):
         self.assertEqual(data['tt_periods']['real_cashiers'][8]['amount'], 0.0)
         self.assertEqual(data['tt_periods']['real_cashiers'][9]['amount'], 1.0)
         day_stats = data['day_stats']
-        self.assertEqual(day_stats['covering'][Converter.convert_date(dt_now)], 0.17647058823529413)
-        self.assertEqual(day_stats['predict_hours'][Converter.convert_date(dt_now)], 51.0)
+        self.assertEqual(day_stats['covering'][Converter.convert_date(dt_now)], 0.125)
+        self.assertEqual(day_stats['predict_hours'][Converter.convert_date(dt_now)], 72.0)
         self.assertEqual(day_stats['graph_hours'][Converter.convert_date(dt_now)], 9.0)
 
         get_params['graph_type'] = 'plan_edit'
@@ -379,22 +442,22 @@ class TestWorkType(APITestCase):
         self.assertEqual(data['tt_periods']['real_cashiers'][9]['amount'], 0.0)
         self.assertEqual(data['tt_periods']['real_cashiers'][34]['amount'], 1.0)
         day_stats = data['day_stats']
-        self.assertEqual(day_stats['covering'][Converter.convert_date(tomorrow)], 0.23529411764705882)
-        self.assertEqual(day_stats['predict_hours'][Converter.convert_date(tomorrow)], 51.0)
+        self.assertEqual(day_stats['covering'][Converter.convert_date(tomorrow)], 0.16666666666666666)
+        self.assertEqual(day_stats['predict_hours'][Converter.convert_date(tomorrow)], 72.0)
         self.assertEqual(day_stats['graph_hours'][Converter.convert_date(tomorrow)], 12.0)
 
         get_params['work_type_ids'] = [self.work_type1.id]
         response = self.client.get(url, data=get_params)
         day_stats = response.json()['day_stats']
         self.assertEqual(day_stats['covering'][Converter.convert_date(after_tomorrow)], 0)
-        self.assertEqual(day_stats['predict_hours'][Converter.convert_date(after_tomorrow)], 34.0)
+        self.assertEqual(day_stats['predict_hours'][Converter.convert_date(after_tomorrow)], 48.0)
         self.assertEqual(day_stats['graph_hours'][Converter.convert_date(after_tomorrow)], 0)
 
         get_params['work_type_ids'] = [self.work_type3.id]
         response = self.client.get(url, data=get_params)
         day_stats = response.json()['day_stats']
-        self.assertEqual(day_stats['covering'][Converter.convert_date(after_tomorrow)], 0.7058823529411765)
-        self.assertEqual(day_stats['predict_hours'][Converter.convert_date(after_tomorrow)], 17.0)
+        self.assertEqual(day_stats['covering'][Converter.convert_date(after_tomorrow)], 0.5)
+        self.assertEqual(day_stats['predict_hours'][Converter.convert_date(after_tomorrow)], 24)
         self.assertEqual(day_stats['graph_hours'][Converter.convert_date(after_tomorrow)], 12.0)
 
         wd5 = WorkerDay.objects.create(
@@ -402,6 +465,7 @@ class TestWorkType(APITestCase):
             dttm_work_end=datetime.combine(after_after_tomorrow, time(hour=22)),
             type=WorkerDay.TYPE_WORKDAY,
             dt=after_after_tomorrow,
+            shop=self.shop,
             employee=self.employee2,
             employment=self.employment2,
             is_approved=True,
@@ -429,5 +493,5 @@ class TestWorkType(APITestCase):
         self.assertIn('indicators', resp_data)
         self.assertNotIn('day_stats', resp_data)
         self.assertIsInstance(resp_data['indicators']['fot'], float)
-        self.assertEqual(resp_data['indicators']['covering'], 13.7)
+        self.assertEqual(resp_data['indicators']['covering'], 9.8)
         self.assertEqual(resp_data['indicators']['deadtime'], 15.4)

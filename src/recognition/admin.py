@@ -245,4 +245,8 @@ class TickPointAdmin(admin.ModelAdmin):
     list_display = ['id', 'name', 'shop', 'dttm_added', 'is_active']
 
 
-admin.site.register(UserConnecter)
+@admin.register(UserConnecter)
+class UserConnecterAdmin(admin.ModelAdmin):
+    search_fields = ['user__last_name', 'user__first_name', 'user__id', 'user__username', 'partner_id']
+    list_filter = ['user']
+    list_display = ['partner_id', 'user']

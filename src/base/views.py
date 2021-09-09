@@ -65,6 +65,7 @@ from src.base.views_abstract import (
 from src.recognition.api.recognition import Recognition
 from src.recognition.models import UserConnecter
 from src.timetable.worker_day.tasks import recalc_wdays
+from .filter_backends import EmployeeFilterBackend
 
 
 class EmploymentViewSet(UpdateorCreateViewSet):
@@ -216,6 +217,7 @@ class EmployeeViewSet(UpdateorCreateViewSet):
     permission_classes = [Permission]
     serializer_class = EmployeeSerializer
     filterset_class = EmployeeFilter
+    filter_backends = [EmployeeFilterBackend]
     openapi_tags = ['Employee', ]
 
     def get_queryset(self):
