@@ -42,7 +42,9 @@ DIVIDERS = ['-', '.', ',', '\n', '\r', ' ']
 
 class BaseUploadDownloadTimeTable:
     def __init__(self):
-        self.wd_type_mapping = dict(WorkerDayType.objects.values_list('code', 'excel_load_code'))
+        self.wd_types_dict = WorkerDayType.get_wd_types_dict()
+        self.wd_type_mapping = {
+            wd_type_code: wd_type.excel_load_code for wd_type_code, wd_type in self.wd_types_dict.items()}
         self.wd_type_mapping_reversed = dict((v, k) for k, v in self.wd_type_mapping.items())
 
     def _get_times(self, time_str: str):
@@ -133,7 +135,7 @@ class BaseUploadDownloadTimeTable:
         if employee_id__in:
             employee_qs = employee_qs.filter(id__in=employee_id__in)
 
-        return employee_qs
+        return employee_qs.distinct()
 
     def _get_worker_day_dict(self, shop_id, employee_qs, dt_from, dt_to, is_fact, is_approved):
         return {
@@ -465,14 +467,15 @@ class UploadDownloadTimetableCells(BaseUploadDownloadTimeTable):
                     )
 
                 WorkerDay.objects.filter(dt=dt, employee=employee, is_fact=is_fact, is_approved=False).delete()
-            
+
+                wd_type_obj = self.wd_type_mapping.get(type_of_work)
                 new_wd = WorkerDay.objects.create(
                     employee=employee,
-                    shop_id=shop_id,
+                    shop_id=shop_id if not wd_type_obj.is_dayoff else None,
                     dt=dt,
                     is_fact=is_fact,
                     is_approved=False,
-                    employment=employment,
+                    employment=employment if not wd_type_obj.is_dayoff else None,
                     dttm_work_start=dttm_work_start,
                     dttm_work_end=dttm_work_end,
                     type_id=type_of_work,
