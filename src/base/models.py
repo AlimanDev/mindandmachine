@@ -918,7 +918,7 @@ class ProductionDay(AbstractModel):
         return cls.objects.filter(
             q,
             id=Subquery(prod_cal_subq.values_list('id', flat=True)[:1])
-        )
+        ).distinct()
 
     @classmethod
     def get_norm_work_hours(cls, region_id, year, month=None):
