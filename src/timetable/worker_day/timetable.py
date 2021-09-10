@@ -1,20 +1,21 @@
 import datetime
 import io
+import re
 import time
+
+import pandas as pd
+import xlsxwriter
+from dateutil.parser import parse
 from dateutil.relativedelta import relativedelta
+from django.conf import settings
 from django.db import transaction
+from django.db.models import Q, F
 from django.db.models.expressions import OuterRef, Subquery
 from django.http.response import HttpResponse
 from django.utils.encoding import escape_uri_path
-
-import pandas as pd
-from django.conf import settings
-from django.db.models import Q, F
 from django.utils.translation import gettext as _
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
-from dateutil.parser import parse
-import xlsxwriter
 
 from src.base.models import (
     Network,
@@ -28,18 +29,17 @@ from src.base.models import (
 from src.timetable.models import (
     EmploymentWorkType,
     WorkerDay,
-    WorkerDayCashboxDetails,
     WorkType,
     WorkerDayType,
 )
 from src.timetable.worker_day.stat import WorkersStatsGetter
 from src.timetable.worker_day.xlsx_utils.timetable import Timetable_xlsx
-from src.util.models_converter import Converter
 
 SKIP_SYMBOLS = ['NAN', '']
 DIVIDERS = ['-', '.', ',', '\n', '\r', ' ']
 MULTIPLE_WDAYS_DIVIDER = '/'
-
+PARSE_CELL_STR_PATTERN = re.compile(
+    r'(?P<excel_code>[а-яА-ЯA-Za-z])?(?P<time_str>\d{1,2}:\d{1,2}\s*[' + r'\\'.join(DIVIDERS) + r']\s*\d{1,2}\:\d{1,2})')
 
 class BaseUploadDownloadTimeTable:
     def __init__(self, user=None):
@@ -49,12 +49,22 @@ class BaseUploadDownloadTimeTable:
             wd_type_code: wd_type.excel_load_code for wd_type_code, wd_type in self.wd_types_dict.items()}
         self.wd_type_mapping_reversed = dict((v, k) for k, v in self.wd_type_mapping.items())
 
-    def _get_times(self, time_str: str):
-        time_str = time_str.strip()
-        for divider in DIVIDERS:
-            if divider in time_str:
-                times = time_str.split(divider)
-                return parse(times[0]).time(), parse(times[1]).time()
+    def _parse_cell_data(self, cell_data: str):
+        cell_data = cell_data.strip()
+        m = PARSE_CELL_STR_PATTERN.search(cell_data)
+        if m:
+            wd_type_id = WorkerDay.TYPE_WORKDAY
+            excel_code = m.group('excel_code')
+            if excel_code:
+                wd_type_id = self.wd_type_mapping_reversed.get(excel_code)
+                if wd_type_id is None:
+                    return
+
+            time_str = m.group('time_str')
+            for divider in DIVIDERS:
+                if divider in time_str:
+                    times = time_str.split(divider)
+                    return wd_type_id, parse(times[0]).time(), parse(times[1]).time()
 
     def _get_employment_work_types(self, users, shop_id):
         default_work_type = WorkType.objects.filter(shop_id=shop_id, dttm_deleted__isnull=True).first()
@@ -401,6 +411,7 @@ class BaseUploadDownloadTimeTable:
     def _generate_upload_example(self, workbook, shop_id, dt_from, dt_to, is_fact, is_approved, employee_id__in):
         raise NotImplementedError()
 
+
 class UploadDownloadTimetableCells(BaseUploadDownloadTimeTable):
     def _upload(self, df, users, form, is_fact):
         number_column = df.columns[0]
@@ -447,8 +458,7 @@ class UploadDownloadTimetableCells(BaseUploadDownloadTimeTable):
                         if cell_data.replace(' ', '').replace('\n', '') in SKIP_SYMBOLS:
                             continue
                         if not (cell_data in self.wd_type_mapping_reversed):
-                            tm_work_start, tm_work_end = self._get_times(cell_data)
-                            type_of_work = WorkerDay.TYPE_WORKDAY
+                            wd_type_id, tm_work_start, tm_work_end = self._parse_cell_data(cell_data)
                             dttm_work_start = datetime.datetime.combine(
                                 dt, tm_work_start
                             )
@@ -458,7 +468,7 @@ class UploadDownloadTimetableCells(BaseUploadDownloadTimeTable):
                             if dttm_work_end < dttm_work_start:
                                 dttm_work_end += datetime.timedelta(days=1)
                         elif not is_fact:
-                            type_of_work = self.wd_type_mapping_reversed[cell_data]
+                            wd_type_id = self.wd_type_mapping_reversed[cell_data]
                         else:
                             continue
                     except Exception as e:
@@ -472,7 +482,7 @@ class UploadDownloadTimetableCells(BaseUploadDownloadTimeTable):
                             }
                         )
 
-                    wd_type_obj = self.wd_types_dict.get(type_of_work)
+                    wd_type_obj = self.wd_types_dict.get(wd_type_id)
                     new_wd_dict = dict(
                         employee_id=employee.id,
                         shop_id=shop_id if not wd_type_obj.is_dayoff else None,
@@ -482,9 +492,9 @@ class UploadDownloadTimetableCells(BaseUploadDownloadTimeTable):
                         employment=employment if not wd_type_obj.is_dayoff else None,
                         dttm_work_start=dttm_work_start,
                         dttm_work_end=dttm_work_end,
-                        type_id=type_of_work,
+                        type_id=wd_type_id,
                     )
-                    if type_of_work == WorkerDay.TYPE_WORKDAY:
+                    if wd_type_id == WorkerDay.TYPE_WORKDAY:
                         new_wd_dict['worker_day_details'] = [
                             dict(
                                 work_type_id=work_type,

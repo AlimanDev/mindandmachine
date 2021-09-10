@@ -712,12 +712,20 @@ class TestUploadDownload(APITestCase):
         self.assertTrue(Employee.objects.filter(tabel_code='A23739').exists())
 
     def test_upload_timetable(self):
+        self.network.allow_creation_several_wdays_for_one_employee_for_one_date = True
+        self.network.save()
         file = open('etc/scripts/timetable.xlsx', 'rb')
         with override_settings(UPLOAD_TT_MATCH_EMPLOYMENT=False):
             response = self.client.post(f'{self.url}upload/', {'shop_id': self.shop.id, 'file': file}, HTTP_ACCEPT_LANGUAGE='ru')
         file.close()
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(WorkerDay.objects.filter(is_approved=False).count(), 180)
+        self.assertEqual(WorkerDay.objects.filter(is_approved=False).count(), 181)
+        self.assertEqual(WorkerDay.objects.filter(
+            employee__user__last_name='Сидоров', dt='2020-04-01',
+            type_id=WorkerDay.TYPE_WORKDAY, is_fact=False, is_approved=False).count(), 2)
+        self.assertEqual(WorkerDay.objects.filter(
+            employee__user__last_name='Сидоров', dt='2020-04-02',
+            type_id=WorkerDay.TYPE_BUSINESS_TRIP, is_fact=False, is_approved=False).count(), 1)
         self.assertEquals(User.objects.filter(last_name='Смешнов').count(), 1)
         user = User.objects.filter(last_name='Смешнов').first()
         self.assertEquals(Employee.objects.filter(user=user).count(), 2)
