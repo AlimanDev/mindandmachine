@@ -52,7 +52,7 @@ class TestWorkerDayApprove(TestsHelperMixin, APITestCase):
         cls.plan_approve_wd_permission = WorkerDayPermission.objects.get(
             graph_type=WorkerDayPermission.PLAN,
             action=WorkerDayPermission.APPROVE,
-            wd_type=WorkerDay.TYPE_WORKDAY,
+            wd_type_id=WorkerDay.TYPE_WORKDAY,
         )
         cls.plan_group_approve_wd_permission = GroupWorkerDayPermission.objects.create(
             group=cls.group,
@@ -61,7 +61,7 @@ class TestWorkerDayApprove(TestsHelperMixin, APITestCase):
         cls.fact_approve_wd_permission = WorkerDayPermission.objects.get(
             graph_type=WorkerDayPermission.FACT,
             action=WorkerDayPermission.APPROVE,
-            wd_type=WorkerDay.TYPE_WORKDAY,
+            wd_type_id=WorkerDay.TYPE_WORKDAY,
         )
         cls.fact_group_approve_wd_permission = GroupWorkerDayPermission.objects.create(
             group=cls.group,

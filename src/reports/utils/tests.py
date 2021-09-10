@@ -621,6 +621,7 @@ class TestOvertimesUndertimes(APITestCase):
         self._test_accounting_period_xlsx(6)
         self._test_accounting_period_xlsx(12)
 
+
 class TestPivotTabel(APITestCase):
     USER_USERNAME = "user1"
     USER_EMAIL = "q@q.q"
@@ -668,13 +669,12 @@ class TestPivotTabel(APITestCase):
             is_fact=True,
         )
 
-
-    def _create_worker_day(self, employment, dt=None, is_fact=False, is_approved=False, dttm_work_start=None, dttm_work_end=None, type=WorkerDay.TYPE_WORKDAY):
+    def _create_worker_day(self, employment, dt=None, is_fact=False, is_approved=False, dttm_work_start=None, dttm_work_end=None, type_id=WorkerDay.TYPE_WORKDAY):
         if not dt:
             dt = self.dt
         return WorkerDay.objects.create(
             shop_id=employment.shop_id,
-            type=type,
+            type_id=type_id,
             employment=employment,
             employee=employment.employee,
             dt=dt,
