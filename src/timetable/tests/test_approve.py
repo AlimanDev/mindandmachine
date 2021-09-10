@@ -1,4 +1,4 @@
-from datetime import time, datetime
+from datetime import time, datetime, timedelta
 
 from django.utils.timezone import now
 from rest_framework.test import APITestCase
@@ -29,7 +29,9 @@ class TestWorkerDayApprove(TestsHelperMixin, APITestCase):
     @classmethod
     def setUpTestData(cls):
         cls.url_approve = cls.get_url('WorkerDay-approve')
-        cls.dt_now = now().date()
+        cls.today = now().date()
+        cls.yesterday = cls.today - timedelta(days=1)
+        cls.tomorrow = cls.today + timedelta(days=1)
         cls.breaks = BreakFactory(value='[[0, 2040, [60]]]')
         cls.network = NetworkFactory(
             breaks=cls.breaks,
@@ -69,35 +71,35 @@ class TestWorkerDayApprove(TestsHelperMixin, APITestCase):
 
     def test_approve_multiple_wdays_in_plan(self):
         WorkerDayFactory(
-            dt=self.dt_now,
+            dt=self.today,
             employee=self.employee,
             employment=self.employment,
             shop=self.shop,
             type_id=WorkerDay.TYPE_WORKDAY,
             is_fact=False,
             is_approved=False,
-            dttm_work_start=datetime.combine(self.dt_now, time(10)),
-            dttm_work_end=datetime.combine(self.dt_now, time(14)),
+            dttm_work_start=datetime.combine(self.today, time(10)),
+            dttm_work_end=datetime.combine(self.today, time(14)),
             last_edited_by=self.user,
         )
         WorkerDayFactory(
-            dt=self.dt_now,
+            dt=self.today,
             employee=self.employee,
             employment=self.employment,
             shop=self.shop,
             type_id=WorkerDay.TYPE_WORKDAY,
             is_fact=False,
             is_approved=False,
-            dttm_work_start=datetime.combine(self.dt_now, time(18)),
-            dttm_work_end=datetime.combine(self.dt_now, time(22)),
+            dttm_work_start=datetime.combine(self.today, time(18)),
+            dttm_work_end=datetime.combine(self.today, time(22)),
             last_edited_by=self.user,
         )
 
         approve_data = {
             'shop_id': self.shop.id,
             'is_fact': False,
-            'dt_from': self.dt_now,
-            'dt_to': self.dt_now,
+            'dt_from': self.today,
+            'dt_to': self.today,
             'wd_types': [WorkerDay.TYPE_WORKDAY],
         }
 
@@ -116,35 +118,35 @@ class TestWorkerDayApprove(TestsHelperMixin, APITestCase):
 
     def test_approve_multiple_wdays_in_fact(self):
         WorkerDayFactory(
-            dt=self.dt_now,
+            dt=self.today,
             employee=self.employee,
             employment=self.employment,
             shop=self.shop,
             type_id=WorkerDay.TYPE_WORKDAY,
             is_fact=True,
             is_approved=False,
-            dttm_work_start=datetime.combine(self.dt_now, time(10)),
-            dttm_work_end=datetime.combine(self.dt_now, time(14)),
+            dttm_work_start=datetime.combine(self.today, time(10)),
+            dttm_work_end=datetime.combine(self.today, time(14)),
             last_edited_by=self.user,
         )
         WorkerDayFactory(
-            dt=self.dt_now,
+            dt=self.today,
             employee=self.employee,
             employment=self.employment,
             shop=self.shop,
             type_id=WorkerDay.TYPE_WORKDAY,
             is_fact=True,
             is_approved=False,
-            dttm_work_start=datetime.combine(self.dt_now, time(18)),
-            dttm_work_end=datetime.combine(self.dt_now, time(22)),
+            dttm_work_start=datetime.combine(self.today, time(18)),
+            dttm_work_end=datetime.combine(self.today, time(22)),
             last_edited_by=self.user,
         )
 
         approve_data = {
             'shop_id': self.shop.id,
             'is_fact': True,
-            'dt_from': self.dt_now,
-            'dt_to': self.dt_now,
+            'dt_from': self.today,
+            'dt_to': self.today,
             'wd_types': [WorkerDay.TYPE_WORKDAY],
         }
 
@@ -163,7 +165,7 @@ class TestWorkerDayApprove(TestsHelperMixin, APITestCase):
 
         wd1 = WorkerDay.objects.filter(
             is_fact=True, is_approved=False, shop_id=self.shop.id).order_by('dttm_work_start').first()
-        wd1.dttm_work_start = datetime.combine(self.dt_now, time(11))
+        wd1.dttm_work_start = datetime.combine(self.today, time(11))
         wd1.save()
 
         resp = self.client.post(self.url_approve, self.dump_data(approve_data), content_type='application/json')
@@ -184,50 +186,145 @@ class TestWorkerDayApprove(TestsHelperMixin, APITestCase):
 
     def test_days_approved_when_one_day_in_draft_and_two_wdays_in_approved_version(self):
         WorkerDayFactory(
-            dt=self.dt_now,
+            dt=self.today,
             employee=self.employee,
             employment=self.employment,
             shop=self.shop,
             type_id=WorkerDay.TYPE_WORKDAY,
             is_fact=False,
             is_approved=True,
-            dttm_work_start=datetime.combine(self.dt_now, time(10)),
-            dttm_work_end=datetime.combine(self.dt_now, time(14)),
+            dttm_work_start=datetime.combine(self.today, time(10)),
+            dttm_work_end=datetime.combine(self.today, time(14)),
             last_edited_by=self.user,
         )
         WorkerDayFactory(
-            dt=self.dt_now,
+            dt=self.today,
             employee=self.employee,
             employment=self.employment,
             shop=self.shop,
             type_id=WorkerDay.TYPE_WORKDAY,
             is_fact=False,
             is_approved=True,
-            dttm_work_start=datetime.combine(self.dt_now, time(18)),
-            dttm_work_end=datetime.combine(self.dt_now, time(22)),
+            dttm_work_start=datetime.combine(self.today, time(18)),
+            dttm_work_end=datetime.combine(self.today, time(22)),
             last_edited_by=self.user,
         )
         WorkerDayFactory(
-            dt=self.dt_now,
+            dt=self.today,
             employee=self.employee,
             employment=self.employment,
             shop=self.shop,
             type_id=WorkerDay.TYPE_WORKDAY,
             is_fact=False,
             is_approved=False,
-            dttm_work_start=datetime.combine(self.dt_now, time(10)),
-            dttm_work_end=datetime.combine(self.dt_now, time(14)),
+            dttm_work_start=datetime.combine(self.today, time(10)),
+            dttm_work_end=datetime.combine(self.today, time(14)),
             last_edited_by=self.user,
         )
 
         resp = self._approve(
             self.shop.id,
             is_fact=False,
-            dt_from=self.dt_now,
-            dt_to=self.dt_now,
+            dt_from=self.today,
+            dt_to=self.today,
             wd_types=[WorkerDay.TYPE_WORKDAY],
         )
         self.assertEqual(resp.status_code, 200)
         # день, которого нету в подтв. версии должен удалиться
         self.assertEqual(WorkerDay.objects.filter(is_fact=False, is_approved=True).count(), 1)
         self.assertEqual(WorkerDay.objects.filter(is_fact=False, is_approved=False).count(), 1)
+
+    def test_approved_only_changed_dates(self):
+        plan_approved_yesterday = WorkerDayFactory(
+            dt=self.yesterday,
+            employee=self.employee,
+            employment=self.employment,
+            shop=self.shop,
+            type_id=WorkerDay.TYPE_WORKDAY,
+            is_fact=False,
+            is_approved=True,
+            dttm_work_start=datetime.combine(self.yesterday, time(10)),
+            dttm_work_end=datetime.combine(self.yesterday, time(18)),
+            last_edited_by=self.user,
+        )
+        plan_approved_today = WorkerDayFactory(
+            dt=self.today,
+            employee=self.employee,
+            employment=self.employment,
+            shop=self.shop,
+            type_id=WorkerDay.TYPE_WORKDAY,
+            is_fact=False,
+            is_approved=True,
+            dttm_work_start=datetime.combine(self.today, time(10)),
+            dttm_work_end=datetime.combine(self.today, time(22)),
+            last_edited_by=self.user,
+        )
+        plan_approved_tomorrow = WorkerDayFactory(
+            dt=self.tomorrow,
+            employee=self.employee,
+            employment=self.employment,
+            shop=self.shop,
+            type_id=WorkerDay.TYPE_WORKDAY,
+            is_fact=False,
+            is_approved=True,
+            dttm_work_start=datetime.combine(self.tomorrow, time(10)),
+            dttm_work_end=datetime.combine(self.tomorrow, time(20)),
+            last_edited_by=self.user,
+        )
+        plan_not_approved_yesterday = WorkerDayFactory(
+            dt=self.yesterday,
+            employee=self.employee,
+            employment=self.employment,
+            shop=self.shop,
+            type_id=WorkerDay.TYPE_WORKDAY,
+            is_fact=False,
+            is_approved=False,
+            dttm_work_start=datetime.combine(self.yesterday, time(10)),
+            dttm_work_end=datetime.combine(self.yesterday, time(18)),
+            last_edited_by=self.user,
+        )
+        plan_not_approved_today = WorkerDayFactory(
+            dt=self.today,
+            employee=self.employee,
+            employment=self.employment,
+            shop=self.shop,
+            type_id=WorkerDay.TYPE_WORKDAY,
+            is_fact=False,
+            is_approved=False,
+            dttm_work_start=datetime.combine(self.today, time(10)),
+            dttm_work_end=datetime.combine(self.today, time(19)),
+            last_edited_by=self.user,
+        )
+        plan_not_approved_tomorrow = WorkerDayFactory(
+            dt=self.tomorrow,
+            employee=self.employee,
+            employment=self.employment,
+            shop=self.shop,
+            type_id=WorkerDay.TYPE_WORKDAY,
+            is_fact=False,
+            is_approved=False,
+            dttm_work_start=datetime.combine(self.tomorrow, time(10)),
+            dttm_work_end=datetime.combine(self.tomorrow, time(20)),
+            last_edited_by=self.user,
+        )
+
+        resp = self._approve(
+            self.shop.id,
+            is_fact=False,
+            dt_from=self.today,
+            dt_to=self.today,
+            wd_types=[WorkerDay.TYPE_WORKDAY],
+        )
+        self.assertEqual(resp.status_code, 200)
+
+        self.assertFalse(plan_not_approved_yesterday.is_approved)
+        self.assertTrue(WorkerDay.objects.filter(id=plan_approved_yesterday.id).exists())
+        self.assertFalse(plan_not_approved_tomorrow.is_approved)
+        self.assertTrue(WorkerDay.objects.filter(id=plan_approved_tomorrow.id).exists())
+
+        plan_not_approved_today.refresh_from_db()
+        self.assertTrue(plan_not_approved_today.is_approved)
+        self.assertFalse(WorkerDay.objects.filter(id=plan_approved_today.id).exists())
+
+        self.assertEqual(WorkerDay.objects.filter(is_fact=False, is_approved=True).count(), 3)
+        self.assertEqual(WorkerDay.objects.filter(is_fact=False, is_approved=False).count(), 3)

@@ -355,8 +355,6 @@ class WorkerDayViewSet(BaseModelViewSet):
             approve_condition = Q(
                 wd_types_q,
                 Q(shop_id=serializer.data['shop_id']) |
-                # TODO: Как определять типы дней, которые мы можем подтверждать для своих сотрудников,
-                #  но в любых (других) магазинах (сейчас только обучение)?
                 Q(Q(shop__isnull=True) | Q(type_id=WorkerDay.TYPE_QUALIFICATION), employee_id__in=employee_ids),
                 dt__lte=serializer.data['dt_to'],
                 dt__gte=serializer.data['dt_from'],
@@ -409,8 +407,8 @@ class WorkerDayViewSet(BaseModelViewSet):
             for employee_id, dates_grouper in groupby(employee_dt_pairs_list, key=lambda i: i[0]):
                 worker_dates_dict[employee_id] = tuple(i[1] for i in list(dates_grouper))
             if employee_dt_pairs_list:
-                employee_days_set = set()
                 employee_days_q = Q()
+                employee_days_set = set()
                 for employee_id, dates in worker_dates_dict.items():
                     employee_days_q |= Q(employee_id=employee_id, dt__in=dates)
                     employee_days_set.add((employee_id, dates))
