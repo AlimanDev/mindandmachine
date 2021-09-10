@@ -353,7 +353,7 @@ class BaseUploadDownloadTimeTable:
             shop_id = form['shop_id']
 
             try:
-                df = pd.read_excel(timetable_file)
+                df = pd.read_excel(timetable_file, dtype=str)
             except KeyError:
                 raise ValidationError({"message": _('Failed to open active sheet.')})
             ######################### сюда писать логику чтения из экселя ######################################################
@@ -522,6 +522,7 @@ class UploadDownloadTimetableCells(BaseUploadDownloadTimeTable):
             employee_id__in=employee_ids,
         ).run()
         stat_type = 'approved' if form['is_approved'] else 'not_approved'
+        norm_type = shop.network.settings_values_prop.get('download_timetable_norm_field', 'norm_work_hours')
 
         workdays = self._get_worker_day_qs(employee_ids=employee_ids, dt_from=timetable.prod_days[0].dt, dt_to=timetable.prod_days[-1].dt, is_approved=form['is_approved'])
 
@@ -541,7 +542,7 @@ class UploadDownloadTimetableCells(BaseUploadDownloadTimeTable):
         timetable.construnts_users_info(employments, 11, 0, ['code', 'fio', 'position'])
 
         # fill page 1
-        timetable.fill_table(workdays, employments, stat, 11, 4, stat_type=stat_type, mapping=self.wd_type_mapping)
+        timetable.fill_table(workdays, employments, stat, 11, 4, stat_type=stat_type, norm_type=norm_type, mapping=self.wd_type_mapping)
 
         # fill page 2
         timetable.fill_table2(shop, timetable.prod_days[-1].dt, workdays)

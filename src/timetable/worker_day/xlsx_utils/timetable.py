@@ -61,6 +61,7 @@ class Timetable_xlsx(Tabel_xlsx):
             'align': 'center',
             'valign': 'vcenter',
             'border': 1,
+            'text_wrap': True,
         }
 
     def format_cells(self, users_len):
@@ -128,7 +129,7 @@ class Timetable_xlsx(Tabel_xlsx):
         self.worksheet.write_string(9, count_of_days + 6, _('H'), format_header_text)
         self.worksheet.write_string(9, count_of_days + 7, _('V'), format_header_text)
 
-    def fill_table(self, workdays, employments, stat, row_s, col_s, stat_type='approved', mapping=WorkerDay.WD_TYPE_MAPPING):
+    def fill_table(self, workdays, employments, stat, row_s, col_s, stat_type='approved', norm_type='norm_hours', mapping=WorkerDay.WD_TYPE_MAPPING):
         """
         одинаковая сортировка у workdays и users должна быть
         :param workdays:
@@ -178,6 +179,7 @@ class Timetable_xlsx(Tabel_xlsx):
                     text,
                     self.workbook.add_format(cell_format)
                 )
+            self.worksheet.set_row(row_s + row_shift, 35)
 
             format_holiday_debt = self.workbook.add_format(fmt(font_size=10, border=1, bg_color='#FEFF99'))
 
@@ -201,7 +203,7 @@ class Timetable_xlsx(Tabel_xlsx):
                 format_text
             )
 
-            norm_hours = int(round(stat.get(employment.employee_id, {}).get('plan', {}).get(stat_type, {}).get('norm_hours', {}).get('curr_month', 0)))
+            norm_hours = int(round(stat.get(employment.employee_id, {}).get('plan', {}).get(stat_type, {}).get(norm_type, {}).get('curr_month', 0)))
 
             self.worksheet.write_string(
                 row_s + row_shift, col_s + day + 3,
