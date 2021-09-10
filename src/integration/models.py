@@ -8,11 +8,16 @@ class ExternalSystem(AbstractCodeNamedModel):
         verbose_name = 'Связь с внешними системами'
         verbose_name_plural = 'Связи с внешними системами'
 
+class AttendanceArea(AbstractCodeNamedModel):
+    class Meta:
+        verbose_name = 'Зона учета внешней системы'
+        verbose_name_plural = 'Зоны учета внешней системы'
+    external_system = models.ForeignKey(ExternalSystem, on_delete=models.PROTECT)
+
 
 class ShopExternalCode(AbstractModel):
-    external_system = models.ForeignKey(ExternalSystem, on_delete=models.PROTECT)
     shop = models.ForeignKey(Shop, on_delete=models.PROTECT)
-    code = models.CharField(null=False, blank=False, max_length=64)
+    attendance_area = models.ForeignKey(AttendanceArea, on_delete=models.PROTECT)
 
 
 class UserExternalCode(AbstractModel):

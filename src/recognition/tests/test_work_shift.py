@@ -210,6 +210,7 @@ class TestWorkShiftViewSet(TestsHelperMixin, APITestCase):
                     'timesheet_employee_bottom': 'sawh_hours',
                     'timesheet_employee_top': 'fact_total_hours_sum',
                 },
+                'display_employee_tabs_in_the_schedule': True,
                 'enable_camera_ticks': False,
                 'id': self.user2.network_id,
                 'logo': None,
@@ -222,6 +223,7 @@ class TestWorkShiftViewSet(TestsHelperMixin, APITestCase):
                 'show_user_biometrics_block': False,
                 'unaccounted_overtime_threshold': 60,
                 'forbid_edit_employments_came_through_integration': True,
+                'show_remaking_choice': False,
                 'url': None
             },
         }
@@ -335,6 +337,7 @@ class TestWorkShiftViewSet(TestsHelperMixin, APITestCase):
                     'timesheet_employee_bottom': 'sawh_hours',
                     'timesheet_employee_top': 'fact_total_hours_sum',
                 },
+                'display_employee_tabs_in_the_schedule': True,
                 'enable_camera_ticks': False,
                 'id': self.user2.network_id,
                 'logo': None,
@@ -347,6 +350,7 @@ class TestWorkShiftViewSet(TestsHelperMixin, APITestCase):
                 'show_user_biometrics_block': False,
                 'unaccounted_overtime_threshold': 60,
                 'forbid_edit_employments_came_through_integration': True,
+                'show_remaking_choice': False,
                 'url': None
             },
         }
@@ -363,7 +367,7 @@ class TestWorkShiftViewSet(TestsHelperMixin, APITestCase):
         self.employee2.save()
         self.shop.timezone = 'Asia/Vladivostok'
         self.shop.save()
-        if datetime.now().hour <= 14:
+        if datetime.now().hour <= 13:
             self.today -= timedelta(1)
         position = WorkerPosition.objects.create(
             name='Работник',
@@ -465,6 +469,7 @@ class TestWorkShiftViewSet(TestsHelperMixin, APITestCase):
                     'timesheet_employee_bottom': 'sawh_hours',
                     'timesheet_employee_top': 'fact_total_hours_sum',
                 },
+                'display_employee_tabs_in_the_schedule': True,
                 'enable_camera_ticks': False,
                 'id': self.user2.network_id,
                 'logo': None,
@@ -477,6 +482,7 @@ class TestWorkShiftViewSet(TestsHelperMixin, APITestCase):
                 'show_user_biometrics_block': False,
                 'unaccounted_overtime_threshold': 60,
                 'forbid_edit_employments_came_through_integration': True,
+                'show_remaking_choice': False,
                 'url': None
             },
         }

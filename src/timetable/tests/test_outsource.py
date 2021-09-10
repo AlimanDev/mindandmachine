@@ -189,7 +189,8 @@ class TestOutsource(TestsHelperMixin, APITestCase):
         WorkerDay.objects.all().update(is_approved=True)
         response = self.client.get('/rest_api/worker_day/vacancy/?only_available=True&limit=10&offset=0')
         self.assertEqual(response.json()['count'], 2)
-        self.assertEqual(len(response.json()['results'][0]['outsources']), 1)
+        resp_data = sorted(response.json()['results'], key=lambda i: i['id'])
+        self.assertEqual(len(resp_data[0]['outsources']), 1)
         response = self.client.get('/rest_api/worker_day/vacancy/?limit=10&offset=0')
         self.assertEqual(response.json()['count'], 2)
         self.client.force_authenticate(user=self.client_user)
@@ -327,24 +328,25 @@ class TestOutsource(TestsHelperMixin, APITestCase):
         self.client.force_authenticate(user=self.client_user)
         response = self.client.get('/rest_api/worker_day/vacancy/?limit=10&offset=0')
         self.assertEqual(response.json()['count'], 2)
+        response_data = sorted(response.json()['results'], key=lambda i: i['id'])
         data = {
-            'id': vacancy['id'], 
-            'first_name': self.user1.first_name, 
-            'last_name': self.user1.last_name, 
-            'is_outsource': True, 
-            'avatar': None, 
-            'worker_shop': self.employment1.shop_id, 
+            'id': vacancy['id'],
+            'first_name': self.user1.first_name,
+            'last_name': self.user1.last_name,
+            'is_outsource': True,
+            'avatar': None,
+            'worker_shop': self.employment1.shop_id,
             'user_network_id': self.user1.network_id,
         }
-        response = response.json()['results'][0]
+        response = response_data[0]
         assert_response = {
-            'id': response['id'], 
-            'first_name': response['first_name'], 
-            'last_name': response['last_name'], 
-            'is_outsource': response['is_outsource'], 
-            'avatar': response['avatar'], 
-            'worker_shop': response['worker_shop'], 
-            'user_network_id': response['user_network_id'], 
+            'id': response['id'],
+            'first_name': response['first_name'],
+            'last_name': response['last_name'],
+            'is_outsource': response['is_outsource'],
+            'avatar': response['avatar'],
+            'worker_shop': response['worker_shop'],
+            'user_network_id': response['user_network_id'],
         }
         self.assertEqual(assert_response, data)
         # получаем список отделов с аутсорс организациями
@@ -389,7 +391,8 @@ class TestOutsource(TestsHelperMixin, APITestCase):
                     'primary_color': '', 
                     'secondary_color': '', 
                     'allowed_geo_distance_km': None, 
-                    'enable_camera_ticks': False, 
+                    'enable_camera_ticks': False,
+                    'display_employee_tabs_in_the_schedule': True,
                     'show_worker_day_additional_info': False, 
                     'allowed_interval_for_late_arrival': '00:00:00', 
                     'allowed_interval_for_early_departure': '00:00:00', 
@@ -402,10 +405,12 @@ class TestOutsource(TestsHelperMixin, APITestCase):
                         'day_bottom': 'deadtime'
                     }, 
                     'show_tabel_graph': True, 
+                    'display_employee_tabs_in_the_schedule': True,
                     'show_worker_day_tasks': False,
                     'show_user_biometrics_block': False,
                     'unaccounted_overtime_threshold': 60,
                     'forbid_edit_employments_came_through_integration': True,
+                    'show_remaking_choice': False,
                 }
             }
         ]

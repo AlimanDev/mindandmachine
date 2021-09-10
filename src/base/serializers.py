@@ -1,5 +1,5 @@
-from datetime import timedelta
 import json
+from datetime import timedelta
 
 from django.conf import settings
 from django.contrib.auth.forms import SetPasswordForm
@@ -48,6 +48,7 @@ class NetworkSerializer(serializers.ModelSerializer):
     default_stats = serializers.SerializerMethodField()
     show_tabel_graph = serializers.SerializerMethodField()
     unaccounted_overtime_threshold = serializers.SerializerMethodField()
+    show_remaking_choice = serializers.SerializerMethodField()
 
     def get_default_stats(self, obj: Network):
         default_stats = json.loads(obj.settings_values).get('default_stats', {})
@@ -65,6 +66,9 @@ class NetworkSerializer(serializers.ModelSerializer):
 
     def get_unaccounted_overtime_threshold(self, obj:Network):
         return obj.settings_values_prop.get('unaccounted_overtime_threshold', 60)
+
+    def get_show_remaking_choice(self, obj: Network):
+        return obj.settings_values_prop.get('show_remaking_choice', False)
 
     def get_logo_url(self, obj) -> str:
         if obj.logo:
@@ -91,8 +95,13 @@ class NetworkSerializer(serializers.ModelSerializer):
             'show_user_biometrics_block',
             'unaccounted_overtime_threshold',
             'forbid_edit_employments_came_through_integration',
+            'show_remaking_choice',
+            'display_employee_tabs_in_the_schedule',
         ]
 
+class NetworkListSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    name = serializers.CharField()
 
 class NetworkWithOutsourcingsAndClientsSerializer(NetworkSerializer):
     outsourcings = OutsourceClientNetworkSerializer(many=True)
@@ -176,10 +185,11 @@ class UserSerializer(BaseNetworkSerializer):
 class EmployeeSerializer(BaseNetworkSerializer):
     user = UserSerializer(read_only=True)
     user_id = serializers.IntegerField(required=False, write_only=True)
+    has_shop_employment = serializers.BooleanField(required=False, read_only=True)
 
     class Meta:
         model = Employee
-        fields = ['id', 'user', 'user_id', 'tabel_code', ]
+        fields = ['id', 'user', 'user_id', 'tabel_code', 'has_shop_employment']
         extra_kwargs = {
             'tabel_code': {
                 'required': False,
