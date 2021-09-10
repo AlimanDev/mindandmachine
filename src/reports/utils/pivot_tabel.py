@@ -9,7 +9,7 @@ from django.utils.encoding import escape_uri_path
 class BasePivotTabel:
     fields_mapping = None
     values_field = None
-    index_fields = ['Сеть сотрудника', 'Отдел', 'Тип работ', 'Табельный номер', 'ФИО']
+    index_fields = ['Сеть сотрудника', 'Подразделение', 'Тип работ', 'Табельный номер', 'ФИО']
     columns_fields = None
 
 
@@ -70,7 +70,7 @@ class BasePivotTabel:
 class PlanAndFactPivotTabel(BasePivotTabel):
     fields_mapping = {
         'worker__network__name': 'Сеть сотрудника',
-        'shop_name': 'Отдел',
+        'shop_name': 'Подразделение',
         'work_type_name': 'Тип работ',
         'tabel_code': 'Табельный номер',
         'worker_fio': 'ФИО',
