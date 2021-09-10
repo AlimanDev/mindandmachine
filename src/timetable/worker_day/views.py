@@ -313,6 +313,7 @@ class WorkerDayViewSet(BaseModelViewSet):
                 is_active=True,
             ).values_list('code', flat=True))
 
+        wd_types_dict = WorkerDayType.get_wd_types_dict()
         with transaction.atomic():
             wd_perms = check_worker_day_permissions(
                 request.user, 
@@ -323,6 +324,7 @@ class WorkerDayViewSet(BaseModelViewSet):
                 serializer.validated_data.get('dt_from'),
                 serializer.validated_data.get('dt_to'),
                 self.error_messages,
+                wd_types_dict,
             )
             today = (datetime.datetime.now() + datetime.timedelta(hours=3)).date()
             employee_filter = {}
@@ -1510,8 +1512,9 @@ class WorkerDayViewSet(BaseModelViewSet):
     )
     @action(detail=False, methods=['post'])
     def change_list(self, request):
+        wd_types_dict = WorkerDayType.get_wd_types_dict()
         data = ChangeListSerializer(
-            data=request.data, context={'request': request, 'wd_types_dict': WorkerDayType.get_wd_types_dict()})
+            data=request.data, context={'request': request, 'wd_types_dict': wd_types_dict})
         data.is_valid(raise_exception=True)
         data = data.validated_data
         check_worker_day_permissions(
@@ -1523,6 +1526,7 @@ class WorkerDayViewSet(BaseModelViewSet):
             data['dt_from'],
             data['dt_to'],
             self.error_messages,
+            wd_types_dict=wd_types_dict,
         )
         response = WorkerDaySerializer(
             create_worker_days_range(

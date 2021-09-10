@@ -398,7 +398,8 @@ def create_worker_days_range(dates, type_id=WorkerDay.TYPE_WORKDAY, shop_id=None
         return created_wds
 
 
-def check_worker_day_permissions(user, shop_id, action, graph_type, wd_types, dt_from, dt_to, error_messages):
+def check_worker_day_permissions(
+        user, shop_id, action, graph_type, wd_types, dt_from, dt_to, error_messages, wd_types_dict):
     wd_perms = GroupWorkerDayPermission.objects.filter(
         group__in=user.get_group_ids(Shop.objects.get(id=shop_id) if shop_id else None),
         worker_day_permission__action=action,
@@ -411,7 +412,7 @@ def check_worker_day_permissions(user, shop_id, action, graph_type, wd_types, dt
     today = (datetime.datetime.now() + datetime.timedelta(hours=3)).date()
     for wd_type_id in wd_types:
         wdp = wd_perms_dict.get(wd_type_id)
-        wd_type_display_str = dict(WorkerDay.TYPES)[wd_type_id]
+        wd_type_display_str = wd_types_dict.get(wd_type_id).name
         if wdp is None:
             raise PermissionDenied(
                 error_messages['no_perm_to_approve_wd_types'].format(wd_type_str=wd_type_display_str))

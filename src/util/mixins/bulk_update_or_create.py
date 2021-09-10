@@ -38,7 +38,7 @@ class BatchUpdateOrCreateModelMixin:
         pass
 
     @classmethod
-    def _check_batch_delete_qs_perms(cls, user, delete_qs, raise_exception=True, exc_cls=None):
+    def _check_batch_delete_qs_perms(cls, user, delete_qs, **kwargs):
         """
         Првоерка прав на удаление объектов на основе qs
             (для объектов, которые удаляем -- можем использовать qs)
@@ -50,7 +50,11 @@ class BatchUpdateOrCreateModelMixin:
         pass
 
     @classmethod
-    def _check_create_or_update_perms(cls, user, create_or_update_perms_data):
+    def _get_check_batch_perms_extra_kwargs(cls):
+        return {}
+
+    @classmethod
+    def _check_create_or_update_perms(cls, user, create_or_update_perms_data, **kwargs):
         pass
 
     @classmethod
@@ -141,6 +145,9 @@ class BatchUpdateOrCreateModelMixin:
 
         with transaction.atomic():
             create_or_update_perms_data = {}
+            check_perms_extra_kwargs = {}
+            if user:
+                check_perms_extra_kwargs = cls._get_check_batch_perms_extra_kwargs()
             stats = stats or {}
             delete_scope_fields_list = delete_scope_fields_list or cls._get_batch_delete_scope_fields_list()
             delete_scope_values_set = set()
@@ -176,7 +183,7 @@ class BatchUpdateOrCreateModelMixin:
                     cls._enrich_create_or_update_perms_data(create_or_update_perms_data, obj_dict)
 
             if user:
-                cls._check_create_or_update_perms(user, create_or_update_perms_data)
+                cls._check_create_or_update_perms(user, create_or_update_perms_data, **check_perms_extra_kwargs)
 
             filter_kwargs = {
                 f"{update_key_field}__in": update_keys,
@@ -227,7 +234,7 @@ class BatchUpdateOrCreateModelMixin:
                     delete_qs = cls.objects.filter(
                         q_for_delete).exclude(id__in=list(obj.id for obj in objs if obj.id))
                     if user:
-                        cls._check_batch_delete_qs_perms(user, delete_qs)
+                        cls._check_batch_delete_qs_perms(user, delete_qs, **check_perms_extra_kwargs)
                     _total_deleted_count, deleted_dict = delete_qs.delete()
 
             if objs_to_create:

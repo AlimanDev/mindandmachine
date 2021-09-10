@@ -558,7 +558,13 @@ class WorkerDay(AbstractModel):
         create_or_update_perms_data.setdefault(k, set()).add(dt)
 
     @classmethod
-    def _check_batch_delete_qs_perms(cls, user, delete_qs, raise_exception=False, exc_cls=None):
+    def _get_check_batch_perms_extra_kwargs(cls):
+        return {
+            'wd_types_dict': WorkerDayType.get_wd_types_dict(),
+        }
+
+    @classmethod
+    def _check_batch_delete_qs_perms(cls, user, delete_qs, **kwargs):
         from src.timetable.worker_day.utils import check_worker_day_permissions
         from src.timetable.worker_day.views import WorkerDayViewSet
         action = WorkerDayPermission.DELETE
@@ -572,10 +578,11 @@ class WorkerDay(AbstractModel):
                 dt_from=dt,
                 dt_to=dt,
                 error_messages=WorkerDayViewSet.error_messages,
+                wd_types_dict=kwargs.get('wd_types_dict'),
             )
 
     @classmethod
-    def _check_create_or_update_perms(cls, user, create_or_update_perms_data):
+    def _check_create_or_update_perms(cls, user, create_or_update_perms_data, **kwargs):
         from src.timetable.worker_day.utils import check_worker_day_permissions
         from src.timetable.worker_day.views import WorkerDayViewSet
         for k, dates_set in create_or_update_perms_data.items():
@@ -589,6 +596,7 @@ class WorkerDay(AbstractModel):
                 dt_from=min(dates_set),
                 dt_to=max(dates_set),
                 error_messages=WorkerDayViewSet.error_messages,
+                wd_types_dict=kwargs.get('wd_types_dict'),
             )
 
     @classmethod
