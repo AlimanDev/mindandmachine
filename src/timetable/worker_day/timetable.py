@@ -280,7 +280,7 @@ class BaseUploadDownloadTimeTable:
             shop_id = form['shop_id']
 
             try:
-                df = pd.read_excel(timetable_file)
+                df = pd.read_excel(timetable_file, dtype=str)
             except KeyError:
                 raise ValidationError({"message": _('Failed to open active sheet.')})
             ######################### сюда писать логику чтения из экселя ######################################################
