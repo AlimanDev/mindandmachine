@@ -1419,6 +1419,7 @@ class FunctionGroup(AbstractModel):
         ('PeriodClients_upload', 'Загрузить нагрузку (Создать) (timeserie_value/upload/)'),
         ('PeriodClients_download', 'Скачать нагрузку (Получить) (timeserie_value/download/)'),
         ('Receipt', 'Чек (receipt)'),
+        ('Reports_pivot_tabel', 'Скачать сводный табель (Получить) (report/pivot_tabel/)'),
         ('Group', 'Группа доступа (group)'),
         ('Shop', 'Отдел (department)'),
         ('Shop_stat', 'Статистика по отделам (Получить) (department/stat/)'),
