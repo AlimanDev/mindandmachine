@@ -1306,7 +1306,7 @@ class WorkerDayViewSet(BaseModelViewSet):
         data.validated_data['network_id'] = request.user.network_id
         shop = Shop.objects.get(id=data.validated_data.get('shop_id'))
         timetable_generator_cls = get_timetable_generator_cls(timetable_format=shop.network.timetable_format)
-        timetable_generator = timetable_generator_cls()
+        timetable_generator = timetable_generator_cls(user=self.request.user)
         return timetable_generator.upload(data.validated_data, file)
 
     @swagger_auto_schema(
@@ -1334,7 +1334,7 @@ class WorkerDayViewSet(BaseModelViewSet):
 
         shop = Shop.objects.get(id=shop_id)
         timetable_generator_cls = get_timetable_generator_cls(timetable_format=shop.network.timetable_format)
-        timetable_generator = timetable_generator_cls()
+        timetable_generator = timetable_generator_cls(user=self.request.user)
         return timetable_generator.generate_upload_example(shop_id, dt_from, dt_to, is_fact, is_approved, employee_id__in)
 
     @swagger_auto_schema(
@@ -1369,7 +1369,7 @@ class WorkerDayViewSet(BaseModelViewSet):
         data.is_valid(raise_exception=True)
         shop = Shop.objects.get(id=data.validated_data.get('shop_id'))
         timetable_generator_cls = get_timetable_generator_cls(timetable_format=shop.network.timetable_format)
-        timetable_generator = timetable_generator_cls()
+        timetable_generator = timetable_generator_cls(user=self.request.user)
         return timetable_generator.download(data.validated_data)
 
     @swagger_auto_schema(

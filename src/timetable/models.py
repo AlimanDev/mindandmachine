@@ -587,6 +587,8 @@ class WorkerDay(AbstractModel):
         from src.timetable.worker_day.views import WorkerDayViewSet
         for k, dates_set in create_or_update_perms_data.items():
             graph_type, action, wd_type_id, shop_id = k.split('_')
+            if shop_id == 'None':
+                shop_id = None
             check_worker_day_permissions(
                 user=user,
                 shop_id=shop_id,
