@@ -78,6 +78,38 @@ class WorkerDayCashboxDetailsListSerializer(serializers.Serializer):
     work_type_id = serializers.IntegerField()
     work_part = serializers.FloatField()
 
+def serialize_worker_day(wd: WorkerDay, request):
+    work_hours = None
+    if isinstance(wd.work_hours, timedelta):
+        work_hours = wd.rounded_work_hours
+    work_hours = wd.work_hours
+    return {
+        'id': wd.id,
+        'worker_id': wd.employee.user_id,
+        'employee_id': wd.employee_id,
+        'shop_id': wd.shop_id,
+        'employment_id': wd.employment_id,
+        'type': wd.type,
+        'dt': wd.dt,
+        'dttm_work_start': wd.dttm_work_start,
+        'dttm_work_end': wd.dttm_work_end,
+        'dttm_work_start_tabel': wd.dttm_work_start_tabel,
+        'dttm_work_end_tabel': wd.dttm_work_end_tabel,
+        'comment': wd.comment,
+        'is_approved': wd.is_approved,
+        'is_fact': wd.is_fact,
+        'work_hours': work_hours,
+        'shop_code': getattr(wd, 'shop_code', None),
+        'user_login': getattr(wd, 'user_login', None),
+        'employment_tabel_code': getattr(wd, 'employment_tabel_code', None),
+        'created_by_id': wd.created_by_id,
+        'dttm_modified': wd.dttm_modified,
+        'is_blocked': wd.is_blocked,
+        'unaccounted_overtime': UnaccountedOvertimeMixin().unaccounted_overtime_getter(wd),
+        'worker_day_details': WorkerDayCashboxDetailsListSerializer(wd.worker_day_details_list, many=True).data,
+        'outsources': NetworkListSerializer(wd.outsources_list, many=True).data,
+        'last_edited_by': UserShorSerializer(wd.last_edited_by).data,
+    }
 
 class WorkerDayListSerializer(serializers.Serializer, UnaccountedOvertimeMixin):
     id = serializers.IntegerField()
@@ -94,17 +126,16 @@ class WorkerDayListSerializer(serializers.Serializer, UnaccountedOvertimeMixin):
     comment = serializers.CharField()
     is_approved = serializers.BooleanField()
     worker_day_details = WorkerDayCashboxDetailsListSerializer(many=True)
-    outsources = NetworkSerializer(many=True, required=False)
+    outsources = NetworkListSerializer(many=True, required=False)
     is_fact = serializers.BooleanField()
     work_hours = serializers.SerializerMethodField()
-    parent_worker_day_id = serializers.IntegerField()
-    shop_code = serializers.CharField(required=False, read_only=True)
-    user_login = serializers.CharField(required=False, read_only=True)
-    employment_tabel_code = serializers.CharField(required=False, read_only=True)
-    created_by_id = serializers.IntegerField(read_only=True)
-    last_edited_by = UserShorSerializer(read_only=True)
-    dttm_modified = serializers.DateTimeField(read_only=True)
-    is_blocked = serializers.BooleanField(read_only=True)
+    shop_code = serializers.CharField(required=False)
+    user_login = serializers.CharField(required=False)
+    employment_tabel_code = serializers.CharField(required=False)
+    created_by_id = serializers.IntegerField()
+    last_edited_by = UserShorSerializer()
+    dttm_modified = serializers.DateTimeField()
+    is_blocked = serializers.BooleanField()
     unaccounted_overtime = serializers.SerializerMethodField()
 
     def get_unaccounted_overtime(self, obj):

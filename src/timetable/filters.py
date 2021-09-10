@@ -33,11 +33,18 @@ class WorkerDayFilter(FilterSet):
     worker_id = NumberFilter(field_name='employee__user_id')
     worker__username__in = ListFilter(field_name='employee__user__username', lookup_expr='in')
     employment__tabel_code__in = ListFilter(field_name='employee__tabel_code', lookup_expr='in')
+    employee_id__in = ListFilter(method='filter_employee_id__in')
 
     def filter_fact_tabel(self, queryset, name, value):
         if value:
             return queryset.get_tabel()
 
+        return queryset
+
+    def filter_employee_id__in(self, queryset, name, value):
+        if value:
+            value = value.split(',')
+            return queryset.filter(employee_id__in=value)
         return queryset
 
     def filter_fact_shop_code__in(self, queryset, name, value):
@@ -70,7 +77,7 @@ class WorkerDayFilter(FilterSet):
         model = WorkerDay
         fields = {
             # 'shop_id':['exact'],
-            'employee_id': ['in', 'exact'],
+            'employee_id': ['exact'],
             'employee__tabel_code': ['in', 'exact'],
             'dt': ['gte', 'lte', 'exact', 'range'],
             'is_approved': ['exact'],

@@ -1,6 +1,8 @@
 import datetime
 import json
 from itertools import groupby
+
+from django.db.models.query import Prefetch
 from src.reports.utils.overtimes_undertimes import overtimes_undertimes_xlsx
 
 import pandas as pd
@@ -62,6 +64,7 @@ from src.timetable.worker_day.serializers import (
     CopyRangeSerializer,
     BlockOrUnblockWorkerDayWrapperSerializer,
     RecalcWdaysSerializer,
+    serialize_worker_day,
 )
 from src.timetable.worker_day.stat import count_daily_stat
 from src.timetable.worker_day.tasks import recalc_wdays, recalc_fact_from_records
@@ -162,10 +165,13 @@ class WorkerDayViewSet(BaseModelViewSet):
                 }
                 data.append(wd_dict)
         else:
-            data = WorkerDayListSerializer(
-                self.filter_queryset(self.get_queryset().prefetch_related('worker_day_details', 'outsources').select_related('last_edited_by', 'employee')),
-                many=True, context=self.get_serializer_context()
-            ).data
+            data = [
+                serialize_worker_day(wd) for wd in self.filter_queryset(self.get_queryset().prefetch_related(Prefetch('worker_day_details', to_attr='worker_day_details_list'), Prefetch('outsources', to_attr='outsources_list')).select_related('last_edited_by', 'employee'))
+            ]
+            # WorkerDayListSerializer(
+            #     self.filter_queryset(self.get_queryset().prefetch_related('worker_day_details', 'outsources').select_related('last_edited_by', 'employee')),
+            #     many=True, context=self.get_serializer_context()
+            # ).data
 
         if request.query_params.get('fill_empty_days', False):
             employment__tabel_code__in = [
