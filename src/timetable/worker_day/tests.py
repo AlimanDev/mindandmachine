@@ -298,6 +298,10 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
             self.assertEqual(wd_from_db.work_hours, wd_from_db_not_approved.work_hours)
             self.assertEqual(wd_from_db.last_edited_by_id, wd_from_db_not_approved.last_edited_by_id)
 
+        for wd in wdscreated:
+            wd.type_id = WorkerDay.TYPE_HOLIDAY
+            wd.save()  # чтобы произошел approve -- должны быть какие-то изменения
+
         # second approve
         response = self.client.post(f"{self.url_approve}", data, format='json')
         self.assertEqual(response.status_code, 200)

@@ -344,7 +344,7 @@ class WorkerDayViewSet(BaseModelViewSet):
                     wd_types_grouped_by_limit.setdefault((limit_days_in_past, limit_days_in_future), []).append(wd_type)
             wd_types_q = Q()
             for (limit_days_in_past, limit_days_in_future), wd_types in wd_types_grouped_by_limit.items():
-                q = Q(type__in=wd_types)
+                q = Q(type_id__in=wd_types)
                 if limit_days_in_past or limit_days_in_future:
                     if limit_days_in_past:
                         q &= Q(dt__gte=today - datetime.timedelta(days=limit_days_in_past))
@@ -354,55 +354,66 @@ class WorkerDayViewSet(BaseModelViewSet):
 
             approve_condition = Q(
                 wd_types_q,
-                Q(shop_id=serializer.data['shop_id']) |
-                Q(Q(shop__isnull=True) | Q(type_id=WorkerDay.TYPE_QUALIFICATION), employee_id__in=employee_ids),
-                dt__lte=serializer.data['dt_to'],
-                dt__gte=serializer.data['dt_from'],
-                is_fact=serializer.data['is_fact'],
+                Q(shop_id=serializer.validated_data['shop_id']) |
+                # TODO: разобраться с | Q(type_id=WorkerDay.TYPE_QUALIFICATION) -- нужно ли еще?
+                Q(Q(type__is_dayoff=True) | Q(type_id=WorkerDay.TYPE_QUALIFICATION), employee_id__in=employee_ids),
+                dt__lte=serializer.validated_data['dt_to'],
+                dt__gte=serializer.validated_data['dt_from'],
+                is_fact=serializer.validated_data['is_fact'],
                 **employee_filter,
             )
-
-            draft_wdays_with_changes = WorkerDay.objects.filter(
+            columns = [
+                'employee_id',
+                'dt',
+                'type_id',
+                'dttm_work_start',
+                'dttm_work_end',
+                'shop_id',
+                'work_type_ids'
+            ]
+            draft_wdays = list(WorkerDay.objects.filter(
                 approve_condition,
                 is_approved=False,
             ).annotate(
-                same_approved_exists=Exists(
+                work_type_ids=StringAgg(
+                    Cast('work_types', CharField()),
+                    distinct=True,
+                    delimiter=',',
+                    output_field=CharField(),
+                ),
+            ).values_list(*columns))
+            draft_df = pd.DataFrame(draft_wdays, columns=columns)
+
+            approved_wdays = list(WorkerDay.objects.annotate(
+                any_draft_wd_exists=Exists(
                     WorkerDay.objects.filter(
-                        Q(shop_id=OuterRef('shop_id')) | Q(shop__isnull=True),
-                        Q(dttm_work_start=OuterRef('dttm_work_start')),
-                        Q(dttm_work_end=OuterRef('dttm_work_end')),
-                        Q(work_types=OuterRef('work_types')) | Q(work_types__isnull=True),
+                        approve_condition,
+                        is_approved=False,
                         employee_id=OuterRef('employee_id'),
                         dt=OuterRef('dt'),
                         is_fact=OuterRef('is_fact'),
-                        type_id=OuterRef('type_id'),
-                        is_approved=True,
                     ),
                 ),
-            ).filter(same_approved_exists=False).only('id', 'employee_id', 'dt')
-
-            approved_without_same_draft = WorkerDay.objects.filter(
+            ).filter(
                 approve_condition,
                 is_approved=True,
+                any_draft_wd_exists=True,
             ).annotate(
-                same_draft_exists=Exists(
-                    WorkerDay.objects.filter(
-                        Q(shop_id=OuterRef('shop_id')) | Q(shop__isnull=True),
-                        Q(dttm_work_start=OuterRef('dttm_work_start')),
-                        Q(dttm_work_end=OuterRef('dttm_work_end')),
-                        Q(work_types=OuterRef('work_types')) | Q(work_types__isnull=True),
-                        employee_id=OuterRef('employee_id'),
-                        dt=OuterRef('dt'),
-                        is_fact=OuterRef('is_fact'),
-                        type_id=OuterRef('type_id'),
-                        is_approved=False,
-                    ),
+                work_type_ids=StringAgg(
+                    Cast('work_types', CharField()),
+                    distinct=True,
+                    delimiter=',',
+                    output_field=CharField(),
                 ),
-            ).filter(same_draft_exists=False).only('id', 'employee_id', 'dt')
+            ).values_list(*columns))
+            approved_df = pd.DataFrame(approved_wdays, columns=columns)
 
-            employee_dates_to_approve = draft_wdays_with_changes.union(approved_without_same_draft)
+            combined_dfs = pd.concat([draft_df, approved_df])
+            symmetric_difference = combined_dfs.drop_duplicates(keep=False)
+
             employee_dt_pairs_list = list(
-                employee_dates_to_approve.values_list('employee_id', 'dt').order_by('employee_id', 'dt').distinct())
+                symmetric_difference[['employee_id', 'dt']].sort_values(
+                    ['employee_id', 'dt'], ascending=[True, True]).values.tolist())
             worker_dates_dict = {}
             for employee_id, dates_grouper in groupby(employee_dt_pairs_list, key=lambda i: i[0]):
                 worker_dates_dict[employee_id] = tuple(i[1] for i in list(dates_grouper))
@@ -448,6 +459,8 @@ class WorkerDayViewSet(BaseModelViewSet):
                         ))
 
                 if not serializer.data['is_fact'] and settings.SEND_DOCTORS_MIS_SCHEDULE_ON_CHANGE:
+                    # TODO: при нескольких workerday скорее всего будет работать некорректно,
+                    #   должны ли мы это поддерживать?
                     from src.celery.tasks import send_doctors_schedule_to_mis
                     mis_data_qs = wdays_to_approve.annotate(
                         approved_wd_type_id=Subquery(WorkerDay.objects.filter(

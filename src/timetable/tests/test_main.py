@@ -4235,7 +4235,6 @@ class TestAditionalFunctions(TestsHelperMixin, APITestCase):
         self.assertEqual(WorkerDay.objects.filter(is_fact=False, is_approved=False, dt__gte=dt_to_first, dt__lte=dt_to_last, type='V').count(), 3)
         self.assertEqual(WorkerDay.objects.filter(is_fact=False, is_approved=False, dt__gte=dt_to_first, dt__lte=dt_to_last, type='W').count(), 5)
         self.assertEqual(WorkerDay.objects.filter(is_fact=False, is_approved=False, dt__gte=dt_to_first, dt__lte=dt_to_last, type='H').count(), 0)
-        
 
     def test_copy_range_bad_dates(self):
         dt_from_first = date.today().replace(day=1)
