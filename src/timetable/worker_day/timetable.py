@@ -41,6 +41,7 @@ MULTIPLE_WDAYS_DIVIDER = '/'
 PARSE_CELL_STR_PATTERN = re.compile(
     r'(?P<excel_code>[а-яА-ЯA-Za-z])?(?P<time_str>\d{1,2}:\d{1,2}\s*[' + r'\\'.join(DIVIDERS) + r']\s*\d{1,2}\:\d{1,2})')
 
+
 class BaseUploadDownloadTimeTable:
     def __init__(self, user=None):
         self.user = user

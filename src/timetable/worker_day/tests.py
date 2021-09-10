@@ -697,6 +697,7 @@ class TestUploadDownload(APITestCase):
         WorkType.objects.create(work_type_name=WorkTypeName.objects.create(name='Кассы'), shop_id=self.shop.id)
         self.url = '/rest_api/worker_day/'
         self.network.add_users_from_excel = True
+        self.network.allow_creation_several_wdays_for_one_employee_for_one_date = True
         self.network.save()
         self.client.force_authenticate(user=self.user1)
 
@@ -705,15 +706,13 @@ class TestUploadDownload(APITestCase):
         response = self.client.post(f'{self.url}upload/', {'shop_id': self.shop.id, 'file': file}, HTTP_ACCEPT_LANGUAGE='ru')
         file.close()
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(WorkerDay.objects.filter(is_approved=False).count(), 180)
+        self.assertEqual(WorkerDay.objects.filter(is_approved=False).count(), 181)
         self.assertEquals(User.objects.filter(last_name='Смешнов').count(), 1)
         user = User.objects.filter(last_name='Смешнов').first()
         self.assertEquals(Employee.objects.filter(user=user).count(), 2)
         self.assertTrue(Employee.objects.filter(tabel_code='A23739').exists())
 
     def test_upload_timetable(self):
-        self.network.allow_creation_several_wdays_for_one_employee_for_one_date = True
-        self.network.save()
         file = open('etc/scripts/timetable.xlsx', 'rb')
         with override_settings(UPLOAD_TT_MATCH_EMPLOYMENT=False):
             response = self.client.post(f'{self.url}upload/', {'shop_id': self.shop.id, 'file': file}, HTTP_ACCEPT_LANGUAGE='ru')
@@ -753,7 +752,7 @@ class TestUploadDownload(APITestCase):
             response = self.client.post(f'{self.url}upload/', {'shop_id': self.shop.id, 'file': file}, HTTP_ACCEPT_LANGUAGE='ru')
         file.close()
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(WorkerDay.objects.filter(is_approved=False).count(), 180)
+        self.assertEqual(WorkerDay.objects.filter(is_approved=False).count(), 181)
         self.assertEquals(User.objects.filter(last_name='Смешнов').count(), 2)
         user1 = User.objects.filter(last_name='Смешнов').first()
         user2 = User.objects.filter(last_name='Смешнов').last()
@@ -767,7 +766,7 @@ class TestUploadDownload(APITestCase):
             response = self.client.post(f'{self.url}upload/', {'shop_id': self.shop.id, 'file': file}, HTTP_ACCEPT_LANGUAGE='ru')
         file.close()
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(WorkerDay.objects.filter(is_approved=False).count(), 180)
+        self.assertEqual(WorkerDay.objects.filter(is_approved=False).count(), 181)
         self.assertEquals(User.objects.filter(last_name='Смешнов').count(), 2)
         user1 = User.objects.filter(last_name='Смешнов').first()
         user2 = User.objects.filter(last_name='Смешнов').last()
