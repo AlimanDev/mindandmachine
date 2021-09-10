@@ -938,7 +938,7 @@ class ProductionDay(AbstractModel):
         return cls.objects.filter(
             q,
             id=Subquery(prod_cal_subq.values_list('id', flat=True)[:1])
-        )
+        ).distinct()
 
     @classmethod
     def get_norm_work_hours(cls, region_id, year, month=None):
@@ -1433,6 +1433,7 @@ class FunctionGroup(AbstractModel):
         ('PeriodClients_upload', 'Загрузить нагрузку (Создать) (timeserie_value/upload/)'),
         ('PeriodClients_download', 'Скачать нагрузку (Получить) (timeserie_value/download/)'),
         ('Receipt', 'Чек (receipt)'),
+        ('Reports_pivot_tabel', 'Скачать сводный табель (Получить) (report/pivot_tabel/)'),
         ('Group', 'Группа доступа (group)'),
         ('Shop', 'Отдел (department)'),
         ('Shop_stat', 'Статистика по отделам (Получить) (department/stat/)'),

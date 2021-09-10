@@ -9,6 +9,7 @@ URV_VIOLATORS_REPORT = 'urv_violators_report'
 URV_STAT_V2 = 'urv_stat_v2'
 UNACCOUNTED_OVERTIME = 'unaccounted_overtime'
 OVERTIMES_UNDERTIMES = 'overtimes_undertimes'
+PIVOT_TABEL = 'pivot_tabel'
 
 class DatesReportMixin:
     @staticmethod
@@ -82,3 +83,21 @@ class UndertimesOvertimesReport(BaseRegisteredReport):
     def get_file(self):
         from src.reports.utils.overtimes_undertimes import overtimes_undertimes_xlsx
         return overtimes_undertimes_xlsx(period_step=self.context.get('period_step', 6), shop_ids=self.context.get('shop_ids', []), in_memory=True)
+
+class PivotTabelReport(BaseRegisteredReport, DatesReportMixin):
+    name = 'Сводный табель'
+    code = PIVOT_TABEL
+
+    def get_file(self):
+        from src.reports.utils.pivot_tabel import PlanAndFactPivotTabel
+        dt_from, dt_to = self.get_dates(self.context)
+        title = f'Pivot_tabel_{dt_from}-{dt_to}.xlsx'
+        pt = PlanAndFactPivotTabel()
+        shop_filter = {}
+        if self.context.get('shop_ids'):
+            shop_filter['shop_id__in'] = self.context.get('shop_ids')
+        return {
+            'name': title,
+            'file': pt.get_pivot_file(dt__gte=dt_from, dt__lte=dt_to, shop__network_id=self.network_id, **shop_filter),
+            'type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        }

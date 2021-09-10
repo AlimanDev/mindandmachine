@@ -722,6 +722,14 @@ class TestUploadDownload(APITestCase):
         user = User.objects.filter(last_name='Смешнов').first()
         self.assertEquals(Employee.objects.filter(user=user).count(), 2)
 
+    def test_upload_timetable_leading_zeros(self):
+        file = open('etc/scripts/timetable_leading_zeros.xlsx', 'rb')
+        response = self.client.post(f'{self.url}upload/', {'shop_id': self.shop.id, 'file': file}, HTTP_ACCEPT_LANGUAGE='ru')
+        file.close()
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(WorkerDay.objects.filter(is_approved=False).count(), 60)
+        self.assertTrue(Employee.objects.filter(tabel_code='0028479').exists())
+
     def test_cant_upload_timetable_with_time_overlap_for_user(self):
         file = open('etc/scripts/timetable_overlap.xlsx', 'rb')
         with override_settings(UPLOAD_TT_MATCH_EMPLOYMENT=False):
@@ -779,6 +787,16 @@ class TestUploadDownload(APITestCase):
         response = self.client.get(
             f'{self.url}download_timetable/?shop_id={self.shop.id}&dt_from=2020-04-01&is_approved=False')
         tabel = pandas.read_excel(io.BytesIO(response.content))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(tabel[tabel.columns[1]][0], 'Магазин: Shop1') #fails with python > 3.6
+        self.assertEqual(tabel[tabel.columns[1]][12], 'Иванов Иван Иванович')
+        self.assertEqual(tabel[tabel.columns[27]][15], 'В')
+        self.network.set_settings_value('download_timetable_norm_field', 'sawh_hours')
+        self.network.save()
+        response = self.client.get(
+            f'{self.url}download_timetable/?shop_id={self.shop.id}&dt_from=2020-04-01&is_approved=False')
+        tabel = pandas.read_excel(io.BytesIO(response.content))
+        print(tabel)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(tabel[tabel.columns[1]][0], 'Магазин: Shop1') #fails with python > 3.6
         self.assertEqual(tabel[tabel.columns[1]][12], 'Иванов Иван Иванович')

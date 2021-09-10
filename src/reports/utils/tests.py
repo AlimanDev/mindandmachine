@@ -1,3 +1,4 @@
+from src.reports.utils.pivot_tabel import PlanAndFactPivotTabel
 from src.util.dg.helpers import MONTH_NAMES
 from dateutil.relativedelta import relativedelta
 from src.base.models import Employee, ProductionDay
@@ -619,3 +620,79 @@ class TestOvertimesUndertimes(APITestCase):
         self._test_accounting_period_xlsx(3)
         self._test_accounting_period_xlsx(6)
         self._test_accounting_period_xlsx(12)
+
+class TestPivotTabel(APITestCase):
+    USER_USERNAME = "user1"
+    USER_EMAIL = "q@q.q"
+    USER_PASSWORD = "4242"
+
+    def setUp(self):
+        super().setUp()
+        create_departments_and_users(self)
+        self.dt = date.today()
+
+        self.employee1.tabel_code = 'employee1_tabel_code'
+        self.employee3.tabel_code = 'employee3_tabel_code'
+        self.employee4.tabel_code = 'employee4_tabel_code'
+        self.employee1.save()
+        self.employee3.save()
+        self.employee4.save()   
+
+        self._create_worker_day(
+            self.employment1,
+            dttm_work_start=datetime.combine(self.dt, time(13, 45)),
+            dttm_work_end=datetime.combine(self.dt, time(20, 15)),
+            is_approved=True,
+            is_fact=True,
+        )
+        self._create_worker_day(
+            self.employment2,
+            dttm_work_start=datetime.combine(self.dt, time(12)),
+            dttm_work_end=datetime.combine(self.dt + timedelta(1), time(3)),
+            is_approved=True,
+            is_fact=True,
+        )
+        self._create_worker_day(
+            self.employment3,
+            dttm_work_start=datetime.combine(self.dt, time(8)),
+            dttm_work_end=datetime.combine(self.dt, time(20)),
+            is_approved=True,
+            is_fact=True,
+        )
+        self._create_worker_day(
+            self.employment4,
+            dt=self.dt + timedelta(1),
+            dttm_work_start=datetime.combine(self.dt + timedelta(1), time(7)),
+            dttm_work_end=datetime.combine(self.dt + timedelta(1), time(20, 30)),
+            is_approved=True,
+            is_fact=True,
+        )
+
+
+    def _create_worker_day(self, employment, dt=None, is_fact=False, is_approved=False, dttm_work_start=None, dttm_work_end=None, type=WorkerDay.TYPE_WORKDAY):
+        if not dt:
+            dt = self.dt
+        return WorkerDay.objects.create(
+            shop_id=employment.shop_id,
+            type=type,
+            employment=employment,
+            employee=employment.employee,
+            dt=dt,
+            dttm_work_start=dttm_work_start,
+            dttm_work_end=dttm_work_end,
+            is_fact=is_fact,
+            is_approved=is_approved,
+            created_by=self.user1,
+        )
+
+    def test_pivot_tabel(self):
+        pt = PlanAndFactPivotTabel()
+        table = pt.get_pivot_file(dt__gte=self.dt, dt__lte=self.dt + timedelta(1))
+        df = pd.read_excel(table)
+        self.assertEquals(len(df.columns), 8)
+        self.assertEquals(len(df.values), 5)
+        self.assertEquals(list(df.iloc[0, 5:].values), [13.75, 0.00, 13.75])
+        self.assertEquals(list(df.iloc[1, 5:].values), [10.75, 0.00, 10.75])
+        self.assertEquals(list(df.iloc[2, 5:].values), [0.00, 12.25, 12.25])
+        self.assertEquals(list(df.iloc[3, 5:].values), [5.50, 0.00, 5.50])
+        self.assertEquals(list(df.iloc[4, 5:].values), [30.00, 12.25, 42.25])

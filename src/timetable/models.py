@@ -2102,6 +2102,7 @@ class PlanAndFactHours(models.Model):
     dttm_work_end_plan = models.DateTimeField()
     dttm_work_start_fact = models.DateTimeField()
     dttm_work_end_fact = models.DateTimeField()
+    is_outsource = models.BooleanField()
 
     class Meta:
         managed = False
