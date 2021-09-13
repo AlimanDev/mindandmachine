@@ -64,7 +64,6 @@ from src.timetable.worker_day.serializers import (
     CopyRangeSerializer,
     BlockOrUnblockWorkerDayWrapperSerializer,
     RecalcWdaysSerializer,
-    serialize_worker_day,
 )
 from src.timetable.worker_day.stat import count_daily_stat
 from src.timetable.worker_day.tasks import recalc_wdays, recalc_fact_from_records
@@ -155,7 +154,7 @@ class WorkerDayViewSet(BaseModelViewSet):
         if request.query_params.get('hours_details', False):
             data = []
 
-            for worker_day in self.filter_queryset(self.get_queryset().prefetch_related('worker_day_details', 'outsources').select_related('last_edited_by', 'shop__network', 'employee')):
+            for worker_day in self.filter_queryset(self.get_queryset().prefetch_related(Prefetch('worker_day_details', to_attr='worker_day_details_list'), Prefetch('outsources', to_attr='outsources_list')).select_related('last_edited_by', 'shop__network', 'employee')):
                 wd_dict = WorkerDayListSerializer(worker_day, context=self.get_serializer_context()).data
                 work_hours, work_hours_day, work_hours_night = worker_day.calc_day_and_night_work_hours()
                 wd_dict['work_hours'] = work_hours
@@ -165,13 +164,10 @@ class WorkerDayViewSet(BaseModelViewSet):
                 }
                 data.append(wd_dict)
         else:
-            data = [
-                serialize_worker_day(wd) for wd in self.filter_queryset(self.get_queryset().prefetch_related(Prefetch('worker_day_details', to_attr='worker_day_details_list'), Prefetch('outsources', to_attr='outsources_list')).select_related('last_edited_by', 'employee'))
-            ]
-            # WorkerDayListSerializer(
-            #     self.filter_queryset(self.get_queryset().prefetch_related('worker_day_details', 'outsources').select_related('last_edited_by', 'employee')),
-            #     many=True, context=self.get_serializer_context()
-            # ).data
+            data = WorkerDayListSerializer(
+                self.filter_queryset(self.get_queryset().prefetch_related(Prefetch('worker_day_details', to_attr='worker_day_details_list'), Prefetch('outsources', to_attr='outsources_list')).select_related('last_edited_by', 'employee')),
+                many=True, context=self.get_serializer_context()
+            ).data
 
         if request.query_params.get('fill_empty_days', False):
             employment__tabel_code__in = [
@@ -1068,7 +1064,7 @@ class WorkerDayViewSet(BaseModelViewSet):
             WorkerDay.check_work_time_overlap(
                 employee_id__in=data['employee_ids'], dt__in=data['dates'], exc_cls=ValidationError)
         
-        return Response(WorkerDayListSerializer(wds.prefetch_related('worker_day_details').select_related('last_edited_by'), many=True, context={'request':request}).data)
+        return Response(WorkerDayListSerializer(wds.prefetch_related(Prefetch('worker_day_details', to_attr='worker_day_details_list')).select_related('last_edited_by'), many=True, context={'request':request}).data)
 
     @swagger_auto_schema(
         request_body=DuplicateSrializer,

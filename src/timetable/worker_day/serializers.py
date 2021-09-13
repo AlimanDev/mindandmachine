@@ -78,38 +78,6 @@ class WorkerDayCashboxDetailsListSerializer(serializers.Serializer):
     work_type_id = serializers.IntegerField()
     work_part = serializers.FloatField()
 
-def serialize_worker_day(wd: WorkerDay, request):
-    work_hours = None
-    if isinstance(wd.work_hours, timedelta):
-        work_hours = wd.rounded_work_hours
-    work_hours = wd.work_hours
-    return {
-        'id': wd.id,
-        'worker_id': wd.employee.user_id,
-        'employee_id': wd.employee_id,
-        'shop_id': wd.shop_id,
-        'employment_id': wd.employment_id,
-        'type': wd.type,
-        'dt': wd.dt,
-        'dttm_work_start': wd.dttm_work_start,
-        'dttm_work_end': wd.dttm_work_end,
-        'dttm_work_start_tabel': wd.dttm_work_start_tabel,
-        'dttm_work_end_tabel': wd.dttm_work_end_tabel,
-        'comment': wd.comment,
-        'is_approved': wd.is_approved,
-        'is_fact': wd.is_fact,
-        'work_hours': work_hours,
-        'shop_code': getattr(wd, 'shop_code', None),
-        'user_login': getattr(wd, 'user_login', None),
-        'employment_tabel_code': getattr(wd, 'employment_tabel_code', None),
-        'created_by_id': wd.created_by_id,
-        'dttm_modified': wd.dttm_modified,
-        'is_blocked': wd.is_blocked,
-        'unaccounted_overtime': UnaccountedOvertimeMixin().unaccounted_overtime_getter(wd),
-        'worker_day_details': WorkerDayCashboxDetailsListSerializer(wd.worker_day_details_list, many=True).data,
-        'outsources': NetworkListSerializer(wd.outsources_list, many=True).data,
-        'last_edited_by': UserShorSerializer(wd.last_edited_by).data,
-    }
 
 class WorkerDayListSerializer(serializers.Serializer, UnaccountedOvertimeMixin):
     id = serializers.IntegerField()
@@ -125,8 +93,8 @@ class WorkerDayListSerializer(serializers.Serializer, UnaccountedOvertimeMixin):
     dttm_work_end_tabel = serializers.DateTimeField(default=None)
     comment = serializers.CharField()
     is_approved = serializers.BooleanField()
-    worker_day_details = WorkerDayCashboxDetailsListSerializer(many=True)
-    outsources = NetworkListSerializer(many=True, required=False)
+    worker_day_details = WorkerDayCashboxDetailsListSerializer(many=True, source='worker_day_details_list')
+    outsources = NetworkListSerializer(many=True, required=False, source='outsources_list')
     is_fact = serializers.BooleanField()
     work_hours = serializers.SerializerMethodField()
     shop_code = serializers.CharField(required=False)
