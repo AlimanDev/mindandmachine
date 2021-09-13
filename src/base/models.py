@@ -203,6 +203,10 @@ class Network(AbstractActiveModel):
     run_recalc_fact_from_att_records_on_plan_approve = models.BooleanField(
         default=False, verbose_name='Запускать пересчет факта на основе отметок при подтверждении плана',
     )
+    edit_manual_fact_on_recalc_fact_from_att_records = models.BooleanField(
+        default=False,
+        verbose_name='Изменять ручные корректировки при пересчете факта на основе отметок (при подтверждения плана)',
+    )
     set_closest_plan_approved_delta_for_manual_fact = models.PositiveIntegerField(
         verbose_name='Макс. разница времени начала и времени окончания в факте и в плане '
                      'при проставлении ближайшего плана в ручной факт (в секундах)',

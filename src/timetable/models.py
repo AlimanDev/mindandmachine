@@ -1287,7 +1287,7 @@ class WorkerDay(AbstractModel):
         )
 
     @classmethod
-    def set_closest_plan_approved(cls, q_obj, is_approved, delta_in_secs):
+    def set_closest_plan_approved(cls, q_obj, delta_in_secs, is_approved=None):
         """
         Метод проставления closest_plan_approved в факте
 
@@ -1296,12 +1296,15 @@ class WorkerDay(AbstractModel):
         :param delta_in_secs: максимальное отклонения в секундах времени начала и времени окончания в плане и в факте
         """
         if q_obj:
-            cls.objects.filter(
-                q_obj,
+            filter_kwargs = dict(
                 is_fact=True,
-                is_approved=is_approved,
-                last_edited_by__isnull=False,  # вспомнить, почему только ручные?? -- забыл)
                 closest_plan_approved__isnull=True,
+            )
+            if is_approved is not None:
+                filter_kwargs['is_approved'] = is_approved
+
+            cls.objects.filter(
+                q_obj, **filter_kwargs,
             ).update(
                 closest_plan_approved=Subquery(cls.get_closest_plan_approved_q(
                     employee_id=OuterRef('employee_id'),
@@ -1802,6 +1805,8 @@ class AttendanceRecords(AbstractModel):
                         type=fact_approved_to_copy.type,
                         is_vacancy=fact_approved_to_copy.is_vacancy,
                         is_outsource=fact_approved_to_copy.is_outsource,
+                        created_by_id=fact_approved_to_copy.created_by_id,
+                        last_edited_by_id=fact_approved_to_copy.last_edited_by_id,
                     )
                     WorkerDay.check_work_time_overlap(
                         employee_id=fact_approved.employee_id, dt=fact_approved.dt, is_fact=True)
@@ -1839,7 +1844,7 @@ class AttendanceRecords(AbstractModel):
             )
         return fact_approved_extra_q
 
-    def save(self, *args, **kwargs):
+    def save(self, *args, recalc_fact_from_att_records=False, **kwargs):
         """
         Создание WorkerDay при занесении отметок.
         """
@@ -1865,6 +1870,10 @@ class AttendanceRecords(AbstractModel):
             ).order_by('-is_equal_shops', '-is_closest_plan_approved_equal').first()
 
             if fact_approved:
+                if fact_approved.last_edited_by_id and (
+                        recalc_fact_from_att_records and not self.user.network.edit_manual_fact_on_recalc_fact_from_att_records):
+                    return
+
                 # если это отметка о приходе, то не перезаписываем время начала работы в графике
                 # если время отметки больше, чем время начала работы в существующем графике
                 skip_condition = (self.type == self.TYPE_COMING) and \
@@ -1873,6 +1882,7 @@ class AttendanceRecords(AbstractModel):
                     return
 
                 setattr(fact_approved, self.TYPE_2_DTTM_FIELD[self.type], self.dttm)
+                # TODO: проставление такого же типа как в плане? (тест + проверить)
                 setattr(fact_approved, 'type_id', WorkerDay.TYPE_WORKDAY)
                 if not fact_approved.worker_day_details.exists():
                     self._create_wd_details(self.dt, fact_approved, active_user_empl, closest_plan_approved)
@@ -1892,6 +1902,7 @@ class AttendanceRecords(AbstractModel):
                     # то обновляем время окончания предыдущей смены. (условие в closest_plan_approved_q)
                     if prev_fa_wd:
                         setattr(prev_fa_wd, self.TYPE_2_DTTM_FIELD[self.type], self.dttm)
+                        # TODO: проставление такого же типа как в плане? (тест + проверить)
                         setattr(prev_fa_wd, 'type_id', WorkerDay.TYPE_WORKDAY)
                         prev_fa_wd.save()
                         # логично дату предыдущую ставить, так как это значение в отчетах используется

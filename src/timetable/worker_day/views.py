@@ -101,6 +101,7 @@ class WorkerDayViewSet(BaseModelViewSet):
     filter_backends = [MultiShopsFilterBackend]
     openapi_tags = ['WorkerDay',]
 
+
     def get_queryset(self):
         queryset = WorkerDay.objects.filter(canceled=False).prefetch_related('outsources')
 
@@ -571,15 +572,24 @@ class WorkerDayViewSet(BaseModelViewSet):
                 if not serializer.data['is_fact']:
                     # удаляется факт автоматический, связанный с удаляемым планом
                     WorkerDay.objects.filter(
-                        created_by__isnull=True,
                         last_edited_by__isnull=True,
                         closest_plan_approved__in=wdays_to_delete,
                     ).delete()
 
                 wdays_to_delete.delete()
 
+                wdays_to_approve.update(is_approved=True)
+                WorkerDay.set_closest_plan_approved(
+                    q_obj=employee_days_q,
+                    is_approved=True if serializer.data['is_fact'] else None,
+                    delta_in_secs=shop.network.set_closest_plan_approved_delta_for_manual_fact,
+                )
                 approved_wds_list = list(
-                    wdays_to_approve.select_related(
+                    WorkerDay.objects.filter(
+                        employee_days_q,
+                        is_approved=True,
+                        is_fact=serializer.data['is_fact'],
+                    ).select_related(
                         'shop',
                         'employment',
                         'employment__position',
@@ -588,16 +598,6 @@ class WorkerDayViewSet(BaseModelViewSet):
                     ).prefetch_related(
                         'worker_day_details',
                     ).distinct()
-                )
-
-                wdays_to_approve.update(is_approved=True)
-
-                # TODO: тесты
-                #   что будет если время начала или время конца null?
-                WorkerDay.set_closest_plan_approved(
-                    q_obj=employee_days_q,
-                    is_approved=True,
-                    delta_in_secs=shop.network.set_closest_plan_approved_delta_for_manual_fact,
                 )
 
                 not_approved_wds_list = WorkerDay.objects.bulk_create(
@@ -666,10 +666,7 @@ class WorkerDayViewSet(BaseModelViewSet):
                             exc_cls=ValidationError,
                         )
 
-                # TODO: нужно ли как-то разделять события подтверждения факта и плана?
                 event_context = serializer.data.copy()
-                # TODO: добавлять ли детальную информацию о подтвержденных днях в контекст?
-                # event_context['grouped_worker_dates'] = grouped_worker_dates
                 transaction.on_commit(lambda: event_signal.send(
                     sender=None,
                     network_id=request.user.network_id,
@@ -681,7 +678,7 @@ class WorkerDayViewSet(BaseModelViewSet):
 
                 # запустим с небольшой задержкой, чтобы успели пересчитаться часы в факте
                 transaction.on_commit(lambda: calc_timesheets.apply_async(
-                    countdown=2,
+                    countdown=3,
                     kwargs=dict(
                         employee_id__in=list(worker_dates_dict.keys())
                     ))
@@ -1096,7 +1093,7 @@ class WorkerDayViewSet(BaseModelViewSet):
                         is_fact=is_copying_to_fact,
                         is_approved=False,
                         type=wd.type,
-                        created_by_id=wd.created_by_id,
+                        created_by_id=wd.created_by_id,  # TODO: нужен last_edited_by_id ?
                         is_vacancy=wd.is_vacancy,
                         is_outsource=wd.is_outsource,
                         comment=wd.comment,

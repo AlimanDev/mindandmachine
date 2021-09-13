@@ -259,7 +259,7 @@ def copy_as_excel_cells(from_employee_id, from_dates, to_employee_id, to_dates, 
                         dt_to, blank_day.dttm_work_end.timetz()) if blank_day.dttm_work_end else None,
                     is_approved=False,
                     is_fact=False,
-                    created_by_id=created_by,
+                    created_by_id=created_by,  # TODO: нужен last_edited_by_id ?
                 )
                 created_wds.append(new_wd)
 
@@ -310,7 +310,13 @@ def create_fact_from_attendance_records(dt_from=None, dt_to=None, shop_ids=None,
         )
         if shop_ids:
             q &= Q(shop_id__in=shop_ids)
-    att_records = AttendanceRecords.objects.filter(q).order_by('user_id', 'dttm')
+    att_records = AttendanceRecords.objects.filter(q).select_related(
+        'shop',
+        'user__network',
+    ).order_by(
+        'user_id',
+        'dttm'
+    )
 
     with transaction.atomic():
         wds_q = Q(
@@ -335,7 +341,7 @@ def create_fact_from_attendance_records(dt_from=None, dt_to=None, shop_ids=None,
             if record.terminal:
                 record.type = None
                 record.employee_id = None
-            record.save()
+            record.save(recalc_fact_from_att_records=True)
 
 
 def create_worker_days_range(dates, type_id=WorkerDay.TYPE_WORKDAY, shop_id=None, employee_id=None, tm_work_start=None, tm_work_end=None, cashbox_details=[], is_approved=False, is_vacancy=False, outsources=[], created_by=None):

@@ -1,12 +1,12 @@
 import json
+import time as time_module
 import uuid
 from datetime import timedelta, time, datetime, date
-from unittest import mock, expectedFailure
-import time as time_module
+from unittest import mock
 
 from dateutil.relativedelta import relativedelta
 from django.core import mail
-from django.db import transaction
+from django.db import transaction, IntegrityError
 from django.test import override_settings
 from django.urls import reverse
 from django.utils.timezone import now
@@ -15,7 +15,6 @@ from rest_framework.test import APITestCase
 
 from src.base.models import (
     Break,
-    FunctionGroup,
     Network,
     Employment,
     Region,
@@ -547,6 +546,117 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(WorkerDay.objects.filter(is_fact=False, is_approved=True).count(), 2)
         self.assertEqual(WorkerDay.objects.filter(is_fact=True, is_approved=True).count(), 2)
+
+    @override_settings(CELERY_TASK_ALWAYS_EAGER=True)
+    def test_edit_manual_fact_on_recalc_fact_from_att_records_is_working(self):
+        """
+        1. Включены настройки "Считать только те фактические часы,
+         которые есть в подтвержденном плановом графике"
+         и "Запускать пересчет факта на основе отметок при подтверждении плана".
+        2. У сотрудника подтвержденный план 12:00-20:00.
+        3. Сотрудник в УРВ отметился в 10:59 на приход и в 19:05 на уход.
+        4. Директор/супервайзер изменил факт на 11:00-19:00 и подтвердил факт.
+        5. Директор/супервайзер изменил план с 12:00-20:00 на 11:00-19:00, подтвердил.
+            При этом запустился пересчет фактического графика на основе отметок.
+        5.1. При включенной настройке "Изменять ручные корректировки при пересчете факта на основе отметок (при подтверждения плана)"
+            факт, скорректированный вручную, скорректируется на основе отметоки снова станет раным 10:59-19:05.
+        5.2. При выключенной настройке "Изменять ручные корректировки при пересчете факта на основе отметок (при подтверждения плана)"
+            факт, скорректированный вручную, будет пропущен и останется 11:00-19:00
+        """
+        self.network.run_recalc_fact_from_att_records_on_plan_approve = True
+        self.network.only_fact_hours_that_in_approved_plan = True
+        self.network.save()
+        WorkerDay.objects.all().delete()
+
+        today = date.today()
+        plan_approved = WorkerDayFactory(
+            employee=self.employee2,
+            employment=self.employment2,
+            dt=today,
+            dttm_work_start=datetime.combine(today, time(12)),
+            dttm_work_end=datetime.combine(today, time(20)),
+            type_id=WorkerDay.TYPE_WORKDAY,
+            shop=self.shop,
+            is_approved=True,
+            is_fact=False,
+        )
+        plan_not_approved = WorkerDayFactory(
+            employee=self.employee2,
+            employment=self.employment2,
+            dt=today,
+            dttm_work_start=datetime.combine(today, time(12)),
+            dttm_work_end=datetime.combine(today, time(20)),
+            type_id=WorkerDay.TYPE_WORKDAY,
+            shop=self.shop,
+            is_approved=False,
+            is_fact=False,
+        )
+        self._create_att_record(
+            AttendanceRecords.TYPE_COMING, datetime.combine(today, time(10, 59)), self.user2.id, self.employee2.id,
+            self.shop.id, terminal=False)
+        self._create_att_record(
+            AttendanceRecords.TYPE_LEAVING, datetime.combine(today, time(19, 5)), self.user2.id, self.employee2.id,
+            self.shop.id, terminal=False)
+
+        fact_approved = WorkerDay.objects.filter(is_fact=True, is_approved=True).first()
+        self.assertIsNotNone(fact_approved)
+        self.assertEqual(fact_approved.dttm_work_start, datetime.combine(today, time(10, 59)))
+        self.assertEqual(fact_approved.dttm_work_end, datetime.combine(today, time(19, 5)))
+        self.assertIsNone(fact_approved.last_edited_by_id)
+        self.assertEqual(fact_approved.closest_plan_approved_id, plan_approved.id)
+        fact_not_approved = WorkerDay.objects.filter(is_fact=True, is_approved=False).first()
+        self.assertIsNotNone(fact_not_approved)
+
+        fact_not_approved.last_edited_by_id = self.user1.id
+        fact_not_approved.dttm_work_start = datetime.combine(today, time(11))
+        fact_not_approved.dttm_work_end = datetime.combine(today, time(19))
+        fact_not_approved.save()
+        resp = self._approve(self.shop.id, True, today, today)
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        fact_not_approved.refresh_from_db()
+        self.assertTrue(fact_not_approved.is_approved)
+        fact_approved = fact_not_approved  # подтв. версия замещена черновиком
+        self.assertEqual(fact_approved.closest_plan_approved_id, plan_approved.id)
+
+        plan_not_approved.dttm_work_start = datetime.combine(today, time(11))
+        plan_not_approved.dttm_work_end = datetime.combine(today, time(19))
+        plan_not_approved.save()
+
+        try:
+            with transaction.atomic():
+                resp = self._approve(self.shop.id, False, today, today)
+                self.assertEqual(resp.status_code, status.HTTP_200_OK)
+                plan_not_approved.refresh_from_db()
+                self.assertTrue(plan_not_approved.is_approved)
+                plan_approved = plan_not_approved  # подтв. версия замещена черновиком
+
+                # по умолчанию настройка выключена, т.е. факт не должен измениться
+                fact_approved.refresh_from_db()
+                self.assertEqual(fact_approved.dttm_work_start, datetime.combine(today, time(11)))
+                self.assertEqual(fact_approved.dttm_work_end, datetime.combine(today, time(19)))
+                self.assertEqual(fact_approved.closest_plan_approved_id, plan_approved.id)
+                raise IntegrityError
+        except IntegrityError:
+            pass
+
+        try:
+            with transaction.atomic():
+                self.network.edit_manual_fact_on_recalc_fact_from_att_records = True
+                self.network.save()
+                resp = self._approve(self.shop.id, False, today, today)
+                self.assertEqual(resp.status_code, status.HTTP_200_OK)
+                plan_not_approved.refresh_from_db()
+                self.assertTrue(plan_not_approved.is_approved)
+                plan_approved = plan_not_approved  # подтв. версия замещена черновиком
+
+                # настройка выключена, т.е. факт должен измениться
+                fact_approved.refresh_from_db()
+                self.assertEqual(fact_approved.dttm_work_start, datetime.combine(today, time(10, 59)))
+                self.assertEqual(fact_approved.dttm_work_end, datetime.combine(today, time(19, 5)))
+                self.assertEqual(fact_approved.closest_plan_approved_id, plan_approved.id)
+                raise IntegrityError
+        except IntegrityError:
+            pass
 
     def test_fact_date_fixed_after_plan_approve(self):
         """

@@ -421,7 +421,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
                     employee_id=wd['employee_id'],
                     dttm_work_start=wd['dttm_work_start'],
                     dttm_work_end=wd['dttm_work_end'],
-                    created_by_id=wd['created_by_id'],
+                    created_by_id=wd['created_by_id'],  # TODO: не нужен last_edited_by_id ?
                     shop_id=wd.get('shop_id'),
                 )
                 wd_mod.work_type_id = wd['work_types__id'] if wd['work_types__id'] else None
