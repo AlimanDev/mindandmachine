@@ -39,7 +39,7 @@ from src.timetable.models import (
     GroupWorkerDayPermission,
     EmploymentWorkType,
 )
-from src.timetable.tests.factories import WorkerDayFactory
+from src.timetable.tests.factories import WorkerDayFactory, WorkerDayTypeFactory
 from src.util.mixins.tests import TestsHelperMixin
 from src.util.models_converter import Converter
 from src.util.test import create_departments_and_users
@@ -657,6 +657,49 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
                 raise IntegrityError
         except IntegrityError:
             pass
+
+    def test_att_record_fact_type_id_received_from_closest_plan(self):
+        WorkerDay.objects.all().delete()
+        san_day_wd_type = WorkerDayTypeFactory(
+            code='SD',
+            name='Санитарный день',
+            short_name='C/Д',
+            html_color='#f7f7f7',
+            use_in_plan=True,
+            use_in_fact=True,
+            excel_load_code='СД',
+            is_dayoff=False,
+            is_work_hours=False,
+            is_reduce_norm=False,
+            is_system=False,
+            show_stat_in_days=True,
+            show_stat_in_hours=True,
+            ordering=0,
+        )
+
+        today = date.today()
+        plan_approved = WorkerDayFactory(
+            employee=self.employee2,
+            employment=self.employment2,
+            dt=today,
+            dttm_work_start=datetime.combine(today, time(10)),
+            dttm_work_end=datetime.combine(today, time(20)),
+            type_id=san_day_wd_type.code,
+            shop=self.shop,
+            is_approved=True,
+            is_fact=False,
+        )
+
+        self._create_att_record(
+            AttendanceRecords.TYPE_COMING, datetime.combine(today, time(10, 2)), self.user2.id, self.employee2.id,
+            self.shop.id, terminal=False)
+        self._create_att_record(
+            AttendanceRecords.TYPE_LEAVING, datetime.combine(today, time(19, 55)), self.user2.id, self.employee2.id,
+            self.shop.id, terminal=False)
+
+        fact_approved = WorkerDay.objects.get(is_fact=True, is_approved=True)
+        self.assertEqual(fact_approved.closest_plan_approved_id, plan_approved.id)
+        self.assertEqual(fact_approved.type_id, san_day_wd_type.code)
 
     def test_fact_date_fixed_after_plan_approve(self):
         """

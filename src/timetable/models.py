@@ -954,7 +954,7 @@ class WorkerDay(AbstractModel):
             dt__lte=dt + datetime.timedelta(1),
             is_approved=True,
             is_fact=False,
-            type_id=WorkerDay.TYPE_WORKDAY,
+            type__is_dayoff=False,
         ).annotate(
             is_equal_shops=Case(
                 When(shop_id=priority_shop_id, then=True),
@@ -1883,7 +1883,8 @@ class AttendanceRecords(AbstractModel):
 
                 setattr(fact_approved, self.TYPE_2_DTTM_FIELD[self.type], self.dttm)
                 # TODO: проставление такого же типа как в плане? (тест + проверить)
-                setattr(fact_approved, 'type_id', WorkerDay.TYPE_WORKDAY)
+                setattr(fact_approved, 'type_id',
+                        closest_plan_approved.type_id if closest_plan_approved else WorkerDay.TYPE_WORKDAY)
                 if not fact_approved.worker_day_details.exists():
                     self._create_wd_details(self.dt, fact_approved, active_user_empl, closest_plan_approved)
                 fact_approved.save()
@@ -1902,8 +1903,8 @@ class AttendanceRecords(AbstractModel):
                     # то обновляем время окончания предыдущей смены. (условие в closest_plan_approved_q)
                     if prev_fa_wd:
                         setattr(prev_fa_wd, self.TYPE_2_DTTM_FIELD[self.type], self.dttm)
-                        # TODO: проставление такого же типа как в плане? (тест + проверить)
-                        setattr(prev_fa_wd, 'type_id', WorkerDay.TYPE_WORKDAY)
+                        setattr(prev_fa_wd, 'type_id',
+                                closest_plan_approved.type_id if closest_plan_approved else WorkerDay.TYPE_WORKDAY)
                         prev_fa_wd.save()
                         # логично дату предыдущую ставить, так как это значение в отчетах используется
                         self.dt = prev_fa_wd.dt
