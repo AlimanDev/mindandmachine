@@ -2,10 +2,10 @@ from django.contrib import admin
 
 from .models import (
     EventEmailNotification,
-    EventOnlineNotification,
-    EventWebhookNotification,
-    SmtpServerSettings,
-    WebhookSettings,
+    # EventOnlineNotification,
+    # EventWebhookNotification,
+    # SmtpServerSettings,
+    # WebhookSettings,
 )
 
 
@@ -22,21 +22,21 @@ class EventEmailNotificationAdmin(BaseEventNotificationWithRecipientsAdmin):
     pass
 
 
-@admin.register(EventOnlineNotification)
-class EventOnlineNotificationAdmin(BaseEventNotificationWithRecipientsAdmin):
-    pass
+# @admin.register(EventOnlineNotification)
+# class EventOnlineNotificationAdmin(BaseEventNotificationWithRecipientsAdmin):
+#     pass
 
 
-@admin.register(EventWebhookNotification)
-class EventWebhookNotificationAdmin(BaseEventNotificationAdmin):
-    pass
+# @admin.register(EventWebhookNotification)
+# class EventWebhookNotificationAdmin(BaseEventNotificationAdmin):
+#     pass
 
 
-@admin.register(SmtpServerSettings)
-class SmtpServerSettingsAdmin(admin.ModelAdmin):
-    pass
+# @admin.register(SmtpServerSettings)
+# class SmtpServerSettingsAdmin(admin.ModelAdmin):
+#     pass
 
 
-@admin.register(WebhookSettings)
-class WebhookSettingsAdmin(admin.ModelAdmin):
-    pass
+# @admin.register(WebhookSettings)
+# class WebhookSettingsAdmin(admin.ModelAdmin):
+#     pass
