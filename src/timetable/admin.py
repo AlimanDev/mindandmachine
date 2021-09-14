@@ -291,7 +291,7 @@ class WorkerDayTypeAdmin(admin.ModelAdmin):
         'code',
         'name',
         'use_in_plan',
-        'use_in_plan',
+        'use_in_fact',
         'excel_load_code',
         'is_dayoff',
         'is_work_hours',
