@@ -1,6 +1,8 @@
 import datetime
 import json
 from itertools import groupby
+
+from django.db.models.query import Prefetch
 from src.reports.utils.overtimes_undertimes import overtimes_undertimes_xlsx
 
 import pandas as pd
@@ -152,7 +154,7 @@ class WorkerDayViewSet(BaseModelViewSet):
         if request.query_params.get('hours_details', False):
             data = []
 
-            for worker_day in self.filter_queryset(self.get_queryset().prefetch_related('worker_day_details', 'outsources').select_related('last_edited_by', 'shop__network', 'employee')):
+            for worker_day in self.filter_queryset(self.get_queryset().prefetch_related(Prefetch('worker_day_details', to_attr='worker_day_details_list'), Prefetch('outsources', to_attr='outsources_list')).select_related('last_edited_by', 'shop__network', 'employee')):
                 wd_dict = WorkerDayListSerializer(worker_day, context=self.get_serializer_context()).data
                 work_hours, work_hours_day, work_hours_night = worker_day.calc_day_and_night_work_hours()
                 wd_dict['work_hours'] = work_hours
@@ -163,7 +165,7 @@ class WorkerDayViewSet(BaseModelViewSet):
                 data.append(wd_dict)
         else:
             data = WorkerDayListSerializer(
-                self.filter_queryset(self.get_queryset().prefetch_related('worker_day_details', 'outsources').select_related('last_edited_by', 'employee')),
+                self.filter_queryset(self.get_queryset().prefetch_related(Prefetch('worker_day_details', to_attr='worker_day_details_list'), Prefetch('outsources', to_attr='outsources_list')).select_related('last_edited_by', 'employee')),
                 many=True, context=self.get_serializer_context()
             ).data
 
@@ -1062,7 +1064,7 @@ class WorkerDayViewSet(BaseModelViewSet):
             WorkerDay.check_work_time_overlap(
                 employee_id__in=data['employee_ids'], dt__in=data['dates'], exc_cls=ValidationError)
         
-        return Response(WorkerDayListSerializer(wds.prefetch_related('worker_day_details').select_related('last_edited_by'), many=True, context={'request':request}).data)
+        return Response(WorkerDayListSerializer(wds.prefetch_related(Prefetch('worker_day_details', to_attr='worker_day_details_list')).select_related('last_edited_by'), many=True, context={'request':request}).data)
 
     @swagger_auto_schema(
         request_body=DuplicateSrializer,
