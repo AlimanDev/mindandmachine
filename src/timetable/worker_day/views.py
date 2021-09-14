@@ -85,7 +85,7 @@ class WorkerDayViewSet(BaseModelViewSet):
         "no_timetable": _("Workers don't have timetable."),
         'cannot_delete': _("Cannot_delete approved version."),
         'na_worker_day_exists': _("Not approved version already exists."),
-        'no_perm_to_approve_wd_types': _('You do not have rights to confirm the day type "{wd_type_str}"'),
+        'no_action_perm_for_wd_type': _('You do not have rights to {action_str} the day type "{wd_type_str}"'),
         'approve_days_interval_restriction': _('You do not have the rights to confirm the type of day "{wd_type_str}" '
                                                'on the selected dates. '
                                                'You need to change the interval for approve. '

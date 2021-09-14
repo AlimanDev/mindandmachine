@@ -96,6 +96,10 @@ class BatchUpdateOrCreateModelMixin:
         return True
 
     @classmethod
+    def _batch_update_extra_handler(cls, obj):
+        pass
+
+    @classmethod
     def batch_update_or_create(
             cls, data: list, update_key_field: str = 'id', delete_scope_fields_list: list = None,
             delete_scope_values_list: list = None, stats=None, user=None):
@@ -202,7 +206,7 @@ class BatchUpdateOrCreateModelMixin:
                     objs_data=to_create, rel_objs_mapping=rel_objs_mapping)
                 objs_to_create = [cls(**obj_dict, **cls._get_batch_create_extra_kwargs()) for obj_dict in to_create]
 
-            update_fields = {"dttm_modified"}
+            update_fields_set = {"dttm_modified"}
             if to_update_dict:
                 to_update = list(to_update_dict.values())
                 update_rel_objs_data = cls._pop_rel_objs_data(
@@ -210,8 +214,12 @@ class BatchUpdateOrCreateModelMixin:
                 for update_dict in to_update:
                     update_key = update_dict.get(update_key_field)
                     obj = existing_objs.get(update_key)
-                    update_fields.update(set(f for f in update_dict.keys() if f != cls._meta.pk.name))
-                    obj.update(update_dict=update_dict, save=False)
+                    for k, v in update_dict.items():
+                        setattr(obj, k, v)
+                        update_fields_set.add(k)
+                    extra_update_fields = cls._batch_update_extra_handler(obj)
+                    if extra_update_fields:
+                        update_fields_set.update(extra_update_fields)
                     objs_to_update.append(obj)
 
             objs = objs_to_create + objs_to_update
@@ -243,7 +251,8 @@ class BatchUpdateOrCreateModelMixin:
                     rel_objs_data=create_rel_objs_data, objs=objs_to_create, rel_objs_mapping=rel_objs_mapping, stats=stats)
 
             if objs_to_update:
-                cls.objects.bulk_update(objs_to_update, update_fields)
+                update_fields_set.discard(cls._meta.pk.name)
+                cls.objects.bulk_update(objs_to_update, fields=update_fields_set)
                 cls._batch_update_or_create_rel_objs(
                     rel_objs_data=update_rel_objs_data, objs=objs_to_update, rel_objs_mapping=rel_objs_mapping, stats=stats)
 
@@ -265,13 +274,3 @@ class BatchUpdateOrCreateModelMixin:
             cls._run_batch_update_or_create_transaction_checks(**transaction_checks_kwargs)
 
         return objs, stats
-
-    def update(self, update_dict=None, save=True, **kwargs):
-        if not update_dict:
-            update_dict = kwargs
-        update_fields = {"dttm_modified"}
-        for k, v in update_dict.items():
-            setattr(self, k, v)
-            update_fields.add(k)
-        if save:
-            self.save(update_fields=update_fields)

@@ -19,6 +19,7 @@ from src.base.models import (
 )
 from src.timetable.models import (
     AttendanceRecords,
+    WorkerDayPermission,
     GroupWorkerDayPermission,
     WorkerDay,
     WorkerDayCashboxDetails,
@@ -421,7 +422,10 @@ def check_worker_day_permissions(
         wd_type_display_str = wd_types_dict.get(wd_type_id).name
         if wdp is None:
             raise PermissionDenied(
-                error_messages['no_perm_to_approve_wd_types'].format(wd_type_str=wd_type_display_str))
+                error_messages['no_action_perm_for_wd_type'].format(
+                    wd_type_str=wd_type_display_str,
+                    action_str=WorkerDayPermission.ACTIONS_DICT.get(action).lower()),
+            )
 
         limit_days_in_past = wdp[1]
         limit_days_in_future = wdp[2]

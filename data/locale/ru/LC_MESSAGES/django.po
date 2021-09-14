@@ -1157,8 +1157,8 @@ msgstr "У расписания уже есть неподтвержденная
 
 #: src/timetable/worker_day/views.py:88
 #, python-brace-format
-msgid "You do not have rights to confirm the day type \"{wd_type_str}\""
-msgstr "У вас нет прав на подтверждение типа дня \"{wd_type_str}\""
+msgid "You do not have rights to {action_str} the day type \"{wd_type_str}\""
+msgstr "У вас нет прав на {action_str} типа дня \"{wd_type_str}\""
 
 #: src/timetable/worker_day/views.py:89
 #, python-brace-format

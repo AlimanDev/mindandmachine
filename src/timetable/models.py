@@ -8,7 +8,7 @@ from django.contrib.auth.models import (
 from django.db import models
 from django.db import transaction
 from django.db.models import (
-    Subquery, OuterRef, Max, Q, Case, When, Value, FloatField, F, IntegerField, Exists, BooleanField
+    Subquery, OuterRef, Max, Q, Case, When, Value, FloatField, F, IntegerField, Exists, BooleanField, Min
 )
 from django.db.models import UniqueConstraint
 from django.db.models.functions import Abs, Cast, Extract, Least
@@ -541,7 +541,7 @@ class WorkerDay(AbstractModel):
 
     @classmethod
     def _get_batch_update_select_related_fields(cls):
-        return ['employee', 'shop']
+        return ['employee__user__network', 'shop__network', 'type']
 
     @classmethod
     def _get_batch_delete_scope_fields_list(cls):
@@ -568,15 +568,29 @@ class WorkerDay(AbstractModel):
         from src.timetable.worker_day.utils import check_worker_day_permissions
         from src.timetable.worker_day.views import WorkerDayViewSet
         action = WorkerDayPermission.DELETE
-        for is_fact, wd_type_id, dt, shop_id in delete_qs.values_list('is_fact', 'type_id', 'dt', 'shop_id').distinct():
+        grouped_qs =  delete_qs.values(
+            'is_fact',
+            'type_id',
+            'shop_id',
+        ).annotate(
+            dt_min=Min('dt'),
+            dt_max=Min('dt'),
+        ).values_list(
+            'is_fact',
+            'type_id',
+            'shop_id',
+            'dt_min',
+            'dt_max',
+        ).distinct()
+        for is_fact, wd_type_id, shop_id, dt_min, dt_max in grouped_qs:
             check_worker_day_permissions(
                 user=user,
                 shop_id=shop_id,
                 action=action,
                 graph_type=WorkerDayPermission.FACT if is_fact else WorkerDayPermission.PLAN,
                 wd_types=[wd_type_id],
-                dt_from=dt,
-                dt_to=dt,
+                dt_from=dt_min,
+                dt_to=dt_max,
                 error_messages=WorkerDayViewSet.error_messages,
                 wd_types_dict=kwargs.get('wd_types_dict'),
             )
@@ -615,6 +629,15 @@ class WorkerDay(AbstractModel):
         user = kwargs.get('user')
         if user and user.network_id and not user.network.allow_creation_several_wdays_for_one_employee_for_one_date:
             cls.check_only_one_wday_on_date(employee_days_q=kwargs.get('employee_days_q'), exc_cls=ValidationError)
+
+    @classmethod
+    def _batch_update_extra_handler(cls, obj):
+        obj.dttm_work_start_tabel, obj.dttm_work_end_tabel, obj.work_hours = obj._calc_wh()
+        return {
+            'dttm_work_start_tabel',
+            'dttm_work_end_tabel',
+            'work_hours',
+        }
 
     def calc_day_and_night_work_hours(self):
         # TODO: нужно учитывать работу в праздничные дни? -- сейчас is_celebration в ProductionDay всегда False
@@ -2034,10 +2057,11 @@ class WorkerDayPermission(AbstractModel):
     APPROVE = 'A'
 
     ACTIONS = (
-        (CREATE_OR_UPDATE, 'Создание/Редактирование'),
-        (DELETE, 'Удаление'),
-        (APPROVE, 'Подтверждение'),
+        (CREATE_OR_UPDATE, _('Создание/изменение')),
+        (DELETE, _('Удаление')),
+        (APPROVE, _('Подтверждение')),
     )
+    ACTIONS_DICT = dict(ACTIONS)
 
     action = models.CharField(choices=ACTIONS, max_length=2, verbose_name='Действие')
     graph_type = models.CharField(choices=GRAPH_TYPES, max_length=1, verbose_name='Тип графика')

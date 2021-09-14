@@ -1980,6 +1980,46 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
             }
         )
 
+    def test_work_hours_recalculated_on_batch_update(self):
+        WorkerDay.objects.all().delete()
+        options = {
+            'return_response': True,
+        }
+        data = {
+            'data': [
+                {
+                    "shop_id": self.shop.id,
+                    "employee_id": self.employee2.id,
+                    "dt": self.dt,
+                    "is_fact": False,
+                    "is_approved": False,
+                    "type": WorkerDay.TYPE_WORKDAY,
+                    "dttm_work_start": datetime.combine(self.dt, time(10)),
+                    "dttm_work_end": datetime.combine(self.dt, time(16)),
+                    "worker_day_details": [{
+                        "work_part": 1.0,
+                        "work_type_id": self.work_type.id}
+                    ]
+                },
+            ],
+            'options': options,
+        }
+
+        resp = self.client.post(
+            self.get_url('WorkerDay-batch-update-or-create'), self.dump_data(data), content_type='application/json')
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        resp_data = resp.json()
+        wd_id = resp_data['data'][0]['id']
+        wd = WorkerDay.objects.get(id=wd_id)
+        self.assertEqual(wd.work_hours, timedelta(seconds=5.5*60*60))
+        data['data'][0] = resp_data['data'][0]
+        data['data'][0]['dttm_work_end'] = datetime.combine(self.dt, time(20))
+        resp = self.client.post(
+            self.get_url('WorkerDay-batch-update-or-create'), self.dump_data(data), content_type='application/json')
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        wd.refresh_from_db()
+        self.assertEqual(wd.work_hours, timedelta(seconds=8.75*60*60))
+
     def test_cant_batch_create_different_wday_types_on_one_date_for_one_employee(self):
         WorkerDay.objects.all().delete()
         data = {
@@ -2116,7 +2156,7 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
         }
         resp = self.client.post(
             self.get_url('WorkerDay-batch-update-or-create'), self.dump_data(data), content_type='application/json')
-        self.assertContains(resp, 'У вас нет прав на подтверждение типа дня', status_code=403)
+        self.assertContains(resp, 'У вас нет прав на создание/изменение типа дня', status_code=403)
 
         create_or_update_plan_workday_perm = WorkerDayPermission.objects.get(
             action=WorkerDayPermission.CREATE_OR_UPDATE,
@@ -2171,7 +2211,7 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
         data['options'] = options
         resp = self.client.post(
             self.get_url('WorkerDay-batch-update-or-create'), self.dump_data(data), content_type='application/json')
-        self.assertEqual(resp.status_code, 403)
+        self.assertContains(resp, 'У вас нет прав на удаление типа дня', status_code=403)
 
         delete_plan_workday_perm = WorkerDayPermission.objects.get(
             action=WorkerDayPermission.DELETE,
