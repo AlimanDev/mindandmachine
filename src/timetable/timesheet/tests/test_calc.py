@@ -53,3 +53,23 @@ class TestTimesheetCalc(TestTimesheetMixin, TestCase):
         self._calc_timesheets()
         dt_timesheet = Timesheet.objects.get(dt=dt)
         self.assertEqual(dt_timesheet.fact_timesheet_total_hours, 11)
+
+    def test_calc_fact_timesheet_for_wd_type_with_is_work_hours_false(self):
+        san_day = self._create_san_day()
+        dt = date(2021, 6, 7)
+        WorkerDay.objects.filter(dt=dt, is_fact=True, is_approved=True).delete()
+        WorkerDayFactory(
+            is_approved=True,
+            is_fact=True,
+            shop=self.shop,
+            employment=self.employment_worker,
+            employee=self.employee_worker,
+            dt=dt,
+            type=san_day,
+            dttm_work_start=datetime.combine(dt, time(10)),
+            dttm_work_end=datetime.combine(dt, time(20)),
+        )
+        self._calc_timesheets()
+        dt_timesheet = Timesheet.objects.get(dt=dt)
+        self.assertEqual(dt_timesheet.fact_timesheet_total_hours, 9)
+        self.assertEqual(dt_timesheet.fact_timesheet_type, san_day)

@@ -399,7 +399,7 @@ class TestOutsource(TestsHelperMixin, APITestCase):
                     'allowed_interval_for_late_arrival': '00:00:00',
                     'allowed_interval_for_early_departure': '00:00:00', 
                     'default_stats': {
-                        'timesheet_employee_top': 'fact_total_hours_sum', 
+                        'timesheet_employee_top': 'fact_total_all_hours_sum',
                         'timesheet_employee_bottom': 'sawh_hours',
                         'employee_bottom': 'norm_hours_curr_month',
                         'employee_top': 'work_hours_total', 

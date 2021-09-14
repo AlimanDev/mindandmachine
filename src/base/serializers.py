@@ -53,7 +53,7 @@ class NetworkSerializer(serializers.ModelSerializer):
     def get_default_stats(self, obj: Network):
         default_stats = json.loads(obj.settings_values).get('default_stats', {})
         return {
-            'timesheet_employee_top': default_stats.get('timesheet_employee_top', 'fact_total_hours_sum'),
+            'timesheet_employee_top': default_stats.get('timesheet_employee_top', 'fact_total_all_hours_sum'),
             'timesheet_employee_bottom': default_stats.get('timesheet_employee_bottom', 'sawh_hours'),
             'employee_top': default_stats.get('employee_top', 'work_hours_total'),
             'employee_bottom': default_stats.get('employee_bottom', 'norm_hours_curr_month'),
