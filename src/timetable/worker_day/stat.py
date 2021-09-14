@@ -413,37 +413,37 @@ class WorkersStatsGetter:
         ).annotate(
             work_days_selected_shop=Coalesce(Count('id', filter=Q(selected_period_q, shop_id=self.shop_id,
                                                                   work_hours__gte=timedelta(0),
-                                                                  type__is_dayoff=False)), 0),
+                                                                  type__is_dayoff=False, type__is_work_hours=True)), 0),
             work_days_other_shops=Coalesce(Count('id', filter=Q(selected_period_q, ~Q(shop_id=self.shop_id),
                                                                 work_hours__gte=timedelta(0),
-                                                                type__is_dayoff=False)), 0),
+                                                                type__is_dayoff=False, type__is_work_hours=True)), 0),
             work_days_selected_period=Coalesce(Count('id', filter=Q(selected_period_q, work_hours__gte=timedelta(0),
-                                                          type__is_dayoff=False)), 0),
+                                                          type__is_dayoff=False, type__is_work_hours=True)), 0),
             work_hours_selected_shop=Coalesce(Sum(Extract(F('work_hours'), 'epoch') / 3600,
                                                   filter=Q(selected_period_q, shop_id=self.shop_id,
                                                            work_hours__gte=timedelta(0),
-                                                           type__is_dayoff=False),
+                                                           type__is_dayoff=False, type__is_work_hours=True),
                                                   output_field=FloatField()), 0),
             work_hours_other_shops=Coalesce(Sum(Extract(F('work_hours'), 'epoch') / 3600,
                                                 filter=Q(selected_period_q, ~Q(shop_id=self.shop_id),
                                                          work_hours__gte=timedelta(0),
-                                                         type__is_dayoff=False),
+                                                         type__is_dayoff=False, type__is_work_hours=True),
                                                 output_field=FloatField()), 0),
             work_hours_selected_period=Coalesce(Sum(Extract(F('work_hours'), 'epoch') / 3600,
                                           filter=Q(selected_period_q, work_hours__gte=timedelta(0),
-                                                   type__is_dayoff=False),
+                                                   type__is_dayoff=False, type__is_work_hours=True),
                                           output_field=FloatField()), 0),
             work_hours_total=Coalesce(Sum(Extract(F('work_hours'), 'epoch') / 3600,
                                                 filter=Q(work_hours__gte=timedelta(0),
-                                                         type__is_dayoff=False),
+                                                         type__is_dayoff=False, type__is_work_hours=True),
                                                 output_field=FloatField()), 0),
             work_hours_until_acc_period_end=Coalesce(Sum(Extract(F('work_hours'), 'epoch') / 3600,
                                                          filter=Q(until_acc_period_end_q, work_hours__gte=timedelta(0),
-                                                                  type__is_dayoff=False),
+                                                                  type__is_dayoff=False, type__is_work_hours=True),
                                                          output_field=FloatField()), 0),
             work_hours_outside_of_selected_period=Coalesce(Sum(Extract(F('work_hours'), 'epoch') / 3600,
                                                          filter=Q(outside_of_selected_period_q, work_hours__gte=timedelta(0),
-                                                                  type__is_dayoff=False),
+                                                                  type__is_dayoff=False, type__is_work_hours=True),
                                                          output_field=FloatField()), 0)
         ).order_by('employee_id', '-is_fact', '-is_approved')  # такая сортировка нужна для work_hours_prev_months
         if self.hours_by_types:
@@ -552,7 +552,8 @@ class WorkersStatsGetter:
             any_day_count_outside_of_selected_period=Count(
                 'type_id', filter=outside_of_selected_period_q),
             workdays_count_outside_of_selected_period=Count(
-                'type_id', filter=Q(outside_of_selected_period_q, Q(Q(type__is_dayoff=False) | Q(type_id=WorkerDay.TYPE_HOLIDAY)))),
+                'type_id', filter=Q(outside_of_selected_period_q, Q(
+                    Q(type__is_dayoff=False, type__is_work_hours=True) | Q(type_id=WorkerDay.TYPE_HOLIDAY)))),
         )
         for wd_dict in work_days:
             data = res.setdefault(

@@ -47,10 +47,10 @@ class TestWorkersStatsGetter(TestsHelperMixin, TestCase):
         self.network.accounting_period_length = length
         self.network.save(update_fields=('accounting_period_length',))
 
-    def _get_worker_stats(self):
+    def _get_worker_stats(self, dt_from=None, dt_to=None):
         return WorkersStatsGetter(
-            dt_from=self.dt_from,
-            dt_to=self.dt_to,
+            dt_from=dt_from or self.dt_from,
+            dt_to=dt_to or self.dt_to,
             shop_id=self.shop.id,
         ).run()
 
@@ -215,8 +215,8 @@ class TestWorkersStatsGetter(TestsHelperMixin, TestCase):
             employee=self.employee,
             dt=self.dt_from,
             type_id=new_wd_type.code,
-            dttm_work_start=datetime.combine(dt, time(10)),
-            dttm_work_end=datetime.combine(dt, time(20)),
+            dttm_work_start=datetime.combine(self.dt_from, time(10)),
+            dttm_work_end=datetime.combine(self.dt_from, time(20)),
         )
         stats = self._get_worker_stats()
         self.assertIn('hours_by_type', stats[self.employee.id]['fact']['approved'])
@@ -240,8 +240,8 @@ class TestWorkersStatsGetter(TestsHelperMixin, TestCase):
             employee=self.employee,
             dt=self.dt_from,
             type_id=WorkerDay.TYPE_WORKDAY,
-            dttm_work_start=datetime.combine(dt, time(10)),
-            dttm_work_end=datetime.combine(dt, time(14)),
+            dttm_work_start=datetime.combine(self.dt_from, time(10)),
+            dttm_work_end=datetime.combine(self.dt_from, time(14)),
         )
         WorkerDayFactory(
             is_approved=True,
@@ -251,11 +251,38 @@ class TestWorkersStatsGetter(TestsHelperMixin, TestCase):
             employee=self.employee,
             dt=self.dt_from,
             type_id=WorkerDay.TYPE_WORKDAY,
-            dttm_work_start=datetime.combine(dt, time(17)),
-            dttm_work_end=datetime.combine(dt, time(22)),
+            dttm_work_start=datetime.combine(self.dt_from, time(17)),
+            dttm_work_end=datetime.combine(self.dt_from, time(22)),
         )
         stats = self._get_worker_stats()
         self.assertEqual(
             stats[self.employee.id]['fact']['approved']['day_type'][WorkerDay.TYPE_WORKDAY],
             1,  # TODO: логичней ведь, чтобы была 1 если 2 дня на 1 дату?
+        )
+
+    def test_wd_types_with_is_work_hours_false_not_counted_in_work_hours_sum(self):
+        """
+        Проверка, что типы дней с is_work_hours=False не учитываются в сумме "Рабочих часов"
+        """
+        san_day = self._create_san_day()
+        dt_now = date.today()
+        WorkerDayFactory(
+            is_approved=True,
+            is_fact=True,
+            shop=self.shop,
+            employment=self.employment,
+            employee=self.employee,
+            dt=dt_now,
+            type=san_day,
+            dttm_work_start=datetime.combine(dt_now, time(10)),
+            dttm_work_end=datetime.combine(dt_now, time(20)),
+        )
+        stats = self._get_worker_stats(dt_from=dt_now, dt_to=dt_now)
+        self.assertEqual(
+            stats[self.employee.id]['fact']['approved']['work_hours']['total'],
+            0,
+        )
+        self.assertEqual(
+            stats[self.employee.id]['fact']['approved']['overtime']['curr_month'],
+            0,
         )
