@@ -54,9 +54,10 @@ class TimesheetViewSet(BaseModelViewSet):
         timesheet_stats_qs = filtered_qs.values(
             'employee_id',
         ).annotate(
-            fact_total_hours_sum=Sum('fact_timesheet_total_hours', filter=Q(fact_timesheet_type__is_work_hours=True)),
-            fact_day_hours_sum=Sum('fact_timesheet_day_hours', filter=Q(fact_timesheet_type__is_work_hours=True)),
-            fact_night_hours_sum=Sum('fact_timesheet_night_hours', filter=Q(fact_timesheet_type__is_work_hours=True)),
+            fact_total_all_hours_sum=Sum('fact_timesheet_total_hours'),
+            fact_total_work_hours_sum=Sum('fact_timesheet_total_hours', filter=Q(fact_timesheet_type__is_work_hours=True)),
+            fact_day_work_hours_sum=Sum('fact_timesheet_day_hours', filter=Q(fact_timesheet_type__is_work_hours=True)),
+            fact_night_work_hours_sum=Sum('fact_timesheet_night_hours', filter=Q(fact_timesheet_type__is_work_hours=True)),
             main_total_hours_sum=Sum('main_timesheet_total_hours'),
             main_day_hours_sum=Sum('main_timesheet_day_hours'),
             main_night_hours_sum=Sum('main_timesheet_night_hours'),

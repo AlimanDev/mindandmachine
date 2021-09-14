@@ -34,9 +34,10 @@ class TestTimesheetApiView(TestTimesheetMixin, APITestCase):
         resp_data = resp.json()
         employee_timesheet_stats = resp_data[str(self.employee_worker.id)]
         self.assertDictEqual(employee_timesheet_stats, {
-            "fact_total_hours_sum": 63.0,
-            "fact_day_hours_sum": 63.0,
-            "fact_night_hours_sum": 0.0,
+            "fact_total_all_hours_sum": 63.0,
+            "fact_total_work_hours_sum": 63.0,
+            "fact_day_work_hours_sum": 63.0,
+            "fact_night_work_hours_sum": 0.0,
             "main_total_hours_sum": None,
             "main_day_hours_sum": None,
             "main_night_hours_sum": None,
@@ -71,9 +72,10 @@ class TestTimesheetApiView(TestTimesheetMixin, APITestCase):
         resp_data = resp.json()
         employee_timesheet_stats = resp_data[str(self.employee_worker.id)]
         self.assertDictEqual(employee_timesheet_stats, {
-            "fact_total_hours_sum": 63.0,
-            "fact_day_hours_sum": 63.0,
-            "fact_night_hours_sum": 0.0,
+            "fact_total_all_hours_sum": 72.0,
+            "fact_total_work_hours_sum": 63.0,
+            "fact_day_work_hours_sum": 63.0,
+            "fact_night_work_hours_sum": 0.0,
             "main_total_hours_sum": None,
             "main_day_hours_sum": None,
             "main_night_hours_sum": None,
