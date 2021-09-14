@@ -5,13 +5,7 @@ from src.timetable.models import AttendanceRecords
 
 
 class AttendanceRecordsFilter(FilterSet):
-    employee_id__in = ListFilter(method='filter_employee_id__in')
-
-    def filter_employee_id__in(self, queryset, name, value):
-        if value:
-            value = value.split(',')
-            return queryset.filter(employee_id__in=value)
-        return queryset
+    employee_id__in = ListFilter(field_name='employee_id', lookup_expr='in')
 
     class Meta:
         model = AttendanceRecords
