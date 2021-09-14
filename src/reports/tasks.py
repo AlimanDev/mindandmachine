@@ -51,11 +51,12 @@ def send_report_emails(report_config_id: int):
 
 @app.task
 def cron_report():
-    dttm = datetime.now()
+    dttm_now = datetime.utcnow()
     crons = CrontabSchedule.objects.all()
     posible_crons = []
     for cron in crons:
         schedule = cron.schedule
+        dttm = dttm_now + cron.timezone.utcoffset(dttm_now)
         if (
             dttm.minute in schedule.minute and
             dttm.hour in schedule.hour and
