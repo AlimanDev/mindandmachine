@@ -2228,6 +2228,152 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(WorkerDay.objects.count(), 1)
 
+    def test_fact_work_hours_calculated_on_batch_create_workerdays(self):
+        self.network.only_fact_hours_that_in_approved_plan = False
+        self.network.allow_creation_several_wdays_for_one_employee_for_one_date = True
+        self.network.save()
+        WorkerDay.objects.all().delete()
+        data = {
+            'data': [
+                {
+                    "shop_id": self.shop.id,
+                    "employee_id": self.employee2.id,
+                    "dt": self.dt,
+                    "is_fact": True,
+                    "is_approved": False,
+                    "type": WorkerDay.TYPE_WORKDAY,
+                    "dttm_work_start": datetime.combine(self.dt, time(10)),
+                    "dttm_work_end": datetime.combine(self.dt, time(14)),
+                    "worker_day_details": [{
+                        "work_part": 1.0,
+                        "work_type_id": self.work_type.id}
+                    ]
+                },
+                {
+                    "shop_id": self.shop.id,
+                    "employee_id": self.employee2.id,
+                    "dt": self.dt,
+                    "is_fact": True,
+                    "is_approved": False,
+                    "type": WorkerDay.TYPE_WORKDAY,
+                    "dttm_work_start": datetime.combine(self.dt, time(16)),
+                    "dttm_work_end": datetime.combine(self.dt, time(23)),
+                    "worker_day_details": [{
+                        "work_part": 1.0,
+                        "work_type_id": self.work_type.id}
+                    ]
+                },
+            ],
+        }
+        resp = self.client.post(
+            self.get_url('WorkerDay-batch-update-or-create'), self.dump_data(data), content_type='application/json')
+        self.assertEqual(resp.status_code, 200)
+        fact_not_approved_qs = WorkerDay.objects.filter(is_fact=True, is_approved=False)
+        self.assertEqual(fact_not_approved_qs.count(), 2)
+        fact_not_approved_wdays = list(fact_not_approved_qs.order_by('dttm_work_start'))
+        self.assertEqual(fact_not_approved_wdays[0].work_hours, timedelta(seconds=3.5*60*60))
+        self.assertEqual(fact_not_approved_wdays[1].work_hours, timedelta(seconds=6*60*60))
+
+    def test_fact_work_hours_recalculated_after_adding_and_approving_closest_plan(self):
+        self.network.only_fact_hours_that_in_approved_plan = True
+        self.network.allow_creation_several_wdays_for_one_employee_for_one_date = True
+        self.network.save()
+        WorkerDay.objects.all().delete()
+        data = {
+            'data': [
+                {
+                    "shop_id": self.shop.id,
+                    "employee_id": self.employee2.id,
+                    "dt": self.dt,
+                    "is_fact": True,
+                    "is_approved": False,
+                    "type": WorkerDay.TYPE_WORKDAY,
+                    "dttm_work_start": datetime.combine(self.dt, time(10)),
+                    "dttm_work_end": datetime.combine(self.dt, time(14)),
+                    "worker_day_details": [{
+                        "work_part": 1.0,
+                        "work_type_id": self.work_type.id}
+                    ]
+                },
+                {
+                    "shop_id": self.shop.id,
+                    "employee_id": self.employee2.id,
+                    "dt": self.dt,
+                    "is_fact": True,
+                    "is_approved": False,
+                    "type": WorkerDay.TYPE_WORKDAY,
+                    "dttm_work_start": datetime.combine(self.dt, time(16)),
+                    "dttm_work_end": datetime.combine(self.dt, time(23)),
+                    "worker_day_details": [{
+                        "work_part": 1.0,
+                        "work_type_id": self.work_type.id}
+                    ]
+                },
+            ],
+        }
+        resp = self.client.post(
+            self.get_url('WorkerDay-batch-update-or-create'), self.dump_data(data), content_type='application/json')
+        self.assertEqual(resp.status_code, 200)
+        fact_not_approved_qs = WorkerDay.objects.filter(is_fact=True, is_approved=False)
+        self.assertEqual(fact_not_approved_qs.count(), 2)
+        fact_not_approved_wdays = list(fact_not_approved_qs.order_by('dttm_work_start'))
+        self.assertEqual(fact_not_approved_wdays[0].work_hours, timedelta(seconds=0))
+        self.assertEqual(fact_not_approved_wdays[1].work_hours, timedelta(seconds=0))
+
+        data = {
+            'data': [
+                {
+                    "shop_id": self.shop.id,
+                    "employee_id": self.employee2.id,
+                    "dt": self.dt,
+                    "is_fact": False,
+                    "is_approved": False,
+                    "type": WorkerDay.TYPE_WORKDAY,
+                    "dttm_work_start": datetime.combine(self.dt, time(10)),
+                    "dttm_work_end": datetime.combine(self.dt, time(14)),
+                    "worker_day_details": [{
+                        "work_part": 1.0,
+                        "work_type_id": self.work_type.id}
+                    ]
+                },
+                {
+                    "shop_id": self.shop.id,
+                    "employee_id": self.employee2.id,
+                    "dt": self.dt,
+                    "is_fact": False,
+                    "is_approved": False,
+                    "type": WorkerDay.TYPE_WORKDAY,
+                    "dttm_work_start": datetime.combine(self.dt, time(16)),
+                    "dttm_work_end": datetime.combine(self.dt, time(23)),
+                    "worker_day_details": [{
+                        "work_part": 1.0,
+                        "work_type_id": self.work_type.id}
+                    ]
+                },
+            ],
+        }
+        resp = self.client.post(
+            self.get_url('WorkerDay-batch-update-or-create'), self.dump_data(data), content_type='application/json')
+        self.assertEqual(resp.status_code, 200)
+        plan_not_approved_qs = WorkerDay.objects.filter(is_fact=False, is_approved=False)
+        self.assertEqual(plan_not_approved_qs.count(), 2)
+
+        resp = self._approve(
+            self.shop.id,
+            is_fact=False,
+            dt_from=self.dt,
+            dt_to=self.dt,
+            wd_types=[WorkerDay.TYPE_WORKDAY],
+        )
+        self.assertEqual(resp.status_code, 200)
+        plan_approved_qs = WorkerDay.objects.filter(is_fact=False, is_approved=True)
+        self.assertEqual(plan_approved_qs.count(), 2)
+
+        fact_not_approved_wdays[0].refresh_from_db()
+        fact_not_approved_wdays[1].refresh_from_db()
+        self.assertEqual(fact_not_approved_wdays[0].work_hours, timedelta(seconds=3.5*60*60))
+        self.assertEqual(fact_not_approved_wdays[1].work_hours, timedelta(seconds=6*60*60))
+
 
 class TestCropSchedule(TestsHelperMixin, APITestCase):
     @classmethod

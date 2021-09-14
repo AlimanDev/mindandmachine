@@ -580,13 +580,26 @@ class WorkerDayViewSet(BaseModelViewSet):
                     ).delete()
 
                 wdays_to_delete.delete()
-
                 wdays_to_approve.update(is_approved=True)
                 WorkerDay.set_closest_plan_approved(
                     q_obj=employee_days_q,
                     is_approved=True if serializer.data['is_fact'] else None,
                     delta_in_secs=shop.network.set_closest_plan_approved_delta_for_manual_fact,
                 )
+
+                # если план, то выполним пересчет часов в ручных корректировках факта
+                if not serializer.data['is_fact'] and request.user.network.only_fact_hours_that_in_approved_plan:
+                    wd_ids = list(WorkerDay.objects.filter(
+                        employee_days_q,
+                        last_edited_by__isnull=False,
+                        is_fact=True,
+                        type__is_dayoff=False,
+                        dttm_work_start__isnull=False,
+                        dttm_work_end__isnull=False,
+                    ).values_list('id', flat=True))
+                    if wd_ids:
+                        recalc_wdays(id__in=wd_ids)
+
                 approved_wds_list = list(
                     WorkerDay.objects.filter(
                         employee_days_q,
@@ -656,7 +669,6 @@ class WorkerDayViewSet(BaseModelViewSet):
                         is_approved=True,
                     )
 
-                    # TODO: можем не вызывать пересчет факта если включена настройка учитывать только пересечения плана и факта?
                     if shop.network.run_recalc_fact_from_att_records_on_plan_approve:
                         transaction.on_commit(lambda: recalc_fact_from_records(employee_days_list=list(employee_days_set)))
 
@@ -679,9 +691,7 @@ class WorkerDayViewSet(BaseModelViewSet):
                     context=event_context,
                 ))
 
-                # запустим с небольшой задержкой, чтобы успели пересчитаться часы в факте
                 transaction.on_commit(lambda: calc_timesheets.apply_async(
-                    countdown=3,
                     kwargs=dict(
                         employee_id__in=list(worker_dates_dict.keys())
                     ))
