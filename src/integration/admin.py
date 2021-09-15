@@ -12,7 +12,7 @@ class ExternalSystemAdmin(admin.ModelAdmin):
 
 @admin.register(ShopExternalCode)
 class ShopExternalCodeAdmin(admin.ModelAdmin):
-    list_display = ('shop', 'code', 'external_system')
+    list_display = ('shop', 'attendance_area')
 
 
 @admin.register(UserExternalCode)

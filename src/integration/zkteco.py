@@ -53,12 +53,10 @@ class ZKTeco:
         response = self.call('GET', url, params=params)
         return response
 
-    def add_user(self, employment, pin=None, userexternalcode=None):
+    def add_user(self, user, pin=None, userexternalcode=None):
         department_code = settings.ZKTECO_DEPARTMENT_CODE
 
         url = 'person/add'
-
-        user = employment.employee.user
 
         if not pin:
             if userexternalcode:
@@ -104,6 +102,14 @@ class ZKTeco:
             "code": shopexternalcode.code,
         }
         return self.call('POST', url, json=json)
+
+    def get_attarea_list(self, page=1, page_size=100):
+        url = 'attAreaPerson/area/list'
+        params = {
+            "pageNo": page,
+            "pageSize": page_size,
+        }
+        return self.call('GET', url, params=params)
 
     def call(self, method, url, data=None, params={}, json=None):
         params.update({'access_token': settings.ZKTECO_KEY})

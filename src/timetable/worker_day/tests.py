@@ -13,7 +13,7 @@ from django.utils.timezone import now
 from rest_framework.test import APITestCase
 
 from etc.scripts.fill_calendar import main as fill_calendar
-from src.base.models import Employee, ProductionDay, Region, User, WorkerPosition
+from src.base.models import Employee, ProductionDay, Region, User, WorkerPosition, Employment
 from src.forecast.models import PeriodClients, OperationType, OperationTypeName
 from src.timetable.models import AttendanceRecords, WorkerDay, WorkType, WorkTypeName
 from src.tasks.models import Task
@@ -692,6 +692,8 @@ class TestUploadDownload(APITestCase):
 
         WorkType.objects.create(work_type_name=WorkTypeName.objects.create(name='Кассы'), shop_id=self.shop.id)
         self.url = '/rest_api/worker_day/'
+        self.network.add_users_from_excel = True
+        self.network.save()
         self.client.force_authenticate(user=self.user1)
 
     def test_upload_timetable_match_tabel_code(self):
@@ -703,6 +705,7 @@ class TestUploadDownload(APITestCase):
         self.assertEquals(User.objects.filter(last_name='Смешнов').count(), 1)
         user = User.objects.filter(last_name='Смешнов').first()
         self.assertEquals(Employee.objects.filter(user=user).count(), 2)
+        self.assertTrue(Employee.objects.filter(tabel_code='A23739').exists())
 
     def test_upload_timetable(self):
         file = open('etc/scripts/timetable.xlsx', 'rb')
@@ -784,6 +787,16 @@ class TestUploadDownload(APITestCase):
         self.assertEqual(tabel[tabel.columns[1]][0], 'Магазин: Shop1') #fails with python > 3.6
         self.assertEqual(tabel[tabel.columns[1]][12], 'Иванов Иван Иванович')
         self.assertEqual(tabel[tabel.columns[27]][15], 'В')
+        self.network.set_settings_value('download_timetable_norm_field', 'sawh_hours')
+        self.network.save()
+        response = self.client.get(
+            f'{self.url}download_timetable/?shop_id={self.shop.id}&dt_from=2020-04-01&is_approved=False')
+        tabel = pandas.read_excel(io.BytesIO(response.content))
+        print(tabel)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(tabel[tabel.columns[1]][0], 'Магазин: Shop1') #fails with python > 3.6
+        self.assertEqual(tabel[tabel.columns[1]][12], 'Иванов Иван Иванович')
+        self.assertEqual(tabel[tabel.columns[27]][15], 'В')
 
     def test_download_timetable_with_child_region(self):
         fill_calendar('2020.4.1', '2021.12.31', self.region.id)
@@ -834,9 +847,9 @@ class TestUploadDownload(APITestCase):
         tabel = pandas.read_excel(io.BytesIO(response.content)).fillna('')
         self.assertEqual(response.status_code, 200)
         self.assertEqual(dict(tabel.iloc[0]), {'Табельный номер': '', 'ФИО': 'Аленова Алена Аленовна', 'Должность': 'Продавец', 'Дата': '2020-04-01', 'Начало смены': '10:00', 'Окончание смены': '20:00'})
-        self.assertEqual(dict(tabel.iloc[37]), {'Табельный номер': 23739, 'ФИО': 'Иванов Иван Иванович', 'Должность': 'Директор магазина', 'Дата': '2020-04-08', 'Начало смены': '10:00', 'Окончание смены': '20:00'})
-        self.assertEqual(dict(tabel.iloc[45]), {'Табельный номер': 23739, 'ФИО': 'Иванов Иван Иванович', 'Должность': 'Директор магазина', 'Дата': '2020-04-16', 'Начало смены': 'В', 'Окончание смены': 'В'})
-        self.assertEqual(dict(tabel.iloc[68]), {'Табельный номер': 28479, 'ФИО': 'Петров Петр Петрович', 'Должность': 'Продавец', 'Дата': '2020-04-09', 'Начало смены': '10:00', 'Окончание смены': '20:00'})
+        self.assertEqual(dict(tabel.iloc[37]), {'Табельный номер': 'A23739', 'ФИО': 'Иванов Иван Иванович', 'Должность': 'Директор магазина', 'Дата': '2020-04-08', 'Начало смены': '10:00', 'Окончание смены': '20:00'})
+        self.assertEqual(dict(tabel.iloc[45]), {'Табельный номер': 'A23739', 'ФИО': 'Иванов Иван Иванович', 'Должность': 'Директор магазина', 'Дата': '2020-04-16', 'Начало смены': 'В', 'Окончание смены': 'В'})
+        self.assertEqual(dict(tabel.iloc[68]), {'Табельный номер': '28479', 'ФИО': 'Петров Петр Петрович', 'Должность': 'Продавец', 'Дата': '2020-04-09', 'Начало смены': '10:00', 'Окончание смены': '20:00'})
 
     def test_upload_timetable_v2(self):
         self.network.timetable_format = 'row_format'
@@ -849,6 +862,57 @@ class TestUploadDownload(APITestCase):
         self.assertEquals(User.objects.filter(last_name='Смешнов').count(), 1)
         user = User.objects.filter(last_name='Смешнов').first()
         self.assertEquals(Employee.objects.filter(user=user).count(), 2)
+        self.assertTrue(Employee.objects.filter(tabel_code='A23739').exists())
+
+    def test_upload_timetable_not_change_or_create_users(self):
+        self.network.add_users_from_excel = False
+        self.network.save()
+        with open('etc/scripts/timetable_users.xlsx', 'rb') as file:
+            response = self.client.post(f'{self.url}upload/', {'shop_id': self.shop.id, 'file': file}, HTTP_ACCEPT_LANGUAGE='ru')
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json(), ['Сотрудник с табельным номером 23739 не существует в текущем магазине.'])
+        user1 = User.objects.create(
+            username='user_test1',
+            first_name='Иван',
+            last_name='Сидоров',
+        )
+        employee1 = Employee.objects.create(
+            user=user1,
+            tabel_code='23739',
+        )
+        employment1 = Employment.objects.create(
+            employee=employee1, 
+            shop=self.shop,
+        )
+        with open('etc/scripts/timetable_users.xlsx', 'rb') as file:
+            response = self.client.post(f'{self.url}upload/', {'shop_id': self.shop.id, 'file': file}, HTTP_ACCEPT_LANGUAGE='ru')
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json(), ['Сотрудник с ФИО Петров Петр Петрович не существует в текущем магазине.'])
+        user2 = User.objects.create(
+            username='user_test2',
+            first_name='Петр',
+            last_name='Петров',
+            middle_name='Петрович',
+        )
+        employee2 = Employee.objects.create(
+            user=user2,
+            tabel_code='23738',
+        )
+        employment2 = Employment.objects.create(
+            employee=employee2, 
+            shop=self.shop,
+        )
+        with open('etc/scripts/timetable_users.xlsx', 'rb') as file:
+            response = self.client.post(f'{self.url}upload/', {'shop_id': self.shop.id, 'file': file}, HTTP_ACCEPT_LANGUAGE='ru')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(WorkerDay.objects.filter(is_approved=False).count(), 60)
+        user1.refresh_from_db()
+        self.assertIsNone(user1.middle_name)
+        self.assertEquals(user1.last_name, 'Сидоров')
+        employment1.refresh_from_db()
+        employment2.refresh_from_db()
+        self.assertIsNone(employment1.position_id)
+        self.assertIsNone(employment2.position_id)
 
 
 class TestCreateFactFromAttendanceRecords(TestsHelperMixin, APITestCase):

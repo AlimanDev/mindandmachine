@@ -102,6 +102,7 @@ class Xlsx_base:
             if format == '%w':
                 self.worksheet.write_string(row, col + i,
                                             self.WEEKDAY_TRANSLATION[int(item.dt.strftime(format))], text_type)
+                self.worksheet.set_column(col + i, col + i, 9.57)
             else:
                 cell_str = item.dt.strftime(format)
                 cell_str = int(cell_str) if xlsx_format==int else cell_str

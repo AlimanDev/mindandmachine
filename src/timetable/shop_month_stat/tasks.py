@@ -6,7 +6,7 @@ from django.conf import settings
 from src.base.models import Shop
 from src.celery.celery import app
 from src.timetable.models import ShopMonthStat
-from src.timetable.work_type.utils import get_efficiency as get_shop_stats
+from src.timetable.work_type.utils import ShopEfficiencyGetter
 
 
 @app.task
@@ -45,16 +45,14 @@ def update_shop_stats(dt=None):
             ).values_list('id', flat=True))
         else:
             work_type_ids = []
-        stats = get_shop_stats(
+        stats = ShopEfficiencyGetter(
             shop_id=month_stat.shop_id,
-            form=dict(
-                from_dt=month_stat.dt,
-                to_dt=month_stat.dt + relativedelta(months=1, days=-1),
-                work_type_ids=work_type_ids,
-                indicators=True,
-                efficiency=False,
-            ),
-        )['indicators']
+            from_dt=month_stat.dt,
+            to_dt=month_stat.dt + relativedelta(months=1, days=-1),
+            work_type_ids=work_type_ids,
+            indicators=True,
+            efficiency=False,
+        ).get()['indicators']
         month_stat.idle = stats['deadtime']
         month_stat.fot = stats['fot']
         month_stat.lack = stats['covering']  # на самом деле покрытие
