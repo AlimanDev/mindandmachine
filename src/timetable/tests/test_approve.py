@@ -425,3 +425,31 @@ class TestWorkerDayApprove(TestsHelperMixin, APITestCase):
         self.assertEqual(WorkerDay.objects.filter(is_fact=False, is_approved=False).count(), 2)
         for wd in WorkerDay.objects.filter(is_fact=False, is_approved=False):
             self.assertEqual(WorkerDayCashboxDetails.objects.filter(worker_day=wd).count(), 1)
+
+    def test_can_approve_vacancy(self):
+        vac_not_approved = WorkerDayFactory(
+            dt=self.today,
+            employee=None,
+            employment=None,
+            shop=self.shop,
+            type_id=WorkerDay.TYPE_WORKDAY,
+            is_fact=False,
+            is_approved=False,
+            dttm_work_start=datetime.combine(self.today, time(10)),
+            dttm_work_end=datetime.combine(self.today, time(20)),
+            cashbox_details__work_type=self.work_type,
+        )
+        resp = self._approve(
+            self.shop.id,
+            is_fact=False,
+            dt_from=self.today,
+            dt_to=self.today,
+            wd_types=[WorkerDay.TYPE_WORKDAY],
+        )
+        self.assertEqual(resp.status_code, 200)
+        vac_not_approved.refresh_from_db()
+        self.assertTrue(vac_not_approved.is_approved)
+        self.assertEqual(WorkerDay.objects.filter(is_fact=False, is_approved=True).count(), 1)
+        for wd in WorkerDay.objects.filter(is_fact=False, is_approved=True):
+            self.assertEqual(WorkerDayCashboxDetails.objects.filter(worker_day=wd).count(), 1)
+        self.assertEqual(WorkerDay.objects.filter(is_fact=False, is_approved=False).count(), 0)

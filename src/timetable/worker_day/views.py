@@ -2,9 +2,7 @@ import datetime
 import json
 from itertools import groupby
 
-from django.db.models.query import Prefetch
-from src.reports.utils.overtimes_undertimes import overtimes_undertimes_xlsx
-
+import numpy as np
 import pandas as pd
 from django.conf import settings
 from django.contrib.postgres.aggregates import StringAgg
@@ -12,6 +10,7 @@ from django.core.serializers.json import DjangoJSONEncoder
 from django.db import transaction
 from django.db.models import OuterRef, Subquery, Q, F, Exists, Case, When, Value, CharField
 from django.db.models.functions import Concat, Cast
+from django.db.models.query import Prefetch
 from django.http import HttpResponse
 from django.utils import timezone
 from django.utils.encoding import escape_uri_path
@@ -415,7 +414,7 @@ class WorkerDayViewSet(BaseModelViewSet):
             approved_df = pd.DataFrame(approved_wdays, columns=columns)
 
             combined_dfs = pd.concat([draft_df, approved_df])
-            symmetric_difference = combined_dfs.drop_duplicates(keep=False)
+            symmetric_difference = combined_dfs.drop_duplicates(keep=False).replace({np.nan: None})
 
             employee_dt_pairs_list = list(
                 symmetric_difference[['employee_id', 'dt']].sort_values(
