@@ -955,7 +955,7 @@ class WorkerDay(AbstractModel):
                 and self.employment_id \
                 and self.employment.shop_id != self.shop_id:
             from src.integration.mda.tasks import create_mda_user_to_shop_relation
-            create_mda_user_to_shop_relation.delay(
+            transaction.on_commit(lambda: create_mda_user_to_shop_relation.delay(
                 username=self.employee.user.username,
                 shop_code=self.shop.code,
                 debug_info={
@@ -963,7 +963,7 @@ class WorkerDay(AbstractModel):
                     'approved': self.is_approved,
                     'is_new': is_new,
                 },
-            )
+            ))
 
         return res
 

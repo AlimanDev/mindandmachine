@@ -42,7 +42,7 @@ def sync_mda_user_to_shop_relation(dt=None, delay_sec=0.01):
     wdays = WorkerDay.objects.annotate_value_equality(
         'is_equal_shops', 'shop_id', F('employment__shop_id'),
     ).filter(
-        Q(is_vacancy=True) | Q(is_equal_shops=False),
+        Q(is_equal_shops=False),
         type__is_dayoff=False,
         is_fact=False, is_approved=True,
         shop__isnull=False, employee__isnull=False, employment__isnull=False,
