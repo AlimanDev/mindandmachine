@@ -1363,7 +1363,7 @@ class WorkerDayViewSet(BaseModelViewSet):
         data.validated_data['network_id'] = request.user.network_id
         shop = Shop.objects.get(id=data.validated_data.get('shop_id'))
         timetable_generator_cls = get_timetable_generator_cls(timetable_format=shop.network.timetable_format)
-        timetable_generator = timetable_generator_cls()
+        timetable_generator = timetable_generator_cls(user=self.request.user)
         return timetable_generator.upload(data.validated_data, file, is_fact=True)
 
     @swagger_auto_schema(

@@ -43,7 +43,7 @@ PARSE_CELL_STR_PATTERN = re.compile(
 
 
 class BaseUploadDownloadTimeTable:
-    def __init__(self, user=None):
+    def __init__(self, user):
         self.user = user
         self.wd_types_dict = WorkerDayType.get_wd_types_dict()
         self.wd_type_mapping = {
@@ -494,6 +494,15 @@ class UploadDownloadTimetableCells(BaseUploadDownloadTimeTable):
                         dttm_work_start=dttm_work_start,
                         dttm_work_end=dttm_work_end,
                         type_id=wd_type_id,
+                        created_by=self.user,
+                        last_edited_by=self.user,
+                        closest_plan_approved=WorkerDay.get_closest_plan_approved_q(
+                            employee_id=employee.id,
+                            dt=dt,
+                            dttm_work_start=dttm_work_start,
+                            dttm_work_end=dttm_work_end,
+                            delta_in_secs=self.user.network.set_closest_plan_approved_delta_for_manual_fact,
+                        ).first() if (is_fact and not wd_type_obj.is_dayoff) else None
                     )
                     if wd_type_id == WorkerDay.TYPE_WORKDAY:
                         new_wd_dict['worker_day_details'] = [
@@ -504,7 +513,6 @@ class UploadDownloadTimetableCells(BaseUploadDownloadTimeTable):
                     new_wdays_data.append(new_wd_dict)
 
         WorkerDay.batch_update_or_create(new_wdays_data, user=self.user)
-
         return Response()
 
     def _download(self, workbook, form):
@@ -795,6 +803,15 @@ class UploadDownloadTimetableRows(BaseUploadDownloadTimeTable):
                     dttm_work_start=dttm_work_start,
                     dttm_work_end=dttm_work_end,
                     type_id=type_of_work,
+                    created_by=self.user,
+                    last_edited_by=self.user,
+                    closest_plan_approved=WorkerDay.get_closest_plan_approved_q(
+                        employee_id=employee.id,
+                        dt=dt,
+                        dttm_work_start=dttm_work_start,
+                        dttm_work_end=dttm_work_end,
+                        delta_in_secs=self.user.network.set_closest_plan_approved_delta_for_manual_fact,
+                    ).first() if (is_fact and not wd_type_obj.is_dayoff) else None
                 )
                 if type_of_work == WorkerDay.TYPE_WORKDAY:
                     new_wd_data['worker_day_details'] = [
