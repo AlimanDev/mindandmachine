@@ -1105,13 +1105,16 @@ class WorkerDayViewSet(BaseModelViewSet):
                         is_fact=is_copying_to_fact,
                         is_approved=False,
                         type=wd.type,
-                        created_by_id=wd.created_by_id,  # TODO: нужен last_edited_by_id ?
+                        created_by=wd.created_by if (wd.is_fact and wd.is_approved) else self.request.user,
+                        last_edited_by=wd.last_edited_by if (wd.is_fact and wd.is_approved) else self.request.user,
                         is_vacancy=wd.is_vacancy,
                         is_outsource=wd.is_outsource,
                         comment=wd.comment,
                         canceled=wd.canceled,
-                        need_count_wh=True,
                         parent_worker_day_id=wd.id,
+                        closest_plan_approved_id=wd.id if (
+                                is_copying_to_fact and wd.is_plan and wd.is_approved) else None,
+                        need_count_wh=True,
                     )
                     for wd in source_wdays_list
                 ]

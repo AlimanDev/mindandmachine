@@ -174,6 +174,7 @@ class WorkerDayConverter(Converter):
             ] if obj.id and obj.type_id in types_with_details else [],
             'work_type': obj.work_type_id if hasattr(obj, 'work_type_id') else None,
             'created_by': obj.created_by_id,
+            'last_edited_by': obj.last_edited_by_id,
             'comment': obj.comment,
         }
         if hasattr(obj, 'other_shop'):

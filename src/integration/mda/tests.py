@@ -1,6 +1,7 @@
 from datetime import datetime, date, timedelta, time
 from unittest import mock
 
+from django.db import transaction
 from django.test import TestCase, override_settings
 from django.utils import timezone
 from rest_framework.test import APITestCase
@@ -214,7 +215,7 @@ class TestMdaIntegration(TestsHelperMixin, TestCase):
         with self.settings(MDA_INTEGRATION_TRANSFER_GROUPS_FIELD=True):
             users_data = mda_integration_helper._get_users_data()
             worker_data = list(filter(lambda u: worker.employee.user_id == u['id'], users_data))[0]
-            self.assertListEqual(worker_data['groups'],  ['Директор'])
+            self.assertListEqual(worker_data['groups'], ['Директор'])
 
     def test_userChecklistsOrganizer(self):
         region = ShopFactory(parent=self.division1, code='region')
@@ -244,7 +245,7 @@ class TestMdaIntegration(TestsHelperMixin, TestCase):
         self.assertEqual(len(users_data), 5)
         user_data = list(filter(lambda u: user.id == u['id'], users_data))[0]
         self.assertEqual(user_data['orgLevel'], 'COMPANY')
-        self.assertEqual(user_data['orgUnits'],  None)
+        self.assertEqual(user_data['orgUnits'], None)
 
     def test_surveyAdmin_for_admin_true_for_oters_false_and_correct_groups(self):
         with self.settings(MDA_INTEGRATION_TRANSFER_GROUPS_FIELD=True):
@@ -264,13 +265,13 @@ class TestMdaIntegration(TestsHelperMixin, TestCase):
             self.assertEqual(len(users_data), 6)
             user_admin_data = list(filter(lambda u: user_admin.id == u['id'], users_data))[0]
             self.assertEqual(user_admin_data['admin'], True)
-            self.assertEqual(user_admin_data['surveyAdmin'],  True)
-            self.assertListEqual(user_admin_data['groups'],  [])
+            self.assertEqual(user_admin_data['surveyAdmin'], True)
+            self.assertListEqual(user_admin_data['groups'], [])
 
             user_worker_data = list(filter(lambda u: user_worker.id == u['id'], users_data))[0]
             self.assertEqual(user_worker_data['admin'], False)
-            self.assertEqual(user_worker_data['surveyAdmin'],  False)
-            self.assertListEqual(user_worker_data['groups'],  [])
+            self.assertEqual(user_worker_data['surveyAdmin'], False)
+            self.assertListEqual(user_worker_data['groups'], [])
 
             with self.settings(MDA_INTEGRATION_INCLUDE_FUNCTION_GROUPS=True):
                 mda_integration_helper = MdaIntegrationHelper()
@@ -359,16 +360,17 @@ class TestMdaIntegration(TestsHelperMixin, TestCase):
         user_worker = UserFactory()
         employee_worker = EmployeeFactory(user=user_worker)
         employment_worker = EmploymentFactory(employee=employee_worker, shop=self.shop1, position=position_worker)
-        vacancy = WorkerDay.objects.create(
-            dt=dt_now,
-            employee=employee_worker,
-            employment=employment_worker,
-            shop=self.shop2,
-            type_id=WorkerDay.TYPE_WORKDAY,
-            is_fact=False,
-            is_approved=True,
-            is_vacancy=True,
-        )
+        with mock.patch.object(transaction, 'on_commit', lambda t: t()):
+            vacancy = WorkerDay.objects.create(
+                dt=dt_now,
+                employee=employee_worker,
+                employment=employment_worker,
+                shop=self.shop2,
+                type_id=WorkerDay.TYPE_WORKDAY,
+                is_fact=False,
+                is_approved=True,
+                is_vacancy=True,
+            )
         _create_mda_user_to_shop_relation_delay.assert_called_once_with(
             debug_info={
                 'wd_id': vacancy.id,
@@ -598,15 +600,15 @@ class TestCaseInsensitiveAuth(TestsHelperMixin, APITestCase):
             )
 
     def test_signin_token_case_sensitive_by_default(self):
-            resp = self.client.post('/rest_api/auth/signin_token/', data=self.dump_data({
-                'username': self.lowered_username,
-                'token': generate_user_token(self.lowered_username),
-            }), content_type='application/json')
-            self.assertContains(
-                response=resp,
-                text='Нет такого пользователя',
-                status_code=400,
-            )
+        resp = self.client.post('/rest_api/auth/signin_token/', data=self.dump_data({
+            'username': self.lowered_username,
+            'token': generate_user_token(self.lowered_username),
+        }), content_type='application/json')
+        self.assertContains(
+            response=resp,
+            text='Нет такого пользователя',
+            status_code=400,
+        )
 
     def test_signin_token_case_insensitive_with_specified_settings(self):
         with self.settings(CASE_INSENSITIVE_AUTH=True):

@@ -4381,6 +4381,8 @@ class TestAditionalFunctions(TestsHelperMixin, APITestCase):
         self.assertEqual(WorkerDay.objects.filter(is_approved=False, dt=dt_now + timedelta(days=6)).count(), 0)
 
     def test_copy_approved_to_fact(self):
+        self.network.only_fact_hours_that_in_approved_plan = True
+        self.network.save()
         dt_now = date.today()
         self.create_worker_days(self.employment1, dt_now, 3, 10, 20, True)
         self.update_or_create_holidays(self.employment1, dt_now + timedelta(days=3), 3, True)
@@ -4411,7 +4413,8 @@ class TestAditionalFunctions(TestsHelperMixin, APITestCase):
         response = self.client.post(self.url + 'copy_approved/', data=data)
 
         self.assertEqual(len(response.json()), 7)
-        self.assertEqual(WorkerDay.objects.filter(is_approved=False, is_fact=True).count(), 7)
+        self.assertEqual(WorkerDay.objects.filter(
+            is_approved=False, is_fact=True, work_hours__gt=timedelta(seconds=0)).count(), 7)
         self.assertEqual(WorkerDay.objects.filter(is_approved=False, is_fact=True, type_id=WorkerDay.TYPE_HOLIDAY).count(), 0)
         self.assertEqual(WorkerDay.objects.filter(is_approved=False, employee_id=self.employment2.employee_id).count(), 0)
         self.assertEqual(WorkerDay.objects.filter(is_approved=False, dt=dt_now + timedelta(days=6)).count(), 0)

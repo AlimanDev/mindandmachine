@@ -196,7 +196,6 @@ def copy_as_excel_cells(from_employee_id, from_dates, to_employee_id, to_dates, 
             main_worker_days_details[key] = []
         main_worker_days_details[key].append(detail)
 
-
     main_worker_days_grouped_by_dt = OrderedDict()
     if include_spaces:
         main_worker_days_grouped_by_dt = OrderedDict([(dt, []) for dt in from_dates])
@@ -260,7 +259,8 @@ def copy_as_excel_cells(from_employee_id, from_dates, to_employee_id, to_dates, 
                         dt_to, blank_day.dttm_work_end.timetz()) if blank_day.dttm_work_end else None,
                     is_approved=False,
                     is_fact=False,
-                    created_by_id=created_by,  # TODO: нужен last_edited_by_id ?
+                    created_by_id=created_by,
+                    last_edited_by_id=created_by,
                 )
                 created_wds.append(new_wd)
 

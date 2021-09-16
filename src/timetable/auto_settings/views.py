@@ -421,7 +421,8 @@ class AutoSettingsViewSet(viewsets.ViewSet):
                     employee_id=wd['employee_id'],
                     dttm_work_start=wd['dttm_work_start'],
                     dttm_work_end=wd['dttm_work_end'],
-                    created_by_id=wd['created_by_id'],  # TODO: не нужен last_edited_by_id ?
+                    created_by_id=wd['created_by_id'],
+                    last_edited_by_id=wd['last_edited_by_id'],
                     shop_id=wd.get('shop_id'),
                 )
                 wd_mod.work_type_id = wd['work_types__id'] if wd['work_types__id'] else None
@@ -445,6 +446,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
             'dttm_work_end',
             'work_types__id',
             'created_by_id',
+            'last_edited_by_id',
             'shop_id',
         )
         new_worker_days = []
@@ -893,7 +895,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
 
                         if plan_draft_wdays:
                             # пропускаем даты, где есть ручные изменения
-                            if any((wd.created_by_id or wd.last_edited_by_id) for wd in plan_draft_wdays):  # TODO: тест
+                            if any(wd.last_edited_by_id for wd in plan_draft_wdays):  # TODO: тест
                                 continue
 
                             # если есть хотя бы 1 день из другого магазина, то пропускаем
