@@ -26,13 +26,13 @@ class TestReportConfig(APITestCase):
         super().setUp()
         create_departments_and_users(self)
 
-    def _create_config(self, count_of_periods, period, include_today=False):
+    def _create_config(self, count_of_periods, period, period_start=ReportConfig.PERIOD_START_YESTERDAY):
         return ReportConfig.objects.create(
             name='Test',
             cron=CrontabSchedule.objects.create(),
             count_of_periods=count_of_periods,
             period=period,
-            include_today=include_today,
+            period_start=period_start,
             report_type=ReportType.objects.first(),
         )
 
@@ -46,7 +46,7 @@ class TestReportConfig(APITestCase):
         self.assertEquals(data, dates)
     
     def test_today(self):
-        config = self._create_config(1, ReportConfig.ACC_PERIOD_DAY, include_today=True)
+        config = self._create_config(1, ReportConfig.ACC_PERIOD_DAY, period_start=ReportConfig.PERIOD_START_TODAY)
         dates = config.get_dates()
         data = {
             'dt_from': date.today(),
@@ -55,14 +55,14 @@ class TestReportConfig(APITestCase):
         self.assertEquals(data, dates)
 
     def test_5days(self):
-        config = self._create_config(5, ReportConfig.ACC_PERIOD_DAY, include_today=True)
+        config = self._create_config(5, ReportConfig.ACC_PERIOD_DAY, period_start=ReportConfig.PERIOD_START_TODAY)
         dates = config.get_dates()
         data = {
             'dt_from': date.today() - timedelta(4),
             'dt_to': date.today(),
         }
         self.assertEquals(data, dates)
-        config.include_today = False
+        config.period_start = ReportConfig.PERIOD_START_YESTERDAY
         config.save()
         dates = config.get_dates()
         data = {
@@ -72,14 +72,14 @@ class TestReportConfig(APITestCase):
         self.assertEquals(data, dates)
 
     def test_month(self):
-        config = self._create_config(1, ReportConfig.ACC_PERIOD_MONTH, include_today=True)
+        config = self._create_config(1, ReportConfig.ACC_PERIOD_MONTH, period_start=ReportConfig.PERIOD_START_TODAY)
         dates = config.get_dates()
         data = {
             'dt_from': date.today() - relativedelta(months=1),
             'dt_to': date.today(),
         }
         self.assertEquals(data, dates)
-        config.include_today = False
+        config.period_start = ReportConfig.PERIOD_START_YESTERDAY
         config.save()
         dates = config.get_dates()
         data = {
@@ -97,14 +97,14 @@ class TestReportConfig(APITestCase):
         self.assertEquals(data, dates)
 
     def test_quarter(self):
-        config = self._create_config(1, ReportConfig.ACC_PERIOD_QUARTER, include_today=True)
+        config = self._create_config(1, ReportConfig.ACC_PERIOD_QUARTER, period_start=ReportConfig.PERIOD_START_TODAY)
         dates = config.get_dates()
         data = {
             'dt_from': date.today() - relativedelta(months=3),
             'dt_to': date.today(),
         }
         self.assertEquals(data, dates)
-        config.include_today = False
+        config.period_start = ReportConfig.PERIOD_START_YESTERDAY
         config.save()
         dates = config.get_dates()
         data = {
@@ -122,14 +122,14 @@ class TestReportConfig(APITestCase):
         self.assertEquals(data, dates)
 
     def test_half_year(self):
-        config = self._create_config(1, ReportConfig.ACC_PERIOD_HALF_YEAR, include_today=True)
+        config = self._create_config(1, ReportConfig.ACC_PERIOD_HALF_YEAR, period_start=ReportConfig.PERIOD_START_TODAY)
         dates = config.get_dates()
         data = {
             'dt_from': date.today() - relativedelta(months=6),
             'dt_to': date.today(),
         }
         self.assertEquals(data, dates)
-        config.include_today = False
+        config.period_start = ReportConfig.PERIOD_START_YESTERDAY
         config.save()
         dates = config.get_dates()
         data = {
@@ -147,14 +147,14 @@ class TestReportConfig(APITestCase):
         self.assertEquals(data, dates)
 
     def test_year(self):
-        config = self._create_config(1, ReportConfig.ACC_PERIOD_YEAR, include_today=True)
+        config = self._create_config(1, ReportConfig.ACC_PERIOD_YEAR, period_start=ReportConfig.PERIOD_START_TODAY)
         dates = config.get_dates()
         data = {
             'dt_from': date.today() - relativedelta(years=1),
             'dt_to': date.today(),
         }
         self.assertEquals(data, dates)
-        config.include_today = False
+        config.period_start = ReportConfig.PERIOD_START_YESTERDAY
         config.save()
         dates = config.get_dates()
         data = {
@@ -170,6 +170,31 @@ class TestReportConfig(APITestCase):
             'dt_to': date.today() - timedelta(1),
         }
         self.assertEquals(data, dates)
+
+    def test_period_start(self):
+        config = self._create_config(1, ReportConfig.ACC_PERIOD_YEAR, period_start=ReportConfig.PERIOD_START_PREVIOUS_MONTH)
+        self.assertEquals(config._get_start_date(date(2021, 1, 23)), date(2020, 12, 31))
+        self.assertEquals(config._get_start_date(date(2021, 3, 30)), date(2021, 2, 28))
+        self.assertEquals(config._get_start_date(date(2021, 12, 31)), date(2021, 11, 30))
+        config.period_start = ReportConfig.PERIOD_START_PREVIOUS_QUARTER
+        config.save()
+        self.assertEquals(config._get_start_date(date(2021, 1, 23)), date(2020, 12, 31))
+        self.assertEquals(config._get_start_date(date(2021, 3, 30)), date(2020, 12, 31))
+        self.assertEquals(config._get_start_date(date(2021, 4, 1)), date(2021, 3, 31))
+        self.assertEquals(config._get_start_date(date(2021, 6, 30)), date(2021, 3, 31))
+        self.assertEquals(config._get_start_date(date(2021, 7, 8)), date(2021, 6, 30))
+        self.assertEquals(config._get_start_date(date(2021, 12, 8)), date(2021, 9, 30))
+        config.period_start = ReportConfig.PERIOD_START_PREVIOUS_HALF_YEAR
+        config.save()
+        self.assertEquals(config._get_start_date(date(2021, 1, 23)), date(2020, 12, 31))
+        self.assertEquals(config._get_start_date(date(2021, 6, 30)), date(2020, 12, 31))
+        self.assertEquals(config._get_start_date(date(2021, 7, 1)), date(2021, 6, 30))
+        self.assertEquals(config._get_start_date(date(2021, 12, 31)), date(2021, 6, 30))
+        config.period_start = ReportConfig.PERIOD_START_PREVIOUS_YEAR
+        config.save()
+        self.assertEquals(config._get_start_date(date(2021, 1, 23)), date(2020, 12, 31))
+        self.assertEquals(config._get_start_date(date(2021, 8, 30)), date(2020, 12, 31))
+
 
 class TestPivotTabelReportNotifications(TestsHelperMixin, APITestCase):
     @classmethod
