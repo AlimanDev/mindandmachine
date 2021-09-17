@@ -195,6 +195,15 @@ class TestReportConfig(APITestCase):
         self.assertEquals(config._get_start_date(date(2021, 1, 23)), date(2020, 12, 31))
         self.assertEquals(config._get_start_date(date(2021, 8, 30)), date(2020, 12, 31))
 
+    def test_period_start_prev_month_period_month(self):
+        config = self._create_config(1, ReportConfig.ACC_PERIOD_MONTH, period_start=ReportConfig.PERIOD_START_PREVIOUS_MONTH)
+        dates = config.get_dates()
+        data = {
+            'dt_from': (date.today() - relativedelta(months=1)).replace(day=1),
+            'dt_to': (date.today() - relativedelta(months=1)) + relativedelta(day=31),
+        }
+        self.assertEquals(data, dates)
+
 
 class TestPivotTabelReportNotifications(TestsHelperMixin, APITestCase):
     @classmethod
