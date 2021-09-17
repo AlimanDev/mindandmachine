@@ -108,6 +108,9 @@ class ReportConfig(models.Model):
         count = self.count_of_periods - 1 if self.period == self.ACC_PERIOD_DAY else self.count_of_periods
         dt_from = dt_to - (delta_mapping[self.period] * count)
 
+        if (not self.period == self.ACC_PERIOD_DAY) and not (self.period_start in [self.PERIOD_START_TODAY, self.PERIOD_START_YESTERDAY]):
+            dt_from = dt_from.replace(day=1) + relativedelta(months=1)
+
         return {'dt_from': dt_from, 'dt_to': dt_to}
 
     def _get_start_date(self, dt):
