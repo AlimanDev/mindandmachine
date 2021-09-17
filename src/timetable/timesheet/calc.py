@@ -107,7 +107,7 @@ class TimesheetCalculator:
         ).exclude(
             type=WorkerDay.TYPE_EMPTY,
         ).select_related(
-            'employee__user',
+            'employee__user__network',
             'shop__network',
         )}
         dt_now = timezone.now().date()

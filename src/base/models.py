@@ -188,6 +188,11 @@ class Network(AbstractActiveModel):
     display_employee_tabs_in_the_schedule = models.BooleanField(
         default=True, verbose_name='Отображать вкладки сотрудников в расписании')
 
+    DEFAULT_NIGHT_EDGES = (
+        '22:00:00',
+        '06:00:00',
+    )
+
     @property
     def settings_values_prop(self):
         return json.loads(self.settings_values)
@@ -210,11 +215,7 @@ class Network(AbstractActiveModel):
 
     @cached_property
     def night_edges(self):
-        default_night_edges = (
-            '22:00:00',
-            '06:00:00',
-        )
-        return self.settings_values_prop.get('night_edges', default_night_edges)
+        return self.settings_values_prop.get('night_edges', Network.DEFAULT_NIGHT_EDGES)
 
     @cached_property
     def night_edges_tm_list(self):
