@@ -293,7 +293,7 @@ def add_logger(name, level='DEBUG', formatter='simple', extra_handlers : list=No
 
 add_logger('clean_wdays')
 add_logger('send_doctors_schedule_to_mis')
-add_logger('calc_timesheets')
+add_logger('calc_timesheets', extra_handlers=['mail_admins'])
 add_logger('send_doctors_schedule_to_mis', extra_handlers=['mail_admins'])
 add_logger('mda_integration', extra_handlers=['mail_admins'])
 
