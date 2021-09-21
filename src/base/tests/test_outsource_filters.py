@@ -122,7 +122,7 @@ class TestOutsource(TestsHelperMixin, APITestCase):
         self.client.force_authenticate(user=self.user1)
         employees = self.client.get('/rest_api/employee/')
         self.assertEquals(len(employees.json()), 8)
-        shops = self.client.get('/rest_api/department/?include_clients=true')
+        shops = self.client.get('/rest_api/department/?include_possible_clients=true')
         self.assertEquals(len(shops.json()), 8)
         self.assertEquals(len(list(filter(lambda x: x['id'] == self.client_shop.id, shops.json()))), 1)
         positions = self.client.get('/rest_api/worker_position/')
@@ -149,7 +149,7 @@ class TestOutsource(TestsHelperMixin, APITestCase):
         self.client.force_authenticate(user=self.user1)
         employees = self.client.get('/rest_api/employee/')
         self.assertEquals(len(employees.json()), 8)
-        shops = self.client.get('/rest_api/department/?include_clients=true')
+        shops = self.client.get('/rest_api/department/?include_possible_clients=true')
         self.assertEquals(len(shops.json()), 8)
         self.assertEquals(len(list(filter(lambda x: x['id'] == self.client_shop.id, shops.json()))), 1)
         position = WorkerPosition.objects.create(
@@ -184,6 +184,8 @@ class TestOutsource(TestsHelperMixin, APITestCase):
         positions = self.client.get('/rest_api/worker_position/?include_clients=true')
         self.assertEquals(len(positions.json()), 1)
         self.assertEquals(len(list(filter(lambda x: x['id'] == self.client_position.id, positions.json()))), 0)
+        shops = self.client.get('/rest_api/department/?include_possible_clients=true')
+        self.assertEquals(len(shops.json()), 6)
         self.network_connect.allow_choose_shop_from_client_for_employement = True
         self.network_connect.save()
 
