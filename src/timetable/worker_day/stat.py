@@ -513,7 +513,7 @@ class WorkersStatsGetter:
                             is_approved_key, {}
                         ).setdefault(
                             'work_hours', {}
-                        )['prev_months'] = float(prev_months_work_hours)
+                        )['prev_months'] = float(prev_months_work_hours or 0)
 
         for employee_id in self.employees_dict.keys():
             employee_dict = res.setdefault(
