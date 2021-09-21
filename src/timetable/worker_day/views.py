@@ -104,7 +104,7 @@ class WorkerDayViewSet(BaseModelViewSet):
     openapi_tags = ['WorkerDay',]
 
     def get_queryset(self):
-        queryset = WorkerDay.objects.filter(canceled=False).prefetch_related('outsources')
+        queryset = WorkerDay.objects.filter(canceled=False).prefetch_related(Prefetch('outsources', to_attr='outsources_list'))
 
         if self.request.query_params.get('by_code', False):
             return queryset.annotate(
@@ -154,7 +154,7 @@ class WorkerDayViewSet(BaseModelViewSet):
         if request.query_params.get('hours_details', False):
             data = []
 
-            for worker_day in self.filter_queryset(self.get_queryset().prefetch_related(Prefetch('worker_day_details', to_attr='worker_day_details_list'), Prefetch('outsources', to_attr='outsources_list')).select_related('last_edited_by', 'shop__network', 'employee')):
+            for worker_day in self.filter_queryset(self.get_queryset().prefetch_related(Prefetch('worker_day_details', to_attr='worker_day_details_list')).select_related('last_edited_by', 'shop__network', 'employee')):
                 wd_dict = WorkerDayListSerializer(worker_day, context=self.get_serializer_context()).data
                 work_hours, work_hours_day, work_hours_night = worker_day.calc_day_and_night_work_hours()
                 wd_dict['work_hours'] = work_hours
@@ -165,7 +165,7 @@ class WorkerDayViewSet(BaseModelViewSet):
                 data.append(wd_dict)
         else:
             data = WorkerDayListSerializer(
-                self.filter_queryset(self.get_queryset().prefetch_related(Prefetch('worker_day_details', to_attr='worker_day_details_list'), Prefetch('outsources', to_attr='outsources_list')).select_related('last_edited_by', 'employee')),
+                self.filter_queryset(self.get_queryset().prefetch_related(Prefetch('worker_day_details', to_attr='worker_day_details_list')).select_related('last_edited_by', 'employee')),
                 many=True, context=self.get_serializer_context()
             ).data
 
