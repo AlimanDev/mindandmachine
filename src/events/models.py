@@ -16,7 +16,7 @@ class EventType(AbstractActiveNetworkSpecificCodeNamedModel):
         )
 
     def __str__(self):
-        return f'{self.name} ({self.code})'
+        return f'{self.name} ({self.code}) {self.network.name}'
 
 
 class EventHistory(AbstractModel):

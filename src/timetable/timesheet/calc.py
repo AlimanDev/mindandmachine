@@ -139,7 +139,7 @@ class TimesheetCalculator:
         ).exclude(
             type_id=WorkerDay.TYPE_EMPTY,
         ).select_related(
-            'employee__user',
+            'employee__user__network',
             'shop__network',
         )
         plan_wdays_dict = {}

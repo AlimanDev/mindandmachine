@@ -39,5 +39,8 @@ def calc_timesheets(employee_id__in: list = None, dt_from=None, dt_to=None):
     )
     wd_types_dict = WorkerDayType.get_wd_types_dict()
     for employee in qs:
-        TimesheetCalculator(employee=employee, dt_from=dt_from, dt_to=dt_to, wd_types_dict=wd_types_dict).calc()
+        try:
+            TimesheetCalculator(employee=employee, dt_from=dt_from, dt_to=dt_to, wd_types_dict=wd_types_dict).calc()
+        except Exception as e:
+            logger.exception(e)
     logger.info('finish calc_timesheets')
