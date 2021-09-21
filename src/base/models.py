@@ -175,7 +175,7 @@ class Network(AbstractActiveModel):
         help_text='Используется при разделении табеля на осн. и доп. Т.е. норма за последний месяц уч. периода = '
                   '{норма по произв. календарю за уч. период} - {отработанные часы за прошлые месяцы}.')
     prev_months_work_hours_source = models.PositiveSmallIntegerField(
-        verbose_name='Источник факт. часов за пред. месяцы уч. периода',
+        verbose_name='Источник рабочих часов за пред. месяцы уч. периода',
         choices=PREV_MONTHS_WORK_HOURS_SOURCE_CHOICES, default=WD_FACT_APPROVED)
     outsourcings = models.ManyToManyField(
         'self', through='base.NetworkConnect', through_fields=('client', 'outsourcing'), symmetrical=False, related_name='clients')
