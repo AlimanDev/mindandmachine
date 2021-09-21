@@ -41,7 +41,7 @@ from src.timetable.models import (
     GroupWorkerDayPermission,
 )
 from src.timetable.timesheet.tasks import calc_timesheets
-from src.timetable.vacancy.utils import cancel_vacancies, cancel_vacancy, confirm_vacancy
+from src.timetable.vacancy.utils import cancel_vacancies, cancel_vacancy, confirm_vacancy, notify_vacancy_created
 from src.timetable.vacancy.tasks import vacancies_create_and_cancel_for_shop
 from src.timetable.worker_day.serializers import (
     OvertimesUndertimesReportSerializer,
@@ -531,6 +531,8 @@ class WorkerDayViewSet(BaseModelViewSet):
                     ).distinct()
                 )
 
+                vacancies_to_approve = list(wdays_to_approve.filter(is_vacancy=True))
+
                 wdays_to_approve.update(is_approved=True)
 
                 wds = WorkerDay.objects.bulk_create(
@@ -604,6 +606,10 @@ class WorkerDayViewSet(BaseModelViewSet):
                         )
                     
                     transaction.on_commit(lambda: vacancies_create_and_cancel_for_shop.delay(serializer.validated_data['shop_id']))
+                    def _notify_vacancies_created():
+                        for vacancy in vacancies_to_approve:
+                            notify_vacancy_created(vacancy, is_auto=False)
+                    transaction.on_commit(lambda: _notify_vacancies_created())
                     if not has_permission_to_change_protected_wdays:
                         WorkerDay.check_tasks_violations(
                             employee_days_q=employee_days_q,
@@ -828,6 +834,7 @@ class WorkerDayViewSet(BaseModelViewSet):
                     ) for details in vacancy_details
                 )
             else:
+                transaction.on_commit(lambda: notify_vacancy_created(vacancy, is_auto=False))
                 vacancy.is_approved = True
                 vacancy.save()
 

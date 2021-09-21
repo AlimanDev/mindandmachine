@@ -21,7 +21,7 @@ from src.base.tests.factories import (
 from src.events.models import EventType
 from src.reports.models import ReportConfig, ReportType
 from src.notifications.models import EventEmailNotification
-from src.timetable.events import REQUEST_APPROVE_EVENT_TYPE, APPROVE_EVENT_TYPE
+from src.timetable.events import REQUEST_APPROVE_EVENT_TYPE, APPROVE_EVENT_TYPE, VACANCY_CREATED
 from src.reports.reports import OVERTIMES_UNDERTIMES, UNACCOUNTED_OVERTIME
 from src.timetable.models import WorkerDay, WorkerDayPermission, GroupWorkerDayPermission
 from src.timetable.tests.factories import WorkerDayFactory
@@ -548,3 +548,84 @@ class TestOvertimesUndertimesReport(TestsHelperMixin, APITestCase):
             data = open_workbook(file_contents=mail.outbox[0].attachments[0][1])
             df = pd.read_excel(data, engine='xlrd').fillna('')
             self.assertEqual(len(df.to_dict('records')), 11)
+
+
+class TestVacancyCreatedNotification(TestsHelperMixin, APITestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.network = NetworkFactory()
+        cls.root_shop = ShopFactory(network=cls.network)
+        cls.shop = ShopFactory(
+            parent=cls.root_shop,
+            name='SHOP_NAME',
+            network=cls.network,
+            email='shop@example.com',
+        )
+        cls.shop2 = ShopFactory(
+            parent=cls.root_shop,
+            name='SHOP_NAME2',
+            network=cls.network,
+            email=None,
+        )
+        cls.user_dir = UserFactory(email='dir@example.com', network=cls.network)
+        cls.employee_dir = EmployeeFactory(user=cls.user_dir)
+        cls.user_urs = UserFactory(email='urs@example.com', network=cls.network)
+        cls.employee_urs = EmployeeFactory(user=cls.user_urs)
+        cls.user_worker = UserFactory(email='worker@example.com', network=cls.network)
+        cls.user_worker2 = UserFactory(email='worker2@example.com', network=cls.network)
+        cls.employee_worker = EmployeeFactory(user=cls.user_worker)
+        cls.employee_worker2 = EmployeeFactory(user=cls.user_worker2)
+        cls.group_dir = GroupFactory(name='Директор', network=cls.network)
+        cls.group_urs = GroupFactory(name='УРС', network=cls.network)
+        cls.group_worker = GroupFactory(name='Сотрудник', network=cls.network)
+        cls.employment_dir = EmploymentFactory(
+            employee=cls.employee_dir, shop=cls.shop, function_group=cls.group_dir,
+        )
+        cls.employment_urs = EmploymentFactory(
+            employee=cls.employee_urs, shop=cls.root_shop, function_group=cls.group_urs,
+        )
+        cls.employment_worker = EmploymentFactory(
+            employee=cls.employee_worker, shop=cls.shop, function_group=cls.group_worker,
+        )
+        cls.employment_worker2 = EmploymentFactory(
+            employee=cls.employee_worker2, shop=cls.shop2, function_group=cls.group_worker,
+        )
+        cls.vacancy_created_event, _created = EventType.objects.get_or_create(
+            code=VACANCY_CREATED, network=cls.network)
+
+        FunctionGroup.objects.create(group=cls.group_dir, func='WorkerDay_approve', method='POST')
+        FunctionGroup.objects.create(group=cls.group_dir, func='WorkerDay_approve_vacancy', method='POST')
+        cls.dt = datetime.now().date()
+
+    def setUp(self):
+        self.client.force_authenticate(user=self.user_dir)
+        self.not_approved_plan = self._create_worker_day(datetime.combine(self.dt, time(8)), datetime.combine(self.dt, time(14)), self.shop.id, employment=self.employment_worker, is_approved=False)
+        self.not_approved_vacancy = self._create_worker_day(datetime.combine(self.dt, time(8)), datetime.combine(self.dt, time(14)), self.shop.id, employment=self.employment_worker, is_approved=False)
+    
+    def _create_worker_day(self, dttm_work_start, dttm_work_end, shop_id, employment=None, is_fact=False, is_approved=True, is_vacancy=False):
+        return WorkerDayFactory(
+            is_approved=is_approved,
+            is_fact=is_fact,
+            shop_id=shop_id,
+            employment=employment,
+            employee_id=employment.employee_id if employment else None,
+            dt=dttm_work_start.date(),
+            type=WorkerDay.TYPE_WORKDAY,
+            dttm_work_start=dttm_work_start,
+            dttm_work_end=dttm_work_end,
+            is_vacancy=is_vacancy,
+        )
+
+    def test_vacancy_created_notification_sent(self):
+        subject = 'Создана новая вакансия'
+        event_email_notification = EventEmailNotification.objects.create(
+            event_type=self.approve_event_type,
+            system_email_template='notifications/email/vacancy_created.html',
+            subject=subject,
+        )
+        event_email_notification.users.add(self.user_urs)
+        
+        with mock.patch.object(transaction, 'on_commit', lambda t: t()):
+            resp = self.client.post(self.get_url('WorkerDay-approve'), data=approve_data)
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(mail.outbox), 0)
