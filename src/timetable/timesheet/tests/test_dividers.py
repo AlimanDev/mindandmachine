@@ -112,7 +112,7 @@ class TestNahodkaDivider(TestTimesheetMixin, TestCase):
     def test_overtime_less_than_zero_after_12h_threshold_moves(self):
         """
         В случае когда переработки < 0
-        Например когда часть часы ушли в доп. табель при проверке не превышение рабочих часов в день 12ч
+        Например когда часть часов ушла в доп. табель при проверке не превышение рабочих часов в день 12ч
         """
         WorkerDay.objects.all().delete()
         date_ranges = (
@@ -177,3 +177,24 @@ class TestNahodkaDivider(TestTimesheetMixin, TestCase):
         self.assertEqual(timesheet_hours['fact_work_hours_sum'], 117)
         self.assertEqual(timesheet_hours['main_hours_sum'], 108)
         self.assertEqual(timesheet_hours['additional_hours_sum'], 9)  # ушло в доп. по кол-ву часов в сутках > 12
+
+    def test_vacation_moved_to_main_timesheet(self):
+        WorkerDay.objects.all().delete()
+        date_ranges = (
+            ((1, 2), WorkerDay.TYPE_VACATION),
+        )
+        for date_range, wd_type_id in date_ranges:
+            for dt in pd.date_range(date(2021, 6, date_range[0]), date(2021, 6, date_range[1])).date:
+                WorkerDayFactory(
+                    is_approved=True,
+                    is_fact=True,
+                    shop=self.shop,
+                    employment=self.employment_worker,
+                    employee=self.employee_worker,
+                    dt=dt,
+                    type_id=wd_type_id,
+                )
+
+        self._calc_timesheets()
+        timesheet = Timesheet.objects.get(employee=self.employee_worker, dt=date(2021, 6, 1))
+        self.assertEqual(timesheet.main_timesheet_type_id, WorkerDay.TYPE_VACATION)

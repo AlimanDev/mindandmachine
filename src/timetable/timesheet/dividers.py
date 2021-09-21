@@ -127,7 +127,7 @@ class BaseTimesheetDivider:
         for data in self.fiscal_sheet_list:
             fact_timesheet_type_id = data.get('fact_timesheet_type_id', '')
             fact_timesheet_type_obj = self.wd_types_dict.get(fact_timesheet_type_id)
-            if fact_timesheet_type_obj and fact_timesheet_type_obj.is_work_hours:
+            if fact_timesheet_type_obj and (fact_timesheet_type_obj.is_dayoff or fact_timesheet_type_obj.is_work_hours):
                 data['main_timesheet_type_id'] = fact_timesheet_type_id
                 main_timesheet_type_obj = fact_timesheet_type_obj
                 if main_timesheet_type_obj and not main_timesheet_type_obj.is_dayoff:
