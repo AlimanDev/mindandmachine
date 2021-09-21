@@ -1,4 +1,4 @@
-from django.db.models import F, Sum
+from django.db.models import F
 from django.utils.translation import gettext as _
 from drf_yasg.utils import swagger_auto_schema
 from rest_framework.decorators import action
@@ -17,8 +17,8 @@ from src.util.models_converter import Converter
 from .filters import TimesheetFilter
 from .serializers import TimesheetSerializer, TimesheetRecalcSerializer
 from .tasks import calc_timesheets
+from .utils import get_timesheet_stats
 from ..models import Timesheet
-from ..worker_day.stat import WorkersStatsGetter
 
 
 class TimesheetViewSet(BaseModelViewSet):
@@ -49,35 +49,12 @@ class TimesheetViewSet(BaseModelViewSet):
     )
     @action(detail=False, methods=['get'])
     def stats(self, *args, **kwargs):
-        filtered_qs = self.filter_queryset(self.get_queryset())
-
-        timesheet_stats_qs = filtered_qs.values(
-            'employee_id',
-        ).annotate(
-            fact_total_hours_sum=Sum('fact_timesheet_total_hours'),
-            fact_day_hours_sum=Sum('fact_timesheet_day_hours'),
-            fact_night_hours_sum=Sum('fact_timesheet_night_hours'),
-            main_total_hours_sum=Sum('main_timesheet_total_hours'),
-            main_day_hours_sum=Sum('main_timesheet_day_hours'),
-            main_night_hours_sum=Sum('main_timesheet_night_hours'),
-            additional_hours_sum=Sum('additional_timesheet_hours'),
-        )
-        timesheet_stats = {}
-        for ts_data in timesheet_stats_qs:
-            k = ts_data.pop('employee_id')
-            timesheet_stats[k] = ts_data
-
-        worker_stats = WorkersStatsGetter(
+        timesheet_stats = get_timesheet_stats(
+            filtered_qs=self.filter_queryset(self.get_queryset()),
             dt_from=Converter.parse_date(self.request.query_params.get('dt__gte')),
             dt_to=Converter.parse_date(self.request.query_params.get('dt__lte')),
-            employee_id__in=timesheet_stats.keys(),
-            network=self.request.user.network,
-        ).run()
-        for employee_id, data in timesheet_stats.items():
-            data['norm_hours'] = worker_stats.get(
-                employee_id, {}).get('plan', {}).get('approved', {}).get('norm_hours', {}).get('selected_period', None)
-            data['sawh_hours'] = worker_stats.get(
-                employee_id, {}).get('plan', {}).get('approved', {}).get('sawh_hours', {}).get('selected_period', None)
+            user=self.request.user,
+        )
         return Response(timesheet_stats)
 
     @swagger_auto_schema(
