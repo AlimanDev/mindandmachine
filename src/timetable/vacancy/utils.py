@@ -500,19 +500,19 @@ def create_vacancy(dttm_from, dttm_to, shop_id, work_type_id, outsources=[]):
 def notify_vacancy_created(worker_day, work_type_id=None, is_auto=True):
     shop = worker_day.shop
     director = {}
-    networks = {}
+    networks = list(worker_day.outsources.all().values_list('id', flat=True)) + [worker_day.shop.network_id]
     work_types = []
     if is_auto:
         director = {
             'email': shop.director.email if shop.director else shop.email,
             'name': shop.director.first_name if shop.director else shop.name,
         }
-    else:
-        networks = list(worker_day.outsources.all().values_list('id', flat=True))
+    
     if work_type_id:
-        work_types = WorkType.objects.select_related('work_type_name').filter(id=work_type_id).values_list('work_type_name__name', flat=True)
+        work_types = list(WorkType.objects.select_related('work_type_name').filter(id=work_type_id).values_list('work_type_name__name', flat=True))
     else:
-        work_types = WorkerDayCashboxDetails.objects.filter(worker_day=worker_day).select_related('work_type__work_type_name').values_list('work_type__work_type_name__name', flat=True)
+        work_types = list(WorkerDayCashboxDetails.objects.filter(worker_day=worker_day).select_related('work_type__work_type_name').values_list('work_type__work_type_name__name', flat=True))
+
     event_signal.send(
         sender=None,
         network_id=shop.network_id,
