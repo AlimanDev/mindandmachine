@@ -348,8 +348,6 @@ class WorkerDayViewSet(BaseModelViewSet):
                         q &= Q(dt__lte=today + datetime.timedelta(days=limit_days_in_future))
                 wd_types_q |= q
 
-            # если у пользователя нет группы с наличием прав на изменение защищенных дней, то проверяем,
-            # что в списке подтверждаемых дней нету защищенных дней, если есть, то выдаем ошибку
             shop = Shop.objects.get(id=serializer.validated_data['shop_id'])
             has_perm_to_approve_other_shop_days = Group.objects.filter(
                 id__in=request.user.get_group_ids(shop),
