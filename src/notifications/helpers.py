@@ -43,7 +43,7 @@ def send_mass_html_mail(datatuple, fail_silently=False, user=None, password=None
     for subject, text, html, file_data, from_email, recipient in datatuple:
         message = EmailMultiAlternatives(subject, text, from_email, recipient)
         message.attach_alternative(html, 'text/html')
-        if file_data:
+        if file_data and file_data.get('file'):
             message.attach(file_data.get('name', 'No name'), file_data['file'].getvalue(), file_data.get('type', mimetypes.guess_type(file_data.get('name', 'No name'))[0]))
         messages.append(message)
     return connection.send_messages(messages)
