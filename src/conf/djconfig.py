@@ -86,6 +86,8 @@ INSTALLED_APPS = [
     'src.reports',
     'import_export',
     'src.tasks',
+    'polymorphic',
+    'src.exchange',
 ]
 
 REST_FRAMEWORK = {

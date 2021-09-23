@@ -104,7 +104,6 @@ class TestUrvFiles(APITestCase):
         }
         self.assertEqual(dict(df.iloc[0]), data)
 
-
     def test_urv_violators_report(self):
         self._create_att_record(
             self.employment4,
