@@ -47,8 +47,8 @@ class BaseUploadDownloadTimeTable:
         self.user = user
         self.wd_types_dict = WorkerDayType.get_wd_types_dict()
         self.wd_type_mapping = {
-            wd_type_code: wd_type.excel_load_code for wd_type_code, wd_type in self.wd_types_dict.items()}
-        self.wd_type_mapping_reversed = dict((v, k) for k, v in self.wd_type_mapping.items())
+            wd_type_code: wd_type for wd_type_code, wd_type in self.wd_types_dict.items()}
+        self.wd_type_mapping_reversed = dict((v.excel_load_code, k) for k, v in self.wd_type_mapping.items())
 
     def _parse_cell_data(self, cell_data: str):
         cell_data = cell_data.strip()
@@ -412,6 +412,13 @@ class BaseUploadDownloadTimeTable:
     def _generate_upload_example(self, workbook, shop_id, dt_from, dt_to, is_fact, is_approved, employee_id__in):
         raise NotImplementedError()
 
+    def _group_worker_days(self, worker_days):
+        wdays = {}
+        for wd in worker_days:
+            wdays.setdefault(wd.employee_id, {}).setdefault(wd.dt, []).append(wd)
+        
+        return wdays
+
 
 class UploadDownloadTimetableCells(BaseUploadDownloadTimeTable):
     def _upload(self, df, users, form, is_fact):
@@ -555,10 +562,10 @@ class UploadDownloadTimetableCells(BaseUploadDownloadTimeTable):
         timetable.construnts_users_info(employments, 11, 0, ['code', 'fio', 'position'])
 
         # fill page 1
-        timetable.fill_table(workdays, employments, stat, 11, 4, stat_type=stat_type, norm_type=norm_type, mapping=self.wd_type_mapping)
+        timetable.fill_table(self._group_worker_days(workdays), employments, stat, 11, 4, stat_type=stat_type, norm_type=norm_type, mapping=self.wd_type_mapping)
 
         # fill page 2
-        timetable.fill_table2(shop, timetable.prod_days[-1].dt, workdays)
+        timetable.fill_table2(shop, timetable.prod_days[-1].dt, self._group_worker_days(workdays))
 
         return workbook, _('Timetable_for_shop_{}_from_{}.xlsx').format(shop.name, form['dt_from'])
 
