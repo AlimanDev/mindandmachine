@@ -47,8 +47,8 @@ class BaseUploadDownloadTimeTable:
         self.user = user
         self.wd_types_dict = WorkerDayType.get_wd_types_dict()
         self.wd_type_mapping = {
-            wd_type_code: wd_type for wd_type_code, wd_type in self.wd_types_dict.items()}
-        self.wd_type_mapping_reversed = dict((v.excel_load_code, k) for k, v in self.wd_type_mapping.items())
+            wd_type_code: wd_type.excel_load_code for wd_type_code, wd_type in self.wd_types_dict.items()}
+        self.wd_type_mapping_reversed = dict((v, k) for k, v in self.wd_type_mapping.items())
 
     def _parse_cell_data(self, cell_data: str):
         cell_data = cell_data.strip()
@@ -104,7 +104,7 @@ class BaseUploadDownloadTimeTable:
         ).order_by('employee__user__last_name', 'employee__user__first_name', 'employee__user__middle_name', 'employee_id')
 
     def _get_worker_day_qs(self, employee_ids=[], dt_from=None, dt_to=None, is_approved=True):
-        workdays = WorkerDay.objects.select_related('employee', 'employee__user', 'shop').filter(
+        workdays = WorkerDay.objects.select_related('employee', 'employee__user', 'shop', 'type').filter(
             Q(dt__lte=F('employment__dt_fired')) | Q(employment__dt_fired__isnull=True) | Q(employment__isnull=True),
             (Q(dt__gte=F('employment__dt_hired')) | Q(employment__isnull=True)) & Q(dt__gte=dt_from),
             employee_id__in=employee_ids,
@@ -112,16 +112,17 @@ class BaseUploadDownloadTimeTable:
             is_approved=is_approved,
             is_fact=False,
         ).order_by(
-            'employee__user__last_name', 'employee__user__first_name', 'employee__user__middle_name', 'employee_id', 'dt')
+            'employee__user__last_name', 'employee__user__first_name', 'employee__user__middle_name', 'employee_id', 'dt', 'dttm_work_start')
 
-        return workdays.get_last_ordered(
-            is_fact=False,
-            order_by=[
-                '-is_approved' if is_approved else 'is_approved',
-                '-is_vacancy',
-                '-id',
-            ]
-        )
+        return workdays
+        # .get_last_ordered(
+        #     is_fact=False,
+        #     order_by=[
+        #         '-is_approved' if is_approved else 'is_approved',
+        #         '-is_vacancy',
+        #         '-id',
+        #     ]
+        # )
 
     def _get_employee_qs(self, network_id, shop_id, dt_from, dt_to, employee_id__in):
         employee_qs = Employee.objects.filter(
@@ -561,11 +562,13 @@ class UploadDownloadTimetableCells(BaseUploadDownloadTimeTable):
         # construct user info
         timetable.construnts_users_info(employments, 11, 0, ['code', 'fio', 'position'])
 
+        groupped_days = self._group_worker_days(workdays)
+
         # fill page 1
-        timetable.fill_table(self._group_worker_days(workdays), employments, stat, 11, 4, stat_type=stat_type, norm_type=norm_type, mapping=self.wd_type_mapping)
+        timetable.fill_table(groupped_days, employments, stat, 11, 4, stat_type=stat_type, norm_type=norm_type, mapping=self.wd_type_mapping)
 
         # fill page 2
-        timetable.fill_table2(shop, timetable.prod_days[-1].dt, self._group_worker_days(workdays))
+        timetable.fill_table2(shop, timetable.prod_days[-1].dt, groupped_days)
 
         return workbook, _('Timetable_for_shop_{}_from_{}.xlsx').format(shop.name, form['dt_from'])
 

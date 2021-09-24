@@ -139,27 +139,38 @@ class Timetable_xlsx(Tabel_xlsx):
         """
 
         mapping = mapping or self.WD_TYPE_MAPPING
-        it = 0
         cell_format = dict(self.day_type)
-        n_workdays = len(workdays)
         for row_shift, employment in enumerate(employments):
-            for day in range(len(self.prod_days)):
-                if (it < n_workdays) and (workdays[it].employee_id == employment.employee_id) and (day + 1 == workdays[it].dt.day):
-                    wd = workdays[it]
+            max_rows = 2
+            for day, dt in enumerate(self.prod_days):
+                texts = []
+                if workdays.get(employment.employee_id, {}).get(dt.dt):
+                    wds = workdays.get(employment.employee_id, {}).get(dt.dt)
+                    if len(wds) > max_rows:
+                        max_rows = len(wds)
+                    wd_types = list(set(map(lambda x: x.type_id, wds)))
+                    font_color = COLOR_BLACK
+                    bg_color = COLOR_WHITE
 
-                    if wd.type_id == WorkerDay.TYPE_WORKDAY:
-                        text = '{}-\n{}'.format(wd.dttm_work_start.time().strftime(QOS_SHORT_TIME_FORMAT),
-                                                wd.dttm_work_end.time().strftime(QOS_SHORT_TIME_FORMAT))
-
-                    else:
-                        text = mapping[wd.type_id]
-
+                    if len(wd_types) == 1:
+                        font_color = self.WORKERDAY_TYPE_COLORS[wd_types[0]][0]
+                        bg_color = self.WORKERDAY_TYPE_COLORS[wd_types[0]][1]
+                    for wd in wds:
+                        if not wd.type.is_dayoff:
+                            text = '{}-{}'.format(wd.dttm_work_start.time().strftime(QOS_SHORT_TIME_FORMAT),
+                                                    wd.dttm_work_end.time().strftime(QOS_SHORT_TIME_FORMAT))
+                            if not wd.type_id == WorkerDay.TYPE_WORKDAY:
+                                text = mapping[wd.type_id] + text
+                        else:
+                            text = mapping[wd.type_id]
+                        
+                        texts.append(text)
+                    
                     cell_format.update({
-                        'font_color': self.WORKERDAY_TYPE_COLORS[wd.type_id][0],
-                        'bg_color': self.WORKERDAY_TYPE_COLORS[wd.type_id][1],
+                        'font_color': font_color,
+                        'bg_color': bg_color,
                     })
 
-                    it += 1
                 else:
                     text = ''
                     cell_format.update({
@@ -170,10 +181,10 @@ class Timetable_xlsx(Tabel_xlsx):
                 self.worksheet.write_string(
                     row_s + row_shift,
                     col_s + day,
-                    text,
+                    '\n'.join(texts),
                     self.workbook.add_format(cell_format)
                 )
-            self.worksheet.set_row(row_s + row_shift, 35)
+            self.worksheet.set_row(row_s + row_shift, 17.5 * max_rows)
 
             format_holiday_debt = self.workbook.add_format(fmt(font_size=10, border=1, bg_color='#FEFF99'))
 
@@ -276,43 +287,40 @@ class Timetable_xlsx(Tabel_xlsx):
             shop_id=shop.id).values_list('employee_id', flat=True)
         employees = Employee.objects.filter(id__in=employments).select_related('user').order_by('id')
         last_worker = len(employees) - 1
+        mapping = dict(WorkerDayType.objects.values_list('code', 'excel_load_code'))
+        max_rows = [2 for _ in range(7)]
         for i, employee in enumerate(employees):
-            worker_days = {x.dt: x for x in workdays if x.employee_id == employee.id}
+            worker_days = workdays.get(employee.id, {})
             user_data = [weekdays]
             dt = dt_from - timedelta(days=dt_from.weekday())
             while dt <= dt_to:
                 weekdays_dts = []
-                work_begin = []
-                work_end = []
+                cell_data = []
                 for xdt in range(int(dt.timestamp()), int((dt + timedelta(days=7)).timestamp()), int(timedelta(days=1).total_seconds())):
                     xdt = datetime.fromtimestamp(xdt)
-                    wd = worker_days.get(xdt.date())
+                    wds = worker_days.get(xdt.date())
 
                     weekdays_dts.append(Cell(xdt, format_date if xdt.weekday() != 6 else format_date_bottom))
-                    if wd is None:
-                        work_begin.append(Cell('', format_common if xdt.weekday() != 6 else format_common_bottom))
-                        work_end.append(Cell('', format_common if xdt.weekday() != 6 else format_common_bottom))
+                    texts = []
+                    if wds is None:
+                        cell_data.append(Cell('', format_common if xdt.weekday() != 6 else format_common_bottom))
                         continue
+                    if len(wds) > max_rows[xdt.weekday()]:
+                        max_rows[xdt.weekday()] = len(wds)
+                    for wd in wds:
+                        if not wd.type.is_dayoff:
+                            text = '{}-{}'.format(wd.dttm_work_start.time().strftime(QOS_SHORT_TIME_FORMAT),
+                                                    wd.dttm_work_end.time().strftime(QOS_SHORT_TIME_FORMAT))
+                            if not wd.type_id == WorkerDay.TYPE_WORKDAY:
+                                text = mapping[wd.type_id] + text
+                        else:
+                            text = mapping[wd.type_id]
+                        texts.append(text)
 
-                    if wd.type_id == WorkerDay.TYPE_WORKDAY:
-                        work_begin.append(
-                            Cell(wd.dttm_work_start.time(), format_time if xdt.weekday() != 6 else format_time_bottom))
-                        work_end.append(
-                            Cell(wd.dttm_work_end.time(), format_time if xdt.weekday() != 6 else format_time_bottom))
-                        continue
+                    cell_data.append(Cell('\n'.join(texts),
+                                        format_common if xdt.weekday() != 6 else format_common_bottom))
 
-                    # для чего был отдельный словарь?
-                    mapping = dict(WorkerDayType.objects.filter(
-                        is_dayoff=True,
-                    ).values_list('code', 'excel_load_code'))
-
-                    text = mapping.get(wd.type_id)
-                    work_begin.append(Cell('' if text is None else text,
-                                           format_common if xdt.weekday() != 6 else format_common_bottom))
-                    work_end.append(Cell('' if text is None else text,
-                                         format_common if xdt.weekday() != 6 else format_common_bottom))
-
-                user_data += [weekdays_dts, work_begin, work_end]
+                user_data += [weekdays_dts, cell_data]
                 dt += timedelta(days=7)
 
             user_data = __transpose(user_data)
@@ -334,10 +342,12 @@ class Timetable_xlsx(Tabel_xlsx):
                 data += [row1 + row2 for row1, row2 in zip(prev_user_data, user_data)]
 
                 if len(data_size['cols']) == 0:
-                    data_size['cols'] = [3] + [5 for _ in range(len(prev_user_data[0]) - 1)] + [3] + [5 for _ in range(
+                    data_size['cols'] = [3] + [5 if i % 2 == 0 else 10 for i in range(len(prev_user_data[0]) - 1)] + [3] + [5 if i % 2 == 0 else 10 for i in range(
                         len(user_data[0]) - 1)]
 
-                data_size['rows'] += [25] + [20 for _ in range(7)]
+                data_size['rows'] += [25] + [max_rows[i] * 10 for i in range(7)]
+
+                max_rows = [2 for _ in range(7)]
 
                 prev_user_data = None
 

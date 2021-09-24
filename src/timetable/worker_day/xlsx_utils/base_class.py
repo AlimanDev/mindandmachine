@@ -102,7 +102,7 @@ class Xlsx_base:
             if format == '%w':
                 self.worksheet.write_string(row, col + i,
                                             self.WEEKDAY_TRANSLATION[int(item.dt.strftime(format))], text_type)
-                self.worksheet.set_column(col + i, col + i, 9.57)
+                self.worksheet.set_column(col + i, col + i, 15)
             else:
                 cell_str = item.dt.strftime(format)
                 cell_str = int(cell_str) if xlsx_format==int else cell_str
@@ -130,6 +130,7 @@ class Xlsx_base:
 
         format_s = dict(self.default_text_settings)
         format_s['border'] = 1
+        format_s['text_wrap'] = True
         text_format = self.workbook.add_format(format_s)
         format_s['num_format'] = 'dd.mm.yyyy'
         date_format = self.workbook.add_format(format_s)
