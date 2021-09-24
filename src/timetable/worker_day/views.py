@@ -540,7 +540,7 @@ class WorkerDayViewSet(BaseModelViewSet):
                     ).distinct()
                 )
 
-                vacancies_to_approve = list(wdays_to_approve.filter(is_vacancy=True))
+                vacancies_to_approve = list(wdays_to_approve.filter(is_vacancy=True, employee_id__isnull=True))
 
                 wdays_to_approve.update(is_approved=True)
 

@@ -616,6 +616,9 @@ class TestVacancyCreatedNotification(TestsHelperMixin, APITestCase):
         self.not_approved_vacancy = self._create_worker_day(
             datetime.combine(self.dt, time(8)), datetime.combine(self.dt, time(14)), self.shop.id, is_approved=False, outsources=[self.outsource_network], is_vacancy=True,
         )
+        self.not_approved_vacancy_with_employee = self._create_worker_day(
+            datetime.combine(self.dt, time(8)), datetime.combine(self.dt, time(14)), self.shop.id, is_approved=False, outsources=[self.outsource_network], is_vacancy=True, employment=self.employment_dir,
+        )
     
     def _create_worker_day(self, dttm_work_start, dttm_work_end, shop_id, employment=None, is_fact=False, is_approved=True, is_vacancy=False, outsources=[]):
         wd = WorkerDayFactory(
