@@ -297,7 +297,7 @@ class WorkerDayViewSet(BaseModelViewSet):
 
     @swagger_auto_schema(
         request_body=WorkerDayApproveSerializer,
-        responses={200:'empty response'},
+        responses={200: 'empty response'},
         operation_description='''
         Метод для подтверждения графика
         ''',
@@ -348,10 +348,19 @@ class WorkerDayViewSet(BaseModelViewSet):
                         q &= Q(dt__lte=today + datetime.timedelta(days=limit_days_in_future))
                 wd_types_q |= q
 
+            shop = Shop.objects.get(id=serializer.validated_data['shop_id'])
+            has_perm_to_approve_other_shop_days = Group.objects.filter(
+                id__in=request.user.get_group_ids(shop),
+                has_perm_to_approve_other_shop_days=True,
+            ).exists()
+
+            shop_employees_q = Q(employee_id__in=employee_ids)
+            if not has_perm_to_approve_other_shop_days:
+                shop_employees_q &= Q(Q(shop__isnull=True) | Q(type=WorkerDay.TYPE_QUALIFICATION))
+
             approve_condition = Q(
                 wd_types_q,
-                Q(shop_id=serializer.data['shop_id']) |
-                Q(Q(shop__isnull=True) | Q(type=WorkerDay.TYPE_QUALIFICATION), employee_id__in=employee_ids),
+                Q(shop_id=serializer.data['shop_id']) | shop_employees_q,
                 dt__lte=serializer.data['dt_to'],
                 dt__gte=serializer.data['dt_from'],
                 is_fact=serializer.data['is_fact'],
@@ -390,7 +399,7 @@ class WorkerDayViewSet(BaseModelViewSet):
                 # если у пользователя нет группы с наличием прав на изменение защищенных дней, то проверяем,
                 # что в списке подтверждаемых дней нету защищенных дней, если есть, то выдаем ошибку
                 has_permission_to_change_protected_wdays = Group.objects.filter(
-                    id__in=request.user.get_group_ids(Shop.objects.get(id=serializer.validated_data['shop_id'])),
+                    id__in=request.user.get_group_ids(shop),
                     has_perm_to_change_protected_wdays=True,
                 ).exists()
                 if not has_permission_to_change_protected_wdays:

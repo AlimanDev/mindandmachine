@@ -388,6 +388,35 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
         self.assertFalse(WorkerDay.objects.filter(id=protected_day.id).exists())
         self.assertTrue(WorkerDay.objects.get(id=day_to_approve.id).is_approved)
 
+    def test_cant_approve_wdays_from_other_shops_without_perm(self):
+        data = {
+            'shop_id': self.shop.id,
+            'dt_from': self.dt,
+            'dt_to': self.dt,
+            'is_fact': False,
+        }
+
+        wd = self.create_worker_day(shop=self.shop2, dt=self.dt, is_approved=False)
+        response = self.client.post(f"{self.url_approve}", data, format='json')
+        self.assertEqual(response.status_code, 200)
+        wd.refresh_from_db()
+        self.assertFalse(wd.is_approved)
+
+    def test_can_approve_wdays_from_other_shops_with_perm(self):
+        data = {
+            'shop_id': self.shop.id,
+            'dt_from': self.dt,
+            'dt_to': self.dt,
+            'is_fact': False,
+        }
+        self.employee_group.has_perm_to_approve_other_shop_days = True
+        self.employee_group.save()
+        wd = self.create_worker_day(shop=self.shop2, dt=self.dt, is_approved=False)
+        response = self.client.post(f"{self.url_approve}", data, format='json')
+        self.assertEqual(response.status_code, 200)
+        wd.refresh_from_db()
+        self.assertFalse(wd.is_approved)
+
     def test_send_doctors_schedule_on_approve(self):
         with self.settings(SEND_DOCTORS_MIS_SCHEDULE_ON_CHANGE=True, CELERY_TASK_ALWAYS_EAGER=True):
             # другой тип работ -- не отправляется
