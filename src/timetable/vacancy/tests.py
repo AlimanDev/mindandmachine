@@ -680,7 +680,7 @@ class TestAutoWorkerExchange(APITestCase):
         dttm_to = dttm_from.replace(hour=21, minute=0, second=0, microsecond=0).strftime('%Y-%m-%d %H:%M:%S')
         dttm_from = dttm_from.strftime('%Y-%m-%d %H:%M:%S')
         work_type = self.work_type1.work_type_name.name
-        self.assertEquals(mail.outbox[0].body, f'Здравствуйте, {self.user_dir.first_name}!\n\nВ отделе {shop_name} автомтически создана вакансия на {dt} с {dttm_from} по {dttm_to} для типа работ {work_type}\n\nПисьмо отправлено роботом.')
+        self.assertEquals(mail.outbox[0].body, f'Здравствуйте, {self.user_dir.first_name}!\n\nВ отделе {shop_name} автоматически создана вакансия на {dt} с {dttm_from} по {dttm_to} для типа работ {work_type}\n\nПисьмо отправлено роботом.')
 
     def test_cancel_vacancy_notification_without_employee(self):
         self.create_vacancy(9, 20, self.work_type1)

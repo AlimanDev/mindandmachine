@@ -87,19 +87,19 @@ msgstr "Нет такого пользователя"
 msgid "Unable to log in with provided credentials."
 msgstr "Невозможно войти с предоставленными учетными данными."
 
-#: src/base/models.py:46 src/reports/models.py:36
+#: src/base/models.py:46 src/reports/models.py:43
 msgid "Month"
 msgstr "Месяц"
 
-#: src/base/models.py:47 src/reports/models.py:37
+#: src/base/models.py:47 src/reports/models.py:44
 msgid "Quarter"
 msgstr "Квартал"
 
-#: src/base/models.py:48 src/reports/models.py:38
+#: src/base/models.py:48 src/reports/models.py:45
 msgid "Half a year"
 msgstr "Пол года"
 
-#: src/base/models.py:49 src/reports/models.py:39
+#: src/base/models.py:49 src/reports/models.py:46
 msgid "Year"
 msgstr "Год"
 
@@ -569,9 +569,33 @@ msgstr "Сегодня у сотрудника нет рабочего дня в
 msgid "The tick does not exist"
 msgstr "Отметка не существует"
 
-#: src/reports/models.py:35
+#: src/reports/models.py:42
 msgid "Day"
 msgstr "День"
+
+#: src/reports/models.py:50
+msgid "Today"
+msgstr "Сегодня"
+
+#: src/reports/models.py:51
+msgid "Yesterday"
+msgstr "Вчера"
+
+#: src/reports/models.py:52
+msgid "End of previous month"
+msgstr "Конец предыдущего месяца"
+
+#: src/reports/models.py:53
+msgid "End of previous quarter"
+msgstr "Конец предыдущего квартала"
+
+#: src/reports/models.py:54
+msgid "End of previous half a year"
+msgstr "Конец предыдущей половины года"
+
+#: src/reports/models.py:55
+msgid "End of previous year"
+msgstr "Конец предыдущего года"
 
 #: src/reports/utils/overtimes_undertimes.py:178
 #: src/timetable/worker_day/timetable.py:564

@@ -1,9 +1,10 @@
+from src.forecast.period_clients.utils import upload_demand_util_v3
 from src.base.forms import DefaultOverrideAdminWidgetsForm
 from django import forms
 from django.db.models import Q
 from datetime import date, timedelta
 from src.base.models import Shop 
-from src.forecast.models import LoadTemplate 
+from src.forecast.models import LoadTemplate, OperationTypeName 
 from src.forecast.load_template.tasks import calculate_shops_load
 from django.contrib.admin.widgets import AdminDateWidget, FilteredSelectMultiple
 
@@ -19,6 +20,9 @@ def get_shops():
     return Shop.objects.filter(
         Q(dttm_deleted__isnull=True) | Q(dttm_deleted__gte=date.today()),
     )
+
+def get_operations():
+    return OperationTypeName.objects.all()
 
 class RecalcLoadForm(forms.Form):
     dt_from = forms.DateField(initial=date.today(), label='Дата с', required=True, widget=AdminDateWidget)
@@ -36,3 +40,14 @@ class RecalcLoadForm(forms.Form):
         else:
             for template in load_templates:
                 calculate_shops_load.delay(template.id, dt_from, dt_to)
+
+class UploadDemandForm(forms.Form):
+    file = forms.FileField()
+    type = forms.ChoiceField(choices=[('F', 'Факт'), ('L', 'Прогноз')])
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['operation_type_name'] = forms.ModelChoiceField(queryset=get_operations(), label='Тип операций')
+
+    def upload_demand(self, operation_type_name, file, type):
+        return upload_demand_util_v3(operation_type_name, file, type=type)
