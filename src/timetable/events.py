@@ -27,7 +27,7 @@ class VacancyConfirmedEvent(BaseRegisteredEvent):
     code = VACANCY_CONFIRMED_TYPE
 
 class VacancyCreatedEvent(BaseRegisteredEvent):
-    name = 'Автоматически создана вакансия'
+    name = 'Создана вакансия'
     code = VACANCY_CREATED
     write_history = True
 
