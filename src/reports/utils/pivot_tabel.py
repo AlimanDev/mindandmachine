@@ -80,7 +80,9 @@ class PlanAndFactPivotTabel(BasePivotTabel):
 
 
     def get_data(self, **kwargs):
-        return list(
+        dt_from = kwargs.get('dt__gte')
+        dt_to = kwargs.get('dt__lte')
+        data = list(
             PlanAndFactHours.objects.select_related(
                 'worker__network',
             ).filter(
@@ -97,3 +99,13 @@ class PlanAndFactPivotTabel(BasePivotTabel):
                 'work_type_name'
             )
         )
+        if data:
+            dates = set(map(lambda x: x['dt'], data))
+            need_dates = set(pd.date_range(dt_from or min(dates), dt_to or max(dates))) - dates
+            worker_fill = data[0].copy()
+            for dt in need_dates:
+                wf = worker_fill.copy()
+                wf['dt'] = dt.date()
+                wf['fact_work_hours'] = 0.0
+                data.append(wf)
+        return data
