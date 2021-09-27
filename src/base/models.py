@@ -269,6 +269,8 @@ class NetworkConnect(AbstractActiveModel):
 
     client = models.ForeignKey(Network, related_name='outsourcing_connections', on_delete=models.PROTECT)
     outsourcing = models.ForeignKey(Network, related_name='outsourcing_clients', on_delete=models.PROTECT)
+    allow_assign_employements_from_outsource = models.BooleanField(default=False, verbose_name='Разрешить назначать сотрудников из аутсорс сетей')
+    allow_choose_shop_from_client_for_employement = models.BooleanField(default=False, verbose_name='Разрешить выбирать магазин для сотрудника из сети клиента')
 
 
 class Region(AbstractActiveNetworkSpecificCodeNamedModel):

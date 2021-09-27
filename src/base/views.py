@@ -1,4 +1,4 @@
-from django.db.models import F
+from django.db.models import F, Q
 from django.db.models.functions import Coalesce
 from django.middleware.csrf import rotate_token
 from django.utils import timezone
@@ -27,6 +27,7 @@ from src.base.models import (
     Employment,
     FunctionGroup,
     Network,
+    NetworkConnect,
     Notification,
     Subscribe,
     ShopSettings,
@@ -93,7 +94,8 @@ class EmploymentViewSet(UpdateorCreateViewSet):
             manager = Employment.objects_with_excluded
 
         qs = manager.filter(
-            shop__network_id=self.request.user.network_id
+            Q(shop__network_id=self.request.user.network_id) | 
+            Q(employee__user__network_id=self.request.user.network_id), # чтобы можно было аутсорсу редактировать трудоустройтсва своих сотрудников
         ).order_by('-dt_hired')
         if self.action in ['list', 'retrieve']:
             qs = qs.select_related('employee', 'employee__user', 'shop').prefetch_related('work_types', 'worker_constraints')
@@ -221,8 +223,18 @@ class EmployeeViewSet(UpdateorCreateViewSet):
     openapi_tags = ['Employee', ]
 
     def get_queryset(self):
+        network_filter = Q(user__network_id=self.request.user.network_id)
+        # сотрудники из аутсорс сети только для чтения
+        if self.action in ['list', 'retrieve']:
+            network_filter |= Q(
+                user__network_id__in=NetworkConnect.objects.filter(
+                    client_id=self.request.user.network_id, 
+                    allow_assign_employements_from_outsource=True,
+                ).values_list('outsourcing_id', flat=True)
+            )
+
         qs = Employee.objects.filter(
-            user__network_id=self.request.user.network_id if self.request.user.is_authenticated else None
+            network_filter,
         ).select_related(
             'user',
         )
@@ -279,9 +291,18 @@ class WorkerPositionViewSet(UpdateorCreateViewSet):
     openapi_tags = ['WorkerPosition', 'Integration',]
 
     def get_queryset(self):
+        include_clients = self.request.query_params.get('include_clients')
+        network_filter = Q(network_id=self.request.user.network_id)
+        if include_clients:
+            network_filter |= Q(
+                network_id__in=NetworkConnect.objects.filter(
+                    outsourcing_id=self.request.user.network_id, 
+                    allow_choose_shop_from_client_for_employement=True,
+                ).values_list('client_id', flat=True)
+            )
         return WorkerPosition.objects.filter(
+            network_filter,
             dttm_deleted__isnull=True,
-            network_id=self.request.user.network_id
         )
 
 
