@@ -489,6 +489,11 @@ class WorkerPositionSerializer(BaseNetworkSerializer):
             )
         )
 
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        data['network_id'] = instance.network_id # create/read-only field
+        return data
+
 
 class EventSerializer(serializers.ModelSerializer):
     shop_id = serializers.IntegerField()
