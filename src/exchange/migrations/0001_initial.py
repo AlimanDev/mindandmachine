@@ -95,7 +95,7 @@ class Migration(migrations.Migration):
             fields=[
                 ('importstrategy_ptr', models.OneToOneField(auto_created=True, on_delete=django.db.models.deletion.CASCADE, parent_link=True, primary_key=True, serialize=False, to='exchange.ImportStrategy')),
                 ('settings_json', models.TextField(default='{}')),
-                ('strategy_type', models.CharField(choices=[('pobeda_import_shop_mapping', 'Импорт сопоставления кодов магазинов (Победа)'), ('pobeda_import_bills', 'Импорт чеков (Победа)'), ('pobeda_import_deliveries', 'Импорт поставок (Победа)'), ('pobeda_import_day_ahead_deliveries', 'Импорт поставок на день вперед (Победа)'), ('pobeda_import_reassessment', 'Импорт переоценок (Победа)'), ('pobeda_import_write_offs', 'Импорт списаний (Победа)')], max_length=128)),
+                ('strategy_type', models.CharField(choices=[('pobeda_import_shop_mapping', 'Импорт сопоставления кодов магазинов (Победа)'), ('pobeda_import_purchases', 'Импорт чеков (Победа)'), ('pobeda_import_deliveries', 'Импорт поставок (Победа)'), ('pobeda_import_day_ahead_deliveries', 'Импорт поставок на день вперед (Победа)'), ('pobeda_import_reassessment', 'Импорт переоценок (Победа)'), ('pobeda_import_write_offs', 'Импорт списаний (Победа)')], max_length=128)),
             ],
             options={
                 'verbose_name': 'Системная стратегия импорта',

@@ -14,6 +14,9 @@ class FilesystemEngine:
     def read_file(self, filename):
         raise NotImplementedError
 
+    def open_file(self, filename):
+        raise NotImplementedError
+
     def write_file(self, path, content):
         raise NotImplementedError
 

@@ -10,7 +10,7 @@ from src.exchange.fs_engines.local import LocalEngine
 class BaseFilesystemConnector(PolymorphicModel):
     name = models.CharField(max_length=256)
 
-    def get_fs_engine(self):
+    def get_fs_engine(self, base_path=None):
         raise NotImplementedError
 
     def __str__(self):
@@ -22,10 +22,10 @@ class BaseFilesystemConnector(PolymorphicModel):
 
 
 class LocalFilesystemConnector(BaseFilesystemConnector):
-    base_path = models.CharField(max_length=512, default=settings.BASE_DIR)
+    default_base_path = models.CharField(max_length=512, default=settings.BASE_DIR)
 
-    def get_fs_engine(self):
-        return LocalEngine(base_path=self.base_path)
+    def get_fs_engine(self, base_path=None):
+        return LocalEngine(base_path=base_path or self.default_base_path)
 
     class Meta:
         verbose_name = 'Коннектор к локальной файловой системе'
@@ -33,15 +33,15 @@ class LocalFilesystemConnector(BaseFilesystemConnector):
 
 
 class FtpFilesystemConnector(BaseFilesystemConnector):
-    base_path = models.CharField(max_length=512)
+    default_base_path = models.CharField(max_length=512)
     host = models.CharField(max_length=128)
     port = models.PositiveSmallIntegerField(default=21)
     username = models.CharField(max_length=128)
     password = models.CharField(max_length=50)  # TODO: виджет пароля из from django import forms в админке
 
-    def get_fs_engine(self):
+    def get_fs_engine(self, base_path=None):
         return FtpEngine(
-            base_path=self.base_path,
+            base_path=base_path or self.default_base_path,
             host=self.host,
             port=self.port,
             username=self.username,
@@ -71,13 +71,16 @@ class ImportStrategy(PolymorphicModel):
 
 
 class SystemImportStrategy(ImportStrategy):
+    POBEDA_IMPORT_SHOP_MAPPING = 'pobeda_import_shop_mapping'
+    POBEDA_IMPORT_PURCHASES = 'pobeda_import_purchases'
+    POBEDA_IMPORT_BRAK = 'pobeda_import_brak'
+    POBEDA_IMPORT_DELIVERY = 'pobeda_import_delivery'
+
     SYSTEM_IMPORT_STRATEGY_CHOICES = (
-        ('pobeda_import_shop_mapping', 'Импорт сопоставления кодов магазинов (Победа)'),
-        ('pobeda_import_bills', 'Импорт чеков (Победа)'),
-        ('pobeda_import_deliveries', 'Импорт поставок (Победа)'),
-        ('pobeda_import_day_ahead_deliveries', 'Импорт поставок на день вперед (Победа)'),
-        ('pobeda_import_reassessment', 'Импорт переоценок (Победа)'),
-        ('pobeda_import_write_offs', 'Импорт списаний (Победа)'),
+        (POBEDA_IMPORT_SHOP_MAPPING, 'Импорт сопоставления кодов магазинов (Победа)'),
+        (POBEDA_IMPORT_PURCHASES, 'Импорт чеков (Победа)'),
+        (POBEDA_IMPORT_BRAK, 'Импорт списаний (Победа)'),
+        (POBEDA_IMPORT_DELIVERY, 'Импорт поставок (Победа)'),
     )
 
     settings_json = models.TextField(default='{}')
@@ -98,6 +101,7 @@ class SystemImportStrategy(ImportStrategy):
 
 
 class ImportJob(AbstractModel):
+    base_path = models.CharField(blank=True, max_length=512)
     import_strategy = models.ForeignKey(ImportStrategy, on_delete=models.CASCADE)
     fs_connector = models.ForeignKey(BaseFilesystemConnector, on_delete=models.CASCADE)
 
@@ -108,7 +112,7 @@ class ImportJob(AbstractModel):
     def run(self):
         strategy_cls = self.import_strategy.get_strategy_cls()
         strategy_cls_kwargs = self.import_strategy.get_strategy_cls_kwargs()
-        strategy_cls_kwargs['fs_engine'] = self.fs_connector.get_fs_engine()
+        strategy_cls_kwargs['fs_engine'] = self.fs_connector.get_fs_engine(base_path=self.base_path)
         strategy = strategy_cls(**strategy_cls_kwargs)
         return strategy.execute()
 
@@ -145,6 +149,7 @@ class SystemExportStrategy(ExportStrategy):
 
 
 class ExportJob(AbstractModel):
+    base_path = models.CharField(blank=True, max_length=512)
     export_strategy = models.ForeignKey(ExportStrategy, on_delete=models.CASCADE)
     fs_connector = models.ForeignKey(BaseFilesystemConnector, on_delete=models.CASCADE)
 
@@ -153,7 +158,7 @@ class ExportJob(AbstractModel):
         verbose_name_plural = 'Задачи экспорта данных'
 
     def run(self):
-        fs_engine = self.fs_connector.get_fs_engine()
+        fs_engine = self.fs_connector.get_fs_engine(base_path=self.base_path)
         strategy_cls = self.export_strategy.get_strategy_cls()
         strategy = strategy_cls(fs_engine=fs_engine)
         return strategy.execute()

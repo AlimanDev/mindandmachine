@@ -49,7 +49,6 @@ class AbstractEventNotificationWithRecipients(AbstractEventNotification):
     class Meta:
         abstract = True
 
-
     def get_recipients(self, user_author_id: int, context: dict):
         """
         :param user_author_id:

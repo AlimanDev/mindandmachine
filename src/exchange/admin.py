@@ -16,12 +16,12 @@ from .models import (
 
 @admin.register(ImportJob)
 class ImportJobAdmin(admin.ModelAdmin):
-    pass
+    list_display = ('import_strategy', 'fs_connector', 'base_path')
 
 
 @admin.register(ExportJob)
 class ExportJobAdmin(admin.ModelAdmin):
-    pass
+    list_display = ('export_strategy', 'fs_connector', 'base_path')
 
 
 class FilesystemConfigChildAdmin(PolymorphicChildModelAdmin):
@@ -30,19 +30,19 @@ class FilesystemConfigChildAdmin(PolymorphicChildModelAdmin):
 
 @admin.register(LocalFilesystemConnector)
 class LocalFilesystemConnectorAdmin(FilesystemConfigChildAdmin):
-    list_display = ('name', 'base_path')
+    pass
 
 
 @admin.register(FtpFilesystemConnector)
 class FtpFilesystemConnectorAdmin(FilesystemConfigChildAdmin):
-    list_display = ('name', 'host', 'username', 'base_path')
+    list_display = ('host', 'username')
 
 
 @admin.register(BaseFilesystemConnector)
 class BaseFilesystemConnectorAdmin(PolymorphicParentModelAdmin):
     base_model = BaseFilesystemConnector
     child_models = (LocalFilesystemConnector, FtpFilesystemConnector)
-    base_list_display = ('name',)
+    base_list_display = ('name', 'default_base_path')
     list_filter = (PolymorphicChildModelFilter,)
 
 

@@ -1,3 +1,4 @@
+import tempfile
 from ftplib import FTP
 from io import BytesIO
 
@@ -22,3 +23,9 @@ class FtpEngine(FilesystemEngine):
         r = BytesIO()
         self.ftp.retrbinary(f'RETR {filename}', r.write)
         return r.getvalue()
+
+    def open_file(self, filename):
+        tmp_f = tempfile.NamedTemporaryFile(mode='wb+')
+        self.ftp.retrbinary(f'RETR {filename}', tmp_f.write)
+        tmp_f.seek(0)
+        return tmp_f
