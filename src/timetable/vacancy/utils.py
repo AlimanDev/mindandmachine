@@ -495,24 +495,40 @@ def create_vacancy(dttm_from, dttm_to, shop_id, work_type_id, outsources=[]):
         work_type_id=work_type_id,
         worker_day=worker_day,  
     )
-    shop = Shop.objects.get(id=shop_id)
+    notify_vacancy_created(worker_day, work_type_id=work_type_id)
+
+def notify_vacancy_created(worker_day, work_type_id=None, is_auto=True):
+    shop = worker_day.shop
+    director = {}
+    networks = list(worker_day.outsources.all().values_list('id', flat=True)) + [worker_day.shop.network_id]
+    work_types = []
+    if is_auto:
+        director = {
+            'email': shop.director.email if shop.director else shop.email,
+            'name': shop.director.first_name if shop.director else shop.name,
+        }
+    
+    if work_type_id:
+        work_types = list(WorkType.objects.select_related('work_type_name').filter(id=work_type_id).values_list('work_type_name__name', flat=True))
+    else:
+        work_types = list(WorkerDayCashboxDetails.objects.filter(worker_day=worker_day).select_related('work_type__work_type_name').values_list('work_type__work_type_name__name', flat=True))
+
     event_signal.send(
         sender=None,
         network_id=shop.network_id,
         event_code=VACANCY_CREATED,
         user_author_id=None,
-        shop_id=shop_id,
+        shop_id=shop.id,
         context={
-            'director': {
-                'email': shop.director.email if shop.director else shop.email,
-                'name': shop.director.first_name if shop.director else shop.name,
-            },
+            'director': director,
+            'networks': networks,
             'dt': worker_day.dt.strftime('%Y-%m-%d'),
             'dttm_from': worker_day.dttm_work_start.strftime('%Y-%m-%d %H:%M:%S'),
             'dttm_to': worker_day.dttm_work_end.strftime('%Y-%m-%d %H:%M:%S'),
-            'shop_id': shop_id,
+            'shop_id': shop.id,
             'shop_name': shop.name,
-            'work_type': WorkType.objects.select_related('work_type_name').get(id=work_type_id).work_type_name.name,
+            'work_types': work_types,
+            'is_auto': is_auto,
         },
     )
 

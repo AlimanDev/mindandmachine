@@ -294,6 +294,8 @@ class NetworkConnect(AbstractActiveModel):
 
     client = models.ForeignKey(Network, related_name='outsourcing_connections', on_delete=models.PROTECT)
     outsourcing = models.ForeignKey(Network, related_name='outsourcing_clients', on_delete=models.PROTECT)
+    allow_assign_employements_from_outsource = models.BooleanField(default=False, verbose_name='Разрешить назначать сотрудников из аутсорс сетей')
+    allow_choose_shop_from_client_for_employement = models.BooleanField(default=False, verbose_name='Разрешить выбирать магазин для сотрудника из сети клиента')
 
 
 class Region(AbstractActiveNetworkSpecificCodeNamedModel):
@@ -890,6 +892,8 @@ class Group(AbstractActiveNetworkSpecificCodeNamedModel):
     subordinates = models.ManyToManyField("self", blank=True)
     has_perm_to_change_protected_wdays = models.BooleanField(
         default=False, verbose_name='Может изменять/подтверждать "защищенные" рабочие дни')
+    has_perm_to_approve_other_shop_days = models.BooleanField(
+        default=False, verbose_name='Может подтверждать дни из других подразделений')
 
     def __str__(self):
         return '{}, {}, {}'.format(
@@ -1453,6 +1457,7 @@ class FunctionGroup(AbstractModel):
         ('PeriodClients_put', 'Обновить нагрузку (Обновить) (timeserie_value/put/)'),
         ('PeriodClients_delete', 'Удалить нагрузку (Удалить) (timeserie_value/delete/)'),
         ('PeriodClients_upload', 'Загрузить нагрузку (Создать) (timeserie_value/upload/)'),
+        ('PeriodClients_upload_demand', 'Загрузить нагрузку по магазинам (Создать) (timeserie_value/upload_demand/)'),
         ('PeriodClients_download', 'Скачать нагрузку (Получить) (timeserie_value/download/)'),
         ('Receipt', 'Чек (receipt)'),
         ('Reports_pivot_tabel', 'Скачать сводный табель (Получить) (report/pivot_tabel/)'),

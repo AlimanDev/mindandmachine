@@ -57,6 +57,9 @@ class AbstractEventNotificationWithRecipients(AbstractEventNotification):
         :return: Список пользователей, которые должны получить оповещение
         """
         recipients = []
+        network_filter = Q()
+        if context.get('networks', []):
+            network_filter = Q(network_id__in=context.get('networks', []))
         if self.get_recipients_from_event_type:
             event_cls = EventRegistryHolder.get_registry().get(self.event_type.code)
             if event_cls:
@@ -67,9 +70,9 @@ class AbstractEventNotificationWithRecipients(AbstractEventNotification):
                 )
                 recipients.extend(list(event.get_recipients()))
 
-        recipients.extend(list(self.users.all()))
+        recipients.extend(list(self.users.filter(network_filter)))
 
-        groups = list(self.groups.all())
+        groups = list(self.groups.filter(network_filter))
         if groups:
             recipients.extend(
                 list(User.objects.filter(
@@ -98,7 +101,7 @@ class AbstractEventNotificationWithRecipients(AbstractEventNotification):
                 ))
             )
 
-        shops = list(self.shops.all())
+        shops = list(self.shops.filter(network_filter))
         if shops:
             recipients.extend(
                 [

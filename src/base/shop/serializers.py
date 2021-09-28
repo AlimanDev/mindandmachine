@@ -77,6 +77,7 @@ def serialize_shop(shop: Shop, request):
         'load_template_id': shop.load_template_id,
         'parent_id': shop.parent_id,
         'distance': distance,
+        'network_id': shop.network_id,
     }
 
 

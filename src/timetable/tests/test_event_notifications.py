@@ -21,10 +21,10 @@ from src.base.tests.factories import (
 from src.events.models import EventType
 from src.reports.models import ReportConfig, ReportType
 from src.notifications.models import EventEmailNotification
-from src.timetable.events import REQUEST_APPROVE_EVENT_TYPE, APPROVE_EVENT_TYPE
+from src.timetable.events import REQUEST_APPROVE_EVENT_TYPE, APPROVE_EVENT_TYPE, VACANCY_CREATED
 from src.reports.reports import OVERTIMES_UNDERTIMES, UNACCOUNTED_OVERTIME
 from src.timetable.models import WorkerDay, WorkerDayPermission, GroupWorkerDayPermission
-from src.timetable.tests.factories import WorkerDayFactory
+from src.timetable.tests.factories import WorkerDayCashboxDetailsFactory, WorkerDayFactory
 from src.util.mixins.tests import TestsHelperMixin
 from src.util.models_converter import Converter
 from src.reports.tasks import cron_report
@@ -547,3 +547,189 @@ class TestOvertimesUndertimesReport(TestsHelperMixin, APITestCase):
             data = open_workbook(file_contents=mail.outbox[0].attachments[0][1])
             df = pd.read_excel(data, engine='xlrd').fillna('')
             self.assertEqual(len(df.to_dict('records')), 11)
+
+
+class TestVacancyCreatedNotification(TestsHelperMixin, APITestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.network = NetworkFactory(name='Client', code='client')
+        cls.outsource_network = NetworkFactory(name='Outsource', code='outsource')
+        cls.outsource_network2 = NetworkFactory(name='Outsource2', code='outsource2')
+        cls.root_shop = ShopFactory(network=cls.network)
+        cls.shop = ShopFactory(
+            parent=cls.root_shop,
+            name='SHOP_NAME',
+            network=cls.network,
+            email='shop@example.com',
+        )
+        cls.shop2 = ShopFactory(
+            parent=cls.root_shop,
+            name='SHOP_NAME2',
+            network=cls.network,
+            email=None,
+        )
+        cls.user_dir = UserFactory(email='dir@example.com', network=cls.network)
+        cls.employee_dir = EmployeeFactory(user=cls.user_dir)
+        cls.user_urs = UserFactory(email='urs@example.com', network=cls.network)
+        cls.employee_urs = EmployeeFactory(user=cls.user_urs)
+        cls.user_worker = UserFactory(email='worker@example.com', network=cls.network)
+        cls.user_worker2 = UserFactory(email='worker2@example.com', network=cls.network)
+        cls.employee_worker = EmployeeFactory(user=cls.user_worker)
+        cls.employee_worker2 = EmployeeFactory(user=cls.user_worker2)
+        cls.group_dir = GroupFactory(name='Директор', network=cls.network)
+        cls.group_urs = GroupFactory(name='УРС', network=cls.network)
+        cls.group_worker = GroupFactory(name='Сотрудник', network=cls.network)
+        cls.employment_dir = EmploymentFactory(
+            employee=cls.employee_dir, shop=cls.shop, function_group=cls.group_dir,
+        )
+        cls.employment_urs = EmploymentFactory(
+            employee=cls.employee_urs, shop=cls.root_shop, function_group=cls.group_urs,
+        )
+        cls.employment_worker = EmploymentFactory(
+            employee=cls.employee_worker, shop=cls.shop, function_group=cls.group_worker,
+        )
+        cls.employment_worker2 = EmploymentFactory(
+            employee=cls.employee_worker2, shop=cls.shop2, function_group=cls.group_worker,
+        )
+        cls.vacancy_created_event, _created = EventType.objects.get_or_create(
+            code=VACANCY_CREATED, network=cls.network)
+
+        cls.user_outsource = UserFactory(email='outsource@example.com', network=cls.outsource_network)
+        cls.user_outsource2 = UserFactory(email='outsource2@example.com', network=cls.outsource_network2)
+
+        FunctionGroup.objects.create(group=cls.group_dir, func='WorkerDay_approve', method='POST')
+        FunctionGroup.objects.create(group=cls.group_dir, func='WorkerDay_approve_vacancy', method='POST')
+        GroupWorkerDayPermission.objects.create(
+            group=cls.group_dir,
+            worker_day_permission=WorkerDayPermission.objects.get(
+                action=WorkerDayPermission.APPROVE,
+                graph_type=WorkerDayPermission.PLAN,
+                wd_type=WorkerDay.TYPE_WORKDAY,
+            ),
+        )
+        cls.dt = datetime.now().date()
+
+    def setUp(self):
+        self.client.force_authenticate(user=self.user_dir)
+        self.not_approved_plan = self._create_worker_day(datetime.combine(self.dt, time(8)), datetime.combine(self.dt, time(14)), self.shop.id, employment=self.employment_worker, is_approved=False)
+        self.not_approved_vacancy = self._create_worker_day(
+            datetime.combine(self.dt, time(8)), datetime.combine(self.dt, time(14)), self.shop.id, is_approved=False, outsources=[self.outsource_network], is_vacancy=True,
+        )
+        self.not_approved_vacancy_with_employee = self._create_worker_day(
+            datetime.combine(self.dt, time(8)), datetime.combine(self.dt, time(14)), self.shop.id, is_approved=False, outsources=[self.outsource_network], is_vacancy=True, employment=self.employment_dir,
+        )
+    
+    def _create_worker_day(self, dttm_work_start, dttm_work_end, shop_id, employment=None, is_fact=False, is_approved=True, is_vacancy=False, outsources=[]):
+        wd = WorkerDayFactory(
+            is_approved=is_approved,
+            is_fact=is_fact,
+            shop_id=shop_id,
+            employment=employment,
+            employee_id=employment.employee_id if employment else None,
+            dt=dttm_work_start.date(),
+            type=WorkerDay.TYPE_WORKDAY,
+            dttm_work_start=dttm_work_start,
+            dttm_work_end=dttm_work_end,
+            is_vacancy=is_vacancy,
+            cashbox_details__work_type__work_type_name__name='Работа',
+        )
+        wd.outsources.add(*outsources)
+        return wd
+
+    def test_vacancy_created_notification_sent_on_approve(self):
+        with self.settings(CELERY_TASK_ALWAYS_EAGER=True):
+            subject = 'Создана новая вакансия'
+            event_email_notification = EventEmailNotification.objects.create(
+                event_type=self.vacancy_created_event,
+                system_email_template='notifications/email/vacancy_created.html',
+                subject=subject,
+            )
+            event_email_notification.users.add(self.user_outsource)
+            event_email_notification.users.add(self.user_outsource2)
+            approve_data = {
+                'shop_id': self.shop.id,
+                'dt_from': self.dt,
+                'dt_to': self.dt,
+                'is_fact': False,
+                'wd_types': [
+                    WorkerDay.TYPE_WORKDAY,
+                ],
+            }
+            with mock.patch.object(transaction, 'on_commit', lambda t: t()):
+                resp = self.client.post(self.get_url('WorkerDay-approve'), data=approve_data)
+            self.assertEqual(resp.status_code, status.HTTP_200_OK)
+            self.assertEqual(len(mail.outbox), 1)
+            self.assertEqual(mail.outbox[0].subject, 'Создана новая вакансия')
+            self.assertEqual(mail.outbox[0].to[0], self.user_outsource.email)
+            dttm_from = self.not_approved_vacancy.dttm_work_start.strftime('%Y-%m-%d %H:%M:%S')
+            dttm_to = self.not_approved_vacancy.dttm_work_end.strftime('%Y-%m-%d %H:%M:%S')
+            self.assertEquals(mail.outbox[0].body, f'Здравствуйте, {self.user_outsource.first_name}!\n\nВ отделе {self.shop.name} создана вакансия на {self.dt} с {dttm_from} по {dttm_to} для типа работ Работа\n\nПисьмо отправлено роботом.')
+
+    def test_vacancy_created_notification_sent_on_approve_vacancy(self):
+        with self.settings(CELERY_TASK_ALWAYS_EAGER=True):
+            subject = 'Создана новая вакансия'
+            event_email_notification = EventEmailNotification.objects.create(
+                event_type=self.vacancy_created_event,
+                system_email_template='notifications/email/vacancy_created.html',
+                subject=subject,
+            )
+            event_email_notification.users.add(self.user_outsource)
+            event_email_notification.users.add(self.user_outsource2)
+            with mock.patch.object(transaction, 'on_commit', lambda t: t()):
+                resp = self.client.post(self.get_url('WorkerDay-approve-vacancy', pk=self.not_approved_vacancy.id))
+            self.assertEqual(resp.status_code, status.HTTP_200_OK)
+            self.assertEqual(len(mail.outbox), 1)
+            self.assertEqual(mail.outbox[0].subject, 'Создана новая вакансия')
+            self.assertEqual(mail.outbox[0].to[0], self.user_outsource.email)
+            dttm_from = self.not_approved_vacancy.dttm_work_start.strftime('%Y-%m-%d %H:%M:%S')
+            dttm_to = self.not_approved_vacancy.dttm_work_end.strftime('%Y-%m-%d %H:%M:%S')
+            self.assertEquals(mail.outbox[0].body, f'Здравствуйте, {self.user_outsource.first_name}!\n\nВ отделе {self.shop.name} создана вакансия на {self.dt} с {dttm_from} по {dttm_to} для типа работ Работа\n\nПисьмо отправлено роботом.')
+
+    def test_vacancy_created_notification_sent_on_approve_vacancy_many_work_types(self):
+        WorkerDayCashboxDetailsFactory(
+            worker_day=self.not_approved_vacancy,
+            work_type__work_type_name__name='Касса',
+        )
+        with self.settings(CELERY_TASK_ALWAYS_EAGER=True):
+            subject = 'Создана новая вакансия'
+            event_email_notification = EventEmailNotification.objects.create(
+                event_type=self.vacancy_created_event,
+                system_email_template='notifications/email/vacancy_created.html',
+                subject=subject,
+            )
+            event_email_notification.users.add(self.user_outsource)
+            event_email_notification.users.add(self.user_outsource2)
+            with mock.patch.object(transaction, 'on_commit', lambda t: t()):
+                resp = self.client.post(self.get_url('WorkerDay-approve-vacancy', pk=self.not_approved_vacancy.id))
+            self.assertEqual(resp.status_code, status.HTTP_200_OK)
+            self.assertEqual(len(mail.outbox), 1)
+            self.assertEqual(mail.outbox[0].subject, 'Создана новая вакансия')
+            self.assertEqual(mail.outbox[0].to[0], self.user_outsource.email)
+            dttm_from = self.not_approved_vacancy.dttm_work_start.strftime('%Y-%m-%d %H:%M:%S')
+            dttm_to = self.not_approved_vacancy.dttm_work_end.strftime('%Y-%m-%d %H:%M:%S')
+            self.assertEquals(mail.outbox[0].body, f'Здравствуйте, {self.user_outsource.first_name}!\n\nВ отделе {self.shop.name} создана вакансия на {self.dt} с {dttm_from} по {dttm_to} для типов работ Работа, Касса\n\nПисьмо отправлено роботом.')
+
+    def test_vacancy_created_notification_not_sent_on_approve(self):
+        WorkerDay.objects.filter(is_vacancy=True).update(is_approved=True)
+        with self.settings(CELERY_TASK_ALWAYS_EAGER=True):
+            subject = 'Создана новая вакансия'
+            event_email_notification = EventEmailNotification.objects.create(
+                event_type=self.vacancy_created_event,
+                system_email_template='notifications/email/vacancy_created.html',
+                subject=subject,
+            )
+            event_email_notification.users.add(self.user_outsource)
+            event_email_notification.users.add(self.user_outsource2)
+            approve_data = {
+                'shop_id': self.shop.id,
+                'dt_from': self.dt,
+                'dt_to': self.dt,
+                'is_fact': False,
+                'wd_types': [
+                    WorkerDay.TYPE_WORKDAY,
+                ],
+            }
+            with mock.patch.object(transaction, 'on_commit', lambda t: t()):
+                resp = self.client.post(self.get_url('WorkerDay-approve'), data=approve_data)
+            self.assertEqual(resp.status_code, status.HTTP_200_OK)
+            self.assertEqual(len(mail.outbox), 0)
