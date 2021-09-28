@@ -167,7 +167,7 @@ class TestReportConfig(APITestCase):
             'dt_to': date.today() - timedelta(1),
         }
         self.assertEquals(data, dates)
-        config.period.count_of_periods = 3
+        config.count_of_periods = 3
         config.period.save()
         dates = config.get_dates()
         data = {
@@ -289,14 +289,17 @@ class TestPivotTabelReportNotifications(TestsHelperMixin, APITestCase):
     def test_employee_working_not_according_to_plan_notification_sent(self):
         with self.settings(CELERY_TASK_ALWAYS_EAGER=True):
             subject = 'Табель'
+            period, _period_created = Period.objects.get_or_create(
+                count_of_periods=1,
+                period=Period.ACC_PERIOD_MONTH,
+            )
             report_config = ReportConfig.objects.create(
                 report_type=self.report,
                 subject=subject,
                 email_text='Табель',
                 cron=self.cron,
                 name='Test',
-                count_of_periods=1,
-                period=Period.ACC_PERIOD_MONTH,
+                period=period,
             )
             report_config.users.add(self.user_dir)
             report_config.users.add(self.user_urs)
