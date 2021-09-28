@@ -41,7 +41,7 @@ from src.timetable.models import (
     GroupWorkerDayPermission,
 )
 from src.timetable.timesheet.tasks import calc_timesheets
-from src.timetable.vacancy.utils import cancel_vacancies, cancel_vacancy, confirm_vacancy
+from src.timetable.vacancy.utils import cancel_vacancies, cancel_vacancy, confirm_vacancy, notify_vacancy_created
 from src.timetable.vacancy.tasks import vacancies_create_and_cancel_for_shop
 from src.timetable.worker_day.serializers import (
     OvertimesUndertimesReportSerializer,
@@ -104,7 +104,7 @@ class WorkerDayViewSet(BaseModelViewSet):
     openapi_tags = ['WorkerDay',]
 
     def get_queryset(self):
-        queryset = WorkerDay.objects.filter(canceled=False).prefetch_related('outsources')
+        queryset = WorkerDay.objects.filter(canceled=False).prefetch_related(Prefetch('outsources', to_attr='outsources_list'))
 
         if self.request.query_params.get('by_code', False):
             return queryset.annotate(
@@ -154,7 +154,7 @@ class WorkerDayViewSet(BaseModelViewSet):
         if request.query_params.get('hours_details', False):
             data = []
 
-            for worker_day in self.filter_queryset(self.get_queryset().prefetch_related(Prefetch('worker_day_details', to_attr='worker_day_details_list'), Prefetch('outsources', to_attr='outsources_list')).select_related('last_edited_by', 'shop__network', 'employee')):
+            for worker_day in self.filter_queryset(self.get_queryset().prefetch_related(Prefetch('worker_day_details', to_attr='worker_day_details_list')).select_related('last_edited_by', 'shop__network', 'employee')):
                 wd_dict = WorkerDayListSerializer(worker_day, context=self.get_serializer_context()).data
                 work_hours, work_hours_day, work_hours_night = worker_day.calc_day_and_night_work_hours()
                 wd_dict['work_hours'] = work_hours
@@ -165,7 +165,7 @@ class WorkerDayViewSet(BaseModelViewSet):
                 data.append(wd_dict)
         else:
             data = WorkerDayListSerializer(
-                self.filter_queryset(self.get_queryset().prefetch_related(Prefetch('worker_day_details', to_attr='worker_day_details_list'), Prefetch('outsources', to_attr='outsources_list')).select_related('last_edited_by', 'employee')),
+                self.filter_queryset(self.get_queryset().prefetch_related(Prefetch('worker_day_details', to_attr='worker_day_details_list')).select_related('last_edited_by', 'employee')),
                 many=True, context=self.get_serializer_context()
             ).data
 
@@ -540,6 +540,8 @@ class WorkerDayViewSet(BaseModelViewSet):
                     ).distinct()
                 )
 
+                vacancies_to_approve = list(wdays_to_approve.filter(is_vacancy=True, employee_id__isnull=True))
+
                 wdays_to_approve.update(is_approved=True)
 
                 wds = WorkerDay.objects.bulk_create(
@@ -613,6 +615,10 @@ class WorkerDayViewSet(BaseModelViewSet):
                         )
                     
                     transaction.on_commit(lambda: vacancies_create_and_cancel_for_shop.delay(serializer.validated_data['shop_id']))
+                    def _notify_vacancies_created():
+                        for vacancy in vacancies_to_approve:
+                            notify_vacancy_created(vacancy, is_auto=False)
+                    transaction.on_commit(lambda: _notify_vacancies_created())
                     if not has_permission_to_change_protected_wdays:
                         WorkerDay.check_tasks_violations(
                             employee_days_q=employee_days_q,
@@ -837,6 +843,7 @@ class WorkerDayViewSet(BaseModelViewSet):
                     ) for details in vacancy_details
                 )
             else:
+                transaction.on_commit(lambda: notify_vacancy_created(vacancy, is_auto=False))
                 vacancy.is_approved = True
                 vacancy.save()
 

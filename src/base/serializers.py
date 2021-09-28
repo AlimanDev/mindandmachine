@@ -16,6 +16,7 @@ from src.base.message import Message
 from src.base.models import (
     Employment,
     Network,
+    NetworkConnect,
     User,
     FunctionGroup,
     WorkerPosition,
@@ -291,6 +292,8 @@ class EmploymentSerializer(serializers.ModelSerializer):
         "no_user_with_user_id": _("There is {amount} models of user with user_id: {user_id}."),
         "no_shop": _("There is {amount} models of shop with code: {code}."),
         "no_position": _("There is {amount} models of position with code: {code}."),
+        "no_network_connect": _("You are not allowed to choose shops from other network."),
+        "bad_network_shop_position": _("Network of shop and position should be equal.")
     }
 
     position_id = serializers.IntegerField(required=False)
@@ -377,6 +380,24 @@ class EmploymentSerializer(serializers.ModelSerializer):
                 attrs['shop_id'] = shops[0].id
             else:
                 self.fail('no_shop', amount=len(shops), code=shop['code'])
+        if attrs.get('shop_id'):
+            shop = Shop.objects.get(id=attrs['shop_id'])
+            connector = NetworkConnect.objects.filter(
+                outsourcing_id=self.context['request'].user.network_id,
+                client_id=shop.network_id,
+                allow_choose_shop_from_client_for_employement=True,
+            )
+            if not (shop.network_id == self.context['request'].user.network_id) and not connector.exists():
+                raise serializers.ValidationError(self.error_messages['no_network_connect'])
+        elif self.instance:
+            shop = self.instance.shop
+        else:
+            raise ValidationError({'shop_id': self.error_messages['required']})
+        
+        if attrs.get('position_id'):
+            position = WorkerPosition.objects.get(id=attrs['position_id'])
+            if shop.network_id != position.network_id:
+                raise serializers.ValidationError(self.error_messages['bad_network_shop_position'])
 
         if self.context['request'].user.network.descrease_employment_dt_fired_in_api:
             if 'dt_hired' in attrs and attrs['dt_fired']:
@@ -467,6 +488,11 @@ class WorkerPositionSerializer(BaseNetworkSerializer):
                 WorkerPosition.objects.filter(network=self.context.get('request').user.network)
             )
         )
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        data['network_id'] = instance.network_id # create/read-only field
+        return data
 
 
 class EventSerializer(serializers.ModelSerializer):
