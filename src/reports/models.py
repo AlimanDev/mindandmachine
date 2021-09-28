@@ -35,6 +35,7 @@ class Period(AbstractModel):
     PERIOD_START_TODAY = 'T'
     PERIOD_START_YESTERDAY = 'E'
     PERIOD_START_PREVIOUS_MONTH = 'M'
+    PERIOD_START_CURRENT_MONTH = 'CM'
     PERIOD_START_PREVIOUS_QUARTER = 'Q'
     PERIOD_START_PREVIOUS_HALF_YEAR = 'H'
     PERIOD_START_PREVIOUS_YEAR = 'Y'
@@ -51,15 +52,16 @@ class Period(AbstractModel):
         (PERIOD_START_TODAY, _('Today')),
         (PERIOD_START_YESTERDAY, _('Yesterday')),
         (PERIOD_START_PREVIOUS_MONTH, _('End of previous month')),
+        (PERIOD_START_CURRENT_MONTH, _('End of current month')),
         (PERIOD_START_PREVIOUS_QUARTER, _('End of previous quarter')),
         (PERIOD_START_PREVIOUS_HALF_YEAR, _('End of previous half a year')),
         (PERIOD_START_PREVIOUS_YEAR, _('End of previous year')),
     )
     name = models.CharField(max_length=256, null=True, blank=True)
     count_of_periods = models.IntegerField(default=1, verbose_name='Количество периодов')
-    period = models.CharField(max_length=1, choices=ACCOUNTING_PERIOD_LENGTH_CHOICES,
+    period = models.CharField(max_length=2, choices=ACCOUNTING_PERIOD_LENGTH_CHOICES,
                               default=ACC_PERIOD_DAY, verbose_name='Период')
-    period_start = models.CharField(max_length=1, choices=PERIOD_START_CHOICES,
+    period_start = models.CharField(max_length=2, choices=PERIOD_START_CHOICES,
                                     default=PERIOD_START_YESTERDAY, verbose_name='Начало периода')
 
     def __str__(self):
@@ -88,6 +90,7 @@ class Period(AbstractModel):
             self.PERIOD_START_TODAY: lambda dt: dt,
             self.PERIOD_START_YESTERDAY: lambda dt: dt - relativedelta(days=1),
             self.PERIOD_START_PREVIOUS_MONTH: lambda dt: (dt - relativedelta(months=1)) + relativedelta(day=31),
+            self.PERIOD_START_CURRENT_MONTH: lambda dt: dt + relativedelta(day=31),
             self.PERIOD_START_PREVIOUS_QUARTER: lambda dt: date(dt.year if dt.month > 3 else dt.year - 1, 3 * (((dt.month - 1) // 3) or 4), 1) + relativedelta(day=31),
             self.PERIOD_START_PREVIOUS_HALF_YEAR: lambda dt: date(dt.year if dt.month > 6 else dt.year - 1, 12 if dt.month <= 6 else 6, 1) + relativedelta(day=31),
             self.PERIOD_START_PREVIOUS_YEAR: lambda dt: date(dt.year - 1, 12, 31),

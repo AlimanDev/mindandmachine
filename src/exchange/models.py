@@ -137,9 +137,11 @@ class ExportStrategy(PolymorphicModel):
 
 class SystemExportStrategy(ExportStrategy):
     WORK_HOURS_PIVOT_TABLE = 'work_hours_pivot_table'
+    PLAN_AND_FACT_HOURS_TABLE = 'plan_and_fact_hours_table'
 
     SYSTEM_EXPORT_STRATEGY_CHOICES = (
         (WORK_HOURS_PIVOT_TABLE, 'Сводная таблица по отработанным часам по всем магазинам'),
+        (PLAN_AND_FACT_HOURS_TABLE, 'Таблица по плановым и факт часам'),
     )
 
     period = models.ForeignKey('reports.Period', null=True, blank=True, on_delete=models.SET_NULL)

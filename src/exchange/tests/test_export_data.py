@@ -1,9 +1,10 @@
+import os
 import tempfile
 from datetime import datetime, time, date
 
-from freezegun import freeze_time
 from django.test import TestCase
-import os
+from freezegun import freeze_time
+
 from src.base.tests.factories import (
     ShopFactory,
     NetworkFactory,
@@ -76,10 +77,36 @@ class TestExportData(TestsHelperMixin, TestCase):
                 export_strategy=export_strategy,
             )
             export_job.run()
-            self.assertTrue(os.path.exists(os.path.join(tmp_dir, f'pivot_table_2021-09-26-2021-09-26.xlsx')))
+            filepath = os.path.join(tmp_dir, 'pivot_table_2021-09-26-2021-09-26.xlsx')
+            self.assertTrue(os.path.exists(filepath))
+            self.assertTrue(os.path.getsize(filepath) > 0)
 
-# User
-# Shop
-# Employment
-# WorkerDay
-# Timesheet (вместо него сводной таблицы достаточно?)
+    @freeze_time('2021-09-26')
+    def test_export_plan_and_fact_hours(self):
+        employment = EmploymentFactory()
+        dt_now = date.today()
+        self._create_worker_day(
+            employment=employment,
+            dttm_work_start=datetime.combine(dt_now, time(10, 00)),
+            dttm_work_end=datetime.combine(dt_now, time(20, 00)),
+            is_approved=True,
+            is_fact=True,
+        )
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            export_strategy = SystemExportStrategy.objects.create(
+                strategy_type=SystemExportStrategy.PLAN_AND_FACT_HOURS_TABLE,
+                period=Period.objects.create(
+                    count_of_periods=1,
+                    period=Period.ACC_PERIOD_MONTH,
+                    period_start=Period.PERIOD_START_CURRENT_MONTH,
+                )
+            )
+            export_job = ExportJob.objects.create(
+                base_path=tmp_dir,
+                fs_connector=self.local_fs_connector,
+                export_strategy=export_strategy,
+            )
+            export_job.run()
+            filepath = os.path.join(tmp_dir, 'plan_and_fact_hours_2021-09-01-2021-09-30.xlsx')
+            self.assertTrue(os.path.exists(filepath))
+            self.assertTrue(os.path.getsize(filepath) > 0)
