@@ -12,6 +12,7 @@ from src.base.models import (
     User,
 )
 from src.integration.models import (
+    AttendanceArea,
     ExternalSystem,
     UserExternalCode,
     ShopExternalCode,

@@ -531,17 +531,20 @@ class UploadDownloadTimetableCells(BaseUploadDownloadTimeTable):
             shop,
             form['dt_from'],
             worksheet=ws,
-            prod_days=None
+            prod_days=None,
+            on_print=form['on_print'],
         )
 
         employments = self._get_employment_qs(shop.network_id, shop.id, dt_from=timetable.prod_days[0].dt, dt_to=timetable.prod_days[-1].dt)
         employee_ids = employments.values_list('employee_id', flat=True)
-        stat = WorkersStatsGetter(
-            dt_from=timetable.prod_days[0].dt,
-            dt_to=timetable.prod_days[-1].dt,
-            shop_id=shop.id,
-            employee_id__in=employee_ids,
-        ).run()
+        stat = None
+        if not timetable.on_print:
+            stat = WorkersStatsGetter(
+                dt_from=timetable.prod_days[0].dt,
+                dt_to=timetable.prod_days[-1].dt,
+                shop_id=shop.id,
+                employee_id__in=employee_ids,
+            ).run()
         stat_type = 'approved' if form['is_approved'] else 'not_approved'
         norm_type = shop.network.settings_values_prop.get('download_timetable_norm_field', 'norm_work_hours')
 
@@ -569,6 +572,16 @@ class UploadDownloadTimetableCells(BaseUploadDownloadTimeTable):
 
         # fill page 2
         timetable.fill_table2(shop, timetable.prod_days[-1].dt, groupped_days)
+
+        if timetable.on_print:
+            timetable.worksheet.set_landscape()
+            timetable.worksheet.set_paper(9)
+            timetable.worksheet.fit_to_pages(1, 0)
+            timetable.worksheet.set_margins(left=0.15, right=0.1)
+            timetable.print_worksheet.set_landscape()
+            timetable.print_worksheet.set_paper(9)
+            timetable.print_worksheet.fit_to_pages(1, 0)
+            timetable.print_worksheet.set_margins(left=0.15, right=0.1)
 
         return workbook, _('Timetable_for_shop_{}_from_{}.xlsx').format(shop.name, form['dt_from'])
 

@@ -641,6 +641,7 @@ class DownloadSerializer(serializers.Serializer):
     is_approved = serializers.BooleanField(default=True)
     inspection_version = serializers.BooleanField(default=False)
     shop_id = serializers.IntegerField()
+    on_print = serializers.BooleanField(default=False)
 
 
 class DownloadTabelSerializer(serializers.Serializer):
