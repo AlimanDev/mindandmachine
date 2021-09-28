@@ -3,13 +3,14 @@ import logging
 
 import pandas as pd
 
-from ..models import WorkerDay, Timesheet
+from ..models import WorkerDay, Timesheet, WorkerDayType
 
 logger = logging.getLogger('calc_timesheets')
 
 
 class BaseTimesheetDivider:
-    def __init__(self, employee, fiscal_sheet_dict, dt_start, dt_end):
+    def __init__(self, employee, fiscal_sheet_dict, dt_start, dt_end, wd_types_dict=None):
+        self.wd_types_dict = wd_types_dict or WorkerDayType.get_wd_types_dict()
         self.employee = employee
         self.fiscal_sheet_dict = fiscal_sheet_dict
         self.fiscal_sheet_list = sorted(list(fiscal_sheet_dict.values()), key=lambda i: i['dt'])
@@ -20,14 +21,15 @@ class BaseTimesheetDivider:
         if not item_data:
             return True
 
-        if item_data.get('main_timesheet_type') is not None:
-            timesheet_type = item_data.get('main_timesheet_type')
+        if item_data.get('main_timesheet_type_id') is not None:
+            timesheet_type = item_data.get('main_timesheet_type_id')
             timesheet_total_hours = item_data.get('main_timesheet_total_hours')
         else:
-            timesheet_type = item_data.get('fact_timesheet_type')
+            timesheet_type = item_data.get('fact_timesheet_type_id')
             timesheet_total_hours = item_data.get('fact_timesheet_total_hours')
 
-        if timesheet_type not in WorkerDay.TYPES_WITH_TM_RANGE or timesheet_total_hours == 0:
+        wd_type_obj = self.wd_types_dict.get(timesheet_type)
+        if wd_type_obj.is_dayoff or timesheet_total_hours == 0:
             return True
 
     def _get_outside_period_data(self, start_of_week, first_dt_weekday_num):
@@ -46,9 +48,9 @@ class BaseTimesheetDivider:
             ).values(
                 'employee_id',
                 'dt',
-                'fact_timesheet_type',
+                'fact_timesheet_type_id',
                 'fact_timesheet_total_hours',
-                'main_timesheet_type',
+                'main_timesheet_type_id',
                 'main_timesheet_total_hours',
             ).order_by(
                 'dt',
@@ -60,7 +62,7 @@ class BaseTimesheetDivider:
         data = self.fiscal_sheet_dict.get(dt)
         if data:
             data['additional_timesheet_hours'] = data['main_timesheet_total_hours']
-            data['main_timesheet_type'] = WorkerDay.TYPE_HOLIDAY
+            data['main_timesheet_type_id'] = WorkerDay.TYPE_HOLIDAY
             data.pop('main_timesheet_total_hours', None)
             data.pop('main_timesheet_day_hours', None)
             data.pop('main_timesheet_night_hours', None)
@@ -123,11 +125,17 @@ class BaseTimesheetDivider:
 
     def _fill_main_timesheet(self):
         for data in self.fiscal_sheet_list:
-            data['main_timesheet_type'] = data.get('fact_timesheet_type', '')
-            if data['main_timesheet_type'] in WorkerDay.TYPES_WITH_TM_RANGE:
-                data['main_timesheet_total_hours'] = data.get('fact_timesheet_total_hours')
-                data['main_timesheet_day_hours'] = data.get('fact_timesheet_day_hours')
-                data['main_timesheet_night_hours'] = data.get('fact_timesheet_night_hours')
+            fact_timesheet_type_id = data.get('fact_timesheet_type_id', '')
+            fact_timesheet_type_obj = self.wd_types_dict.get(fact_timesheet_type_id)
+            if fact_timesheet_type_obj and (fact_timesheet_type_obj.is_dayoff or fact_timesheet_type_obj.is_work_hours):
+                data['main_timesheet_type_id'] = fact_timesheet_type_id
+                main_timesheet_type_obj = fact_timesheet_type_obj
+                if main_timesheet_type_obj and not main_timesheet_type_obj.is_dayoff:
+                    data['main_timesheet_total_hours'] = data.get('fact_timesheet_total_hours')
+                    data['main_timesheet_day_hours'] = data.get('fact_timesheet_day_hours')
+                    data['main_timesheet_night_hours'] = data.get('fact_timesheet_night_hours')
+            else:
+                data['main_timesheet_type_id'] = WorkerDay.TYPE_HOLIDAY
 
     def _check_not_more_than_12_hours(self):
         for data in self.fiscal_sheet_list:
@@ -145,7 +153,8 @@ class BaseTimesheetDivider:
         (в приоритете за счет ночных часов)
         """
         hours_overflow = None
-        if data['main_timesheet_type'] in WorkerDay.TYPES_WITH_TM_RANGE:
+        main_timesheet_type_obj = self.wd_types_dict.get(data['main_timesheet_type_id'])
+        if main_timesheet_type_obj and not main_timesheet_type_obj.is_dayoff:
             hours_overflow = data.get('main_timesheet_total_hours') - threshold_hours
             if hours_overflow > 0:
                 logger.debug(f'dt: {data["dt"]} has overflow threshold_hours: {threshold_hours} hours_overflow: {hours_overflow}')
@@ -229,7 +238,8 @@ class BaseTimesheetDivider:
                 logger.debug('overtime_plan == 0.0, break')
                 break
 
-            if data.get('main_timesheet_type') not in WorkerDay.TYPES_WITH_TM_RANGE or data.get(
+            main_timesheet_type_obj = self.wd_types_dict.get(data.get('main_timesheet_type_id'))
+            if (main_timesheet_type_obj and main_timesheet_type_obj.is_dayoff) or data.get(
                     'main_timesheet_total_hours') == 0.0:
                 continue
 

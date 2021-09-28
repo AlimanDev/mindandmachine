@@ -14,7 +14,6 @@ from src.timetable.models import WorkerDay, AttendanceRecords
 from django.test import override_settings
 
 
-@override_settings(MDA_SKIP_LEAVING_TICK=True)
 class TestUrvFiles(APITestCase):
     USER_USERNAME = "user1"
     USER_EMAIL = "q@q.q"
@@ -56,14 +55,15 @@ class TestUrvFiles(APITestCase):
             datetime.combine(self.dt, time(8, 54)),
             AttendanceRecords.TYPE_COMING,
         )
+        self.network.skip_leaving_tick = True
+        self.network.save()
 
-
-    def _create_worker_day(self, employment, dt=None, is_fact=False, is_approved=False, dttm_work_start=None, dttm_work_end=None, type=WorkerDay.TYPE_WORKDAY):
+    def _create_worker_day(self, employment, dt=None, is_fact=False, is_approved=False, dttm_work_start=None, dttm_work_end=None, type_id=WorkerDay.TYPE_WORKDAY):
         if not dt:
             dt = self.dt
         return WorkerDay.objects.create(
             shop_id=employment.shop_id,
-            type=type,
+            type_id=type_id,
             employment=employment,
             employee=employment.employee,
             dt=dt,
@@ -278,6 +278,7 @@ class TestUrvFiles(APITestCase):
         self.assertEqual(len(df.iloc[:,:]), 2)
         self.assertEqual(dict(df.iloc[0, :6]), data)
 
+
 class TestUnaccountedOvertime(APITestCase):
     USER_USERNAME = "user1"
     USER_EMAIL = "q@q.q"
@@ -289,25 +290,25 @@ class TestUnaccountedOvertime(APITestCase):
         self.dt = date.today()
         self.network.only_fact_hours_that_in_approved_plan = True
         self.network.save()
-        self._create_worker_day(
+        pa1 = self._create_worker_day(
             self.employment1,
             dttm_work_start=datetime.combine(self.dt, time(14)),
             dttm_work_end=datetime.combine(self.dt, time(20)),
             is_approved=True,
         )
-        self._create_worker_day(
+        pa2 = self._create_worker_day(
             self.employment2,
             dttm_work_start=datetime.combine(self.dt, time(13)),
             dttm_work_end=datetime.combine(self.dt + timedelta(1), time(1)),
             is_approved=True,
         )
-        self._create_worker_day(
+        pa3 = self._create_worker_day(
             self.employment3,
             dttm_work_start=datetime.combine(self.dt, time(8)),
             dttm_work_end=datetime.combine(self.dt, time(20)),
             is_approved=True,
         )
-        self._create_worker_day(
+        pa4 = self._create_worker_day(
             self.employment4,
             dttm_work_start=datetime.combine(self.dt, time(8)),
             dttm_work_end=datetime.combine(self.dt, time(20)),
@@ -320,6 +321,7 @@ class TestUnaccountedOvertime(APITestCase):
             dttm_work_end=datetime.combine(self.dt, time(20, 15)),
             is_approved=True,
             is_fact=True,
+            closest_plan_approved_id=pa1.id,
         )
         # переработка 3 часа
         self._create_worker_day(
@@ -328,6 +330,7 @@ class TestUnaccountedOvertime(APITestCase):
             dttm_work_end=datetime.combine(self.dt + timedelta(1), time(3)),
             is_approved=True,
             is_fact=True,
+            closest_plan_approved_id=pa2.id,
         )
         # нет переработки
         self._create_worker_day(
@@ -336,6 +339,7 @@ class TestUnaccountedOvertime(APITestCase):
             dttm_work_end=datetime.combine(self.dt, time(20)),
             is_approved=True,
             is_fact=True,
+            closest_plan_approved_id=pa3.id,
         )
         # переработка 1 час
         self._create_worker_day(
@@ -344,15 +348,17 @@ class TestUnaccountedOvertime(APITestCase):
             dttm_work_end=datetime.combine(self.dt, time(20, 30)),
             is_approved=True,
             is_fact=True,
+            closest_plan_approved_id=pa4.id,
         )
 
 
-    def _create_worker_day(self, employment, dt=None, is_fact=False, is_approved=False, dttm_work_start=None, dttm_work_end=None, type=WorkerDay.TYPE_WORKDAY):
+    def _create_worker_day(
+            self, employment, dt=None, is_fact=False, is_approved=False, dttm_work_start=None, dttm_work_end=None, type_id=WorkerDay.TYPE_WORKDAY, closest_plan_approved_id=None):
         if not dt:
             dt = self.dt
         return WorkerDay.objects.create(
             shop_id=employment.shop_id,
-            type=type,
+            type_id=type_id,
             employment=employment,
             employee=employment.employee,
             dt=dt,
@@ -361,6 +367,7 @@ class TestUnaccountedOvertime(APITestCase):
             is_fact=is_fact,
             is_approved=is_approved,
             created_by=self.user1,
+            closest_plan_approved_id=closest_plan_approved_id,
         )
 
     def test_unaccounted_overtimes(self):
@@ -466,12 +473,12 @@ class TestOvertimesUndertimes(APITestCase):
         )
 
 
-    def _create_worker_day(self, employment, dt=None, is_fact=False, is_approved=False, dttm_work_start=None, dttm_work_end=None, type=WorkerDay.TYPE_WORKDAY):
+    def _create_worker_day(self, employment, dt=None, is_fact=False, is_approved=False, dttm_work_start=None, dttm_work_end=None, type_id=WorkerDay.TYPE_WORKDAY):
         if not dt:
             dt = self.dt
         return WorkerDay.objects.create(
             shop_id=employment.shop_id,
-            type=type,
+            type_id=type_id,
             employment=employment,
             employee=employment.employee,
             dt=dt,
@@ -614,6 +621,7 @@ class TestOvertimesUndertimes(APITestCase):
         self._test_accounting_period_xlsx(6)
         self._test_accounting_period_xlsx(12)
 
+
 class TestPivotTabel(APITestCase):
     USER_USERNAME = "user1"
     USER_EMAIL = "q@q.q"
@@ -661,13 +669,12 @@ class TestPivotTabel(APITestCase):
             is_fact=True,
         )
 
-
-    def _create_worker_day(self, employment, dt=None, is_fact=False, is_approved=False, dttm_work_start=None, dttm_work_end=None, type=WorkerDay.TYPE_WORKDAY):
+    def _create_worker_day(self, employment, dt=None, is_fact=False, is_approved=False, dttm_work_start=None, dttm_work_end=None, type_id=WorkerDay.TYPE_WORKDAY):
         if not dt:
             dt = self.dt
         return WorkerDay.objects.create(
             shop_id=employment.shop_id,
-            type=type,
+            type_id=type_id,
             employment=employment,
             employee=employment.employee,
             dt=dt,

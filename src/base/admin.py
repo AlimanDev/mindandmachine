@@ -81,7 +81,17 @@ class NetworkAdmin(admin.ModelAdmin):
     form = NetworkAdminForm
     fieldsets = (
         (_('Basic settings'), {'fields': ('logo', 'url', 'primary_color', 'secondary_color', 'name', 'code', 'okpo')}),
-        (_('Time attendance settings'), {'fields': ('allowed_interval_for_late_arrival', 'allowed_interval_for_early_departure', 'allowed_geo_distance_km', 'enable_camera_ticks')}),
+        (_('Time attendance settings'), {
+            'fields': (
+                'allowed_interval_for_late_arrival',
+                'allowed_interval_for_early_departure',
+                'allowed_geo_distance_km',
+                'enable_camera_ticks',
+                'max_work_shift_seconds',
+                'skip_leaving_tick',
+                'max_plan_diff_in_seconds',
+            )
+        }),
         (_('Time tracking settings'), {
             'fields': (
                 'crop_work_hours_by_shop_schedule',
@@ -95,7 +105,12 @@ class NetworkAdmin(admin.ModelAdmin):
         }),
         (_('Vacancy settings'), {'fields': ('need_symbol_for_vacancy', 'allow_workers_confirm_outsource_vacancy')}),
         (_('Format settings'), {'fields': ('download_tabel_template', 'convert_tabel_to', 'timetable_format', 'add_users_from_excel')}),
-        (_('Timetable settings'), {'fields': ('show_worker_day_additional_info', 'show_worker_day_tasks', 'copy_plan_to_fact_crossing')}),
+        (_('Timetable settings'), {'fields': (
+            'show_worker_day_additional_info',
+            'show_worker_day_tasks',
+            'copy_plan_to_fact_crossing',
+            'display_employee_tabs_in_the_schedule',
+        )}),
         (_('Integration settings'), {'fields': (
             'descrease_employment_dt_fired_in_api',
             'ignore_parent_code_when_updating_department_via_api',
@@ -107,6 +122,11 @@ class NetworkAdmin(admin.ModelAdmin):
             'settings_values',
             'show_user_biometrics_block',
             'forbid_edit_employments_came_through_integration',
+            'allow_creation_several_wdays_for_one_employee_for_one_date',
+            'run_recalc_fact_from_att_records_on_plan_approve',
+            'edit_manual_fact_on_recalc_fact_from_att_records',
+            'set_closest_plan_approved_delta_for_manual_fact',
+            'clean_wdays_on_employment_dt_change',
         )}),
     )
 
@@ -289,18 +309,10 @@ class GroupWorkerDayPermissionInline(admin.TabularInline):
 
 @admin.register(Group)
 class GroupAdmin(admin.ModelAdmin):
-    list_dispaly = ('id', 'dttm_added', 'name', 'subordinates')
-    list_filter = ('id', 'name')
-    inlines = (
-        GroupWorkerDayPermissionInline,
-    )
+    list_display = ('id', 'name', 'code', 'network',)
+    list_filter = ('network',)
+    search_fields = ('name', 'code',)
     save_as = True
-
-    def get_actions(self, request):
-        from src.util.wd_perms.utils import WdPermsHelper
-        actions = super().get_actions(request)
-        actions.update(WdPermsHelper.get_preset_actions())
-        return actions
 
     def save_model(self, request, obj, form, change):
         obj.save()
@@ -320,6 +332,19 @@ class GroupAdmin(admin.ModelAdmin):
                         level_up=f.level_up,
                     )
                     for f in funcs
+                ]
+            )
+            from src.timetable.models import GroupWorkerDayPermission
+            gwdps = GroupWorkerDayPermission.objects.filter(group_id=original_pk)
+            GroupWorkerDayPermission.objects.bulk_create(
+                [
+                    GroupWorkerDayPermission(
+                        group=obj,
+                        worker_day_permission=gwdp.worker_day_permission,
+                        limit_days_in_past=gwdp.limit_days_in_past,
+                        limit_days_in_future=gwdp.limit_days_in_future,
+                    )
+                    for gwdp in gwdps
                 ]
             )
 
