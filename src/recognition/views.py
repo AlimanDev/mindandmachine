@@ -191,11 +191,18 @@ class TickViewSet(BaseModelViewSet):
             user_id=OuterRef('user_id'),
             tick_point__shop_id=OuterRef('tick_point__shop_id'),
         )
+        yesterday_leaving_tick_cond = Tick.objects.filter(
+            dttm__date=(dt_from - timedelta(1)),
+            type=Tick.TYPE_LEAVING,
+            user_id=OuterRef('user_id'),
+            tick_point__shop_id=OuterRef('tick_point__shop_id'),
+        )
 
         queryset = Tick.objects.annotate(
             today_exists=Exists(today_comming_tick_cond),
+            yesterday_leaving_exists=Exists(yesterday_leaving_tick_cond),
         ).filter(
-            (Q(dttm__date__gte=(dt_from - timedelta(1))) & Q(type=Tick.TYPE_COMING) & Q(today_exists=False)) |
+            (Q(dttm__date__gte=(dt_from - timedelta(1))) & Q(type=Tick.TYPE_COMING) & Q(today_exists=False) & Q(yesterday_leaving_exists=False)) |
             Q(dttm__date__gte=dt_from, dttm__date__lte=dt_to),
             dttm_deleted__isnull=True
         )

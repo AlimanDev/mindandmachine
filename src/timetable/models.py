@@ -2059,9 +2059,10 @@ class WorkerDayPermission(AbstractModel):
     APPROVE = 'A'
 
     ACTIONS = (
-        (CREATE_OR_UPDATE, _('Создание/изменение')),
-        (DELETE, _('Удаление')),
-        (APPROVE, _('Подтверждение')),
+        (CREATE_OR_UPDATE, _('Create/update')),
+        # Remove, т.к. Delete почему-то переводится в "Удалено", даже если в django.py "Удаление".
+        (DELETE, _('Remove')),
+        (APPROVE, _('Approve')),
     )
     ACTIONS_DICT = dict(ACTIONS)
 

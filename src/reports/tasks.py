@@ -8,7 +8,7 @@ from src.reports.models import ReportConfig
 from src.reports.helpers import get_datatuple
 
 @app.task
-def send_report_emails(report_config_id: int):
+def send_report_emails(report_config_id: int, zone: str):
     report_config = ReportConfig.objects.select_related(
         'report_type',
     ).get(
@@ -21,7 +21,7 @@ def send_report_emails(report_config_id: int):
     if report_config.email_addresses:
         recipients.extend(report_config.email_addresses.split(','))
     datatuple = []
-    dates = report_config.get_dates()
+    dates = report_config.get_dates(zone)
     context = {
         'dt_from': dates['dt_from'],
         'dt_to': dates['dt_to'],
@@ -68,8 +68,9 @@ def cron_report():
     reports = ReportConfig.objects.filter(
         cron__in=posible_crons,
         is_active=True,
-    )
+    ).select_related('cron')
     for report in reports:
         send_report_emails.delay(
             report_config_id=report.id,
+            zone=report.cron.timezone.zone,
         )

@@ -40,8 +40,8 @@ from src.timetable.models import (
     WorkerDayType,
 )
 from src.timetable.timesheet.tasks import calc_timesheets
+from src.timetable.vacancy.utils import cancel_vacancies, cancel_vacancy, confirm_vacancy, notify_vacancy_created
 from src.timetable.vacancy.tasks import vacancies_create_and_cancel_for_shop
-from src.timetable.vacancy.utils import cancel_vacancies, cancel_vacancy, confirm_vacancy
 from src.timetable.worker_day.serializers import (
     OvertimesUndertimesReportSerializer,
     ChangeListSerializer,
@@ -105,7 +105,7 @@ class WorkerDayViewSet(BaseModelViewSet):
 
 
     def get_queryset(self):
-        queryset = WorkerDay.objects.filter(canceled=False).prefetch_related('outsources')
+        queryset = WorkerDay.objects.filter(canceled=False).prefetch_related(Prefetch('outsources', to_attr='outsources_list'))
 
         if self.request.query_params.get('by_code', False):
             return queryset.annotate(
@@ -155,7 +155,7 @@ class WorkerDayViewSet(BaseModelViewSet):
         if request.query_params.get('hours_details', False):
             data = []
 
-            for worker_day in self.filter_queryset(self.get_queryset().prefetch_related(Prefetch('worker_day_details', to_attr='worker_day_details_list'), Prefetch('outsources', to_attr='outsources_list')).select_related('last_edited_by', 'shop__network', 'employee')):
+            for worker_day in self.filter_queryset(self.get_queryset().prefetch_related(Prefetch('worker_day_details', to_attr='worker_day_details_list')).select_related('last_edited_by', 'shop__network', 'employee')):
                 wd_dict = WorkerDayListSerializer(worker_day, context=self.get_serializer_context()).data
                 work_hours, work_hours_day, work_hours_night = worker_day.calc_day_and_night_work_hours()
                 wd_dict['work_hours'] = work_hours
@@ -166,7 +166,7 @@ class WorkerDayViewSet(BaseModelViewSet):
                 data.append(wd_dict)
         else:
             data = WorkerDayListSerializer(
-                self.filter_queryset(self.get_queryset().prefetch_related(Prefetch('worker_day_details', to_attr='worker_day_details_list'), Prefetch('outsources', to_attr='outsources_list')).select_related('last_edited_by', 'employee')),
+                self.filter_queryset(self.get_queryset().prefetch_related(Prefetch('worker_day_details', to_attr='worker_day_details_list')).select_related('last_edited_by', 'employee')),
                 many=True, context=self.get_serializer_context()
             ).data
 
@@ -299,7 +299,7 @@ class WorkerDayViewSet(BaseModelViewSet):
 
     @swagger_auto_schema(
         request_body=WorkerDayApproveSerializer,
-        responses={200:'empty response'},
+        responses={200: 'empty response'},
         operation_description='''
         Метод для подтверждения графика
         ''',
@@ -357,11 +357,19 @@ class WorkerDayViewSet(BaseModelViewSet):
                         q &= Q(dt__lte=today + datetime.timedelta(days=limit_days_in_future))
                 wd_types_q |= q
 
+            shop = Shop.objects.get(id=serializer.validated_data['shop_id'])
+            has_perm_to_approve_other_shop_days = Group.objects.filter(
+                id__in=request.user.get_group_ids(shop),
+                has_perm_to_approve_other_shop_days=True,
+            ).exists()
+
+            shop_employees_q = Q(employee_id__in=employee_ids)
+            if not has_perm_to_approve_other_shop_days:
+                shop_employees_q &= Q(Q(type__is_dayoff=True) | Q(type_id=WorkerDay.TYPE_QUALIFICATION))
+
             approve_condition = Q(
                 wd_types_q,
-                Q(shop_id=serializer.validated_data['shop_id']) |
-                # TODO: разобраться с | Q(type_id=WorkerDay.TYPE_QUALIFICATION) -- нужно ли еще?
-                Q(Q(type__is_dayoff=True) | Q(type_id=WorkerDay.TYPE_QUALIFICATION), employee_id__in=employee_ids),
+                Q(shop_id=serializer.validated_data['shop_id']) | shop_employees_q,
                 dt__lte=serializer.validated_data['dt_to'],
                 dt__gte=serializer.validated_data['dt_from'],
                 is_fact=serializer.validated_data['is_fact'],
@@ -438,7 +446,7 @@ class WorkerDayViewSet(BaseModelViewSet):
                 # если у пользователя нет группы с наличием прав на изменение защищенных дней, то проверяем,
                 # что в списке подтверждаемых дней нету защищенных дней, если есть, то выдаем ошибку
                 has_permission_to_change_protected_wdays = Group.objects.filter(
-                    id__in=request.user.get_group_ids(Shop.objects.get(id=serializer.validated_data['shop_id'])),
+                    id__in=request.user.get_group_ids(shop),
                     has_perm_to_change_protected_wdays=True,
                 ).exists()
                 if not has_permission_to_change_protected_wdays:
@@ -579,6 +587,7 @@ class WorkerDayViewSet(BaseModelViewSet):
                     ).delete()
 
                 wdays_to_delete.delete()
+                vacancies_to_approve = list(wdays_to_approve.filter(is_vacancy=True, employee_id__isnull=True))
                 wdays_to_approve.update(is_approved=True)
                 WorkerDay.set_closest_plan_approved(
                     q_obj=employee_days_q,
@@ -672,6 +681,10 @@ class WorkerDayViewSet(BaseModelViewSet):
                         transaction.on_commit(lambda: recalc_fact_from_records(employee_days_list=list(employee_days_set)))
 
                     transaction.on_commit(lambda: vacancies_create_and_cancel_for_shop.delay(serializer.validated_data['shop_id']))
+                    def _notify_vacancies_created():
+                        for vacancy in vacancies_to_approve:
+                            notify_vacancy_created(vacancy, is_auto=False)
+                    transaction.on_commit(lambda: _notify_vacancies_created())
                     if not has_permission_to_change_protected_wdays:
                         WorkerDay.check_tasks_violations(
                             employee_days_q=employee_days_q,
@@ -891,6 +904,7 @@ class WorkerDayViewSet(BaseModelViewSet):
                     ) for details in vacancy_details
                 )
             else:
+                transaction.on_commit(lambda: notify_vacancy_created(vacancy, is_auto=False))
                 vacancy.is_approved = True
                 vacancy.save()
 

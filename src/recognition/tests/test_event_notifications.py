@@ -730,38 +730,38 @@ class TestEmployeeNotCheckedEventNotifications(TestsHelperMixin, APITestCase):
         cls.event_out, _created = EventType.objects.get_or_create(
             code=EMPLOYEE_NOT_CHECKED_OUT, network=cls.network)
         
-        cls.dt = datetime.now().date()
-        cls.now = datetime.now() + timedelta(hours=cls.shop.get_tz_offset())
-        WorkerDayFactory(
-            is_approved=True,
-            is_fact=False,
-            shop=cls.shop,
-            employment=cls.employment_worker,
-            employee=cls.employee_worker,
-            dt=cls.dt,
-            type_id=WorkerDay.TYPE_WORKDAY,
-            dttm_work_start=cls.now - timedelta(minutes=5),
-            dttm_work_end=cls.now + timedelta(hours=6),
-        )
-        WorkerDayFactory(
-            is_approved=True,
-            is_fact=False,
-            shop=cls.shop,
-            employment=cls.employment_dir,
-            employee=cls.employee_dir,
-            dt=cls.dt,
-            type_id=WorkerDay.TYPE_WORKDAY,
-            dttm_work_start=cls.now - timedelta(hours=6),
-            dttm_work_end=cls.now - timedelta(minutes=5),
-        )
-        AttendanceRecords.objects.create(
-            shop=cls.shop,
-            type=AttendanceRecords.TYPE_COMING,
-            user=cls.user_dir,
-            dttm=cls.now - timedelta(hours=6, minutes=23)
-        )
 
     def setUp(self):
+        self.dt = datetime.now().date()
+        self.now = datetime.now() + timedelta(hours=self.shop.get_tz_offset())
+        WorkerDayFactory(
+            is_approved=True,
+            is_fact=False,
+            shop=self.shop,
+            employment=self.employment_worker,
+            employee=self.employee_worker,
+            dt=self.dt,
+            type_id=WorkerDay.TYPE_WORKDAY,
+            dttm_work_start=self.now - timedelta(minutes=5),
+            dttm_work_end=self.now + timedelta(hours=6),
+        )
+        WorkerDayFactory(
+            is_approved=True,
+            is_fact=False,
+            shop=self.shop,
+            employment=self.employment_dir,
+            employee=self.employee_dir,
+            dt=self.dt,
+            type_id=WorkerDay.TYPE_WORKDAY,
+            dttm_work_start=self.now - timedelta(hours=6),
+            dttm_work_end=self.now - timedelta(minutes=5),
+        )
+        AttendanceRecords.objects.create(
+            shop=self.shop,
+            type=AttendanceRecords.TYPE_COMING,
+            user=self.user_dir,
+            dttm=self.now - timedelta(hours=6, minutes=23)
+        )
         self.client.force_authenticate(user=self.user_dir)
 
     def test_employee_not_checked_notification_sent(self):
@@ -829,7 +829,7 @@ class TestEmployeeNotCheckedEventNotifications(TestsHelperMixin, APITestCase):
     def test_employee_not_checked_notification_sent_custom_deltas(self):
         self.network.settings_values = json.dumps(
             {
-                'delta_for_comming_in_secs': 120,
+                'delta_for_comming_in_secs': 125,
                 'delta_for_leaving_in_secs': 240,
             }
         )

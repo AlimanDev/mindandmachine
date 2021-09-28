@@ -226,3 +226,27 @@ class TestTicksViewSet(TestsHelperMixin, APITestCase):
         )
         response = self.client.get(self.get_url('Tick-list'))
         self.assertEqual(len(response.json()), 2)
+
+    def test_get_ticks_with_yesterday_leving_for_tick_point(self):
+        tick_point_id = self._authorize_tick_point().json()['tick_point']['id']
+        dt = date.today()
+        self.shop.timezone = 'UTC'
+        self.shop.save()
+        Tick.objects.create(
+            user=self.user1,
+            dttm=datetime.combine(dt - timedelta(1), time(8, 0, 2)),
+            employee=self.employee1,
+            tick_point_id=tick_point_id,
+            type=Tick.TYPE_COMING,
+            lateness=timedelta(0),
+        )
+        Tick.objects.create(
+            user=self.user1,
+            dttm=datetime.combine(dt - timedelta(1), time(20, 3, 43)),
+            employee=self.employee1,
+            tick_point_id=tick_point_id,
+            type=Tick.TYPE_LEAVING,
+            lateness=timedelta(0),
+        )
+        response = self.client.get(self.get_url('Tick-list'))
+        self.assertEqual(len(response.json()), 0)
