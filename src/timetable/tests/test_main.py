@@ -2156,7 +2156,8 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
         }
         resp = self.client.post(
             self.get_url('WorkerDay-batch-update-or-create'), self.dump_data(data), content_type='application/json')
-        self.assertContains(resp, 'У вас нет прав на создание/изменение типа дня', status_code=403)
+        self.assertContains(
+            resp, 'У вас нет прав на создание/изменение типа дня', status_code=403)
 
         create_or_update_plan_workday_perm = WorkerDayPermission.objects.get(
             action=WorkerDayPermission.CREATE_OR_UPDATE,

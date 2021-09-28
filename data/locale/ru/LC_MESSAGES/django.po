@@ -12,7 +12,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Django REST framework\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2021-09-28 07:48+0000\n"
+"POT-Creation-Date: 2021-09-28 08:22+0000\n"
 "PO-Revision-Date: 2017-08-03 14:58+0000\n"
 "Last-Translator: Grigory Mishchenko <grishkokot@gmail.com>\n"
 "Language-Team: Russian (http://www.transifex.com/django-rest-framework-1/"
@@ -929,16 +929,16 @@ msgstr ""
 "вакансию"
 
 #: src/timetable/models.py:2062
-msgid "Создание/изменение"
-msgstr "Create/update"
+msgid "Create/update"
+msgstr "Создание/изменение"
 
 #: src/timetable/models.py:2063
-msgid "Удаление"
-msgstr "Delete"
+msgid "Remove"
+msgstr "Удаление"
 
 #: src/timetable/models.py:2064
-msgid "Подтверждение"
-msgstr "Approve"
+msgid "Approve"
+msgstr "Подтверждение"
 
 #: src/timetable/timesheet/serializers.py:44
 msgid "The start date must be the first day of the month."
@@ -952,7 +952,7 @@ msgstr "Дата окончания должна быть равна после�
 msgid "Recalculation can only be run for 1 month."
 msgstr "Пересчет можно запускать только для 1 месяца."
 
-#: src/timetable/timesheet/views.py:83 src/timetable/worker_day/views.py:1504
+#: src/timetable/timesheet/views.py:83 src/timetable/worker_day/views.py:1501
 msgid "No employees satisfying the conditions."
 msgstr "Не найдено сотрудников удовлетворяющих условиям запроса."
 
@@ -1228,39 +1228,39 @@ msgstr ""
 msgid "There is no such user in your network."
 msgstr "В вашей сети нет такого пользователя."
 
-#: src/timetable/worker_day/views.py:880
+#: src/timetable/worker_day/views.py:877
 msgid "This vacancy does not exist or has already been approved."
 msgstr "Такой вакансии не существует или она уже подтверждена."
 
-#: src/timetable/worker_day/views.py:883
+#: src/timetable/worker_day/views.py:880
 msgid "You can not approve vacancy from other network."
 msgstr "Вы не можете подтвердить вакансию из другой сети."
 
-#: src/timetable/worker_day/views.py:925
+#: src/timetable/worker_day/views.py:922
 msgid "There is no such vacancy."
 msgstr "Такой вакансии не существует"
 
-#: src/timetable/worker_day/views.py:929
+#: src/timetable/worker_day/views.py:926
 msgid "The vacancy cannot be edited because it has already been responded."
 msgstr "Невозможно отредактировать вакансию, так как на неё уже откликнулись."
 
-#: src/timetable/worker_day/views.py:1425
+#: src/timetable/worker_day/views.py:1422
 msgid "Fact"
 msgstr "Факт"
 
-#: src/timetable/worker_day/views.py:1426
+#: src/timetable/worker_day/views.py:1423
 msgid "Main"
 msgstr "Осн"
 
-#: src/timetable/worker_day/views.py:1427
+#: src/timetable/worker_day/views.py:1424
 msgid "Additional"
 msgstr "Доп"
 
-#: src/timetable/worker_day/views.py:1429
+#: src/timetable/worker_day/views.py:1426
 msgid "{}_timesheet_for_shop_{}_from_{}.{}"
 msgstr "{}_табель_для_подразделения_{}_от_{}.{}"
 
-#: src/timetable/worker_day/views.py:1506
+#: src/timetable/worker_day/views.py:1503
 msgid "Hours recalculation started successfully."
 msgstr "Пересчет часов успешно запущен."
 

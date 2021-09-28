@@ -587,6 +587,7 @@ class WorkerDayViewSet(BaseModelViewSet):
                     ).delete()
 
                 wdays_to_delete.delete()
+                vacancies_to_approve = list(wdays_to_approve.filter(is_vacancy=True, employee_id__isnull=True))
                 wdays_to_approve.update(is_approved=True)
                 WorkerDay.set_closest_plan_approved(
                     q_obj=employee_days_q,
@@ -622,10 +623,6 @@ class WorkerDayViewSet(BaseModelViewSet):
                         'worker_day_details',
                     ).distinct()
                 )
-
-                vacancies_to_approve = list(wdays_to_approve.filter(is_vacancy=True, employee_id__isnull=True))
-
-                wdays_to_approve.update(is_approved=True)
 
                 not_approved_wds_list = WorkerDay.objects.bulk_create(
                     [
