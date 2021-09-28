@@ -14,18 +14,16 @@ class FtpEngine(FilesystemEngine):
         super(FtpEngine, self).__init__(**kwargs)
         self.ftp = self._init_ftp()
 
-    def _init_ftp(self):
+    def _init_ftp(self):  # TODO: нужно ли закрывать коннекшн?
         ftp = FTP(host=self.host, user=self.username, passwd=self.password)
         ftp.cwd(self.base_path)
         return ftp
-
-    def read_file(self, filename):
-        r = BytesIO()
-        self.ftp.retrbinary(f'RETR {filename}', r.write)
-        return r.getvalue()
 
     def open_file(self, filename):
         tmp_f = tempfile.NamedTemporaryFile(mode='wb+')
         self.ftp.retrbinary(f'RETR {filename}', tmp_f.write)
         tmp_f.seek(0)
         return tmp_f
+
+    def write_file(self, filename, file_obj):
+        self.ftp.storbinary(f'STOR {filename}', file_obj)

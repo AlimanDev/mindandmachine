@@ -1,4 +1,5 @@
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.db import models
 from polymorphic.models import PolymorphicModel
 
@@ -127,21 +128,38 @@ class ExportStrategy(PolymorphicModel):
     def __str__(self):
         return self.name
 
+    def get_strategy_cls_kwargs(self):
+        return {}
+
     def get_strategy_cls(self):
         raise NotImplementedError
 
 
 class SystemExportStrategy(ExportStrategy):
+    WORK_HOURS_PIVOT_TABLE = 'work_hours_pivot_table'
+
     SYSTEM_EXPORT_STRATEGY_CHOICES = (
-        ('work_hours_pivot_table', 'Сводная таблица по отработанным часам по всем магазинам'),
+        (WORK_HOURS_PIVOT_TABLE, 'Сводная таблица по отработанным часам по всем магазинам'),
     )
 
+    period = models.ForeignKey('reports.Period', null=True, blank=True, on_delete=models.SET_NULL)
     settings_json = models.TextField(default='{}')
     strategy_type = models.CharField(max_length=128, choices=SYSTEM_EXPORT_STRATEGY_CHOICES)
 
     class Meta:
         verbose_name = 'Системная стратегия экспорта'
         verbose_name_plural = 'Системные стратегии экспорта'
+
+    def clean(self):
+        period_needed_strategies = [SystemExportStrategy.WORK_HOURS_PIVOT_TABLE]
+        if self.strategy_type in period_needed_strategies and self.period is None:
+            raise ValidationError(f'Для стратегии "{self.strategy_type}" обязательно выбрать период.')
+
+    def get_strategy_cls_kwargs(self):
+        kwargs = super(SystemExportStrategy, self).get_strategy_cls_kwargs()
+        kwargs['settings_json'] = self.settings_json
+        kwargs['period'] = self.period
+        return kwargs
 
     def get_strategy_cls(self):
         from .export_strategies.system import SYSTEM_EXPORT_STRATEGIES_DICT
@@ -158,7 +176,8 @@ class ExportJob(AbstractModel):
         verbose_name_plural = 'Задачи экспорта данных'
 
     def run(self):
-        fs_engine = self.fs_connector.get_fs_engine(base_path=self.base_path)
         strategy_cls = self.export_strategy.get_strategy_cls()
-        strategy = strategy_cls(fs_engine=fs_engine)
+        strategy_cls_kwargs = self.export_strategy.get_strategy_cls_kwargs()
+        strategy_cls_kwargs['fs_engine'] = self.fs_connector.get_fs_engine(base_path=self.base_path)
+        strategy = strategy_cls(**strategy_cls_kwargs)
         return strategy.execute()

@@ -11,6 +11,7 @@ UNACCOUNTED_OVERTIME = 'unaccounted_overtime'
 OVERTIMES_UNDERTIMES = 'overtimes_undertimes'
 PIVOT_TABEL = 'pivot_tabel'
 
+
 class DatesReportMixin:
     @staticmethod
     def get_dates(context):
@@ -22,6 +23,7 @@ class DatesReportMixin:
             dt_from = datetime.strptime(dt_from, '%Y-%m-%d').date()
             dt_to = datetime.strptime(dt_to, '%Y-%m-%d').date()
         return dt_from, dt_to
+
 
 class UrvStatReport(BaseRegisteredReport, DatesReportMixin):
     name = 'Отчет по УРВ'
@@ -83,6 +85,7 @@ class UndertimesOvertimesReport(BaseRegisteredReport):
     def get_file(self):
         from src.reports.utils.overtimes_undertimes import overtimes_undertimes_xlsx
         return overtimes_undertimes_xlsx(period_step=self.context.get('period_step', 6), shop_ids=self.context.get('shop_ids', []), in_memory=True)
+
 
 class PivotTabelReport(BaseRegisteredReport, DatesReportMixin):
     name = 'Сводный табель'

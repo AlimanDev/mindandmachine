@@ -24,7 +24,7 @@ from src.integration.models import GenericExternalCode
 from src.util.mixins.tests import TestsHelperMixin
 
 
-class TestImportHistoricalData(TestsHelperMixin, TestCase):
+class TestImportData(TestsHelperMixin, TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.network = NetworkFactory(
