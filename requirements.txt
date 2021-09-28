@@ -153,3 +153,4 @@ pytest-django==4.4.0
 pytest-cov==2.12.1
 coverage==5.5
 django-polymorphic==3.0.0
+freezegun==1.1.0
