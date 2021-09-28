@@ -1,11 +1,16 @@
-from src.timetable.forms import ExchangeSettingsForm
 from django.contrib import admin
+from django.forms import Form
 from django.utils.translation import gettext as _
+from django_admin_listfilter_dropdown.filters import RelatedOnlyDropdownFilter, ChoiceDropdownFilter
+from import_export.admin import ExportActionMixin, ImportMixin
 from rangefilter.filter import DateRangeFilter, DateTimeRangeFilter
-from django_admin_listfilter_dropdown.filters import RelatedOnlyDropdownFilter, DropdownFilter, ChoiceDropdownFilter
 
-
-
+from src.base.forms import (
+    CustomImportFunctionGroupForm,
+    CustomConfirmImportFunctionGroupForm,
+)
+from src.recognition.admin import RelatedOnlyDropdownNameOrderedFilter
+from src.timetable.forms import ExchangeSettingsForm
 from src.timetable.models import (
     Cashbox,
     EmploymentWorkType,
@@ -21,7 +26,11 @@ from src.timetable.models import (
     Event,
     WorkerDay,
     WorkTypeName,
+    WorkerDayType,
+    GroupWorkerDayPermission,
+    WorkerDayPermission,
 )
+from .resources import GroupWorkerDayPermissionResource
 
 
 @admin.register(Slot)
@@ -136,16 +145,16 @@ class WorkerDayAdmin(admin.ModelAdmin):
     )
     search_fields = ('employee__user__last_name', 'shop__name', 'shop__parent__name', 'id', 'dt')
     list_filter = (
-        ('dt', DateRangeFilter), 
-        'is_fact', 
-        'is_approved', 
-        ('shop', RelatedOnlyDropdownFilter), 
-        ('type', ChoiceDropdownFilter), 
-        ('dttm_modified', DateTimeRangeFilter), 
+        ('dt', DateRangeFilter),
+        'is_fact',
+        'is_approved',
+        ('shop', RelatedOnlyDropdownFilter),
+        ('type', ChoiceDropdownFilter),
+        ('dttm_modified', DateTimeRangeFilter),
         ('created_by', RelatedOnlyDropdownFilter),
     )
-    raw_id_fields = ('parent_worker_day', 'employment', 'created_by', 'last_edited_by', 'employee', 'shop')
-    list_select_related = ('employee__user', 'shop', 'created_by')
+    raw_id_fields = ('parent_worker_day', 'employment', 'created_by', 'last_edited_by', 'employee', 'shop', 'type', 'closest_plan_approved')
+    list_select_related = ('employee__user', 'shop', 'created_by', 'last_edited_by', 'parent_worker_day', 'type', 'closest_plan_approved')
     readonly_fields = ('dttm_modified',)
     change_list_template = 'worker_day_change_list.html'
 
@@ -274,3 +283,61 @@ class EventAdmin(admin.ModelAdmin):
 class WorkTypeNameAdmin(admin.ModelAdmin):
     list_display = ('id', 'name')
     search_fields = ('name',)
+
+
+@admin.register(WorkerDayType)
+class WorkerDayTypeAdmin(admin.ModelAdmin):
+    list_display = (
+        'code',
+        'name',
+        'use_in_plan',
+        'use_in_fact',
+        'excel_load_code',
+        'is_dayoff',
+        'is_work_hours',
+        'is_reduce_norm',
+        'is_system',
+        'show_stat_in_days',
+        'show_stat_in_hours',
+        'ordering',
+        'is_active',
+    )
+    search_fields = ('name', 'short_name', 'code')
+
+    def has_delete_permission(self, request, obj=None):
+        if obj and obj.is_system:
+            return False
+        return super(WorkerDayTypeAdmin, self).has_delete_permission(request, obj=obj)
+
+
+@admin.register(GroupWorkerDayPermission)
+class GroupWorkerDayPermissionAdmin(ImportMixin, ExportActionMixin, admin.ModelAdmin):
+    list_display = ('id', 'group', 'worker_day_permission', 'limit_days_in_past', 'limit_days_in_future')
+    list_editable = ('limit_days_in_past', 'limit_days_in_future')
+    list_filter = [
+        ('group', RelatedOnlyDropdownNameOrderedFilter),
+        'worker_day_permission__action',
+        'worker_day_permission__graph_type',
+        'worker_day_permission__wd_type',
+    ]
+    list_select_related = ('group', 'worker_day_permission__wd_type')
+    resource_class = GroupWorkerDayPermissionResource
+
+    def get_import_form(self):
+        return CustomImportFunctionGroupForm
+
+    def get_confirm_import_form(self):
+        return CustomConfirmImportFunctionGroupForm
+
+    def get_form_kwargs(self, form, *args, **kwargs):
+        if isinstance(form, Form) and form.is_valid():
+            groups = form.cleaned_data['groups']
+            kwargs.update({'groups': groups.values_list('id', flat=True)})
+        return kwargs
+
+    def get_import_data_kwargs(self, request, *args, **kwargs):
+        form = kwargs.get('form')
+        if form and form.is_valid():
+            groups = form.cleaned_data['groups']
+            kwargs.update({'groups': groups.values_list('id', flat=True)})
+        return super().get_import_data_kwargs(request, *args, **kwargs)

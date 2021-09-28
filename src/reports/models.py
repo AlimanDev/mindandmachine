@@ -144,7 +144,6 @@ class ReportConfig(models.Model):
         else:
             return None
 
-
     def get_recipients(self):
         """
         :param context:

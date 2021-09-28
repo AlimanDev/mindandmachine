@@ -41,6 +41,7 @@ class WorkerDayPermissionQueryStringSerializer(serializers.Serializer):
             ).select_related('network'),
         )
 
+
 class WsPermissionDataSerializer(serializers.ModelSerializer):
     class Meta:
         model = WorkerDay

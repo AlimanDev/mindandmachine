@@ -4,7 +4,7 @@ from datetime import datetime, time
 import factory
 
 from src.base.tests.factories_abstract import AbstractActiveNamedModelFactory
-from src.timetable.models import WorkerDay, WorkerDayCashboxDetails, WorkType, WorkTypeName, EmploymentWorkType
+from src.timetable.models import WorkerDay, WorkerDayCashboxDetails, WorkType, WorkTypeName, EmploymentWorkType, WorkerDayType
 
 
 class WorkTypeNameFactory(AbstractActiveNamedModelFactory):
@@ -32,18 +32,25 @@ class WorkerDayCashboxDetailsFactory(factory.django.DjangoModelFactory):
         model = WorkerDayCashboxDetails
 
 
+class WorkerDayTypeFactory(factory.django.DjangoModelFactory):
+    code = factory.LazyFunction(lambda: random.choice(WorkerDay.TYPES_USED))
+
+    class Meta:
+        model = WorkerDayType
+        django_get_or_create = ('code', )
+
+
 class WorkerDayFactory(factory.django.DjangoModelFactory):
     shop = factory.SubFactory('src.base.tests.factories.ShopFactory')
     employment = factory.SubFactory('src.base.tests.factories.EmploymentFactory')
     dt = factory.Faker('date_between', start_date='-120d', end_date='+30d')
+    employee = factory.SubFactory('src.base.tests.factories.EmployeeFactory')
     dttm_work_start = factory.LazyAttribute(
-        lambda wd: datetime.combine(wd.dt, time(10, 0, 0)) if WorkerDay.is_type_with_tm_range(wd.type) else None
+        lambda wd: datetime.combine(wd.dt, time(10, 0, 0)) if wd.type_id == WorkerDay.TYPE_WORKDAY else None
     )
     dttm_work_end = factory.LazyAttribute(
-        lambda wd: datetime.combine(wd.dt, time(20, 0, 0)) if WorkerDay.is_type_with_tm_range(wd.type) else None
+        lambda wd: datetime.combine(wd.dt, time(20, 0, 0)) if wd.type_id == WorkerDay.TYPE_WORKDAY else None
     )
-    employee = factory.SubFactory('src.base.tests.factories.EmployeeFactory')
-    type = factory.LazyFunction(lambda: random.choice(WorkerDay.TYPES_USED))
 
     class Meta:
         model = WorkerDay
@@ -53,7 +60,7 @@ class WorkerDayFactory(factory.django.DjangoModelFactory):
         if not create:
             return
 
-        if self.type == WorkerDay.TYPE_WORKDAY:
+        if self.type_id == WorkerDay.TYPE_WORKDAY:
             WorkerDayCashboxDetailsFactory(
                 worker_day=self,
                 work_type__shop=self.shop,

@@ -174,7 +174,7 @@ class TestURVTicks(MultipleActiveEmploymentsSupportMixin, APITestCase):
             employee=self.employee1_2,
             employment=self.employment1_2_1,
             shop=self.shop1,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dttm_work_start=datetime.combine(self.dt, time(8, 0, 0)),
             dttm_work_end=datetime.combine(self.dt, time(20, 0, 0)),
         )
@@ -209,6 +209,7 @@ class TestURVTicks(MultipleActiveEmploymentsSupportMixin, APITestCase):
         fact_approved = fact_approved_list[0]
         self.assertEqual(fact_approved.employment_id, self.employment2_2_3.id)
 
+    # падает в 00:20+
     def test_get_employment_by_max_norm_work_hours_when_multiple_active_empls_in_the_same_shop(self):
         """
         Получение трудоустройства с наибольшей ставкой
@@ -227,7 +228,7 @@ class TestURVTicks(MultipleActiveEmploymentsSupportMixin, APITestCase):
         1 рабочий день с 09:00 до 15:00
         2 рабочий день с 15:01 до 20:00
 
-        Если сотрудник закончит по 1 смене чуть раньше в 15:40 и переоткроет смену,
+        Если сотрудник закончит по 1 смене чуть раньше в 14:40 и переоткроет смену,
         то должны привязаться к началу следующего дня
         """
         self.client.force_authenticate(user=self.user1)
@@ -238,7 +239,7 @@ class TestURVTicks(MultipleActiveEmploymentsSupportMixin, APITestCase):
             employee=self.employee1_1,
             employment=self.employment1_1_1,
             shop=self.shop1,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dttm_work_start=datetime.combine(self.dt, time(9, 0, 0)),
             dttm_work_end=datetime.combine(self.dt, time(15, 0, 0)),
         )
@@ -249,7 +250,7 @@ class TestURVTicks(MultipleActiveEmploymentsSupportMixin, APITestCase):
             employee=self.employee1_2,
             employment=self.employment1_2_1,
             shop=self.shop1,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dttm_work_start=datetime.combine(self.dt, time(15, 0, 1)),
             dttm_work_end=datetime.combine(self.dt, time(20, 0, 0)),
         )
@@ -292,7 +293,7 @@ class TestConfirmVacancy(MultipleActiveEmploymentsSupportMixin, APITestCase):
                 employee=employee,
                 is_fact=False,
                 is_approved=True,
-                type=WorkerDay.TYPE_HOLIDAY,
+                type_id=WorkerDay.TYPE_HOLIDAY,
             )
 
     def test_empl_received_by_cashier_work_type(self):
@@ -300,13 +301,14 @@ class TestConfirmVacancy(MultipleActiveEmploymentsSupportMixin, APITestCase):
             employee=None,
             employment=None,
             shop=self.shop1,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dt=self.dt_now,
             is_vacancy=True,
             is_fact=False,
             is_approved=True,
             cashbox_details__work_type=self.work_type1_cachier,
         )
+        WorkerDay.check_work_time_overlap(employee_id=self.employee1_1.id)
         self.client.force_authenticate(user=self.user1)
         resp = self.client.post(self.get_url('WorkerDay-confirm-vacancy', pk=vacancy.pk))
         self.assertEqual(resp.status_code, 200)
@@ -318,7 +320,7 @@ class TestConfirmVacancy(MultipleActiveEmploymentsSupportMixin, APITestCase):
             employee=None,
             employment=None,
             shop=self.shop1,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dt=self.dt_now,
             is_vacancy=True,
             is_fact=False,
@@ -336,7 +338,7 @@ class TestConfirmVacancy(MultipleActiveEmploymentsSupportMixin, APITestCase):
             employee=None,
             employment=None,
             shop=self.shop3,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dt=self.dt_now,
             is_vacancy=True,
             is_fact=False,
@@ -367,7 +369,7 @@ class TestGetWorkersStatAndTabel(MultipleActiveEmploymentsSupportMixin, APITestC
                 employee=self.employee1_1,
                 employment=self.employment1_1_1,
                 shop=self.shop1,
-                type=WorkerDay.TYPE_WORKDAY,
+                type_id=WorkerDay.TYPE_WORKDAY,
                 is_fact=True,
                 is_approved=True,
                 cashbox_details__work_type=self.work_type1_cachier,
@@ -379,7 +381,7 @@ class TestGetWorkersStatAndTabel(MultipleActiveEmploymentsSupportMixin, APITestC
                 employee=self.employee1_1,
                 employment=self.employment1_1_1,
                 shop=self.shop1,
-                type=WorkerDay.TYPE_HOLIDAY,
+                type_id=WorkerDay.TYPE_HOLIDAY,
                 is_fact=False,
                 is_approved=True,
             )
@@ -388,7 +390,7 @@ class TestGetWorkersStatAndTabel(MultipleActiveEmploymentsSupportMixin, APITestC
                 employee=self.employee1_2,
                 employment=self.employment1_2_1,
                 shop=self.shop1,
-                type=WorkerDay.TYPE_HOLIDAY,
+                type_id=WorkerDay.TYPE_HOLIDAY,
                 is_fact=False,
                 is_approved=True,
             )
@@ -399,7 +401,7 @@ class TestGetWorkersStatAndTabel(MultipleActiveEmploymentsSupportMixin, APITestC
                 employee=self.employee1_2,
                 employment=self.employment1_2_1,
                 shop=self.shop1,
-                type=WorkerDay.TYPE_WORKDAY,
+                type_id=WorkerDay.TYPE_WORKDAY,
                 is_fact=True,
                 is_approved=True,
                 cashbox_details__work_type=self.work_type1_cleaner,
@@ -411,7 +413,7 @@ class TestGetWorkersStatAndTabel(MultipleActiveEmploymentsSupportMixin, APITestC
                 employee=self.employee1_1,
                 employment=self.employment1_1_1,
                 shop=self.shop1,
-                type=WorkerDay.TYPE_VACATION,
+                type_id=WorkerDay.TYPE_VACATION,
                 is_fact=False,
                 is_approved=True,
             )
@@ -420,7 +422,7 @@ class TestGetWorkersStatAndTabel(MultipleActiveEmploymentsSupportMixin, APITestC
                 employee=self.employee1_2,
                 employment=self.employment1_2_1,
                 shop=self.shop1,
-                type=WorkerDay.TYPE_VACATION,
+                type_id=WorkerDay.TYPE_VACATION,
                 is_fact=False,
                 is_approved=True,
             )
@@ -431,7 +433,7 @@ class TestGetWorkersStatAndTabel(MultipleActiveEmploymentsSupportMixin, APITestC
                 employee=self.employee1_2,
                 employment=self.employment1_2_1,
                 shop=self.shop1,
-                type=WorkerDay.TYPE_WORKDAY,
+                type_id=WorkerDay.TYPE_WORKDAY,
                 is_fact=True,
                 is_approved=True,
                 cashbox_details__work_type=self.work_type1_cleaner,
@@ -483,7 +485,7 @@ class TestGetWorkersStatAndTabel(MultipleActiveEmploymentsSupportMixin, APITestC
                 employee=self.employee1_1,
                 employment=self.employment1_1_1,
                 shop=self.shop3,
-                type=WorkerDay.TYPE_WORKDAY,
+                type_id=WorkerDay.TYPE_WORKDAY,
                 is_fact=True,
                 is_approved=True,
                 cashbox_details__work_type=self.work_type3_cachier,
@@ -494,7 +496,7 @@ class TestGetWorkersStatAndTabel(MultipleActiveEmploymentsSupportMixin, APITestC
                 employee=self.employee2_2,
                 employment=self.employment2_2_3,
                 shop=self.shop3,
-                type=WorkerDay.TYPE_WORKDAY,
+                type_id=WorkerDay.TYPE_WORKDAY,
                 is_fact=True,
                 is_approved=True,
                 cashbox_details__work_type=self.work_type3_cachier,
@@ -863,7 +865,7 @@ class TestWorkTimeOverlap(MultipleActiveEmploymentsSupportMixin, APITestCase):
             employee=self.employee1_1,
             employment=self.employment1_2_1,
             shop=self.shop1,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dttm_work_start=datetime.combine(self.dt, time(8, 0, 0)),
             dttm_work_end=datetime.combine(self.dt, time(17, 0, 0)),
         )
@@ -1033,7 +1035,7 @@ class TestEmployeeAPI(MultipleActiveEmploymentsSupportMixin, APITestCase):
             employee=self.employee3,
             employment=self.employment3,
             shop=self.shop1,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dttm_work_start=datetime.combine(self.dt, time(8, 0, 0)),
             dttm_work_end=datetime.combine(self.dt, time(17, 0, 0)),
         )

@@ -14,6 +14,7 @@ from src.timetable.worker_day.views import WorkerDayViewSet
 from src.timetable.worker_day_permissions.views import WorkerDayPermissionsAPIView
 from src.timetable.timesheet.views import TimesheetViewSet
 from src.timetable.attendance_records.views import AttendanceRecordsViewSet
+from src.timetable.worker_day_type.views import WorkerDayTypeViewSet
 
 router = routers.DefaultRouter()
 router.register(r'worker_day', WorkerDayViewSet, basename='WorkerDay')
@@ -26,6 +27,7 @@ router.register(r'exchange_settings', ExchangeSettingsViewSet, basename='Exchang
 router.register(r'vacancy_black_list', VacancyBlackListViewSet, basename='VacancyBlackList')
 router.register(r'timesheet', TimesheetViewSet, basename='Timesheet')
 router.register(r'attendance_records', AttendanceRecordsViewSet, basename='AttendanceRecords')
+router.register(r'worker_day_type', WorkerDayTypeViewSet, basename='WorkerDayType')
 
 employment_nested_router.register(r'worker_constraint', WorkerConstraintViewSet, basename='WorkerConstraint')
 
