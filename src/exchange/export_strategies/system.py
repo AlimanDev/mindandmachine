@@ -5,7 +5,7 @@ import pandas as pd
 
 from src.exchange.models import SystemExportStrategy
 from src.reports.utils.pivot_tabel import PlanAndFactPivotTabel
-from src.timetable.models import PlanAndFactHours, WorkerDay
+from src.timetable.models import PlanAndFactHours
 from .base import BaseExportStrategy
 
 
@@ -41,7 +41,7 @@ class ExportPlanAndFactHoursStrategy(BaseSystemExportStrategy):
         df = pd.DataFrame(list(PlanAndFactHours.objects.filter(
             dt__gte=dt_from,
             dt__lte=dt_to,
-            wd_type__in=WorkerDay.TYPES_WITH_TM_RANGE,  # переделать на wd_type__is_dayoff=False
+            wd_type__is_dayoff=False,
         ).values_list(
             'dt',
             'worker_fio',
