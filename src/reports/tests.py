@@ -31,8 +31,8 @@ class TestReportConfig(APITestCase):
     def _create_config(self, count_of_periods, period, period_start=Period.PERIOD_START_YESTERDAY):
         period, _period_created = Period.objects.get_or_create(
             period=period,
-            count_of_periods=count_of_periods,
             period_start=period_start,
+            count_of_periods=count_of_periods,
         )
         return ReportConfig.objects.create(
             name='Test',
@@ -167,7 +167,7 @@ class TestReportConfig(APITestCase):
             'dt_to': date.today() - timedelta(1),
         }
         self.assertEquals(data, dates)
-        config.count_of_periods = 3
+        config.period.count_of_periods = 3
         config.period.save()
         dates = config.get_dates()
         data = {
