@@ -481,7 +481,7 @@ class UploadDownloadTimetableCells(BaseUploadDownloadTimeTable):
                         }
                     )
 
-                WorkerDay.objects.filter(dt=dt, employee=employee, is_fact=is_fact, is_approved=False).delete()
+                WorkerDay.objects_with_excluded.filter(dt=dt, employee=employee, is_fact=is_fact, is_approved=False).delete()
             
                 new_wd = WorkerDay.objects.create(
                     employee=employee,
