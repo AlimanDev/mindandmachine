@@ -3,6 +3,7 @@ from datetime import date, datetime, time, timedelta
 import pandas as pd
 from dateutil.relativedelta import relativedelta
 from django.core import mail
+from calendar import monthrange
 from django_celery_beat.models import CrontabSchedule
 from rest_framework.test import APITestCase
 from xlrd import open_workbook
@@ -243,7 +244,7 @@ class TestPivotTabelReportNotifications(TestsHelperMixin, APITestCase):
         cls.report, _created = ReportType.objects.get_or_create(
             code=PIVOT_TABEL, network=cls.network)
 
-        cls.dt = datetime.now().date() - timedelta(3)
+        cls.dt = (datetime.now().date() - relativedelta(months=1)).replace(day=21)
         cls.now = datetime.now() + timedelta(hours=cls.shop.get_tz_offset())
         cls.cron = CrontabSchedule.objects.create()
         WorkerDayFactory(
@@ -286,12 +287,13 @@ class TestPivotTabelReportNotifications(TestsHelperMixin, APITestCase):
     def setUp(self):
         self.client.force_authenticate(user=self.user_dir)
 
-    def test_employee_working_not_according_to_plan_notification_sent(self):
+    def test_pivot_tabel_report_sent(self):
         with self.settings(CELERY_TASK_ALWAYS_EAGER=True):
             subject = 'Табель'
             period, _period_created = Period.objects.get_or_create(
                 count_of_periods=1,
                 period=Period.ACC_PERIOD_MONTH,
+                period_start=ReportConfig.PERIOD_START_PREVIOUS_MONTH,
             )
             report_config = ReportConfig.objects.create(
                 report_type=self.report,
@@ -316,11 +318,13 @@ class TestPivotTabelReportNotifications(TestsHelperMixin, APITestCase):
             self.assertEqual(emails, [self.user_dir.email, self.shop.email, self.user_urs.email])
             data = open_workbook(file_contents=mail.outbox[0].attachments[0][1])
             df = pd.read_excel(data, engine='xlrd')
-            self.assertEquals(len(df.columns), 8)
+            self.assertEquals(len(df.columns), 6 + monthrange(self.dt.year, self.dt.month)[1])
             self.assertEquals(len(df.values), 3)
-            self.assertEquals(list(df.iloc[0, 5:].values), [0.00, 10.75, 10.75])
-            self.assertEquals(list(df.iloc[1, 5:].values), [10.75, 10.75, 21.50])
-            self.assertEquals(list(df.iloc[2, 5:].values), [10.75, 21.50, 32.25])
+            first_date = datetime.combine(self.dt - timedelta(1), time())
+            second_date = datetime.combine(self.dt, time())
+            self.assertEquals(list(df.loc[0, [first_date, second_date, 'Часов за период']].values), [0.00, 10.75, 10.75])
+            self.assertEquals(list(df.loc[1, [first_date, second_date, 'Часов за период']].values), [10.75, 10.75, 21.50])
+            self.assertEquals(list(df.loc[2, [first_date, second_date, 'Часов за период']].values), [10.75, 21.50, 32.25])
 
 
 class TestReportsViewSet(TestsHelperMixin, APITestCase):
@@ -359,7 +363,7 @@ class TestReportsViewSet(TestsHelperMixin, APITestCase):
             access_type='ALL',
         )
 
-        cls.dt = datetime.now().date()
+        cls.dt = (datetime.now().date() - relativedelta(months=1)).replace(day=21)
         WorkerDayFactory(
             is_approved=True,
             is_fact=True,
@@ -400,7 +404,7 @@ class TestReportsViewSet(TestsHelperMixin, APITestCase):
     def setUp(self):
         self.client.force_authenticate(user=self.user_dir)
 
-    def test_employee_working_not_according_to_plan_notification_sent(self):
+    def test_report_pivot_tabel_get(self):
         response = self.client.get(f'/rest_api/report/pivot_tabel/?dt_from={self.dt - timedelta(1)}&dt_to={self.dt}')
         self.assertEquals(response.status_code, 200)
         data = open_workbook(file_contents=response.content)
