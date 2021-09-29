@@ -169,4 +169,4 @@ class TestImportData(TestsHelperMixin, TestCase):
             value_sum=Sum('value'),
         ).values_list('operation_type__operation_type_name__code', 'value_sum'))
         self.assertEqual(pc_sums['bills_count'], 105)
-        self.assertEqual(pc_sums['goods_count'], 891.76)
+        self.assertEqual(pc_sums['goods_count'], 891.7600000000001)
