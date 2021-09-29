@@ -104,7 +104,7 @@ class BaseUploadDownloadTimeTable:
         ).order_by('employee__user__last_name', 'employee__user__first_name', 'employee__user__middle_name', 'employee_id')
 
     def _get_worker_day_qs(self, employee_ids=[], dt_from=None, dt_to=None, is_approved=True):
-        workdays = WorkerDay.objects.select_related('employee', 'employee__user', 'shop').filter(
+        workdays = WorkerDay.objects.select_related('employee', 'employee__user', 'shop', 'type').filter(
             Q(dt__lte=F('employment__dt_fired')) | Q(employment__dt_fired__isnull=True) | Q(employment__isnull=True),
             (Q(dt__gte=F('employment__dt_hired')) | Q(employment__isnull=True)) & Q(dt__gte=dt_from),
             employee_id__in=employee_ids,
@@ -112,16 +112,17 @@ class BaseUploadDownloadTimeTable:
             is_approved=is_approved,
             is_fact=False,
         ).order_by(
-            'employee__user__last_name', 'employee__user__first_name', 'employee__user__middle_name', 'employee_id', 'dt')
+            'employee__user__last_name', 'employee__user__first_name', 'employee__user__middle_name', 'employee_id', 'dt', 'dttm_work_start')
 
-        return workdays.get_last_ordered(
-            is_fact=False,
-            order_by=[
-                '-is_approved' if is_approved else 'is_approved',
-                '-is_vacancy',
-                '-id',
-            ]
-        )
+        return workdays
+        # .get_last_ordered(
+        #     is_fact=False,
+        #     order_by=[
+        #         '-is_approved' if is_approved else 'is_approved',
+        #         '-is_vacancy',
+        #         '-id',
+        #     ]
+        # )
 
     def _get_employee_qs(self, network_id, shop_id, dt_from, dt_to, employee_id__in):
         employee_qs = Employee.objects.filter(
@@ -412,6 +413,13 @@ class BaseUploadDownloadTimeTable:
     def _generate_upload_example(self, workbook, shop_id, dt_from, dt_to, is_fact, is_approved, employee_id__in):
         raise NotImplementedError()
 
+    def _group_worker_days(self, worker_days):
+        wdays = {}
+        for wd in worker_days:
+            wdays.setdefault(wd.employee_id, {}).setdefault(wd.dt, []).append(wd)
+        
+        return wdays
+
 
 class UploadDownloadTimetableCells(BaseUploadDownloadTimeTable):
     def _upload(self, df, users, form, is_fact):
@@ -523,7 +531,8 @@ class UploadDownloadTimetableCells(BaseUploadDownloadTimeTable):
             shop,
             form['dt_from'],
             worksheet=ws,
-            prod_days=None
+            prod_days=None,
+            on_print=form['on_print'],
         )
 
         employments = self._get_employment_qs(shop.network_id, shop.id, dt_from=timetable.prod_days[0].dt, dt_to=timetable.prod_days[-1].dt)
@@ -554,11 +563,23 @@ class UploadDownloadTimetableCells(BaseUploadDownloadTimeTable):
         # construct user info
         timetable.construnts_users_info(employments, 11, 0, ['code', 'fio', 'position'])
 
+        groupped_days = self._group_worker_days(workdays)
+
         # fill page 1
-        timetable.fill_table(workdays, employments, stat, 11, 4, stat_type=stat_type, norm_type=norm_type, mapping=self.wd_type_mapping)
+        timetable.fill_table(groupped_days, employments, stat, 11, 4, stat_type=stat_type, norm_type=norm_type, mapping=self.wd_type_mapping)
 
         # fill page 2
-        timetable.fill_table2(shop, timetable.prod_days[-1].dt, workdays)
+        timetable.fill_table2(shop, timetable.prod_days[-1].dt, groupped_days)
+
+        if timetable.on_print:
+            timetable.worksheet.set_landscape()
+            timetable.worksheet.set_paper(9)
+            timetable.worksheet.fit_to_pages(1, 0)
+            timetable.worksheet.set_margins(left=0.15, right=0.1)
+            timetable.print_worksheet.set_landscape()
+            timetable.print_worksheet.set_paper(9)
+            timetable.print_worksheet.fit_to_pages(1, 0)
+            timetable.print_worksheet.set_margins(left=0.15, right=0.1)
 
         return workbook, _('Timetable_for_shop_{}_from_{}.xlsx').format(shop.name, form['dt_from'])
 
