@@ -293,7 +293,7 @@ class TestPivotTabelReportNotifications(TestsHelperMixin, APITestCase):
             period, _period_created = Period.objects.get_or_create(
                 count_of_periods=1,
                 period=Period.ACC_PERIOD_MONTH,
-                period_start=ReportConfig.PERIOD_START_PREVIOUS_MONTH,
+                period_start=Period.PERIOD_START_PREVIOUS_MONTH,
             )
             report_config = ReportConfig.objects.create(
                 report_type=self.report,
