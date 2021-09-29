@@ -61,8 +61,6 @@ class Recognition:
         return self.partner.detect_and_match(partner_id, image)
 
     def delete_person(self, partner_id):
-        if not settings.ENV_LVL == settings.ENV_LVL_PROD:
-            raise EnvLvlViolation()
         return self.partner.delete_person(partner_id)
 
 
@@ -199,6 +197,8 @@ class Tevian:
 
     @authenticate
     def delete_person(self, tevian_id):
+        if not settings.ENV_LVL == settings.ENV_LVL_PROD:
+            raise EnvLvlViolation()
         return self._call(
             'DELETE',
             TEVIAN_URL + "persons/" + str(tevian_id),
