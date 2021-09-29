@@ -14,7 +14,9 @@ def add_WorkerDay_generate_upload_example_perms(apps, schema_editor):
                 group=group,
                 func='WorkerDay_generate_upload_example',
                 method='GET',
-                access_type='A',
+                defaults=dict(
+                    access_type='A',
+                )
             )
 
 

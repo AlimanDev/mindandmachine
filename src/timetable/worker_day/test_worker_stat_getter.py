@@ -1,4 +1,5 @@
-from datetime import date, timedelta
+from datetime import date, timedelta, datetime, time
+from unittest import expectedFailure
 
 from django.test import TestCase
 
@@ -12,6 +13,7 @@ from src.base.tests.factories import (
     WorkerPositionFactory,
     EmployeeFactory,
 )
+from src.timetable.models import WorkerDay
 from src.timetable.tests.factories import WorkerDayFactory
 from src.util.mixins.tests import TestsHelperMixin
 from .stat import WorkersStatsGetter
@@ -45,35 +47,35 @@ class TestWorkersStatsGetter(TestsHelperMixin, TestCase):
         self.network.accounting_period_length = length
         self.network.save(update_fields=('accounting_period_length',))
 
-    def _get_worker_stats(self):
+    def _get_worker_stats(self, dt_from=None, dt_to=None):
         return WorkersStatsGetter(
-            dt_from=self.dt_from,
-            dt_to=self.dt_to,
+            dt_from=dt_from or self.dt_from,
+            dt_to=dt_to or self.dt_to,
             shop_id=self.shop.id,
         ).run()
 
     def test_work_days_count(self):
         WorkerDayFactory(is_fact=True, is_approved=True, employee=self.employee, employment=self.employment,
-                         shop=self.shop, dt=date(2020, 12, 1), type='W')
+                         shop=self.shop, dt=date(2020, 12, 1), type_id='W')
         WorkerDayFactory(is_fact=True, is_approved=True, employee=self.employee, employment=self.employment,
-                         shop=self.shop, dt=date(2020, 12, 2), type='W')
+                         shop=self.shop, dt=date(2020, 12, 2), type_id='W')
 
         WorkerDayFactory(is_fact=False, is_approved=True, employee=self.employee, employment=self.employment,
-                         shop=self.shop, dt=date(2020, 12, 1), type='W')
+                         shop=self.shop, dt=date(2020, 12, 1), type_id='W')
         WorkerDayFactory(is_fact=False, is_approved=True, employee=self.employee, employment=self.employment,
-                         shop=self.shop, dt=date(2020, 12, 2), type='W')
+                         shop=self.shop, dt=date(2020, 12, 2), type_id='W')
         WorkerDayFactory(is_fact=False, is_approved=True, employee=self.employee, employment=self.employment,
-                         shop=self.shop2, dt=date(2020, 12, 3), type='W')
+                         shop=self.shop2, dt=date(2020, 12, 3), type_id='W')
         WorkerDayFactory(is_fact=False, is_approved=True, employee=self.employee, employment=self.employment,
-                         shop=self.shop, dt=date(2020, 12, 4), type='H')
+                         shop=self.shop, dt=date(2020, 12, 4), type_id='H')
         WorkerDayFactory(is_fact=False, is_approved=True, employee=self.employee, employment=self.employment,
-                         shop=self.shop, dt=date(2020, 12, 5), type='H')
+                         shop=self.shop, dt=date(2020, 12, 5), type_id='H')
         WorkerDayFactory(is_fact=False, is_approved=True, employee=self.employee, employment=self.employment,
-                         shop=self.shop, dt=date(2020, 12, 6), type='S')
+                         shop=self.shop, dt=date(2020, 12, 6), type_id='S')
         WorkerDayFactory(is_fact=False, is_approved=True, employee=self.employee, employment=self.employment,
-                         shop=self.shop, dt=date(2020, 12, 7), type='S')
+                         shop=self.shop, dt=date(2020, 12, 7), type_id='S')
         WorkerDayFactory(is_fact=False, is_approved=True, employee=self.employee, employment=self.employment,
-                         shop=self.shop, dt=date(2020, 12, 8), type='S')
+                         shop=self.shop, dt=date(2020, 12, 8), type_id='S')
         stats = self._get_worker_stats()
 
         self.assertEqual(
@@ -96,11 +98,11 @@ class TestWorkersStatsGetter(TestsHelperMixin, TestCase):
 
     def test_work_hours(self):
         WorkerDayFactory(is_fact=True, is_approved=True, employee=self.employee, employment=self.employment,
-                         shop=self.shop, dt=date(2020, 12, 1), type='W')
+                         shop=self.shop, dt=date(2020, 12, 1), type_id='W')
         WorkerDayFactory(is_fact=True, is_approved=True, employee=self.employee, employment=self.employment,
-                         shop=self.shop, dt=date(2020, 12, 2), type='W')
+                         shop=self.shop, dt=date(2020, 12, 2), type_id='W')
         WorkerDayFactory(is_fact=True, is_approved=True, employee=self.employee, employment=self.employment,
-                         shop=self.shop2, dt=date(2020, 12, 3), type='W')
+                         shop=self.shop2, dt=date(2020, 12, 3), type_id='W')
         stats = self._get_worker_stats()
         self.assertEqual(
             stats[self.employee.id]['fact']['approved']['work_hours'],
@@ -115,15 +117,15 @@ class TestWorkersStatsGetter(TestsHelperMixin, TestCase):
 
     def test_day_type(self):
         WorkerDayFactory(is_fact=False, is_approved=True, employee=self.employee, employment=self.employment,
-                         shop=self.shop, dt=date(2020, 12, 1), type='W')
+                         shop=self.shop, dt=date(2020, 12, 1), type_id='W')
         WorkerDayFactory(is_fact=False, is_approved=True, employee=self.employee, employment=self.employment,
-                         shop=self.shop, dt=date(2020, 12, 2), type='W')
+                         shop=self.shop, dt=date(2020, 12, 2), type_id='W')
         WorkerDayFactory(is_fact=False, is_approved=True, employee=self.employee, employment=self.employment,
-                         shop=self.shop2, dt=date(2020, 12, 3), type='W')
+                         shop=self.shop2, dt=date(2020, 12, 3), type_id='W')
         WorkerDayFactory(is_fact=False, is_approved=True, employee=self.employee, employment=self.employment,
-                         shop=self.shop2, dt=date(2020, 12, 4), type='H')
+                         shop=self.shop2, dt=date(2020, 12, 4), type_id='H')
         WorkerDayFactory(is_fact=False, is_approved=True, employee=self.employee, employment=self.employment,
-                         shop=self.shop2, dt=date(2020, 12, 5), type='S')
+                         shop=self.shop2, dt=date(2020, 12, 5), type_id='S')
         stats = self._get_worker_stats()
         self.assertEqual(
             stats[self.employee.id]['plan']['approved']['day_type'],
@@ -143,9 +145,9 @@ class TestWorkersStatsGetter(TestsHelperMixin, TestCase):
 
     def test_overtime_curr_month(self):
         WorkerDayFactory(is_fact=True, is_approved=True, employee=self.employee, employment=self.employment,
-                         shop=self.shop, dt=date(2020, 12, 1), type='W')
+                         shop=self.shop, dt=date(2020, 12, 1), type_id='W')
         WorkerDayFactory(is_fact=True, is_approved=True, employee=self.employee, employment=self.employment,
-                         shop=self.shop, dt=date(2020, 12, 2), type='W')
+                         shop=self.shop, dt=date(2020, 12, 2), type_id='W')
         stats = self._get_worker_stats()
         self.assertEqual(
             stats[self.employee.id]['fact']['approved']['overtime']['curr_month'],
@@ -155,16 +157,16 @@ class TestWorkersStatsGetter(TestsHelperMixin, TestCase):
     def test_work_hours_for_prev_months_counted_from_fact(self):
         self._set_accounting_period_length(3)
         WorkerDayFactory(is_fact=True, is_approved=True, employee=self.employee, employment=self.employment,
-                         shop=self.shop, dt=date(2020, 10, 1), type='W')
+                         shop=self.shop, dt=date(2020, 10, 1), type_id='W')
         WorkerDayFactory(is_fact=True, is_approved=True, employee=self.employee, employment=self.employment,
-                         shop=self.shop, dt=date(2020, 11, 1), type='W')
+                         shop=self.shop, dt=date(2020, 11, 1), type_id='W')
         WorkerDayFactory(is_fact=True, is_approved=True, employee=self.employee, employment=self.employment,
-                         shop=self.shop, dt=date(2020, 12, 1), type='W')
+                         shop=self.shop, dt=date(2020, 12, 1), type_id='W')
 
         WorkerDayFactory(is_fact=False, is_approved=True, employee=self.employee, employment=self.employment,
-                         shop=self.shop, dt=date(2020, 10, 1), type='W')
+                         shop=self.shop, dt=date(2020, 10, 1), type_id='W')
         WorkerDayFactory(is_fact=False, is_approved=True, employee=self.employee, employment=self.employment,
-                         shop=self.shop, dt=date(2020, 12, 1), type='W')
+                         shop=self.shop, dt=date(2020, 12, 1), type_id='W')
 
         stats = self._get_worker_stats()
         self.assertEqual(
@@ -200,4 +202,87 @@ class TestWorkersStatsGetter(TestsHelperMixin, TestCase):
         self.assertEqual(
             stats[self.employee.id]['plan']['approved']['norm_hours']['curr_month'],
             178.40000000000003,
+        )
+
+    def test_get_hours_sum_and_days_count_by_type(self):
+        new_wd_type = self._create_san_day()
+        dt = date(2021, 6, 1)
+        WorkerDayFactory(
+            is_approved=True,
+            is_fact=True,
+            shop=self.shop,
+            employment=self.employment,
+            employee=self.employee,
+            dt=self.dt_from,
+            type_id=new_wd_type.code,
+            dttm_work_start=datetime.combine(self.dt_from, time(10)),
+            dttm_work_end=datetime.combine(self.dt_from, time(20)),
+        )
+        stats = self._get_worker_stats()
+        self.assertIn('hours_by_type', stats[self.employee.id]['fact']['approved'])
+        self.assertEqual(
+            stats[self.employee.id]['fact']['approved']['hours_by_type']['SD'],
+            9.0,
+        )
+        self.assertEqual(
+            stats[self.employee.id]['fact']['approved']['day_type']['SD'],
+            1,
+        )
+
+    @expectedFailure
+    def test_days_count_by_type_for_multiple_wdays_on_one_date(self):
+        dt = date(2021, 6, 1)
+        WorkerDayFactory(
+            is_approved=True,
+            is_fact=True,
+            shop=self.shop,
+            employment=self.employment,
+            employee=self.employee,
+            dt=self.dt_from,
+            type_id=WorkerDay.TYPE_WORKDAY,
+            dttm_work_start=datetime.combine(self.dt_from, time(10)),
+            dttm_work_end=datetime.combine(self.dt_from, time(14)),
+        )
+        WorkerDayFactory(
+            is_approved=True,
+            is_fact=True,
+            shop=self.shop,
+            employment=self.employment,
+            employee=self.employee,
+            dt=self.dt_from,
+            type_id=WorkerDay.TYPE_WORKDAY,
+            dttm_work_start=datetime.combine(self.dt_from, time(17)),
+            dttm_work_end=datetime.combine(self.dt_from, time(22)),
+        )
+        stats = self._get_worker_stats()
+        self.assertEqual(
+            stats[self.employee.id]['fact']['approved']['day_type'][WorkerDay.TYPE_WORKDAY],
+            1,  # TODO: логичней ведь, чтобы была 1 если 2 дня на 1 дату?
+        )
+
+    def test_wd_types_with_is_work_hours_false_not_counted_in_work_hours_sum(self):
+        """
+        Проверка, что типы дней с is_work_hours=False не учитываются в сумме "Рабочих часов"
+        """
+        san_day = self._create_san_day()
+        dt_now = date.today()
+        WorkerDayFactory(
+            is_approved=True,
+            is_fact=True,
+            shop=self.shop,
+            employment=self.employment,
+            employee=self.employee,
+            dt=dt_now,
+            type=san_day,
+            dttm_work_start=datetime.combine(dt_now, time(10)),
+            dttm_work_end=datetime.combine(dt_now, time(20)),
+        )
+        stats = self._get_worker_stats(dt_from=dt_now, dt_to=dt_now)
+        self.assertEqual(
+            stats[self.employee.id]['fact']['approved']['work_hours']['total'],
+            0,
+        )
+        self.assertEqual(
+            stats[self.employee.id]['fact']['approved']['overtime']['curr_month'],
+            0,
         )

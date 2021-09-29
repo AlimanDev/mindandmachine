@@ -47,7 +47,7 @@ def overtimes_undertimes(period_step=6, employee_id__in=None, shop_ids=None):
                     'plan_work_hours',
                     filter=Q(
                         plan_work_hours__gte=0,
-                        wd_type__in=WorkerDay.TYPES_WITH_TM_RANGE
+                        wd_type__is_dayoff=False
                     ) & ~Q(dt__in=celebration_dates),
                     output_field=FloatField(),
                 ), 
@@ -61,7 +61,7 @@ def overtimes_undertimes(period_step=6, employee_id__in=None, shop_ids=None):
                     'fact_work_hours',
                     filter=Q(
                         fact_work_hours__gte=0,
-                        wd_type__in=WorkerDay.TYPES_WITH_TM_RANGE
+                        wd_type__is_dayoff=False
                     ) & ~Q(dt__in=celebration_dates),
                     output_field=FloatField(),
                 ), 
@@ -75,7 +75,7 @@ def overtimes_undertimes(period_step=6, employee_id__in=None, shop_ids=None):
                     'fact_work_hours',
                     filter=Q(
                         fact_work_hours__gte=0,
-                        wd_type__in=WorkerDay.TYPES_WITH_TM_RANGE
+                        wd_type__is_dayoff=False
                     ) & Q(dt__in=celebration_dates),
                     output_field=FloatField(),
                 ), 

@@ -102,7 +102,7 @@ def search_candidates(vacancy, **kwargs):
         dttm_work_start__lte=vacancy.dttm_work_start,
         dttm_work_end__gte=vacancy.dttm_work_end,
         dt=vacancy.dt,
-        type=WorkerDay.TYPE_WORKDAY,
+        type_id=WorkerDay.TYPE_WORKDAY,
         child__id__isnull=True,
     )
 
@@ -148,7 +148,7 @@ def search_holiday_candidate(vacancy, max_working_hours, constraints, exclude_po
         workerdays_exists=Exists(
             WorkerDay.objects.filter(
                 employee_id=OuterRef('pk'),
-                type=WorkerDay.TYPE_HOLIDAY,
+                type_id=WorkerDay.TYPE_HOLIDAY,
                 dt=vacancy_dt,
                 is_fact=False,
                 is_approved=True,
@@ -170,7 +170,7 @@ def search_holiday_candidate(vacancy, max_working_hours, constraints, exclude_po
             employee_id=OuterRef('pk'),
             dt__gte=vacancy_dt.replace(day=1),
             dt__lte=vacancy_dt.replace(day=1) + relativedelta(months=+1) - timedelta(days=1),
-            type__in=WorkerDay.TYPES_PAID,
+            type__is_work_hours=True,
             is_fact=False,
             is_approved=True,
         ).order_by().values('employee__user_id').annotate(wh=Sum('work_hours')).values('wh'), output_field=DurationField()) + work_hours,
@@ -194,7 +194,7 @@ def search_holiday_candidate(vacancy, max_working_hours, constraints, exclude_po
             dt__lte=vacancy_dt + timedelta(days=2),
             employee_id=employee.id,
         ).order_by('dt'):
-            if worker_day.type == WorkerDay.TYPE_HOLIDAY:
+            if worker_day.type_id == WorkerDay.TYPE_HOLIDAY:
                 max_holidays += 1
                 tmp_obj['work_days'].append(True)
             else:
@@ -218,8 +218,8 @@ def search_holiday_candidate(vacancy, max_working_hours, constraints, exclude_po
             dt__gte=vacancy_dt - timedelta(days=7),
             dt__lte=vacancy_dt + timedelta(days=7),
             employee_id=employee['employee'].id,
-        ).order_by('dt'):
-            if worker_day.type in WorkerDay.TYPES_PAID:
+        ).select_related('type').order_by('dt'):
+            if worker_day.type.is_work_hours:
                 tmp_hours += worker_day.work_hours.seconds // 3600
             else:
                 if all(employee['work_days'][1:3]) and worker_day.dt + timedelta(days=1) == vacancy_dt:
@@ -251,8 +251,8 @@ def search_holiday_candidate(vacancy, max_working_hours, constraints, exclude_po
             dt__gte=vacancy_dt - timedelta(days=7),
             dt__lte=vacancy_dt + timedelta(days=7),
             employee_id=employee['employee'].id,
-        ).order_by('dt'):
-            if worker_day.type in WorkerDay.TYPES_PAID:
+        ).select_related('type').order_by('dt'):
+            if worker_day.type.is_work_hours:
                 tmp_hours += worker_day.work_hours.seconds // 3600
             else:
                 if worker_day.dt == vacancy_dt:
@@ -315,7 +315,7 @@ def do_shift_elongation(vacancy, max_working_hours):
                 Q(dttm_work_start__gt=vacancy.dttm_work_start) | 
                 Q(dttm_work_end__lt=vacancy.dttm_work_end),
                 employee=OuterRef('pk'), 
-                type=WorkerDay.TYPE_WORKDAY,
+                type_id=WorkerDay.TYPE_WORKDAY,
                 shop=shop,
                 dt=vacancy_dt,
                 work_types__work_type_name_id__in=work_types,
@@ -332,7 +332,7 @@ def do_shift_elongation(vacancy, max_working_hours):
             employee_id=OuterRef('pk'),
             dt__gte=vacancy_dt.replace(day=1),
             dt__lte=vacancy_dt.replace(day=1) + relativedelta(months=+1) - timedelta(days=1),
-            type__in=WorkerDay.TYPES_PAID,
+            type__is_work_hours=True,
             is_fact=False,
             is_approved=True,
         ).order_by().values('employee__user_id').annotate(wh=Sum('work_hours')).values('wh'), output_field=DurationField()) + work_hours,
@@ -435,7 +435,7 @@ def cancel_vacancy(vacancy_id, auto=True):
                 dttm_work_start=None,
                 dttm_work_end=None,
                 shop_id=None,
-                type=WorkerDay.TYPE_HOLIDAY,
+                type_id=WorkerDay.TYPE_HOLIDAY,
                 employment=None,
                 is_vacancy=False,
                 is_outsource=False,
@@ -483,7 +483,7 @@ def create_vacancy(dttm_from, dttm_to, shop_id, work_type_id, outsources=[]):
     worker_day = WorkerDay.objects.create(
         dttm_work_start=dttm_from,
         dttm_work_end=dttm_to,
-        type=WorkerDay.TYPE_WORKDAY,
+        type_id=WorkerDay.TYPE_WORKDAY,
         is_vacancy=True,
         dt=dttm_from.date(),
         shop_id=shop_id,
@@ -495,24 +495,40 @@ def create_vacancy(dttm_from, dttm_to, shop_id, work_type_id, outsources=[]):
         work_type_id=work_type_id,
         worker_day=worker_day,  
     )
-    shop = Shop.objects.get(id=shop_id)
+    notify_vacancy_created(worker_day, work_type_id=work_type_id)
+
+def notify_vacancy_created(worker_day, work_type_id=None, is_auto=True):
+    shop = worker_day.shop
+    director = {}
+    networks = list(worker_day.outsources.all().values_list('id', flat=True)) + [worker_day.shop.network_id]
+    work_types = []
+    if is_auto:
+        director = {
+            'email': shop.director.email if shop.director else shop.email,
+            'name': shop.director.first_name if shop.director else shop.name,
+        }
+    
+    if work_type_id:
+        work_types = list(WorkType.objects.select_related('work_type_name').filter(id=work_type_id).values_list('work_type_name__name', flat=True))
+    else:
+        work_types = list(WorkerDayCashboxDetails.objects.filter(worker_day=worker_day).select_related('work_type__work_type_name').values_list('work_type__work_type_name__name', flat=True))
+
     event_signal.send(
         sender=None,
         network_id=shop.network_id,
         event_code=VACANCY_CREATED,
         user_author_id=None,
-        shop_id=shop_id,
+        shop_id=shop.id,
         context={
-            'director': {
-                'email': shop.director.email if shop.director else shop.email,
-                'name': shop.director.first_name if shop.director else shop.name,
-            },
+            'director': director,
+            'networks': networks,
             'dt': worker_day.dt.strftime('%Y-%m-%d'),
             'dttm_from': worker_day.dttm_work_start.strftime('%Y-%m-%d %H:%M:%S'),
             'dttm_to': worker_day.dttm_work_end.strftime('%Y-%m-%d %H:%M:%S'),
-            'shop_id': shop_id,
+            'shop_id': shop.id,
             'shop_name': shop.name,
-            'work_type': WorkType.objects.select_related('work_type_name').get(id=work_type_id).work_type_name.name,
+            'work_types': work_types,
+            'is_auto': is_auto,
         },
     )
 
@@ -617,20 +633,22 @@ def confirm_vacancy(vacancy_id, user, employee_id=None, exchange=False, reconfir
                 res['status_code'] = 400
                 return res
 
-            employee_worker_day = WorkerDay.objects.get_plan_approved(
+            employee_worker_days_qs = WorkerDay.objects.get_plan_approved(
                 employee_id=active_employment.employee_id,
                 dt=vacancy.dt,
-            ).select_related('shop').first()
+            ).select_related('shop')
+            employee_worker_days = list(employee_worker_days_qs)
 
             # нельзя откликнуться на вакансию если для сотрудника не составлен график на этот день
-            if not employee_worker_day and not (vacancy.is_outsource and vacancy_shop.network_id != active_employment.shop.network_id):
+            if not employee_worker_days and not (
+                    vacancy.is_outsource and vacancy_shop.network_id != active_employment.shop.network_id):
                 res['text'] = messages['no_timetable']
                 res['status_code'] = 400
                 return res
 
-
             # откликаться на вакансию можно только в нерабочие/неоплачиваемые дни
-            update_condition = employee_worker_day.type not in WorkerDay.TYPES_PAID if employee_worker_day else True
+            update_condition = all(
+                 not wd.type.is_work_hours for wd in employee_worker_days if not wd.is_vacancy)
             if active_employment.shop_id != vacancy_shop.id and not exchange:
                 try:
                     tt = ShopMonthStat.objects.get(shop=vacancy_shop, dt=vacancy.dt.replace(day=1))
@@ -643,18 +661,29 @@ def confirm_vacancy(vacancy_id, user, employee_id=None, exchange=False, reconfir
                     update_condition = False
 
             if update_condition or exchange:
-                if employee_worker_day:
-                    employee_worker_day.delete()
-                if reconfirm:
+                if any((not wd.is_vacancy and not wd.type.is_work_hours) for wd in employee_worker_days):
+                    employee_worker_days_qs.filter(type__is_work_hours=False, is_vacancy=False).delete()
+                elif exchange:
+                    # TODO: ???
+                    employee_worker_days_qs.filter(last_edited_by__isnull=True).delete()
+
+                prev_employee_id = vacancy.employee_id
+                if reconfirm and prev_employee_id:
+                    # возможно надо по-другому сделать (копировать всю подтв. версию в черновик?)
                     WorkerDay.objects.filter(
                         is_fact=False,
                         is_approved=False,
                         dt=vacancy.dt,
-                        employee_id=vacancy.employee_id,
+                        employee_id=prev_employee_id,
                         is_vacancy=True,
+                        dttm_work_start=vacancy.dttm_work_start,
+                        dttm_work_end=vacancy.dttm_work_end,
                     ).delete()
 
-                # TODO: добавить проверку на пересечение с рабочими днями у этого же пользователя
+                # TODO: проставлять сотруднику, у которого отменили вакансию, выходной,
+                #  если нет других вакансий и не аутсорс?
+                #  вызывать cancel_vacancy + поправить внутри логику?
+
                 vacancy.employee = active_employment.employee
                 vacancy.employment = active_employment
                 vacancy.save(
@@ -664,6 +693,7 @@ def confirm_vacancy(vacancy_id, user, employee_id=None, exchange=False, reconfir
                     )
                 )
 
+                # TODO: тут ведь тоже надо поправить?
                 WorkerDay.objects_with_excluded.filter(
                     dt=vacancy.dt,
                     employee_id=vacancy.employee_id,
@@ -674,25 +704,31 @@ def confirm_vacancy(vacancy_id, user, employee_id=None, exchange=False, reconfir
                 vacancy_details = WorkerDayCashboxDetails.objects.filter(
                     worker_day=vacancy).values('work_type_id', 'work_part')
 
-                vacancy.id = None
-                vacancy.is_approved = False
-                vacancy.save()
+                try:
+                    with transaction.atomic():
+                        vacancy.id = None
+                        vacancy.is_approved = False
+                        vacancy.save()
 
-                WorkerDayCashboxDetails.objects.bulk_create(
-                    WorkerDayCashboxDetails(
-                        worker_day=vacancy,
-                        work_type_id=details['work_type_id'],
-                        work_part=details['work_part'],
-                    ) for details in vacancy_details
-                )
+                        WorkerDayCashboxDetails.objects.bulk_create(
+                            WorkerDayCashboxDetails(
+                                worker_day=vacancy,
+                                work_type_id=details['work_type_id'],
+                                work_part=details['work_part'],
+                            ) for details in vacancy_details
+                        )
+                        WorkerDay.check_work_time_overlap(
+                            employee_id=vacancy.employee_id, dt=vacancy.dt, is_fact=False, is_approved=False)
+                except WorkTimeOverlap:
+                    pass
 
                 # TODO: создать событие об отклике на вакансию
 
                 Event.objects.filter(worker_day=vacancy).delete()
                 res['text'] = messages['vacancy_success']
 
-                WorkerDay.check_work_time_overlap(employee_id=vacancy.employee_id, dt=vacancy.dt)
-
+                WorkerDay.check_work_time_overlap(
+                    employee_id=vacancy.employee_id, dt=vacancy.dt, is_fact=False, is_approved=True)
             else:
                 res['text'] = messages['cant_apply_vacancy']
                 res['status_code'] = 400
@@ -895,7 +931,6 @@ def cancel_vacancies(shop_id, work_type_id, dt_from=None, dt_to=None, approved=F
     df_stat['dttm'] = pandas.to_datetime(df_stat.dttm, format=QOS_DATETIME_FORMAT)
     df_stat.set_index(df_stat.dttm, inplace=True)
 
-
     vacancies = WorkerDay.objects.filter(
         (Q(employee__isnull=False) & Q(dttm_work_start__gte=min_dttm)) | Q(employee__isnull=True),
         dt__gte=from_dt,
@@ -905,7 +940,7 @@ def cancel_vacancies(shop_id, work_type_id, dt_from=None, dt_to=None, approved=F
         is_fact=False,
         created_by__isnull=True,
         is_approved=approved,
-    ).order_by('dt')
+    ).order_by('dt', 'id')
 
     for vacancy in vacancies:
         cond = (df_stat['dttm'] >= vacancy.dttm_work_start) & (df_stat['dttm'] <= vacancy.dttm_work_end)
@@ -1067,7 +1102,7 @@ def workers_exchange():
                         worker_day__is_vacancy=False,
                         worker_day__is_fact=False,
                         worker_day__is_approved=True,
-                        worker_day__type__in=WorkerDay.TYPES_PAID,
+                        worker_day__type__is_work_hours=True,
                         work_type__work_type_name=work_type.work_type_name,
                         worker_day__canceled=False,
                     ).exclude(
@@ -1140,12 +1175,12 @@ def workers_exchange():
 
 
 def _lack_add(df, work_type_id, dttm_from, dttm_to, add):
-    cond = (df.work_type_id==work_type_id) & (df['dttm'] >= dttm_from) & (df['dttm'] < dttm_to)
+    cond = (df.work_type_id == work_type_id) & (df['dttm'] >= dttm_from) & (df['dttm'] < dttm_to)
     df.loc[cond, 'lack'] += add
 
 
 def _lack_calc(df, work_type_id, dttm_from, dttm_to):
-    cond = (df.work_type_id==work_type_id) & (df['dttm'] >= dttm_from) & (df['dttm'] < dttm_to)
+    cond = (df.work_type_id == work_type_id) & (df['dttm'] >= dttm_from) & (df['dttm'] < dttm_to)
     return df.loc[cond, 'lack'].apply(
-        lambda x:  x if (x < 1.0 and x >-1.0) else 1 if x >= 1 else -1
+        lambda x: x if (x < 1.0 and x > -1.0) else 1 if x >= 1 else -1
     ).mean()

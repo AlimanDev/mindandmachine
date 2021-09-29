@@ -1,4 +1,5 @@
-from datetime import date
+from datetime import date, datetime
+from pytz import timezone
 
 from django.db.models import Q
 from src.base.models import Employment, User
@@ -31,12 +32,28 @@ class ReportConfig(models.Model):
     ACC_PERIOD_HALF_YEAR = 'H'
     ACC_PERIOD_YEAR = 'Y'
 
+    PERIOD_START_TODAY = 'T'
+    PERIOD_START_YESTERDAY = 'E'
+    PERIOD_START_PREVIOUS_MONTH = 'M'
+    PERIOD_START_PREVIOUS_QUARTER = 'Q'
+    PERIOD_START_PREVIOUS_HALF_YEAR = 'H'
+    PERIOD_START_PREVIOUS_YEAR = 'Y'
+
     ACCOUNTING_PERIOD_LENGTH_CHOICES = (
         (ACC_PERIOD_DAY, _('Day')),
         (ACC_PERIOD_MONTH, _('Month')),
         (ACC_PERIOD_QUARTER, _('Quarter')),
         (ACC_PERIOD_HALF_YEAR, _('Half a year')),
         (ACC_PERIOD_YEAR, _('Year')),
+    )
+
+    PERIOD_START_CHOICES = (
+        (PERIOD_START_TODAY, _('Today')),
+        (PERIOD_START_YESTERDAY, _('Yesterday')),
+        (PERIOD_START_PREVIOUS_MONTH, _('End of previous month')),
+        (PERIOD_START_PREVIOUS_QUARTER, _('End of previous quarter')),
+        (PERIOD_START_PREVIOUS_HALF_YEAR, _('End of previous half a year')),
+        (PERIOD_START_PREVIOUS_YEAR, _('End of previous year')),
     )
     report_type = models.ForeignKey('reports.ReportType', verbose_name='Тип отчета', on_delete=models.CASCADE)
     is_active = models.BooleanField(default=True, verbose_name='Активен')
@@ -52,7 +69,8 @@ class ReportConfig(models.Model):
     count_of_periods = models.IntegerField(default=1, verbose_name='Количество периодов')
     period = models.CharField(max_length=1, choices=ACCOUNTING_PERIOD_LENGTH_CHOICES, 
         default=ACC_PERIOD_DAY, verbose_name='Период')
-    include_today = models.BooleanField(default=False, verbose_name='Включать сегодняшний день')
+    period_start = models.CharField(max_length=1, choices=PERIOD_START_CHOICES, 
+        default=PERIOD_START_YESTERDAY, verbose_name='Начало периода')
     send_by_group_employments_shops = models.BooleanField(default=False, verbose_name='Фильтровать рассылку по магазинам трудоустройств групп')
 
     users = models.ManyToManyField('base.User', blank=True, verbose_name='Оповещать конкретных пользователей')
@@ -78,7 +96,7 @@ class ReportConfig(models.Model):
     def __str__(self):
         return f'{self.name}, {self.report_type}'
 
-    def get_dates(self):
+    def get_dates(self, tz='UTC'):
         delta_mapping = {
             self.ACC_PERIOD_DAY: relativedelta(days=1),
             self.ACC_PERIOD_MONTH: relativedelta(months=1),
@@ -86,13 +104,26 @@ class ReportConfig(models.Model):
             self.ACC_PERIOD_HALF_YEAR: relativedelta(months=6),
             self.ACC_PERIOD_YEAR: relativedelta(years=1),
         }
-        dt_to = date.today()
-        if not self.include_today:
-            dt_to = dt_to - relativedelta(days=1)
+        dt_to = self._get_start_date(datetime.now(tz=timezone(tz)).date())
         count = self.count_of_periods - 1 if self.period == self.ACC_PERIOD_DAY else self.count_of_periods
         dt_from = dt_to - (delta_mapping[self.period] * count)
 
+        if (not self.period == self.ACC_PERIOD_DAY) and not (self.period_start in [self.PERIOD_START_TODAY, self.PERIOD_START_YESTERDAY]):
+            dt_from = dt_from.replace(day=1) + relativedelta(months=1)
+
         return {'dt_from': dt_from, 'dt_to': dt_to}
+
+    def _get_start_date(self, dt):
+        date_getters = {
+            self.PERIOD_START_TODAY: lambda dt: dt,
+            self.PERIOD_START_YESTERDAY: lambda dt: dt - relativedelta(days=1),
+            self.PERIOD_START_PREVIOUS_MONTH: lambda dt: (dt - relativedelta(months=1)) + relativedelta(day=31),
+            self.PERIOD_START_PREVIOUS_QUARTER: lambda dt: date(dt.year if dt.month > 3 else dt.year - 1, 3 * (((dt.month - 1) // 3) or 4), 1) + relativedelta(day=31),
+            self.PERIOD_START_PREVIOUS_HALF_YEAR: lambda dt: date(dt.year if dt.month > 6 else dt.year - 1, 12 if dt.month <= 6 else 6, 1) + relativedelta(day=31),
+            self.PERIOD_START_PREVIOUS_YEAR: lambda dt: date(dt.year - 1, 12, 31),
+        }
+
+        return date_getters[self.period_start](dt)
 
     def get_acc_period(self):
         acc_period_mapping = {
@@ -112,7 +143,6 @@ class ReportConfig(models.Model):
             ).get_file()
         else:
             return None
-
 
     def get_recipients(self):
         """

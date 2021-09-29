@@ -2,12 +2,15 @@ import json
 import random
 from calendar import Calendar
 from datetime import datetime, timedelta, time
+from unittest import mock
 
 from django.core.serializers.json import DjangoJSONEncoder
+from django.db import transaction
 from django.urls import reverse
 
 from src.base.models import Employment, FunctionGroup
-from src.timetable.models import WorkerDay, WorkerDayCashboxDetails
+from src.timetable.models import WorkerDay, WorkerDayCashboxDetails, WorkerDayType
+from src.timetable.tests.factories import WorkerDayTypeFactory
 from src.util.test import create_departments_and_users
 from src.util.utils import generate_user_token
 
@@ -71,7 +74,7 @@ class TestsHelperMixin:
                 is_workday = day.weekday() not in [5, 6]
                 kwargs = dict(
                     dt=day,
-                    type='W' if is_workday else 'H',
+                    type_id='W' if is_workday else 'H',
                     is_fact=False,
                     is_approved=True,
                     employee_id=empl.employee_id,
@@ -157,3 +160,53 @@ class TestsHelperMixin:
         network_settings = json.loads(network.settings_values)
         network_settings[key] = value
         network.settings_values = json.dumps(network_settings)
+
+    def _change_wd_data(self, wd_id, data_to_change, auth_user=None):
+        self.client.force_authenticate(user=auth_user or self.user1)
+        resp = self.client.get(self.get_url('WorkerDay-detail', pk=wd_id))
+        wd_data = resp.json()
+        wd_data.update(data_to_change)
+        with mock.patch.object(transaction, 'on_commit', lambda t: t()):
+            resp = self.client.put(
+                self.get_url('WorkerDay-detail', pk=wd_id),
+                data=self.dump_data(wd_data),
+                content_type='application/json',
+            )
+        return resp
+
+    def _approve(self, shop_id, is_fact, dt_from, dt_to, wd_types=None, employee_ids=None):
+        approve_data = {
+            'shop_id': shop_id,
+            'is_fact': is_fact,
+            'dt_from': dt_from,
+            'dt_to': dt_to,
+        }
+        if wd_types:
+            approve_data['wd_types'] = wd_types
+        if employee_ids:
+            approve_data['employee_ids'] = employee_ids
+
+        with mock.patch.object(transaction, 'on_commit', lambda t: t()):
+            resp = self.client.post(
+                self.get_url('WorkerDay-approve'), data=self.dump_data(approve_data), content_type='application/json')
+        return resp
+
+    def _create_san_day(self):
+        return WorkerDayTypeFactory(
+            code='SD',
+            name='Санитарный день',
+            short_name='САН',
+            html_color='white',
+            use_in_plan=True,
+            use_in_fact=True,
+            excel_load_code='СД',
+            is_dayoff=False,
+            is_work_hours=False,
+            is_reduce_norm=False,
+            show_stat_in_hours=True,
+            show_stat_in_days=True,
+        )
+
+    @property
+    def wd_types_dict(self):
+        return WorkerDayType.get_wd_types_dict()

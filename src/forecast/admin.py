@@ -49,6 +49,7 @@ class PeriodClientsAdmin(admin.ModelAdmin):
     list_display = ('id', 'operation_type_name', 'value', 'dttm_forecast', 'type',)
     search_fields = ('dttm_forecast', 'id')
     list_filter = ('operation_type__work_type_id', 'type')
+    change_list_template = 'period_clients_change_list.html'
 
     @staticmethod
     def operation_type_name(instance: PeriodClients):

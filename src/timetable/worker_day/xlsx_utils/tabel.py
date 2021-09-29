@@ -2,51 +2,28 @@ import datetime
 import json
 from math import ceil
 
-from django.utils.translation import gettext as _
 from src.base.models import ProductionDay
 from src.timetable.models import (
     WorkerDay,
+    WorkerDayType,
 )
 from src.timetable.worker_day.xlsx_utils.colors import *
+from src.util.colors import get_contrast_color
 from src.util.dg.helpers import MONTH_NAMES
 from .base_class import Xlsx_base
 
 
 class Tabel_xlsx(Xlsx_base):
-    # (font; background)
-    WORKERDAY_TYPE_COLORS = {
-        WorkerDay.TYPE_WORKDAY: (COLOR_BLACK, COLOR_WHITE),
-        WorkerDay.TYPE_BUSINESS_TRIP: (COLOR_RED, COLOR_WHITE),
-        WorkerDay.TYPE_HOLIDAY: (COLOR_BLACK, COLOR_GREEN),
-        WorkerDay.TYPE_HOLIDAY_WORK: (COLOR_BLACK, COLOR_GREEN),
-        WorkerDay.TYPE_ABSENSE: (COLOR_BLACK, COLOR_YELLOW2),
-        WorkerDay.TYPE_REAL_ABSENCE: (COLOR_BLACK, COLOR_RED),
-        WorkerDay.TYPE_SICK: (COLOR_BLACK, COLOR_1),
-        WorkerDay.TYPE_VACATION: (COLOR_BLACK, COLOR_BLUE),
-        WorkerDay.TYPE_EXTRA_VACATION: (COLOR_RED, COLOR_BLUE),
-        WorkerDay.TYPE_STUDY_VACATION: (COLOR_BLACK, COLOR_DARK_BLUE),
-        WorkerDay.TYPE_SELF_VACATION: (COLOR_BLACK, COLOR_BLUE2),
-        WorkerDay.TYPE_SELF_VACATION_TRUE: (COLOR_BLACK, COLOR_LITE_GREEN),
-        WorkerDay.TYPE_GOVERNMENT: (COLOR_BLACK, COLOR_PINK3),
-        WorkerDay.TYPE_MATERNITY: (COLOR_BLACK, COLOR_YELLOW3),
-        WorkerDay.TYPE_MATERNITY_CARE: (COLOR_BLACK, COLOR_PURPLE),
-        WorkerDay.TYPE_DONOR_OR_CARE_FOR_DISABLED_PEOPLE: (COLOR_BLACK, COLOR_GREEN2),
-        WorkerDay.TYPE_ETC: (COLOR_GREY, COLOR_GREY),
-        WorkerDay.TYPE_EMPTY: (COLOR_GREY, COLOR_GREY),
-        WorkerDay.TYPE_QUALIFICATION: (COLOR_BLACK, COLOR_DARK_BLUE),
-
-        'night_work': (COLOR_BLACK, COLOR_PINK2),
-
-    }
-
-    WORKERDAY_TYPE_CHANGE2HOLIDAY = [
-        WorkerDay.TYPE_MATERNITY,
-        WorkerDay.TYPE_MATERNITY_CARE,
-        WorkerDay.TYPE_DONOR_OR_CARE_FOR_DISABLED_PEOPLE
-    ]
-
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.WORKERDAY_TYPE_COLORS = {}
+        self.WD_TYPE_MAPPING = {}
+
+        for wdt in WorkerDayType.objects.only('code', 'html_color', 'excel_load_code'):
+            self.WORKERDAY_TYPE_COLORS[wdt.code] = (get_contrast_color(wdt.html_color), wdt.html_color)
+            self.WD_TYPE_MAPPING[wdt.code] = wdt.excel_load_code
+
+        self.WORKERDAY_TYPE_COLORS['night_work'] = (COLOR_BLACK, COLOR_PINK2)
         self.day_type = {
             'font_size': 12,
             'font_name': 'Arial',
@@ -312,18 +289,9 @@ class Tabel_xlsx(Xlsx_base):
                             text = '{}_{}'.format(total_h, night_h)
                         else:
                             text = str(total_h)
-
-                    elif wd.type == WorkerDay.TYPE_HOLIDAY_WORK:
-                        total_h = ceil(self._time2hours(wd.dttm_work_start.time(), wd.dttm_work_end.time(), current_triplet))
-                        text = 'В{}'.format(total_h)
-
-                    elif (wd.type in self.WORKERDAY_TYPE_CHANGE2HOLIDAY) \
-                            and (self.prod_days[day].type == ProductionDay.TYPE_HOLIDAY):
-                        wd.type = WorkerDay.TYPE_HOLIDAY
-                        text = WorkerDay.WD_TYPE_MAPPING[wd.type]
-
                     else:
-                        text = WorkerDay.WD_TYPE_MAPPING[wd.type]
+                        text = self.WD_TYPE_MAPPING[wd.type]
+
                     cell_format.update({
                         'font_color': self.WORKERDAY_TYPE_COLORS[wd.type][0],
                         'bg_color': self.WORKERDAY_TYPE_COLORS[wd.type][1],

@@ -42,7 +42,7 @@ def upload_demand_util_v1(df, shop_id, lang):
     for work_type in work_types:
         operation_type = op_types.get(work_type)
         if not operation_type:
-            raise ValidationError(_('There is no such work type or it is not associated with the operation type {work_type}.').format(work_type=worktype))
+            raise ValidationError(_('There is no such work type or it is not associated with the operation type {work_type}.').format(work_type=work_type))
         work_type_df = df[df['Тип работ'] == work_type]
         dttms = list(work_type_df['Время'])
         period_clients_to_delete_ids += list(PeriodClients.objects.filter(
@@ -58,7 +58,7 @@ def upload_demand_util_v1(df, shop_id, lang):
                 dttm_forecast=data['Время'],
                 type=PeriodClients.LONG_FORECASE_TYPE,
             )
-            for _, data in work_type_df.iterrows()
+            for _not_used, data in work_type_df.iterrows()
         ]
     
     PeriodClients.objects.filter(id__in=period_clients_to_delete_ids).delete()
@@ -89,7 +89,7 @@ def upload_demand_util_v2(new_workload, shop_id, lang):
                 type=PeriodClients.LONG_FORECASE_TYPE,
                 value=row[worktype]
 
-            ) for _, row in new_workload[['dttm', worktype]].iterrows()
+            ) for _not_used, row in new_workload[['dttm', worktype]].iterrows()
         ]
     PeriodClients.objects.filter(
         dttm_forecast__gte=dttm_min,
@@ -99,6 +99,44 @@ def upload_demand_util_v2(new_workload, shop_id, lang):
     ).delete()
     PeriodClients.objects.bulk_create(period_clients)
     return Response()
+
+def upload_demand_util_v3(operation_type_name, demand_file, index_col=None, type='F'):
+    if index_col:
+        df = pd.read_excel(demand_file, index_col=index_col)
+    else:
+        df = pd.read_excel(demand_file)
+    SHOP_COL = df.columns[0]
+    DTTM_COL = df.columns[1]
+    VALUE_COL = df.columns[2]
+    with transaction.atomic():
+        shops = df[SHOP_COL].unique()
+        shops = Shop.objects.filter(code__in=shops)
+        operation_types = {ot.shop_id: ot for ot in OperationType.objects.filter(shop__in=shops, operation_type_name=operation_type_name)}
+        creates = []
+        for s in shops:
+            data = df[df[SHOP_COL] == s.code]
+            min_dttm = min(data[DTTM_COL])
+            max_dttm = max(data[DTTM_COL])
+            PeriodClients.objects.filter(operation_type=operation_types[s.id], dttm_forecast__gte=min_dttm, dttm_forecast__lte=max_dttm, type=type).delete()
+            creates.append(
+                (
+                    s.code, 
+                    len(
+                        PeriodClients.objects.bulk_create(
+                            [
+                                PeriodClients(
+                                    operation_type=operation_types[s.id],
+                                    dttm_forecast=row[DTTM_COL],
+                                    value=row[VALUE_COL],
+                                    type=type,
+                                )
+                                for _, row in data.iterrows()
+                            ]
+                        )
+                    )
+                )
+            )
+    return Response(creates)
 
 
 def upload_demand_util(demand_file, shop_id, lang='ru'):

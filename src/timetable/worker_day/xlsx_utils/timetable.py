@@ -13,6 +13,7 @@ from src.base.models import (
 from src.conf.djconfig import QOS_SHORT_TIME_FORMAT
 from src.timetable.models import (
     WorkerDay,
+    WorkerDayType,
 )
 from src.timetable.worker_day.xlsx_utils.colors import *
 from src.timetable.worker_day.xlsx_utils.tabel import Tabel_xlsx
@@ -129,7 +130,7 @@ class Timetable_xlsx(Tabel_xlsx):
         self.worksheet.write_string(9, count_of_days + 6, _('H'), format_header_text)
         self.worksheet.write_string(9, count_of_days + 7, _('V'), format_header_text)
 
-    def fill_table(self, workdays, employments, stat, row_s, col_s, stat_type='approved', norm_type='norm_hours', mapping=WorkerDay.WD_TYPE_MAPPING):
+    def fill_table(self, workdays, employments, stat, row_s, col_s, stat_type='approved', norm_type='norm_hours', mapping=None):
         """
         одинаковая сортировка у workdays и users должна быть
         :param workdays:
@@ -137,6 +138,7 @@ class Timetable_xlsx(Tabel_xlsx):
         :return:
         """
 
+        mapping = mapping or self.WD_TYPE_MAPPING
         it = 0
         cell_format = dict(self.day_type)
         n_workdays = len(workdays)
@@ -145,24 +147,16 @@ class Timetable_xlsx(Tabel_xlsx):
                 if (it < n_workdays) and (workdays[it].employee_id == employment.employee_id) and (day + 1 == workdays[it].dt.day):
                     wd = workdays[it]
 
-                    if wd.type == WorkerDay.TYPE_WORKDAY:
+                    if wd.type_id == WorkerDay.TYPE_WORKDAY:
                         text = '{}-\n{}'.format(wd.dttm_work_start.time().strftime(QOS_SHORT_TIME_FORMAT),
                                                 wd.dttm_work_end.time().strftime(QOS_SHORT_TIME_FORMAT))
 
-                    elif wd.type == WorkerDay.TYPE_HOLIDAY_WORK:
-                        total_h = ceil(wd.work_hours)
-                        text = 'В{}'.format(total_h)
-
-                    elif (wd.type in self.WORKERDAY_TYPE_CHANGE2HOLIDAY) \
-                            and (self.prod_days[day].type == ProductionDay.TYPE_HOLIDAY):
-                        wd.type = WorkerDay.TYPE_HOLIDAY
-                        text = mapping[wd.type]
-
                     else:
-                        text = mapping[wd.type]
+                        text = mapping[wd.type_id]
+
                     cell_format.update({
-                        'font_color': self.WORKERDAY_TYPE_COLORS[wd.type][0],
-                        'bg_color': self.WORKERDAY_TYPE_COLORS[wd.type][1],
+                        'font_color': self.WORKERDAY_TYPE_COLORS[wd.type_id][0],
+                        'bg_color': self.WORKERDAY_TYPE_COLORS[wd.type_id][1],
                     })
 
                     it += 1
@@ -300,20 +294,19 @@ class Timetable_xlsx(Tabel_xlsx):
                         work_end.append(Cell('', format_common if xdt.weekday() != 6 else format_common_bottom))
                         continue
 
-                    if wd.type == WorkerDay.TYPE_WORKDAY:
+                    if wd.type_id == WorkerDay.TYPE_WORKDAY:
                         work_begin.append(
                             Cell(wd.dttm_work_start.time(), format_time if xdt.weekday() != 6 else format_time_bottom))
                         work_end.append(
                             Cell(wd.dttm_work_end.time(), format_time if xdt.weekday() != 6 else format_time_bottom))
                         continue
 
-                    mapping = {
-                        WorkerDay.TYPE_HOLIDAY: _('H'),
-                        WorkerDay.TYPE_VACATION: _('V'),
-                        WorkerDay.TYPE_MATERNITY: _('MAT'),
-                    }
+                    # для чего был отдельный словарь?
+                    mapping = dict(WorkerDayType.objects.filter(
+                        is_dayoff=True,
+                    ).values_list('code', 'excel_load_code'))
 
-                    text = mapping.get(wd.type)
+                    text = mapping.get(wd.type_id)
                     work_begin.append(Cell('' if text is None else text,
                                            format_common if xdt.weekday() != 6 else format_common_bottom))
                     work_end.append(Cell('' if text is None else text,

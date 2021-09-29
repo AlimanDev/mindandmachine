@@ -1,4 +1,5 @@
-from datetime import date
+from datetime import date, time, datetime, timedelta
+from decimal import Decimal
 
 from django.test import override_settings, TestCase
 
@@ -19,12 +20,15 @@ from src.base.tests.factories import (
     EmployeeFactory,
     RegionFactory,
 )
-from src.timetable.models import WorkerDay
+from src.timetable.models import WorkerDay, Timesheet
 from src.timetable.tests.factories import WorkerDayFactory
+from src.timetable.timesheet.tasks import calc_timesheets
+from src.timetable.timesheet.utils import get_timesheet_stats
 from src.timetable.worker_day.stat import (
     WorkersStatsGetter,
 )
 from src.util.mixins.tests import TestsHelperMixin
+
 
 class SawhSettingsHelperMixin(TestsHelperMixin):
     acc_period = None
@@ -133,7 +137,7 @@ class TestSAWHSettingsMonthAccPeriod(SawhSettingsHelperMixin, TestCase):
                 employee=self.employee,
                 employment=self.employment,
                 shop=self.shop,
-                type=WorkerDay.TYPE_SICK,
+                type_id=WorkerDay.TYPE_SICK,
                 dt=date(2021, 1, day_num),
                 is_fact=False,
                 is_approved=True,
@@ -145,7 +149,7 @@ class TestSAWHSettingsMonthAccPeriod(SawhSettingsHelperMixin, TestCase):
                 employee=self.employee,
                 employment=self.employment,
                 shop=self.shop,
-                type=WorkerDay.TYPE_SICK,
+                type_id=WorkerDay.TYPE_SICK,
                 dt=date(2021, 1, day_num),
                 is_fact=False,
                 is_approved=True,
@@ -160,7 +164,7 @@ class TestSAWHSettingsMonthAccPeriod(SawhSettingsHelperMixin, TestCase):
                 employee=self.employee,
                 employment=self.employment,
                 shop=self.shop,
-                type=WorkerDay.TYPE_SICK,
+                type_id=WorkerDay.TYPE_SICK,
                 dt=date(2021, 1, day_num),
                 is_fact=False,
                 is_approved=True,
@@ -176,7 +180,7 @@ class TestSAWHSettingsMonthAccPeriod(SawhSettingsHelperMixin, TestCase):
                 employee=self.employee,
                 employment=self.employment,
                 shop=self.shop,
-                type=WorkerDay.TYPE_SICK,
+                type_id=WorkerDay.TYPE_SICK,
                 dt=date(2021, 1, day_num),
                 is_fact=False,
                 is_approved=True,
@@ -368,6 +372,256 @@ class TestSAWHSettingsQuarterAccPeriod(SawhSettingsHelperMixin, TestCase):
             dt_to=date(2021, 2, 28),
             expected_norm_hours=143,
         )
+
+    @override_settings(FISCAL_SHEET_DIVIDER_ALIAS='nahodka')
+    def test_correct_norm_hours_last_month_acc_period(self):
+        self.sawh_settings_mapping.shops.remove(self.shop)
+        self._test_hours_for_period(
+            dt_from=date(2021, 7, 1),
+            dt_to=date(2021, 7, 31),
+            expected_norm_hours=176,
+        )
+        self._test_hours_for_period(
+            dt_from=date(2021, 8, 1),
+            dt_to=date(2021, 8, 31),
+            expected_norm_hours=176,
+        )
+        self._test_hours_for_period(
+            dt_from=date(2021, 9, 1),
+            dt_to=date(2021, 9, 30),
+            expected_norm_hours=176,
+        )
+        wdays = (
+            ((WorkerDay.TYPE_HOLIDAY, None, None), (
+                date(2021, 7, 3),
+                date(2021, 7, 5),
+                date(2021, 7, 6),
+                date(2021, 7, 7),
+                date(2021, 7, 11),
+                date(2021, 7, 14),
+                date(2021, 7, 15),
+                date(2021, 7, 18),
+                date(2021, 7, 19),
+                date(2021, 7, 22),
+                date(2021, 7, 23),
+                date(2021, 7, 26),
+                date(2021, 7, 27),
+
+                date(2021, 8, 3),
+                date(2021, 8, 4),
+                date(2021, 8, 7),
+                date(2021, 8, 8),
+                date(2021, 8, 12),
+
+                date(2021, 9, 1),
+                date(2021, 9, 2),
+                date(2021, 9, 4),
+                date(2021, 9, 5),
+                date(2021, 9, 8),
+                date(2021, 9, 9),
+                date(2021, 9, 13),
+                date(2021, 9, 20),
+                date(2021, 9, 21),
+                date(2021, 9, 24),
+                date(2021, 9, 28),
+                date(2021, 9, 29),
+            )),
+            ((WorkerDay.TYPE_VACATION, None, None), (
+                date(2021, 8, 16),
+                date(2021, 8, 17),
+                date(2021, 8, 18),
+                date(2021, 8, 19),
+                date(2021, 8, 20),
+                date(2021, 8, 21),
+                date(2021, 8, 22),
+                date(2021, 8, 23),
+                date(2021, 8, 24),
+                date(2021, 8, 25),
+                date(2021, 8, 26),
+                date(2021, 8, 27),
+                date(2021, 8, 28),
+                date(2021, 8, 29),
+            )),
+            ((WorkerDay.TYPE_WORKDAY, time(8), time(21)), (
+                date(2021, 7, 1),
+                date(2021, 7, 2),
+                date(2021, 7, 4),
+                date(2021, 7, 8),
+                date(2021, 7, 12),
+                date(2021, 7, 13),
+                date(2021, 7, 16),
+                date(2021, 7, 17),
+                date(2021, 7, 20),
+                date(2021, 7, 21),
+                date(2021, 7, 24),
+                date(2021, 7, 29),
+
+                date(2021, 8, 1),
+                date(2021, 8, 2),
+                date(2021, 8, 5),
+                date(2021, 8, 6),
+                date(2021, 8, 9),
+                date(2021, 8, 14),
+                date(2021, 8, 15),
+                date(2021, 8, 30),
+                date(2021, 8, 31),
+
+                date(2021, 9, 3),
+                date(2021, 9, 6),
+                date(2021, 9, 7),
+                date(2021, 9, 10),
+                date(2021, 9, 11),
+                date(2021, 9, 12),
+                date(2021, 9, 14),
+                date(2021, 9, 15),
+                date(2021, 9, 16),
+                date(2021, 9, 17),
+                date(2021, 9, 19),
+                date(2021, 9, 22),
+                date(2021, 9, 23),
+                date(2021, 9, 25),
+                date(2021, 9, 26),
+                date(2021, 9, 27),
+                date(2021, 9, 30),
+            )),
+            ((WorkerDay.TYPE_WORKDAY, time(8), time(1, 15)), (
+                date(2021, 7, 9),
+            )),
+            ((WorkerDay.TYPE_WORKDAY, time(10), time(21)), (
+                date(2021, 7, 10),
+            )),
+            ((WorkerDay.TYPE_WORKDAY, time(14, 6), time(21)), (
+                date(2021, 7, 25),
+            )),
+            ((WorkerDay.TYPE_WORKDAY, time(8), time(22)), (
+                date(2021, 7, 28),
+
+                date(2021, 8, 10),
+
+                date(2021, 9, 18),
+            )),
+
+            ((WorkerDay.TYPE_WORKDAY, time(20), time(8)), (
+                date(2021, 8, 11),
+            )),
+        )
+        for (wd_type_id, tm_start, tm_end), dates in wdays:
+            for dt in dates:
+                is_night_work = False
+                if tm_start and tm_end and tm_end < tm_start:
+                    is_night_work = True
+
+                is_work_day = wd_type_id == WorkerDay.TYPE_WORKDAY
+                WorkerDayFactory(
+                    type_id=wd_type_id,
+                    dt=dt,
+                    shop=self.shop,
+                    employee=self.employee,
+                    employment=self.employment,
+                    dttm_work_start=datetime.combine(dt, tm_start) if is_work_day else None,
+                    dttm_work_end=datetime.combine(dt + timedelta(days=1) if is_night_work else dt,
+                                                   tm_end) if is_work_day else None,
+                    is_fact=is_work_day,
+                    is_approved=True,
+                )
+
+        self._test_hours_for_period(
+            dt_from=date(2021, 7, 1),
+            dt_to=date(2021, 7, 31),
+            expected_norm_hours=176,
+        )
+
+        calc_timesheets(employee_id__in=[self.employee.id], dt_from=date(2021, 7, 1), dt_to=date(2021, 7, 31))
+
+        timesheet_qs = Timesheet.objects.filter(
+            employee=self.employee,
+            dt__gte=date(2021, 7, 1),
+            dt__lte=date(2021, 7, 31),
+        )
+        timesheet_stats = get_timesheet_stats(
+            filtered_qs=timesheet_qs,
+            dt_from=date(2021, 7, 1),
+            dt_to=date(2021, 7, 31),
+            user=self.worker,
+        )
+        self.assertEqual(timesheet_stats[self.employee.id]['main_total_hours_sum'], 176)
+        self.assertEqual(timesheet_stats[self.employee.id]['sawh_hours'], 176)
+
+        subregion = RegionFactory(parent=self.region, name='Татарстан', code='tatarstan')
+        self.shop.region = subregion
+        self.shop.save(update_fields=['region'])
+        ProductionDay.objects.create(
+            region=subregion, dt=date(2021, 7, 19), type=ProductionDay.TYPE_SHORT_WORK)
+        ProductionDay.objects.create(
+            region=subregion, dt=date(2021, 7, 20), type=ProductionDay.TYPE_HOLIDAY, is_celebration=True)
+        ProductionDay.objects.create(
+            region=subregion, dt=date(2021, 8, 30), type=ProductionDay.TYPE_HOLIDAY, is_celebration=True)
+
+        timesheet_qs = Timesheet.objects.filter(
+            employee=self.employee,
+            dt__gte=date(2021, 7, 1),
+            dt__lte=date(2021, 7, 31),
+        )
+        timesheet_stats = get_timesheet_stats(
+            filtered_qs=timesheet_qs,
+            dt_from=date(2021, 7, 1),
+            dt_to=date(2021, 7, 31),
+            user=self.worker,
+        )
+        self.assertEqual(timesheet_stats[self.employee.id]['main_total_hours_sum'], 176)
+        self.assertEqual(timesheet_stats[self.employee.id]['sawh_hours'], 167)
+
+        self._test_hours_for_period(
+            dt_from=date(2021, 7, 1),
+            dt_to=date(2021, 7, 31),
+            expected_norm_hours=167,
+        )
+        self._test_hours_for_period(
+            dt_from=date(2021, 8, 1),
+            dt_to=date(2021, 8, 31),
+            expected_norm_hours=92.12903225806451,
+        )
+        self._test_hours_for_period(
+            dt_from=date(2021, 9, 1),
+            dt_to=date(2021, 9, 30),
+            expected_norm_hours=176,
+        )
+
+        calc_timesheets(employee_id__in=[self.employee.id], dt_from=date(2021, 8, 1), dt_to=date(2021, 8, 31))
+        calc_timesheets(employee_id__in=[self.employee.id], dt_from=date(2021, 9, 1), dt_to=date(2021, 9, 30))
+
+        timesheet_qs = Timesheet.objects.filter(
+            employee=self.employee,
+            dt__gte=date(2021, 9, 1),
+            dt__lte=date(2021, 9, 30),
+        )
+        timesheet_stats = get_timesheet_stats(
+            filtered_qs=timesheet_qs,
+            dt_from=date(2021, 9, 1),
+            dt_to=date(2021, 9, 30),
+            user=self.worker,
+        )
+        self.assertEqual(timesheet_stats[self.employee.id]['main_total_hours_sum'], 176)
+        self.assertEqual(timesheet_stats[self.employee.id]['sawh_hours'], 176)
+
+        self.network.correct_norm_hours_last_month_acc_period = True
+        self.network.prev_months_work_hours_source = Network.MAIN_TIMESHEET
+        self.network.save()
+
+        calc_timesheets(employee_id__in=[self.employee.id], dt_from=date(2021, 9, 1), dt_to=date(2021, 9, 30))
+        timesheet_qs = Timesheet.objects.filter(
+            employee=self.employee,
+            dt__gte=date(2021, 9, 1),
+            dt__lte=date(2021, 9, 30),
+        )
+        timesheet_stats = get_timesheet_stats(
+            filtered_qs=timesheet_qs,
+            dt_from=date(2021, 9, 1),
+            dt_to=date(2021, 9, 30),
+            user=self.worker,
+        )
+        self.assertEqual(timesheet_stats[self.employee.id]['main_total_hours_sum'], Decimal('162.87'))
+        self.assertEqual(timesheet_stats[self.employee.id]['sawh_hours'], 162.87)
 
 
 @override_settings(CELERY_TASK_ALWAYS_EAGER=True)

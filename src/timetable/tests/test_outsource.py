@@ -1,29 +1,29 @@
 from datetime import datetime, date, timedelta, time
 
 from django.core import mail
-from src.notifications.models.event_notification import EventEmailNotification
-from src.timetable.events import VACANCY_CONFIRMED_TYPE
-from src.events.models import EventType
-
 from django.test import override_settings
 from rest_framework.test import APITestCase
 
+from src.base.models import Shop, NetworkConnect, Network, User, Employee, Employment, Group, FunctionGroup
+from src.events.models import EventType
+from src.notifications.models.event_notification import EventEmailNotification
+from src.recognition.models import TickPoint, Tick
+from src.timetable.events import VACANCY_CONFIRMED_TYPE
+from src.timetable.models import ShopMonthStat
 from src.timetable.models import (
-    WorkerDay, 
-    WorkType, 
-    WorkTypeName, 
-    GroupWorkerDayPermission, 
+    WorkerDay,
+    WorkType,
+    WorkTypeName,
+    GroupWorkerDayPermission,
     WorkerDayPermission,
-    ShopMonthStat,
     AttendanceRecords,
 )
-from src.base.models import Shop, NetworkConnect, Network, User, Employee, Employment, Group, FunctionGroup
-from src.recognition.models import TickPoint, Tick
-from src.timetable.models import ShopMonthStat
+from src.timetable.tests.factories import WorkerDayFactory
 from src.util.mixins.tests import TestsHelperMixin
 
 
 class TestOutsource(TestsHelperMixin, APITestCase):
+    maxDiff = None
 
     @classmethod
     def setUpTestData(cls):
@@ -284,11 +284,12 @@ class TestOutsource(TestsHelperMixin, APITestCase):
         self.assertEqual(vacancy.employee_id, self.employee3.id)
         self.assertEqual(vacancy.employment_id, self.employment3.id)
         self.assertIsNone(WorkerDay.objects.filter(employee_id=self.employee2.id).first())
-        WorkerDay.objects.create(
+        WorkerDayFactory(
             dt=dt_now,
             is_fact=True,
             is_approved=True,
             employee_id=self.employee3.id,
+            type_id=WorkerDay.TYPE_WORKDAY,
         )
         response = self.client.post(
             f'/rest_api/worker_day/{vacancy.id}/reconfirm_vacancy_to_worker/',
@@ -307,7 +308,7 @@ class TestOutsource(TestsHelperMixin, APITestCase):
         WorkerDay.objects.all().update(is_approved=True)
         WorkerDay.objects.create(
             dt=dt_now,
-            type=WorkerDay.TYPE_HOLIDAY,
+            type_id=WorkerDay.TYPE_HOLIDAY,
             employee=self.client_employee,
             is_approved=True,
         )
@@ -390,14 +391,15 @@ class TestOutsource(TestsHelperMixin, APITestCase):
                     'url': None, 
                     'primary_color': '', 
                     'secondary_color': '', 
-                    'allowed_geo_distance_km': None, 
-                    'enable_camera_ticks': False,
+                    'allowed_geo_distance_km': None,
+                    'allow_creation_several_wdays_for_one_employee_for_one_date': False,
                     'display_employee_tabs_in_the_schedule': True,
-                    'show_worker_day_additional_info': False, 
-                    'allowed_interval_for_late_arrival': '00:00:00', 
+                    'enable_camera_ticks': False,
+                    'show_worker_day_additional_info': False,
+                    'allowed_interval_for_late_arrival': '00:00:00',
                     'allowed_interval_for_early_departure': '00:00:00', 
                     'default_stats': {
-                        'timesheet_employee_top': 'fact_total_hours_sum', 
+                        'timesheet_employee_top': 'fact_total_all_hours_sum',
                         'timesheet_employee_bottom': 'sawh_hours',
                         'employee_bottom': 'norm_hours_curr_month',
                         'employee_top': 'work_hours_total', 
@@ -405,7 +407,6 @@ class TestOutsource(TestsHelperMixin, APITestCase):
                         'day_bottom': 'deadtime'
                     }, 
                     'show_tabel_graph': True, 
-                    'display_employee_tabs_in_the_schedule': True,
                     'show_worker_day_tasks': False,
                     'show_user_biometrics_block': False,
                     'unaccounted_overtime_threshold': 60,
