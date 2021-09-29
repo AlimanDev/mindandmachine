@@ -19,7 +19,7 @@ from src.base.tests.factories import (
     EmployeeFactory,
 )
 from src.events.models import EventType
-from src.reports.models import ReportConfig, ReportType
+from src.reports.models import ReportConfig, ReportType, Period
 from src.notifications.models import EventEmailNotification
 from src.timetable.events import REQUEST_APPROVE_EVENT_TYPE, APPROVE_EVENT_TYPE, VACANCY_CREATED
 from src.reports.reports import OVERTIMES_UNDERTIMES, UNACCOUNTED_OVERTIME
@@ -193,10 +193,12 @@ class TestApproveEventNotifications(TestsHelperMixin, APITestCase):
             self.assertEqual(resp.status_code, status.HTTP_200_OK)
             self.assertEqual(len(mail.outbox), 0)
 
+
 class TestSendUnaccountedReport(TestsHelperMixin, APITestCase):
     @classmethod
     def setUpTestData(cls):
         cls.network = NetworkFactory(only_fact_hours_that_in_approved_plan=True)
+        cls.period = Period.objects.create()
         cls.root_shop = ShopFactory(network=cls.network)
         cls.shop = ShopFactory(
             parent=cls.root_shop,
@@ -267,6 +269,7 @@ class TestSendUnaccountedReport(TestsHelperMixin, APITestCase):
             subject = 'Отчет по неучтенным переработкам'
             report_config = ReportConfig.objects.create(
                 report_type=self.unaccounted_overtime_report,
+                period=self.period,
                 subject=subject,
                 email_text='Отчет по неучтенным переработкам',
                 cron=self.cron,
@@ -322,6 +325,7 @@ class TestSendUnaccountedReport(TestsHelperMixin, APITestCase):
             subject = 'Отчет по неучтенным переработкам'
             report_config = ReportConfig.objects.create(
                 report_type=self.unaccounted_overtime_report,
+                period=self.period,
                 subject=subject,
                 email_text='Отчет по неучтенным переработкам',
                 cron=self.cron,
@@ -354,6 +358,7 @@ class TestSendUnaccountedReport(TestsHelperMixin, APITestCase):
             subject = 'Отчет по неучтенным переработкам'
             report_config = ReportConfig.objects.create(
                 report_type=self.unaccounted_overtime_report,
+                period=self.period,
                 subject=subject,
                 email_text='Отчет по неучтенным переработкам',
                 cron=self.cron,
@@ -454,6 +459,7 @@ class TestOvertimesUndertimesReport(TestsHelperMixin, APITestCase):
     @classmethod
     def setUpTestData(cls):
         cls.network = NetworkFactory(only_fact_hours_that_in_approved_plan=True)
+        cls.period = Period.objects.create()
         cls.root_shop = ShopFactory(network=cls.network)
         cls.shop = ShopFactory(
             parent=cls.root_shop,
@@ -524,6 +530,7 @@ class TestOvertimesUndertimesReport(TestsHelperMixin, APITestCase):
             subject = 'Отчет по переработкам/недоработкам'
             report_config = ReportConfig.objects.create(
                 report_type=self.overtimes_undertimes_report,
+                period=self.period,
                 subject=subject,
                 email_text='Отчет по переработкам/недоработкам',
                 cron=self.cron,

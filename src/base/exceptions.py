@@ -14,3 +14,7 @@ class FieldError(ValidationError):
     def __init__(self, detail=None, field='non_field_errors', code=None ):
         super().__init__(detail, code)
         self.detail = {field: detail}
+
+
+class EnvLvlViolation(Exception):
+    pass

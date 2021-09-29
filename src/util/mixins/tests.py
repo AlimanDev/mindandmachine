@@ -10,7 +10,7 @@ from django.urls import reverse
 
 from src.base.models import Employment, FunctionGroup
 from src.timetable.models import WorkerDay, WorkerDayCashboxDetails, WorkerDayType
-from src.timetable.tests.factories import WorkerDayTypeFactory
+from src.timetable.tests.factories import WorkerDayTypeFactory, WorkerDayFactory
 from src.util.test import create_departments_and_users
 from src.util.utils import generate_user_token
 
@@ -210,3 +210,17 @@ class TestsHelperMixin:
     @property
     def wd_types_dict(self):
         return WorkerDayType.get_wd_types_dict()
+
+    def _create_worker_day(self, employment, dttm_work_start, dttm_work_end, is_fact=False, is_approved=True,
+                           shop_id=None):
+        return WorkerDayFactory(
+            is_approved=is_approved,
+            is_fact=is_fact,
+            shop_id=shop_id or employment.shop_id,
+            employment=employment,
+            employee_id=employment.employee_id,
+            dt=dttm_work_start.date(),
+            type_id=WorkerDay.TYPE_WORKDAY,
+            dttm_work_start=dttm_work_start,
+            dttm_work_end=dttm_work_end,
+        )

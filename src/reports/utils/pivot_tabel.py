@@ -12,7 +12,6 @@ class BasePivotTabel:
     index_fields = ['Сеть сотрудника', 'Подразделение', 'Тип работ', 'Табельный номер', 'ФИО']
     columns_fields = None
 
-
     def __init__(self):
         if not (self.fields_mapping and self.values_field and self.index_fields and self.columns_fields):
             raise NotImplementedError()
@@ -67,6 +66,7 @@ class BasePivotTabel:
         response['Content-Disposition'] = 'attachment; filename="{}.xlsx"'.format(escape_uri_path(output_name))
         return response
 
+
 class PlanAndFactPivotTabel(BasePivotTabel):
     fields_mapping = {
         'worker__network__name': 'Сеть сотрудника',
@@ -77,7 +77,6 @@ class PlanAndFactPivotTabel(BasePivotTabel):
     }
     values_field = 'fact_work_hours'
     columns_fields = ['dt']
-
 
     def get_data(self, **kwargs):
         dt_from = kwargs.get('dt__gte')

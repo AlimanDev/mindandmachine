@@ -29,7 +29,7 @@ from src.reports.reports import (
     URV_VIOLATORS_REPORT, 
     URV_STAT_V2,
 )
-from src.reports.models import ReportConfig, ReportType
+from src.reports.models import ReportConfig, ReportType, Period
 from src.timetable.models import WorkerDay, AttendanceRecords
 from src.timetable.tests.factories import WorkerDayFactory
 from src.util.mixins.tests import TestsHelperMixin
@@ -42,6 +42,7 @@ class TestSendUrvStatEventNotifications(TestsHelperMixin, APITestCase):
     @classmethod
     def setUpTestData(cls):
         cls.network = NetworkFactory()
+        cls.period = Period.objects.create()
         cls.root_shop = ShopFactory(network=cls.network)
         cls.shop = ShopFactory(
             parent=cls.root_shop,
@@ -110,6 +111,7 @@ class TestSendUrvStatEventNotifications(TestsHelperMixin, APITestCase):
             subject = 'Отчет УРВ'
             report_config = ReportConfig.objects.create(
                 report_type=self.urv_stat_report,
+                period=self.period,
                 subject=subject,
                 email_text='Отчет УРВ',
                 cron=self.cron,
@@ -173,6 +175,7 @@ class TestSendUrvStatEventNotifications(TestsHelperMixin, APITestCase):
             subject = 'Отчет УРВ'
             report_config = ReportConfig.objects.create(
                 report_type=self.urv_stat_report,
+                period=self.period,
                 subject=subject,
                 email_text='Отчет УРВ',
                 cron=self.cron,
@@ -213,6 +216,7 @@ class TestSendUrvStatTodayEventNotifications(TestsHelperMixin, APITestCase):
     @classmethod
     def setUpTestData(cls):
         cls.network = NetworkFactory()
+        cls.period = Period.objects.create()
         cls.root_shop = ShopFactory(network=cls.network)
         cls.shop = ShopFactory(
             parent=cls.root_shop,
@@ -281,6 +285,7 @@ class TestSendUrvStatTodayEventNotifications(TestsHelperMixin, APITestCase):
             subject = 'Отчет УРВ за сегодня'
             report_config = ReportConfig.objects.create(
                 report_type=self.urv_stat_report,
+                period=self.period,
                 subject=subject,
                 email_text='Отчет УРВ за сегодня',
                 cron=self.cron,
@@ -326,6 +331,7 @@ class TestSendUrvStatTodayEventNotifications(TestsHelperMixin, APITestCase):
             subject = 'Отчет УРВ за сегодня'
             report_config = ReportConfig.objects.create(
                 report_type=self.urv_stat_report,
+                period=self.period,
                 subject=subject,
                 email_text='Отчет УРВ за сегодня',
                 cron=self.cron,
@@ -353,11 +359,11 @@ class TestSendUrvStatTodayEventNotifications(TestsHelperMixin, APITestCase):
             self.assertEqual(df.to_dict('records'), data)
 
 
-
 class TestSendUrvViolatorsEventNotifications(TestsHelperMixin, APITestCase):
     @classmethod
     def setUpTestData(cls):
         cls.network = NetworkFactory()
+        cls.period = Period.objects.create()
         cls.root_shop = ShopFactory(network=cls.network)
         cls.shop = ShopFactory(
             parent=cls.root_shop,
@@ -442,6 +448,7 @@ class TestSendUrvViolatorsEventNotifications(TestsHelperMixin, APITestCase):
             subject = 'Отчет о нарушителях УРВ'
             report_config = ReportConfig.objects.create(
                 report_type=self.urv_violators_report,
+                period=self.period,
                 subject=subject,
                 email_text='Отчет о нарушителях УРВ',
                 cron=self.cron,
@@ -497,6 +504,7 @@ class TestSendUrvViolatorsEventNotifications(TestsHelperMixin, APITestCase):
             subject = 'Отчет о нарушителях УРВ'
             report_config = ReportConfig.objects.create(
                 report_type=self.urv_violators_report,
+                period=self.period,
                 subject=subject,
                 email_text='Отчет о нарушителях УРВ',
                 cron=self.cron,
@@ -529,6 +537,7 @@ class TestSendUrvStatV2EventNotifications(TestsHelperMixin, APITestCase):
     @classmethod
     def setUpTestData(cls):
         cls.network = NetworkFactory()
+        cls.period = Period.objects.create()
         cls.root_shop = ShopFactory(network=cls.network)
         cls.shop = ShopFactory(
             parent=cls.root_shop,
@@ -603,6 +612,7 @@ class TestSendUrvStatV2EventNotifications(TestsHelperMixin, APITestCase):
             subject = 'Отчет УРВ версия 2'
             report_config = ReportConfig.objects.create(
                 report_type=self.urv_stat_report,
+                period=self.period,
                 subject=subject,
                 email_text='Отчет УРВ версия 2',
                 cron=self.cron,
@@ -666,6 +676,7 @@ class TestSendUrvStatV2EventNotifications(TestsHelperMixin, APITestCase):
             subject = 'Отчет УРВ версия 2'
             report_config = ReportConfig.objects.create(
                 report_type=self.urv_stat_report,
+                period=self.period,
                 subject=subject,
                 email_text='Отчет УРВ версия 2',
                 cron=self.cron,

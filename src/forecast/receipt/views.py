@@ -1,11 +1,11 @@
 import json
 
 from django.http.response import Http404
+from django.utils.dateparse import parse_datetime
 from django.utils.translation import gettext as _
+from drf_yasg.utils import swagger_auto_schema
 from rest_framework import serializers, status
 from rest_framework.response import Response
-
-from drf_yasg.utils import swagger_auto_schema
 
 from src.base.models import Shop
 from src.base.permissions import FilteredListPermission
@@ -66,10 +66,12 @@ class ReceiptViewSet(GetObjectByCodeMixin, BaseModelViewSet):
             if shop_dict.get(receipt[receive_data_info['shop_code_field_name']], '') == '':
                 raise serializers.ValidationError(_('There is no department with this identifier: {key}.').format(key=receipt[receive_data_info['shop_code_field_name']]))
 
+            dttm = receipt[receive_data_info['dttm_field_name']]
             receipt = Receipt(
                 shop_id=shop_dict[receipt[receive_data_info['shop_code_field_name']]],
                 code=receipt[receive_data_info['receipt_code_field_name']],
-                dttm=receipt[receive_data_info['dttm_field_name']],
+                dttm=dttm,
+                dt=parse_datetime(dttm).date(),
                 info=json.dumps(receipt),
                 data_type=data_type,
             )
@@ -103,9 +105,11 @@ class ReceiptViewSet(GetObjectByCodeMixin, BaseModelViewSet):
 
         is_new = instance.pk is None
 
+        dttm = data[receive_data_info['dttm_field_name']]
         instance.shop_id = shop.id
         instance.code = data[receive_data_info['receipt_code_field_name']]
-        instance.dttm = data[receive_data_info['dttm_field_name']]
+        instance.dttm = dttm
+        instance.dt = parse_datetime(dttm).date()
         instance.info = json.dumps(data)
         instance.data_type = data_type
         if 'version' in serializer.validated_data:

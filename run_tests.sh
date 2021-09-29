@@ -13,13 +13,18 @@ docker-compose down --remove-orphans
 docker-compose build web
 
 if [ ${1:-'foo'} = 'with_coverage' ]; then
-    docker-compose run web pytest -v \
+    docker-compose run web pytest ${2:-''} -v \
       --junitxml=./etc/reports/junit.xml \
       --ignore=src/main \
       && coverage xml -o ./etc/reports/coverage.xml
-else
-    docker-compose run web pytest -v \
+elif [ ${1:-'foo'} = 'with_reports' ]; then
+    docker-compose run web pytest ${2:-''} -v \
       --junitxml=./etc/reports/junit.xml \
+      --no-cov \
+      --ignore=src/main \
+      --exitfirst
+else
+    docker-compose run web pytest ${2:-''} -v \
       --no-cov \
       --ignore=src/main \
       --exitfirst
