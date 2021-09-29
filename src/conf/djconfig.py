@@ -6,6 +6,7 @@ config importance
 4. config
 """
 
+import enum
 import os
 import sys
 
@@ -13,6 +14,8 @@ import environ
 from celery.schedules import crontab
 
 env = environ.Env()
+
+
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -299,6 +302,8 @@ add_logger('calc_timesheets', extra_handlers=['mail_admins'])
 add_logger('send_doctors_schedule_to_mis', extra_handlers=['mail_admins'])
 add_logger('mda_integration', extra_handlers=['mail_admins'])
 add_logger('algo_set_timetable', level='DEBUG' if DEBUG else 'INFO')
+add_logger('import_jobs', extra_handlers=['mail_admins'])
+add_logger('export_jobs', extra_handlers=['mail_admins'])
 
 # LOGGING USAGE:
 # import logging
@@ -492,8 +497,16 @@ SESAME_TOKEN_NAME = 'otp_token'
 # Если == None, то при расчете табеля разделение на осн. и доп. не производится
 FISCAL_SHEET_DIVIDER_ALIAS = None
 
+ENV_LVL_PROD = 'prod'
+ENV_LVL_TEST = 'test'
+ENV_LVL_LOCAL = 'local'
+ENV_LVL = env.str('ENV_LVL', default='')
+
 if is_config_exists('djconfig_local.py'):
     from .djconfig_local import *
+
+if not ENV_LVL:
+    ENV_LVL = ENV_LVL_TEST if DEBUG else ENV_LVL_PROD
 
 CELERY_TASK_DEFAULT_QUEUE = BACKEND_QUEUE
 

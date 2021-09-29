@@ -17,6 +17,8 @@ from django.conf import settings
 from django.utils.translation import gettext as _
 from requests.exceptions import HTTPError
 
+from src.base.exceptions import EnvLvlViolation
+
 logger = logging.getLogger('django')
 
 TEVIAN_URL = settings.TEVIAN_URL
@@ -59,6 +61,8 @@ class Recognition:
         return self.partner.detect_and_match(partner_id, image)
 
     def delete_person(self, partner_id):
+        if not settings.ENV_LVL == settings.ENV_LVL_PROD:
+            raise EnvLvlViolation()
         return self.partner.delete_person(partner_id)
 
 

@@ -1,7 +1,9 @@
 import tempfile
 from ftplib import FTP
-from io import BytesIO
 
+from django.conf import settings
+
+from src.base.exceptions import EnvLvlViolation
 from .base import FilesystemEngine
 
 
@@ -26,4 +28,6 @@ class FtpEngine(FilesystemEngine):
         return tmp_f
 
     def write_file(self, filename, file_obj):
+        if not settings.ENV_LVL == settings.ENV_LVL_PROD:
+            raise EnvLvlViolation()
         self.ftp.storbinary(f'STOR {filename}', file_obj)
