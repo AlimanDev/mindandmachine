@@ -101,11 +101,11 @@ class PlanAndFactPivotTabel(BasePivotTabel):
         )
         if data:
             dates = set(map(lambda x: x['dt'], data))
-            need_dates = set(pd.date_range(dt_from or min(dates), dt_to or max(dates))) - dates
+            need_dates = set(pd.date_range(dt_from or min(dates), dt_to or max(dates)).date) - dates
             worker_fill = data[0].copy()
             for dt in need_dates:
                 wf = worker_fill.copy()
-                wf['dt'] = dt.date()
+                wf['dt'] = dt
                 wf['fact_work_hours'] = 0.0
                 data.append(wf)
         return data
