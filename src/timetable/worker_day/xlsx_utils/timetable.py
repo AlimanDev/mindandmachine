@@ -86,7 +86,7 @@ class Timetable_xlsx(Tabel_xlsx):
 
     def add_main_info(self):
         # format
-        format_header_text = self.workbook.add_format(fmt(font_size=10, border=2))
+        format_header_text = self.workbook.add_format(fmt(font_size=10 if not self.on_print else 5, border=2, text_wrap=True))
         format_meta_bold = self.workbook.add_format(fmt(font_size=11, bold=True, align='left', text_wrap=False))
         format_meta_bold_bottom = self.workbook.add_format(
             fmt(font_size=11, bold=True, align='left', text_wrap=False, bottom=1))
@@ -113,23 +113,24 @@ class Timetable_xlsx(Tabel_xlsx):
         self.worksheet.write_string(9, 2, _('POSITION'), format_header_text)
         self.worksheet.write_string(9, 3, '', format_header_text)
         count_of_days = len(self.prod_days) + 4
-        if not self.on_print:
-            # right info
-            self.worksheet.set_column(count_of_days, count_of_days, 75 / 6.23820623)
-            self.worksheet.set_column(count_of_days + 1, count_of_days + 1, 75 / 6.23820623)
-            self.worksheet.set_column(count_of_days + 2, count_of_days + 2, 100 / 6.23820623)
-            self.worksheet.set_column(count_of_days + 3, count_of_days + 3, 75 / 6.23820623)
-            self.worksheet.set_column(count_of_days + 4, count_of_days + 4, 75 / 6.23820623)
-            self.worksheet.set_column(count_of_days + 5, count_of_days + 5, 150 / 6.23820623)
-            self.worksheet.write_string(9, count_of_days, _('plan days'), format_header_text)
-            self.worksheet.write_string(9, count_of_days + 1, _('plan hours'), format_header_text)
-            self.worksheet.write_string(9, count_of_days + 2, _('the rate of hours per month'), format_header_text)
-            self.worksheet.write_string(9, count_of_days + 3, _('overtime'), format_header_text)
-            self.worksheet.write_string(9, count_of_days + 4, _('date'), format_header_text)
-            self.worksheet.write_string(9, count_of_days + 5, _('I have read the work schedule**. I agree to work on public holidays'),
-                                        format_header_text)
-            self.worksheet.write_string(9, count_of_days + 6, _('H'), format_header_text)
-            self.worksheet.write_string(9, count_of_days + 7, _('V'), format_header_text)
+        # right info
+        self.worksheet.set_column(count_of_days, count_of_days, (75 if not self.on_print else 20) / 6.23820623)
+        self.worksheet.set_column(count_of_days + 1, count_of_days + 1, (75 if not self.on_print else 20) / 6.23820623)
+        self.worksheet.set_column(count_of_days + 2, count_of_days + 2, (100 if not self.on_print else 50) / 6.23820623)
+        self.worksheet.set_column(count_of_days + 3, count_of_days + 3, (75 if not self.on_print else 20) / 6.23820623)
+        self.worksheet.set_column(count_of_days + 4, count_of_days + 4, (75 if not self.on_print else 30) / 6.23820623)
+        self.worksheet.set_column(count_of_days + 5, count_of_days + 5, (150 if not self.on_print else 50) / 6.23820623)
+        self.worksheet.set_column(count_of_days + 6, count_of_days + 6, (75 if not self.on_print else 20) / 6.23820623)
+        self.worksheet.set_column(count_of_days + 7, count_of_days + 7, (75 if not self.on_print else 20) / 6.23820623)
+        self.worksheet.write_string(9, count_of_days, _('plan days'), format_header_text)
+        self.worksheet.write_string(9, count_of_days + 1, _('plan hours'), format_header_text)
+        self.worksheet.write_string(9, count_of_days + 2, _('the rate of hours per month'), format_header_text)
+        self.worksheet.write_string(9, count_of_days + 3, _('overtime'), format_header_text)
+        self.worksheet.write_string(9, count_of_days + 4, _('date'), format_header_text)
+        self.worksheet.write_string(9, count_of_days + 5, _('I have read the work schedule**. I agree to work on public holidays'),
+                                    format_header_text)
+        self.worksheet.write_string(9, count_of_days + 6, _('H'), format_header_text)
+        self.worksheet.write_string(9, count_of_days + 7, _('V'), format_header_text)
 
     def fill_table(self, workdays, employments, stat, row_s, col_s, stat_type='approved', norm_type='norm_hours', mapping=None):
         """
@@ -187,67 +188,66 @@ class Timetable_xlsx(Tabel_xlsx):
                 )
             self.worksheet.set_row(row_s + row_shift, (17.5 if not self.on_print else 10) * max_rows)
 
-            if not self.on_print:
 
-                format_holiday_debt = self.workbook.add_format(fmt(font_size=10, border=1, bg_color='#FEFF99'))
+            format_holiday_debt = self.workbook.add_format(fmt(font_size=10, border=1, bg_color='#FEFF99'))
 
-                self.worksheet.write_string(
-                    row_s + row_shift, col_s - 1,
-                    '',
-                    format_holiday_debt
-                )
-                format_text = self.workbook.add_format(fmt(font_size=12, border=1, bold=True))
-                self.worksheet.write_string(
-                    row_s + row_shift, col_s + day + 1,
-                    str(stat.get(employment.employee_id, {}).get('plan', {}).get(stat_type, {}).get('work_days', {}).get('total', 0)),
-                    format_text
-                )
-                
-                plan_hours = int(round(stat.get(employment.employee_id, {}).get('plan', {}).get(stat_type, {}).get('work_hours', {}).get('total', 0)))
+            self.worksheet.write_string(
+                row_s + row_shift, col_s - 1,
+                '',
+                format_holiday_debt
+            )
+            format_text = self.workbook.add_format(fmt(font_size=12 if not self.on_print else 6, border=1, bold=True))
+            self.worksheet.write_string(
+                row_s + row_shift, col_s + day + 1,
+                str(stat.get(employment.employee_id, {}).get('plan', {}).get(stat_type, {}).get('work_days', {}).get('total', 0)),
+                format_text
+            )
+            
+            plan_hours = int(round(stat.get(employment.employee_id, {}).get('plan', {}).get(stat_type, {}).get('work_hours', {}).get('total', 0)))
 
-                self.worksheet.write_string(
-                    row_s + row_shift, col_s + day + 2,
-                    str(plan_hours),
-                    format_text
-                )
+            self.worksheet.write_string(
+                row_s + row_shift, col_s + day + 2,
+                str(plan_hours),
+                format_text
+            )
 
-                norm_hours = int(round(stat.get(employment.employee_id, {}).get('plan', {}).get(stat_type, {}).get(norm_type, {}).get('curr_month', 0)))
+            norm_hours = int(round(stat.get(employment.employee_id, {}).get('plan', {}).get(stat_type, {}).get(norm_type, {}).get('curr_month', 0)))
 
-                self.worksheet.write_string(
-                    row_s + row_shift, col_s + day + 3,
-                    str(norm_hours),
-                    format_text
-                )
+            self.worksheet.write_string(
+                row_s + row_shift, col_s + day + 3,
+                str(norm_hours),
+                format_text
+            )
 
-                self.worksheet.write_string(
-                    row_s + row_shift, col_s + day + 4,
-                    str(int(plan_hours - norm_hours)),
-                    format_text
-                )
+            self.worksheet.write_string(
+                row_s + row_shift, col_s + day + 4,
+                str(int(plan_hours - norm_hours)),
+                format_text
+            )
 
-                self.worksheet.write_string(
-                    row_s + row_shift, col_s + day + 5,
-                    '',
-                    format_text
-                )
+            self.worksheet.write_string(
+                row_s + row_shift, col_s + day + 5,
+                '',
+                format_text
+            )
 
-                self.worksheet.write_string(
-                    row_s + row_shift, col_s + day + 6,
-                    '',
-                    format_text
-                )
+            self.worksheet.write_string(
+                row_s + row_shift, col_s + day + 6,
+                '',
+                format_text
+            )
 
-                self.worksheet.write_string(
-                    row_s + row_shift, col_s + day + 7,
-                    str(stat.get(employment.employee_id, {}).get('plan', {}).get(stat_type, {}).get('day_type', {}).get('H', 0)),
-                    format_text
-                )
+            self.worksheet.write_string(
+                row_s + row_shift, col_s + day + 7,
+                str(stat.get(employment.employee_id, {}).get('plan', {}).get(stat_type, {}).get('day_type', {}).get('H', 0)),
+                format_text
+            )
 
-                self.worksheet.write_string(
-                    row_s + row_shift, col_s + day + 8,
-                    str(stat.get(employment.employee_id, {}).get('plan', {}).get(stat_type, {}).get('day_type', {}).get('V', 0)),
-                    format_text
-                )
+            self.worksheet.write_string(
+                row_s + row_shift, col_s + day + 8,
+                str(stat.get(employment.employee_id, {}).get('plan', {}).get(stat_type, {}).get('day_type', {}).get('V', 0)),
+                format_text
+            )
 
     def fill_table2(self, shop, dt_from, workdays):
         def __transpose(__data):

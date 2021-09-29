@@ -537,14 +537,12 @@ class UploadDownloadTimetableCells(BaseUploadDownloadTimeTable):
 
         employments = self._get_employment_qs(shop.network_id, shop.id, dt_from=timetable.prod_days[0].dt, dt_to=timetable.prod_days[-1].dt)
         employee_ids = employments.values_list('employee_id', flat=True)
-        stat = None
-        if not timetable.on_print:
-            stat = WorkersStatsGetter(
-                dt_from=timetable.prod_days[0].dt,
-                dt_to=timetable.prod_days[-1].dt,
-                shop_id=shop.id,
-                employee_id__in=employee_ids,
-            ).run()
+        stat = WorkersStatsGetter(
+            dt_from=timetable.prod_days[0].dt,
+            dt_to=timetable.prod_days[-1].dt,
+            shop_id=shop.id,
+            employee_id__in=employee_ids,
+        ).run()
         stat_type = 'approved' if form['is_approved'] else 'not_approved'
         norm_type = shop.network.settings_values_prop.get('download_timetable_norm_field', 'norm_work_hours')
 

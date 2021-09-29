@@ -54,6 +54,7 @@ class Tabel_xlsx(Xlsx_base):
 
         normalized_row = 1
         set_rows(0, 10, 21 / normalized_row)
+        set_rows(0, 11, 21 if not self.on_print else 30 / normalized_row)
         set_rows(11, 11, 30 / normalized_row)
         set_rows(12, 12, 35 / normalized_row)
         set_rows(13, 14, 25 / normalized_row)
