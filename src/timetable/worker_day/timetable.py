@@ -178,7 +178,7 @@ class BaseUploadDownloadTimeTable:
                 employment = None
                 tabel_code = ''
                 if number_cond:
-                    tabel_code = str(data[number_column]).split('.')[0]
+                    tabel_code = str(data[number_column]).split('.')[0].strip()
                     employment = Employment.objects.filter(
                         employee__tabel_code=tabel_code, 
                         shop_id=shop_id,
