@@ -664,7 +664,11 @@ class TestVacancyCreatedNotification(TestsHelperMixin, APITestCase):
             self.assertEqual(mail.outbox[0].to[0], self.user_outsource.email)
             dttm_from = self.not_approved_vacancy.dttm_work_start.strftime('%Y-%m-%d %H:%M:%S')
             dttm_to = self.not_approved_vacancy.dttm_work_end.strftime('%Y-%m-%d %H:%M:%S')
-            self.assertEquals(mail.outbox[0].body, f'Здравствуйте, {self.user_outsource.first_name}!\n\nВ отделе {self.shop.name} создана вакансия на {self.dt} с {dttm_from} по {dttm_to} для типа работ Работа\n\nПисьмо отправлено роботом.')
+            self.assertEquals(
+                mail.outbox[0].body, 
+                f'Здравствуйте, {self.user_outsource.first_name}!\n\n\n\n\n\n\nВ подразделении {self.shop.name} создана вакансия для типа работ Работа\n'
+                f'Дата: {self.dt}\nВремя с {dttm_from} по {dttm_to}\n\n\n\n\n\nПисьмо отправлено роботом. Подробности можно узнать по ссылке'
+            )
 
     def test_vacancy_created_notification_sent_on_approve_vacancy(self):
         with self.settings(CELERY_TASK_ALWAYS_EAGER=True):
@@ -684,7 +688,11 @@ class TestVacancyCreatedNotification(TestsHelperMixin, APITestCase):
             self.assertEqual(mail.outbox[0].to[0], self.user_outsource.email)
             dttm_from = self.not_approved_vacancy.dttm_work_start.strftime('%Y-%m-%d %H:%M:%S')
             dttm_to = self.not_approved_vacancy.dttm_work_end.strftime('%Y-%m-%d %H:%M:%S')
-            self.assertEquals(mail.outbox[0].body, f'Здравствуйте, {self.user_outsource.first_name}!\n\nВ отделе {self.shop.name} создана вакансия на {self.dt} с {dttm_from} по {dttm_to} для типа работ Работа\n\nПисьмо отправлено роботом.')
+            self.assertEquals(
+                mail.outbox[0].body, 
+                f'Здравствуйте, {self.user_outsource.first_name}!\n\n\n\n\n\n\nВ подразделении {self.shop.name} создана вакансия для типа работ Работа\n'
+                f'Дата: {self.dt}\nВремя с {dttm_from} по {dttm_to}\n\n\n\n\n\nПисьмо отправлено роботом. Подробности можно узнать по ссылке'
+            )
 
     def test_vacancy_created_notification_sent_on_approve_vacancy_many_work_types(self):
         WorkerDayCashboxDetailsFactory(
@@ -708,7 +716,11 @@ class TestVacancyCreatedNotification(TestsHelperMixin, APITestCase):
             self.assertEqual(mail.outbox[0].to[0], self.user_outsource.email)
             dttm_from = self.not_approved_vacancy.dttm_work_start.strftime('%Y-%m-%d %H:%M:%S')
             dttm_to = self.not_approved_vacancy.dttm_work_end.strftime('%Y-%m-%d %H:%M:%S')
-            self.assertEquals(mail.outbox[0].body, f'Здравствуйте, {self.user_outsource.first_name}!\n\nВ отделе {self.shop.name} создана вакансия на {self.dt} с {dttm_from} по {dttm_to} для типов работ Работа, Касса\n\nПисьмо отправлено роботом.')
+            self.assertEquals(
+                mail.outbox[0].body, 
+                f'Здравствуйте, {self.user_outsource.first_name}!\n\n\n\n\n\n\nВ подразделении {self.shop.name} создана вакансия для типов работ Работа, Касса\n'
+                f'Дата: {self.dt}\nВремя с {dttm_from} по {dttm_to}\n\n\n\n\n\nПисьмо отправлено роботом. Подробности можно узнать по ссылке'
+            )
 
     def test_vacancy_created_notification_not_sent_on_approve(self):
         WorkerDay.objects.filter(is_vacancy=True).update(is_approved=True)

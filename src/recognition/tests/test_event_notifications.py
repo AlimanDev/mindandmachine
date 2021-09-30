@@ -788,10 +788,16 @@ class TestEmployeeNotCheckedEventNotifications(TestsHelperMixin, APITestCase):
             self.assertEqual(mail.outbox[1].subject, subject_out)
             self.assertEqual(mail.outbox[0].to[0], self.user_dir.email)
             dttm = (self.now - timedelta(minutes=5)).replace(second=0).strftime('%Y-%m-%d %H:%M:%S')
-            body1 = f'Здравствуйте, {self.user_dir.first_name}!\n\nСотрудник {self.user_worker.last_name} {self.user_worker.first_name} не отметился на приход в {dttm}.\n\nПисьмо отправлено роботом.'
-            self.assertEqual(mail.outbox[0].body, body1)
-            body2 = f'Здравствуйте, {self.user_dir.first_name}!\n\nСотрудник {self.user_dir.last_name} {self.user_dir.first_name} не отметился на уход в {dttm}.\n\nПисьмо отправлено роботом.'
-            self.assertEqual(mail.outbox[1].body, body2)
+            self.assertEqual(
+                mail.outbox[0].body,
+                f'Здравствуйте, {self.user_dir.first_name}!\n\n\n\n\n\n\nСотрудник {self.user_worker.last_name} {self.user_worker.first_name} не отметился на приход.\n\n'
+                f'Время начала смены: {dttm}.\n\n\n\n\n\n\nПисьмо отправлено роботом. Подробности можно узнать по ссылке'
+            )
+            self.assertEqual(
+                mail.outbox[1].body, 
+                f'Здравствуйте, {self.user_dir.first_name}!\n\n\n\n\n\n\nСотрудник {self.user_dir.last_name} {self.user_dir.first_name} не отметился на уход.\n\n'
+                f'Время окончания смены: {dttm}.\n\n\n\n\n\n\nПисьмо отправлено роботом. Подробности можно узнать по ссылке'
+            )
 
     
     def test_employee_not_checked_notification_sent_only_one(self):
@@ -823,8 +829,11 @@ class TestEmployeeNotCheckedEventNotifications(TestsHelperMixin, APITestCase):
             self.assertEqual(mail.outbox[0].subject, subject_in)
             self.assertEqual(mail.outbox[0].to[0], self.user_dir.email)
             dttm = (self.now - timedelta(minutes=5)).replace(second=0).strftime('%Y-%m-%d %H:%M:%S')
-            body1 = f'Здравствуйте, {self.user_dir.first_name}!\n\nСотрудник {self.user_worker.last_name} {self.user_worker.first_name} не отметился на приход в {dttm}.\n\nПисьмо отправлено роботом.'
-            self.assertEqual(mail.outbox[0].body, body1)
+            self.assertEqual(
+                mail.outbox[0].body, 
+                f'Здравствуйте, {self.user_dir.first_name}!\n\n\n\n\n\n\nСотрудник {self.user_worker.last_name} {self.user_worker.first_name} не отметился на приход.\n\n'
+                f'Время начала смены: {dttm}.\n\n\n\n\n\n\nПисьмо отправлено роботом. Подробности можно узнать по ссылке'
+            )
 
     def test_employee_not_checked_notification_sent_custom_deltas(self):
         self.network.settings_values = json.dumps(
@@ -861,8 +870,11 @@ class TestEmployeeNotCheckedEventNotifications(TestsHelperMixin, APITestCase):
             self.assertEqual(mail.outbox[0].subject, subject_in)
             self.assertEqual(mail.outbox[0].to[0], self.user_dir.email)
             dttm = (self.now - timedelta(minutes=2)).replace(second=0).strftime('%Y-%m-%d %H:%M:%S')
-            body1 = f'Здравствуйте, {self.user_dir.first_name}!\n\nСотрудник {self.user_worker.last_name} {self.user_worker.first_name} не отметился на приход в {dttm}.\n\nПисьмо отправлено роботом.'
-            self.assertEqual(mail.outbox[0].body, body1)
+            self.assertEqual(
+                mail.outbox[0].body, 
+                f'Здравствуйте, {self.user_dir.first_name}!\n\n\n\n\n\n\nСотрудник {self.user_worker.last_name} {self.user_worker.first_name} не отметился на приход.\n\n'
+                f'Время начала смены: {dttm}.\n\n\n\n\n\n\nПисьмо отправлено роботом. Подробности можно узнать по ссылке'
+            )
 
 
 class TestEmployeeWorkingNotAccordingToPlanEventNotifications(TestsHelperMixin, APITestCase):
@@ -948,5 +960,8 @@ class TestEmployeeWorkingNotAccordingToPlanEventNotifications(TestsHelperMixin, 
             self.assertEqual(mail.outbox[0].subject, subject)
             self.assertEqual(mail.outbox[0].to[0], self.user_dir.email)
             dttm = datetime.combine(self.dt, time(9, 3)).strftime('%Y-%m-%d %H:%M:%S')
-            body = f'Здравствуйте, {self.user_dir.first_name}!\n\nСотрудник {self.user_worker.last_name} {self.user_worker.first_name} вышел не по плану в {dttm}.\n\nПисьмо отправлено роботом.'
-            self.assertEqual(mail.outbox[0].body, body)
+            self.assertEqual(
+                mail.outbox[0].body,
+                f'Здравствуйте, {self.user_dir.first_name}!\n\n\n\n\n\n\nСотрудник {self.user_worker.last_name} {self.user_worker.first_name} вышел не по плану.\n'
+                f'Время: {dttm}\n\n\n\n\n\nПисьмо отправлено роботом. Подробности можно узнать по ссылке'
+            )

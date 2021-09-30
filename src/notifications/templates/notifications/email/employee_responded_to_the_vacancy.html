@@ -1,8 +1,8 @@
 {% extends 'notifications/email/base.html' %}
 
 {% block content %}
-Это автоматическое уведомление для {{ shop.name }} об изменениях в графике: <br><br>
-Сотрудник {{ user.last_name }} {{ user.first_name }}
-назначен на вакансию на {{ dt }}. <br><br>
-Посмотреть детали можно по ссылке: http://{{ domain }}
+<p style="font-size:15px">Это автоматическое уведомление для подразделения <b>{{ shop.name }}</b> об изменениях в графике.</p>
+<p style="font-size:15px">Сотрудник <b>{{ user.last_name }} {{ user.first_name }}</b>
+    назначен на вакансию. </p>
+<p style="font-size:15px">Дата: <b>{{ dt }}</b></p>
 {% endblock %}

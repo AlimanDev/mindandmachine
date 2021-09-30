@@ -1,9 +1,9 @@
 {% extends 'notifications/email/base.html' %}
 
 {% block content %}
-Это автоматическое уведомление для {{ shop.name }} об изменениях в графике: <br><br>
-Сотрудник {{ user.last_name }} {{ user.first_name }}
-отмененил вакансию на типах работ {{ work_types }},
-с {{ dttm_work_start }} по {{ dttm_work_end }}, дата {{ dt }}. <br><br>
-Посмотреть детали можно по ссылке: http://{{ domain }}
+<p style="font-size:15px">Это автоматическое уведомление для подразделения <b>{{ shop.name }}</b> об изменениях в графике.</p>
+<p style="font-size:15px">Сотрудник <b>{{ user.last_name }} {{ user.first_name }}</b>
+    отмененил вакансию на типах работ <b>{{ work_types }}</b>.</p>
+<p style="font-size:15px">Дата <b>{{ dt }}</b></p>
+<p style="font-size:15px">Время с <b>{{ dttm_work_start }}</b> по <b>{{ dttm_work_end }}</b></p>
 {% endblock %}

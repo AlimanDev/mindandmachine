@@ -1,5 +1,8 @@
 {% extends 'notifications/email/base.html' %}
 
 {% block content %}
-<p>Сотрудник {{ user.last_name }} {{ user.first_name }} не отметился на {{ type }} в {{ dttm }}.</p>
+<p style="font-size:15px">Сотрудник <b>{{ user.last_name }} {{ user.first_name }}</b> не отметился на <b>{{ type }}.</b>
+</p>
+<p style="font-size:15px">Время {% if type == 'приход' %}начала{% else %}окончания{% endif %} смены: <b>{{ dttm }}</b>.
+</p>
 {% endblock %}
