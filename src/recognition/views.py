@@ -253,7 +253,7 @@ class TickViewSet(BaseModelViewSet):
                 shop_id=tick_point.shop_id,
                 dt__gte=dttm_from - timedelta(1),
                 dt__lte=dttm_to.date(),
-                type__in=WorkerDay.TYPES_WITH_TM_RANGE,
+                type__is_dayoff=False,
                 is_approved=True,
                 is_fact=False,
                 is_vacancy=True,

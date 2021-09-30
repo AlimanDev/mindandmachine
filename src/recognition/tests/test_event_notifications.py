@@ -29,7 +29,7 @@ from src.reports.reports import (
     URV_VIOLATORS_REPORT, 
     URV_STAT_V2,
 )
-from src.reports.models import ReportConfig, ReportType
+from src.reports.models import ReportConfig, ReportType, Period
 from src.timetable.models import WorkerDay, AttendanceRecords
 from src.timetable.tests.factories import WorkerDayFactory
 from src.util.mixins.tests import TestsHelperMixin
@@ -42,6 +42,7 @@ class TestSendUrvStatEventNotifications(TestsHelperMixin, APITestCase):
     @classmethod
     def setUpTestData(cls):
         cls.network = NetworkFactory()
+        cls.period = Period.objects.create()
         cls.root_shop = ShopFactory(network=cls.network)
         cls.shop = ShopFactory(
             parent=cls.root_shop,
@@ -90,7 +91,7 @@ class TestSendUrvStatEventNotifications(TestsHelperMixin, APITestCase):
             employment=cls.employment_worker,
             employee=cls.employee_worker,
             dt=cls.dt,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
         )
         cls.plan_approved2 = WorkerDayFactory(
             is_approved=True,
@@ -99,7 +100,7 @@ class TestSendUrvStatEventNotifications(TestsHelperMixin, APITestCase):
             employment=cls.employment_worker2,
             employee=cls.employee_worker2,
             dt=cls.dt,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
         )
 
     def setUp(self):
@@ -110,6 +111,7 @@ class TestSendUrvStatEventNotifications(TestsHelperMixin, APITestCase):
             subject = 'Отчет УРВ'
             report_config = ReportConfig.objects.create(
                 report_type=self.urv_stat_report,
+                period=self.period,
                 subject=subject,
                 email_text='Отчет УРВ',
                 cron=self.cron,
@@ -173,6 +175,7 @@ class TestSendUrvStatEventNotifications(TestsHelperMixin, APITestCase):
             subject = 'Отчет УРВ'
             report_config = ReportConfig.objects.create(
                 report_type=self.urv_stat_report,
+                period=self.period,
                 subject=subject,
                 email_text='Отчет УРВ',
                 cron=self.cron,
@@ -213,6 +216,7 @@ class TestSendUrvStatTodayEventNotifications(TestsHelperMixin, APITestCase):
     @classmethod
     def setUpTestData(cls):
         cls.network = NetworkFactory()
+        cls.period = Period.objects.create()
         cls.root_shop = ShopFactory(network=cls.network)
         cls.shop = ShopFactory(
             parent=cls.root_shop,
@@ -261,7 +265,7 @@ class TestSendUrvStatTodayEventNotifications(TestsHelperMixin, APITestCase):
             employment=cls.employment_worker,
             employee=cls.employee_worker,
             dt=cls.dt,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
         )
         cls.plan_approved = WorkerDayFactory(
             is_approved=True,
@@ -270,7 +274,7 @@ class TestSendUrvStatTodayEventNotifications(TestsHelperMixin, APITestCase):
             employment=cls.employment_worker2,
             employee=cls.employee_worker2,
             dt=cls.dt,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
         )
 
     def setUp(self):
@@ -281,6 +285,7 @@ class TestSendUrvStatTodayEventNotifications(TestsHelperMixin, APITestCase):
             subject = 'Отчет УРВ за сегодня'
             report_config = ReportConfig.objects.create(
                 report_type=self.urv_stat_report,
+                period=self.period,
                 subject=subject,
                 email_text='Отчет УРВ за сегодня',
                 cron=self.cron,
@@ -326,6 +331,7 @@ class TestSendUrvStatTodayEventNotifications(TestsHelperMixin, APITestCase):
             subject = 'Отчет УРВ за сегодня'
             report_config = ReportConfig.objects.create(
                 report_type=self.urv_stat_report,
+                period=self.period,
                 subject=subject,
                 email_text='Отчет УРВ за сегодня',
                 cron=self.cron,
@@ -353,11 +359,11 @@ class TestSendUrvStatTodayEventNotifications(TestsHelperMixin, APITestCase):
             self.assertEqual(df.to_dict('records'), data)
 
 
-
 class TestSendUrvViolatorsEventNotifications(TestsHelperMixin, APITestCase):
     @classmethod
     def setUpTestData(cls):
         cls.network = NetworkFactory()
+        cls.period = Period.objects.create()
         cls.root_shop = ShopFactory(network=cls.network)
         cls.shop = ShopFactory(
             parent=cls.root_shop,
@@ -406,7 +412,7 @@ class TestSendUrvViolatorsEventNotifications(TestsHelperMixin, APITestCase):
             employment=cls.employment_worker,
             employee=cls.employee_worker,
             dt=cls.dt,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
         )
         cls.plan_approved_dir = WorkerDayFactory(
             is_approved=True,
@@ -415,7 +421,7 @@ class TestSendUrvViolatorsEventNotifications(TestsHelperMixin, APITestCase):
             employment=cls.employment_dir,
             employee=cls.employee_dir,
             dt=cls.dt,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
         )
         cls.plan_approved2 = WorkerDayFactory(
             is_approved=True,
@@ -424,7 +430,7 @@ class TestSendUrvViolatorsEventNotifications(TestsHelperMixin, APITestCase):
             employment=cls.employment_worker2,
             employee=cls.employee_worker2,
             dt=cls.dt,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
         )
 
         AttendanceRecords.objects.create(
@@ -442,6 +448,7 @@ class TestSendUrvViolatorsEventNotifications(TestsHelperMixin, APITestCase):
             subject = 'Отчет о нарушителях УРВ'
             report_config = ReportConfig.objects.create(
                 report_type=self.urv_violators_report,
+                period=self.period,
                 subject=subject,
                 email_text='Отчет о нарушителях УРВ',
                 cron=self.cron,
@@ -497,6 +504,7 @@ class TestSendUrvViolatorsEventNotifications(TestsHelperMixin, APITestCase):
             subject = 'Отчет о нарушителях УРВ'
             report_config = ReportConfig.objects.create(
                 report_type=self.urv_violators_report,
+                period=self.period,
                 subject=subject,
                 email_text='Отчет о нарушителях УРВ',
                 cron=self.cron,
@@ -529,6 +537,7 @@ class TestSendUrvStatV2EventNotifications(TestsHelperMixin, APITestCase):
     @classmethod
     def setUpTestData(cls):
         cls.network = NetworkFactory()
+        cls.period = Period.objects.create()
         cls.root_shop = ShopFactory(network=cls.network)
         cls.shop = ShopFactory(
             parent=cls.root_shop,
@@ -603,6 +612,7 @@ class TestSendUrvStatV2EventNotifications(TestsHelperMixin, APITestCase):
             subject = 'Отчет УРВ версия 2'
             report_config = ReportConfig.objects.create(
                 report_type=self.urv_stat_report,
+                period=self.period,
                 subject=subject,
                 email_text='Отчет УРВ версия 2',
                 cron=self.cron,
@@ -666,6 +676,7 @@ class TestSendUrvStatV2EventNotifications(TestsHelperMixin, APITestCase):
             subject = 'Отчет УРВ версия 2'
             report_config = ReportConfig.objects.create(
                 report_type=self.urv_stat_report,
+                period=self.period,
                 subject=subject,
                 email_text='Отчет УРВ версия 2',
                 cron=self.cron,
@@ -741,7 +752,7 @@ class TestEmployeeNotCheckedEventNotifications(TestsHelperMixin, APITestCase):
             employment=self.employment_worker,
             employee=self.employee_worker,
             dt=self.dt,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dttm_work_start=self.now - timedelta(minutes=5),
             dttm_work_end=self.now + timedelta(hours=6),
         )
@@ -752,7 +763,7 @@ class TestEmployeeNotCheckedEventNotifications(TestsHelperMixin, APITestCase):
             employment=self.employment_dir,
             employee=self.employee_dir,
             dt=self.dt,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dttm_work_start=self.now - timedelta(hours=6),
             dttm_work_end=self.now - timedelta(minutes=5),
         )
@@ -919,7 +930,7 @@ class TestEmployeeWorkingNotAccordingToPlanEventNotifications(TestsHelperMixin, 
             employment=cls.employment_dir,
             employee=cls.employee_dir,
             dt=cls.dt,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dttm_work_start=datetime.combine(cls.dt, time(8)),
             dttm_work_end=datetime.combine(cls.dt, time(20)),
         )

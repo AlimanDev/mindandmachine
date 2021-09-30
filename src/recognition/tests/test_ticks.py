@@ -16,7 +16,7 @@ class TestTicksViewSet(TestsHelperMixin, APITestCase):
         cls.create_departments_and_users()
         WorkerDay.objects.create(
             dt=date.today(),
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             employee=cls.employee2,
             employment=cls.employment2,
             shop=cls.shop2,
@@ -185,17 +185,13 @@ class TestTicksViewSet(TestsHelperMixin, APITestCase):
     def test_cant_create_att_record_withot_active_empl(self):
         self.employment2.dt_fired = date.today() - timedelta(days=2)
         self.employment2.save()
-        at = None
-        try:
-            at = AttendanceRecords.objects.create(
+
+        with self.assertRaisesMessage(ValidationError, 'У вас нет активного трудоустройства'):
+            AttendanceRecords.objects.create(
                 user_id=self.employee2.user_id,
                 shop=self.shop,
                 dttm=datetime.now(),
             )
-        except ValidationError as e:
-            self.assertEqual(e.detail[0], 'У вас нет активного трудоустройства')
-
-        self.assertIsNone(at)
 
     def test_get_ticks_for_tick_point(self):
         tick_point_id = self._authorize_tick_point().json()['tick_point']['id']

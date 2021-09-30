@@ -1,7 +1,8 @@
-from datetime import datetime, date, timedelta
+from datetime import datetime, date, timedelta, time
 from unittest import mock
 
-from django.test import TestCase
+from django.db import transaction
+from django.test import TestCase, override_settings
 from django.utils import timezone
 from rest_framework.test import APITestCase
 
@@ -15,6 +16,7 @@ from src.base.tests.factories import (
     WorkerPositionFactory,
 )
 from src.integration.mda.integration import MdaIntegrationHelper
+from src.integration.mda.tasks import sync_mda_user_to_shop_relation
 from src.integration.models import VMdaUsers
 from src.timetable.models import WorkerDay
 from src.timetable.tests.factories import WorkerDayFactory
@@ -213,7 +215,7 @@ class TestMdaIntegration(TestsHelperMixin, TestCase):
         with self.settings(MDA_INTEGRATION_TRANSFER_GROUPS_FIELD=True):
             users_data = mda_integration_helper._get_users_data()
             worker_data = list(filter(lambda u: worker.employee.user_id == u['id'], users_data))[0]
-            self.assertListEqual(worker_data['groups'],  ['Директор'])
+            self.assertListEqual(worker_data['groups'], ['Директор'])
 
     def test_userChecklistsOrganizer(self):
         region = ShopFactory(parent=self.division1, code='region')
@@ -243,7 +245,7 @@ class TestMdaIntegration(TestsHelperMixin, TestCase):
         self.assertEqual(len(users_data), 5)
         user_data = list(filter(lambda u: user.id == u['id'], users_data))[0]
         self.assertEqual(user_data['orgLevel'], 'COMPANY')
-        self.assertEqual(user_data['orgUnits'],  None)
+        self.assertEqual(user_data['orgUnits'], None)
 
     def test_surveyAdmin_for_admin_true_for_oters_false_and_correct_groups(self):
         with self.settings(MDA_INTEGRATION_TRANSFER_GROUPS_FIELD=True):
@@ -263,13 +265,13 @@ class TestMdaIntegration(TestsHelperMixin, TestCase):
             self.assertEqual(len(users_data), 6)
             user_admin_data = list(filter(lambda u: user_admin.id == u['id'], users_data))[0]
             self.assertEqual(user_admin_data['admin'], True)
-            self.assertEqual(user_admin_data['surveyAdmin'],  True)
-            self.assertListEqual(user_admin_data['groups'],  [])
+            self.assertEqual(user_admin_data['surveyAdmin'], True)
+            self.assertListEqual(user_admin_data['groups'], [])
 
             user_worker_data = list(filter(lambda u: user_worker.id == u['id'], users_data))[0]
             self.assertEqual(user_worker_data['admin'], False)
-            self.assertEqual(user_worker_data['surveyAdmin'],  False)
-            self.assertListEqual(user_worker_data['groups'],  [])
+            self.assertEqual(user_worker_data['surveyAdmin'], False)
+            self.assertListEqual(user_worker_data['groups'], [])
 
             with self.settings(MDA_INTEGRATION_INCLUDE_FUNCTION_GROUPS=True):
                 mda_integration_helper = MdaIntegrationHelper()
@@ -349,6 +351,82 @@ class TestMdaIntegration(TestsHelperMixin, TestCase):
         mda_integration_helper.sync_users()
         _logger.error.assert_called_with(errors_dict)
 
+    @mock.patch('src.integration.mda.tasks.create_mda_user_to_shop_relation.delay')
+    @override_settings(MDA_SEND_USER_TO_SHOP_REL_ON_WD_SAVE=True)
+    def test_mda_user_to_shop_relation(self, _create_mda_user_to_shop_relation_delay):
+        dt_now = timezone.now()
+        group_worker = GroupFactory(code='worker', name='Сотрудник')
+        position_worker = WorkerPositionFactory(group=group_worker, name='Директор', code='director')
+        user_worker = UserFactory()
+        employee_worker = EmployeeFactory(user=user_worker)
+        employment_worker = EmploymentFactory(employee=employee_worker, shop=self.shop1, position=position_worker)
+        with mock.patch.object(transaction, 'on_commit', lambda t: t()):
+            vacancy = WorkerDay.objects.create(
+                dt=dt_now,
+                employee=employee_worker,
+                employment=employment_worker,
+                shop=self.shop2,
+                type_id=WorkerDay.TYPE_WORKDAY,
+                is_fact=False,
+                is_approved=True,
+                is_vacancy=True,
+            )
+        _create_mda_user_to_shop_relation_delay.assert_called_once_with(
+            debug_info={
+                'wd_id': vacancy.id,
+                'approved': True,
+                'is_new': True,
+            },
+            shop_code=vacancy.shop.code,
+            username=vacancy.employee.user.username,
+        )
+
+    @mock.patch('src.integration.mda.tasks.create_mda_user_to_shop_relation.delay')
+    @override_settings(MDA_SEND_USER_TO_SHOP_REL_ON_WD_SAVE=True)
+    def test_mda_user_to_shop_relation_didnt_called_for_the_same_shop(self, _create_mda_user_to_shop_relation_delay):
+        dt_now = timezone.now()
+        group_worker = GroupFactory(code='worker', name='Сотрудник')
+        position_worker = WorkerPositionFactory(group=group_worker, name='Директор', code='director')
+        user_worker = UserFactory()
+        employee_worker = EmployeeFactory(user=user_worker)
+        employment_worker = EmploymentFactory(employee=employee_worker, shop=self.shop1, position=position_worker)
+        WorkerDay.objects.create(
+            dt=dt_now,
+            employee=employee_worker,
+            employment=employment_worker,
+            shop=self.shop1,
+            type_id=WorkerDay.TYPE_WORKDAY,
+            is_fact=False,
+            is_approved=True,
+        )
+        _create_mda_user_to_shop_relation_delay.assert_not_called()
+
+    @mock.patch('src.integration.mda.tasks.create_mda_user_to_shop_relation')
+    def test_sync_mda_user_to_shop_relation(self, _create_mda_user_to_shop_relation):
+        dt_now = timezone.now()
+        group_worker = GroupFactory(code='worker', name='Сотрудник')
+        position_worker = WorkerPositionFactory(group=group_worker, name='Директор', code='director')
+        user_worker = UserFactory()
+        employee_worker = EmployeeFactory(user=user_worker)
+        employment_worker = EmploymentFactory(employee=employee_worker, shop=self.shop1, position=position_worker)
+        vacancy = WorkerDay.objects.create(
+            dt=dt_now,
+            employee=employee_worker,
+            employment=employment_worker,
+            shop=self.shop2,
+            type_id=WorkerDay.TYPE_WORKDAY,
+            dttm_work_start=datetime.combine(dt_now, time(8)),
+            dttm_work_end=datetime.combine(dt_now, time(20)),
+            is_fact=False,
+            is_approved=True,
+            is_vacancy=True,
+        )
+        sync_mda_user_to_shop_relation()
+        _create_mda_user_to_shop_relation.assert_called_once_with(
+            shop_code=vacancy.shop.code,
+            username=vacancy.employee.user.username,
+        )
+
 
 class TestVMdaUsers(TestsHelperMixin, TestCase):
     @classmethod
@@ -381,7 +459,7 @@ class TestVMdaUsers(TestsHelperMixin, TestCase):
             employee=employee_director1,
             employment=None,
             shop=self.shop1,
-            type=WorkerDay.TYPE_VACATION,
+            type_id=WorkerDay.TYPE_VACATION,
             is_fact=False,
             is_approved=True,
         )
@@ -402,7 +480,7 @@ class TestVMdaUsers(TestsHelperMixin, TestCase):
             employee=employee_director2,
             employment=None,
             shop=self.shop1,
-            type=WorkerDay.TYPE_VACATION,
+            type_id=WorkerDay.TYPE_VACATION,
             is_fact=False,
             is_approved=True,
         )
@@ -438,7 +516,7 @@ class TestVMdaUsers(TestsHelperMixin, TestCase):
             employee=employee_director,
             employment=None,
             shop=self.shop1,
-            type=WorkerDay.TYPE_SICK,
+            type_id=WorkerDay.TYPE_SICK,
             is_fact=False,
             is_approved=True,
         )
@@ -522,15 +600,15 @@ class TestCaseInsensitiveAuth(TestsHelperMixin, APITestCase):
             )
 
     def test_signin_token_case_sensitive_by_default(self):
-            resp = self.client.post('/rest_api/auth/signin_token/', data=self.dump_data({
-                'username': self.lowered_username,
-                'token': generate_user_token(self.lowered_username),
-            }), content_type='application/json')
-            self.assertContains(
-                response=resp,
-                text='Нет такого пользователя',
-                status_code=400,
-            )
+        resp = self.client.post('/rest_api/auth/signin_token/', data=self.dump_data({
+            'username': self.lowered_username,
+            'token': generate_user_token(self.lowered_username),
+        }), content_type='application/json')
+        self.assertContains(
+            response=resp,
+            text='Нет такого пользователя',
+            status_code=400,
+        )
 
     def test_signin_token_case_insensitive_with_specified_settings(self):
         with self.settings(CASE_INSENSITIVE_AUTH=True):

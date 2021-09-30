@@ -19,8 +19,8 @@ class ApproveEvent(BaseRegisteredEvent):
 
     def get_recipients(self):
         # TODO: добавить пользователей, для которых был подтвержден график
-        # TODO: подтверждаются все неподтвержденные дни периода, даже если они не отличаются от планового, что делать?
         return []
+
 
 class VacancyConfirmedEvent(BaseRegisteredEvent):
     name = 'Сотрудник откликнулся на вакансию'

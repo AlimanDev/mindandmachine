@@ -150,17 +150,19 @@ class UserConverter(Converter):
 class WorkerDayConverter(Converter):
     @classmethod
     def convert_function(cls, obj, need_percentage=False):
-        with_tm_range = list(WorkerDay.TYPES_WITH_TM_RANGE)
-        with_tm_range.append('R') # дни отработанные в других магазинах
+        types_with_details = [WorkerDay.TYPE_WORKDAY]
+        # TODO: переделать на какой-то отдельный параметр? -- использовать существующее поле плохо
+        types_with_details.append('R')  # дни отработанные в других магазинах
+
         def __work_tm(__field):
-            return cls.convert_time(__field) if obj.type in with_tm_range else None
+            return cls.convert_time(__field) if (obj.type_id == 'R' or not obj.type.is_dayoff) else None
 
         data = {
             'id': obj.id,
             'dttm_added': cls.convert_datetime(obj.dttm_added),
             'dt': cls.convert_date(obj.dt),
             'worker': obj.employee_id,
-            'type': obj.type,
+            'type': obj.type_id,
             'dttm_work_start': __work_tm(obj.dttm_work_start),
             'dttm_work_end': __work_tm(obj.dttm_work_end),
             'work_types': [
@@ -169,9 +171,10 @@ class WorkerDayConverter(Converter):
                     'percent': wdds.work_part * 100,
                 }
                 for wdds in obj.worker_day_details.filter(work_part__gt=0)
-            ] if obj.id and obj.type in with_tm_range else [],
+            ] if obj.id and obj.type_id in types_with_details else [],
             'work_type': obj.work_type_id if hasattr(obj, 'work_type_id') else None,
             'created_by': obj.created_by_id,
+            'last_edited_by': obj.last_edited_by_id,
             'comment': obj.comment,
         }
         if hasattr(obj, 'other_shop'):

@@ -166,7 +166,7 @@ class ShopEfficiencyGetter:
             qs = qs.get_plan_approved()
 
         qs = qs.filter(
-            type__in=WorkerDay.TYPES_PAID,
+            type__is_work_hours=True,
             worker_day_details__work_type_id__in=self.work_types.keys(),
         ).exclude(
             Q(dttm_work_start__isnull=True) | Q(dttm_work_end__isnull=True),

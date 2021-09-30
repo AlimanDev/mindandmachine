@@ -19,9 +19,10 @@ from src.forecast.models import OperationTypeName, OperationType, Receipt, Perio
         'aggregate': [
             {
                 'timeserie_code': код операции,
-                'timeserie_action': ['count', 'sum'],
+                'timeserie_action': ['count', 'sum', 'nunique],
                 'timeserie_value': какое значение для агрегации использовать,
-                'timeserie_filters': словарь, например: {"ВидОперации": "Продажа"}
+                'timeserie_value_complex': опциональный вариант значения для группировки по нескольким полям,
+                'timeserie_filters': словарь, например: {"ВидОперации": "Продажа"},
             },
             ...
         ],
@@ -55,13 +56,15 @@ def aggregate_timeserie_value():
             for timeserie in receive_data_info:
                 grouping_period = timeserie.get('grouping_period', 'h1')
                 update_gap = timeserie.get('update_gap', 3)
+                data_type = timeserie.get('data_type')
                 for aggregate in timeserie['aggregate']:
                     aggr_filters = aggregate.get('timeserie_filters')
                     timeserie_action = aggregate.get('timeserie_action', 'sum')
                     dttm_for_update = (datetime.now() - timedelta(days=update_gap)).replace(hour=0, minute=0, second=0)
 
                     # check all needed
-                    if not (aggregate.get('timeserie_code') and aggregate.get('timeserie_value')):
+                    if not (aggregate.get('timeserie_code') and (
+                            aggregate.get('timeserie_value') or aggregate.get('timeserie_value_complex'))):
                         raise Exception(f"no needed values in timeserie: {timeserie}. Network: {network}")
 
                     print(network, aggregate['timeserie_code'])
@@ -81,16 +84,23 @@ def aggregate_timeserie_value():
 
                     for operation_type in operations_type:
                         items_list = []
-                        items = Receipt.objects.filter(shop=operation_type.shop, dttm__gte=dttm_for_update)
+                        items = Receipt.objects.filter(
+                            shop=operation_type.shop, dttm__gte=dttm_for_update, data_type=data_type)
                         for item in items:
                             item.info = json.loads(item.info)
 
                             # Пропускаем записи, которые не удовл. значениям в фильтре
                             if aggr_filters and not all(item.info.get(k) == v for k, v in aggr_filters.items()):
                                 continue
+
+                            value = 0
+                            if 'timeserie_value' in aggregate:
+                                value = float(item.info.get(aggregate['timeserie_value'], 0))  # fixme: то ли ошибку лучше кидать, то ли пропускать (0 ставить)
+                            elif 'timeserie_value_complex' in aggregate:
+                                value = '_'.join(item.info.get(field_name) for field_name in aggregate['timeserie_value_complex'])
                             items_list.append({
                                 'dttm': item.dttm,
-                                'value': float(item.info.get(aggregate['timeserie_value'], 0))  # fixme: то ли ошибку лучше кидать, то ли пропускать (0 ставить)
+                                'value': value,
                             })
 
                         item_df = pd.DataFrame(items_list, columns=['dttm', 'value'])
@@ -121,6 +131,8 @@ def aggregate_timeserie_value():
                             periods_data = periods_data.sum()
                         elif timeserie_action == 'count':
                             periods_data = periods_data.count()
+                        elif timeserie_action == 'nunique':
+                            periods_data = periods_data.nunique()
                         else:
                             raise NotImplementedError(f'timeserie_action {timeserie_action}, timeserie {timeserie}, network {network}')
 

@@ -28,8 +28,8 @@ class Migration(migrations.Migration):
                 ('network', models.ForeignKey(null=True, on_delete=django.db.models.deletion.PROTECT, to='base.Network')),
             ],
             options={
-                'verbose_name': 'Связь с внешними системами',
-                'verbose_name_plural': 'Связи с внешними системами',
+                'verbose_name': 'Внешняя система',
+                'verbose_name_plural': 'Внешние системы',
             },
         ),
         migrations.CreateModel(

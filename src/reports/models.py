@@ -4,7 +4,7 @@ from pytz import timezone
 from django.db.models import Q
 from src.base.models import Employment, User
 from src.reports.registry import ReportRegistryHolder
-from src.base.models_abstract import AbstractActiveNetworkSpecificCodeNamedModel
+from src.base.models_abstract import AbstractActiveNetworkSpecificCodeNamedModel, AbstractModel
 from dateutil.relativedelta import relativedelta
 from django.db import models
 from django.utils.translation import gettext_lazy as _
@@ -25,7 +25,7 @@ class ReportType(AbstractActiveNetworkSpecificCodeNamedModel):
         return f'{self.name} ({self.code}) {self.network}'
 
 
-class ReportConfig(models.Model):
+class Period(AbstractModel):
     ACC_PERIOD_DAY = 'D'
     ACC_PERIOD_MONTH = 'M'
     ACC_PERIOD_QUARTER = 'Q'
@@ -35,6 +35,7 @@ class ReportConfig(models.Model):
     PERIOD_START_TODAY = 'T'
     PERIOD_START_YESTERDAY = 'E'
     PERIOD_START_PREVIOUS_MONTH = 'M'
+    PERIOD_START_CURRENT_MONTH = 'CM'
     PERIOD_START_PREVIOUS_QUARTER = 'Q'
     PERIOD_START_PREVIOUS_HALF_YEAR = 'H'
     PERIOD_START_PREVIOUS_YEAR = 'Y'
@@ -51,50 +52,21 @@ class ReportConfig(models.Model):
         (PERIOD_START_TODAY, _('Today')),
         (PERIOD_START_YESTERDAY, _('Yesterday')),
         (PERIOD_START_PREVIOUS_MONTH, _('End of previous month')),
+        (PERIOD_START_CURRENT_MONTH, _('End of current month')),
         (PERIOD_START_PREVIOUS_QUARTER, _('End of previous quarter')),
         (PERIOD_START_PREVIOUS_HALF_YEAR, _('End of previous half a year')),
         (PERIOD_START_PREVIOUS_YEAR, _('End of previous year')),
     )
-    report_type = models.ForeignKey('reports.ReportType', verbose_name='Тип отчета', on_delete=models.CASCADE)
-    is_active = models.BooleanField(default=True, verbose_name='Активен')
-    cron = models.ForeignKey(
-        CrontabSchedule,
-        verbose_name='Расписание для отправки', on_delete=models.PROTECT,
-    )
-    shops = models.ManyToManyField(
-        'base.Shop', blank=True, verbose_name='Фильтровать по выбранным отделам',
-    )
-    name = models.CharField(max_length=128)
-
+    name = models.CharField(max_length=256, null=True, blank=True)
     count_of_periods = models.IntegerField(default=1, verbose_name='Количество периодов')
-    period = models.CharField(max_length=1, choices=ACCOUNTING_PERIOD_LENGTH_CHOICES, 
-        default=ACC_PERIOD_DAY, verbose_name='Период')
-    period_start = models.CharField(max_length=1, choices=PERIOD_START_CHOICES, 
-        default=PERIOD_START_YESTERDAY, verbose_name='Начало периода')
-    send_by_group_employments_shops = models.BooleanField(default=False, verbose_name='Фильтровать рассылку по магазинам трудоустройств групп')
-
-    users = models.ManyToManyField('base.User', blank=True, verbose_name='Оповещать конкретных пользователей')
-    groups = models.ManyToManyField(
-        'base.Group', blank=True,
-        verbose_name='Оповещать пользователей определенных групп',
-        related_name='+',
-    )
-    email_addresses = models.CharField(
-        max_length=256, null=True, blank=True, verbose_name='E-mail адреса получателей, через запятую')
-    shops_to_notify = models.ManyToManyField(
-        'base.Shop', blank=True, verbose_name='Оповещать по почте магазина', related_name='+',
-    )
-
-    email_text = models.TextField(
-        verbose_name='E-mail текст',
-        null=True, blank=True,
-    )
-    subject = models.CharField(
-        max_length=256, verbose_name='Тема письма',
-    )
+    period = models.CharField(max_length=2, choices=ACCOUNTING_PERIOD_LENGTH_CHOICES,
+                              default=ACC_PERIOD_DAY, verbose_name='Период')
+    period_start = models.CharField(max_length=2, choices=PERIOD_START_CHOICES,
+                                    default=PERIOD_START_YESTERDAY, verbose_name='Начало периода')
 
     def __str__(self):
-        return f'{self.name}, {self.report_type}'
+        return self.name or f'period: {self.get_period_display()} ' \
+               f'period start: {self.get_period_start_display()} count: {self.count_of_periods}'
 
     def get_dates(self, tz='UTC'):
         delta_mapping = {
@@ -118,6 +90,7 @@ class ReportConfig(models.Model):
             self.PERIOD_START_TODAY: lambda dt: dt,
             self.PERIOD_START_YESTERDAY: lambda dt: dt - relativedelta(days=1),
             self.PERIOD_START_PREVIOUS_MONTH: lambda dt: (dt - relativedelta(months=1)) + relativedelta(day=31),
+            self.PERIOD_START_CURRENT_MONTH: lambda dt: dt + relativedelta(day=31),
             self.PERIOD_START_PREVIOUS_QUARTER: lambda dt: date(dt.year if dt.month > 3 else dt.year - 1, 3 * (((dt.month - 1) // 3) or 4), 1) + relativedelta(day=31),
             self.PERIOD_START_PREVIOUS_HALF_YEAR: lambda dt: date(dt.year if dt.month > 6 else dt.year - 1, 12 if dt.month <= 6 else 6, 1) + relativedelta(day=31),
             self.PERIOD_START_PREVIOUS_YEAR: lambda dt: date(dt.year - 1, 12, 31),
@@ -134,6 +107,49 @@ class ReportConfig(models.Model):
         }
         return acc_period_mapping.get(self.period, 1)
 
+
+class ReportConfig(models.Model):
+    report_type = models.ForeignKey('reports.ReportType', verbose_name='Тип отчета', on_delete=models.CASCADE)
+    is_active = models.BooleanField(default=True, verbose_name='Активен')
+    cron = models.ForeignKey(
+        CrontabSchedule,
+        verbose_name='Расписание для отправки', on_delete=models.PROTECT,
+    )
+    shops = models.ManyToManyField(
+        'base.Shop', blank=True, verbose_name='Фильтровать по выбранным отделам',
+    )
+    name = models.CharField(max_length=128)
+    period = models.ForeignKey('reports.Period', on_delete=models.PROTECT)
+    send_by_group_employments_shops = models.BooleanField(default=False, verbose_name='Фильтровать рассылку по магазинам трудоустройств групп')
+
+    users = models.ManyToManyField('base.User', blank=True, verbose_name='Оповещать конкретных пользователей')
+    groups = models.ManyToManyField(
+        'base.Group', blank=True,
+        verbose_name='Оповещать пользователей определенных групп',
+        related_name='+',
+    )
+    email_addresses = models.CharField(
+        max_length=256, null=True, blank=True, verbose_name='E-mail адреса получателей, через запятую')
+    shops_to_notify = models.ManyToManyField(
+        'base.Shop', blank=True, verbose_name='Оповещать по почте магазина', related_name='+',
+    )
+    email_text = models.TextField(
+        verbose_name='E-mail текст',
+        null=True, blank=True,
+    )
+    subject = models.CharField(
+        max_length=256, verbose_name='Тема письма',
+    )
+
+    def __str__(self):
+        return f'{self.name}, {self.report_type}'
+
+    def get_dates(self, tz='UTC'):
+        return self.period.get_dates(tz=tz)
+
+    def get_acc_period(self):
+        return self.period.get_acc_period()
+
     def get_file(self, context: dict):
         report_cls = ReportRegistryHolder.get_registry().get(self.report_type.code)
         if report_cls:
@@ -143,7 +159,6 @@ class ReportConfig(models.Model):
             ).get_file()
         else:
             return None
-
 
     def get_recipients(self):
         """
@@ -172,11 +187,3 @@ class ReportConfig(models.Model):
             )
     
         return recipients
-
-    def __str__(self):
-        return '{}, {} получателей{}'.format(
-            self.report_type.name,
-            self.shops_to_notify.count() + self.users.count()\
-            + (len(self.email_addresses.split(',')) if self.email_addresses else 0),
-            f', расписание {self.cron}',
-        )
