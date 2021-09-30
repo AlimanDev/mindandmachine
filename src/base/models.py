@@ -1689,3 +1689,46 @@ class ShopSchedule(AbstractModel):
                 dt__lte=dt_str,
             )
         return super(ShopSchedule, self).save(*args, **kwargs)
+
+
+class ApiLog(AbstractModel):
+    """
+    Лог api.
+    Необходим для того,
+     чтобы пользователи системы (поддержка, админы, разработчики и т.д.)
+     могли посмотреть лог получения данных по интеграции.
+
+    Настраивается с помощью добавления настроек в Network.settings_values, например:
+    {
+        ...
+        "api_log_settings": {
+            "delete_gap_days": 90,  # чистить лог старше 90 дней
+            "log_funcs": {
+                "Employment": {  # функция, которую надо логировать (то же самое что в FunctionGroup.FUNCS_TUPLE)
+                    "by_code": true,  # логируются только запросы по интеграции
+                    "http_methods": ['POST'],  # какие http методы логировать
+                    "save_response_codes": [400],  # сохранять ответ при опред. кодах. Полезно для дебага.
+                }
+            }
+        }
+        ...
+    }
+    """
+    user = models.ForeignKey('base.User', on_delete=models.CASCADE)
+    view_func = models.CharField(max_length=256)
+    http_method = models.CharField(max_length=32)
+    url_kwargs = models.TextField(blank=True)
+    request_datetime = models.DateTimeField(auto_now_add=True)
+    query_params = models.TextField(blank=True)
+    request_path = models.CharField(max_length=128)
+    request_data = models.TextField(blank=True)
+    response_ms = models.PositiveIntegerField()
+    response_datetime = models.DateTimeField(null=True, blank=True)
+    response_body = models.TextField(blank=True)
+    response_status_code = models.PositiveSmallIntegerField(null=True, blank=True)
+    error_traceback = models.TextField(blank=True)
+
+    class Meta:
+        index_together = (
+            ('view_func', 'http_method'),
+        )

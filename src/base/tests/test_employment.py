@@ -6,7 +6,7 @@ from django.db import transaction
 from django.utils import timezone
 from rest_framework.test import APITestCase
 
-from src.base.models import WorkerPosition, Employment, Break
+from src.base.models import WorkerPosition, Employment, Break, ApiLog
 from src.celery.tasks import delete_inactive_employment_groups
 from src.timetable.models import WorkTypeName, EmploymentWorkType, WorkerDay
 from src.timetable.tests.factories import WorkerDayFactory
@@ -135,6 +135,17 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
         ).first().norm_work_hours, 123.0)
 
     def test_put_by_code(self):
+        self.network.set_settings_value("api_log_settings", {
+            "delete_gap_days": 90,
+            "log_funcs": {
+                "Employment": {
+                    "by_code": True,
+                    "http_methods": ['POST', 'PUT'],
+                    "save_response_codes": [400],
+                }
+            }
+        })
+
         self.shop2.code = str(self.shop2.id)
         self.shop2.save()
         self.user2.username = f'u-{self.user2.id}'
@@ -198,6 +209,8 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
         e.refresh_from_db(fields=['shop', 'employee'])
         self.assertEqual(e.shop.id, self.shop3.id)
         self.assertEqual(e.employee.tabel_code, self.employee2.tabel_code)  # cant change tabel_code for existing employment
+        
+        self.assertEqual(ApiLog.objects.count(), 3)
 
     def test_auto_timetable(self):
         Employment.objects.all().update(auto_timetable=True)

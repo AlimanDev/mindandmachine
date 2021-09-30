@@ -5,21 +5,7 @@ from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 
 from src.util.drf.exceptions import NotImplementedAPIException
-
-
-class GetObjectByCodeMixin:
-    get_object_field = 'code'
-
-    def get_object(self):
-        if self.request.method == 'GET':
-            by_code = self.request.query_params.get('by_code', False)
-        else:
-            by_code = self.request.data.get('by_code', False)
-        if by_code:
-            self.lookup_field = self.get_object_field
-            self.kwargs[self.get_object_field] = self.kwargs['pk']
-        self.request.by_code = by_code
-        return super().get_object()
+from .mixins import GetObjectByCodeMixin, ApiLogMixin
 
 
 class BatchUpdateOrCreateOptionsSerializer(serializers.Serializer):
@@ -97,7 +83,7 @@ class BatchUpdateOrCreateViewMixin:
         return Response(res)
 
 
-class BaseModelViewSet(BatchUpdateOrCreateViewMixin, ModelViewSet):
+class BaseModelViewSet(ApiLogMixin, BatchUpdateOrCreateViewMixin, ModelViewSet):
     http_method_names = ['get', 'post', 'put', 'delete']
 
 

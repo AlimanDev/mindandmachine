@@ -304,6 +304,7 @@ add_logger('mda_integration', extra_handlers=['mail_admins'])
 add_logger('algo_set_timetable', level='DEBUG' if DEBUG else 'INFO')
 add_logger('import_jobs', extra_handlers=['mail_admins'])
 add_logger('export_jobs', extra_handlers=['mail_admins'])
+add_logger('api_log', extra_handlers=['mail_admins'])
 
 # LOGGING USAGE:
 # import logging

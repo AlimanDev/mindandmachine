@@ -46,9 +46,10 @@ from src.base.models import (
     ShopSchedule,
     Employee,
     NetworkConnect,
+    ApiLog,
 )
 from src.timetable.models import GroupWorkerDayPermission
-from src.recognition.admin import RelatedOnlyDropdownNameOrderedFilter
+from src.recognition.admin import RelatedOnlyDropdownNameOrderedFilter, RelatedOnlyDropdownLastNameOrderedFilter
 
 
 class FunctionGroupResource(resources.ModelResource):
@@ -449,3 +450,25 @@ class ShopScheduleAdmin(admin.ModelAdmin):
     def save_model(self, request, obj, form, change):
         obj.modified_by = request.user
         obj.save(recalc_wdays=True)
+
+
+@admin.register(ApiLog)
+class ApiLogAdmin(admin.ModelAdmin):
+    list_display = (
+        'view_func',
+        'http_method',
+        'url_kwargs',
+        'request_datetime',
+        'user',
+        'response_ms',
+        'response_status_code',
+    )
+    list_filter = (
+        'view_func',
+        'http_method',
+        ('user', RelatedOnlyDropdownLastNameOrderedFilter),
+        'response_status_code',
+    )
+    search_fields = ('url_kwargs',)
+    raw_id_fields = ('user',)
+    list_select_related = ('user',)
