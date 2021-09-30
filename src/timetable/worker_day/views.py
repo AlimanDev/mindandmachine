@@ -810,7 +810,7 @@ class WorkerDayViewSet(BaseModelViewSet):
         result = result['text']
         if status_code == 200:
             vacancy = WorkerDay.objects.get(pk=pk)
-            work_type = vacancy.work_types.first()
+            work_types = list(vacancy.work_types.all().values_list('work_type_name__name', flat=True))
             event_signal.send(
                 sender=None,
                 network_id=vacancy.shop.network_id,
@@ -823,7 +823,7 @@ class WorkerDayViewSet(BaseModelViewSet):
                         'first_name': request.user.first_name,
                     },
                     'dt': str(vacancy.dt),
-                    'work_type': work_type.work_type_name.name if work_type else 'Без типа работ',
+                    'work_types': work_types,
                     'shop_id': vacancy.shop_id,
                 },
             )

@@ -520,7 +520,7 @@ class NotificationSerializer(serializers.ModelSerializer):
         message = Message(lang=lang)
         if event.type == 'vacancy':
             details = event.worker_day
-            params = {'details': details, 'dt': details.dt, 'shop': event.shop, 'domain': settings.DOMAIN}
+            params = {'details': details, 'dt': details.dt, 'shop': event.shop, 'domain': settings.EXTERNAL_HOST}
         else:
             params = event.params
         return message.get_message(event.type, params)

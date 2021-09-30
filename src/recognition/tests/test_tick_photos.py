@@ -37,6 +37,7 @@ class TestTickPhotos(TestsHelperMixin, APITestCase):
 
     def test_check_duplicate(self):
         subject = 'Дублирование биометрии'
+        self.maxDiff = None
         event_email_notification = EventEmailNotification.objects.create(
             event_type=self.duplicate_biometrics_event,
             subject=subject,
@@ -47,8 +48,10 @@ class TestTickPhotos(TestsHelperMixin, APITestCase):
             with override_settings(CELERY_TASK_ALWAYS_EAGER=True):
                 check_duplicate_biometrics(None, self.user3, shop_id=self.shop2.id)
         self.assertEqual(len(mail.outbox), 1)
-        body = f'Здравствуйте, {self.user2.first_name}!\n\nОдинаковые биометрические параметры сотрудников.\n' +\
-        f'Первый сотрудник: {self.user3.last_name} {self.user3.first_name}\nТабельный номер: {self.employee3.tabel_code}\nОтдел: {self.shop.name}\nСсылка на биошаблон: {settings.EXTERNAL_HOST}/_i/media/photo/3\n' +\
-        f'Второй сотрудник: {self.user1.last_name} {self.user1.first_name}\nТабельный номер: {self.employee1.tabel_code}\nОтдел: {self.root_shop.name}\nСсылка на биошаблон: {settings.EXTERNAL_HOST}/_i/media/photo/1' +\
-        '\n\nПисьмо отправлено роботом.'
-        self.assertEqual(mail.outbox[0].body, body)
+        self.assertEqual(
+            mail.outbox[0].body,
+            f'Здравствуйте, {self.user2.first_name}!\n\n\n\n\n\n\n\n\n\n\nОдинаковые биометрические параметры сотрудников.\n\n\n\n\n\n\n'
+            f'ФИО\n\n\n{self.user3.last_name} {self.user3.first_name}\n\n\n{self.user1.last_name} {self.user1.first_name}\n\n\n\n\n'
+            f'Табельный номер\n\n\n{self.employee3.tabel_code}\n\n\n{self.employee1.tabel_code}\n\n\n\n\nПодразделение\n\n\n{self.shop.name}\n\n\n{self.root_shop.name}\n\n\n\n\n'
+            f'Ссылка на биошаблон\n\n\nбиошаблон\n\n\nбиошаблон\n\n\n\n\n\n\n\n\n\n\n\nПисьмо отправлено роботом. Подробности можно узнать по ссылке'
+        )

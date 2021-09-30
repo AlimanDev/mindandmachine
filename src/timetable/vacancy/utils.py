@@ -393,7 +393,7 @@ def do_shift_elongation(vacancy, max_working_hours):
             message = f'Это автоматическое уведомление для {worker_day.shop.name} об изменениях в графике:\n\n' + \
                     f'У сотрудника {candidate.user.last_name} {candidate.user.first_name} изменено время работы. ' +\
                     f'Новое время работы с {wd.dttm_work_start} до {wd.dttm_work_end}, дата {wd.dt}.\n\n' +\
-                    f'Посмотреть детали можно по ссылке: http://{settings.DOMAIN}'
+                    f'Посмотреть детали можно по ссылке: http://{settings.EXTERNAL_HOST}'
             msg = EmailMultiAlternatives(
                 subject='Изменение в графике выхода сотрудников',
                 body=message,
@@ -1147,7 +1147,7 @@ def workers_exchange():
                             f'К Вам был переведён сотрудник {user.last_name} {user.first_name}, ' + \
                             f'на тип работы {work_type.work_type_name.name}, на {vacancy.dttm_work_start.time()}-{vacancy.dttm_work_end.time()}, ' + \
                             f'из магазина {shop_from.name} ({shop_from.address}), дата {vacancy.dt}.\n\n' + \
-                            'Посмотреть детали можно по ссылке: http://{settings.DOMAIN}'
+                            'Посмотреть детали можно по ссылке: http://{settings.EXTERNAL_HOST}'
                             msg = EmailMultiAlternatives(
                                 subject='Изменение в графике выхода сотрудников',
                                 body=message,
@@ -1160,7 +1160,7 @@ def workers_exchange():
                                 f'От Вас был переведён сотрудник {user.last_name} {user.first_name}, ' + \
                                 f'на тип работы {work_type.work_type_name.name}, на {vacancy.dttm_work_start.time()}-{vacancy.dttm_work_end.time()}, ' + \
                                 f'в магазин {shop_to.name} ({shop_from.address}), дата {vacancy.dt}.\n\n' + \
-                                'Посмотреть детали можно по ссылке: http://{settings.DOMAIN}'
+                                'Посмотреть детали можно по ссылке: http://{settings.EXTERNAL_HOST}'
                             msg = EmailMultiAlternatives(
                                 subject='Изменение в графике выхода сотрудников',
                                 body=message,

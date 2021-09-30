@@ -1,3 +1,14 @@
-{% block greeting %}<h3>Здравствуйте{% if recipient %}, {{ recipient.first_name }}{% endif %}!</h3>{% endblock %}
-{% block content %}{% endblock %}
-{% block footer %}<p>Письмо отправлено роботом.</p>{% endblock %}
+{% block greeting %}<h3>Здравствуйте{% if recipient %}, {{ recipient.first_name }}{% endif %}!</h3>
+<div
+    style='border-top-color:#d4d5d6;border-top-style:solid;border-top-width:1px;margin:20px 0 5px 0;padding:8px 0 8px 0'>
+</div>{% endblock %}
+<table style="border:0;border-collapse:collapse;width:100%">
+    <tbody>
+        <tr>
+            <td style="background:#f0f0f0;padding:12px 16px 12px 16px">{% block content %}{% endblock %}</td>
+        </tr>
+    </tbody>
+</table>
+{% block footer %}<div
+    style='border-top-color:#d4d5d6;border-top-style:solid;border-top-width:1px;color:#777777;font-family:sans-serif;font-size:11px;margin:20px 0 20px 0;padding:8px 0 8px 0'>
+    Письмо отправлено роботом. Подробности можно узнать по <a href="{{ host }}">ссылке</a></div>{% endblock %}

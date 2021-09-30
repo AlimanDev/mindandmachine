@@ -1,6 +1,6 @@
 {% extends 'notifications/email/base.html' %}
 
 {% block content %}
-<p>График в магазине {{ shop.name }} подтвержден.</p>
-<p>Даты подтверждения: с {{ dt_from }} по {{ dt_to }}.</p>
+<p style="font-size:15px">График в подразделении <b>{{ shop.name }}</b> подтвержден.</p>
+<p style="font-size:15px">Даты подтверждения: с <b>{{ dt_from }}</b> по <b>{{ dt_to }}</b>.</p>
 {% endblock %}
