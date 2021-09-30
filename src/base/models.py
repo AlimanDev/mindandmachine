@@ -1702,7 +1702,7 @@ class ApiLog(AbstractModel):
     {
         ...
         "api_log_settings": {
-            "delete_gap_days": 90,  # чистить лог старше 90 дней
+            "delete_gap": 60,  # можно переопределить сколько дней хранить лог (по умолчанию 90 в API_LOG_DELETE_GAP)
             "log_funcs": {
                 "Employment": {  # функция, которую надо логировать (то же самое что в FunctionGroup.FUNCS_TUPLE)
                     "by_code": true,  # логируются только запросы по интеграции
@@ -1732,3 +1732,10 @@ class ApiLog(AbstractModel):
         index_together = (
             ('view_func', 'http_method'),
         )
+
+    @classmethod
+    def clean_log(cls, network_id, delete_gap):
+        cls.objects.filter(
+            user__network_id=network_id,
+            request_datetime__gte=timezone.now() - datetime.timedelta(days=delete_gap),
+        ).delete()

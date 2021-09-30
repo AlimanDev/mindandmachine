@@ -1,5 +1,8 @@
-from rest_framework.test import APITestCase
 from datetime import date
+
+from freezegun import freeze_time
+from rest_framework.test import APITestCase
+
 from src.base.models import (
     User,
     Shop,
@@ -162,3 +165,40 @@ class TestApiLog(TestsHelperMixin, APITestCase):
         self.assertEqual(employment.dt_hired, date(2021, 1, 10))
 
         self.assertEqual(ApiLog.objects.count(), 4)  # все еще 4, запрос без by_code не должен записаться
+
+    def test_clean_old_api_log(self):
+        username = "НМ00-123456"
+        user_data = {
+                "first_name": " Иван",
+                "last_name": " Иванов",
+                "middle_name": "Иванович",
+                "birthday": "2000-07-20",
+                "username": username,
+                "auth_type": "local",
+                "by_code": True,
+            }
+        with freeze_time('2021-06-15'):
+            response = self.client.put(
+                path=self.get_url('User-detail', pk=username),
+                data=self.dump_data(user_data),
+                content_type='application/json',
+            )
+        self.assertEqual(response.status_code, 201)
+        user = User.objects.filter(username=username).first()
+        self.assertIsNotNone(user)
+        self.assertEqual(ApiLog.objects.count(), 1)
+
+        user_data['middle_name'] = 'Иванович2'
+        with freeze_time('2021-08-15'):
+            response = self.client.put(
+                path=self.get_url('User-detail', pk=username),
+                data=self.dump_data(user_data),
+                content_type='application/json',
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(ApiLog.objects.count(), 2)
+
+        with freeze_time('2021-09-30'):
+            ApiLog.clean_log(network_id=self.api_employee.user.network_id, delete_gap=60)
+        self.assertEqual(ApiLog.objects.count(), 1)
