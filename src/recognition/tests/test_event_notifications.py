@@ -802,12 +802,12 @@ class TestEmployeeNotCheckedEventNotifications(TestsHelperMixin, APITestCase):
             self.assertEqual(
                 mail.outbox[0].body,
                 f'Здравствуйте, {self.user_dir.first_name}!\n\n\n\n\n\n\nСотрудник {self.user_worker.last_name} {self.user_worker.first_name} не отметился на приход.\n\n'
-                f'Время начала смены: {dttm}.\n\n\n\n\n\n\nПисьмо отправлено роботом. Подробности можно узнать по ссылке'
+                f'Время начала смены: {dttm}.\n\nПодразделение: {self.shop.name}.\n\n\n\n\n\n\nПисьмо отправлено роботом. Подробности можно узнать по ссылке'
             )
             self.assertEqual(
                 mail.outbox[1].body, 
                 f'Здравствуйте, {self.user_dir.first_name}!\n\n\n\n\n\n\nСотрудник {self.user_dir.last_name} {self.user_dir.first_name} не отметился на уход.\n\n'
-                f'Время окончания смены: {dttm}.\n\n\n\n\n\n\nПисьмо отправлено роботом. Подробности можно узнать по ссылке'
+                f'Время окончания смены: {dttm}.\n\nПодразделение: {self.shop.name}.\n\n\n\n\n\n\nПисьмо отправлено роботом. Подробности можно узнать по ссылке'
             )
 
     
@@ -843,7 +843,7 @@ class TestEmployeeNotCheckedEventNotifications(TestsHelperMixin, APITestCase):
             self.assertEqual(
                 mail.outbox[0].body, 
                 f'Здравствуйте, {self.user_dir.first_name}!\n\n\n\n\n\n\nСотрудник {self.user_worker.last_name} {self.user_worker.first_name} не отметился на приход.\n\n'
-                f'Время начала смены: {dttm}.\n\n\n\n\n\n\nПисьмо отправлено роботом. Подробности можно узнать по ссылке'
+                f'Время начала смены: {dttm}.\n\nПодразделение: {self.shop.name}.\n\n\n\n\n\n\nПисьмо отправлено роботом. Подробности можно узнать по ссылке'
             )
 
     def test_employee_not_checked_notification_sent_custom_deltas(self):
@@ -884,7 +884,7 @@ class TestEmployeeNotCheckedEventNotifications(TestsHelperMixin, APITestCase):
             self.assertEqual(
                 mail.outbox[0].body, 
                 f'Здравствуйте, {self.user_dir.first_name}!\n\n\n\n\n\n\nСотрудник {self.user_worker.last_name} {self.user_worker.first_name} не отметился на приход.\n\n'
-                f'Время начала смены: {dttm}.\n\n\n\n\n\n\nПисьмо отправлено роботом. Подробности можно узнать по ссылке'
+                f'Время начала смены: {dttm}.\n\nПодразделение: {self.shop.name}.\n\n\n\n\n\n\nПисьмо отправлено роботом. Подробности можно узнать по ссылке'
             )
 
 
@@ -974,5 +974,5 @@ class TestEmployeeWorkingNotAccordingToPlanEventNotifications(TestsHelperMixin, 
             self.assertEqual(
                 mail.outbox[0].body,
                 f'Здравствуйте, {self.user_dir.first_name}!\n\n\n\n\n\n\nСотрудник {self.user_worker.last_name} {self.user_worker.first_name} вышел не по плану.\n'
-                f'Время: {dttm}\n\n\n\n\n\nПисьмо отправлено роботом. Подробности можно узнать по ссылке'
+                f'Время: {dttm}\nПодразделение: {self.shop.name}\n\n\n\n\n\nПисьмо отправлено роботом. Подробности можно узнать по ссылке'
             )

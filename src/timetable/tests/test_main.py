@@ -3623,7 +3623,7 @@ class TestVacancy(TestsHelperMixin, APITestCase):
         self.assertEqual(
             mail.outbox[0].body,
             f'Здравствуйте, {self.user1.first_name}!\n\n\n\n\n\n\nСотрудник {self.user2.last_name} {self.user2.first_name} откликнулся на вакансию с типом работ {self.work_type1.work_type_name.name}\n'
-            f'Дата: {self.vacancy2.dt}\n\n\n\n\n\nПисьмо отправлено роботом. Подробности можно узнать по ссылке'
+            f'Дата: {self.vacancy2.dt}\nПодразделение: {self.shop.name}\n\n\n\n\n\nПисьмо отправлено роботом. Подробности можно узнать по ссылке'
         )
 
         self.assertFalse(WorkerDay.objects.filter(id=pawd.id).exists())
