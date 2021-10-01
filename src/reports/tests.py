@@ -171,6 +171,7 @@ class TestReportConfig(APITestCase):
         }
         self.assertEquals(data, dates)
 
+
 class TestPivotTabelReportNotifications(TestsHelperMixin, APITestCase):
     @classmethod
     def setUpTestData(cls):
