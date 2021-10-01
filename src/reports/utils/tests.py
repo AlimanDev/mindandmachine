@@ -1,3 +1,8 @@
+from django.db.models.aggregates import Sum
+from django.db.models.fields import FloatField
+from django.db.models.functions.comparison import Coalesce
+from django.db.models.query_utils import Q
+from src.reports.helpers import RoundWithPlaces
 from src.reports.utils.pivot_tabel import PlanAndFactPivotTabel
 from src.util.dg.helpers import MONTH_NAMES
 from dateutil.relativedelta import relativedelta
@@ -10,7 +15,7 @@ from src.reports.utils.unaccounted_overtime import get_unaccounted_overtimes, un
 from src.util.test import create_departments_and_users
 import pandas as pd
 from datetime import date, datetime, time, timedelta
-from src.timetable.models import WorkerDay, AttendanceRecords
+from src.timetable.models import PlanAndFactHours, ProdCal, WorkerDay, AttendanceRecords
 from django.test import override_settings
 
 
@@ -504,25 +509,65 @@ class TestOvertimesUndertimes(APITestCase):
         self.assertEquals(len(df.columns[6:]), period_step * 5)
         return df
 
+    def _get_norm_for_month(self, date):
+        return ProdCal.objects.filter(
+            dt__month=date.month,
+            dt__year=date.year,
+        ).exclude(
+            dt__in=ProductionDay.objects.filter(dt__month=date.month, is_celebration=True).values_list('dt', flat=True)
+        ).values('dt').distinct().aggregate(
+            plan=Coalesce(
+                RoundWithPlaces(
+                    Sum(
+                        'norm_hours',
+                        output_field=FloatField(),
+                    ), 
+                    1,
+                ),
+                0
+            ),
+        )['plan']
+
+    def _get_norm_for_period(self, dt_from, dt_to):
+        return ProdCal.objects.filter(
+            dt__gte=dt_from,
+            dt__lte=dt_to,
+        ).exclude(
+            dt__in=ProductionDay.objects.filter(dt__gte=dt_from, dt__lte=dt_to, is_celebration=True).values_list('dt', flat=True)
+        ).values('dt').distinct().aggregate(
+            plan=Coalesce(
+                RoundWithPlaces(
+                    Sum(
+                        'norm_hours',
+                        output_field=FloatField(),
+                    ), 
+                    1,
+                ),
+                0
+            ),
+        )['plan']
+
     def test_overtimes_undertimes(self):
         data = self._test_accounting_period(3)
+        plan_sum = self._get_norm_for_period(*self.network.get_acc_period_range(date.today()))
+        plan = self._get_norm_for_month(date.today())
         self.assertCountEqual(data['employees'], Employee.objects.all())
         self.assertEquals(data['data'][self.employee1.id]['plan_sum'], 5.5)
         self.assertEquals(data['data'][self.employee1.id]['fact_sum'], 5.5)
-        self.assertEquals(data['data'][self.employee1.id]['norm_sum'], 528.0)
-        self.assertEquals(data['data'][self.employee1.id][date.today().month], {'plan': 5.5, 'fact': 5.5, 'norm': 176.0, 'fact_celebration': 0.0, 'norm_celebration': 0.0})
+        self.assertEquals(data['data'][self.employee1.id]['norm_sum'], plan_sum)
+        self.assertEquals(data['data'][self.employee1.id][date.today().month], {'plan': 5.5, 'fact': 5.5, 'norm': plan, 'fact_celebration': 0.0, 'norm_celebration': 0.0})
         self.assertEquals(data['data'][self.employee2.id]['plan_sum'], 10.8)
         self.assertEquals(data['data'][self.employee2.id]['fact_sum'], 13.8)
-        self.assertEquals(data['data'][self.employee2.id]['norm_sum'], 528.0)
-        self.assertEquals(data['data'][self.employee2.id][date.today().month], {'plan': 10.8, 'fact': 13.8, 'norm': 176.0, 'fact_celebration': 0.0, 'norm_celebration': 0.0})
+        self.assertEquals(data['data'][self.employee2.id]['norm_sum'], plan_sum)
+        self.assertEquals(data['data'][self.employee2.id][date.today().month], {'plan': 10.8, 'fact': 13.8, 'norm': plan, 'fact_celebration': 0.0, 'norm_celebration': 0.0})
         self.assertEquals(data['data'][self.employee3.id]['plan_sum'], 10.8)
         self.assertEquals(data['data'][self.employee3.id]['fact_sum'], 10.8)
-        self.assertEquals(data['data'][self.employee3.id]['norm_sum'], 528.0)
-        self.assertEquals(data['data'][self.employee3.id][date.today().month], {'plan': 10.8, 'fact': 10.8, 'norm': 176.0, 'fact_celebration': 0.0, 'norm_celebration': 0.0})
+        self.assertEquals(data['data'][self.employee3.id]['norm_sum'], plan_sum)
+        self.assertEquals(data['data'][self.employee3.id][date.today().month], {'plan': 10.8, 'fact': 10.8, 'norm': plan, 'fact_celebration': 0.0, 'norm_celebration': 0.0})
         self.assertEquals(data['data'][self.employee4.id]['plan_sum'], 10.8)
         self.assertEquals(data['data'][self.employee4.id]['fact_sum'], 12.3)
-        self.assertEquals(data['data'][self.employee4.id]['norm_sum'], 528.0)
-        self.assertEquals(data['data'][self.employee4.id][date.today().month], {'plan': 10.8, 'fact': 12.3, 'norm': 176.0, 'fact_celebration': 0.0, 'norm_celebration': 0.0})
+        self.assertEquals(data['data'][self.employee4.id]['norm_sum'], plan_sum)
+        self.assertEquals(data['data'][self.employee4.id][date.today().month], {'plan': 10.8, 'fact': 12.3, 'norm': plan, 'fact_celebration': 0.0, 'norm_celebration': 0.0})
         self._test_accounting_period(1)
         self._test_accounting_period(6)
         self._test_accounting_period(12)
@@ -549,6 +594,9 @@ class TestOvertimesUndertimes(APITestCase):
     def test_overtimes_undertimes_xlsx(self):
         self.maxDiff = None
         data = self._test_accounting_period_xlsx(1)
+        self.network.accounting_period_length = 1
+        plan_sum = self._get_norm_for_period(*self.network.get_acc_period_range(date.today()))
+        plan = self._get_norm_for_month(date.today())
         assert_data = [
             {
                 'ФИО': '', 
@@ -566,52 +614,52 @@ class TestOvertimesUndertimes(APITestCase):
             {
                 'ФИО': 'Васнецов Иван', 
                 'Табельный номер': '', 
-                'Норма за учетный период': 176.0, 
+                'Норма за учетный период': plan_sum, 
                 f'Отработано на сегодня ({date.today().strftime("%d.%m.%Y")})': 5.5, 
-                f'Всего переработки/недоработки ({date.today().strftime("%d.%m.%Y")})': -170.5, 
+                f'Всего переработки/недоработки ({date.today().strftime("%d.%m.%Y")})': 5.5 - plan, 
                 'Unnamed: 5': '', 
-                'Норма часов': '176.0', 
+                'Норма часов': f'{plan}', 
                 'Отработано часов': '5.5', 
-                'Всего переработки/недоработки': '-170.5', 
+                'Всего переработки/недоработки': f'{5.5 - plan}', 
                 'Переработки/недоработки: отработано часов в праздники': '0.0', 
                 'Плановое количество часов': '5.5'
             }, 
             {
                 'ФИО': 'Иванов Иван2', 
                 'Табельный номер': 'employee2_tabel_code', 
-                'Норма за учетный период': 176.0, 
+                'Норма за учетный период': plan_sum, 
                 f'Отработано на сегодня ({date.today().strftime("%d.%m.%Y")})': 13.8, 
-                f'Всего переработки/недоработки ({date.today().strftime("%d.%m.%Y")})': -162.2, 
+                f'Всего переработки/недоработки ({date.today().strftime("%d.%m.%Y")})': 13.8 - plan, 
                 'Unnamed: 5': '', 
-                'Норма часов': '176.0', 
+                'Норма часов': f'{plan}', 
                 'Отработано часов': '13.8', 
-                'Всего переработки/недоработки': '-162.2', 
+                'Всего переработки/недоработки': f'{13.8 - plan}', 
                 'Переработки/недоработки: отработано часов в праздники': '0.0',
                 'Плановое количество часов': '10.8'
             }, 
             {
                 'ФИО': 'Сидоров Иван3', 
                 'Табельный номер': '', 
-                'Норма за учетный период': 176.0, 
+                'Норма за учетный период': plan_sum, 
                 f'Отработано на сегодня ({date.today().strftime("%d.%m.%Y")})': 10.8, 
-                f'Всего переработки/недоработки ({date.today().strftime("%d.%m.%Y")})': -165.2, 
+                f'Всего переработки/недоработки ({date.today().strftime("%d.%m.%Y")})': 10.8 - plan, 
                 'Unnamed: 5': '', 
-                'Норма часов': '176.0', 
+                'Норма часов': f'{plan}', 
                 'Отработано часов': '10.8', 
-                'Всего переработки/недоработки': '-165.2', 
+                'Всего переработки/недоработки': f'{10.8 - plan}', 
                 'Переработки/недоработки: отработано часов в праздники': '0.0',
                 'Плановое количество часов': '10.8'
             }, 
             {
                 'ФИО': 'Петров Иван4', 
                 'Табельный номер': '', 
-                'Норма за учетный период': 176.0, 
+                'Норма за учетный период': plan_sum, 
                 f'Отработано на сегодня ({date.today().strftime("%d.%m.%Y")})': 12.3, 
-                f'Всего переработки/недоработки ({date.today().strftime("%d.%m.%Y")})': -163.7, 
+                f'Всего переработки/недоработки ({date.today().strftime("%d.%m.%Y")})': 12.3 - plan, 
                 'Unnamed: 5': '', 
-                'Норма часов': '176.0', 
+                'Норма часов': f'{plan}', 
                 'Отработано часов': '12.3', 
-                'Всего переработки/недоработки': '-163.7',
+                'Всего переработки/недоработки': f'{12.3 - plan}',
                 'Переработки/недоработки: отработано часов в праздники': '0.0', 
                 'Плановое количество часов': '10.8'
             }
