@@ -26,7 +26,7 @@ from src.misc import urls as misc_api
 from src.recognition.urls import router as recognition_router
 from src.timetable import urls as timetable_api
 from src.timetable.views import RecalcWhAdminView
-from src.forecast.views import RecalcLoadAdminView
+from src.forecast.views import RecalcLoadAdminView, UploadDemandAdminView
 from src.recognition.views import DownloadViolatorsReportAdminView
 from src.tasks import urls as task_urls
 from src.reports import urls as reports_urls
@@ -51,6 +51,7 @@ urlpatterns = [
     path('api/', include(api_urlpatterns)),
     path('admin/timetable/workerday/recalc_wh/', RecalcWhAdminView.as_view(), name='recalc_wh'),
     path('admin/forecast/loadtemplate/recalc_load/', RecalcLoadAdminView.as_view(), name='recalc_load'),
+    path('admin/forecast/periodclients/upload_demand/', UploadDemandAdminView.as_view(), name='upload_demand'),
     path('admin/recognition/ticks/download_violators/', DownloadViolatorsReportAdminView.as_view(), name='download_violators'),
     path('admin/', admin.site.urls),
     path('rest_api/recognition/', include(recognition_router.get_urls())),

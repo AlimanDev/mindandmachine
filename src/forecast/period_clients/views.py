@@ -5,14 +5,14 @@ from django_filters.rest_framework import FilterSet
 from django_filters import DateFilter, NumberFilter
 from src.util.utils import JsonResponse
 from src.base.permissions import FilteredListPermission
-from src.forecast.models import OperationType, PeriodClients, PeriodDemandChangeLog
+from src.forecast.models import OperationType, OperationTypeName, PeriodClients, PeriodDemandChangeLog
 from django.db.models import Q, F, Sum
 from src.conf.djconfig import QOS_DATETIME_FORMAT, QOS_DATE_FORMAT
 from rest_framework.decorators import action
 from src.base.models import Shop, Employment, FunctionGroup
 from src.util.models_converter import Converter
 from src.forecast.load_template.utils import apply_reverse_formula # чтобы тесты не падали
-from src.forecast.period_clients.utils import upload_demand_util, download_demand_xlsx_util, create_demand
+from src.forecast.period_clients.utils import upload_demand_util, download_demand_xlsx_util, create_demand, upload_demand_util_v3
 from src.util.upload import get_uploaded_file
 import json
 from src.base.views_abstract import BaseModelViewSet
@@ -60,6 +60,10 @@ class UploadSerializer(serializers.Serializer):
     shop_id = serializers.IntegerField()
     file = serializers.FileField()
 
+class UploadDemandSerializer(serializers.Serializer):
+    file = serializers.FileField()
+    operation_type_name_id = serializers.IntegerField()
+    type = serializers.CharField(default='F')
 
 class DownloadSerializer(serializers.Serializer):
     dt_from = serializers.DateField(format=QOS_DATE_FORMAT)
@@ -378,6 +382,21 @@ class PeriodClientsViewSet(BaseModelViewSet):
         data = UploadSerializer(data=request.data)
         data.is_valid(raise_exception=True)
         return upload_demand_util(file, data.validated_data['shop_id'], lang=request.user.lang)
+
+    @swagger_auto_schema(
+        request_body=UploadSerializer, 
+        operation_description='''
+        Загружает нагрузку в систему по нескольким магазинам в файле.\n 
+        Необходимо отправить файл в формате excel в поле file
+        ''',
+        responses={200: 'empty response'}, 
+    )
+    @action(detail=False, methods=['post'])
+    @get_uploaded_file
+    def upload_demand(self, request, file):
+        data = UploadDemandSerializer(data=request.data)
+        data.is_valid(raise_exception=True)
+        return upload_demand_util_v3(OperationTypeName.objects.get(id=data.validated_data['operation_type_name_id']), file, type=data.validated_data['type'])
 
     @swagger_auto_schema(
         query_serializer=DownloadSerializer, 

@@ -1437,6 +1437,7 @@ class FunctionGroup(AbstractModel):
         ('PeriodClients_put', 'Обновить нагрузку (Обновить) (timeserie_value/put/)'),
         ('PeriodClients_delete', 'Удалить нагрузку (Удалить) (timeserie_value/delete/)'),
         ('PeriodClients_upload', 'Загрузить нагрузку (Создать) (timeserie_value/upload/)'),
+        ('PeriodClients_upload_demand', 'Загрузить нагрузку по магазинам (Создать) (timeserie_value/upload_demand/)'),
         ('PeriodClients_download', 'Скачать нагрузку (Получить) (timeserie_value/download/)'),
         ('Receipt', 'Чек (receipt)'),
         ('Reports_pivot_tabel', 'Скачать сводный табель (Получить) (report/pivot_tabel/)'),
