@@ -952,9 +952,9 @@ class WorkersStatsGetter:
                     is_last_month = curr_month == acc_period_dt_to.month
                     if self.network.correct_norm_hours_last_month_acc_period and self.network.accounting_period_length > 1 and is_last_month:
                         acc_period_norm_hours = employee_dict.get(
-                            'plan', {}).get('approved', {}).get('norm_hours', {})['acc_period']
+                            'plan', {}).get('approved', {}).get('norm_hours', {}).get('acc_period', 0)
                         work_hours_prev_months = employee_dict.get(
-                            'plan', {}).get('approved', {}).get('work_hours', {})['prev_months']
+                            'plan', {}).get('approved', {}).get('work_hours', {}).get('prev_months', 0)
                         sawh_hours['curr_month'] = acc_period_norm_hours - work_hours_prev_months
                     else:
                         sawh_hours['curr_month'] = sawh_hours.get('by_months', {}).get(curr_month, 0)

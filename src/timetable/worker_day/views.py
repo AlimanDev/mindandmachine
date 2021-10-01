@@ -670,11 +670,14 @@ class WorkerDayViewSet(BaseModelViewSet):
                 # если план
                 if not serializer.data['is_fact']:
                     # отмечаем, что график подтвержден
-                    ShopMonthStat.objects.filter(
+                    dttm_now = timezone.now()
+                    ShopMonthStat.objects.update_or_create(
                         shop_id=serializer.validated_data['shop_id'],
                         dt=serializer.validated_data['dt_from'].replace(day=1),
-                    ).update(
-                        is_approved=True,
+                        defaults=dict(
+                            dttm_status_change=dttm_now,
+                            is_approved=True,
+                        )
                     )
 
                     if shop.network.run_recalc_fact_from_att_records_on_plan_approve:
