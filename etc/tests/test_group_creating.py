@@ -7,6 +7,7 @@ from src.base.models import (
     Network,
 )
 
+
 class TestCreateGroupFunctions(TestCase):
     @classmethod
     def setUpTestData(self):
