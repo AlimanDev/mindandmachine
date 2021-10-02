@@ -940,7 +940,10 @@ class WorkersStatsGetter:
                             'plan', {}).get('approved', {}).get('norm_hours', {}).get('acc_period', 0)
                         work_hours_prev_months = employee_dict.get(
                             'plan', {}).get('approved', {}).get('work_hours', {}).get('prev_months', 0)
-                        sawh_hours['curr_month'] = acc_period_norm_hours - work_hours_prev_months
+                        sawh_hours['curr_month'] = min(
+                            sawh_hours.get('by_months', {}).get(curr_month, 0),
+                            acc_period_norm_hours - work_hours_prev_months,
+                        )
                     else:
                         sawh_hours['curr_month'] = sawh_hours.get('by_months', {}).get(curr_month, 0)
 
