@@ -697,7 +697,7 @@ class TestSAWHSettingsQuarterAccPeriod(SawhSettingsHelperMixin, TestCase):
 
                 is_work_day = wd_type_id == WorkerDay.TYPE_WORKDAY
                 WorkerDayFactory(
-                    type=wd_type_id,
+                    type_id=wd_type_id,
                     dt=dt,
                     shop=self.shop,
                     employee=self.employee,
