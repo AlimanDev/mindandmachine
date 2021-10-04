@@ -1,5 +1,6 @@
 from django.db.models import F, Q
 from django.db.models.functions import Coalesce
+from django.db import transaction
 from django.middleware.csrf import rotate_token
 from django.utils import timezone
 from django.utils.translation import gettext as _
@@ -172,10 +173,11 @@ class UserViewSet(UpdateorCreateViewSet):
             biometrics_image = self.request.data['file']
             recognition = Recognition()
             try:
-                user.avatar = biometrics_image
-                user.save()
-                partner_id = recognition.create_person({"id": user.id})
-                recognition.upload_photo(partner_id, biometrics_image)
+                with transaction.atomic():
+                    user.avatar = biometrics_image
+                    user.save()
+                    partner_id = recognition.create_person({"id": user.id})
+                    recognition.upload_photo(partner_id, biometrics_image)
             except HTTPError as e:
                 return Response({"detail": str(e)}, e.response.status_code)
 
