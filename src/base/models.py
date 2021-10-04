@@ -6,7 +6,6 @@ from calendar import monthrange
 import pandas as pd
 from celery import chain
 from dateutil.relativedelta import relativedelta
-from django.apps import apps
 from django.conf import settings
 from django.contrib.auth.models import (
     AbstractUser as DjangoAbstractUser,
@@ -34,6 +33,7 @@ from src.base.models_abstract import (
     AbstractCodeNamedModel,
 )
 from src.conf.djconfig import QOS_TIME_FORMAT
+from src.util.mixins.qs import AnnotateValueEqualityQSMixin
 
 
 class Network(AbstractActiveModel):
@@ -175,7 +175,7 @@ class Network(AbstractActiveModel):
         help_text='Используется при разделении табеля на осн. и доп. Т.е. норма за последний месяц уч. периода = '
                   '{норма по произв. календарю за уч. период} - {отработанные часы за прошлые месяцы}.')
     prev_months_work_hours_source = models.PositiveSmallIntegerField(
-        verbose_name='Источник факт. часов за пред. месяцы уч. периода',
+        verbose_name='Источник рабочих часов за пред. месяцы уч. периода',
         choices=PREV_MONTHS_WORK_HOURS_SOURCE_CHOICES, default=WD_FACT_APPROVED)
     outsourcings = models.ManyToManyField(
         'self', through='base.NetworkConnect', through_fields=('client', 'outsourcing'), symmetrical=False, related_name='clients')
@@ -204,6 +204,31 @@ class Network(AbstractActiveModel):
     )
     display_employee_tabs_in_the_schedule = models.BooleanField(
         default=True, verbose_name='Отображать вкладки сотрудников в расписании')
+    max_work_shift_seconds = models.PositiveIntegerField(
+        verbose_name=_('Maximum shift length (in seconds)'), default=3600 * 16)
+    skip_leaving_tick = models.BooleanField(
+        verbose_name=_('Skip the creation of a departure mark if more than '
+                       'the Maximum shift length has passed since the opening of the previous shift'),
+        default=False,
+    )
+    max_plan_diff_in_seconds = models.PositiveIntegerField(
+        verbose_name=_('Max difference between the start or end time to "pull" to the planned work day'),
+        default=3600 * 5,
+    )
+    allow_creation_several_wdays_for_one_employee_for_one_date = models.BooleanField(
+        default=False, verbose_name='Разрешить создание нескольких рабочих дней для 1 сотрудника на 1 дату')
+    run_recalc_fact_from_att_records_on_plan_approve = models.BooleanField(
+        default=False, verbose_name='Запускать пересчет факта на основе отметок при подтверждении плана',
+    )
+    edit_manual_fact_on_recalc_fact_from_att_records = models.BooleanField(
+        default=False,
+        verbose_name='Изменять ручные корректировки при пересчете факта на основе отметок (при подтверждения плана)',
+    )
+    set_closest_plan_approved_delta_for_manual_fact = models.PositiveIntegerField(
+        verbose_name='Макс. разница времени начала и времени окончания в факте и в плане '
+                     'при проставлении ближайшего плана в ручной факт (в секундах)',
+        default=60 * 70,
+    )
 
     DEFAULT_NIGHT_EDGES = (
         '22:00:00',
@@ -269,6 +294,8 @@ class NetworkConnect(AbstractActiveModel):
 
     client = models.ForeignKey(Network, related_name='outsourcing_connections', on_delete=models.PROTECT)
     outsourcing = models.ForeignKey(Network, related_name='outsourcing_clients', on_delete=models.PROTECT)
+    allow_assign_employements_from_outsource = models.BooleanField(default=False, verbose_name='Разрешить назначать сотрудников из аутсорс сетей')
+    allow_choose_shop_from_client_for_employement = models.BooleanField(default=False, verbose_name='Разрешить выбирать магазин для сотрудника из сети клиента')
 
 
 class Region(AbstractActiveNetworkSpecificCodeNamedModel):
@@ -449,9 +476,8 @@ class Shop(MPTTModel, AbstractActiveNetworkSpecificCodeNamedModel):
         fields=['tm_open_dict', 'tm_close_dict', 'load_template', 'latitude', 'longitude', 'fias_code', 'director_id'])
 
     def __str__(self):
-        return '{}, {}, {}, {}'.format(
+        return '{}, {}, {}'.format(
             self.name,
-            self.parent_title(),
             self.id,
             self.code,
         )
@@ -824,7 +850,7 @@ class EmploymentManager(models.Manager):
             q &= extra_q
         return self.filter(q, **kwargs)
 
-    def get_active_empl_by_priority(
+    def get_active_empl_by_priority(  # TODO: переделать, чтобы можно было в 1 запросе получать активные эмплойменты для пар (сотрудник, даты)?
             self, network_id=None, dt=None, priority_shop_id=None, priority_employment_id=None,
             priority_work_type_id=None, priority_by_visible=True, extra_q=None, **kwargs):
         qs = self.get_active(network_id=network_id, dt_from=dt, dt_to=dt, extra_q=extra_q, **kwargs)
@@ -857,7 +883,6 @@ class EmploymentManager(models.Manager):
         return qs.order_by(*order_by)
 
 
-
 class Group(AbstractActiveNetworkSpecificCodeNamedModel):
     class Meta(AbstractActiveNetworkSpecificCodeNamedModel.Meta):
         verbose_name = 'Группа пользователей'
@@ -874,7 +899,8 @@ class Group(AbstractActiveNetworkSpecificCodeNamedModel):
         return '{}, {}, {}'.format(
             self.id,
             self.name,
-            self.subordinates.all() if self.subordinates.all() else ''
+            self.code,
+            # ', '.join(list(self.subordinates.values_list('name', flat=True)))
         )
 
 
@@ -1158,13 +1184,7 @@ class WorkerPosition(AbstractActiveNetworkSpecificCodeNamedModel):
         return None
 
 
-class EmploymentQuerySet(QuerySet):
-    def annotate_value_equality(self, annotate_name, field_name, value):
-        return self.annotate(**{annotate_name: Case(
-            When(**{field_name: value}, then=True),
-            default=False, output_field=models.BooleanField()
-        )})
-
+class EmploymentQuerySet(AnnotateValueEqualityQSMixin, QuerySet):
     def last_hired(self):
         last_hired_subq = self.filter(user_id=OuterRef('user_id')).order_by('-dt_hired').values('id')[:1]
         return self.filter(
@@ -1344,7 +1364,7 @@ class Employment(AbstractActiveModel):
                         employment_id=self.id,
                         is_fact=False,
                         dt__gt=dt,
-                        type__in=WorkerDay.TYPES_WITH_TM_RANGE,
+                        type__is_dayoff=False,
                     ):
                 wd.save()
 
@@ -1359,7 +1379,7 @@ class Employment(AbstractActiveModel):
             }
             if is_new:
                 kwargs['filter_kwargs'] = {
-                    'type': WorkerDay.TYPE_WORKDAY,
+                    'type__is_dayoff': False,
                     'employee_id': self.employee_id,
                 }
                 if self.dt_hired:
@@ -1373,7 +1393,7 @@ class Employment(AbstractActiveModel):
                 else:
                     dt__gte = self.dt_hired
                 kwargs['filter_kwargs'] = {
-                    'type': WorkerDay.TYPE_WORKDAY,
+                    'type__is_dayoff': False,
                     'employee_id': self.employee_id,
                     'dt__gte': Converter.convert_date(dt__gte),
                 }
@@ -1484,6 +1504,8 @@ class FunctionGroup(AbstractModel):
         ('WorkerDay_generate_upload_example', 'Скачать шаблон графика (Получить) (worker_day/generate_upload_example/)'),
         ('WorkerDay_recalc', 'Пересчитать часы (Создать) (worker_day/recalc/)'),
         ('WorkerDay_overtimes_undertimes_report', 'Скачать отчет о переработках/недоработках (Получить) (worker_day/overtimes_undertimes_report/)'),
+        ('WorkerDay_batch_update_or_create', 'Массовое создание/обновление дней сотрудников (Создать/Обновить) (worker_day/batch_update_or_create/)'),
+        ('WorkerDayType', 'Тип дня сотрудника (worker_day_type)'),
         ('WorkerPosition', 'Должность (worker_position)'),
         ('WorkTypeName', 'Название типа работ (work_type_name)'),
         ('WorkType', 'Тип работ ()work_type'),
@@ -1667,3 +1689,53 @@ class ShopSchedule(AbstractModel):
                 dt__lte=dt_str,
             )
         return super(ShopSchedule, self).save(*args, **kwargs)
+
+
+class ApiLog(AbstractModel):
+    """
+    Лог api.
+    Необходим для того,
+     чтобы пользователи системы (поддержка, админы, разработчики и т.д.)
+     могли посмотреть лог получения данных по интеграции.
+
+    Настраивается с помощью добавления настроек в Network.settings_values, например:
+    {
+        ...
+        "api_log_settings": {
+            "delete_gap": 60,  # можно переопределить сколько дней хранить лог (по умолчанию 90 в API_LOG_DELETE_GAP)
+            "log_funcs": {
+                "Employment": {  # функция, которую надо логировать (то же самое что в FunctionGroup.FUNCS_TUPLE)
+                    "by_code": true,  # логируются только запросы по интеграции
+                    "http_methods": ['POST'],  # какие http методы логировать
+                    "save_response_codes": [400],  # сохранять ответ при опред. кодах. Полезно для дебага.
+                }
+            }
+        }
+        ...
+    }
+    """
+    user = models.ForeignKey('base.User', on_delete=models.CASCADE)
+    view_func = models.CharField(max_length=256)
+    http_method = models.CharField(max_length=32)
+    url_kwargs = models.TextField(blank=True)
+    request_datetime = models.DateTimeField(auto_now_add=True)
+    query_params = models.TextField(blank=True)
+    request_path = models.CharField(max_length=128)
+    request_data = models.TextField(blank=True)
+    response_ms = models.PositiveIntegerField()
+    response_datetime = models.DateTimeField(null=True, blank=True)
+    response_body = models.TextField(blank=True)
+    response_status_code = models.PositiveSmallIntegerField(null=True, blank=True)
+    error_traceback = models.TextField(blank=True)
+
+    class Meta:
+        index_together = (
+            ('view_func', 'http_method'),
+        )
+
+    @classmethod
+    def clean_log(cls, network_id, delete_gap):
+        cls.objects.filter(
+            user__network_id=network_id,
+            request_datetime__gte=timezone.now() - datetime.timedelta(days=delete_gap),
+        ).delete()

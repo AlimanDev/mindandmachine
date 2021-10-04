@@ -1,13 +1,61 @@
 {% extends 'notifications/email/base.html' %}
 
 {% block content %}
-<p>Одинаковые биометрические параметры сотрудников.</p>
-<p>Первый сотрудник: {{fio1}}</p>
-<p>Табельный номер: {{tabel_code1}}</p>
-<p>Отдел: {{shop1}}</p>
-<p>Ссылка на биошаблон: {{url1}}</p>
-<p>Второй сотрудник: {{fio2}}</p>
-<p>Табельный номер: {{tabel_code2}}</p>
-<p>Отдел: {{shop2}}</p>
-<p>Ссылка на биошаблон: {{url2}}</p>
+<table style="border:0;border-collapse:collapse;width:100%">
+    <tbody>
+        <tr>
+            <td style="padding:0;vertical-align:top;">
+                <h3>Одинаковые биометрические параметры сотрудников.</h3>
+            </td>
+        </tr>
+        <table style="border:0;border-collapse:collapse;width:100%">
+            <tbody>
+                <tr>
+                    <td style="padding:0;vertical-align:top;font-size: 15px;">
+                        <p>ФИО</p>
+                    </td>
+                    <td style="padding:0;vertical-align:top;font-size: 15px;text-align: center;">
+                        <p>{{fio1}}</p>
+                    </td>
+                    <td style="padding:0;vertical-align:top;font-size: 15px;text-align: center;">
+                        <p>{{fio2}}</p>
+                    </td>
+                </tr>
+                <tr>
+                    <td style="padding:0;vertical-align:top;font-size: 15px;">
+                        <p>Табельный номер</p>
+                    </td>
+                    <td style="padding:0;vertical-align:top;font-size: 15px;text-align: center;">
+                        <p>{{tabel_code1}}</p>
+                    </td>
+                    <td style="padding:0;vertical-align:top;font-size: 15px;text-align: center;">
+                        <p>{{tabel_code2}}</p>
+                    </td>
+                </tr>
+                <tr>
+                    <td style="padding:0;vertical-align:top;font-size: 15px;">
+                        <p>Подразделение</p>
+                    </td>
+                    <td style="padding:0;vertical-align:top;font-size: 15px;text-align: center;">
+                        <p>{{shop1}}</p>
+                    </td>
+                    <td style="padding:0;vertical-align:top;font-size: 15px;text-align: center;">
+                        <p>{{shop2}}</p>
+                    </td>
+                </tr>
+                <tr>
+                    <td style="padding:0;vertical-align:top;font-size: 15px;">
+                        <p>Ссылка на биошаблон</p>
+                    </td>
+                    <td style="padding:0;vertical-align:top;font-size: 15px;text-align: center;">
+                        <a href="{{url1}}">биошаблон</a>
+                    </td>
+                    <td style="padding:0;vertical-align:top;font-size: 15px;text-align: center;">
+                        <a href="{{url2}}">биошаблон</a>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </tbody>
+</table>
 {% endblock %}

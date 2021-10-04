@@ -1,12 +1,14 @@
 from django.db import models
 from django.utils import timezone
 
+from src.util.mixins.bulk_update_or_create import BatchUpdateOrCreateModelMixin
+
 
 class AbstractModelManager(models.Manager):
     pass
 
 
-class AbstractModel(models.Model):
+class AbstractModel(BatchUpdateOrCreateModelMixin, models.Model):
     """
     Базовая абстрактная модель. От нее должны быть наследованы все сущности (модели)
 
@@ -121,6 +123,6 @@ class AbstractActiveNetworkSpecificCodeNamedModel(AbstractActiveModel, AbstractC
     class Meta:
         abstract = True
         unique_together = (('code', 'network'),)
-        ordering = ['name',]
+        ordering = ['name', ]
 
     objects = AbstractActiveNetworkSpecificCodeNamedModelManager()

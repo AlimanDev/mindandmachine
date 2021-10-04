@@ -32,7 +32,7 @@ class TestCleanWdays(TestsHelperMixin, TestCase):
             employee=self.employee,
             shop=self.shop,
             employment=empl,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
         )
 
         clean_wdays_helper = CleanWdaysHelper(only_logging=False)
@@ -58,7 +58,7 @@ class TestCleanWdays(TestsHelperMixin, TestCase):
             employee=self.employee,
             shop=self.shop,
             employment=inactive_empl,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
         )
 
         clean_wdays_helper = CleanWdaysHelper(only_logging=False)
@@ -86,7 +86,7 @@ class TestCleanWdays(TestsHelperMixin, TestCase):
             employee=self.employee,
             shop=self.shop,
             employment=inactive_empl,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             is_vacancy=False,
         )
 
@@ -115,7 +115,7 @@ class TestCleanWdays(TestsHelperMixin, TestCase):
             employee=self.employee,
             shop=self.shop,
             employment=inactive_empl,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             is_vacancy=True,
         )
 
@@ -140,7 +140,7 @@ class TestCleanWdays(TestsHelperMixin, TestCase):
     #         employee=self.employee,
     #         shop=self.shop,
     #         employment=active_empl_in_other_shop,
-    #         type=WorkerDay.TYPE_HOLIDAY,
+    #         type_id=WorkerDay.TYPE_HOLIDAY,
     #         is_vacancy=True,
     #     )
     #
@@ -167,7 +167,7 @@ class TestCleanWdays(TestsHelperMixin, TestCase):
             employee=self.employee,
             shop=self.shop,
             employment=empl,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
         )
 
         clean_wdays_helper = CleanWdaysHelper(only_logging=False)

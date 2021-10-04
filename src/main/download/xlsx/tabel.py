@@ -11,59 +11,6 @@ import json
 
 
 class Tabel_xlsx(Xlsx_base):
-    # (font; background)
-    WORKERDAY_TYPE_COLORS = {
-        WorkerDay.TYPE_WORKDAY: (COLOR_BLACK, COLOR_WHITE),
-        WorkerDay.TYPE_BUSINESS_TRIP: (COLOR_RED, COLOR_WHITE),
-        WorkerDay.TYPE_HOLIDAY: (COLOR_BLACK, COLOR_GREEN),
-        WorkerDay.TYPE_HOLIDAY_WORK: (COLOR_BLACK, COLOR_GREEN),
-        WorkerDay.TYPE_ABSENSE: (COLOR_BLACK, COLOR_YELLOW2),
-        WorkerDay.TYPE_REAL_ABSENCE: (COLOR_BLACK, COLOR_RED),
-        WorkerDay.TYPE_SICK: (COLOR_BLACK, COLOR_1),
-        WorkerDay.TYPE_VACATION: (COLOR_BLACK, COLOR_BLUE),
-        WorkerDay.TYPE_EXTRA_VACATION: (COLOR_RED, COLOR_BLUE),
-        WorkerDay.TYPE_STUDY_VACATION: (COLOR_BLACK, COLOR_DARK_BLUE),
-        WorkerDay.TYPE_SELF_VACATION: (COLOR_BLACK, COLOR_BLUE2),
-        WorkerDay.TYPE_SELF_VACATION_TRUE: (COLOR_BLACK, COLOR_LITE_GREEN),
-        WorkerDay.TYPE_GOVERNMENT: (COLOR_BLACK, COLOR_PINK3),
-        WorkerDay.TYPE_MATERNITY: (COLOR_BLACK, COLOR_YELLOW3),
-        WorkerDay.TYPE_MATERNITY_CARE: (COLOR_BLACK, COLOR_PURPLE),
-        WorkerDay.TYPE_DONOR_OR_CARE_FOR_DISABLED_PEOPLE: (COLOR_BLACK, COLOR_GREEN2),
-        WorkerDay.TYPE_ETC: (COLOR_GREY, COLOR_GREY),
-        WorkerDay.TYPE_EMPTY: (COLOR_GREY, COLOR_GREY),
-        WorkerDay.TYPE_QUALIFICATION: (COLOR_GREY, COLOR_GREY),
-
-        'night_work': (COLOR_BLACK, COLOR_PINK2),
-
-    }
-
-    WORKERDAY_TYPE_VALUE = {
-        WorkerDay.TYPE_BUSINESS_TRIP: 'К',
-        WorkerDay.TYPE_HOLIDAY: 'В',
-        WorkerDay.TYPE_ABSENSE: 'Н',
-        WorkerDay.TYPE_REAL_ABSENCE: 'ПР',
-        WorkerDay.TYPE_QUALIFICATION: 'КВ',
-        WorkerDay.TYPE_SICK: 'Б',
-        WorkerDay.TYPE_VACATION: 'ОТ',
-        WorkerDay.TYPE_EXTRA_VACATION: 'ОД',
-        WorkerDay.TYPE_STUDY_VACATION: 'У',
-        WorkerDay.TYPE_SELF_VACATION: 'ДО',
-        WorkerDay.TYPE_SELF_VACATION_TRUE: 'ОЗ',
-        WorkerDay.TYPE_GOVERNMENT: 'Г',
-        # WorkerDay.TYPE_MATERNITY: 'Р',
-        WorkerDay.TYPE_MATERNITY: 'ОЖ',
-        WorkerDay.TYPE_MATERNITY_CARE: 'Р',
-        WorkerDay.TYPE_DONOR_OR_CARE_FOR_DISABLED_PEOPLE: 'ОВ',
-        WorkerDay.TYPE_ETC: '',
-        WorkerDay.TYPE_EMPTY: '',
-    }
-
-    WORKERDAY_TYPE_CHANGE2HOLIDAY = [
-        WorkerDay.TYPE_MATERNITY,
-        WorkerDay.TYPE_MATERNITY_CARE,
-        WorkerDay.TYPE_DONOR_OR_CARE_FOR_DISABLED_PEOPLE
-    ]
-
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.day_type = {
@@ -72,6 +19,51 @@ class Tabel_xlsx(Xlsx_base):
             'bold': True,
             'align': 'center',
             'border': 1,
+        }
+
+        # (font; background)
+        self.WORKERDAY_TYPE_COLORS = {
+            WorkerDay.TYPE_WORKDAY: (COLOR_BLACK, COLOR_WHITE),
+            WorkerDay.TYPE_BUSINESS_TRIP: (COLOR_RED, COLOR_WHITE),
+            WorkerDay.TYPE_HOLIDAY: (COLOR_BLACK, COLOR_GREEN),
+            WorkerDay.TYPE_HOLIDAY_WORK: (COLOR_BLACK, COLOR_GREEN),
+            WorkerDay.TYPE_ABSENSE: (COLOR_BLACK, COLOR_YELLOW2),
+            WorkerDay.TYPE_REAL_ABSENCE: (COLOR_BLACK, COLOR_RED),
+            WorkerDay.TYPE_SICK: (COLOR_BLACK, COLOR_1),
+            WorkerDay.TYPE_VACATION: (COLOR_BLACK, COLOR_BLUE),
+            WorkerDay.TYPE_EXTRA_VACATION: (COLOR_RED, COLOR_BLUE),
+            WorkerDay.TYPE_STUDY_VACATION: (COLOR_BLACK, COLOR_DARK_BLUE),
+            WorkerDay.TYPE_SELF_VACATION: (COLOR_BLACK, COLOR_BLUE2),
+            WorkerDay.TYPE_SELF_VACATION_TRUE: (COLOR_BLACK, COLOR_LITE_GREEN),
+            WorkerDay.TYPE_GOVERNMENT: (COLOR_BLACK, COLOR_PINK3),
+            WorkerDay.TYPE_MATERNITY: (COLOR_BLACK, COLOR_YELLOW3),
+            WorkerDay.TYPE_MATERNITY_CARE: (COLOR_BLACK, COLOR_PURPLE),
+            WorkerDay.TYPE_DONOR_OR_CARE_FOR_DISABLED_PEOPLE: (COLOR_BLACK, COLOR_GREEN2),
+            WorkerDay.TYPE_ETC: (COLOR_GREY, COLOR_GREY),
+            WorkerDay.TYPE_EMPTY: (COLOR_GREY, COLOR_GREY),
+            WorkerDay.TYPE_QUALIFICATION: (COLOR_GREY, COLOR_GREY),
+
+            'night_work': (COLOR_BLACK, COLOR_PINK2),
+        }
+        self.WORKERDAY_TYPE_VALUE = {
+            WorkerDay.TYPE_BUSINESS_TRIP: 'К',
+            WorkerDay.TYPE_HOLIDAY: 'В',
+            WorkerDay.TYPE_ABSENSE: 'Н',
+            WorkerDay.TYPE_REAL_ABSENCE: 'ПР',
+            WorkerDay.TYPE_QUALIFICATION: 'КВ',
+            WorkerDay.TYPE_SICK: 'Б',
+            WorkerDay.TYPE_VACATION: 'ОТ',
+            WorkerDay.TYPE_EXTRA_VACATION: 'ОД',
+            WorkerDay.TYPE_STUDY_VACATION: 'У',
+            WorkerDay.TYPE_SELF_VACATION: 'ДО',
+            WorkerDay.TYPE_SELF_VACATION_TRUE: 'ОЗ',
+            WorkerDay.TYPE_GOVERNMENT: 'Г',
+            # WorkerDay.TYPE_MATERNITY: 'Р',
+            WorkerDay.TYPE_MATERNITY: 'ОЖ',
+            WorkerDay.TYPE_MATERNITY_CARE: 'Р',
+            WorkerDay.TYPE_DONOR_OR_CARE_FOR_DISABLED_PEOPLE: 'ОВ',
+            WorkerDay.TYPE_ETC: '',
+            WorkerDay.TYPE_EMPTY: '',
         }
 
     def format_cells(self, users_len):
@@ -334,11 +326,6 @@ class Tabel_xlsx(Xlsx_base):
                     elif wd.type == WorkerDay.TYPE_HOLIDAY_WORK:
                         total_h = ceil(self._time2hours(wd.dttm_work_start.time(), wd.dttm_work_end.time(), triplets))
                         text = 'В{}'.format(total_h)
-
-                    elif (wd.type in self.WORKERDAY_TYPE_CHANGE2HOLIDAY) \
-                            and (self.prod_days[day].type == ProductionDay.TYPE_HOLIDAY):
-                        wd.type = WorkerDay.TYPE_HOLIDAY
-                        text = self.WORKERDAY_TYPE_VALUE[wd.type]
 
                     else:
                         text = self.WORKERDAY_TYPE_VALUE[wd.type]

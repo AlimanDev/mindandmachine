@@ -16,15 +16,16 @@ class Xlsx_base:
         'сб',
     ]
 
-    def __init__(self, workbook, shop, dt, worksheet=None, prod_days=None):
+    def __init__(self, workbook, shop, dt, worksheet=None, prod_days=None, on_print=False):
         self.workbook = workbook
+        self.on_print = on_print
 
         self.worksheet = None
         if worksheet:
             self.worksheet = worksheet
 
         self.default_text_settings = {
-            'font_size': 10,
+            'font_size': 10 if not self.on_print else 6,
             'font_name': 'Arial',
             'align': 'center',
             'valign': 'vcenter',
@@ -69,7 +70,7 @@ class Xlsx_base:
         """
 
         text_dict = {
-            'font_size': 11,
+            'font_size': 11 if not self.on_print else 8,
             'font_name': 'Arial',
             'bold': True,
             'align': 'center',
@@ -102,7 +103,7 @@ class Xlsx_base:
             if format == '%w':
                 self.worksheet.write_string(row, col + i,
                                             self.WEEKDAY_TRANSLATION[int(item.dt.strftime(format))], text_type)
-                self.worksheet.set_column(col + i, col + i, 9.57)
+                self.worksheet.set_column(col + i, col + i, 15 if not self.on_print else 6.5)
             else:
                 cell_str = item.dt.strftime(format)
                 cell_str = int(cell_str) if xlsx_format==int else cell_str
@@ -113,9 +114,9 @@ class Xlsx_base:
             'border': 1,
             'bg_color': COLOR_GREY
         })
-        while i < 31:
-            self.worksheet.write_string(row, col + i, '', text_type)
-            i += 1
+        # while i < 31:
+        #     self.worksheet.write_string(row, col + i, '', text_type)
+        #     i += 1
 
     def construnts_users_info(self, employments, row, col, ordered_columns, extra_row=False):
         """
@@ -130,6 +131,7 @@ class Xlsx_base:
 
         format_s = dict(self.default_text_settings)
         format_s['border'] = 1
+        format_s['text_wrap'] = True
         text_format = self.workbook.add_format(format_s)
         format_s['num_format'] = 'dd.mm.yyyy'
         date_format = self.workbook.add_format(format_s)

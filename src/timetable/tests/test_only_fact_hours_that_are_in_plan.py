@@ -52,21 +52,21 @@ class TestOnlyFactHoursThatInApprovedPlan(TestsHelperMixin, APITestCase):
             employee=self.employee,
             employment=self.employment,
             shop=self.shop,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dttm_work_start=datetime.combine(self.dt, time(8, 0, 0)),
             dttm_work_end=datetime.combine(self.dt, time(20, 0, 0)),
         )
         self.assertEqual(fact_approved.work_hours.total_seconds(), 0)
 
     def test_crop_fact_approved_work_hours_by_plan_approved(self):
-        WorkerDayFactory(
+        plan_approved = WorkerDayFactory(
             is_fact=False,
             is_approved=True,
             dt=self.dt,
             employee=self.employee,
             employment=self.employment,
             shop=self.shop,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dttm_work_start=datetime.combine(self.dt, time(9, 0, 0)),
             dttm_work_end=datetime.combine(self.dt, time(20, 0, 0)),
         )
@@ -77,21 +77,73 @@ class TestOnlyFactHoursThatInApprovedPlan(TestsHelperMixin, APITestCase):
             employee=self.employee,
             employment=self.employment,
             shop=self.shop,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dttm_work_start=datetime.combine(self.dt, time(8, 35, 0)),
             dttm_work_end=datetime.combine(self.dt, time(20, 25, 0)),
+            closest_plan_approved=plan_approved,
         )
         self.assertEqual(fact_approved.work_hours.total_seconds(), 10 * 3600)
 
-    def test_crop_fact_not_approved_work_hours_by_plan_approved(self):
-        WorkerDayFactory(
+    def test_crop_fact_approved_work_hours_by_plan_approved_with_multiple_wdays_on_one_date(self):
+        plan_approved = WorkerDayFactory(
             is_fact=False,
             is_approved=True,
             dt=self.dt,
             employee=self.employee,
             employment=self.employment,
             shop=self.shop,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
+            dttm_work_start=datetime.combine(self.dt, time(9, 0, 0)),
+            dttm_work_end=datetime.combine(self.dt, time(14, 0, 0)),
+        )
+        fact_approved = WorkerDayFactory(
+            is_fact=True,
+            is_approved=True,
+            dt=self.dt,
+            employee=self.employee,
+            employment=self.employment,
+            shop=self.shop,
+            type_id=WorkerDay.TYPE_WORKDAY,
+            dttm_work_start=datetime.combine(self.dt, time(8, 35, 0)),
+            dttm_work_end=datetime.combine(self.dt, time(14, 25, 0)),
+            closest_plan_approved=plan_approved,
+        )
+        self.assertEqual(fact_approved.work_hours.total_seconds(), 4 * 3600)
+
+        plan_approved2 = WorkerDayFactory(
+            is_fact=False,
+            is_approved=True,
+            dt=self.dt,
+            employee=self.employee,
+            employment=self.employment,
+            shop=self.shop,
+            type_id=WorkerDay.TYPE_WORKDAY,
+            dttm_work_start=datetime.combine(self.dt, time(18, 0, 0)),
+            dttm_work_end=datetime.combine(self.dt, time(22, 0, 0)),
+        )
+        fact_approved2 = WorkerDayFactory(
+            is_fact=True,
+            is_approved=True,
+            dt=self.dt,
+            employee=self.employee,
+            employment=self.employment,
+            shop=self.shop,
+            type_id=WorkerDay.TYPE_WORKDAY,
+            dttm_work_start=datetime.combine(self.dt, time(17, 35, 0)),
+            dttm_work_end=datetime.combine(self.dt, time(22, 24, 0)),
+            closest_plan_approved=plan_approved2,
+        )
+        self.assertEqual(fact_approved2.work_hours.total_seconds(), 3 * 3600)
+
+    def test_crop_fact_not_approved_work_hours_by_plan_approved(self):
+        plan_approved = WorkerDayFactory(
+            is_fact=False,
+            is_approved=True,
+            dt=self.dt,
+            employee=self.employee,
+            employment=self.employment,
+            shop=self.shop,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dttm_work_start=datetime.combine(self.dt, time(9, 0, 0)),
             dttm_work_end=datetime.combine(self.dt, time(20, 0, 0)),
         )
@@ -102,11 +154,63 @@ class TestOnlyFactHoursThatInApprovedPlan(TestsHelperMixin, APITestCase):
             employee=self.employee,
             employment=self.employment,
             shop=self.shop,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dttm_work_start=datetime.combine(self.dt, time(8, 35, 0)),
             dttm_work_end=datetime.combine(self.dt, time(20, 25, 0)),
+            closest_plan_approved=plan_approved,
         )
         self.assertEqual(fact_not_approved.work_hours.total_seconds(), 10 * 3600)
+
+    def test_crop_fact_not_approved_work_hours_by_plan_approved_with_multiple_wdays_on_one_date(self):
+        plan_approved = WorkerDayFactory(
+            is_fact=False,
+            is_approved=True,
+            dt=self.dt,
+            employee=self.employee,
+            employment=self.employment,
+            shop=self.shop,
+            type_id=WorkerDay.TYPE_WORKDAY,
+            dttm_work_start=datetime.combine(self.dt, time(9, 0, 0)),
+            dttm_work_end=datetime.combine(self.dt, time(14, 0, 0)),
+        )
+        fact_not_approved = WorkerDayFactory(
+            is_fact=True,
+            is_approved=False,
+            dt=self.dt,
+            employee=self.employee,
+            employment=self.employment,
+            shop=self.shop,
+            type_id=WorkerDay.TYPE_WORKDAY,
+            dttm_work_start=datetime.combine(self.dt, time(8, 35, 0)),
+            dttm_work_end=datetime.combine(self.dt, time(14, 25, 0)),
+            closest_plan_approved=plan_approved,
+        )
+        self.assertEqual(fact_not_approved.work_hours.total_seconds(), 4 * 3600)
+
+        plan_approved2 = WorkerDayFactory(
+            is_fact=False,
+            is_approved=True,
+            dt=self.dt,
+            employee=self.employee,
+            employment=self.employment,
+            shop=self.shop,
+            type_id=WorkerDay.TYPE_WORKDAY,
+            dttm_work_start=datetime.combine(self.dt, time(18, 0, 0)),
+            dttm_work_end=datetime.combine(self.dt, time(22, 0, 0)),
+        )
+        fact_not_approved2 = WorkerDayFactory(
+            is_fact=True,
+            is_approved=False,
+            dt=self.dt,
+            employee=self.employee,
+            employment=self.employment,
+            shop=self.shop,
+            type_id=WorkerDay.TYPE_WORKDAY,
+            dttm_work_start=datetime.combine(self.dt, time(17, 35, 0)),
+            dttm_work_end=datetime.combine(self.dt, time(22, 24, 0)),
+            closest_plan_approved=plan_approved2,
+        )
+        self.assertEqual(fact_not_approved2.work_hours.total_seconds(), 3 * 3600)
 
     def test_crop_fact_approved_work_hours_by_plan_approved_created_after_fact(self):
         fact_approved = WorkerDayFactory(
@@ -116,22 +220,24 @@ class TestOnlyFactHoursThatInApprovedPlan(TestsHelperMixin, APITestCase):
             employee=self.employee,
             employment=self.employment,
             shop=self.shop,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dttm_work_start=datetime.combine(self.dt, time(8, 35, 0)),
             dttm_work_end=datetime.combine(self.dt, time(20, 25, 0)),
         )
-        WorkerDayFactory(
+        plan_approved = WorkerDayFactory(
             is_fact=False,
             is_approved=True,
             dt=self.dt,
             employee=self.employee,
             employment=self.employment,
             shop=self.shop,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dttm_work_start=datetime.combine(self.dt, time(9, 0, 0)),
             dttm_work_end=datetime.combine(self.dt, time(20, 0, 0)),
         )
         fact_approved.refresh_from_db(fields=('work_hours',))
+        fact_approved.closest_plan_approved = plan_approved
+        fact_approved.save()
         self.assertEqual(fact_approved.work_hours.total_seconds(), 10 * 3600)
 
     def test_facts_work_hours_recalculated_on_plan_change(self):
@@ -142,7 +248,7 @@ class TestOnlyFactHoursThatInApprovedPlan(TestsHelperMixin, APITestCase):
             employee=self.employee,
             employment=self.employment,
             shop=self.shop,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dttm_work_start=datetime.combine(self.dt, time(9, 0, 0)),
             dttm_work_end=datetime.combine(self.dt, time(20, 0, 0)),
         )
@@ -154,9 +260,10 @@ class TestOnlyFactHoursThatInApprovedPlan(TestsHelperMixin, APITestCase):
             employee=self.employee,
             employment=self.employment,
             shop=self.shop,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dttm_work_start=datetime.combine(self.dt, time(8, 35, 0)),
             dttm_work_end=datetime.combine(self.dt, time(20, 25, 0)),
+            closest_plan_approved=plan_approved,
         )
         self.assertEqual(fact_approved.work_hours.total_seconds(), 10 * 3600)
 
@@ -167,9 +274,10 @@ class TestOnlyFactHoursThatInApprovedPlan(TestsHelperMixin, APITestCase):
             employee=self.employee,
             employment=self.employment,
             shop=self.shop,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dttm_work_start=datetime.combine(self.dt, time(9, 00, 0)),
             dttm_work_end=datetime.combine(self.dt, time(19, 00, 0)),
+            closest_plan_approved=plan_approved,
         )
         self.assertEqual(fact_not_approved.work_hours.total_seconds(), 9 * 3600)
 
@@ -192,7 +300,7 @@ class TestOnlyFactHoursThatInApprovedPlan(TestsHelperMixin, APITestCase):
             is_fact=False,
             is_approved=True,
             shop=self.shop,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dt=self.dt,
             dttm_work_start=datetime.combine(self.dt, time(12)),
             dttm_work_end=datetime.combine(self.dt, time(18)),
@@ -203,10 +311,11 @@ class TestOnlyFactHoursThatInApprovedPlan(TestsHelperMixin, APITestCase):
             is_fact=True,
             is_approved=True,
             shop=self.shop,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dt=self.dt,
             dttm_work_start=datetime.combine(self.dt, time(13, 2)),
             dttm_work_end=datetime.combine(self.dt, time(19, 4)),
+            closest_plan_approved=wd_plan,
         )
         self.assertGreaterEqual(wd_plan.work_hours, wd_fact.work_hours)
         work_hours = ((wd_fact.dttm_work_end_tabel - wd_fact.dttm_work_start_tabel).total_seconds() / 60) - 72
@@ -219,7 +328,7 @@ class TestOnlyFactHoursThatInApprovedPlan(TestsHelperMixin, APITestCase):
             is_fact=False,
             is_approved=True,
             shop=self.shop,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dt=self.dt,
             dttm_work_start=datetime.combine(self.dt, time(13, 30)),
             dttm_work_end=datetime.combine(self.dt, time(13, 35)),

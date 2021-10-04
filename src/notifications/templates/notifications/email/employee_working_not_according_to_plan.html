@@ -1,5 +1,7 @@
 {% extends 'notifications/email/base.html' %}
 
 {% block content %}
-<p>Сотрудник {{ user.last_name }} {{ user.first_name }} вышел не по плану в {{ dttm }}.</p>
+<p style="font-size:15px">Сотрудник <b>{{ user.last_name }} {{ user.first_name }}</b> вышел не по плану.</p>
+<p style="font-size:15px">Время: <b>{{ dttm }}</b></p>
+<p style="font-size:15px">Подразделение: <b>{{ shop.name }}</b></p>
 {% endblock %}

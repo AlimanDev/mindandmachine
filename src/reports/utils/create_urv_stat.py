@@ -42,7 +42,7 @@ def urv_stat_v1(dt_from, dt_to, title=None, shop_codes=None, shop_ids=None, comm
             dt__gte=dt_from,
             dt__lte=dt_to,
             shop__network_id=network_id,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             is_approved=True,
             is_fact=False,
         ).values_list('shop_id', flat=True),
@@ -114,7 +114,7 @@ def urv_stat_v1(dt_from, dt_to, title=None, shop_codes=None, shop_ids=None, comm
                 shop=shop, 
                 dt=date,
                 employee_id__in=employee_ids,
-                wd_type=WorkerDay.TYPE_WORKDAY,
+                wd_type_id=WorkerDay.TYPE_WORKDAY,
             ).aggregate(
                 plan_ticks=Sum('ticks_plan_count'),
                 fact_comming_ticks=Sum('ticks_comming_fact_count'),

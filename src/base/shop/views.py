@@ -93,6 +93,7 @@ class ShopViewSet(UpdateorCreateViewSet):
         user = self.request.user
         only_top = self.request.query_params.get('only_top')
         include_clients = self.request.query_params.get('include_clients')
+        include_possible_clients = self.request.query_params.get('include_possible_clients')
         include_outsources = self.request.query_params.get('include_outsources')
 
         # aa: fixme: refactor code
@@ -102,17 +103,16 @@ class ShopViewSet(UpdateorCreateViewSet):
         # shops = Shop.objects.filter(id__in=employments.values('shop_id'))
         # if not only_top:
         #     shops = Shop.objects.get_queryset_descendants(shops, include_self=True)
-        shops = Shop.objects.all()
-        if include_clients:
-            clients = NetworkConnect.objects.filter(outsourcing_id=user.network_id).values_list('client_id', flat=True)
-            shops = shops.filter(Q(network_id__in=clients) | Q(network_id=user.network_id))
-        if include_outsources:
-            outsources = NetworkConnect.objects.filter(client_id=user.network_id).values_list('outsourcing_id', flat=True)
-            shops = shops.filter(Q(network_id__in=outsources) | Q(network_id=user.network_id))
-        if not (include_outsources or include_clients):
-            shops = shops.filter(network_id=user.network_id)
+        shops_filter = Q(network_id=user.network_id)
+        if include_possible_clients:
+            shops_filter |= Q(network_id__in=NetworkConnect.objects.filter(outsourcing_id=user.network_id, allow_choose_shop_from_client_for_employement=True).values_list('client_id', flat=True))
+        else:
+            if include_clients:
+                shops_filter |= Q(network_id__in=NetworkConnect.objects.filter(outsourcing_id=user.network_id).values_list('client_id', flat=True))
+            if include_outsources:
+                shops_filter |= Q(network_id__in=NetworkConnect.objects.filter(client_id=user.network_id).values_list('outsourcing_id', flat=True))
 
-        return shops.order_by('level', 'name')
+        return Shop.objects.filter(shops_filter).order_by('level', 'name')
 
     @action(detail=False, methods=['get'], serializer_class=ShopStatSerializer)#, permission_classes=[IsAdminOrIsSelf])
     def stat(self, request):

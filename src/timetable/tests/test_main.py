@@ -1,12 +1,12 @@
 import json
+import time as time_module
 import uuid
 from datetime import timedelta, time, datetime, date
 from unittest import mock
-from django.db import transaction
 
 from dateutil.relativedelta import relativedelta
 from django.core import mail
-from django.db import transaction
+from django.db import transaction, IntegrityError
 from django.test import override_settings
 from django.urls import reverse
 from django.utils.timezone import now
@@ -15,7 +15,6 @@ from rest_framework.test import APITestCase
 
 from src.base.models import (
     Break,
-    FunctionGroup,
     Network,
     Employment,
     Region,
@@ -40,7 +39,7 @@ from src.timetable.models import (
     GroupWorkerDayPermission,
     EmploymentWorkType,
 )
-from src.timetable.tests.factories import WorkerDayFactory
+from src.timetable.tests.factories import WorkerDayFactory, WorkerDayTypeFactory
 from src.util.mixins.tests import TestsHelperMixin
 from src.util.models_converter import Converter
 from src.util.test import create_departments_and_users
@@ -75,7 +74,7 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
             employment=self.employment2,
             dt=self.dt,
             is_fact=False,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dttm_work_start=datetime.combine(self.dt, time(8, 0, 0)),
             dttm_work_end=datetime.combine(self.dt, time(20, 0, 0)),
             is_approved=True,
@@ -86,7 +85,7 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
             employment=self.employment2,
             dt=self.dt,
             is_fact=False,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dttm_work_start=datetime.combine(self.dt, time(8, 0, 0)),
             dttm_work_end=datetime.combine(self.dt, time(20, 0, 0)),
             parent_worker_day=self.worker_day_plan_approved
@@ -97,11 +96,13 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
             employment=self.employment2,
             dt=self.dt,
             is_fact=True,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dttm_work_start=datetime.combine(self.dt, time(8, 0, 0)),
             dttm_work_end=datetime.combine(self.dt, time(20, 30, 0)),
             is_approved=True,
             parent_worker_day=self.worker_day_plan_approved,
+            closest_plan_approved=self.worker_day_plan_approved,
+            last_edited_by=self.user1,
         )
         self.worker_day_fact_not_approved = WorkerDay.objects.create(
             shop=self.shop,
@@ -109,10 +110,12 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
             employment=self.employment2,
             dt=self.dt,
             is_fact=True,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dttm_work_start=datetime.combine(self.dt, time(7, 58, 0)),
             dttm_work_end=datetime.combine(self.dt, time(19, 59, 1)),
-            parent_worker_day=self.worker_day_fact_approved
+            parent_worker_day=self.worker_day_fact_approved,
+            closest_plan_approved=self.worker_day_plan_approved,
+            last_edited_by=self.user1,
         )
 
         self.client.force_authenticate(user=self.user1)
@@ -164,6 +167,7 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
             'is_vacancy': False,
             'unaccounted_overtime': 0.0,
             'crop_work_hours_by_shop_schedule': True,
+            'closest_plan_approved_id': None,
         }
 
         self.assertEqual(response.json(), data)
@@ -175,7 +179,6 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
             'dt_from': self.dt,
             'dt_to': self.dt + timedelta(days=2),
             'is_fact': False,
-            # 'wd_types': WorkerDay.TYPES_USED,  # временно
         }
         response = self.client.post(self.url_approve, data, format='json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -189,23 +192,16 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(WorkerDay.objects.get(id=self.worker_day_plan_not_approved.id).is_approved, True)
 
-        # self.assertIsNone(WorkerDay.objects.get(id=self.worker_day_plan_not_approved.id).parent_worker_day_id)
         self.assertFalse(WorkerDay.objects.filter(id=self.worker_day_plan_approved.id).exists())
-        # self.assertEqual(WorkerDay.objects.get(id=self.worker_day_fact_approved.id).parent_worker_day_id,
-        #                  self.worker_day_plan_not_approved.id)
 
         # Approve fact
         data['is_fact'] = True
 
-        # plan(approved) <- fact0(approved) <- fact1(not approved) ==> plan(approved) <- fact1(approved)
         response = self.client.post(self.url_approve, data, format='json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        # id = response.json()['id']
         self.assertEqual(WorkerDay.objects.get(id=self.worker_day_fact_not_approved.id).is_approved, True)
         self.assertFalse(WorkerDay.objects.filter(id=self.worker_day_fact_approved.id).exists())
         self.assertTrue(WorkerDay.objects.filter(id=self.worker_day_plan_not_approved.id).exists())
-        # self.assertEqual(WorkerDay.objects.get(id=self.worker_day_fact_not_approved.id).parent_worker_day_id,
-        #                  self.worker_day_plan_not_approved.id)
 
     # Последовательное создание и подтверждение P1 -> A1 -> P2 -> F1 -> A2 -> F2
     def test_create_and_approve(self):
@@ -232,6 +228,7 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
 
         # edit not approved plan
         data = {
+            "id": plan_id,
             "shop_id": self.shop.id,
             "employee_id": self.employee2.id,
             "employment_id": self.employment2.id,
@@ -272,7 +269,7 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
             worker_day_permission=WorkerDayPermission.objects.get(
                 action=WorkerDayPermission.APPROVE,
                 graph_type=WorkerDayPermission.PLAN,
-                wd_type=WorkerDay.TYPE_HOLIDAY,
+                wd_type_id=WorkerDay.TYPE_HOLIDAY,
             ),
             limit_days_in_past=3,
             limit_days_in_future=1,
@@ -329,6 +326,7 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
         response = self.client.post(self.url, data, format='json')
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         fact_id = response.json()['id']
+        data['id'] = fact_id
 
         # edit not approved fact
         data['dttm_work_start'] = Converter.convert_datetime(datetime.combine(dt, time(7, 48, 0)))
@@ -365,14 +363,14 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(WorkerDay.objects.get(id=fact_id).is_approved, True)
 
-        # create approved plan
+        # cant create approved plan again
         data['is_fact'] = False
+        data.pop('id')
         response = self.client.post(f"{self.url}", data, format='json')
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        new_plan_id = response.json()['id']
-        new_plan = WorkerDay.objects.get(id=new_plan_id)
-        self.assertNotEqual(new_plan_id, plan_id)
-        self.assertEqual(response.json()['type'], data['type'])
+        self.assertContains(
+            response, 'Операция не может быть выполнена. Недопустимое пересечение времени работы',
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
 
         # # create approved plan again
         # response = self.client.post(f"{self.url}", data, format='json')
@@ -385,14 +383,10 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
 
         data['is_fact'] = True
         response = self.client.post(f"{self.url}", data, format='json')
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-
-        res = response.json()
-        new_fact_id = res['id']
-        new_fact = WorkerDay.objects.get(id=new_fact_id)
-        self.assertNotEqual(new_fact_id, fact_id)
-        self.assertEqual(res['dttm_work_start'], data['dttm_work_start'])
-        self.assertEqual(res['dttm_work_end'], data['dttm_work_end'])
+        self.assertContains(
+            response, 'Операция не может быть выполнена. Недопустимое пересечение времени работы',
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
 
         # # create approved fact again
         # response = self.client.post(f"{self.url}", data, format='json')
@@ -426,17 +420,21 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
         self.assertEqual(WorkerDay.objects.get(id=self.worker_day_fact_not_approved.id).is_approved, True)
         self.assertFalse(WorkerDay.objects.filter(id=self.worker_day_fact_approved.id).exists())
 
-    @override_settings(ZKTECO_INTEGRATION=True, CELERY_TASK_ALWAYS_EAGER=True)
+    @staticmethod
+    def _create_att_record(type, dttm, user_id, employee_id, shop_id, terminal=True):
+        return AttendanceRecords.objects.create(
+            dttm=dttm,
+            shop_id=shop_id,
+            user_id=user_id,
+            employee_id=employee_id,
+            type=type,
+            terminal=terminal,
+        )
+
+    @override_settings(CELERY_TASK_ALWAYS_EAGER=True)
     def test_recalc_fact_from_records_after_approve(self):
-        def create_att_record(type, dttm, user_id, employee_id, shop_id, terminal=True):
-            return AttendanceRecords.objects.create(
-                dttm=dttm,
-                shop_id=shop_id,
-                user_id=user_id,
-                employee_id=employee_id,
-                type=type,
-                terminal=terminal,
-            )
+        self.network.run_recalc_fact_from_att_records_on_plan_approve = True
+        self.network.save()
         WorkerDay.objects.all().delete()
         dt = date.today()
         wd_plan1 = WorkerDay.objects.create(
@@ -445,7 +443,7 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
             dt=dt,
             dttm_work_start=datetime.combine(dt, time(18)),
             dttm_work_end=datetime.combine(dt + timedelta(1), time(1)),
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             shop=self.shop,
         )
         wd_plan2 = WorkerDay.objects.create(
@@ -454,13 +452,13 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
             dt=dt,
             dttm_work_start=datetime.combine(dt, time(12)),
             dttm_work_end=datetime.combine(dt, time(22)),
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             shop=self.shop,
         )
-        create_att_record(AttendanceRecords.TYPE_COMING, datetime.combine(dt, time(17, 49)), self.user2.id, self.employee2.id, self.shop.id, terminal=False)
-        create_att_record(AttendanceRecords.TYPE_COMING, datetime.combine(dt + timedelta(1), time(1, 5)), self.user2.id, self.employee2.id, self.shop.id)
-        create_att_record(AttendanceRecords.TYPE_COMING, datetime.combine(dt, time(11, 56)), self.user3.id, self.employee3.id, self.shop.id, terminal=False)
-        create_att_record(AttendanceRecords.TYPE_LEAVING, datetime.combine(dt, time(23, 1)), self.user3.id, self.employee3.id, self.shop.id)
+        self._create_att_record(AttendanceRecords.TYPE_COMING, datetime.combine(dt, time(17, 49)), self.user2.id, self.employee2.id, self.shop.id, terminal=False)
+        self._create_att_record(AttendanceRecords.TYPE_COMING, datetime.combine(dt + timedelta(1), time(1, 5)), self.user2.id, self.employee2.id, self.shop.id)
+        self._create_att_record(AttendanceRecords.TYPE_COMING, datetime.combine(dt, time(11, 56)), self.user3.id, self.employee3.id, self.shop.id, terminal=False)
+        self._create_att_record(AttendanceRecords.TYPE_LEAVING, datetime.combine(dt, time(23, 1)), self.user3.id, self.employee3.id, self.shop.id)
 
         self.assertEqual(WorkerDay.objects.filter(is_fact=False, is_approved=True).count(), 0)
         self.assertEqual(WorkerDay.objects.filter(is_fact=True, is_approved=True).count(), 3)
@@ -480,6 +478,299 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
         self.assertEqual(wd_night_shift.dttm_work_end, datetime.combine(dt + timedelta(1), time(1, 5)))
         self.assertEqual(AttendanceRecords.objects.filter(type=AttendanceRecords.TYPE_COMING).count(), 2)
         self.assertEqual(AttendanceRecords.objects.filter(type=AttendanceRecords.TYPE_LEAVING).count(), 2)
+
+    @override_settings(CELERY_TASK_ALWAYS_EAGER=True)
+    def test_recalc_fact_from_records_after_approve_with_multiple_wdays_in_plan(self):
+        """
+        Отметки:
+        10:11 приход
+        14:14 уход
+        18:25 приход
+        22:12 уход
+
+        1. Сначала нету плана -> 1 workeday в факте
+        2. Добавляем план подтверждаем -> происходит пересчет факта на основе отметок, создается 2 wd в факте
+        """
+        self.network.run_recalc_fact_from_att_records_on_plan_approve = True
+        self.network.save()
+        WorkerDay.objects.all().delete()
+
+        dt = date.today()
+        self._create_att_record(AttendanceRecords.TYPE_COMING, datetime.combine(dt, time(10, 11)), self.user2.id,
+                          self.employee2.id, self.shop.id, terminal=False)
+        self._create_att_record(AttendanceRecords.TYPE_LEAVING, datetime.combine(dt, time(14, 14)), self.user2.id,
+                          self.employee2.id, self.shop.id, terminal=False)
+        self._create_att_record(AttendanceRecords.TYPE_COMING, datetime.combine(dt, time(18, 25)), self.user2.id,
+                          self.employee2.id, self.shop.id, terminal=False)
+        self._create_att_record(AttendanceRecords.TYPE_LEAVING, datetime.combine(dt, time(22, 12)), self.user2.id,
+                          self.employee2.id, self.shop.id, terminal=False)
+
+        self.assertEqual(WorkerDay.objects.filter(is_fact=False, is_approved=True).count(), 0)
+        self.assertEqual(WorkerDay.objects.filter(is_fact=True, is_approved=True).count(), 1)
+
+        wd = WorkerDay.objects.filter(is_fact=True, is_approved=True).first()
+        self.assertEqual(wd.dttm_work_start, datetime.combine(dt, time(10, 11)))
+        self.assertEqual(wd.dttm_work_end, datetime.combine(dt, time(22, 12)))
+
+        WorkerDayFactory(
+            employee=self.employee2,
+            employment=self.employment2,
+            dt=dt,
+            dttm_work_start=datetime.combine(dt, time(10)),
+            dttm_work_end=datetime.combine(dt, time(14)),
+            type_id=WorkerDay.TYPE_WORKDAY,
+            shop=self.shop,
+            is_approved=False,
+            is_fact=False,
+        )
+        WorkerDayFactory(
+            employee=self.employee2,
+            employment=self.employment2,
+            dt=dt,
+            dttm_work_start=datetime.combine(dt, time(18)),
+            dttm_work_end=datetime.combine(dt, time(22)),
+            type_id=WorkerDay.TYPE_WORKDAY,
+            shop=self.shop,
+            is_approved=False,
+            is_fact=False,
+        )
+
+        data = {
+            'shop_id': self.shop.id,
+            'dt_from': dt,
+            'dt_to': dt,
+            'is_fact': False,
+        }
+        with mock.patch.object(transaction, 'on_commit', lambda t: t()):
+            response = self.client.post(self.url_approve, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(WorkerDay.objects.filter(is_fact=False, is_approved=True).count(), 2)
+        self.assertEqual(WorkerDay.objects.filter(is_fact=True, is_approved=True).count(), 2)
+
+    @override_settings(CELERY_TASK_ALWAYS_EAGER=True)
+    def test_edit_manual_fact_on_recalc_fact_from_att_records_is_working(self):
+        """
+        1. Включены настройки "Считать только те фактические часы,
+         которые есть в подтвержденном плановом графике"
+         и "Запускать пересчет факта на основе отметок при подтверждении плана".
+        2. У сотрудника подтвержденный план 12:00-20:00.
+        3. Сотрудник в УРВ отметился в 10:59 на приход и в 19:05 на уход.
+        4. Директор/супервайзер изменил факт на 11:00-19:00 и подтвердил факт.
+        5. Директор/супервайзер изменил план с 12:00-20:00 на 11:00-19:00, подтвердил.
+            При этом запустился пересчет фактического графика на основе отметок.
+        5.1. При включенной настройке "Изменять ручные корректировки при пересчете факта на основе отметок (при подтверждения плана)"
+            факт, скорректированный вручную, скорректируется на основе отметоки снова станет раным 10:59-19:05.
+        5.2. При выключенной настройке "Изменять ручные корректировки при пересчете факта на основе отметок (при подтверждения плана)"
+            факт, скорректированный вручную, будет пропущен и останется 11:00-19:00
+        """
+        self.network.run_recalc_fact_from_att_records_on_plan_approve = True
+        self.network.only_fact_hours_that_in_approved_plan = True
+        self.network.save()
+        WorkerDay.objects.all().delete()
+
+        today = date.today()
+        plan_approved = WorkerDayFactory(
+            employee=self.employee2,
+            employment=self.employment2,
+            dt=today,
+            dttm_work_start=datetime.combine(today, time(12)),
+            dttm_work_end=datetime.combine(today, time(20)),
+            type_id=WorkerDay.TYPE_WORKDAY,
+            shop=self.shop,
+            is_approved=True,
+            is_fact=False,
+        )
+        plan_not_approved = WorkerDayFactory(
+            employee=self.employee2,
+            employment=self.employment2,
+            dt=today,
+            dttm_work_start=datetime.combine(today, time(12)),
+            dttm_work_end=datetime.combine(today, time(20)),
+            type_id=WorkerDay.TYPE_WORKDAY,
+            shop=self.shop,
+            is_approved=False,
+            is_fact=False,
+        )
+        self._create_att_record(
+            AttendanceRecords.TYPE_COMING, datetime.combine(today, time(10, 59)), self.user2.id, self.employee2.id,
+            self.shop.id, terminal=False)
+        self._create_att_record(
+            AttendanceRecords.TYPE_LEAVING, datetime.combine(today, time(19, 5)), self.user2.id, self.employee2.id,
+            self.shop.id, terminal=False)
+
+        fact_approved = WorkerDay.objects.filter(is_fact=True, is_approved=True).first()
+        self.assertIsNotNone(fact_approved)
+        self.assertEqual(fact_approved.dttm_work_start, datetime.combine(today, time(10, 59)))
+        self.assertEqual(fact_approved.dttm_work_end, datetime.combine(today, time(19, 5)))
+        self.assertIsNone(fact_approved.last_edited_by_id)
+        self.assertEqual(fact_approved.closest_plan_approved_id, plan_approved.id)
+        fact_not_approved = WorkerDay.objects.filter(is_fact=True, is_approved=False).first()
+        self.assertIsNotNone(fact_not_approved)
+
+        fact_not_approved.last_edited_by_id = self.user1.id
+        fact_not_approved.dttm_work_start = datetime.combine(today, time(11))
+        fact_not_approved.dttm_work_end = datetime.combine(today, time(19))
+        fact_not_approved.save()
+        resp = self._approve(self.shop.id, True, today, today)
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        fact_not_approved.refresh_from_db()
+        self.assertTrue(fact_not_approved.is_approved)
+        fact_approved = fact_not_approved  # подтв. версия замещена черновиком
+        self.assertEqual(fact_approved.closest_plan_approved_id, plan_approved.id)
+
+        plan_not_approved.dttm_work_start = datetime.combine(today, time(11))
+        plan_not_approved.dttm_work_end = datetime.combine(today, time(19))
+        plan_not_approved.save()
+
+        try:
+            with transaction.atomic():
+                resp = self._approve(self.shop.id, False, today, today)
+                self.assertEqual(resp.status_code, status.HTTP_200_OK)
+                plan_not_approved.refresh_from_db()
+                self.assertTrue(plan_not_approved.is_approved)
+                plan_approved = plan_not_approved  # подтв. версия замещена черновиком
+
+                # по умолчанию настройка выключена, т.е. факт не должен измениться
+                fact_approved.refresh_from_db()
+                self.assertEqual(fact_approved.dttm_work_start, datetime.combine(today, time(11)))
+                self.assertEqual(fact_approved.dttm_work_end, datetime.combine(today, time(19)))
+                self.assertEqual(fact_approved.closest_plan_approved_id, plan_approved.id)
+                raise IntegrityError
+        except IntegrityError:
+            pass
+
+        try:
+            with transaction.atomic():
+                self.network.edit_manual_fact_on_recalc_fact_from_att_records = True
+                self.network.save()
+                resp = self._approve(self.shop.id, False, today, today)
+                self.assertEqual(resp.status_code, status.HTTP_200_OK)
+                plan_not_approved.refresh_from_db()
+                self.assertTrue(plan_not_approved.is_approved)
+                plan_approved = plan_not_approved  # подтв. версия замещена черновиком
+
+                # настройка выключена, т.е. факт должен измениться
+                fact_approved.refresh_from_db()
+                self.assertEqual(fact_approved.dttm_work_start, datetime.combine(today, time(10, 59)))
+                self.assertEqual(fact_approved.dttm_work_end, datetime.combine(today, time(19, 5)))
+                self.assertEqual(fact_approved.closest_plan_approved_id, plan_approved.id)
+                raise IntegrityError
+        except IntegrityError:
+            pass
+
+    def test_att_record_fact_type_id_received_from_closest_plan(self):
+        WorkerDay.objects.all().delete()
+        san_day_wd_type = WorkerDayTypeFactory(
+            code='SD',
+            name='Санитарный день',
+            short_name='C/Д',
+            html_color='#f7f7f7',
+            use_in_plan=True,
+            use_in_fact=True,
+            excel_load_code='СД',
+            is_dayoff=False,
+            is_work_hours=False,
+            is_reduce_norm=False,
+            is_system=False,
+            show_stat_in_days=True,
+            show_stat_in_hours=True,
+            ordering=0,
+        )
+
+        today = date.today()
+        plan_approved = WorkerDayFactory(
+            employee=self.employee2,
+            employment=self.employment2,
+            dt=today,
+            dttm_work_start=datetime.combine(today, time(10)),
+            dttm_work_end=datetime.combine(today, time(20)),
+            type_id=san_day_wd_type.code,
+            shop=self.shop,
+            is_approved=True,
+            is_fact=False,
+        )
+
+        self._create_att_record(
+            AttendanceRecords.TYPE_COMING, datetime.combine(today, time(10, 2)), self.user2.id, self.employee2.id,
+            self.shop.id, terminal=False)
+        self._create_att_record(
+            AttendanceRecords.TYPE_LEAVING, datetime.combine(today, time(19, 55)), self.user2.id, self.employee2.id,
+            self.shop.id, terminal=False)
+
+        fact_approved = WorkerDay.objects.get(is_fact=True, is_approved=True)
+        self.assertEqual(fact_approved.closest_plan_approved_id, plan_approved.id)
+        self.assertEqual(fact_approved.type_id, san_day_wd_type.code)
+
+    def test_fact_date_fixed_after_plan_approve(self):
+        """
+        1. план есть только на вчера
+        2. происходят отметки сегодня, но ближайших план найден на вчера (факт крепится к вчерашнему дню)
+        3. проиходит исправление плана -> факт должен перецепиться на сегодня
+        """
+        self.network.run_recalc_fact_from_att_records_on_plan_approve = True
+        self.network.save()
+        WorkerDay.objects.all().delete()
+        today = date.today()
+        yesterday = today - timedelta(days=1)
+        WorkerDayFactory(
+            employee=self.employee2,
+            employment=self.employment2,
+            dt=yesterday,
+            dttm_work_start=datetime.combine(yesterday, time(14)),
+            dttm_work_end=datetime.combine(yesterday, time(23)),
+            type_id=WorkerDay.TYPE_WORKDAY,
+            shop=self.shop,
+            is_approved=True,
+            is_fact=False,
+        )
+
+        self._create_att_record(AttendanceRecords.TYPE_COMING, datetime.combine(today, time(1, 14)), self.user2.id,
+                          self.employee2.id, self.shop.id, terminal=False)
+        self._create_att_record(AttendanceRecords.TYPE_LEAVING, datetime.combine(today, time(17, 3)), self.user2.id,
+                          self.employee2.id, self.shop.id, terminal=False)
+
+        self.assertEqual(WorkerDay.objects.filter(is_fact=True, is_approved=True).count(), 1)
+
+        wd = WorkerDay.objects.filter(is_fact=True, is_approved=True).first()
+        self.assertEqual(wd.dt, yesterday)
+
+        WorkerDayFactory(
+            employee=self.employee2,
+            employment=self.employment2,
+            dt=yesterday,
+            type_id=WorkerDay.TYPE_HOLIDAY,
+            is_approved=False,
+            is_fact=False,
+        )
+        WorkerDayFactory(
+            employee=self.employee2,
+            employment=self.employment2,
+            dt=today,
+            dttm_work_start=datetime.combine(yesterday, time(1)),
+            dttm_work_end=datetime.combine(yesterday, time(17)),
+            type_id=WorkerDay.TYPE_WORKDAY,
+            shop=self.shop,
+            is_approved=False,
+            is_fact=False,
+        )
+
+        approve_data = {
+            'shop_id': self.shop.id,
+            'dt_from': yesterday,
+            'dt_to': today,
+            'is_fact': False,
+        }
+        with mock.patch.object(transaction, 'on_commit', lambda t: t()):
+            response = self.client.post(self.url_approve, self.dump_data(approve_data), content_type='application/json')
+
+        self.assertEqual(response.status_code, 200)
+
+        self.assertEqual(WorkerDay.objects.filter(is_fact=False, is_approved=False).count(), 2)
+        self.assertEqual(WorkerDay.objects.filter(is_fact=False, is_approved=True).count(), 2)
+        self.assertEqual(WorkerDay.objects.filter(is_fact=True, is_approved=True).count(), 1)
+
+        wd = WorkerDay.objects.filter(is_fact=True, is_approved=True).first()
+        self.assertEqual(wd.dt, today)
 
     def test_empty_params(self):
         data = {
@@ -528,7 +819,7 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
                     shop=employment.shop,
                     dt=date,
                     is_approved=approved,
-                    type=WorkerDay.TYPE_WORKDAY,
+                    type_id=WorkerDay.TYPE_WORKDAY,
                     is_fact=False,
                     defaults=dict(
                         employment=employment,
@@ -554,7 +845,7 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
                     employee=employment.employee,
                     shop=employment.shop,
                     dt=dt,
-                    type=WorkerDay.TYPE_HOLIDAY,
+                    type_id=WorkerDay.TYPE_HOLIDAY,
                     is_approved=approved,
                     is_fact=False,
                     defaults=dict(
@@ -573,7 +864,7 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
             employee_id=self.employment1.employee_id,
             employment=self.employment1,
             dt=dt_now,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             shop_id=self.employment1.shop_id,
             is_fact=True,
             is_approved=True,
@@ -597,7 +888,7 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
 
         self.assertEqual(len(response.json()), 7)
         self.assertEqual(WorkerDay.objects.filter(is_approved=False, is_fact=True).count(), 7)
-        self.assertEqual(WorkerDay.objects.filter(is_approved=False, is_fact=True, type=WorkerDay.TYPE_HOLIDAY).count(), 0)
+        self.assertEqual(WorkerDay.objects.filter(is_approved=False, is_fact=True, type_id=WorkerDay.TYPE_HOLIDAY).count(), 0)
         self.assertEqual(WorkerDay.objects.filter(is_approved=False, employee_id=self.employment2.employee_id).count(), 0)
         self.assertEqual(WorkerDay.objects.filter(is_approved=False, dt=dt_now + timedelta(days=6)).count(), 0)
         wd_not_approved = WorkerDay.objects.get(is_approved=False, is_fact=True, dt=dt_now, employee_id=self.employment1.employee_id)
@@ -772,7 +1063,7 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
     def test_S_type_plan_approved_returned_in_tabel_if_fact_approved_is_missing(self):
         WorkerDay.objects.filter(
             id=self.worker_day_plan_approved.id,
-        ).update(type=WorkerDay.TYPE_SICK)
+        ).update(type_id=WorkerDay.TYPE_SICK)
         WorkerDay.objects.filter(
             id=self.worker_day_fact_approved.id,  # не удаляется, поэтому обновим дату на другой день
         ).update(parent_worker_day=None, dt=self.dt - timedelta(days=365))
@@ -1106,6 +1397,7 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
         self.assertEqual(response.status_code, 200)
 
     def test_can_create_and_update_not_approved_fact_only_with_empty_or_workday_type(self):
+        WorkerDay.objects.all().delete()
         dt = now().date()
         data = {
             "shop_code": self.shop.code,
@@ -1208,7 +1500,7 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
             WorkerDayPermission.CREATE_OR_UPDATE, WorkerDayPermission.PLAN, WorkerDay.TYPE_HOLIDAY,
         )
         wd.refresh_from_db()
-        self.assertEqual(wd.type, WorkerDay.TYPE_HOLIDAY)
+        self.assertEqual(wd.type_id, WorkerDay.TYPE_HOLIDAY)
 
         # delete
         self._test_wd_perm(
@@ -1275,7 +1567,7 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
               "dt_from": self.dt - timedelta(days=10),
               "dt_to": self.dt + timedelta(days=10),
               "type": WorkerDay.TYPE_MATERNITY,
-              "is_fact": False,
+              "is_fact": True,  # проверим, что наличие is_fact True не влияет (через этот метод всегда в план)
               "is_approved": True
             }
           ]
@@ -1288,7 +1580,21 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
         )
         self.assertFalse(WorkerDay.objects.filter(id=self.worker_day_plan_approved.id).exists())
         self.assertEqual(
-            WorkerDay.objects.filter(employee__tabel_code=self.employee2.tabel_code, type=WorkerDay.TYPE_MATERNITY).count(),
+            WorkerDay.objects.filter(
+                employee__tabel_code=self.employee2.tabel_code,
+                type_id=WorkerDay.TYPE_MATERNITY,
+                is_approved=True,
+                is_fact=False,
+            ).count(),
+            21,
+        )
+        self.assertEqual(
+            WorkerDay.objects.filter(
+                employee__tabel_code=self.employee2.tabel_code,
+                type_id=WorkerDay.TYPE_MATERNITY,
+                is_approved=False,
+                is_fact=False,
+            ).count(),
             21,
         )
 
@@ -1304,7 +1610,7 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
             dt=self.dt,
             is_fact=False,
             is_approved=True,
-            type=WorkerDay.TYPE_MATERNITY,
+            type_id=WorkerDay.TYPE_MATERNITY,
         ).last()
         self.assertIsNotNone(wd.created_by)
         self.assertEqual(wd.created_by.id, self.user1.id)
@@ -1330,7 +1636,7 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
         resp = self.client.post(self.url, data, format='json')
         self.assertEqual(resp.status_code, 400)
         self.assertEqual(
-            resp.json()[0],
+            resp.json()["non_field_errors"][0],
             'Невозможно создать рабочий день, так как пользователь в этот период не трудоустроен',
         )
 
@@ -1391,6 +1697,29 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
         self.assertTrue(wd.is_vacancy)
         self.assertEqual(wd.employment.id, self.employment8.id)
 
+    def test_shop_id_set_to_none_if_wd_type_is_day_off(self):
+        data = {
+            "shop_id": self.shop.id,
+            "employee_id": self.employee8.id,
+            "dt": self.dt,
+            "is_fact": False,
+            "is_approved": False,
+            "type": WorkerDay.TYPE_HOLIDAY,
+            "dttm_work_start": datetime.combine(self.dt, time(10, 0, 0)),
+            "dttm_work_end": datetime.combine(self.dt, time(20, 0, 0)),
+            "worker_day_details": [{
+                "work_part": 1.0,
+                "work_type_id": self.work_type.id}
+            ]
+        }
+        resp = self.client.post(self.url, data, format='json')
+        self.assertEqual(resp.status_code, 201)
+        resp_data = resp.json()
+        wd = WorkerDay.objects.get(id=resp_data['id'])
+        self.assertIsNone(wd.shop_id)
+        self.assertIsNone(wd.dttm_work_start)
+        self.assertIsNone(wd.dttm_work_end)
+
     def test_create_vacancy_for_the_same_shop_then_update_for_other_shop(self):
         data = {
             "shop_id": self.shop2.id,
@@ -1428,6 +1757,7 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
         self.assertFalse(wd.is_vacancy)
 
     def test_inactive_employment_replaced_by_active(self):
+        WorkerDay.objects.all().delete()
         Employment.objects.filter(id=self.employment2.id).update(
             dt_hired=self.dt - timedelta(days=100),
             dt_fired=self.dt - timedelta(days=1),
@@ -1526,7 +1856,7 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
             dt=dt,
             dttm_work_start=datetime.combine(dt, time(8)),
             dttm_work_end=datetime.combine(dt, time(20)),
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
         )
         self.assertEqual(wd.work_hours, timedelta(hours=10, minutes=45))
 
@@ -1558,6 +1888,515 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
         response = self.client.post(self.url, data, format='json')
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(response.json(), {'non_field_errors': ['Дата начала должна быть меньше чем дата окончания.']})
+
+    def test_batch_create_or_update_worker_days(self):
+        WorkerDay.objects.all().delete()
+        options = {
+            'return_response': True,
+        }
+        data = {
+           'data':  [
+                {
+                    "shop_id": self.shop.id,
+                    "employee_id": self.employee2.id,
+                    "dt": self.dt,
+                    "is_fact": False,
+                    "is_approved": False,
+                    "type": WorkerDay.TYPE_WORKDAY,
+                    "dttm_work_start": datetime.combine(self.dt, time(11)),
+                    "dttm_work_end": datetime.combine(self.dt, time(14)),
+                    "worker_day_details": [{
+                        "work_part": 1.0,
+                        "work_type_id": self.work_type.id}
+                    ]
+                },
+                {
+                    "shop_id": self.shop.id,
+                    "employee_id": self.employee2.id,
+                    "dt": self.dt,
+                    "is_fact": False,
+                    "is_approved": False,
+                    "type": WorkerDay.TYPE_WORKDAY,
+                    "dttm_work_start": datetime.combine(self.dt, time(18)),
+                    "dttm_work_end": datetime.combine(self.dt, time(21)),
+                    "worker_day_details": [{
+                        "work_part": 1.0,
+                        "work_type_id": self.work_type.id}
+                    ]
+                },
+            ],
+            'options': options,
+        }
+
+        resp = self.client.post(
+            self.get_url('WorkerDay-batch-update-or-create'), self.dump_data(data), content_type='application/json')
+        self.assertContains(
+            resp, 'Создание нескольких дней на одну дату для одного сотрудника запрещено.', status_code=400)
+
+        self.network.allow_creation_several_wdays_for_one_employee_for_one_date = True
+        self.network.save()
+        resp = self.client.post(
+            self.get_url('WorkerDay-batch-update-or-create'), self.dump_data(data), content_type='application/json')
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        resp_data = resp.json()
+        id1 = resp_data.get('data')[0]['id']
+        dttm_modified1 = resp_data.get('data')[0]['dttm_modified']
+
+        self.assertEqual(len(resp_data.get('data')), 2)
+        wdays_qs = WorkerDay.objects.filter(
+            dt=self.dt,
+            shop=self.shop,
+            employee_id=self.employee2.id,
+            is_approved=False,
+            is_fact=False,
+        )
+        self.assertEqual(wdays_qs.count(), 2)
+        self.assertEqual(WorkerDayCashboxDetails.objects.filter(worker_day__in=wdays_qs).count(), 2)
+        time_module.sleep(0.1)
+        resp_data.get('data').pop(1)
+        resp_data['options'] = options
+        resp = self.client.post(
+            self.get_url('WorkerDay-batch-update-or-create'), self.dump_data(resp_data), content_type='application/json')
+
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        resp_data = resp.json()
+        resp_data.get('data')[0]["dttm_work_start"] = datetime.combine(self.dt, time(9))
+        id2 = resp_data.get('data')[0]['id']
+        dttm_modified2 = resp_data.get('data')[0]['dttm_modified']
+        self.assertEqual(len(resp_data.get('data')), 1)
+        self.assertEqual(wdays_qs.count(), 1)
+        self.assertEqual(WorkerDayCashboxDetails.objects.filter(worker_day__in=wdays_qs).count(), 1)
+        self.assertEqual(id1, id2)
+        self.assertNotEqual(dttm_modified1, dttm_modified2)  # проверка, что время обновляется
+
+        wd_data = resp_data.get('data').pop(0)
+        # при отправке пустого списка нам нужно передать "разрез" данных
+        # в рамках которого мы будем определять какие объекты нам нужно удалить
+        # например: мы редактируем расписание и хотим удалить все дни на дату для сотрудника в плане черновике
+        # в этом случае мы педеаем пустой список в данных и передаем "разрез" по сотруднику, дате, is_fact, is_approved
+        resp_data['data'] = []
+        options['delete_scope_values_list'] = [
+            {
+                'employee_id': wd_data['employee_id'],
+                'dt': wd_data['dt'],
+                'is_fact': wd_data['is_fact'],
+                'is_approved': wd_data['is_approved'],
+            },
+        ]
+        options.pop('return_response')
+        resp_data['options'] = options
+        resp = self.client.post(
+            self.get_url('WorkerDay-batch-update-or-create'), self.dump_data(resp_data),
+            content_type='application/json')
+        resp_data = resp.json()
+        self.assertDictEqual(
+            resp_data,
+            {
+                'stats': {
+                    "WorkerDay": {
+                        "deleted": 1
+                    },
+                    "WorkerDayCashboxDetails": {
+                        "deleted": 1
+                    }
+                },
+            }
+        )
+
+    def test_work_hours_recalculated_on_batch_update(self):
+        WorkerDay.objects.all().delete()
+        options = {
+            'return_response': True,
+        }
+        data = {
+            'data': [
+                {
+                    "shop_id": self.shop.id,
+                    "employee_id": self.employee2.id,
+                    "dt": self.dt,
+                    "is_fact": False,
+                    "is_approved": False,
+                    "type": WorkerDay.TYPE_WORKDAY,
+                    "dttm_work_start": datetime.combine(self.dt, time(10)),
+                    "dttm_work_end": datetime.combine(self.dt, time(16)),
+                    "worker_day_details": [{
+                        "work_part": 1.0,
+                        "work_type_id": self.work_type.id}
+                    ]
+                },
+            ],
+            'options': options,
+        }
+
+        resp = self.client.post(
+            self.get_url('WorkerDay-batch-update-or-create'), self.dump_data(data), content_type='application/json')
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        resp_data = resp.json()
+        wd_id = resp_data['data'][0]['id']
+        wd = WorkerDay.objects.get(id=wd_id)
+        self.assertEqual(wd.work_hours, timedelta(seconds=5.5*60*60))
+        data['data'][0] = resp_data['data'][0]
+        data['data'][0]['dttm_work_end'] = datetime.combine(self.dt, time(20))
+        resp = self.client.post(
+            self.get_url('WorkerDay-batch-update-or-create'), self.dump_data(data), content_type='application/json')
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        wd.refresh_from_db()
+        self.assertEqual(wd.work_hours, timedelta(seconds=8.75*60*60))
+
+    def test_cant_batch_create_different_wday_types_on_one_date_for_one_employee(self):
+        WorkerDay.objects.all().delete()
+        data = {
+            'data': [
+                {
+                    "shop_id": self.shop.id,
+                    "employee_id": self.employee2.id,
+                    "dt": self.dt,
+                    "is_fact": False,
+                    "is_approved": False,
+                    "type": WorkerDay.TYPE_WORKDAY,
+                    "dttm_work_start": datetime.combine(self.dt, time(11)),
+                    "dttm_work_end": datetime.combine(self.dt, time(14)),
+                    "worker_day_details": [{
+                        "work_part": 1.0,
+                        "work_type_id": self.work_type.id}
+                    ]
+                },
+                {
+                    "shop_id": self.shop.id,
+                    "employee_id": self.employee2.id,
+                    "dt": self.dt,
+                    "is_fact": False,
+                    "is_approved": False,
+                    "type": WorkerDay.TYPE_HOLIDAY,
+                },
+            ],
+        }
+        resp = self.client.post(
+            self.get_url('WorkerDay-batch-update-or-create'), self.dump_data(data), content_type='application/json')
+        self.assertContains(
+            resp, 'Операция не может быть выполнена. '
+                  'Невозможно создать разные типы дней на одну дату для одного сотрудника.', status_code=400)
+
+    def test_cant_create_multiple_wdays_on_one_date_if_setting_is_enabled(self):
+        WorkerDay.objects.all().delete()
+        data = {
+            'data': [
+                {
+                    "shop_id": self.shop.id,
+                    "employee_id": self.employee2.id,
+                    "dt": self.dt,
+                    "is_fact": False,
+                    "is_approved": False,
+                    "type": WorkerDay.TYPE_WORKDAY,
+                    "dttm_work_start": datetime.combine(self.dt, time(11)),
+                    "dttm_work_end": datetime.combine(self.dt, time(17)),
+                    "worker_day_details": [{
+                        "work_part": 1.0,
+                        "work_type_id": self.work_type.id}
+                    ]
+                },
+                {
+                    "shop_id": self.shop.id,
+                    "employee_id": self.employee2.id,
+                    "dt": self.dt,
+                    "is_fact": False,
+                    "is_approved": False,
+                    "type": WorkerDay.TYPE_WORKDAY,
+                    "dttm_work_start": datetime.combine(self.dt, time(19)),
+                    "dttm_work_end": datetime.combine(self.dt, time(22)),
+                    "worker_day_details": [{
+                        "work_part": 1.0,
+                        "work_type_id": self.work_type.id}
+                    ]
+                },
+            ],
+        }
+        resp = self.client.post(
+            self.get_url('WorkerDay-batch-update-or-create'), self.dump_data(data), content_type='application/json')
+        self.assertContains(
+            resp, 'Создание нескольких дней на одну дату для одного сотрудника запрещено.', status_code=400)
+
+    def test_batch_create_or_update_workerdays_user_work_time_overlap_validation(self):
+        WorkerDay.objects.all().delete()
+        data = {
+            'data': [
+                {
+                    "shop_id": self.shop.id,
+                    "employee_id": self.employee2.id,
+                    "dt": self.dt,
+                    "is_fact": False,
+                    "is_approved": False,
+                    "type": WorkerDay.TYPE_WORKDAY,
+                    "dttm_work_start": datetime.combine(self.dt, time(11)),
+                    "dttm_work_end": datetime.combine(self.dt, time(17)),
+                    "worker_day_details": [{
+                        "work_part": 1.0,
+                        "work_type_id": self.work_type.id}
+                    ]
+                },
+                {
+                    "shop_id": self.shop.id,
+                    "employee_id": self.employee2.id,
+                    "dt": self.dt,
+                    "is_fact": False,
+                    "is_approved": False,
+                    "type": WorkerDay.TYPE_WORKDAY,
+                    "dttm_work_start": datetime.combine(self.dt, time(15)),
+                    "dttm_work_end": datetime.combine(self.dt, time(22)),
+                    "worker_day_details": [{
+                        "work_part": 1.0,
+                        "work_type_id": self.work_type.id}
+                    ]
+                },
+            ],
+        }
+        resp = self.client.post(
+            self.get_url('WorkerDay-batch-update-or-create'), self.dump_data(data), content_type='application/json')
+        self.assertContains(
+            resp, 'Операция не может быть выполнена. Недопустимое пересечение времени работы.', status_code=400)
+
+    def test_batch_create_or_update_wd_perms(self):
+        GroupWorkerDayPermission.objects.all().delete()
+        WorkerDay.objects.all().delete()
+        wd_data = {
+            "shop_id": self.shop.id,
+            "employee_id": self.employee2.id,
+            "dt": self.dt,
+            "is_fact": False,
+            "is_approved": False,
+            "type": WorkerDay.TYPE_WORKDAY,
+            "dttm_work_start": datetime.combine(self.dt, time(11)),
+            "dttm_work_end": datetime.combine(self.dt, time(15)),
+            "worker_day_details": [{
+                "work_part": 1.0,
+                "work_type_id": self.work_type.id}
+            ]
+        }
+        data = {
+            'data': [
+                wd_data,
+            ],
+        }
+        resp = self.client.post(
+            self.get_url('WorkerDay-batch-update-or-create'), self.dump_data(data), content_type='application/json')
+        self.assertContains(
+            resp, 'У вас нет прав на создание/изменение типа дня', status_code=403)
+
+        create_or_update_plan_workday_perm = WorkerDayPermission.objects.get(
+            action=WorkerDayPermission.CREATE_OR_UPDATE,
+            graph_type=WorkerDayPermission.PLAN,
+            wd_type_id=WorkerDay.TYPE_WORKDAY,
+        )
+        gwdp = GroupWorkerDayPermission.objects.create(
+            group=self.admin_group,
+            worker_day_permission=create_or_update_plan_workday_perm,
+            limit_days_in_past=1,
+            limit_days_in_future=1,
+        )
+
+        resp = self.client.post(
+            self.get_url('WorkerDay-batch-update-or-create'), self.dump_data(data), content_type='application/json')
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(WorkerDay.objects.count(), 1)
+
+        wd_data['dt'] = self.dt - timedelta(days=2)
+        wd_data['dttm_work_start'] = datetime.combine(self.dt - timedelta(days=2), time(11))
+        wd_data['dttm_work_end'] = datetime.combine(self.dt - timedelta(days=2), time(15))
+        resp = self.client.post(
+            self.get_url('WorkerDay-batch-update-or-create'), self.dump_data(data), content_type='application/json')
+        self.assertContains(resp, 'Необходимо изменить интервал для подтверждения', status_code=403)
+
+        wd_data['dt'] = self.dt + timedelta(days=2)
+        wd_data['dttm_work_start'] = datetime.combine(self.dt + timedelta(days=2), time(11))
+        wd_data['dttm_work_end'] = datetime.combine(self.dt + timedelta(days=2), time(15))
+        resp = self.client.post(
+            self.get_url('WorkerDay-batch-update-or-create'), self.dump_data(data), content_type='application/json')
+        self.assertContains(resp, 'Необходимо изменить интервал для подтверждения', status_code=403)
+
+        gwdp.limit_days_in_past = None
+        gwdp.limit_days_in_future = None
+        gwdp.save()
+
+        resp = self.client.post(
+            self.get_url('WorkerDay-batch-update-or-create'), self.dump_data(data), content_type='application/json')
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(WorkerDay.objects.count(), 2)
+
+        # попытка удалить день
+        data['data'] = []
+        options = {'delete_scope_values_list': [
+            {
+                'employee_id': wd_data['employee_id'],
+                'dt': wd_data['dt'],
+                'is_fact': wd_data['is_fact'],
+                'is_approved': wd_data['is_approved'],
+            },
+        ]}
+        data['options'] = options
+        resp = self.client.post(
+            self.get_url('WorkerDay-batch-update-or-create'), self.dump_data(data), content_type='application/json')
+        self.assertContains(resp, 'У вас нет прав на удаление типа дня', status_code=403)
+
+        delete_plan_workday_perm = WorkerDayPermission.objects.get(
+            action=WorkerDayPermission.DELETE,
+            graph_type=WorkerDayPermission.PLAN,
+            wd_type_id=WorkerDay.TYPE_WORKDAY,
+        )
+        GroupWorkerDayPermission.objects.create(
+            group=self.admin_group,
+            worker_day_permission=delete_plan_workday_perm,
+        )
+
+        resp = self.client.post(
+            self.get_url('WorkerDay-batch-update-or-create'), self.dump_data(data), content_type='application/json')
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(WorkerDay.objects.count(), 1)
+
+    def test_fact_work_hours_calculated_on_batch_create_workerdays(self):
+        self.network.only_fact_hours_that_in_approved_plan = False
+        self.network.allow_creation_several_wdays_for_one_employee_for_one_date = True
+        self.network.save()
+        WorkerDay.objects.all().delete()
+        data = {
+            'data': [
+                {
+                    "shop_id": self.shop.id,
+                    "employee_id": self.employee2.id,
+                    "dt": self.dt,
+                    "is_fact": True,
+                    "is_approved": False,
+                    "type": WorkerDay.TYPE_WORKDAY,
+                    "dttm_work_start": datetime.combine(self.dt, time(10)),
+                    "dttm_work_end": datetime.combine(self.dt, time(14)),
+                    "worker_day_details": [{
+                        "work_part": 1.0,
+                        "work_type_id": self.work_type.id}
+                    ]
+                },
+                {
+                    "shop_id": self.shop.id,
+                    "employee_id": self.employee2.id,
+                    "dt": self.dt,
+                    "is_fact": True,
+                    "is_approved": False,
+                    "type": WorkerDay.TYPE_WORKDAY,
+                    "dttm_work_start": datetime.combine(self.dt, time(16)),
+                    "dttm_work_end": datetime.combine(self.dt, time(23)),
+                    "worker_day_details": [{
+                        "work_part": 1.0,
+                        "work_type_id": self.work_type.id}
+                    ]
+                },
+            ],
+        }
+        resp = self.client.post(
+            self.get_url('WorkerDay-batch-update-or-create'), self.dump_data(data), content_type='application/json')
+        self.assertEqual(resp.status_code, 200)
+        fact_not_approved_qs = WorkerDay.objects.filter(is_fact=True, is_approved=False)
+        self.assertEqual(fact_not_approved_qs.count(), 2)
+        fact_not_approved_wdays = list(fact_not_approved_qs.order_by('dttm_work_start'))
+        self.assertEqual(fact_not_approved_wdays[0].work_hours, timedelta(seconds=3.5*60*60))
+        self.assertEqual(fact_not_approved_wdays[1].work_hours, timedelta(seconds=6*60*60))
+
+    def test_fact_work_hours_recalculated_after_adding_and_approving_closest_plan(self):
+        self.network.only_fact_hours_that_in_approved_plan = True
+        self.network.allow_creation_several_wdays_for_one_employee_for_one_date = True
+        self.network.save()
+        WorkerDay.objects.all().delete()
+        data = {
+            'data': [
+                {
+                    "shop_id": self.shop.id,
+                    "employee_id": self.employee2.id,
+                    "dt": self.dt,
+                    "is_fact": True,
+                    "is_approved": False,
+                    "type": WorkerDay.TYPE_WORKDAY,
+                    "dttm_work_start": datetime.combine(self.dt, time(10)),
+                    "dttm_work_end": datetime.combine(self.dt, time(14)),
+                    "worker_day_details": [{
+                        "work_part": 1.0,
+                        "work_type_id": self.work_type.id}
+                    ]
+                },
+                {
+                    "shop_id": self.shop.id,
+                    "employee_id": self.employee2.id,
+                    "dt": self.dt,
+                    "is_fact": True,
+                    "is_approved": False,
+                    "type": WorkerDay.TYPE_WORKDAY,
+                    "dttm_work_start": datetime.combine(self.dt, time(16)),
+                    "dttm_work_end": datetime.combine(self.dt, time(23)),
+                    "worker_day_details": [{
+                        "work_part": 1.0,
+                        "work_type_id": self.work_type.id}
+                    ]
+                },
+            ],
+        }
+        resp = self.client.post(
+            self.get_url('WorkerDay-batch-update-or-create'), self.dump_data(data), content_type='application/json')
+        self.assertEqual(resp.status_code, 200)
+        fact_not_approved_qs = WorkerDay.objects.filter(is_fact=True, is_approved=False)
+        self.assertEqual(fact_not_approved_qs.count(), 2)
+        fact_not_approved_wdays = list(fact_not_approved_qs.order_by('dttm_work_start'))
+        self.assertEqual(fact_not_approved_wdays[0].work_hours, timedelta(seconds=0))
+        self.assertEqual(fact_not_approved_wdays[1].work_hours, timedelta(seconds=0))
+
+        data = {
+            'data': [
+                {
+                    "shop_id": self.shop.id,
+                    "employee_id": self.employee2.id,
+                    "dt": self.dt,
+                    "is_fact": False,
+                    "is_approved": False,
+                    "type": WorkerDay.TYPE_WORKDAY,
+                    "dttm_work_start": datetime.combine(self.dt, time(10)),
+                    "dttm_work_end": datetime.combine(self.dt, time(14)),
+                    "worker_day_details": [{
+                        "work_part": 1.0,
+                        "work_type_id": self.work_type.id}
+                    ]
+                },
+                {
+                    "shop_id": self.shop.id,
+                    "employee_id": self.employee2.id,
+                    "dt": self.dt,
+                    "is_fact": False,
+                    "is_approved": False,
+                    "type": WorkerDay.TYPE_WORKDAY,
+                    "dttm_work_start": datetime.combine(self.dt, time(16)),
+                    "dttm_work_end": datetime.combine(self.dt, time(23)),
+                    "worker_day_details": [{
+                        "work_part": 1.0,
+                        "work_type_id": self.work_type.id}
+                    ]
+                },
+            ],
+        }
+        resp = self.client.post(
+            self.get_url('WorkerDay-batch-update-or-create'), self.dump_data(data), content_type='application/json')
+        self.assertEqual(resp.status_code, 200)
+        plan_not_approved_qs = WorkerDay.objects.filter(is_fact=False, is_approved=False)
+        self.assertEqual(plan_not_approved_qs.count(), 2)
+
+        resp = self._approve(
+            self.shop.id,
+            is_fact=False,
+            dt_from=self.dt,
+            dt_to=self.dt,
+            wd_types=[WorkerDay.TYPE_WORKDAY],
+        )
+        self.assertEqual(resp.status_code, 200)
+        plan_approved_qs = WorkerDay.objects.filter(is_fact=False, is_approved=True)
+        self.assertEqual(plan_approved_qs.count(), 2)
+
+        fact_not_approved_wdays[0].refresh_from_db()
+        fact_not_approved_wdays[1].refresh_from_db()
+        self.assertEqual(fact_not_approved_wdays[0].work_hours, timedelta(seconds=3.5*60*60))
+        self.assertEqual(fact_not_approved_wdays[1].work_hours, timedelta(seconds=6*60*60))
 
 
 class TestCropSchedule(TestsHelperMixin, APITestCase):
@@ -1595,7 +2434,7 @@ class TestCropSchedule(TestsHelperMixin, APITestCase):
             dt=self.dt_now,
             is_fact=True,
             is_approved=True,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dttm_work_start=datetime.combine(self.dt_now, time(work_start_h, 00, 0)) \
                 if isinstance(work_start_h, int) else work_start_h,
             dttm_work_end=datetime.combine(self.dt_now, time(work_end_h, 00, 0))
@@ -1676,7 +2515,7 @@ class TestCropSchedule(TestsHelperMixin, APITestCase):
         self._test_crop_both_bulk_and_original_save(10, 20, 8, 21, 0)
 
 
-class TestWorkerDayCreateFact(APITestCase):
+class TestWorkerDayCreateFact(TestsHelperMixin, APITestCase):
     USER_USERNAME = "user1"
     USER_EMAIL = "q@q.q"
     USER_PASSWORD = "4242"
@@ -1723,6 +2562,41 @@ class TestWorkerDayCreateFact(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         plan_id = response.json()['id']
 
+    def test_closest_plan_approved_set_on_fact_creation(self):
+        plan_approved = WorkerDayFactory(
+            is_fact=False,
+            is_approved=True,
+            dt=self.dt,
+            employee=self.employee2,
+            employment=self.employment2,
+            shop=self.shop,
+            type_id=WorkerDay.TYPE_WORKDAY,
+            dttm_work_start=datetime.combine(self.dt, time(8, 0, 0)),
+            dttm_work_end=datetime.combine(self.dt, time(20, 0, 0)),
+            cashbox_details__work_type=self.work_type,
+        )
+
+        data = {
+            "shop_id": self.shop.id,
+            "employee_id": self.employee2.id,
+            "employment_id": self.employment2.id,
+            "dt": self.dt,
+            "is_fact": True,
+            "type": WorkerDay.TYPE_WORKDAY,
+            "dttm_work_start": datetime.combine(self.dt, time(8, 0, 0)),
+            "dttm_work_end": datetime.combine(self.dt, time(20, 0, 0)),
+            "worker_day_details": [{
+                "work_part": 1.0,
+                "work_type_id": self.work_type.id}
+            ]
+        }
+
+        resp = self.client.post(self.url, self.dump_data(data), content_type='application/json')
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
+        fact_id = resp.json()['id']
+        fact = WorkerDay.objects.get(id=fact_id)
+        self.assertEqual(fact.closest_plan_approved_id, plan_approved.id)
+
 
 @override_settings(TRUST_TICK_REQUEST=True)
 class TestAttendanceRecords(TestsHelperMixin, APITestCase):
@@ -1739,10 +2613,10 @@ class TestAttendanceRecords(TestsHelperMixin, APITestCase):
             employment=self.employment2,
             dt=self.dt,
             is_fact=False,
-            type=WorkerDay.TYPE_WORKDAY,
+            is_approved=True,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dttm_work_start=datetime.combine(self.dt, time(8, 0, 0)),
             dttm_work_end=datetime.combine(self.dt, time(20, 0, 0)),
-            is_approved=True,
         )
         self.worker_day_plan_not_approved = WorkerDayFactory(
             shop=self.shop,
@@ -1750,10 +2624,10 @@ class TestAttendanceRecords(TestsHelperMixin, APITestCase):
             employment=self.employment2,
             dt=self.dt,
             is_fact=False,
-            type=WorkerDay.TYPE_WORKDAY,
+            is_approved=False,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dttm_work_start=datetime.combine(self.dt, time(8, 0, 0)),
             dttm_work_end=datetime.combine(self.dt, time(20, 0, 0)),
-            parent_worker_day=self.worker_day_plan_approved
         )
         self.worker_day_fact_approved = WorkerDayFactory(
             shop=self.shop,
@@ -1761,11 +2635,12 @@ class TestAttendanceRecords(TestsHelperMixin, APITestCase):
             employment=self.employment2,
             dt=self.dt,
             is_fact=True,
-            type=WorkerDay.TYPE_WORKDAY,
+            is_approved=True,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dttm_work_start=datetime.combine(self.dt, time(8, 12, 23)),
             dttm_work_end=datetime.combine(self.dt, time(20, 2, 1)),
-            is_approved=True,
             parent_worker_day=self.worker_day_plan_approved,
+            closest_plan_approved=self.worker_day_plan_approved,
         )
         self.worker_day_fact_not_approved = WorkerDayFactory(
             shop=self.shop,
@@ -1773,10 +2648,11 @@ class TestAttendanceRecords(TestsHelperMixin, APITestCase):
             employment=self.employment2,
             dt=self.dt,
             is_fact=True,
-            type=WorkerDay.TYPE_WORKDAY,
+            is_approved=False,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dttm_work_start=datetime.combine(self.dt, time(7, 58, 0)),
             dttm_work_end=datetime.combine(self.dt, time(19, 59, 1)),
-            parent_worker_day=self.worker_day_fact_approved
+            closest_plan_approved=self.worker_day_plan_approved,
         )
 
     def test_attendancerecords_update(self):
@@ -1878,8 +2754,10 @@ class TestAttendanceRecords(TestsHelperMixin, APITestCase):
 
         self.assertTrue(wd.exists())
 
-    @override_settings(MDA_SKIP_LEAVING_TICK=False)
     def test_attendancerecords_no_fact_create(self):
+        self.network.skip_leaving_tick = True
+        self.network.save()
+
         self.worker_day_fact_not_approved.delete()
         self.worker_day_fact_approved.delete()
 
@@ -1932,7 +2810,7 @@ class TestAttendanceRecords(TestsHelperMixin, APITestCase):
 
     def test_set_workday_type_for_existing_empty_types(self):
         WorkerDay.objects.filter(id=self.worker_day_fact_approved.id).update(
-            type=WorkerDay.TYPE_EMPTY,
+            type_id=WorkerDay.TYPE_EMPTY,
             dttm_work_start=None,
             dttm_work_end=None,
         )
@@ -1947,7 +2825,7 @@ class TestAttendanceRecords(TestsHelperMixin, APITestCase):
         )
 
         fact_approved = WorkerDay.objects.get(id=self.worker_day_fact_approved.id)
-        self.assertEqual(fact_approved.type, WorkerDay.TYPE_WORKDAY)
+        self.assertEqual(fact_approved.type_id, WorkerDay.TYPE_WORKDAY)
         self.assertEqual(fact_approved.dttm_work_start, tm_start)
         self.assertEqual(fact_approved.dttm_work_end, None)
         fact_worker_day_details = fact_approved.worker_day_details.all()
@@ -1974,13 +2852,14 @@ class TestAttendanceRecords(TestsHelperMixin, APITestCase):
             dttm_work_end=None,
             employee=self.employee8,
         ).last()
-        self.assertEqual(new_wd.type, WorkerDay.TYPE_WORKDAY)
+        self.assertEqual(new_wd.type_id, WorkerDay.TYPE_WORKDAY)
         self.assertEqual(new_wd.dttm_work_start, tm_start)
         self.assertEqual(new_wd.dttm_work_end, None)
         self.assertEqual(new_wd.is_vacancy, True)
 
     def test_create_attendance_records_for_different_shops(self):
         self.worker_day_fact_approved.delete()
+        self.worker_day_plan_approved.delete()
 
         tm_start = datetime.combine(self.dt, time(6, 0, 0))
         ar = AttendanceRecords.objects.create(
@@ -1996,7 +2875,7 @@ class TestAttendanceRecords(TestsHelperMixin, APITestCase):
             dt=tm_start.date()
         ).first()
         self.assertIsNotNone(wd)
-        self.assertEqual(wd.type, WorkerDay.TYPE_WORKDAY)
+        self.assertEqual(wd.type_id, WorkerDay.TYPE_WORKDAY)
         self.assertEqual(wd.dttm_work_start, tm_start)
         self.assertEqual(wd.dttm_work_end, None)
         self.assertEqual(wd.is_vacancy, True)
@@ -2009,7 +2888,7 @@ class TestAttendanceRecords(TestsHelperMixin, APITestCase):
             user=self.user2
         )
         wd.refresh_from_db()
-        self.assertEqual(wd.type, WorkerDay.TYPE_WORKDAY)
+        self.assertEqual(wd.type_id, WorkerDay.TYPE_WORKDAY)
         self.assertEqual(wd.dttm_work_start, tm_start)
         self.assertEqual(wd.dttm_work_end, tm_end)
         self.assertEqual(wd.is_vacancy, True)
@@ -2022,7 +2901,7 @@ class TestAttendanceRecords(TestsHelperMixin, APITestCase):
             user=self.user2
         )
         wd.refresh_from_db()
-        self.assertEqual(wd.type, WorkerDay.TYPE_WORKDAY)
+        self.assertEqual(wd.type_id, WorkerDay.TYPE_WORKDAY)
         self.assertEqual(wd.dttm_work_start, tm_start)
         self.assertEqual(wd.dttm_work_end, tm_end)
         self.assertEqual(wd.is_vacancy, True)
@@ -2035,7 +2914,7 @@ class TestAttendanceRecords(TestsHelperMixin, APITestCase):
             user=self.user2
         )
         wd.refresh_from_db()
-        self.assertEqual(wd.type, WorkerDay.TYPE_WORKDAY)
+        self.assertEqual(wd.type_id, WorkerDay.TYPE_WORKDAY)
         self.assertEqual(wd.dttm_work_start, tm_start)
         self.assertEqual(wd.dttm_work_end, tm_end2)
         self.assertEqual(wd.is_vacancy, True)
@@ -2150,7 +3029,7 @@ class TestAttendanceRecords(TestsHelperMixin, APITestCase):
         self.worker_day_fact_approved.delete()
         self.worker_day_plan_approved.worker_day_details.all().delete()
         WorkerDay.objects.filter(id=self.worker_day_plan_approved.id).update(
-            type=WorkerDay.TYPE_HOLIDAY,
+            type_id=WorkerDay.TYPE_HOLIDAY,
             dttm_work_start=None,
             dttm_work_end=None,
         )
@@ -2193,17 +3072,19 @@ class TestAttendanceRecords(TestsHelperMixin, APITestCase):
         self.assertEqual(wd.dttm_work_end, datetime.combine(self.dt + timedelta(1), time(1, 54)))
 
     def test_create_second_record_for_prev_day_when_prev_fact_closed(self):
-        self.worker_day_fact_approved.dttm_work_start = datetime.combine(self.dt - timedelta(1), time(18, 34))
-        self.worker_day_fact_approved.dttm_work_end = datetime.combine(self.dt, time(1, 2))
+        self.worker_day_fact_approved.dt = self.dt
+        self.worker_day_fact_approved.dttm_work_start = datetime.combine(self.dt, time(18, 34))
+        self.worker_day_fact_approved.dttm_work_end = datetime.combine(self.dt + timedelta(1), time(1, 2))
         self.worker_day_fact_approved.save()
         AttendanceRecords.objects.create(
             shop_id=self.worker_day_fact_approved.shop_id,
             user_id=self.worker_day_fact_approved.employee.user_id,
-            dttm=datetime.combine(self.dt, time(1, 5)),
+            dttm=datetime.combine(self.dt + timedelta(1), time(1, 5)),
             type=AttendanceRecords.TYPE_LEAVING,
         )
         self.assertEqual(WorkerDay.objects.filter(is_fact=True, is_approved=True).count(), 1)
-        self.assertEqual(WorkerDay.objects.filter(is_fact=True, is_approved=True).first().dttm_work_end, datetime.combine(self.dt, time(1, 5)))
+        self.assertEqual(WorkerDay.objects.filter(is_fact=True, is_approved=True).first().dttm_work_end,
+                         datetime.combine(self.dt + timedelta(1), time(1, 5)))
 
     def test_create_att_record_and_update_not_approved(self):
         AttendanceRecords.objects.create(
@@ -2224,7 +3105,7 @@ class TestAttendanceRecords(TestsHelperMixin, APITestCase):
             type=AttendanceRecords.TYPE_LEAVING,
         )
         self.assertEqual(WorkerDay.objects.filter(is_fact=True, employee=self.employee1).count(), 2)
-        wd_not_approved.refresh_from_db()
+        wd_not_approved = WorkerDay.objects.get(is_approved=False, is_fact=True, employee=self.employee1)
         wd_approved.refresh_from_db()
         self.assertEqual(wd_not_approved.dttm_work_start, datetime.combine(self.dt, time(11, 5)))
         self.assertEqual(wd_not_approved.dttm_work_end, datetime.combine(self.dt, time(14, 54)))
@@ -2236,25 +3117,28 @@ class TestAttendanceRecords(TestsHelperMixin, APITestCase):
             type=AttendanceRecords.TYPE_LEAVING,
         )
         self.assertEqual(WorkerDay.objects.filter(is_fact=True, employee=self.employee1).count(), 2)
-        wd_not_approved.refresh_from_db()
+        wd_not_approved = WorkerDay.objects.get(is_approved=False, is_fact=True, employee=self.employee1)
         wd_approved.refresh_from_db()
         self.assertEqual(wd_not_approved.dttm_work_start, datetime.combine(self.dt, time(11, 5)))
         self.assertEqual(wd_not_approved.dttm_work_end, datetime.combine(self.dt, time(19, 54)))
         self.assertEqual(wd_not_approved.dttm_work_start, wd_approved.dttm_work_start)
 
-    @override_settings(MDA_SKIP_LEAVING_TICK=False)
     def test_create_record_no_replace_not_approved_fact(self):
-        wd = WorkerDay.objects.create(
+        self.network.skip_leaving_tick = False
+        self.network.save()
+        wd = WorkerDayFactory(
             dt=self.dt,
             employee_id=self.employment1.employee_id,
             employment=self.employment1,
             shop_id=self.employment1.shop_id,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dttm_work_start=datetime.combine(self.dt, time(10, 5)),
             dttm_work_end=datetime.combine(self.dt, time(20, 10)),
             created_by=self.user1,
+            last_edited_by=self.user1,
             is_fact=True,
         )
+        self.assertEqual(WorkerDay.objects.filter(is_fact=True, employee=self.employee1).count(), 1)
         AttendanceRecords.objects.create(
             shop_id=self.employment1.shop_id,
             user_id=self.employment1.employee.user_id,
@@ -2283,7 +3167,7 @@ class TestAttendanceRecords(TestsHelperMixin, APITestCase):
             is_fact=False,
             defaults={
                 'employment': self.employment2,
-                'type': WorkerDay.TYPE_WORKDAY,
+                'type_id': WorkerDay.TYPE_WORKDAY,
                 'shop_id': self.employment2.shop_id,
                 'dttm_work_start': datetime.combine(self.dt, time(10, 5)),
                 'dttm_work_end': datetime.combine(self.dt, time(20, 10)),
@@ -2306,7 +3190,7 @@ class TestAttendanceRecords(TestsHelperMixin, APITestCase):
             is_fact=False,
             defaults={
                 'employment': self.employment2,
-                'type': WorkerDay.TYPE_WORKDAY,
+                'type_id': WorkerDay.TYPE_WORKDAY,
                 'shop': self.shop,
                 'dttm_work_start': datetime.combine(self.dt, time(10)),
                 'dttm_work_end': datetime.combine(self.dt, time(16)),
@@ -2326,7 +3210,7 @@ class TestAttendanceRecords(TestsHelperMixin, APITestCase):
             is_approved=True,
             is_fact=False,
             employment=self.second_employment,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             shop=self.shop,
             dttm_work_start=datetime.combine(self.dt, time(16)),
             dttm_work_end=datetime.combine(self.dt, time(22)),
@@ -2359,6 +3243,189 @@ class TestAttendanceRecords(TestsHelperMixin, APITestCase):
         self.assertEqual(day, 11.4)
         self.assertEqual(night, 0.0)
 
+    def test_two_facts_created_when_there_are_two_plans(self):
+        WorkerDay.objects.filter(
+            dt=self.dt,
+            employee_id=self.employment2.employee_id,
+        ).delete()
+        WorkerDayFactory(
+            dt=self.dt,
+            employee_id=self.employment2.employee_id,
+            employment=self.employment2,
+            is_approved=True,
+            is_fact=False,
+            type_id=WorkerDay.TYPE_WORKDAY,
+            shop=self.shop,
+            dttm_work_start=datetime.combine(self.dt, time(10)),
+            dttm_work_end=datetime.combine(self.dt, time(13)),
+        )
+        WorkerDayFactory(
+            dt=self.dt,
+            employee_id=self.employment2.employee_id,
+            employment=self.employment2,
+            is_approved=True,
+            is_fact=False,
+            type_id=WorkerDay.TYPE_WORKDAY,
+            shop=self.shop,
+            dttm_work_start=datetime.combine(self.dt, time(19)),
+            dttm_work_end=datetime.combine(self.dt, time(22)),
+        )
+
+        dttm_start1 = datetime.combine(self.dt, time(9, 54))
+        AttendanceRecords.objects.create(
+            shop=self.shop,
+            user=self.user2,
+            dttm=dttm_start1,
+            type=AttendanceRecords.TYPE_COMING,
+        )
+        dttm_end1 = datetime.combine(self.dt, time(13, 2))
+        AttendanceRecords.objects.create(
+            shop=self.shop,
+            user=self.user2,
+            dttm=dttm_end1,
+            type=AttendanceRecords.TYPE_LEAVING,
+        )
+        self.assertTrue(WorkerDay.objects.filter(
+            employee_id=self.employment2.employee_id,
+            dt=self.dt,
+            dttm_work_start=dttm_start1,
+            dttm_work_end=dttm_end1,
+            is_fact=True,
+            is_approved=True,
+        ).exists())
+
+        dttm_start2 = datetime.combine(self.dt, time(18, 56))
+        AttendanceRecords.objects.create(
+            shop=self.shop,
+            user=self.user2,
+            dttm=dttm_start2,
+            type=AttendanceRecords.TYPE_COMING,
+        )
+        dttm_end2 = datetime.combine(self.dt, time(22, 6))
+        AttendanceRecords.objects.create(
+            shop=self.shop,
+            user=self.user2,
+            dttm=dttm_end2,
+            type=AttendanceRecords.TYPE_LEAVING,
+        )
+        self.assertTrue(WorkerDay.objects.filter(
+            employee_id=self.employment2.employee_id,
+            dt=self.dt,
+            dttm_work_start=dttm_start2,
+            dttm_work_end=dttm_end2,
+            is_fact=True,
+            is_approved=True,
+        ).exists())
+        self.assertEqual(WorkerDay.objects.filter(
+            employee_id=self.employment2.employee_id,
+            dt=self.dt,
+            is_fact=True,
+            is_approved=True,
+        ).count(), 2)
+        self.assertEqual(WorkerDay.objects.filter(
+            employee_id=self.employment2.employee_id,
+            dt=self.dt,
+            is_fact=True,
+            is_approved=False,
+        ).count(), 2)
+
+    def test_there_is_no_redundant_fact_approved_created_on_att_record_recalc(self):
+        WorkerDay.objects.filter(
+            id__in=[
+                self.worker_day_plan_approved.id,
+                self.worker_day_plan_not_approved.id,
+            ],
+        ).update(
+            dt=self.dt,
+            dttm_work_start=datetime.combine(self.dt, time(10)),
+            dttm_work_end=datetime.combine(self.dt, time(20)),
+        )
+        WorkerDay.objects.filter(
+            id__in=[
+                self.worker_day_fact_approved.id,
+                self.worker_day_fact_not_approved.id,
+            ],
+        ).delete()
+        fact_dttm_start = datetime.combine(self.dt, time(9, 57))
+        ar_start = AttendanceRecords.objects.create(
+            shop=self.shop,
+            user=self.user2,
+            dttm=fact_dttm_start,
+            type=AttendanceRecords.TYPE_COMING,
+        )
+
+        fact_qs = WorkerDay.objects.filter(
+            employee_id=ar_start.employee_id,
+            dt=self.dt,
+            dttm_work_start=fact_dttm_start,
+            type_id=WorkerDay.TYPE_WORKDAY,
+            is_fact=True,
+        )
+        fact_approved_qs = fact_qs.filter(is_approved=True)
+        fact_approved = fact_approved_qs.get()
+        fact_not_approved_qs = fact_qs.filter(is_approved=False)
+        fact_not_approved = fact_not_approved_qs.get()
+        self.assertIsNone(fact_not_approved.created_by_id)
+        self.assertIsNone(fact_not_approved.last_edited_by_id)
+        # при отметке должен был проставиться closest_plan_approved
+        self.assertEqual(fact_approved.closest_plan_approved.id, self.worker_day_plan_approved.id)
+
+        manual_fact_dttm_end = datetime.combine(self.dt, time(20))
+        resp = self._change_wd_data(fact_not_approved.id, data_to_change={'dttm_work_end': manual_fact_dttm_end})
+        self.assertEqual(resp.status_code, 200)
+        fact_not_approved.refresh_from_db()
+        self.assertEqual(fact_not_approved.dttm_work_end, manual_fact_dttm_end)
+        self.assertEqual(fact_not_approved.closest_plan_approved_id, self.worker_day_plan_approved.id)
+        resp = self._approve(
+            shop_id=fact_not_approved.shop_id,
+            is_fact=True,
+            dt_from=self.dt,
+            dt_to=self.dt,
+            employee_ids=[fact_not_approved.employee_id],
+        )
+        self.assertEqual(resp.status_code, 200)
+        fact_not_approved.refresh_from_db()
+        self.assertTrue(fact_not_approved.is_approved)
+        self.assertIsNone(fact_not_approved.created_by_id)
+        self.assertEqual(fact_not_approved.last_edited_by_id, self.user1.id)
+        self.assertFalse(WorkerDay.objects.filter(id=fact_approved.id).exists())
+        fact_approved = fact_not_approved
+        fact_not_approved = fact_not_approved_qs.get()
+        self.assertIsNone(fact_not_approved.created_by_id)
+        self.assertEqual(fact_not_approved.last_edited_by_id, self.user1.id)
+        # после подтв. факта должен быть проставлен closest_plan_approved в новом факте подтвежденном (бывшем черновике)
+        self.assertEqual(fact_approved.closest_plan_approved.id, self.worker_day_plan_approved.id)
+        ar_start.refresh_from_db()
+
+        new_plan_dttm_end = datetime.combine(self.dt, time(19))
+        resp = self._change_wd_data(
+            self.worker_day_plan_not_approved.id, data_to_change={'dttm_work_end': new_plan_dttm_end})
+        self.assertEqual(resp.status_code, 200)
+        self.worker_day_plan_not_approved.refresh_from_db()
+        self.assertEqual(self.worker_day_plan_not_approved.dttm_work_end, new_plan_dttm_end)
+        resp = self._approve(
+            shop_id=self.worker_day_plan_not_approved.shop_id,
+            is_fact=False,
+            dt_from=self.dt,
+            dt_to=self.dt,
+            employee_ids=[self.worker_day_plan_not_approved.employee_id],
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.worker_day_plan_not_approved.refresh_from_db()
+        self.assertTrue(self.worker_day_plan_not_approved.is_approved)
+        plan_approved = self.worker_day_plan_not_approved
+        # после подтверждения плана должен проставиться новый план подтвержденный (бывшый план черновик)
+        fact_approved.refresh_from_db()
+        self.assertEqual(fact_approved.closest_plan_approved.id, plan_approved.id)
+
+        self.assertTrue(WorkerDay.objects.filter(id=fact_approved.id).exists())
+        self.assertTrue(WorkerDay.objects.filter(id=fact_not_approved.id).exists())
+
+        # TODO: проверка, что автоматический пересчет факта на основе отметок запустится
+        # пока вызовем пересчет отметки вручную
+        ar_start.save()
+        self.assertEqual(fact_approved_qs.count(), 1)  # не должен создаться дополнительный факт
+
 
 class TestVacancy(TestsHelperMixin, APITestCase):
     @classmethod
@@ -2376,7 +3443,7 @@ class TestVacancy(TestsHelperMixin, APITestCase):
             employment=cls.employment1,
             dttm_work_start=datetime.combine(cls.dt_now, time(9)),
             dttm_work_end=datetime.combine(cls.dt_now, time(20)),
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dt=cls.dt_now,
             is_vacancy=True,
         )
@@ -2384,7 +3451,7 @@ class TestVacancy(TestsHelperMixin, APITestCase):
             shop=cls.shop,
             dttm_work_start=datetime.combine(cls.dt_now, time(9)),
             dttm_work_end=datetime.combine(cls.dt_now, time(17)),
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dt=cls.dt_now,
             is_vacancy=True,
             is_approved=True,
@@ -2542,7 +3609,7 @@ class TestVacancy(TestsHelperMixin, APITestCase):
             shop=self.shop,
             employee=self.employee2,
             employment=self.employment2,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dttm_work_start=datetime.combine(self.dt_now, time(hour=11, minute=30)),
             dttm_work_end=datetime.combine(self.dt_now, time(hour=20, minute=30)),
             dt=self.dt_now,
@@ -2557,7 +3624,7 @@ class TestVacancy(TestsHelperMixin, APITestCase):
             shop=self.shop,
             employee=self.employee2,
             employment=self.employment2,
-            type=WorkerDay.TYPE_HOLIDAY,
+            type_id=WorkerDay.TYPE_HOLIDAY,
             dt=self.dt_now,
             is_approved=True,
         )
@@ -2568,13 +3635,7 @@ class TestVacancy(TestsHelperMixin, APITestCase):
             dttm_status_change=now(),
             status=ShopMonthStat.READY,
         )
-        FunctionGroup.objects.create(
-            group=self.employee_group,
-            method='POST',
-            func='WorkerDay_confirm_vacancy',
-            level_up=1,
-            level_down=99,
-        )
+        self.add_group_perm(self.employee_group, 'WorkerDay_confirm_vacancy', 'POST')
         response = self.client.post(f'/rest_api/worker_day/{self.vacancy2.id}/confirm_vacancy/')
 
         self.assertEqual(response.status_code, 200)
@@ -2582,10 +3643,49 @@ class TestVacancy(TestsHelperMixin, APITestCase):
         self.assertEqual(len(mail.outbox), 1)
         self.assertEqual(mail.outbox[0].subject, subject)
         self.assertEqual(mail.outbox[0].to[0], self.user1.email)
-        body = f'Здравствуйте, {self.user1.first_name}!\n\nСотрудник {self.user2.last_name} {self.user2.first_name} откликнулся на вакансию {self.vacancy2.dt} с типом работ {self.work_type1.work_type_name.name}\n\nПисьмо отправлено роботом.'
-        self.assertEqual(mail.outbox[0].body, body)
+        self.assertEqual(
+            mail.outbox[0].body,
+            f'Здравствуйте, {self.user1.first_name}!\n\n\n\n\n\n\nСотрудник {self.user2.last_name} {self.user2.first_name} откликнулся на вакансию с типом работ {self.work_type1.work_type_name.name}\n'
+            f'Дата: {self.vacancy2.dt}\nПодразделение: {self.shop.name}\n\n\n\n\n\nПисьмо отправлено роботом. Подробности можно узнать по ссылке'
+        )
 
         self.assertFalse(WorkerDay.objects.filter(id=pawd.id).exists())
+
+        # можно откликнуться на вакансию,
+        # если время не пересекается с другой вакансией на которую уже откликнулся или назначен
+        vacancy3 = WorkerDayFactory(
+            employee_id=None,
+            employment_id=None,
+            shop=self.shop,
+            dttm_work_start=datetime.combine(self.dt_now, time(18)),
+            dttm_work_end=datetime.combine(self.dt_now, time(22)),
+            type_id=WorkerDay.TYPE_WORKDAY,
+            dt=self.dt_now,
+            is_vacancy=True,
+            is_approved=True,
+            cashbox_details__work_type=self.work_type1,
+        )
+        response = self.client.post(f'/rest_api/worker_day/{vacancy3.id}/confirm_vacancy/')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {'result': 'Вакансия успешно принята.'})
+
+        # нельзя откликнуться на вакансию,
+        # если время вакансии пересекается с другой/другими днями
+        vacancy4 = WorkerDayFactory(
+            employee_id=None,
+            employment_id=None,
+            shop=self.shop,
+            dttm_work_start=datetime.combine(self.dt_now, time(12)),
+            dttm_work_end=datetime.combine(self.dt_now, time(22)),
+            type_id=WorkerDay.TYPE_WORKDAY,
+            dt=self.dt_now,
+            is_vacancy=True,
+            is_approved=True,
+            cashbox_details__work_type=self.work_type1,
+        )
+        response = self.client.post(f'/rest_api/worker_day/{vacancy4.id}/confirm_vacancy/')
+        self.assertContains(
+            response, text='Операция не может быть выполнена. Недопустимое пересечение времени', status_code=400)
 
     def test_approve_vacancy(self):
         WorkerDay.objects.filter(id=self.vacancy.id).update(employee_id=None, is_approved=False)
@@ -2593,7 +3693,7 @@ class TestVacancy(TestsHelperMixin, APITestCase):
             shop=self.shop,
             employee=self.employee2,
             employment=self.employment2,
-            type=WorkerDay.TYPE_HOLIDAY,
+            type_id=WorkerDay.TYPE_HOLIDAY,
             dt=self.dt_now,
             is_approved=True,
         )
@@ -2628,7 +3728,7 @@ class TestVacancy(TestsHelperMixin, APITestCase):
         WorkerDay.objects.create(
             employee=self.employment1.employee,
             employment=self.employment1,
-            type=WorkerDay.TYPE_HOLIDAY,
+            type_id=WorkerDay.TYPE_HOLIDAY,
             dt=self.dt_now,
             is_approved=True,
         )
@@ -2636,7 +3736,7 @@ class TestVacancy(TestsHelperMixin, APITestCase):
             shop=self.shop,
             employee=self.employment1.employee,
             employment=self.employment1,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dttm_work_start=datetime.combine(self.dt_now + timedelta(1), time(hour=11, minute=30)),
             dttm_work_end=datetime.combine(self.dt_now + timedelta(1), time(hour=20, minute=30)),
             dt=self.dt_now + timedelta(1),
@@ -2646,7 +3746,7 @@ class TestVacancy(TestsHelperMixin, APITestCase):
             shop=self.shop,
             dttm_work_start=datetime.combine(self.dt_now + timedelta(1), time(9)),
             dttm_work_end=datetime.combine(self.dt_now + timedelta(1), time(17)),
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dt=self.dt_now + timedelta(1),
             is_vacancy=True,
             is_approved=True,
@@ -2655,7 +3755,7 @@ class TestVacancy(TestsHelperMixin, APITestCase):
             shop=self.shop,
             dttm_work_start=datetime.combine(self.dt_now + timedelta(2), time(9)),
             dttm_work_end=datetime.combine(self.dt_now + timedelta(2), time(17)),
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dt=self.dt_now + timedelta(2),
             is_vacancy=True,
             is_approved=True,
@@ -2663,7 +3763,7 @@ class TestVacancy(TestsHelperMixin, APITestCase):
         WorkerDay.objects.create(
             employee=self.employment1.employee,
             employment=self.employment1,
-            type=WorkerDay.TYPE_HOLIDAY,
+            type_id=WorkerDay.TYPE_HOLIDAY,
             dt=self.dt_now + timedelta(3),
             is_approved=True,
         )
@@ -2671,7 +3771,7 @@ class TestVacancy(TestsHelperMixin, APITestCase):
             shop=self.shop,
             dttm_work_start=datetime.combine(self.dt_now + timedelta(2), time(9)),
             dttm_work_end=datetime.combine(self.dt_now + timedelta(2), time(17)),
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dt=self.dt_now + timedelta(3),
             is_vacancy=True,
             is_approved=True,
@@ -2681,7 +3781,6 @@ class TestVacancy(TestsHelperMixin, APITestCase):
         resp = self.client.get('/rest_api/worker_day/vacancy/?only_available=true&offset=0&limit=10&is_vacant=true')
         self.assertEqual(resp.json()['count'], 1)
         self.assertEqual(resp.json()['results'][0]['dt'], self.dt_now.strftime('%Y-%m-%d'))
-
 
 
 class TestAditionalFunctions(TestsHelperMixin, APITestCase):
@@ -2714,7 +3813,7 @@ class TestAditionalFunctions(TestsHelperMixin, APITestCase):
                 employment=employment,
                 shop=None,
                 dt=dt,
-                type=WorkerDay.TYPE_HOLIDAY,
+                type_id=WorkerDay.TYPE_HOLIDAY,
                 is_approved=approved,
                 parent_worker_day=parent_worker_day,
             )
@@ -2731,7 +3830,7 @@ class TestAditionalFunctions(TestsHelperMixin, APITestCase):
                 employee=employment.employee,
                 shop_id=shop_id or employment.shop_id,
                 dt=date,
-                type=WorkerDay.TYPE_WORKDAY,
+                type_id=WorkerDay.TYPE_WORKDAY,
                 dttm_work_start=datetime.combine(date, time(from_tm)),
                 dttm_work_end=datetime.combine(date_to, time(to_tm)),
                 is_approved=approved,
@@ -2897,33 +3996,33 @@ class TestAditionalFunctions(TestsHelperMixin, APITestCase):
                 WorkerDayFactory(
                     employment=self.employment2,
                     employee=self.employee2,
-                    type=WorkerDay.TYPE_WORKDAY, shop=self.shop, dt=dt_from - timedelta(days=2), is_approved=True,
+                    type_id=WorkerDay.TYPE_WORKDAY, shop=self.shop, dt=dt_from - timedelta(days=2), is_approved=True,
                     cashbox_details__work_type__work_type_name__name='Продавец-кассир',
                     cashbox_details__work_type__work_type_name__code='consult',
                 )
                 WorkerDayFactory(
                     employment=self.employment3,
                     employee=self.employee3,
-                    type=WorkerDay.TYPE_HOLIDAY, shop=self.shop, dt=dt_from - timedelta(days=2), is_approved=True,
+                    type_id=WorkerDay.TYPE_HOLIDAY, shop=self.shop, dt=dt_from - timedelta(days=2), is_approved=True,
                 )
 
                 wd_create_user3_and_delete_user2 = WorkerDayFactory(
                     employment=self.employment2,
                     employee=self.employee2,
-                    type=WorkerDay.TYPE_WORKDAY, shop=self.shop, dt=dt_from - timedelta(days=1), is_approved=True,
+                    type_id=WorkerDay.TYPE_WORKDAY, shop=self.shop, dt=dt_from - timedelta(days=1), is_approved=True,
                     cashbox_details__work_type__work_type_name__name='Врач',
                     cashbox_details__work_type__work_type_name__code='doctor',
                 )
                 WorkerDayFactory(
                     employment=self.employment3,
                     employee=self.employee3,
-                    type=WorkerDay.TYPE_HOLIDAY, shop=self.shop, dt=dt_from - timedelta(days=1), is_approved=True,
+                    type_id=WorkerDay.TYPE_HOLIDAY, shop=self.shop, dt=dt_from - timedelta(days=1), is_approved=True,
                 )
 
                 wd_update_user3 = WorkerDayFactory(
                     employment=self.employment2,
                     employee=self.employee2,
-                    type=WorkerDay.TYPE_WORKDAY, shop=self.shop, dt=dt_from, is_approved=True,
+                    type_id=WorkerDay.TYPE_WORKDAY, shop=self.shop, dt=dt_from, is_approved=True,
                     dttm_work_start=datetime.combine(dt_from, time(8, 0, 0)),
                     dttm_work_end=datetime.combine(dt_from, time(21, 0, 0)),
                     cashbox_details__work_type__work_type_name__name='Врач',
@@ -2932,7 +4031,7 @@ class TestAditionalFunctions(TestsHelperMixin, APITestCase):
                 wd_update_user2 = WorkerDayFactory(
                     employment=self.employment3,
                     employee=self.employee3,
-                    type=WorkerDay.TYPE_WORKDAY, shop=self.shop, dt=dt_from, is_approved=True,
+                    type_id=WorkerDay.TYPE_WORKDAY, shop=self.shop, dt=dt_from, is_approved=True,
                     dttm_work_start=datetime.combine(dt_from, time(8, 0, 0)),
                     dttm_work_end=datetime.combine(dt_from, time(20, 0, 0)),
                     cashbox_details__work_type__work_type_name__name='Врач',
@@ -2942,12 +4041,12 @@ class TestAditionalFunctions(TestsHelperMixin, APITestCase):
                 WorkerDayFactory(
                     employment=self.employment2,
                     employee=self.employee2,
-                    type=WorkerDay.TYPE_HOLIDAY, shop=self.shop, dt=dt_from + timedelta(days=1), is_approved=True,
+                    type_id=WorkerDay.TYPE_HOLIDAY, shop=self.shop, dt=dt_from + timedelta(days=1), is_approved=True,
                 )
                 wd_create_user2_and_delete_user3 = WorkerDayFactory(
                     employment=self.employment3,
                     employee=self.employee3,
-                    type=WorkerDay.TYPE_WORKDAY, shop=self.shop, dt=dt_from + timedelta(days=1), is_approved=True,
+                    type_id=WorkerDay.TYPE_WORKDAY, shop=self.shop, dt=dt_from + timedelta(days=1), is_approved=True,
                     dttm_work_start=datetime.combine(dt_from, time(11, 0, 0)),
                     dttm_work_end=datetime.combine(dt_from, time(21, 0, 0)),
                     cashbox_details__work_type__work_type_name__name='Врач',
@@ -2958,18 +4057,18 @@ class TestAditionalFunctions(TestsHelperMixin, APITestCase):
                 WorkerDayFactory(
                     employment=self.employment2,
                     employee=self.employee2,
-                    type=WorkerDay.TYPE_HOLIDAY, shop=self.shop, dt=dt_from + timedelta(days=2), is_approved=True,
+                    type_id=WorkerDay.TYPE_HOLIDAY, shop=self.shop, dt=dt_from + timedelta(days=2), is_approved=True,
                 )
                 WorkerDayFactory(
                     employment=self.employment3,
                     employee=self.employee3,
-                    type=WorkerDay.TYPE_VACATION, shop=self.shop, dt=dt_from + timedelta(days=2), is_approved=True,
+                    type_id=WorkerDay.TYPE_VACATION, shop=self.shop, dt=dt_from + timedelta(days=2), is_approved=True,
                 )
 
                 wd_create_user3_and_delete_user2_diff_work_types = WorkerDayFactory(
                     employment=self.employment2,
                     employee=self.employee2,
-                    type=WorkerDay.TYPE_WORKDAY, shop=self.shop, dt=dt_from + timedelta(days=3), is_approved=True,
+                    type_id=WorkerDay.TYPE_WORKDAY, shop=self.shop, dt=dt_from + timedelta(days=3), is_approved=True,
                     dttm_work_start=datetime.combine(dt_from + timedelta(days=3), time(8, 0, 0)),
                     dttm_work_end=datetime.combine(dt_from + timedelta(days=3), time(21, 0, 0)),
                     cashbox_details__work_type__work_type_name__name='Врач',
@@ -2978,7 +4077,7 @@ class TestAditionalFunctions(TestsHelperMixin, APITestCase):
                 WorkerDayFactory(
                     employment=self.employment3,
                     employee=self.employee3,
-                    type=WorkerDay.TYPE_WORKDAY, shop=self.shop, dt=dt_from + timedelta(days=3), is_approved=True,
+                    type_id=WorkerDay.TYPE_WORKDAY, shop=self.shop, dt=dt_from + timedelta(days=3), is_approved=True,
                     dttm_work_start=datetime.combine(dt_from + timedelta(days=3), time(8, 0, 0)),
                     dttm_work_end=datetime.combine(dt_from + timedelta(days=3), time(20, 0, 0)),
                     cashbox_details__work_type__work_type_name__name='Продавец-кассир',
@@ -3240,7 +4339,7 @@ class TestAditionalFunctions(TestsHelperMixin, APITestCase):
             employee=self.employee2,
             employment=self.employment2,
             dt=dt_tomorrow,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dttm_work_start=datetime.combine(dt_now, time(8, 0, 0)),
             dttm_work_end=datetime.combine(dt_now, time(20, 0, 0)),
             is_fact=False,
@@ -3251,7 +4350,7 @@ class TestAditionalFunctions(TestsHelperMixin, APITestCase):
             employee=self.employee2,
             employment=self.employment2,
             dt=dt_now,
-            type=WorkerDay.TYPE_HOLIDAY,
+            type_id=WorkerDay.TYPE_HOLIDAY,
             is_fact=False,
             is_approved=False,
         )
@@ -3270,7 +4369,7 @@ class TestAditionalFunctions(TestsHelperMixin, APITestCase):
             employee=self.employee3, is_approved=False, dt=dt_to, type='H'
         ).count(), 1)
         self.assertEqual(WorkerDay.objects.filter(
-            employee=self.employee3, is_approved=False, dt=dt_to + timedelta(days=1), type='W'
+            employee=self.employee3, is_approved=False, dt=dt_to + timedelta(days=1), type_id='W'
         ).count(), 1)
 
     def test_copy_approved(self):
@@ -3280,7 +4379,7 @@ class TestAditionalFunctions(TestsHelperMixin, APITestCase):
         WorkerDay.objects.create(
             employee_id=self.employment1.employee_id,
             employment=self.employment1,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             is_fact=True,
             is_approved=True,
             dt=dt_now + timedelta(1),
@@ -3309,6 +4408,8 @@ class TestAditionalFunctions(TestsHelperMixin, APITestCase):
         self.assertEqual(WorkerDay.objects.filter(is_approved=False, dt=dt_now + timedelta(days=6)).count(), 0)
 
     def test_copy_approved_to_fact(self):
+        self.network.only_fact_hours_that_in_approved_plan = True
+        self.network.save()
         dt_now = date.today()
         self.create_worker_days(self.employment1, dt_now, 3, 10, 20, True)
         self.update_or_create_holidays(self.employment1, dt_now + timedelta(days=3), 3, True)
@@ -3320,7 +4421,7 @@ class TestAditionalFunctions(TestsHelperMixin, APITestCase):
             employee_id=self.employment1.employee_id,
             employment=self.employment1,
             dt=dt_now,
-            type=WorkerDay.TYPE_EMPTY,
+            type_id=WorkerDay.TYPE_EMPTY,
             shop_id=self.employment1.shop_id,
             is_fact=True,
         )
@@ -3339,8 +4440,9 @@ class TestAditionalFunctions(TestsHelperMixin, APITestCase):
         response = self.client.post(self.url + 'copy_approved/', data=data)
 
         self.assertEqual(len(response.json()), 7)
-        self.assertEqual(WorkerDay.objects.filter(is_approved=False, is_fact=True).count(), 7)
-        self.assertEqual(WorkerDay.objects.filter(is_approved=False, is_fact=True, type=WorkerDay.TYPE_HOLIDAY).count(), 0)
+        self.assertEqual(WorkerDay.objects.filter(
+            is_approved=False, is_fact=True, work_hours__gt=timedelta(seconds=0)).count(), 7)
+        self.assertEqual(WorkerDay.objects.filter(is_approved=False, is_fact=True, type_id=WorkerDay.TYPE_HOLIDAY).count(), 0)
         self.assertEqual(WorkerDay.objects.filter(is_approved=False, employee_id=self.employment2.employee_id).count(), 0)
         self.assertEqual(WorkerDay.objects.filter(is_approved=False, dt=dt_now + timedelta(days=6)).count(), 0)
 
@@ -3353,7 +4455,7 @@ class TestAditionalFunctions(TestsHelperMixin, APITestCase):
         self.create_worker_days(self.employment3, dt_now, 4, 10, 20, True)
         self.update_or_create_holidays(self.employment3, dt_now + timedelta(days=4), 2, True)
         WorkerDay.objects.filter(
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
         ).update(
             is_fact=True,
         )
@@ -3373,7 +4475,7 @@ class TestAditionalFunctions(TestsHelperMixin, APITestCase):
 
         self.assertEqual(len(response.json()), 7)
         self.assertEqual(WorkerDay.objects.filter(is_approved=False, is_fact=True).count(), 7)
-        self.assertEqual(WorkerDay.objects.filter(is_approved=False, is_fact=True, type=WorkerDay.TYPE_HOLIDAY).count(), 0)
+        self.assertEqual(WorkerDay.objects.filter(is_approved=False, is_fact=True, type_id=WorkerDay.TYPE_HOLIDAY).count(), 0)
         self.assertEqual(WorkerDay.objects.filter(is_approved=False, employee_id=self.employment2.employee_id).count(), 0)
         self.assertEqual(WorkerDay.objects.filter(is_approved=False, dt=dt_now + timedelta(days=6)).count(), 0)
 
@@ -3385,13 +4487,13 @@ class TestAditionalFunctions(TestsHelperMixin, APITestCase):
 
         for i in range((dt_from_last - dt_from_first).days + 1):
             dt = dt_from_first + timedelta(i)
-            type = WorkerDay.TYPE_WORKDAY if i % 3 != 0 else WorkerDay.TYPE_HOLIDAY
+            type_id = WorkerDay.TYPE_WORKDAY if i % 3 != 0 else WorkerDay.TYPE_HOLIDAY
             WorkerDay.objects.create(
                 dt=dt,
                 shop_id=self.employment2.shop_id,
                 employee_id=self.employment2.employee_id,
                 employment=self.employment2,
-                type=type,
+                type_id=type_id,
                 is_approved=True,
             )
             if i % 2 == 0 and i < 28:
@@ -3400,7 +4502,7 @@ class TestAditionalFunctions(TestsHelperMixin, APITestCase):
                     shop_id=self.employment2.shop_id,
                     employee_id=self.employment2.employee_id,
                     employment=self.employment2,
-                    type=WorkerDay.TYPE_WORKDAY,
+                    type_id=WorkerDay.TYPE_WORKDAY,
                     is_approved=True,
                     is_fact=True,
                 )
@@ -3409,7 +4511,7 @@ class TestAditionalFunctions(TestsHelperMixin, APITestCase):
                 shop_id=self.employment3.shop_id,
                 employee_id=self.employment3.employee_id,
                 employment=self.employment3,
-                type=type,
+                type_id=type_id,
                 is_approved=True,
             )
             WorkerDay.objects.create(
@@ -3417,7 +4519,7 @@ class TestAditionalFunctions(TestsHelperMixin, APITestCase):
                 shop_id=self.employment4.shop_id,
                 employee_id=self.employment4.employee_id,
                 employment=self.employment4,
-                type=type,
+                type_id=type_id,
                 is_approved=True,
             )
 
@@ -3463,13 +4565,13 @@ class TestAditionalFunctions(TestsHelperMixin, APITestCase):
         for i in range(5):
             # H,W,W,H,W
             dt = dt_from_first + timedelta(i)
-            type = WorkerDay.TYPE_WORKDAY if i % 3 != 0 else WorkerDay.TYPE_HOLIDAY
+            type_id = WorkerDay.TYPE_WORKDAY if i % 3 != 0 else WorkerDay.TYPE_HOLIDAY
             WorkerDay.objects.create(
                 dt=dt,
                 shop_id=self.employment2.shop_id,
                 employee_id=self.employment2.employee_id,
                 employment=self.employment2,
-                type=type,
+                type_id=type_id,
                 is_approved=False,
             )
         for i in range(8):
@@ -3479,7 +4581,7 @@ class TestAditionalFunctions(TestsHelperMixin, APITestCase):
                 shop_id=self.employment2.shop_id,
                 employee_id=self.employment2.employee_id,
                 employment=self.employment2,
-                type=WorkerDay.TYPE_VACATION,
+                type_id=WorkerDay.TYPE_VACATION,
                 is_approved=False,
             )
 
@@ -3502,7 +4604,6 @@ class TestAditionalFunctions(TestsHelperMixin, APITestCase):
         self.assertEqual(WorkerDay.objects.filter(is_fact=False, is_approved=False, dt__gte=dt_to_first, dt__lte=dt_to_last, type='V').count(), 3)
         self.assertEqual(WorkerDay.objects.filter(is_fact=False, is_approved=False, dt__gte=dt_to_first, dt__lte=dt_to_last, type='W').count(), 5)
         self.assertEqual(WorkerDay.objects.filter(is_fact=False, is_approved=False, dt__gte=dt_to_first, dt__lte=dt_to_last, type='H').count(), 0)
-        
 
     def test_copy_range_bad_dates(self):
         dt_from_first = date.today().replace(day=1)
@@ -3526,7 +4627,7 @@ class TestAditionalFunctions(TestsHelperMixin, APITestCase):
         dt_now = date.today()
         wd = WorkerDayFactory(
             dt=dt_now,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             is_approved=False,
             is_fact=True,
         )
@@ -3550,7 +4651,7 @@ class TestAditionalFunctions(TestsHelperMixin, APITestCase):
         dt_now = date.today()
         wd = WorkerDayFactory(
             dt=dt_now,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             is_approved=False,
             is_fact=True,
             is_blocked=True,
@@ -3697,7 +4798,7 @@ class TestAditionalFunctions(TestsHelperMixin, APITestCase):
         response = self.client.post(url, data, format='json')
         data = response.json()
         self.assertEquals(len(data), 31)
-        self.assertEquals(WorkerDay.objects.filter(employee_id=self.employee1.id, type=WorkerDay.TYPE_VACATION, dt__gte=dt_from, dt__lte=dt_to).count(), 31)
+        self.assertEquals(WorkerDay.objects.filter(employee_id=self.employee1.id, type_id=WorkerDay.TYPE_VACATION, dt__gte=dt_from, dt__lte=dt_to).count(), 31)
 
     def test_change_list_create_vacancy_many_work_types(self):
         dt_from = date.today()
@@ -3800,7 +4901,7 @@ class TestAditionalFunctions(TestsHelperMixin, APITestCase):
         today = date.today()
         wd = WorkerDayFactory(
             dt=today,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             employee=self.employee2,
             employment=self.employment2,
             shop=self.employment2.shop,
@@ -3837,6 +4938,26 @@ class TestAditionalFunctions(TestsHelperMixin, APITestCase):
                 data=self.dump_data(data), content_type='application/json',
             )
         self.assertContains(resp2, 'Не найдено сотрудников удовлетворяющих условиям запроса.', status_code=400)
+
+    def test_duplicate_for_multiple_wdays_on_one_date(self):
+        dt_from = date.today()
+        self.create_worker_days(self.employment2, dt_from, 5, 10, 14, True)
+        self.create_worker_days(self.employment2, dt_from, 5, 18, 22, True)
+        self.create_worker_days(self.employment3, dt_from, 4, 10, 14, False)
+        self.create_worker_days(self.employment3, dt_from, 4, 18, 22, False)
+        self.assertEqual(WorkerDay.objects.filter(employee=self.employee3, is_approved=False).count(), 8)
+        data = {
+            'from_employee_id': self.employee2.id,
+            'from_dates': [Converter.convert_date(dt_from + timedelta(i)) for i in range(5)],
+            'to_employee_id': self.employee3.id,
+            'to_dates': [Converter.convert_date(dt_from + timedelta(i)) for i in range(5)],
+            'is_approved': True,
+        }
+        url = f'{self.url}duplicate/'
+        response = self.client.post(url, data, format='json')
+        self.assertEqual(len(response.json()), 10)
+        self.assertEqual(WorkerDay.objects.filter(employee=self.employee3, is_approved=False).count(), 10)
+
 
 class TestFineLogic(APITestCase):
     USER_USERNAME = "user1"
@@ -3896,19 +5017,20 @@ class TestFineLogic(APITestCase):
         )
         return user, employee, employment
 
-    def _create_or_update_worker_day(self, employment, dttm_from, dttm_to, is_fact=False, is_approved=True):
+    def _create_or_update_worker_day(self, employment, dttm_from, dttm_to, is_fact=False, is_approved=True, closest_plan_approved_id=None):
         wd, _ =  WorkerDay.objects.update_or_create(
             employee_id=employment.employee_id,
             is_fact=is_fact,
             is_approved=is_approved,
             dt=dttm_from.date(),
             shop=self.shop,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             defaults=dict(
                 dttm_work_start=dttm_from,
                 dttm_work_end=dttm_to,
                 employment=employment,
-            )
+            ),
+            closest_plan_approved_id=closest_plan_approved_id,
         )
         return wd
 
@@ -3916,40 +5038,40 @@ class TestFineLogic(APITestCase):
         dt = date.today()
         plan_wd_dir = self._create_or_update_worker_day(self.dir[2], datetime.combine(dt, time(10)), datetime.combine(dt, time(20)))
         self.assertEquals(plan_wd_dir.work_hours, timedelta(hours=9, minutes=30))
-        fact_wd_dir = self._create_or_update_worker_day(self.dir[2], datetime.combine(dt, time(9, 53)), datetime.combine(dt, time(20, 10)), is_fact=True)
+        fact_wd_dir = self._create_or_update_worker_day(self.dir[2], datetime.combine(dt, time(9, 53)), datetime.combine(dt, time(20, 10)), is_fact=True, closest_plan_approved_id=plan_wd_dir.id)
         self.assertEquals(fact_wd_dir.work_hours, timedelta(hours=9, minutes=47))
-        fact_wd_dir_bad = self._create_or_update_worker_day(self.dir[2], datetime.combine(dt, time(9, 56)), datetime.combine(dt, time(20)), is_fact=True)
+        fact_wd_dir_bad = self._create_or_update_worker_day(self.dir[2], datetime.combine(dt, time(9, 56)), datetime.combine(dt, time(20)), is_fact=True, closest_plan_approved_id=plan_wd_dir.id)
         self.assertEquals(fact_wd_dir_bad.work_hours, timedelta(hours=7, minutes=34))
 
         plan_wd_cashier = self._create_or_update_worker_day(self.cashier[2], datetime.combine(dt, time(10)), datetime.combine(dt, time(20)))
         self.assertEquals(plan_wd_cashier.work_hours, timedelta(hours=9, minutes=30))
-        fact_wd_cashier = self._create_or_update_worker_day(self.cashier[2], datetime.combine(dt, time(9, 55)), datetime.combine(dt, time(20, 10)), is_fact=True)
+        fact_wd_cashier = self._create_or_update_worker_day(self.cashier[2], datetime.combine(dt, time(9, 55)), datetime.combine(dt, time(20, 10)), is_fact=True, closest_plan_approved_id=plan_wd_cashier.id)
         self.assertEquals(fact_wd_cashier.work_hours, timedelta(hours=9, minutes=45))
-        fact_wd_cashier_bad = self._create_or_update_worker_day(self.cashier[2], datetime.combine(dt, time(9, 56)), datetime.combine(dt, time(20)), is_fact=True)
+        fact_wd_cashier_bad = self._create_or_update_worker_day(self.cashier[2], datetime.combine(dt, time(9, 56)), datetime.combine(dt, time(20)), is_fact=True, closest_plan_approved_id=plan_wd_cashier.id)
         self.assertEquals(fact_wd_cashier_bad.work_hours, timedelta(hours=8, minutes=34))
 
         plan_wd_courier = self._create_or_update_worker_day(self.courier[2], datetime.combine(dt, time(10)), datetime.combine(dt, time(20)))
         self.assertEquals(plan_wd_courier.work_hours, timedelta(hours=9, minutes=30))
-        fact_wd_courier = self._create_or_update_worker_day(self.courier[2], datetime.combine(dt, time(9, 55)), datetime.combine(dt, time(20, 11)), is_fact=True)
+        fact_wd_courier = self._create_or_update_worker_day(self.courier[2], datetime.combine(dt, time(9, 55)), datetime.combine(dt, time(20, 11)), is_fact=True, closest_plan_approved_id=plan_wd_courier.id)
         self.assertEquals(fact_wd_courier.work_hours, timedelta(hours=9, minutes=46))
-        fact_wd_courier_bad = self._create_or_update_worker_day(self.courier[2], datetime.combine(dt, time(10, 1)), datetime.combine(dt, time(19, 50)), is_fact=True)
+        fact_wd_courier_bad = self._create_or_update_worker_day(self.courier[2], datetime.combine(dt, time(10, 1)), datetime.combine(dt, time(19, 50)), is_fact=True, closest_plan_approved_id=plan_wd_courier.id)
         self.assertEquals(fact_wd_courier_bad.work_hours, timedelta(hours=8, minutes=19))
 
         plan_wd_cleaner = self._create_or_update_worker_day(self.cleaner[2], datetime.combine(dt, time(10)), datetime.combine(dt, time(20)))
         self.assertEquals(plan_wd_cleaner.work_hours, timedelta(hours=9, minutes=30))
-        fact_wd_cleaner = self._create_or_update_worker_day(self.cleaner[2], datetime.combine(dt, time(9, 55)), datetime.combine(dt, time(20, 10)), is_fact=True)
+        fact_wd_cleaner = self._create_or_update_worker_day(self.cleaner[2], datetime.combine(dt, time(9, 55)), datetime.combine(dt, time(20, 10)), is_fact=True, closest_plan_approved_id=plan_wd_cleaner.id)
         self.assertEquals(fact_wd_cleaner.work_hours, timedelta(hours=9, minutes=45))
-        fact_wd_cleaner_bad = self._create_or_update_worker_day(self.cleaner[2], datetime.combine(dt, time(10, 5)), datetime.combine(dt, time(19, 50)), is_fact=True)
+        fact_wd_cleaner_bad = self._create_or_update_worker_day(self.cleaner[2], datetime.combine(dt, time(10, 5)), datetime.combine(dt, time(19, 50)), is_fact=True, closest_plan_approved_id=plan_wd_cleaner.id)
         self.assertEquals(fact_wd_cleaner_bad.work_hours, timedelta(hours=9, minutes=15))
 
     def test_facts_work_hours_recalculated_on_plan_change(self):
         dt = date.today()
         plan_approved = self._create_or_update_worker_day(self.dir[2], datetime.combine(dt, time(9)), datetime.combine(dt, time(20)))
 
-        fact_approved = self._create_or_update_worker_day(self.dir[2], datetime.combine(dt, time(8, 35)), datetime.combine(dt, time(20, 25)), is_fact=True)
+        fact_approved = self._create_or_update_worker_day(self.dir[2], datetime.combine(dt, time(8, 35)), datetime.combine(dt, time(20, 25)), is_fact=True, closest_plan_approved_id=plan_approved.id)
         self.assertEqual(fact_approved.work_hours.total_seconds(), 11 * 3600 + 20 * 60)
 
-        fact_not_approved = self._create_or_update_worker_day(self.dir[2], datetime.combine(dt, time(9)), datetime.combine(dt, time(19)), is_approved=False, is_fact=True)
+        fact_not_approved = self._create_or_update_worker_day(self.dir[2], datetime.combine(dt, time(9)), datetime.combine(dt, time(19)), is_approved=False, is_fact=True, closest_plan_approved_id=plan_approved.id)
         self.assertEqual(fact_not_approved.work_hours.total_seconds(), 6 * 3600 + 30 * 60)
 
         plan_approved.dttm_work_start = datetime.combine(dt, time(11, 00, 0))
@@ -3967,9 +5089,9 @@ class TestFineLogic(APITestCase):
         dt = date.today()
         plan_wd_dir = self._create_or_update_worker_day(self.dir[2], datetime.combine(dt, time(10)), datetime.combine(dt, time(20)))
         self.assertEquals(plan_wd_dir.work_hours, timedelta(hours=9, minutes=30))
-        fact_wd_dir = self._create_or_update_worker_day(self.dir[2], datetime.combine(dt, time(9, 53)), datetime.combine(dt, time(20, 10)), is_fact=True)
+        fact_wd_dir = self._create_or_update_worker_day(self.dir[2], datetime.combine(dt, time(9, 53)), datetime.combine(dt, time(20, 10)), is_fact=True, closest_plan_approved_id=plan_wd_dir.id)
         self.assertEquals(fact_wd_dir.work_hours, timedelta(hours=9, minutes=30))
-        fact_wd_dir_bad = self._create_or_update_worker_day(self.dir[2], datetime.combine(dt, time(9, 56)), datetime.combine(dt, time(20)), is_fact=True)
+        fact_wd_dir_bad = self._create_or_update_worker_day(self.dir[2], datetime.combine(dt, time(9, 56)), datetime.combine(dt, time(20)), is_fact=True, closest_plan_approved_id=plan_wd_dir.id)
         self.assertEquals(fact_wd_dir_bad.work_hours, timedelta(hours=7, minutes=30))
 
     def test_fine_settings_crop_work_hours_by_shop_schedule(self):
@@ -3984,10 +5106,11 @@ class TestFineLogic(APITestCase):
         )
         plan_wd_dir = self._create_or_update_worker_day(self.dir[2], datetime.combine(dt, time(10)), datetime.combine(dt, time(20)))
         self.assertEquals(plan_wd_dir.work_hours, timedelta(hours=9, minutes=30))
-        fact_wd_dir = self._create_or_update_worker_day(self.dir[2], datetime.combine(dt, time(9, 53)), datetime.combine(dt, time(20, 10)), is_fact=True)
+        fact_wd_dir = self._create_or_update_worker_day(self.dir[2], datetime.combine(dt, time(9, 53)), datetime.combine(dt, time(20, 10)), is_fact=True, closest_plan_approved_id=plan_wd_dir.id)
         self.assertEquals(fact_wd_dir.work_hours, timedelta(hours=9, minutes=30))
-        fact_wd_dir_bad = self._create_or_update_worker_day(self.dir[2], datetime.combine(dt, time(9, 56)), datetime.combine(dt, time(20)), is_fact=True)
+        fact_wd_dir_bad = self._create_or_update_worker_day(self.dir[2], datetime.combine(dt, time(9, 56)), datetime.combine(dt, time(20)), is_fact=True, closest_plan_approved_id=plan_wd_dir.id)
         self.assertEquals(fact_wd_dir_bad.work_hours, timedelta(hours=7, minutes=30))
+
 
 class TestUnaccountedOvertimesAPI(APITestCase):
     USER_USERNAME = "user1"
@@ -4000,19 +5123,19 @@ class TestUnaccountedOvertimesAPI(APITestCase):
         self.dt = date.today()
         self.network.only_fact_hours_that_in_approved_plan = True
         self.network.save()
-        self._create_worker_day(
+        pa1 = self._create_worker_day(
             self.employment2,
             dttm_work_start=datetime.combine(self.dt, time(13)),
             dttm_work_end=datetime.combine(self.dt + timedelta(1), time(1)),
             is_approved=True,
         )
-        self._create_worker_day(
+        pa2 = self._create_worker_day(
             self.employment3,
             dttm_work_start=datetime.combine(self.dt, time(8)),
             dttm_work_end=datetime.combine(self.dt, time(20)),
             is_approved=True,
         )
-        self._create_worker_day(
+        pa3 = self._create_worker_day(
             self.employment4,
             dttm_work_start=datetime.combine(self.dt, time(8)),
             dttm_work_end=datetime.combine(self.dt, time(20)),
@@ -4025,6 +5148,7 @@ class TestUnaccountedOvertimesAPI(APITestCase):
             dttm_work_end=datetime.combine(self.dt + timedelta(1), time(3)),
             is_approved=True,
             is_fact=True,
+            closest_plan_approved_id=pa1.id,
         )
         # нет переработки
         self._create_worker_day(
@@ -4033,6 +5157,7 @@ class TestUnaccountedOvertimesAPI(APITestCase):
             dttm_work_end=datetime.combine(self.dt, time(20)),
             is_approved=True,
             is_fact=True,
+            closest_plan_approved_id=pa2.id,
         )
         # переработка 1 час
         self.wd = self._create_worker_day(
@@ -4041,15 +5166,16 @@ class TestUnaccountedOvertimesAPI(APITestCase):
             dttm_work_end=datetime.combine(self.dt, time(20, 30)),
             is_approved=True,
             is_fact=True,
+            closest_plan_approved_id=pa3.id,
         )
         self.client.force_authenticate(self.user1)
 
-    def _create_worker_day(self, employment, dt=None, is_fact=False, is_approved=False, dttm_work_start=None, dttm_work_end=None, type=WorkerDay.TYPE_WORKDAY):
+    def _create_worker_day(self, employment, dt=None, is_fact=False, is_approved=False, dttm_work_start=None, dttm_work_end=None, type_id=WorkerDay.TYPE_WORKDAY, closest_plan_approved_id=None):
         if not dt:
             dt = self.dt
         return WorkerDay.objects.create(
             shop_id=self.shop.id,
-            type=type,
+            type_id=type_id,
             employment=employment,
             employee=employment.employee,
             dt=dt,
@@ -4058,6 +5184,7 @@ class TestUnaccountedOvertimesAPI(APITestCase):
             is_fact=is_fact,
             is_approved=is_approved,
             created_by=self.user1,
+            closest_plan_approved_id=closest_plan_approved_id,
         )
 
     def test_get_list(self):

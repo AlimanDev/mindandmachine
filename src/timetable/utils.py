@@ -53,7 +53,7 @@ def wd_stat_count(worker_days, shop):
         breaktime_fact = Case(*whens, output_field=FloatField())
 
     return worker_days.filter(
-        type=WorkerDay.TYPE_WORKDAY
+        type_id=WorkerDay.TYPE_WORKDAY
     ).values('worker_id', 'employment_id', 'dt', 'dttm_work_start', 'dttm_work_end').annotate(
         coming=Min('worker__attendancerecords__dttm', filter=Q(
             worker__attendancerecords__shop=shop,
@@ -102,7 +102,7 @@ class CleanWdaysHelper:
     Проходит по всем дням, которые находятся с учетом filter_kwargs и exclude_kwargs
     Алгоритм для каждого дня:
     1. Если нету активного трудоустройства:
-    1.1 Если тип дня один из [WorkerDay.TYPE_MATERNITY, WorkerDay.TYPE_VACATION, WorkerDay.TYPE_SICK], то КОНЕЦ.
+    1.1 Если тип дня -- выходной, то КОНЕЦ.
     1.2 В остальных случаях очищаем employment_id, КОНЕЦ.
     2. Если есть активное трудоустройство:
     2.1 Если employment в дне и в активном трудоустройстве не совпадают:
@@ -148,7 +148,7 @@ class CleanWdaysHelper:
         wdays_qs = WorkerDay.objects_with_excluded.exclude(
             employee__isnull=True,
         ).exclude(
-            type=WorkerDay.TYPE_EMPTY,
+            type_id=WorkerDay.TYPE_EMPTY,
         ).order_by('dt', 'employee', 'shop')
         if self.filter_kwargs:
             wdays_qs = wdays_qs.filter(**self.filter_kwargs)
@@ -179,7 +179,7 @@ class CleanWdaysHelper:
                 ).first()
 
                 if not employee_active_empl:
-                    if wd.type in [WorkerDay.TYPE_MATERNITY, WorkerDay.TYPE_VACATION, WorkerDay.TYPE_SICK]:
+                    if wd.type.is_dayoff:
                         continue
 
                     self._log_wd(wd, 'no active empl empl_cleaned')

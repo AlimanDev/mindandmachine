@@ -279,7 +279,7 @@ def create_users_workdays(workers, work_types_dict, start_dt, days, shop, shop_s
                     worker=worker,
                     employment=employment,
                     dt=dt,
-                    type=WorkerDay.TYPE_WORKDAY,
+                    type_id=WorkerDay.TYPE_WORKDAY,
                     shop=shop,
                     work_hours=work_hours,
                     dttm_work_start=dttm_work_start,
@@ -289,7 +289,7 @@ def create_users_workdays(workers, work_types_dict, start_dt, days, shop, shop_s
                     wd_model.parent_worker_day = WorkerDay.objects.create(
                         worker=worker,
                         dt=dt,
-                        type=WorkerDay.TYPE_HOLIDAY,
+                        type_id=WorkerDay.TYPE_HOLIDAY,
                         employment=employment,
                         dttm_work_start=None,
                         dttm_work_end=None,

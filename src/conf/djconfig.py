@@ -6,6 +6,7 @@ config importance
 4. config
 """
 
+import enum
 import os
 import sys
 
@@ -37,8 +38,6 @@ HOST = env.str('HOST', default='http://127.0.0.1:8000')
 EXTERNAL_HOST = env.str('EXTERNAL_HOST', default=HOST)
 TIMETABLE_IP = env.str('TIMETABLE_IP', default='127.0.0.1:5000')
 
-# доменное имя проекта, используется в src.timetable.vacancy в письмах
-DOMAIN = ''
 
 SECRET_KEY = '2p7d00y99lhyh1xno9fgk6jd4bl8xsmkm23hq4vj811ku60g7dsac8dee5rn'
 MDAUDIT_AUTHTOKEN_SALT = 'DLKAXGKFPP57B2NEQ4NLB2TLDT3QR20I7QKAGE8I'
@@ -86,6 +85,8 @@ INSTALLED_APPS = [
     'src.reports',
     'import_export',
     'src.tasks',
+    'polymorphic',
+    'src.exchange',
 ]
 
 REST_FRAMEWORK = {
@@ -105,16 +106,16 @@ REST_FRAMEWORK = {
         'rest_framework_xml.parsers.XMLParser',
     ],
 }
-OLD_PASSWORD_FIELD_ENABLED=True
+OLD_PASSWORD_FIELD_ENABLED = True
 
 FCM_DJANGO_SETTINGS = {
     "FCM_SERVER_KEY": "AAAAoJJLEXM:APA91bHcdiVZxmJE26xjLgYHmmVF03BgEt5r05uJN0kITq_buvZKI26jxGQP-qNAA2FjJdYNI21n_ECtBiisVlIZnCxaF8csG3AW5AXB1BoQiBsn4PlXLFOr1XcxA0cMD3pbwCifWGb0",
-     # true if you want to have only one active device per registered user at a time
-     # default: False
+    # true if you want to have only one active device per registered user at a time
+    # default: False
     "ONE_DEVICE_PER_USER": False,
-     # devices to which notifications cannot be sent,
-     # are deleted upon receiving error response from FCM
-     # default: False
+    # devices to which notifications cannot be sent,
+    # are deleted upon receiving error response from FCM
+    # default: False
     "DELETE_INACTIVE_DEVICES": False,
 }
 
@@ -186,7 +187,6 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
-
 ADMINS = [
     ('Robot', 'robot@mindandmachine.ru'),
     ('alex', 'a.aleskin@mindandmachine.ru'),
@@ -208,7 +208,6 @@ EMAIL_HOST_USER = 'robot@mindandmachine.ru'
 EMAIL_HOST_PASSWORD = 'TjP6szfJe0PpLNH'
 
 SERVER_EMAIL = EMAIL_HOST_USER
-
 
 SFTP_IP = '212.109.194.87'
 SFTP_USERNAME = ''
@@ -245,7 +244,8 @@ LOGGING = {
         'django_request': {
             'level': 'ERROR',
             'class': 'logging.handlers.RotatingFileHandler',
-            'filename': os.path.join(BASE_DIR, 'logs/django_request.log'),  # directory with logs must be already created
+            'filename': os.path.join(BASE_DIR, 'logs/django_request.log'),
+            # directory with logs must be already created
             'maxBytes': 5 * 1024 * 1024,
             'backupCount': 10,
             'formatter': 'simple',
@@ -261,22 +261,23 @@ LOGGING = {
     },
     'loggers': {
         'django': {
-          'handlers': ['console'],
-          'level': 'INFO',
+            'handlers': ['console'],
+            'level': 'INFO',
         },
         'django.request': {
             'handlers': ['django_request', 'mail_admins'],
             'level': 'ERROR',
             'propagate': True,
         },
-        #'django.db.backends': {
+        # 'django.db.backends': {
         #    'handlers': ['console'],
         #    'level': 'DEBUG',
-        #}
+        # }
     },
 }
 
-def add_logger(name, level='DEBUG', formatter='simple', extra_handlers : list=None):
+
+def add_logger(name, level='DEBUG', formatter='simple', extra_handlers: list = None):
     LOGGING['handlers'][name] = {
         'level': level,
         'class': 'logging.handlers.WatchedFileHandler',
@@ -291,11 +292,16 @@ def add_logger(name, level='DEBUG', formatter='simple', extra_handlers : list=No
     if extra_handlers:
         LOGGING['loggers'][name]['handlers'].extend(extra_handlers)
 
+
 add_logger('clean_wdays')
 add_logger('send_doctors_schedule_to_mis')
 add_logger('calc_timesheets', extra_handlers=['mail_admins'])
 add_logger('send_doctors_schedule_to_mis', extra_handlers=['mail_admins'])
 add_logger('mda_integration', extra_handlers=['mail_admins'])
+add_logger('algo_set_timetable', level='DEBUG' if DEBUG else 'INFO')
+add_logger('import_jobs', extra_handlers=['mail_admins'])
+add_logger('export_jobs', extra_handlers=['mail_admins'])
+add_logger('api_log', extra_handlers=['mail_admins'])
 
 # LOGGING USAGE:
 # import logging
@@ -309,16 +315,16 @@ LANGUAGE_CODE = 'ru-RU'
 
 TIME_ZONE = 'UTC'
 
-USE_I18N = True 
+USE_I18N = True
 
-USE_L10N = False 
+USE_L10N = False
 
 USE_TZ = False
 
 DATETIME_FORMAT = "d b, Y, H:i:s"
 
 LOCALE_PATHS = [
-    os.path.join(BASE_DIR,  'data/locale')
+    os.path.join(BASE_DIR, 'data/locale')
 ]
 
 STATIC_ROOT = os.path.join(BASE_DIR, 'static/')
@@ -370,12 +376,12 @@ OPENAPI_INTEGRATION_MODELS_METHODS = [
 
 # DCS_SESSION_COOKIE_SAMESITE = 'none'  # for md audit
 
-QOS_DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%S" #'%H:%M:%S %d.%m.%Y'
+QOS_DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%S"  # '%H:%M:%S %d.%m.%Y'
 QOS_DATE_FORMAT = '%Y-%m-%d'
 QOS_TIME_FORMAT = '%H:%M:%S'
 QOS_SHORT_TIME_FORMAT = '%H:%M'
 
-IS_PUSH_ACTIVE = False # отправляем ли пуши на телефон при уведомлениях
+IS_PUSH_ACTIVE = False  # отправляем ли пуши на телефон при уведомлениях
 
 ALLOWED_UPLOAD_EXTENSIONS = ['xlsx', 'xls']
 
@@ -396,6 +402,7 @@ CELERY_IMPORTS = (
     'src.timetable.vacancy.tasks',
     'src.timetable.worker_day.tasks',
     'src.timetable.timesheet.tasks',
+    'src.base.tasks',
 )
 
 REDIS_HOST = env.str('REDIS_HOST', default='localhost')
@@ -418,12 +425,6 @@ REBUILD_TIMETABLE_MIN_DELTA = 2
 # например, для Ортеки для отображения в отчете нужны показатели только по продавцам-кассирам
 UPDATE_SHOP_STATS_WORK_TYPES_CODES = None
 
-MAX_WORK_SHIFT_SECONDS = 60 * 60 * 16  # максимальная длина смены (в секундах)
-
-# пропускать создание отметки об уходе,
-# если с момент открытия предыдущей незакрытой смены прошло более MAX_WORK_SHIFT_SECONDS
-MDA_SKIP_LEAVING_TICK = False
-
 # docker volume create jod_converter_conf
 # docker run \
 # 	--memory 512m \
@@ -440,13 +441,10 @@ GOTENBERG_URL = env.str('GOTENBERG_URL', default='http://localhost:3001')
 
 ZKTECO_HOST = ''
 ZKTECO_KEY = ''
-ZKTECO_DEPARTMENT_CODE = 1 # код отдела из zkteco к которому привязываются новые юзеры
+ZKTECO_DEPARTMENT_CODE = 1  # код отдела из zkteco к которому привязываются новые юзеры
 
 # Используем ли интеграцию в проекте
 ZKTECO_INTEGRATION = False
-# Максимальная разность между временем начала 
-# или окончания для "притягивания" к рабочему дню
-ZKTECO_MAX_DIFF_IN_SECONDS = 3600 * 5
 # Игнорировать отметки без подтвержденного планового рабочего дня
 ZKTECO_IGNORE_TICKS_WITHOUT_WORKER_DAY = True
 # смещение id пользователя в ZKTeco чтобы не пересекались
@@ -469,7 +467,7 @@ USERS_WITH_SCHEDULE_ONLY = False
 # игнорировать отметку без активного трудоустройства или вакансии
 USERS_WITH_ACTIVE_EMPLOYEE_OR_VACANCY_ONLY = False
 
-CALCULATE_LOAD_TEMPLATE = False # параметр отключающий автоматический расчет нагрузки
+CALCULATE_LOAD_TEMPLATE = False  # параметр отключающий автоматический расчет нагрузки
 
 CLIENT_TIMEZONE = 3
 
@@ -498,8 +496,18 @@ SESAME_TOKEN_NAME = 'otp_token'
 # Если == None, то при расчете табеля разделение на осн. и доп. не производится
 FISCAL_SHEET_DIVIDER_ALIAS = None
 
+ENV_LVL_PROD = 'prod'
+ENV_LVL_TEST = 'test'
+ENV_LVL_LOCAL = 'local'
+ENV_LVL = env.str('ENV_LVL', default='')
+
+API_LOG_DELETE_GAP = 90
+
 if is_config_exists('djconfig_local.py'):
     from .djconfig_local import *
+
+if not ENV_LVL:
+    ENV_LVL = ENV_LVL_TEST if DEBUG else ENV_LVL_PROD
 
 CELERY_TASK_DEFAULT_QUEUE = BACKEND_QUEUE
 
@@ -614,6 +622,11 @@ CELERY_BEAT_SCHEDULE = {
         'schedule': crontab(hour=3, minute=15),
         'options': {'queue': BACKEND_QUEUE}
     },
+    'task-clean-api-log': {
+        'task': 'src.base.tasks.clean_api_log',
+        'schedule': crontab(hour=3, minute=46),
+        'options': {'queue': BACKEND_QUEUE}
+    },
 }
 
 if MDA_SYNC_DEPARTMENTS:
@@ -664,6 +677,7 @@ if 'test' in sys.argv:
     class MigrationDisabler(dict):
         def __getitem__(self, item):
             return None
+
 
     MIGRATION_MODULES = MigrationDisabler()
 

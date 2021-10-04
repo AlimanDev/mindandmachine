@@ -1,17 +1,22 @@
+from django.contrib.contenttypes.fields import GenericForeignKey
+from django.contrib.contenttypes.models import ContentType
 from django.db import models
+
 from src.base.models import Shop, User
 from src.base.models_abstract import AbstractModel, AbstractCodeNamedModel
 
 
 class ExternalSystem(AbstractCodeNamedModel):
     class Meta:
-        verbose_name = 'Связь с внешними системами'
-        verbose_name_plural = 'Связи с внешними системами'
+        verbose_name = 'Внешняя система'
+        verbose_name_plural = 'Внешние системы'
+
 
 class AttendanceArea(AbstractCodeNamedModel):
     class Meta:
         verbose_name = 'Зона учета внешней системы'
         verbose_name_plural = 'Зоны учета внешней системы'
+
     external_system = models.ForeignKey(ExternalSystem, on_delete=models.PROTECT)
 
 
@@ -24,6 +29,22 @@ class UserExternalCode(AbstractModel):
     external_system = models.ForeignKey(ExternalSystem, on_delete=models.PROTECT)
     user = models.ForeignKey(User, on_delete=models.PROTECT)
     code = models.CharField(null=False, blank=False, max_length=64)
+
+
+class GenericExternalCode(AbstractModel):
+    external_system = models.ForeignKey(ExternalSystem, on_delete=models.CASCADE)
+    code = models.CharField(max_length=64)
+    object_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)  # TODO: виджет в админке поудобнее?
+    object_id = models.PositiveIntegerField()
+    object = GenericForeignKey('object_type', 'object_id')
+
+    class Meta:
+        unique_together = (
+            ('code', 'external_system', 'object_type', 'object_id'),
+        )
+
+    def __str__(self):
+        return '{} {} {}'.format(self.object, self.code, self.external_system)
 
 
 class VMdaUsers(models.Model):

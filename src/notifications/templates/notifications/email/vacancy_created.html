@@ -1,5 +1,7 @@
 {% extends 'notifications/email/base.html' %}
 
 {% block content %}
-<p>В отделе {{ shop_name }} автомтически создана вакансия на {{ dt }} с {{ dttm_from }} по {{ dttm_to }} для типа работ {{ work_type }}</p>
+<p style="font-size:15px">В подразделении <b>{{ shop_name }}</b> {% if is_auto %}автоматически {% endif %}создана вакансия для тип{% if work_types|length == 1 %}а{% else %}ов{% endif %} работ <b>{{ work_types|join:", " }}</b></p>
+<p style="font-size:15px">Дата: <b>{{ dt }}</b></p>
+<p style="font-size:15px">Время с <b>{{ dttm_from }}</b> по <b>{{ dttm_to }}</b></p>
 {% endblock %}

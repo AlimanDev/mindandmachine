@@ -2,9 +2,7 @@ import datetime
 import json
 from itertools import groupby
 
-from django.db.models.query import Prefetch
-from src.reports.utils.overtimes_undertimes import overtimes_undertimes_xlsx
-
+import numpy as np
 import pandas as pd
 from django.conf import settings
 from django.contrib.postgres.aggregates import StringAgg
@@ -12,6 +10,7 @@ from django.core.serializers.json import DjangoJSONEncoder
 from django.db import transaction
 from django.db.models import OuterRef, Subquery, Q, F, Exists, Case, When, Value, CharField
 from django.db.models.functions import Concat, Cast
+from django.db.models.query import Prefetch
 from django.http import HttpResponse
 from django.utils import timezone
 from django.utils.encoding import escape_uri_path
@@ -29,19 +28,19 @@ from src.base.models import Employment, Shop, Group, User, Employee
 from src.base.permissions import WdPermission
 from src.base.views_abstract import BaseModelViewSet
 from src.events.signals import event_signal
+from src.reports.utils.overtimes_undertimes import overtimes_undertimes_xlsx
 from src.timetable.backends import MultiShopsFilterBackend
 from src.timetable.events import REQUEST_APPROVE_EVENT_TYPE, APPROVE_EVENT_TYPE, VACANCY_CONFIRMED_TYPE
 from src.timetable.filters import WorkerDayFilter, WorkerDayStatFilter, VacancyFilter
 from src.timetable.models import (
-    WorkType,
     WorkerDay,
     WorkerDayCashboxDetails,
     ShopMonthStat,
     WorkerDayPermission,
-    GroupWorkerDayPermission,
+    WorkerDayType,
 )
 from src.timetable.timesheet.tasks import calc_timesheets
-from src.timetable.vacancy.utils import cancel_vacancies, cancel_vacancy, confirm_vacancy
+from src.timetable.vacancy.utils import cancel_vacancies, cancel_vacancy, confirm_vacancy, notify_vacancy_created
 from src.timetable.vacancy.tasks import vacancies_create_and_cancel_for_shop
 from src.timetable.worker_day.serializers import (
     OvertimesUndertimesReportSerializer,
@@ -68,7 +67,8 @@ from src.timetable.worker_day.serializers import (
 from src.timetable.worker_day.stat import count_daily_stat
 from src.timetable.worker_day.tasks import recalc_wdays, recalc_fact_from_records
 from src.timetable.worker_day.timetable import get_timetable_generator_cls
-from src.timetable.worker_day.utils import check_worker_day_permissions, create_worker_days_range, exchange, copy_as_excel_cells
+from src.timetable.worker_day.utils import check_worker_day_permissions, create_worker_days_range, exchange, \
+    copy_as_excel_cells
 from src.util.dg.tabel import get_tabel_generator_cls
 from src.util.models_converter import Converter
 from src.util.openapi.responses import (
@@ -87,7 +87,7 @@ class WorkerDayViewSet(BaseModelViewSet):
         "no_timetable": _("Workers don't have timetable."),
         'cannot_delete': _("Cannot_delete approved version."),
         'na_worker_day_exists': _("Not approved version already exists."),
-        'no_perm_to_approve_wd_types': _('You do not have rights to confirm the day type "{wd_type_str}"'),
+        'no_action_perm_for_wd_type': _('You do not have rights to {action_str} the day type "{wd_type_str}"'),
         'approve_days_interval_restriction': _('You do not have the rights to confirm the type of day "{wd_type_str}" '
                                                'on the selected dates. '
                                                'You need to change the interval for approve. '
@@ -103,8 +103,9 @@ class WorkerDayViewSet(BaseModelViewSet):
     filter_backends = [MultiShopsFilterBackend]
     openapi_tags = ['WorkerDay',]
 
+
     def get_queryset(self):
-        queryset = WorkerDay.objects.filter(canceled=False).prefetch_related('outsources')
+        queryset = WorkerDay.objects.filter(canceled=False).prefetch_related(Prefetch('outsources', to_attr='outsources_list'))
 
         if self.request.query_params.get('by_code', False):
             return queryset.annotate(
@@ -154,7 +155,7 @@ class WorkerDayViewSet(BaseModelViewSet):
         if request.query_params.get('hours_details', False):
             data = []
 
-            for worker_day in self.filter_queryset(self.get_queryset().prefetch_related(Prefetch('worker_day_details', to_attr='worker_day_details_list'), Prefetch('outsources', to_attr='outsources_list')).select_related('last_edited_by', 'shop__network', 'employee')):
+            for worker_day in self.filter_queryset(self.get_queryset().prefetch_related(Prefetch('worker_day_details', to_attr='worker_day_details_list')).select_related('last_edited_by', 'shop__network', 'employee')):
                 wd_dict = WorkerDayListSerializer(worker_day, context=self.get_serializer_context()).data
                 work_hours, work_hours_day, work_hours_night = worker_day.calc_day_and_night_work_hours()
                 wd_dict['work_hours'] = work_hours
@@ -165,7 +166,7 @@ class WorkerDayViewSet(BaseModelViewSet):
                 data.append(wd_dict)
         else:
             data = WorkerDayListSerializer(
-                self.filter_queryset(self.get_queryset().prefetch_related(Prefetch('worker_day_details', to_attr='worker_day_details_list'), Prefetch('outsources', to_attr='outsources_list')).select_related('last_edited_by', 'employee')),
+                self.filter_queryset(self.get_queryset().prefetch_related(Prefetch('worker_day_details', to_attr='worker_day_details_list')).select_related('last_edited_by', 'employee')),
                 many=True, context=self.get_serializer_context()
             ).data
 
@@ -191,10 +192,11 @@ class WorkerDayViewSet(BaseModelViewSet):
                     is_approved=True,
                     is_fact=False,
                 ).exclude(
-                    type=WorkerDay.TYPE_EMPTY,
+                    type_id=WorkerDay.TYPE_EMPTY,
                 ).select_related(
                     'employee__user',
                     'shop',
+                    'type',
                 )}
                 for employee in employees:
                     for dt in pd.date_range(dt__gte, dt__lte).date:
@@ -239,7 +241,7 @@ class WorkerDayViewSet(BaseModelViewSet):
                             continue
 
                         dt_now = timezone.now().date()
-                        if plan_wd and plan_wd.type in WorkerDay.TYPES_WITH_TM_RANGE:
+                        if plan_wd and not plan_wd.type.is_dayoff:
                             day_in_past = dt < dt_now
                             d = {
                                 "id": None,
@@ -307,26 +309,33 @@ class WorkerDayViewSet(BaseModelViewSet):
         kwargs = {'context': self.get_serializer_context()}
         serializer = WorkerDayApproveSerializer(data=request.data, **kwargs)
         serializer.is_valid(raise_exception=True)
-        if not serializer.validated_data['wd_types']:
-            raise PermissionDenied()
 
+        wd_types = serializer.validated_data.get('wd_types')
+        if not wd_types:
+            wd_types = list(WorkerDayType.objects.filter(
+                is_active=True,
+            ).values_list('code', flat=True))
+
+        wd_types_dict = WorkerDayType.get_wd_types_dict()
         with transaction.atomic():
             wd_perms = check_worker_day_permissions(
                 request.user, 
                 serializer.validated_data.get('shop_id'), 
                 WorkerDayPermission.APPROVE, 
                 WorkerDayPermission.FACT if serializer.validated_data['is_fact'] else WorkerDayPermission.PLAN,
-                serializer.validated_data.get('wd_types'),
+                wd_types,
                 serializer.validated_data.get('dt_from'),
                 serializer.validated_data.get('dt_to'),
                 self.error_messages,
+                wd_types_dict,
             )
             today = (datetime.datetime.now() + datetime.timedelta(hours=3)).date()
             employee_filter = {}
             if serializer.data.get('employee_ids'):
                 employee_filter['employee_id__in'] = serializer.data['employee_ids']
+            shop = Shop.objects.filter(id=serializer.data['shop_id']).select_related('network').get()
             employee_ids = Employment.objects.get_active(
-                Shop.objects.get(id=serializer.data['shop_id']).network_id,
+                network_id=shop.network_id,
                 dt_from=serializer.data['dt_from'],
                 dt_to=serializer.data['dt_to'],
                 shop_id=serializer.data['shop_id'],
@@ -336,11 +345,11 @@ class WorkerDayViewSet(BaseModelViewSet):
             wd_types_grouped_by_limit = {}
             for wd_type, limit_days_in_past, limit_days_in_future in wd_perms:
                 # фильтруем только по тем типам, которые переданы
-                if wd_type in serializer.validated_data['wd_types']:
+                if wd_type in wd_types:
                     wd_types_grouped_by_limit.setdefault((limit_days_in_past, limit_days_in_future), []).append(wd_type)
             wd_types_q = Q()
             for (limit_days_in_past, limit_days_in_future), wd_types in wd_types_grouped_by_limit.items():
-                q = Q(type__in=wd_types)
+                q = Q(type_id__in=wd_types)
                 if limit_days_in_past or limit_days_in_future:
                     if limit_days_in_past:
                         q &= Q(dt__gte=today - datetime.timedelta(days=limit_days_in_past))
@@ -356,45 +365,83 @@ class WorkerDayViewSet(BaseModelViewSet):
 
             shop_employees_q = Q(employee_id__in=employee_ids)
             if not has_perm_to_approve_other_shop_days:
-                shop_employees_q &= Q(Q(shop__isnull=True) | Q(type=WorkerDay.TYPE_QUALIFICATION))
+                shop_employees_q &= Q(Q(type__is_dayoff=True) | Q(type_id=WorkerDay.TYPE_QUALIFICATION))
 
             approve_condition = Q(
                 wd_types_q,
-                Q(shop_id=serializer.data['shop_id']) | shop_employees_q,
-                dt__lte=serializer.data['dt_to'],
-                dt__gte=serializer.data['dt_from'],
-                is_fact=serializer.data['is_fact'],
-                is_approved=False,
+                Q(shop_id=serializer.validated_data['shop_id']) | shop_employees_q,
+                dt__lte=serializer.validated_data['dt_to'],
+                dt__gte=serializer.validated_data['dt_from'],
+                is_fact=serializer.validated_data['is_fact'],
                 **employee_filter,
             )
-
-            wdays_to_approve = WorkerDay.objects.filter(
+            columns = [
+                'employee_id',
+                'dt',
+                'type_id',
+                'dttm_work_start',
+                'dttm_work_end',
+                'shop_id',
+                'work_type_ids'
+            ]
+            draft_wdays = list(WorkerDay.objects.filter(
                 approve_condition,
+                is_approved=False,
             ).annotate(
-                same_approved_exists=Exists(
+                work_type_ids=StringAgg(
+                    Cast('work_types', CharField()),
+                    distinct=True,
+                    delimiter=',',
+                    output_field=CharField(),
+                ),
+            ).values_list(*columns))
+            draft_df = pd.DataFrame(draft_wdays, columns=columns)
+
+            approved_wdays = list(WorkerDay.objects.annotate(
+                any_draft_wd_exists=Exists(
                     WorkerDay.objects.filter(
-                        Q(shop_id=OuterRef('shop_id')) | Q(shop__isnull=True),
-                        Q(dttm_work_start=OuterRef('dttm_work_start')),
-                        Q(dttm_work_end=OuterRef('dttm_work_end')),
-                        Q(work_types=OuterRef('work_types')) | Q(work_types__isnull=True),
+                        approve_condition,
+                        is_approved=False,
                         employee_id=OuterRef('employee_id'),
                         dt=OuterRef('dt'),
                         is_fact=OuterRef('is_fact'),
-                        type=OuterRef('type'),
-                        is_approved=True,
                     ),
                 ),
-            ).filter(same_approved_exists=False)
+            ).filter(
+                approve_condition,
+                is_approved=True,
+                any_draft_wd_exists=True,
+            ).annotate(
+                work_type_ids=StringAgg(
+                    Cast('work_types', CharField()),
+                    distinct=True,
+                    delimiter=',',
+                    output_field=CharField(),
+                ),
+            ).values_list(*columns))
+            approved_df = pd.DataFrame(approved_wdays, columns=columns)
+
+            combined_dfs = pd.concat([draft_df, approved_df])
+            symmetric_difference = combined_dfs.drop_duplicates(keep=False).replace({np.nan: None})
 
             employee_dt_pairs_list = list(
-                wdays_to_approve.values_list('employee_id', 'dt').order_by('employee_id', 'dt').distinct())
+                symmetric_difference[['employee_id', 'dt']].sort_values(
+                    ['employee_id', 'dt'], ascending=[True, True]).values.tolist())
             worker_dates_dict = {}
             for employee_id, dates_grouper in groupby(employee_dt_pairs_list, key=lambda i: i[0]):
-                worker_dates_dict[employee_id] = [i[1] for i in list(dates_grouper)]
+                worker_dates_dict[employee_id] = tuple(i[1] for i in list(dates_grouper))
             if employee_dt_pairs_list:
                 employee_days_q = Q()
+                employee_days_set = set()
                 for employee_id, dates in worker_dates_dict.items():
                     employee_days_q |= Q(employee_id=employee_id, dt__in=dates)
+                    employee_days_set.add((employee_id, dates))
+
+                wdays_to_approve = WorkerDay.objects.filter(
+                    employee_days_q,
+                    is_approved=False,
+                    is_fact=serializer.validated_data['is_fact'],
+                )
 
                 # если у пользователя нет группы с наличием прав на изменение защищенных дней, то проверяем,
                 # что в списке подтверждаемых дней нету защищенных дней, если есть, то выдаем ошибку
@@ -425,14 +472,16 @@ class WorkerDayViewSet(BaseModelViewSet):
                         ))
 
                 if not serializer.data['is_fact'] and settings.SEND_DOCTORS_MIS_SCHEDULE_ON_CHANGE:
+                    # TODO: при нескольких workerday скорее всего будет работать некорректно,
+                    #   должны ли мы это поддерживать?
                     from src.celery.tasks import send_doctors_schedule_to_mis
                     mis_data_qs = wdays_to_approve.annotate(
-                        approved_wd_type=Subquery(WorkerDay.objects.filter(
+                        approved_wd_type_id=Subquery(WorkerDay.objects.filter(
                             dt=OuterRef('dt'),
                             employee_id=OuterRef('employee_id'),
                             is_fact=serializer.data['is_fact'],
                             is_approved=True,
-                        ).values('type')[:1]),
+                        ).values('type_id')[:1]),
                         approved_wd_has_doctor_work_type=Exists(WorkerDayCashboxDetails.objects.filter(
                             worker_day__dt=OuterRef('dt'),
                             worker_day__employee_id=OuterRef('employee_id'),
@@ -453,33 +502,33 @@ class WorkerDayViewSet(BaseModelViewSet):
                             is_approved=True,
                         ).values('dttm_work_end')[:1]),
                     ).filter(
-                        Q(type=WorkerDay.TYPE_WORKDAY) | Q(approved_wd_type=WorkerDay.TYPE_WORKDAY),
+                        Q(type_id=WorkerDay.TYPE_WORKDAY) | Q(approved_wd_type_id=WorkerDay.TYPE_WORKDAY),
                     ).annotate(
                         action=Case(
                             When(
                                 Q(
-                                    Q(approved_wd_type__isnull=True) | ~Q(approved_wd_type=WorkerDay.TYPE_WORKDAY),
-                                    type=WorkerDay.TYPE_WORKDAY,
+                                    Q(approved_wd_type_id__isnull=True) | ~Q(approved_wd_type_id=WorkerDay.TYPE_WORKDAY),
+                                    type_id=WorkerDay.TYPE_WORKDAY,
                                     work_types__work_type_name__code='doctor',
                                 ),
                                 then=Value('create', output_field=CharField())
                             ),
                             When(
                                 Q(
-                                    ~Q(type=WorkerDay.TYPE_WORKDAY),
-                                    approved_wd_type=WorkerDay.TYPE_WORKDAY,
+                                    ~Q(type_id=WorkerDay.TYPE_WORKDAY),
+                                    approved_wd_type_id=WorkerDay.TYPE_WORKDAY,
                                     approved_wd_has_doctor_work_type=True,
                                 ),
                                 then=Value('delete', output_field=CharField()),
                             ),
                             When(
-                                type=F('approved_wd_type'),
+                                type_id=F('approved_wd_type_id'),
                                 work_types__work_type_name__code='doctor',
                                 approved_wd_has_doctor_work_type=True,
                                 then=Value('update', output_field=CharField()),
                             ),
                             When(
-                                type=F('approved_wd_type'),
+                                type_id=F('approved_wd_type_id'),
                                 work_types__work_type_name__code='doctor',
                                 approved_wd_has_doctor_work_type=False,
                                 then=Value('create', output_field=CharField()),
@@ -487,7 +536,7 @@ class WorkerDayViewSet(BaseModelViewSet):
                             When(
                                 Q(
                                     ~Q(work_types__work_type_name__code='doctor'),
-                                    type=F('approved_wd_type'),
+                                    type_id=F('approved_wd_type_id'),
                                     approved_wd_has_doctor_work_type=True,
                                 ),
                                 then=Value('delete', output_field=CharField()),
@@ -521,15 +570,50 @@ class WorkerDayViewSet(BaseModelViewSet):
                         transaction.on_commit(
                             lambda f_json_data=json_data: send_doctors_schedule_to_mis.delay(json_data=f_json_data))
 
-                WorkerDay.objects_with_excluded.filter(
-                    employee_days_q, is_fact=serializer.data['is_fact'],
+                wdays_to_delete = WorkerDay.objects_with_excluded.filter(
+                    employee_days_q, is_fact=serializer.validated_data['is_fact'],
                 ).exclude(
                     id__in=wdays_to_approve.values_list('id', flat=True)
                 ).exclude(
                     employee_id__isnull=True,
-                ).delete()
-                list_wd = list(
-                    wdays_to_approve.select_related(
+                )
+
+                # если план
+                if not serializer.data['is_fact']:
+                    # удаляется факт автоматический, связанный с удаляемым планом
+                    WorkerDay.objects.filter(
+                        last_edited_by__isnull=True,
+                        closest_plan_approved__in=wdays_to_delete,
+                    ).delete()
+
+                wdays_to_delete.delete()
+                vacancies_to_approve = list(wdays_to_approve.filter(is_vacancy=True, employee_id__isnull=True))
+                wdays_to_approve.update(is_approved=True)
+                WorkerDay.set_closest_plan_approved(
+                    q_obj=employee_days_q,
+                    is_approved=True if serializer.data['is_fact'] else None,
+                    delta_in_secs=shop.network.set_closest_plan_approved_delta_for_manual_fact,
+                )
+
+                # если план, то выполним пересчет часов в ручных корректировках факта
+                if not serializer.data['is_fact'] and request.user.network.only_fact_hours_that_in_approved_plan:
+                    wd_ids = list(WorkerDay.objects.filter(
+                        employee_days_q,
+                        last_edited_by__isnull=False,
+                        is_fact=True,
+                        type__is_dayoff=False,
+                        dttm_work_start__isnull=False,
+                        dttm_work_end__isnull=False,
+                    ).values_list('id', flat=True))
+                    if wd_ids:
+                        recalc_wdays(id__in=wd_ids)
+
+                approved_wds_list = list(
+                    WorkerDay.objects.filter(
+                        employee_days_q,
+                        is_approved=True,
+                        is_fact=serializer.data['is_fact'],
+                    ).select_related(
                         'shop',
                         'employment',
                         'employment__position',
@@ -540,48 +624,46 @@ class WorkerDayViewSet(BaseModelViewSet):
                     ).distinct()
                 )
 
-                wdays_to_approve.update(is_approved=True)
-
-                wds = WorkerDay.objects.bulk_create(
+                not_approved_wds_list = WorkerDay.objects.bulk_create(
                     [
                         WorkerDay(
-                            shop=wd.shop,
-                            employee_id=wd.employee_id,
-                            employment=wd.employment,
-                            dttm_work_start=wd.dttm_work_start,
-                            dttm_work_end=wd.dttm_work_end,
-                            dt=wd.dt,
-                            is_fact=wd.is_fact,
+                            shop=approved_wd.shop,
+                            employee_id=approved_wd.employee_id,
+                            employment=approved_wd.employment,
+                            dttm_work_start=approved_wd.dttm_work_start,
+                            dttm_work_end=approved_wd.dttm_work_end,
+                            dt=approved_wd.dt,
+                            is_fact=approved_wd.is_fact,
                             is_approved=False,
-                            type=wd.type,
-                            created_by_id=wd.created_by_id,
-                            last_edited_by_id=wd.last_edited_by_id,
-                            is_vacancy=wd.is_vacancy,
-                            is_outsource=wd.is_outsource,
-                            comment=wd.comment,
-                            canceled=wd.canceled,
+                            type=approved_wd.type,
+                            created_by_id=approved_wd.created_by_id,
+                            last_edited_by_id=approved_wd.last_edited_by_id,
+                            is_vacancy=approved_wd.is_vacancy,
+                            is_outsource=approved_wd.is_outsource,
+                            comment=approved_wd.comment,
+                            canceled=approved_wd.canceled,
                             need_count_wh=True,
-                            is_blocked=wd.is_blocked,
+                            is_blocked=approved_wd.is_blocked,
+                            closest_plan_approved_id=approved_wd.closest_plan_approved_id,
+                            parent_worker_day_id=approved_wd.id,
                         )
-                        for wd in list_wd if wd.employee_id  # не копируем день без сотрудника (вакансию) в неподтв. версию
+                        for approved_wd in approved_wds_list if approved_wd.employee_id
+                        # не копируем день без сотрудника (вакансию) в неподтв. версию
                     ]
                 )
                 search_wds = {}
-                for wd in wds:
-                    key_employee = wd.employee_id
-                    if not key_employee in search_wds:
-                        search_wds[key_employee] = {}
-                    search_wds[key_employee][wd.dt] = wd
+                for not_approved_wd in not_approved_wds_list:
+                    search_wds[not_approved_wd.parent_worker_day_id] = not_approved_wd
 
                 WorkerDayCashboxDetails.objects.bulk_create(
                     [
                         WorkerDayCashboxDetails(
                             work_part=details.work_part,
-                            worker_day=search_wds[wd.employee_id][wd.dt],
+                            worker_day=search_wds[approved_wd.id],
                             work_type_id=details.work_type_id,
                         )
-                        for wd in list_wd if wd.employee_id  # TODO: написать тест
-                        for details in wd.worker_day_details.all()
+                        for approved_wd in approved_wds_list if approved_wd.employee_id  # TODO: тест
+                        for details in approved_wd.worker_day_details.all()
                     ]
                 )
 
@@ -590,7 +672,7 @@ class WorkerDayViewSet(BaseModelViewSet):
                     # отмечаем, что график подтвержден
                     dttm_now = timezone.now()
                     ShopMonthStat.objects.update_or_create(
-                        shop_id=serializer.data['shop_id'],
+                        shop_id=serializer.validated_data['shop_id'],
                         dt=serializer.validated_data['dt_from'].replace(day=1),
                         defaults=dict(
                             dttm_status_change=dttm_now,
@@ -598,36 +680,23 @@ class WorkerDayViewSet(BaseModelViewSet):
                         )
                     )
 
-                    if request.user.network.only_fact_hours_that_in_approved_plan:
-                        wd_ids = list(WorkerDay.objects.filter(
-                            employee_days_q,
-                            is_fact=True,
-                            type__in=WorkerDay.TYPES_WITH_TM_RANGE,
-                        ).values_list('id', flat=True))
-                        if wd_ids:
-                            transaction.on_commit(lambda wd_ids=wd_ids: recalc_wdays.delay(id__in=wd_ids))
-                    if settings.ZKTECO_INTEGRATION: # если используем терминалы
-                        transaction.on_commit(
-                            lambda: recalc_fact_from_records.delay(
-                                serializer.validated_data['dt_from'], 
-                                serializer.validated_data['dt_to'], 
-                                shop_ids=[serializer.data['shop_id']]
-                            )
-                        )
-                    
+                    if shop.network.run_recalc_fact_from_att_records_on_plan_approve:
+                        transaction.on_commit(lambda: recalc_fact_from_records(employee_days_list=list(employee_days_set)))
+
                     transaction.on_commit(lambda: vacancies_create_and_cancel_for_shop.delay(serializer.validated_data['shop_id']))
+                    def _notify_vacancies_created():
+                        for vacancy in vacancies_to_approve:
+                            notify_vacancy_created(vacancy, is_auto=False)
+                    transaction.on_commit(lambda: _notify_vacancies_created())
                     if not has_permission_to_change_protected_wdays:
                         WorkerDay.check_tasks_violations(
                             employee_days_q=employee_days_q,
                             is_approved=True,
-                            is_fact=serializer.data['is_fact'],
+                            is_fact=serializer.validated_data['is_fact'],
                             exc_cls=ValidationError,
                         )
 
-                # TODO: нужно ли как-то разделять события подтверждения факта и плана?
                 event_context = serializer.data.copy()
-                # TODO: добавлять ли детальную информацию о подтвержденных днях в контекст?
-                # event_context['grouped_worker_dates'] = grouped_worker_dates
                 transaction.on_commit(lambda: event_signal.send(
                     sender=None,
                     network_id=request.user.network_id,
@@ -637,9 +706,7 @@ class WorkerDayViewSet(BaseModelViewSet):
                     context=event_context,
                 ))
 
-                # запустим с небольшой задержкой, чтобы успели пересчитаться часы в факте
                 transaction.on_commit(lambda: calc_timesheets.apply_async(
-                    countdown=2,
                     kwargs=dict(
                         employee_id__in=list(worker_dates_dict.keys())
                     ))
@@ -746,7 +813,7 @@ class WorkerDayViewSet(BaseModelViewSet):
         result = result['text']
         if status_code == 200:
             vacancy = WorkerDay.objects.get(pk=pk)
-            work_type = vacancy.work_types.first()
+            work_types = list(vacancy.work_types.all().values_list('work_type_name__name', flat=True))
             event_signal.send(
                 sender=None,
                 network_id=vacancy.shop.network_id,
@@ -759,7 +826,7 @@ class WorkerDayViewSet(BaseModelViewSet):
                         'first_name': request.user.first_name,
                     },
                     'dt': str(vacancy.dt),
-                    'work_type': work_type.work_type_name.name if work_type else 'Без типа работ',
+                    'work_types': work_types,
                     'shop_id': vacancy.shop_id,
                 },
             )
@@ -840,6 +907,7 @@ class WorkerDayViewSet(BaseModelViewSet):
                     ) for details in vacancy_details
                 )
             else:
+                transaction.on_commit(lambda: notify_vacancy_created(vacancy, is_auto=False))
                 vacancy.is_approved = True
                 vacancy.save()
 
@@ -884,6 +952,55 @@ class WorkerDayViewSet(BaseModelViewSet):
             ])
         return Response(WorkerDaySerializer(editable_vacancy).data)
 
+    def _change_range(self, is_fact, is_approved, dt_from, dt_to, wd_type, employee_tabel_code, res=None):
+        deleted = WorkerDay.objects.filter(
+            employee__tabel_code=employee_tabel_code,
+            dt__gte=dt_from,
+            dt__lte=dt_to,
+            is_approved=is_approved,
+            is_fact=is_fact,
+        ).exclude(
+            type=wd_type,
+        ).delete()
+
+        existing_dates = list(WorkerDay.objects.filter(
+            employee__tabel_code=employee_tabel_code,
+            dt__gte=dt_from,
+            dt__lte=dt_to,
+            is_approved=is_approved,
+            is_fact=is_fact,
+            type=wd_type,
+        ).values_list('dt', flat=True))
+
+        wdays_to_create = []
+        for dt in [d.date() for d in pd.date_range(dt_from, dt_to)]:
+            if dt not in existing_dates:
+                employment = Employment.objects.get_active_empl_by_priority(
+                    network_id=self.request.user.network_id,
+                    dt=dt,
+                    employee__tabel_code=employee_tabel_code,
+                ).first()
+                if employment:
+                    wdays_to_create.append(
+                        WorkerDay(
+                            employment=employment,
+                            employee_id=employment.employee_id,
+                            dt=dt,
+                            is_approved=is_approved,
+                            is_fact=is_fact,
+                            type=wd_type,
+                            created_by=self.request.user,
+                        )
+                    )
+        WorkerDay.objects.bulk_create(wdays_to_create)
+
+        if res is not None:
+            employee_stats = res.setdefault(employee_tabel_code, {})
+            employee_stats['deleted_count'] = employee_stats.get(
+                'deleted_count', 0) + deleted[1].get('timetable.WorkerDay', 0)
+            employee_stats['existing_count'] = employee_stats.get('existing_count', 0) + len(existing_dates)
+            employee_stats['created_count'] = employee_stats.get('created_count', 0) + len(wdays_to_create)
+
     @swagger_auto_schema(
         request_body=ChangeRangeListSerializer,
         operation_description='''
@@ -894,60 +1011,30 @@ class WorkerDayViewSet(BaseModelViewSet):
     )
     @action(detail=False, methods=['post'])
     def change_range(self, request):
-        serializer = ChangeRangeListSerializer(data=request.data, context=self.get_serializer_context())
-        serializer.is_valid(raise_exception=True)
+        with transaction.atomic():
+            serializer = ChangeRangeListSerializer(data=request.data, context=self.get_serializer_context())
+            serializer.is_valid(raise_exception=True)
 
-        res = {}
-        for range in serializer.validated_data['ranges']:
-            tabel_code = range['worker']
-
-            with transaction.atomic():
-                deleted = WorkerDay.objects.filter(
-                    employee__tabel_code=tabel_code,
-                    dt__gte=range['dt_from'],
-                    dt__lte=range['dt_to'],
+            res = {}
+            for range in serializer.validated_data['ranges']:
+                self._change_range(
+                    is_fact=False,  # всегда в план
                     is_approved=range['is_approved'],
-                    is_fact=range['is_fact'],
-                ).exclude(
-                    type=range['type'],
-                ).delete()
-
-                existing_dates = list(WorkerDay.objects.filter(
-                    employee__tabel_code=tabel_code,
-                    dt__gte=range['dt_from'],
-                    dt__lte=range['dt_to'],
-                    is_approved=range['is_approved'],
-                    is_fact=range['is_fact'],
-                    type=range['type'],
-                ).values_list('dt', flat=True))
-
-                wdays_to_create = []
-                for dt in [d.date() for d in pd.date_range(range['dt_from'], range['dt_to'])]:
-                    if dt not in existing_dates:
-                        employment = Employment.objects.get_active_empl_by_priority(
-                            network_id=self.request.user.network_id,
-                            dt=dt,
-                            employee__tabel_code=tabel_code,
-                        ).first()
-                        if employment:
-                            wdays_to_create.append(
-                                WorkerDay(
-                                    employment=employment,
-                                    employee_id=employment.employee_id,
-                                    dt=dt,
-                                    is_approved=range['is_approved'],
-                                    is_fact=range['is_fact'],
-                                    type=range['type'],
-                                    created_by=self.request.user,
-                                )
-                            )
-                WorkerDay.objects.bulk_create(wdays_to_create)
-
-                res[tabel_code] = {
-                    'deleted_count': deleted[1].get('timetable.WorkerDay', 0),
-                    'existing_count': len(existing_dates),
-                    'created_count': len(wdays_to_create)
-                }
+                    dt_from=range['dt_from'],
+                    dt_to=range['dt_to'],
+                    wd_type=range['type'],
+                    employee_tabel_code=range['worker'],
+                    res=res,
+                )
+                if range['is_approved']:
+                    self._change_range(
+                        is_fact=False,  # всегда в план
+                        is_approved=False,
+                        dt_from=range['dt_from'],
+                        dt_to=range['dt_to'],
+                        wd_type=range['type'],
+                        employee_tabel_code=range['worker'],
+                    )
 
         return Response(res)
 
@@ -964,23 +1051,20 @@ class WorkerDayViewSet(BaseModelViewSet):
         data.is_valid(raise_exception=True)
         data = data.validated_data
         with transaction.atomic():
-            fact_filter = {}
+            is_copying_from_fact = data['type'] == CopyApprovedSerializer.TYPE_FACT_TO_FACT
+            source_wdays_filter_q = Q(is_fact=is_copying_from_fact)
             if data['type'] == CopyApprovedSerializer.TYPE_PLAN_TO_FACT:
-                fact_filter['type__in'] = list(WorkerDay.TYPES_WITH_TM_RANGE)
-                fact_filter['type__in'].append(WorkerDay.TYPE_EMPTY)
-            if data['type'] == CopyApprovedSerializer.TYPE_FACT_TO_FACT:
-                fact_filter['is_fact'] = True
-            else:
-                fact_filter['is_fact'] = False
-            list_wd = list(
+                source_wdays_filter_q &= Q(Q(type__is_dayoff=False) | Q(type_id=WorkerDay.TYPE_EMPTY))
+            source_wdays_list = list(
                 WorkerDay.objects.filter(
+                    source_wdays_filter_q,
                     dt__in=data['dates'],
                     employee_id__in=data['employee_ids'],
                     is_approved=True,
-                    **fact_filter,
                 ).select_related(
                     'shop', 
-                    'employment', 
+                    'type',
+                    'employment',
                     'employment__position', 
                     'employment__position__breaks',
                     'shop__settings__breaks',
@@ -988,43 +1072,43 @@ class WorkerDayViewSet(BaseModelViewSet):
                     'worker_day_details',
                 )
             )
-            fact_filter['is_fact'] = True if data['type'] in (CopyApprovedSerializer.TYPE_PLAN_TO_FACT, CopyApprovedSerializer.TYPE_FACT_TO_FACT) else False
+            is_copying_to_fact = data['type'] in (
+                CopyApprovedSerializer.TYPE_PLAN_TO_FACT, CopyApprovedSerializer.TYPE_FACT_TO_FACT)
             WorkerDay.objects_with_excluded.filter(
+                is_fact=is_copying_to_fact,
                 dt__in=data['dates'],
                 employee_id__in=data['employee_ids'],
                 is_approved=False,
-                **fact_filter,
             ).delete()
 
             if data['type'] == CopyApprovedSerializer.TYPE_PLAN_TO_FACT and request.user.network.copy_plan_to_fact_crossing:
                 grouped_wds = {}
-                for wd in list_wd:
-                    grouped_wds.setdefault(wd.employee_id, {})[wd.dt] = wd
-                wds_approved =  WorkerDay.objects_with_excluded.filter(
+                for wd in source_wdays_list:
+                    k = f'{wd.employee_id}_{wd.dt}'
+                    grouped_wds.setdefault(k, []).append(wd)
+
+                wds_approved = WorkerDay.objects_with_excluded.filter(
                     dt__in=data['dates'],
                     employee_id__in=data['employee_ids'],
                     is_approved=True,
                     is_fact=True,
+                ).select_related(
+                    'shop',
+                    'type',
+                    'employment',
+                    'employment__position',
+                    'employment__position__breaks',
+                    'shop__settings__breaks',
+                ).prefetch_related(
+                    'worker_day_details',
                 )
+                popped_keys = set()
                 for wd in wds_approved:
-                    grouped_wds.setdefault(wd.employee_id, {})[wd.dt] = WorkerDay(
-                        shop=wd.shop,
-                        employee_id=wd.employee_id,
-                        employment=wd.employment,
-                        dttm_work_start=wd.dttm_work_start,
-                        dttm_work_end=wd.dttm_work_end,
-                        dt=wd.dt,
-                        is_fact=wd.is_fact,
-                        is_approved=wd.is_approved,
-                        type=wd.type,
-                        created_by_id=wd.created_by_id,
-                        is_vacancy=wd.is_vacancy,
-                        is_outsource=wd.is_outsource,
-                        comment=wd.comment,
-                        canceled=wd.canceled,
-                        need_count_wh=True,
-                    )
-                list_wd = [wd for user_data in grouped_wds.values() for wd in user_data.values()]
+                    k = f'{wd.employee_id}_{wd.dt}'
+                    if k in grouped_wds and k not in popped_keys:
+                        grouped_wds.pop(k)
+                    grouped_wds.setdefault(k, []).append(wd)
+                source_wdays_list = [wd for wdays_list in grouped_wds.values() for wd in wdays_list]
 
             WorkerDay.objects.bulk_create(
                 [
@@ -1035,48 +1119,51 @@ class WorkerDayViewSet(BaseModelViewSet):
                         dttm_work_start=wd.dttm_work_start,
                         dttm_work_end=wd.dttm_work_end,
                         dt=wd.dt,
-                        is_fact=fact_filter['is_fact'],
+                        is_fact=is_copying_to_fact,
                         is_approved=False,
                         type=wd.type,
-                        created_by_id=wd.created_by_id,
+                        created_by=wd.created_by if (wd.is_fact and wd.is_approved) else self.request.user,
+                        last_edited_by=wd.last_edited_by if (wd.is_fact and wd.is_approved) else self.request.user,
                         is_vacancy=wd.is_vacancy,
                         is_outsource=wd.is_outsource,
                         comment=wd.comment,
                         canceled=wd.canceled,
+                        parent_worker_day_id=wd.id,
+                        closest_plan_approved_id=wd.id if (
+                                is_copying_to_fact and wd.is_plan and wd.is_approved) else None,
                         need_count_wh=True,
                     )
-                    for wd in list_wd
+                    for wd in source_wdays_list
                 ]
             )
-            wds = WorkerDay.objects.filter(
+
+            copied_wdays_qs = WorkerDay.objects.filter(
+                is_fact=is_copying_to_fact,
+                is_approved=False,
                 dt__in=data['dates'],
                 employee_id__in=data['employee_ids'],
-                is_approved=False,
-                **fact_filter,
             )
+
             search_wds = {}
-            for wd in wds:
-                key_employee = wd.employee_id
-                if not key_employee in search_wds:
-                    search_wds[key_employee] = {}
-                search_wds[key_employee][wd.dt] = wd
-            
+            for copied_wd in copied_wdays_qs:
+                search_wds[copied_wd.parent_worker_day_id] = copied_wd
+
             WorkerDayCashboxDetails.objects.bulk_create(
                 [
                     WorkerDayCashboxDetails(
                         work_part=details.work_part,
-                        worker_day=search_wds[wd.employee_id][wd.dt],
+                        worker_day=search_wds[source_wd.id],
                         work_type_id=details.work_type_id,
                     )
-                    for wd in list_wd
-                    for details in wd.worker_day_details.all()
+                    for source_wd in source_wdays_list
+                    for details in source_wd.worker_day_details.all()
                 ]
             )
 
             WorkerDay.check_work_time_overlap(
                 employee_id__in=data['employee_ids'], dt__in=data['dates'], exc_cls=ValidationError)
         
-        return Response(WorkerDayListSerializer(wds.prefetch_related(Prefetch('worker_day_details', to_attr='worker_day_details_list')).select_related('last_edited_by'), many=True, context={'request':request}).data)
+        return Response(WorkerDayListSerializer(copied_wdays_qs.prefetch_related(Prefetch('worker_day_details', to_attr='worker_day_details_list')).select_related('last_edited_by'), many=True, context={'request':request}).data)
 
     @swagger_auto_schema(
         request_body=DuplicateSrializer,
@@ -1130,12 +1217,12 @@ class WorkerDayViewSet(BaseModelViewSet):
         with transaction.atomic():
             for employee_id in employee_ids:
                 wds, w_types = copy_as_excel_cells(
-                    employee_id, 
-                    from_dates, 
-                    employee_id, 
-                    to_dates, 
-                    created_by=request.user.id, 
-                    is_approved=data['is_approved'], 
+                    employee_id,
+                    from_dates,
+                    employee_id,
+                    to_dates,
+                    created_by=request.user.id,
+                    is_approved=data['is_approved'],
                     include_spaces=True,
                     worker_day_types=data['worker_day_types'],
                 )
@@ -1246,7 +1333,7 @@ class WorkerDayViewSet(BaseModelViewSet):
         data.validated_data['network_id'] = request.user.network_id
         shop = Shop.objects.get(id=data.validated_data.get('shop_id'))
         timetable_generator_cls = get_timetable_generator_cls(timetable_format=shop.network.timetable_format)
-        timetable_generator = timetable_generator_cls()
+        timetable_generator = timetable_generator_cls(user=self.request.user)
         return timetable_generator.upload(data.validated_data, file)
 
     @swagger_auto_schema(
@@ -1274,7 +1361,7 @@ class WorkerDayViewSet(BaseModelViewSet):
 
         shop = Shop.objects.get(id=shop_id)
         timetable_generator_cls = get_timetable_generator_cls(timetable_format=shop.network.timetable_format)
-        timetable_generator = timetable_generator_cls()
+        timetable_generator = timetable_generator_cls(user=self.request.user)
         return timetable_generator.generate_upload_example(shop_id, dt_from, dt_to, is_fact, is_approved, employee_id__in)
 
     @swagger_auto_schema(
@@ -1293,7 +1380,7 @@ class WorkerDayViewSet(BaseModelViewSet):
         data.validated_data['network_id'] = request.user.network_id
         shop = Shop.objects.get(id=data.validated_data.get('shop_id'))
         timetable_generator_cls = get_timetable_generator_cls(timetable_format=shop.network.timetable_format)
-        timetable_generator = timetable_generator_cls()
+        timetable_generator = timetable_generator_cls(user=self.request.user)
         return timetable_generator.upload(data.validated_data, file, is_fact=True)
 
     @swagger_auto_schema(
@@ -1309,7 +1396,7 @@ class WorkerDayViewSet(BaseModelViewSet):
         data.is_valid(raise_exception=True)
         shop = Shop.objects.get(id=data.validated_data.get('shop_id'))
         timetable_generator_cls = get_timetable_generator_cls(timetable_format=shop.network.timetable_format)
-        timetable_generator = timetable_generator_cls()
+        timetable_generator = timetable_generator_cls(user=self.request.user)
         return timetable_generator.download(data.validated_data)
 
     @swagger_auto_schema(
@@ -1431,8 +1518,8 @@ class WorkerDayViewSet(BaseModelViewSet):
         data.is_valid(raise_exception=True)
         data = data.validated_data
         output = overtimes_undertimes_xlsx(
-            period_step=request.user.network.accounting_period_length, 
-            employee_id__in=data.get('employee_id__in'), 
+            period_step=request.user.network.accounting_period_length,
+            employee_id__in=data.get('employee_id__in'),
             shop_ids=[data.get('shop_id')] if data.get('shop_id') else None,
             in_memory=True,
         )
@@ -1442,7 +1529,7 @@ class WorkerDayViewSet(BaseModelViewSet):
         )
         response['Content-Disposition'] = 'attachment; filename="{}.xlsx"'.format(escape_uri_path('Overtimes_undertimes'))
         return response
-    
+
     @swagger_auto_schema(
         request_body=ChangeListSerializer,
         responses={200: None},
@@ -1452,7 +1539,9 @@ class WorkerDayViewSet(BaseModelViewSet):
     )
     @action(detail=False, methods=['post'])
     def change_list(self, request):
-        data = ChangeListSerializer(data=request.data, context={'request': request})
+        wd_types_dict = WorkerDayType.get_wd_types_dict()
+        data = ChangeListSerializer(
+            data=request.data, context={'request': request, 'wd_types_dict': wd_types_dict})
         data.is_valid(raise_exception=True)
         data = data.validated_data
         check_worker_day_permissions(
@@ -1460,16 +1549,17 @@ class WorkerDayViewSet(BaseModelViewSet):
             data['shop_id'],
             WorkerDayPermission.CREATE_OR_UPDATE,
             WorkerDayPermission.PLAN,
-            [data['type'],],
+            [data['type_id'],],
             data['dt_from'],
             data['dt_to'],
             self.error_messages,
+            wd_types_dict=wd_types_dict,
         )
         response = WorkerDaySerializer(
             create_worker_days_range(
                 data['dates'], 
-                type=data['type'], 
-                employee_id=data.get('employee_id'), 
+                type_id=data['type_id'],
+                employee_id=data.get('employee_id'),
                 shop_id=data['shop_id'],
                 tm_work_start=data.get('tm_work_start'),
                 tm_work_end=data.get('tm_work_end'),

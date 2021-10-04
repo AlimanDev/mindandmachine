@@ -8,6 +8,7 @@ import xlsxwriter
 from src.base.models import Employment
 from src.timetable.models import WorkerDay
 
+
 def get_unaccounted_overtimes(network_id, dt_from=None, dt_to=None, shop_ids=None, user_ids=None):
     filter_values = {}
     if shop_ids:
@@ -26,7 +27,8 @@ def get_unaccounted_overtimes(network_id, dt_from=None, dt_to=None, shop_ids=Non
     filter_values.pop('employee__user_id__in', None)
     return WorkerDay.objects.filter(
         employee_id__in=employee_ids,
-        type__in=WorkerDay.TYPES_WITH_TM_RANGE,
+        type__is_dayoff=False,
+        type__is_work_hours=True,
         shop__isnull=False,
         dt__gte=dt_from,
         dt__lte=dt_to,
@@ -51,6 +53,7 @@ def get_unaccounted_overtimes(network_id, dt_from=None, dt_to=None, shop_ids=Non
         'dt',
         'employee_id',
     )
+
 
 def unaccounted_overtimes_xlsx(network_id, dt_from=None, dt_to=None, title=None, shop_ids=None, in_memory=False):
     if not dt_from:
