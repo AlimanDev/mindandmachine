@@ -3731,6 +3731,32 @@ class TestAditionalFunctions(TestsHelperMixin, APITestCase):
         self.assertEquals(WorkerDay.objects.filter(is_vacancy=True, shop_id=self.shop.id, is_outsource=False).count(), 10)
         self.assertEquals(WorkerDayCashboxDetails.objects.count(), 20)
 
+    def test_change_list_create_night_shifts_vacancy(self):
+        dt_from = date.today()
+        data = {
+            'shop_id': self.shop.id,
+            'type': WorkerDay.TYPE_WORKDAY,
+            'tm_work_start': '20:00:00',
+            'tm_work_end': '08:00:00',
+            'cashbox_details': [
+                {
+                    'work_type_id': self.work_type.id,
+                    'work_part': 1,
+                },
+            ],
+            'is_vacancy': True,
+            'dt_from': dt_from,
+            'dt_to': dt_from + timedelta(9),
+        }
+        url = f'{self.url}change_list/'
+        response = self.client.post(url, data, format='json')
+        data = response.json()
+        self.assertEquals(len(data), 10)
+        self.assertEquals(WorkerDay.objects.filter(is_vacancy=True, shop_id=self.shop.id, is_outsource=False).count(), 10)
+        wd = WorkerDay.objects.filter(dt=dt_from).first()
+        self.assertEquals(wd.dttm_work_start, datetime.combine(dt_from, time(20)))
+        self.assertEquals(wd.dttm_work_end, datetime.combine(dt_from + timedelta(1), time(8)))
+
     def test_change_list_errors(self):
         dt_from = date(2021, 1, 1)
         dt_to = date(2021, 1, 2)
