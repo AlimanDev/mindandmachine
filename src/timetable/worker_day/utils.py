@@ -377,6 +377,9 @@ def create_worker_days_range(dates, type_id=WorkerDay.TYPE_WORKDAY, shop_id=None
                         _('It is not possible to create days on the selected dates. '
                         'Please check whether the employee has active employment.')
                     )
+            dt_to = date
+            if tm_work_start and tm_work_end and tm_work_end < tm_work_start:
+                dt_to = date + datetime.timedelta(days=1)
             wd = WorkerDay.objects.create(
                 dt=date,
                 shop_id=shop_id,
@@ -385,7 +388,7 @@ def create_worker_days_range(dates, type_id=WorkerDay.TYPE_WORKDAY, shop_id=None
                 is_vacancy=is_vacancy,
                 is_approved=is_approved,
                 dttm_work_start=datetime.datetime.combine(date, tm_work_start) if tm_work_start else None,
-                dttm_work_end=datetime.datetime.combine(date, tm_work_end) if tm_work_end else None,
+                dttm_work_end=datetime.datetime.combine(dt_to, tm_work_end) if tm_work_end else None,
                 type_id=type_id,
                 is_outsource=bool(outsources),
                 created_by=created_by,
