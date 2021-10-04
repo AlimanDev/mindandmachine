@@ -1697,6 +1697,29 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
         self.assertTrue(wd.is_vacancy)
         self.assertEqual(wd.employment.id, self.employment8.id)
 
+    def test_shop_id_set_to_none_if_wd_type_is_day_off(self):
+        data = {
+            "shop_id": self.shop.id,
+            "employee_id": self.employee8.id,
+            "dt": self.dt,
+            "is_fact": False,
+            "is_approved": False,
+            "type": WorkerDay.TYPE_HOLIDAY,
+            "dttm_work_start": datetime.combine(self.dt, time(10, 0, 0)),
+            "dttm_work_end": datetime.combine(self.dt, time(20, 0, 0)),
+            "worker_day_details": [{
+                "work_part": 1.0,
+                "work_type_id": self.work_type.id}
+            ]
+        }
+        resp = self.client.post(self.url, data, format='json')
+        self.assertEqual(resp.status_code, 201)
+        resp_data = resp.json()
+        wd = WorkerDay.objects.get(id=resp_data['id'])
+        self.assertIsNone(wd.shop_id)
+        self.assertIsNone(wd.dttm_work_start)
+        self.assertIsNone(wd.dttm_work_end)
+
     def test_create_vacancy_for_the_same_shop_then_update_for_other_shop(self):
         data = {
             "shop_id": self.shop2.id,

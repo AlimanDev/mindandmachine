@@ -206,9 +206,12 @@ class WorkerDaySerializer(serializers.ModelSerializer, UnaccountedOvertimeMixin)
                 )
             })
 
+        shop_id = attrs.get('shop_id')
         if wd_type_obj.is_dayoff:
             attrs['dttm_work_start'] = None
             attrs['dttm_work_end'] = None
+            attrs['shop_id'] = None
+            attrs.pop('shop_code', None)
         elif not (attrs.get('dttm_work_start') and attrs.get('dttm_work_end')):
             messages = {}
             for k in 'dttm_work_start', 'dttm_work_end':
@@ -223,8 +226,9 @@ class WorkerDaySerializer(serializers.ModelSerializer, UnaccountedOvertimeMixin)
             shops = list(Shop.objects.filter(code=shop_code, network_id=self.context['request'].user.network_id))
             if len(shops) == 1:
                 attrs['shop_id'] = shops[0].id
+                shop_id = shops[0].id
             else:
-                self.fail('no_shop', amount=len(shops), code=shop_code)
+                self.fail('no_such_shop_in_network')
         elif attrs.get('shop_id') and not Shop.objects.filter(
                 Q(network_id=self.context['request'].user.network_id) |
                 Q(network_id__in=NetworkConnect.objects.filter(
@@ -281,7 +285,7 @@ class WorkerDaySerializer(serializers.ModelSerializer, UnaccountedOvertimeMixin)
                 ),
                 employee_id=attrs.get('employee_id'),
                 dt=attrs.get('dt'),
-                priority_shop_id=attrs.get('shop_id'),
+                priority_shop_id=shop_id,
                 priority_employment_id=attrs.get('employment_id'),
             ).first()
             if not employee_active_empl:
@@ -321,7 +325,7 @@ class WorkerDaySerializer(serializers.ModelSerializer, UnaccountedOvertimeMixin)
         employee_id = validated_data.get('employee_id', instance.employee_id if instance else None)
         if employee_id:
             validated_data['is_vacancy'] = validated_data.get('is_vacancy') \
-                or not self._employee_active_empl.is_equal_shops
+                or not getattr(self._employee_active_empl, 'is_equal_shops', True)
 
     def _run_transaction_checks(self, employee_id, dt, is_fact, is_approved):
         WorkerDay.check_work_time_overlap(
