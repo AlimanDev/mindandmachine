@@ -172,8 +172,6 @@ class UserViewSet(UpdateorCreateViewSet):
             biometrics_image = self.request.data['file']
             recognition = Recognition()
             try:
-                user.avatar = biometrics_image
-                user.save()
                 partner_id = recognition.create_person({"id": user.id})
                 recognition.upload_photo(partner_id, biometrics_image)
             except HTTPError as e:
@@ -183,6 +181,8 @@ class UserViewSet(UpdateorCreateViewSet):
                 user=user,
                 partner_id=partner_id,
             )
+            user.avatar = biometrics_image
+            user.save()
             success_msg = _('Biometrics template added successfully.')
             return Response({"detail": success_msg}, status=status.HTTP_200_OK)
         else:
