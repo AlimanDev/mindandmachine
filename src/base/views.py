@@ -1,6 +1,5 @@
 from django.db.models import F, Q
 from django.db.models.functions import Coalesce
-from django.db import transaction
 from django.middleware.csrf import rotate_token
 from django.utils import timezone
 from django.utils.translation import gettext as _
@@ -173,11 +172,8 @@ class UserViewSet(UpdateorCreateViewSet):
             biometrics_image = self.request.data['file']
             recognition = Recognition()
             try:
-                with transaction.atomic():
-                    user.avatar = biometrics_image
-                    user.save()
-                    partner_id = recognition.create_person({"id": user.id})
-                    recognition.upload_photo(partner_id, biometrics_image)
+                partner_id = recognition.create_person({"id": user.id})
+                recognition.upload_photo(partner_id, biometrics_image)
             except HTTPError as e:
                 return Response({"detail": str(e)}, e.response.status_code)
 
@@ -185,6 +181,8 @@ class UserViewSet(UpdateorCreateViewSet):
                 user=user,
                 partner_id=partner_id,
             )
+            user.avatar = biometrics_image
+            user.save()
             success_msg = _('Biometrics template added successfully.')
             return Response({"detail": success_msg}, status=status.HTTP_200_OK)
         else:
