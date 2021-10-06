@@ -554,19 +554,19 @@ class UploadDownloadTimetableCells(BaseUploadDownloadTimeTable):
         timetable.format_cells(len(employments))
 
         # construct weekday
-        timetable.construct_dates('%w', 8, 4)
+        timetable.construct_dates('%w', 6, 4)
 
         # construct day 2
-        timetable.construct_dates('%d.%m', 9, 4)
+        timetable.construct_dates('%d.%m', 7, 4)
         timetable.add_main_info()
 
         # construct user info
-        timetable.construnts_users_info(employments, 11, 0, ['code', 'fio', 'position'])
+        timetable.construnts_users_info(employments, 9, 0, ['code', 'fio', 'position'])
 
         groupped_days = self._group_worker_days(workdays)
 
         # fill page 1
-        timetable.fill_table(groupped_days, employments, stat, 11, 4, stat_type=stat_type, norm_type=norm_type, mapping=self.wd_type_mapping)
+        timetable.fill_table(groupped_days, employments, stat, 9, 4, stat_type=stat_type, norm_type=norm_type, mapping=self.wd_type_mapping)
 
         # fill page 2
         timetable.fill_table2(shop, timetable.prod_days[-1].dt, groupped_days)
@@ -702,7 +702,6 @@ class UploadDownloadTimetableRows(BaseUploadDownloadTimeTable):
                             e.dt_fired is None or wd.dt <= e.dt_fired),
                 empls.get(wd.employee_id, []),
             ))[0]
-
 
         shop = Shop.objects.get(pk=form['shop_id'])
         dt_from = form['dt_from']
