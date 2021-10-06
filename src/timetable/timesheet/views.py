@@ -81,5 +81,9 @@ class TimesheetViewSet(BaseModelViewSet):
         employee_ids = list(employee_ids)
         if not employee_ids:
             raise ValidationError({'detail': _('No employees satisfying the conditions.')})
-        calc_timesheets.delay(employee_id__in=list(employee_ids))
+        calc_timesheets.delay(
+            employee_id__in=list(employee_ids),
+            dt_from=serializer.data['dt_from'],
+            dt_to=serializer.data['dt_to'],
+        )
         return Response({'detail': _('Timesheet recalculation started successfully.')})
