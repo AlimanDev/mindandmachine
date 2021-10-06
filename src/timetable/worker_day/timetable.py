@@ -575,11 +575,11 @@ class UploadDownloadTimetableCells(BaseUploadDownloadTimeTable):
             timetable.worksheet.set_landscape()
             timetable.worksheet.set_paper(9)
             timetable.worksheet.fit_to_pages(1, 0)
-            timetable.worksheet.set_margins(left=0.15, right=0.1)
+            timetable.worksheet.set_margins(left=0.25, right=0.25)
             timetable.print_worksheet.set_landscape()
             timetable.print_worksheet.set_paper(9)
             timetable.print_worksheet.fit_to_pages(1, 0)
-            timetable.print_worksheet.set_margins(left=0.15, right=0.1)
+            timetable.print_worksheet.set_margins(left=0.25, right=0.25)
 
         return workbook, _('Timetable_for_shop_{}_from_{}.xlsx').format(shop.name, form['dt_from'])
 

@@ -60,7 +60,7 @@ class Xlsx_base:
 
     def _font_size(self, font_size, on_print_font_size=None):
         if self.on_print:
-            return on_print_font_size or int(font_size / 2) + 3
+            return on_print_font_size or int(font_size / 2) + 4
         return font_size
 
     def _column_width(self, column_width, on_print_column_width=None):

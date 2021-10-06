@@ -100,7 +100,7 @@ class Timetable_xlsx(Tabel_xlsx):
         self.worksheet.set_column(37, 39, 60 / normalized)
 
         normalized_row = 1
-        set_rows(7, 9, 60 / normalized_row)
+        set_rows(7, 9, 66 / normalized_row)
         set_rows(8, 10, 15 / normalized_row)
         set_rows(9, 11 + users_len, 45 / normalized_row)
 
@@ -225,7 +225,7 @@ class Timetable_xlsx(Tabel_xlsx):
                     '\n'.join(texts),
                     self.workbook.add_format(cell_format)
                 )
-            self.worksheet.set_row(row_s + row_shift, self._row_height(32 * max_rows / 2, 24 * max_rows))
+            self.worksheet.set_row(row_s + row_shift, self._row_height(32 * max_rows / 2, 26 * max_rows))
 
             format_holiday_debt = self.workbook.add_format(fmt(font_size=self._font_size(9), border=1, bg_color='#FEFF99'))
             self.worksheet.write_string(
