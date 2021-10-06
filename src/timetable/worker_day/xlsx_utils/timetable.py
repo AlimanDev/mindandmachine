@@ -106,7 +106,7 @@ class Timetable_xlsx(Tabel_xlsx):
 
         border_fmt = self.workbook.add_format(fmt(border=1))
         self.worksheet.conditional_format(
-            0, 0, 9, 36 + self.additional_fields_count, {'type': 'blanks', 'format': border_fmt})
+            0, 0, 9, len(self.prod_days) + 5 + self.additional_fields_count, {'type': 'blanks', 'format': border_fmt})
 
     def add_main_info(self):
         # format
