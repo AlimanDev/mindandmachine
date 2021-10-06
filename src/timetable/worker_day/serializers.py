@@ -440,6 +440,7 @@ class VacancySerializer(serializers.Serializer):
     user_network_id = serializers.IntegerField(required=False)
     outsources = NetworkListSerializer(many=True, read_only=True)
     shop = ShopListSerializer()
+    comment = serializers.CharField(required=False)
 
     def get_avatar_url(self, obj) -> str:
         if obj.employee_id and obj.employee.user_id and obj.employee.user.avatar:

@@ -3446,6 +3446,7 @@ class TestVacancy(TestsHelperMixin, APITestCase):
             type_id=WorkerDay.TYPE_WORKDAY,
             dt=cls.dt_now,
             is_vacancy=True,
+            comment='Test',
         )
         cls.vacancy2 = WorkerDay.objects.create(
             shop=cls.shop,
@@ -3455,6 +3456,7 @@ class TestVacancy(TestsHelperMixin, APITestCase):
             dt=cls.dt_now,
             is_vacancy=True,
             is_approved=True,
+            comment='Test',
         )
         cls.vac_wd_details = WorkerDayCashboxDetails.objects.create(
             work_type=cls.work_type1,
@@ -3561,6 +3563,7 @@ class TestVacancy(TestsHelperMixin, APITestCase):
         response = self.client.get(f'{self.url}?shop_id={self.shop.id}&limit=100')
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.json()['results']), 2)
+        self.assertEqual(response.json()['results'][0]['comment'], 'Test')
 
     def test_get_list_shift_length(self):
         response = self.client.get(
