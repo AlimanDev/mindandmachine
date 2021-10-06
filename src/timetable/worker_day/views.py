@@ -776,7 +776,10 @@ class WorkerDayViewSet(BaseModelViewSet):
                 worker_day_outsource_network_exitst=Exists(worker_day_outsource_network_subq),
             ).filter(
                 Q(shop__network_id=request.user.network_id) | 
-                Q(is_outsource=True, worker_day_outsource_network_exitst=True, is_approved=True), # аутсорс фильтр
+                (
+                    Q(is_outsource=True, worker_day_outsource_network_exitst=True, is_approved=True)&
+                    (Q(employee__isnull=True) | Q(employee__user__network_id=request.user.network_id)) # чтобы не попадали вакансии с сотрудниками другой аутсорс сети
+                ), # аутсорс фильтр
             ).select_related(
                 'shop',
                 'employee__user',

@@ -26,6 +26,7 @@ Note:
 import json
 # TODO разобраться с Event
 from datetime import timedelta, datetime, time
+from django.db.models.expressions import F
 
 import pandas
 from dateutil.relativedelta import relativedelta
@@ -556,14 +557,25 @@ def confirm_vacancy(vacancy_id, user, employee_id=None, exchange=False, reconfir
     }
     try:
         with transaction.atomic():
-            no_employee_filter = {}
+            filt = Q()
+            worker_day_qs = WorkerDay.objects.all()
             if not reconfirm:
-                no_employee_filter['employee__isnull'] = True
-            vacancy = WorkerDay.objects.get_plan_approved(
+                filt = Q(employee__isnull=True)
+            else:
+                worker_day_qs = worker_day_qs.annotate(
+                    user_or_shop_same_network=Exists( # из-за select_for_update
+                        WorkerDay.objects.filter(
+                            Q(shop__network_id=user.network_id) | Q(employee__user__network_id=user.network_id),
+                            id=OuterRef('id'),
+                        )
+                    ),
+                )
+                filt = Q(user_or_shop_same_network=True)
+            vacancy = worker_day_qs.get_plan_approved(
+                filt,
                 id=vacancy_id,
                 is_vacancy=True,
                 canceled=False,
-                **no_employee_filter,
             ).select_for_update().first()
             if not vacancy:
                 res['text'] = messages['no_vacancy']
