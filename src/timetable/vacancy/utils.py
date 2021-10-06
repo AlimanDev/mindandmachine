@@ -586,7 +586,7 @@ def confirm_vacancy(vacancy_id, user, employee_id=None, exchange=False, reconfir
             else:
                 employee_filter['employee__user_id'] = user.id
             active_employment = Employment.objects.get_active_empl_by_priority(
-                network_id=user.network_id, dt=vacancy.dt,
+                dt=vacancy.dt,
                 priority_shop_id=vacancy.shop_id,
                 priority_work_type_id=vacancy.work_types.values_list('id', flat=True).first(),
                 **employee_filter,
