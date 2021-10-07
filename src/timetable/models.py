@@ -253,7 +253,7 @@ class WorkerConstraint(AbstractModel):
         unique_together = (('employment', 'weekday', 'tm'),)
 
     def __str__(self):
-        return '{} {}, {}, {}, {}'.format(self.worker.last_name, self.worker.id, self.weekday, self.tm, self.id)
+        return '{} {}, {}, {}, {}'.format(self.employment.employee.user.last_name, self.employment.id, self.weekday, self.tm, self.id)
 
     id = models.BigAutoField(primary_key=True)
     shop = models.ForeignKey(Shop, blank=True, null=True, on_delete=models.PROTECT, related_name='worker_constraints')
