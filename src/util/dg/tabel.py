@@ -66,6 +66,11 @@ class BaseTabelDataGetter:
             'fact_timesheet_type',
             'main_timesheet_type',
         )
+        employement_extra_q = Q()
+        if self.shop.network.settings_values_prop.get('timesheet_exclude_invisible_employments', True):
+            employement_extra_q &= Q(
+                is_visible=True,
+            )
         if self.type_field:
             shop_employees_part_q = Q(**{self.type_field + '__is_dayoff': True})
             if self.shop.network.settings_values_prop.get('tabel_include_other_shops_wdays', False):  # TODO: сделать в виде параметра на фронте? Или так ок?
@@ -83,6 +88,7 @@ class BaseTabelDataGetter:
                         dt_from=self.dt_from,
                         dt_to=self.dt_to,
                         shop=self.shop,
+                        extra_q=employement_extra_q,
                     ).distinct().values_list('employee', flat=True))
                 ),
             )
@@ -95,6 +101,7 @@ class BaseTabelDataGetter:
                             dt_from=self.dt_from,
                             dt_to=self.dt_to,
                             shop=self.shop,
+                            extra_q=employement_extra_q,
                         ).distinct().values_list('employee', flat=True)
                     )
             tabel_wdays = tabel_wdays.filter(
