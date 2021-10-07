@@ -105,8 +105,9 @@ class CashboxAdmin(admin.ModelAdmin):
 class WorkerCashboxInfoAdmin(admin.ModelAdmin):
     list_display = ('worker', 'work_type_name', 'id')
     search_fields = ('employment__employee__user__last_name', 'work_type__work_type_name__name', 'id')
-    list_filter = ('work_type__shop',)
-    list_select_related = ('work_type', 'work_type__shop', 'employment__employee__user')
+    list_filter = (('work_type__shop', RelatedOnlyDropdownNameOrderedFilter),)
+    list_select_related = ('work_type__work_type_name', 'work_type__shop', 'employment__employee__user')
+    raw_id_fields = ('employment', 'work_type')
 
     @staticmethod
     def worker(instance: EmploymentWorkType):
@@ -121,12 +122,14 @@ class WorkerCashboxInfoAdmin(admin.ModelAdmin):
 @admin.register(WorkerConstraint)
 class WorkerConstraintAdmin(admin.ModelAdmin):
     list_display = ('worker_last_name', 'weekday', 'tm', 'id')
-    search_fields = ('worker__last_name',)
-    list_filter = ('shop',)
+    search_fields = ('employment__employee__user__last_name',)
+    list_filter = (('shop', RelatedOnlyDropdownNameOrderedFilter),)
+    raw_id_fields = ('employment', 'shop')
+    list_select_related = ('employment__employee__user',)
 
     @staticmethod
     def worker_last_name(instance: WorkerConstraint):
-        return instance.worker.last_name
+        return instance.employment.employee.user.last_name
 
 
 @admin.register(WorkerDay)
@@ -149,7 +152,7 @@ class WorkerDayAdmin(admin.ModelAdmin):
         'is_fact',
         'is_approved',
         ('shop', CustomRelatedOnlyDropdownFilter),
-        ('type', CustomChoiceDropdownFilter),
+        ('type', CustomRelatedOnlyDropdownFilter),
         ('dttm_modified', DateTimeRangeFilter),
         ('created_by', CustomRelatedOnlyDropdownFilter),
     )
@@ -201,10 +204,10 @@ class WorkerDayCashboxDetailsAdmin(admin.ModelAdmin):
     # todo: нет нормального отображения для конкретного pk(скорее всего из-за harakiri time в настройках uwsgi)
     list_display = ('worker_last_name', 'shop_title', 'worker_day_dt', 'on_work_type', 'id')
     search_fields = ('worker_day__employee__user__last_name', 'worker_day__shop__name', 'id')
-    list_filter = ('worker_day__shop',)
+    list_filter = (('worker_day__shop', RelatedOnlyDropdownNameOrderedFilter),)
     raw_id_fields = ('worker_day', 'work_type')
     list_select_related = (
-        'worker_day__employee__user', 'worker_day__shop', 'work_type')
+        'worker_day__employee__user', 'worker_day__shop', 'work_type__work_type_name')
 
     @staticmethod
     def worker_last_name(instance: WorkerDayCashboxDetails):
@@ -247,7 +250,9 @@ class TimetableAdmin(admin.ModelAdmin):
     list_display = ('id', 'shop_title', 'parent_title', 'dt', 'status', 'dttm_status_change',
                     'fot', 'idle', 'lack', 'workers_amount', 'revenue', 'fot_revenue',)
     search_fields = ('shop__name', 'shop__parent__name')
-    list_filter = ('shop',)
+    list_select_related = ('shop', 'shop__parent')
+    list_filter = (('shop', RelatedOnlyDropdownNameOrderedFilter),)
+    raw_id_fields = ('shop',)
 
     @staticmethod
     def parent_title(instance: ShopMonthStat):
@@ -266,7 +271,8 @@ class WorkerDayChangeRequestAdmin(admin.ModelAdmin):
 @admin.register(AttendanceRecords)
 class AttendanceRecordsAdmin(admin.ModelAdmin):
     list_display = ('id', 'dttm', 'type',)
-    list_filter = ('type', 'verified', 'type')
+    list_filter = ('type', 'verified',)
+    raw_id_fields = ('user', 'employee', 'shop')
 
 
 @admin.register(ExchangeSettings)
@@ -318,7 +324,7 @@ class GroupWorkerDayPermissionAdmin(ImportMixin, ExportActionMixin, admin.ModelA
         ('group', RelatedOnlyDropdownNameOrderedFilter),
         'worker_day_permission__action',
         'worker_day_permission__graph_type',
-        'worker_day_permission__wd_type',
+        ('worker_day_permission__wd_type', RelatedOnlyDropdownNameOrderedFilter),
     ]
     list_select_related = ('group', 'worker_day_permission__wd_type')
     resource_class = GroupWorkerDayPermissionResource
