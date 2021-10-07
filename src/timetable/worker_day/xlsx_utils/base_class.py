@@ -33,6 +33,7 @@ class Xlsx_base:
         }
 
         self.shop = shop
+        self.dt = dt
         self.month = datetime.date(dt.year, dt.month, 1)
         self.prod_days = prod_days
 
