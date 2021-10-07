@@ -1,9 +1,9 @@
 from django.contrib import admin
 from django.forms import Form
 from django.utils.translation import gettext as _
-from django_admin_listfilter_dropdown.filters import RelatedOnlyDropdownFilter, ChoiceDropdownFilter
 from import_export.admin import ExportActionMixin, ImportMixin
 from rangefilter.filter import DateRangeFilter, DateTimeRangeFilter
+from src.base.admin_filters import CustomChoiceDropdownFilter, CustomRelatedOnlyDropdownFilter
 
 from src.base.forms import (
     CustomImportFunctionGroupForm,
@@ -148,10 +148,10 @@ class WorkerDayAdmin(admin.ModelAdmin):
         ('dt', DateRangeFilter),
         'is_fact',
         'is_approved',
-        ('shop', RelatedOnlyDropdownFilter),
-        ('type', ChoiceDropdownFilter),
+        ('shop', CustomRelatedOnlyDropdownFilter),
+        ('type', CustomChoiceDropdownFilter),
         ('dttm_modified', DateTimeRangeFilter),
-        ('created_by', RelatedOnlyDropdownFilter),
+        ('created_by', CustomRelatedOnlyDropdownFilter),
     )
     raw_id_fields = ('parent_worker_day', 'employment', 'created_by', 'last_edited_by', 'employee', 'shop', 'type', 'closest_plan_approved')
     list_select_related = ('employee__user', 'shop', 'created_by', 'last_edited_by', 'parent_worker_day', 'type', 'closest_plan_approved')
