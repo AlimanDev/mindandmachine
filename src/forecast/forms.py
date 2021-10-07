@@ -25,11 +25,10 @@ def get_operations():
     return OperationTypeName.objects.all()
 
 class RecalcLoadForm(forms.Form):
-    dt_from = forms.DateField(initial=date.today(), label='Дата с', required=True, widget=AdminDateWidget)
-    dt_to = forms.DateField(initial=date.today() + timedelta(days=30), label='Дата по', required=True, widget=AdminDateWidget)
-
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.fields['dt_from'] = forms.DateField(initial=date.today(), label='Дата с', required=True, widget=AdminDateWidget)
+        self.fields['dt_to'] = forms.DateField(initial=date.today() + timedelta(days=30), label='Дата по', required=True, widget=AdminDateWidget)
         self.fields['load_templates'] = forms.ModelMultipleChoiceField(queryset=get_templates(), label='Шаблоны нагрузки', required=False, widget=FilteredSelectMultiple('Шаблоны нагрузки', is_stacked=False))
         self.fields['shops'] = forms.ModelMultipleChoiceField(queryset=get_shops(), label='Магазины', required=False, widget=FilteredSelectMultiple('Отделы', is_stacked=False))
 
