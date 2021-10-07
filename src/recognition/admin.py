@@ -9,30 +9,14 @@ from django.db.models.functions import Coalesce
 from django.http import HttpResponse
 from django.utils.html import format_html
 from django.utils.timezone import now
-from django_admin_listfilter_dropdown.filters import RelatedOnlyDropdownFilter
 from rangefilter.filter import DateTimeRangeFilter
+from src.base.admin_filters import CustomRelatedOnlyDropdownFilter, RelatedOnlyDropdownNameOrderedFilter
 
 from src.recognition.models import TickPoint, Tick, TickPhoto, UserConnecter
 from src.timetable.models import User, Employment
 from src.util.dg.ticks_report import TicksOdsReportGenerator, TicksOdtReportGenerator
 
 admin.site.unregister(Group)
-
-
-class RelatedOnlyDropdownOrderedFilter(RelatedOnlyDropdownFilter):
-    ordering_field = None
-
-    def field_choices(self, field, request, model_admin):
-        pk_qs = model_admin.get_queryset(request).distinct().values_list('%s__pk' % self.field_path, flat=True)
-        return field.get_choices(include_blank=False, limit_choices_to={'pk__in': pk_qs}, ordering=[self.ordering_field,])
-
-
-class RelatedOnlyDropdownNameOrderedFilter(RelatedOnlyDropdownOrderedFilter):
-    ordering_field = 'name'
-
-
-class RelatedOnlyDropdownLastNameOrderedFilter(RelatedOnlyDropdownOrderedFilter):
-    ordering_field = 'last_name'
 
 
 class UserListFilter(admin.SimpleListFilter):
@@ -227,7 +211,7 @@ class TickPhotoAdmin(admin.ModelAdmin):
     list_filter = [('liveness', RangeNumericFilter),
                    ('dttm', DateTimeRangeFilter),
                    'type',
-                   ('tick__tick_point__shop', RelatedOnlyDropdownFilter),
+                   ('tick__tick_point__shop', CustomRelatedOnlyDropdownFilter),
                    PhotoUserListFilter,
                    ]
     list_display = ['id', 'user', 'type', 'tick_point', 'liveness', 'verified_score', 'dttm', 'image_tag']
