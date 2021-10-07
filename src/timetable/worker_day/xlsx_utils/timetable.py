@@ -65,9 +65,7 @@ class Timetable_xlsx(Tabel_xlsx):
             'text_wrap': True,
         }
 
-        self.timetable_settings = dict(
-            timetable_set_date_as_2_months_ago=self.shop.network.settings_values_prop.get(
-                'timetable_set_date_as_2_months_ago', False),
+        self.additional_fields_settings = dict(
             timetable_add_work_days_field=self.shop.network.settings_values_prop.get(
                 'timetable_add_work_days_field', True),
             timetable_add_work_hours_field=self.shop.network.settings_values_prop.get(
@@ -81,7 +79,7 @@ class Timetable_xlsx(Tabel_xlsx):
             timetable_add_vacation_count_field=self.shop.network.settings_values_prop.get(
                 'timetable_add_vacation_count_field', False),
         )
-        self.additional_fields_count = sum(self.timetable_settings.values())
+        self.additional_fields_count = sum(self.additional_fields_settings.values())
 
     def format_cells(self, users_len):
         super().format_cells(users_len)
@@ -149,19 +147,19 @@ class Timetable_xlsx(Tabel_xlsx):
 
         # right info
         n = 0
-        if self.timetable_settings.get('timetable_add_work_days_field'):
+        if self.additional_fields_settings.get('timetable_add_work_days_field'):
             self.worksheet.set_column(count_of_days, count_of_days, self._column_width(75) / 6.23820623)
             self.worksheet.write_string(7, count_of_days, _('days'), format_header_text)
             n += 1
-        if self.timetable_settings.get('timetable_add_work_hours_field'):
+        if self.additional_fields_settings.get('timetable_add_work_hours_field'):
             self.worksheet.set_column(count_of_days + n, count_of_days + n, self._column_width(75) / 6.23820623)
             self.worksheet.write_string(7, count_of_days + n, _('hours'), format_header_text)
             n += 1
-        if self.timetable_settings.get('timetable_add_norm_hours_field'):
+        if self.additional_fields_settings.get('timetable_add_norm_hours_field'):
             self.worksheet.set_column(count_of_days + n, count_of_days + n, self._column_width(100) / 6.23820623)
             self.worksheet.write_string(7, count_of_days + n, _('the rate of hours per month'), format_header_text)
             n += 1
-        if self.timetable_settings.get('timetable_add_overtime_field'):
+        if self.additional_fields_settings.get('timetable_add_overtime_field'):
             self.worksheet.set_column(count_of_days + n, count_of_days + n, self._column_width(75) / 6.23820623)
             self.worksheet.write_string(7, count_of_days + n, _('overtime'), format_header_text)
             n += 1
@@ -173,11 +171,11 @@ class Timetable_xlsx(Tabel_xlsx):
                                     _('I have read the work schedule**. I agree to work on public holidays'),
                                     format_header_text)
         n += 1
-        if self.timetable_settings.get('timetable_add_holiday_count_field'):
+        if self.additional_fields_settings.get('timetable_add_holiday_count_field'):
             self.worksheet.set_column(count_of_days + n, count_of_days + n, self._column_width(75) / 6.23820623)
             self.worksheet.write_string(7, count_of_days + n, _('H'), format_header_text)
             n += 1
-        if self.timetable_settings.get('timetable_add_vacation_count_field'):
+        if self.additional_fields_settings.get('timetable_add_vacation_count_field'):
             self.worksheet.set_column(count_of_days + n, count_of_days + n, self._column_width(75) / 6.23820623)
             self.worksheet.write_string(7, count_of_days + n, _('V'), format_header_text)
 
@@ -247,7 +245,7 @@ class Timetable_xlsx(Tabel_xlsx):
             format_text = self.workbook.add_format(fmt(font_size=self._font_size(12), border=1, bold=True))
 
             n = 1
-            if self.timetable_settings.get('timetable_add_work_days_field'):
+            if self.additional_fields_settings.get('timetable_add_work_days_field'):
                 self.worksheet.write_string(
                     row_s + row_shift, col_s + day + n,
                     str(stat.get(employment.employee_id, {}).get('plan', {}).get(stat_type, {}).get('work_days', {}).get('total', 0)),
@@ -256,7 +254,7 @@ class Timetable_xlsx(Tabel_xlsx):
                 n += 1
 
             plan_hours = None
-            if self.timetable_settings.get('timetable_add_work_hours_field'):
+            if self.additional_fields_settings.get('timetable_add_work_hours_field'):
                 plan_hours = int(round(stat.get(employment.employee_id, {}).get('plan', {}).get(stat_type, {}).get('work_hours', {}).get('total', 0)))
                 self.worksheet.write_string(
                     row_s + row_shift, col_s + day + n,
@@ -266,7 +264,7 @@ class Timetable_xlsx(Tabel_xlsx):
                 n += 1
 
             norm_hours = None
-            if self.timetable_settings.get('timetable_add_norm_hours_field'):
+            if self.additional_fields_settings.get('timetable_add_norm_hours_field'):
                 norm_hours = int(round(stat.get(employment.employee_id, {}).get('plan', {}).get(stat_type, {}).get(norm_type, {}).get('curr_month', 0)))
                 self.worksheet.write_string(
                     row_s + row_shift, col_s + day + n,
@@ -275,7 +273,7 @@ class Timetable_xlsx(Tabel_xlsx):
                 )
                 n += 1
 
-            if self.timetable_settings.get('timetable_add_overtime_field'):
+            if self.additional_fields_settings.get('timetable_add_overtime_field'):
                 self.worksheet.write_string(
                     row_s + row_shift, col_s + day + n,
                     str(int(plan_hours - norm_hours)),
@@ -285,7 +283,7 @@ class Timetable_xlsx(Tabel_xlsx):
 
             self.worksheet.write_string(
                 row_s + row_shift, col_s + day + n,
-                (self.dt - relativedelta(months=2)).replace(day=1).strftime('%d.%m.%Y') if self.timetable_settings.get('timetable_set_date_as_2_months_ago') else '',
+                (self.dt - relativedelta(months=2)).replace(day=1).strftime('%d.%m.%Y') if self.shop.network.settings_values_prop.get('timetable_set_date_as_2_months_ago', False) else '',
                 format_text
             )
             n += 1
@@ -297,7 +295,7 @@ class Timetable_xlsx(Tabel_xlsx):
             )
             n += 1
 
-            if self.timetable_settings.get('timetable_add_holiday_count_field'):
+            if self.additional_fields_settings.get('timetable_add_holiday_count_field'):
                 self.worksheet.write_string(
                     row_s + row_shift, col_s + day + n,
                     str(stat.get(employment.employee_id, {}).get('plan', {}).get(stat_type, {}).get('day_type', {}).get('H', 0)),
@@ -305,7 +303,7 @@ class Timetable_xlsx(Tabel_xlsx):
                 )
                 n += 1
 
-            if self.timetable_settings.get('timetable_add_vacation_count_field'):
+            if self.additional_fields_settings.get('timetable_add_vacation_count_field'):
                 self.worksheet.write_string(
                     row_s + row_shift, col_s + day + n,
                     str(stat.get(employment.employee_id, {}).get('plan', {}).get(stat_type, {}).get('day_type', {}).get('V', 0)),

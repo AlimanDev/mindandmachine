@@ -87,16 +87,22 @@ class BaseUploadDownloadTimeTable:
         
         return employment_work_type
 
-    def _get_employment_qs(self, network_id, shop_id, dt_from=None, dt_to=None):
+    def _get_employment_qs(self, network, shop_id, dt_from=None, dt_to=None):
+        employment_extra_q = Q()
+        if not network or network.settings_values_prop.get('timetable_exclude_invisible_employments', True):
+            employment_extra_q &= Q(
+                is_visible=True,
+            )
         if not dt_from:
             dt_from = datetime.date.today()
         if not dt_to:
             dt_to = datetime.date.today()
         return Employment.objects.get_active(
-            network_id=network_id,
+            network_id=network.id if network else None,
             dt_from=dt_from,
             dt_to=dt_to,
             shop_id=shop_id,
+            extra_q=employment_extra_q,
         ).select_related(
             'employee', 
             'employee__user', 
@@ -535,7 +541,7 @@ class UploadDownloadTimetableCells(BaseUploadDownloadTimeTable):
             on_print=form['on_print'],
         )
 
-        employments = self._get_employment_qs(shop.network_id, shop.id, dt_from=timetable.prod_days[0].dt, dt_to=timetable.prod_days[-1].dt)
+        employments = self._get_employment_qs(shop.network, shop.id, dt_from=timetable.prod_days[0].dt, dt_to=timetable.prod_days[-1].dt)
         employee_ids = employments.values_list('employee_id', flat=True)
         stat = WorkersStatsGetter(
             dt_from=timetable.prod_days[0].dt,
@@ -708,7 +714,7 @@ class UploadDownloadTimetableRows(BaseUploadDownloadTimeTable):
         dt_to = dt_from + relativedelta(day=31)
 
         empls = {}
-        employments = self._get_employment_qs(shop.network_id, shop.id, dt_from=dt_from, dt_to=dt_to)
+        employments = self._get_employment_qs(shop.network, shop.id, dt_from=dt_from, dt_to=dt_to)
         employee_ids = employments.values_list('employee_id', flat=True)
         for e in employments:
             empls.setdefault(e.employee_id, []).append(e)
