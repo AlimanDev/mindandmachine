@@ -102,12 +102,13 @@ def upload_demand_util_v2(new_workload, shop_id, lang):
 
 def upload_demand_util_v3(operation_type_name, demand_file, index_col=None, type='F'):
     if index_col:
-        df = pd.read_excel(demand_file, index_col=index_col)
+        df = pd.read_excel(demand_file, index_col=index_col, dtype=str)
     else:
-        df = pd.read_excel(demand_file)
+        df = pd.read_excel(demand_file, dtype=str)
     SHOP_COL = df.columns[0]
     DTTM_COL = df.columns[1]
     VALUE_COL = df.columns[2]
+    df[VALUE_COL] = df[VALUE_COL].astype(float)
     with transaction.atomic():
         shops = df[SHOP_COL].unique()
         shops = Shop.objects.filter(code__in=shops)
