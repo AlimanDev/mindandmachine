@@ -197,3 +197,28 @@ class TestOutsource(TestsHelperMixin, APITestCase):
         self.assertEquals(len(list(filter(lambda x: x['id'] == self.employee2.id, employees.json()))), 0)
         self.network_connect.allow_assign_employements_from_outsource = True
         self.network_connect.save()
+
+    def test_client_can_create_worker_day_to_employee_from_other_network_in_own_shop(self):
+        Employment.objects.filter(employee=self.employee2.id).update(dt_fired=date.today() - timedelta(1))
+
+        create_employment_response = self.client.post(
+            '/rest_api/employment/', 
+            {
+                'shop_id': self.client_shop.id,
+                'employee_id': self.employee2.id,
+                'position_id': self.client_position.id,
+                'dt_hired': date.today(),
+            }
+        )
+        self.assertEquals(create_employment_response.status_code, 201)
+        self.assertTrue(Employment.objects.filter(shop_id=self.client_shop.id, employee_id=self.employee2.id, position_id=self.client_position.id).exists())
+        self.assertTrue(Employment.objects.get_active(employee_id=self.employee2.id).count(), 1)
+        created_wd = self.client.post(
+            '/rest_api/worker_day/',
+            {
+                'employee_id': self.employee2.id,
+                'type': 'H',
+                'dt': date.today() + timedelta(1),
+            }
+        )
+        self.assertEquals(created_wd.status_code, 201)
