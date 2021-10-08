@@ -130,9 +130,9 @@ class TestOutsource(TestsHelperMixin, APITestCase):
         self.assertEquals(len(shops.json()), 8)
         self.assertEquals(len(list(filter(lambda x: x['id'] == self.client_shop.id, shops.json()))), 1)
         positions = self.client.get('/rest_api/worker_position/')
-        self.assertEquals(len(positions.json()), 0)
-        positions = self.client.get('/rest_api/worker_position/?include_clients=true')
         self.assertEquals(len(positions.json()), 1)
+        positions = self.client.get('/rest_api/worker_position/?include_clients=true')
+        self.assertEquals(len(positions.json()), 2)
         self.assertEquals(len(list(filter(lambda x: x['id'] == self.client_position.id, positions.json()))), 1)
 
         create_employment_response = self.client.post(
@@ -186,7 +186,7 @@ class TestOutsource(TestsHelperMixin, APITestCase):
         self.assertEquals(create_employment_response.status_code, 400)
         self.assertEquals(create_employment_response.json(),  {'non_field_errors': ['Вы не можете выбирать магазины из другой сети.']})
         positions = self.client.get('/rest_api/worker_position/?include_clients=true')
-        self.assertEquals(len(positions.json()), 1)
+        self.assertEquals(len(positions.json()), 2)
         self.assertEquals(len(list(filter(lambda x: x['id'] == self.client_position.id, positions.json()))), 0)
         shops = self.client.get('/rest_api/department/?include_possible_clients=true')
         self.assertEquals(len(shops.json()), 6)
