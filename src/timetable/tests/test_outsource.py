@@ -469,3 +469,24 @@ class TestOutsource(TestsHelperMixin, APITestCase):
         response = self.client.post(f"/rest_api/worker_day/{vacancy['id']}/approve_vacancy/")
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.json(), ['Вы не можете подтвердить вакансию из другой сети.'])
+
+    def test_client_can_get_and_approve_wd_for_employee_from_other_network_emploeed_in_own_shop(self):
+        self.employment2.shop = self.client_shop
+        self.employment2.save()
+        wd = WorkerDay.objects.create(
+            employee=self.employee2,
+            employment=self.employment2,
+            type='H',
+            dt=date.today(),
+        )
+        response = self.client.get(f'/rest_api/worker_day/?employee_id__in={self.employee2.id}')
+        self.assertEquals(len(response.json()), 1)
+        self.assertEquals(len(list(filter(lambda x: x['id'] == wd.id, response.json()))), 1)
+        response = self.client.post('/rest_api/worker_day/approve/', {
+            'shop_id': self.client_shop.id,
+            'dt_from': date.today(),
+            'dt_to': date.today(),
+        })
+        self.assertEquals(response.status_code, 200)
+        wd.refresh_from_db()
+        self.assertTrue(wd.is_approved)
