@@ -16,12 +16,12 @@ from .models import (
 
 @admin.register(ImportJob)
 class ImportJobAdmin(admin.ModelAdmin):
-    list_display = ('import_strategy', 'fs_connector', 'base_path')
+    list_display = ('__str__', 'base_path')
 
 
 @admin.register(ExportJob)
 class ExportJobAdmin(admin.ModelAdmin):
-    list_display = ('export_strategy', 'fs_connector', 'base_path')
+    list_display = ('__str__', 'base_path')
 
 
 class FilesystemConfigChildAdmin(PolymorphicChildModelAdmin):
