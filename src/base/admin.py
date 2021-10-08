@@ -15,11 +15,11 @@ from django.urls import path, reverse, resolve
 from django.utils.html import escape
 from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
-from django_admin_listfilter_dropdown.filters import ChoiceDropdownFilter
 from import_export import resources
 from import_export.admin import ExportActionMixin, ImportMixin
 from import_export.fields import Field
 from sesame.utils import get_token
+from src.base.admin_filters import CustomChoiceDropdownFilter, RelatedOnlyDropdownLastNameOrderedFilter, RelatedOnlyDropdownNameOrderedFilter
 
 from src.base.forms import (
     NetworkAdminForm,
@@ -49,7 +49,6 @@ from src.base.models import (
     ApiLog,
 )
 from src.timetable.models import GroupWorkerDayPermission
-from src.recognition.admin import RelatedOnlyDropdownNameOrderedFilter, RelatedOnlyDropdownLastNameOrderedFilter
 
 
 class FunctionGroupResource(resources.ModelResource):
@@ -355,7 +354,7 @@ class FunctionGroupAdmin(ImportMixin, ExportActionMixin, admin.ModelAdmin):
     list_display = ('id', 'access_type', 'group', 'func', 'method', 'level_down', 'level_up')
     list_filter = [
         ('group', RelatedOnlyDropdownNameOrderedFilter),
-        ('func', ChoiceDropdownFilter),
+        ('func', CustomChoiceDropdownFilter),
     ]
     # list_filter = ('access_type', 'group', 'func')
     list_select_related = ('group',)

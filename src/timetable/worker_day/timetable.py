@@ -87,16 +87,22 @@ class BaseUploadDownloadTimeTable:
         
         return employment_work_type
 
-    def _get_employment_qs(self, network_id, shop_id, dt_from=None, dt_to=None):
+    def _get_employment_qs(self, network, shop_id, dt_from=None, dt_to=None):
+        employment_extra_q = Q()
+        if not network or network.settings_values_prop.get('timetable_exclude_invisible_employments', True):
+            employment_extra_q &= Q(
+                is_visible=True,
+            )
         if not dt_from:
             dt_from = datetime.date.today()
         if not dt_to:
             dt_to = datetime.date.today()
         return Employment.objects.get_active(
-            network_id=network_id,
+            network_id=network.id if network else None,
             dt_from=dt_from,
             dt_to=dt_to,
             shop_id=shop_id,
+            extra_q=employment_extra_q,
         ).select_related(
             'employee', 
             'employee__user', 
@@ -535,7 +541,7 @@ class UploadDownloadTimetableCells(BaseUploadDownloadTimeTable):
             on_print=form['on_print'],
         )
 
-        employments = self._get_employment_qs(shop.network_id, shop.id, dt_from=timetable.prod_days[0].dt, dt_to=timetable.prod_days[-1].dt)
+        employments = self._get_employment_qs(shop.network, shop.id, dt_from=timetable.prod_days[0].dt, dt_to=timetable.prod_days[-1].dt)
         employee_ids = employments.values_list('employee_id', flat=True)
         stat = WorkersStatsGetter(
             dt_from=timetable.prod_days[0].dt,
@@ -554,19 +560,19 @@ class UploadDownloadTimetableCells(BaseUploadDownloadTimeTable):
         timetable.format_cells(len(employments))
 
         # construct weekday
-        timetable.construct_dates('%w', 8, 4)
+        timetable.construct_dates('%w', 6, 4)
 
         # construct day 2
-        timetable.construct_dates('%d.%m', 9, 4)
+        timetable.construct_dates('%d.%m', 7, 4)
         timetable.add_main_info()
 
         # construct user info
-        timetable.construnts_users_info(employments, 11, 0, ['code', 'fio', 'position'])
+        timetable.construnts_users_info(employments, 9, 0, ['code', 'fio', 'position'])
 
         groupped_days = self._group_worker_days(workdays)
 
         # fill page 1
-        timetable.fill_table(groupped_days, employments, stat, 11, 4, stat_type=stat_type, norm_type=norm_type, mapping=self.wd_type_mapping)
+        timetable.fill_table(groupped_days, employments, stat, 9, 4, stat_type=stat_type, norm_type=norm_type, mapping=self.wd_type_mapping)
 
         # fill page 2
         timetable.fill_table2(shop, timetable.prod_days[-1].dt, groupped_days)
@@ -575,11 +581,11 @@ class UploadDownloadTimetableCells(BaseUploadDownloadTimeTable):
             timetable.worksheet.set_landscape()
             timetable.worksheet.set_paper(9)
             timetable.worksheet.fit_to_pages(1, 0)
-            timetable.worksheet.set_margins(left=0.15, right=0.1)
+            timetable.worksheet.set_margins(left=0.25, right=0.25)
             timetable.print_worksheet.set_landscape()
             timetable.print_worksheet.set_paper(9)
             timetable.print_worksheet.fit_to_pages(1, 0)
-            timetable.print_worksheet.set_margins(left=0.15, right=0.1)
+            timetable.print_worksheet.set_margins(left=0.25, right=0.25)
 
         return workbook, _('Timetable_for_shop_{}_from_{}.xlsx').format(shop.name, form['dt_from'])
 
@@ -703,13 +709,12 @@ class UploadDownloadTimetableRows(BaseUploadDownloadTimeTable):
                 empls.get(wd.employee_id, []),
             ))[0]
 
-
         shop = Shop.objects.get(pk=form['shop_id'])
         dt_from = form['dt_from']
         dt_to = dt_from + relativedelta(day=31)
 
         empls = {}
-        employments = self._get_employment_qs(shop.network_id, shop.id, dt_from=dt_from, dt_to=dt_to)
+        employments = self._get_employment_qs(shop.network, shop.id, dt_from=dt_from, dt_to=dt_to)
         employee_ids = employments.values_list('employee_id', flat=True)
         for e in employments:
             empls.setdefault(e.employee_id, []).append(e)

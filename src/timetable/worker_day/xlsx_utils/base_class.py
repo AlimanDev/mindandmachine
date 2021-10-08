@@ -25,7 +25,7 @@ class Xlsx_base:
             self.worksheet = worksheet
 
         self.default_text_settings = {
-            'font_size': 10 if not self.on_print else 6,
+            'font_size': self._font_size(10),
             'font_name': 'Arial',
             'align': 'center',
             'valign': 'vcenter',
@@ -33,6 +33,7 @@ class Xlsx_base:
         }
 
         self.shop = shop
+        self.dt = dt
         self.month = datetime.date(dt.year, dt.month, 1)
         self.prod_days = prod_days
 
@@ -57,6 +58,22 @@ class Xlsx_base:
         ).aggregate(
             norm_work_hours=Sum('work_hours', output_field=IntegerField())
         )
+
+    def _font_size(self, font_size, on_print_font_size=None):
+        if self.on_print:
+            return on_print_font_size or int(font_size / 2) + 4
+        return font_size
+
+    def _column_width(self, column_width, on_print_column_width=None):
+        if self.on_print:
+            return on_print_column_width or int(column_width / 2)
+        return column_width
+
+    def _row_height(self, row_height, on_print_row_height=None):
+        if self.on_print:
+            return on_print_row_height or int(row_height / 2)
+        return row_height
+
     def construct_dates(self, format, row, col, xlsx_format=str):
         """
         Записывает даты в указанном в format типе в строку под номером row, начиная с col колонки в self.worksheet. Ячейки надо
@@ -70,7 +87,7 @@ class Xlsx_base:
         """
 
         text_dict = {
-            'font_size': 11 if not self.on_print else 8,
+            'font_size': self._font_size(11),
             'font_name': 'Arial',
             'bold': True,
             'align': 'center',
@@ -103,7 +120,7 @@ class Xlsx_base:
             if format == '%w':
                 self.worksheet.write_string(row, col + i,
                                             self.WEEKDAY_TRANSLATION[int(item.dt.strftime(format))], text_type)
-                self.worksheet.set_column(col + i, col + i, 15 if not self.on_print else 6.5)
+                self.worksheet.set_column(col + i, col + i, self._column_width(16, 5.5))
             else:
                 cell_str = item.dt.strftime(format)
                 cell_str = int(cell_str) if xlsx_format==int else cell_str

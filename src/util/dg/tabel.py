@@ -66,6 +66,11 @@ class BaseTabelDataGetter:
             'fact_timesheet_type',
             'main_timesheet_type',
         )
+        employement_extra_q = Q()
+        if self.shop.network.settings_values_prop.get('timesheet_exclude_invisible_employments', True):
+            employement_extra_q &= Q(
+                is_visible=True,
+            )
         if self.type_field:
             shop_employees_part_q = Q(**{self.type_field + '__is_dayoff': True})
             if self.shop.network.settings_values_prop.get('tabel_include_other_shops_wdays', False):  # TODO: сделать в виде параметра на фронте? Или так ок?
@@ -83,6 +88,7 @@ class BaseTabelDataGetter:
                         dt_from=self.dt_from,
                         dt_to=self.dt_to,
                         shop=self.shop,
+                        extra_q=employement_extra_q,
                     ).distinct().values_list('employee', flat=True))
                 ),
             )
@@ -95,6 +101,7 @@ class BaseTabelDataGetter:
                             dt_from=self.dt_from,
                             dt_to=self.dt_to,
                             shop=self.shop,
+                            extra_q=employement_extra_q,
                         ).distinct().values_list('employee', flat=True)
                     )
             tabel_wdays = tabel_wdays.filter(
@@ -111,7 +118,6 @@ class BaseTabelDataGetter:
             'employee_id',
             'dt',
         )
-
 
     def get_data(self):
         raise NotImplementedError
@@ -200,14 +206,22 @@ class T13TabelDataGetter(BaseTabelDataGetter):
             users.append(user_data)
             num += 1
 
+        work_hours_sum = 0
+        work_days_sum = 0
         for user_data in users:
+            work_days_sum += user_data['full_month_wdays']
+            work_hours_sum += user_data['full_month_whours']
             for day_num in range(1, 31 + 1):
                 day_key = _get_day_key(day_num)
                 if day_key not in user_data['days']:
                     day_data = user_data['days'].setdefault(day_key, {})
                     self.set_day_data(day_data, None)
 
-        return {'users': users}
+        return {
+            'users': users,
+            'work_hours_sum': work_hours_sum,
+            'work_days_sum': work_days_sum,
+        }
 
 
 class MtsTabelDataGetter(BaseTabelDataGetter):
@@ -310,7 +324,7 @@ class BaseTabelGenerator(BaseDocGenerator):
                 'dttm_work_end_fact_h': _('Shift end time, fact, h'),
                 'dttm_work_start_plan_h': _('Shift start time, plan, h'),
                 'dttm_work_end_plan_h': _('Shift end time, plan, h'),
-            }
+            },
         }
         return data
 
@@ -370,7 +384,7 @@ class AigulTabelGenerator(BaseTabelGenerator):
         return os.path.join(settings.BASE_DIR, 'src/util/dg/templates/t_aigul.ods')
 
 
-tabel_formats = {
+tabel_formats = {  # TODO: поменять имена клиентов на какие-то общие названия
     'default': MTSTabelGenerator,
     'mts': MTSTabelGenerator,
     't13': T13TabelGenerator,

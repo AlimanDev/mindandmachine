@@ -38,9 +38,9 @@ class Tabel_xlsx(Xlsx_base):
                 self.worksheet.set_row(row, heigth)
 
         normalized = 6.23820623
-        self.worksheet.set_column(0, 0, (80 if not self.on_print else 40) / normalized)
-        self.worksheet.set_column(1, 1, (200 if not self.on_print else 100) / normalized)
-        self.worksheet.set_column(2, 2, (160 if not self.on_print else 80) / normalized)
+        self.worksheet.set_column(0, 0, self._column_width(80) / normalized)
+        self.worksheet.set_column(1, 1, self._column_width(200) / normalized)
+        self.worksheet.set_column(2, 2, self._column_width(160) / normalized)
         self.worksheet.set_column(3, 3, 100 / normalized)
 
         self.worksheet.set_column(4, 5, 100 / normalized, None, {'hidden': True})
@@ -54,7 +54,7 @@ class Tabel_xlsx(Xlsx_base):
 
         normalized_row = 1
         set_rows(0, 10, 21 / normalized_row)
-        set_rows(0, 11, 21 if not self.on_print else 30 / normalized_row)
+        set_rows(0, 11, self._row_height(21, 30) / normalized_row)
         set_rows(11, 11, 30 / normalized_row)
         set_rows(12, 12, 35 / normalized_row)
         set_rows(13, 14, 25 / normalized_row)
@@ -141,7 +141,6 @@ class Tabel_xlsx(Xlsx_base):
         self.worksheet.write_string('C11', 'Запланированные часы', text_f)
         self.worksheet.write_number('D11', self.prod_month.get('norm_work_hours', 0), number_f)
 
-        #
         # add workday types:
         day_text_d = {
             'font_size': 12,

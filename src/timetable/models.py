@@ -253,7 +253,7 @@ class WorkerConstraint(AbstractModel):
         unique_together = (('employment', 'weekday', 'tm'),)
 
     def __str__(self):
-        return '{} {}, {}, {}, {}'.format(self.worker.last_name, self.worker.id, self.weekday, self.tm, self.id)
+        return '{} {}, {}, {}, {}'.format(self.employment.employee.user.last_name, self.employment.id, self.weekday, self.tm, self.id)
 
     id = models.BigAutoField(primary_key=True)
     shop = models.ForeignKey(Shop, blank=True, null=True, on_delete=models.PROTECT, related_name='worker_constraints')
@@ -268,20 +268,21 @@ class WorkerConstraint(AbstractModel):
 
 
 class WorkerDayQuerySet(AnnotateValueEqualityQSMixin, QuerySet):
-    def get_plan_approved(self, **kwargs):
-        return self.filter(is_fact=False, is_approved=True, **kwargs)
+    def get_plan_approved(self, *args, **kwargs):
+        return self.filter(*args, is_fact=False, is_approved=True, **kwargs)
 
-    def get_plan_not_approved(self, **kwargs):
-        return self.filter(is_fact=False, is_approved=False, **kwargs)
+    def get_plan_not_approved(self, *args, **kwargs):
+        return self.filter(*args, is_fact=False, is_approved=False, **kwargs)
 
-    def get_fact_approved(self, **kwargs):
-        return self.filter(is_fact=True, is_approved=True, **kwargs)
+    def get_fact_approved(self, *args, **kwargs):
+        return self.filter(*args, is_fact=True, is_approved=True, **kwargs)
 
-    def get_fact_not_approved(self, **kwargs):
-        return self.filter(is_fact=True, is_approved=False, **kwargs)
+    def get_fact_not_approved(self, *args, **kwargs):
+        return self.filter(*args, is_fact=True, is_approved=False, **kwargs)
 
-    def get_plan_edit(self, **kwargs):
+    def get_plan_edit(self, *args, **kwargs):
         return self.get_last_ordered(
+            *args,
             is_fact=False,
             order_by=[
                 'is_approved',
@@ -290,13 +291,14 @@ class WorkerDayQuerySet(AnnotateValueEqualityQSMixin, QuerySet):
             **kwargs
         )
 
-    def get_last_ordered(self, is_fact, order_by, **kwargs):
+    def get_last_ordered(self, *args, is_fact, order_by, **kwargs):
         ordered_subq = self.filter(
             dt=OuterRef('dt'),
             employee_id=OuterRef('employee_id'),
             is_fact=is_fact,
         ).order_by(*order_by).values_list('id')[:1]
         return self.filter(
+            *args,
             is_fact=is_fact,
             id=Subquery(ordered_subq),
             **kwargs,

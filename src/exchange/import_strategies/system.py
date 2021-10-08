@@ -27,8 +27,8 @@ class PobedaImportShopMapping(BaseSystemImportStrategy):
         f = self.fs_engine.open_file(filename)
         try:
             df = pd.read_excel(f, engine='xlrd')
-            shop_code_1s_field_name = self.settings_dict.get('shop_code_1s_field_name')
-            shop_number_run_field_name = self.settings_dict.get('shop_number_run_field_name')
+            shop_code_1s_field_name = self.settings_dict.get('shop_code_1s_field_name', 'GUID в 1С')
+            shop_number_run_field_name = self.settings_dict.get('shop_number_run_field_name', 'Код магазина')
             shops_dict = {s.code: s for s in Shop.objects.filter(code__in=list(df[shop_code_1s_field_name].values))}
 
             pobeda_external_system, _created = ExternalSystem.objects.get_or_create(

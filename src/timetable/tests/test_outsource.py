@@ -36,6 +36,11 @@ class TestOutsource(TestsHelperMixin, APITestCase):
         cls.outsource_network2 = Network.objects.create(
             name='Аутсорс'
         )
+        cls.outsource_root_shop = Shop.objects.create(
+            name='Outsource',
+            region=cls.region,
+            network=cls.outsource_network2,
+        )
         cls.client_root_shop = Shop.objects.create(
             name='Клиент',
             region=cls.region,
@@ -49,20 +54,41 @@ class TestOutsource(TestsHelperMixin, APITestCase):
             code='client',
         )
         cls.cleint_admin_group = Group.objects.create(name='Администратор client', code='client admin', network=cls.client_network)
+        cls.outsource_admin_group = Group.objects.create(name='Администратор outsource', code='outsource admin', network=cls.outsource_network2)
         FunctionGroup.objects.bulk_create([
             FunctionGroup(
-                group=cls.cleint_admin_group,
+                group=g,
                 method=method,
                 func=func,
                 level_up=1,
                 level_down=99,
-            ) for func, _ in FunctionGroup.FUNCS_TUPLE for method, _ in FunctionGroup.METHODS_TUPLE
+            ) 
+            for g in [cls.cleint_admin_group, cls.outsource_admin_group]
+            for func, _ in FunctionGroup.FUNCS_TUPLE 
+            for method, _ in FunctionGroup.METHODS_TUPLE
         ])
         GroupWorkerDayPermission.objects.bulk_create(
             GroupWorkerDayPermission(
-                group=cls.cleint_admin_group,
+                group=g,
                 worker_day_permission=wdp,
-            ) for wdp in WorkerDayPermission.objects.all()
+            ) 
+            for g in [cls.cleint_admin_group, cls.outsource_admin_group]
+            for wdp in WorkerDayPermission.objects.all()
+        )
+        cls.outsource_user = User.objects.create(
+            first_name='outsource',
+            last_name='outsource',
+            username='outsource',
+            network=cls.outsource_network2,
+        )
+        cls.outsource_employee = Employee.objects.create(
+            user=cls.outsource_user,
+            tabel_code='outsource',
+        )
+        cls.outsource_employment = Employment.objects.create(
+            employee=cls.outsource_employee,
+            shop=cls.outsource_root_shop,
+            function_group=cls.outsource_admin_group,
         )
         cls.client_user = User.objects.create(
             first_name='client',
@@ -490,3 +516,34 @@ class TestOutsource(TestsHelperMixin, APITestCase):
         self.assertEquals(response.status_code, 200)
         wd.refresh_from_db()
         self.assertTrue(wd.is_approved)
+
+    def test_outource_do_not_see_vacancies_applied_by_worker_from_other_network(self):
+        dt_now = self.dt_now
+        vacancy = self._create_vacancy(dt_now, datetime.combine(dt_now, time(8)), datetime.combine(dt_now, time(20)), outsources=[self.outsource_network.id, self.outsource_network2.id]).json()
+        WorkerDay.objects.all().update(is_approved=True)
+        self.client.force_authenticate(user=self.user1)
+        response = self.client.get('/rest_api/worker_day/vacancy/?limit=10&offset=0')
+        self.assertEquals(len(response.json()['results']), 1)
+        self.assertEquals(len(list(filter(lambda x: x["id"] == vacancy["id"], response.json()['results']))), 1)
+        self.client.force_authenticate(user=self.outsource_user)
+        response = self.client.post(f'/rest_api/worker_day/{vacancy["id"]}/confirm_vacancy/')
+        self.assertEqual(response.status_code, 200)
+        self.client.force_authenticate(user=self.user1)
+        response = self.client.get('/rest_api/worker_day/vacancy/?limit=10&offset=0')
+        self.assertEquals(len(response.json()['results']), 0)
+
+    def test_outource_cant_reconfirm_vacancy_applied_by_worker_from_other_network(self):
+        dt_now = self.dt_now
+        vacancy = self._create_vacancy(dt_now, datetime.combine(dt_now, time(8)), datetime.combine(dt_now, time(20)), outsources=[self.outsource_network.id, self.outsource_network2.id]).json()
+        WorkerDay.objects.all().update(is_approved=True)
+        self.client.force_authenticate(user=self.user1)
+        response = self.client.get('/rest_api/worker_day/vacancy/?limit=10&offset=0')
+        self.assertEquals(len(response.json()['results']), 1)
+        self.assertEquals(len(list(filter(lambda x: x["id"] == vacancy["id"], response.json()['results']))), 1)
+        self.client.force_authenticate(user=self.outsource_user)
+        response = self.client.post(f'/rest_api/worker_day/{vacancy["id"]}/confirm_vacancy/')
+        self.assertEqual(response.status_code, 200)
+        self.client.force_authenticate(user=self.user1)
+        response = self.client.post(f'/rest_api/worker_day/{vacancy["id"]}/reconfirm_vacancy_to_worker/', {'user_id': self.user1.id})
+        self.assertEqual(response.status_code, 404)
+        self.assertEquals(response.json(), {'result': 'Такой вакансии не существует'})
