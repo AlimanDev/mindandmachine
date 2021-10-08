@@ -502,7 +502,7 @@ class TestOutsource(TestsHelperMixin, APITestCase):
         wd = WorkerDay.objects.create(
             employee=self.employee2,
             employment=self.employment2,
-            type='H',
+            type_id='H',
             dt=date.today(),
         )
         response = self.client.get(f'/rest_api/worker_day/?employee_id__in={self.employee2.id}')
