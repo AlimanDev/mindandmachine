@@ -91,6 +91,10 @@ class TestOutsource(TestsHelperMixin, APITestCase):
             name='Client position',
             network=cls.client_network,
         )
+        cls.outsource_position = WorkerPosition.objects.create(
+            name='Outsource position',
+            network=cls.outsource_network,
+        )
         
         cls.network_connect = NetworkConnect.objects.create(client=cls.client_network, outsourcing=cls.outsource_network, allow_assign_employements_from_outsource=True, allow_choose_shop_from_client_for_employement=True)
         cls.network_connect2 = NetworkConnect.objects.create(client=cls.client_network, outsourcing=cls.outsource_network2, allow_assign_employements_from_outsource=True, allow_choose_shop_from_client_for_employement=True)
@@ -197,3 +201,8 @@ class TestOutsource(TestsHelperMixin, APITestCase):
         self.assertEquals(len(list(filter(lambda x: x['id'] == self.employee2.id, employees.json()))), 0)
         self.network_connect.allow_assign_employements_from_outsource = True
         self.network_connect.save()
+
+    def test_client_can_get_outsource_positions(self):
+        positions = self.client.get('/rest_api/worker_position/?include_outsources=true')
+        self.assertEquals(len(positions.json()), 2)
+        self.assertEquals(len(list(filter(lambda x: x['id'] == self.outsource_position.id, positions.json()))), 1)

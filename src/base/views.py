@@ -292,6 +292,7 @@ class WorkerPositionViewSet(UpdateorCreateViewSet):
 
     def get_queryset(self):
         include_clients = self.request.query_params.get('include_clients')
+        include_outsources = self.request.query_params.get('include_outsources')
         network_filter = Q(network_id=self.request.user.network_id)
         if include_clients:
             network_filter |= Q(
@@ -299,6 +300,12 @@ class WorkerPositionViewSet(UpdateorCreateViewSet):
                     outsourcing_id=self.request.user.network_id, 
                     allow_choose_shop_from_client_for_employement=True,
                 ).values_list('client_id', flat=True)
+            )
+        if include_outsources:
+            network_filter |= Q(
+                network_id__in=NetworkConnect.objects.filter(
+                    client_id=self.request.user.network_id, 
+                ).values_list('outsourcing_id', flat=True)
             )
         return WorkerPosition.objects.filter(
             network_filter,
