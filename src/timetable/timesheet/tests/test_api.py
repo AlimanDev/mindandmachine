@@ -31,7 +31,11 @@ class TestTimesheetApiView(TestTimesheetMixin, APITestCase):
         }
         self.client.post(
             self.get_url('Timesheet-recalc'), data=self.dump_data(data), content_type='application/json')
-        _calc_timesheets_delay.assert_called_once_with(employee_id__in=[self.employee_worker.id])
+        _calc_timesheets_delay.assert_called_once_with(
+            employee_id__in=[self.employee_worker.id],
+            dt_from='2021-05-01',
+            dt_to='2021-05-31',
+        )
 
         employee2 = EmployeeFactory(user=self.user_worker, tabel_code='user_worker_employee2')
 

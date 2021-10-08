@@ -177,7 +177,7 @@ class BaseUploadDownloadTimeTable:
                 employment = None
                 tabel_code = ''
                 if number_cond:
-                    tabel_code = str(data[number_column]).split('.')[0]
+                    tabel_code = str(data[number_column]).split('.')[0].strip()
                     employment = Employment.objects.filter(
                         employee__tabel_code=tabel_code, 
                         shop_id=shop_id,
@@ -481,7 +481,7 @@ class UploadDownloadTimetableCells(BaseUploadDownloadTimeTable):
                         }
                     )
 
-                WorkerDay.objects.filter(dt=dt, employee=employee, is_fact=is_fact, is_approved=False).delete()
+                WorkerDay.objects_with_excluded.filter(dt=dt, employee=employee, is_fact=is_fact, is_approved=False).delete()
             
                 new_wd = WorkerDay.objects.create(
                     employee=employee,

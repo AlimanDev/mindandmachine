@@ -49,6 +49,16 @@ class Network(AbstractActiveModel):
         (ACC_PERIOD_YEAR, _('Year')),
     )
 
+    WD_FACT_APPROVED = 1
+    FACT_TIMESHEET = 2
+    MAIN_TIMESHEET = 3
+
+    PREV_MONTHS_WORK_HOURS_SOURCE_CHOICES = (
+        (WD_FACT_APPROVED, 'Факт. подтв. график'),
+        (FACT_TIMESHEET, 'Фактический табель'),
+        (MAIN_TIMESHEET, 'Основной табель'),
+    )
+
     TABEL_FORMAT_CHOICES = (
         ('mts', 'MTSTabelGenerator'),
         ('t13_custom', 'CustomT13TabelGenerator'),
@@ -160,6 +170,13 @@ class Network(AbstractActiveModel):
     consider_remaining_hours_in_prev_months_when_calc_norm_hours = models.BooleanField(
         default=False, verbose_name=_('Consider remaining hours in previous months when calculating norm hours'),
     )
+    correct_norm_hours_last_month_acc_period = models.BooleanField(
+        default=False, verbose_name=_('Корректировать норму часов для последнего месяца уч. периода (если уч. период != 1 мес)'),
+        help_text='Используется при разделении табеля на осн. и доп. Т.е. норма за последний месяц уч. периода = '
+                  '{норма по произв. календарю за уч. период} - {отработанные часы за прошлые месяцы}.')
+    prev_months_work_hours_source = models.PositiveSmallIntegerField(
+        verbose_name='Источник факт. часов за пред. месяцы уч. периода',
+        choices=PREV_MONTHS_WORK_HOURS_SOURCE_CHOICES, default=WD_FACT_APPROVED)
     outsourcings = models.ManyToManyField(
         'self', through='base.NetworkConnect', through_fields=('client', 'outsourcing'), symmetrical=False, related_name='clients')
     ignore_parent_code_when_updating_department_via_api = models.BooleanField(
@@ -1422,6 +1439,7 @@ class FunctionGroup(AbstractModel):
         ('PeriodClients_put', 'Обновить нагрузку (Обновить) (timeserie_value/put/)'),
         ('PeriodClients_delete', 'Удалить нагрузку (Удалить) (timeserie_value/delete/)'),
         ('PeriodClients_upload', 'Загрузить нагрузку (Создать) (timeserie_value/upload/)'),
+        ('PeriodClients_upload_demand', 'Загрузить нагрузку по магазинам (Создать) (timeserie_value/upload_demand/)'),
         ('PeriodClients_download', 'Скачать нагрузку (Получить) (timeserie_value/download/)'),
         ('Receipt', 'Чек (receipt)'),
         ('Reports_pivot_tabel', 'Скачать сводный табель (Получить) (report/pivot_tabel/)'),

@@ -540,6 +540,30 @@ class TestDemand(APITestCase):
             40
         )
 
+    def test_upload_demand_shops(self):
+        file = open('etc/scripts/demand_shops.xlsx', 'rb')
+        self.shop.code = 'adcd'
+        self.shop.save()
+        self.shop2.code = 'adce'
+        self.shop2.save()
+        OperationType.objects.create(
+            operation_type_name=self.op_type_name,
+            shop=self.shop2,
+        )
+        response = self.client.post(f'{self.url}upload_demand/', {'file': file, 'type': 'F', 'operation_type_name_id': self.op_type_name.id})
+        file.close()
+        self.assertEquals(response.json(), [['adcd', 20], ['adce', 20]])
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            PeriodClients.objects.filter(
+                operation_type__shop__in=[self.shop, self.shop2],
+                dttm_forecast__date__gte=datetime(2020, 4, 30),
+                dttm_forecast__date__lte=datetime(2020, 5, 1),
+            ).count(),
+            40
+        )
+
+
     def test_get_demand_xlsx(self):
         response = self.client.get(
             f'{self.url}download/?dt_from={Converter.convert_date(datetime(2019, 5, 30).date())}&dt_to={Converter.convert_date(datetime(2019, 6, 2).date())}&shop_id={self.shop.id}')

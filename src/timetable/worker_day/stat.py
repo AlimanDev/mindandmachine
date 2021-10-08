@@ -12,16 +12,16 @@ from django.db.models import (
     Exists, OuterRef, Subquery,
     F, Q,
     Value,
-    FloatField
+    FloatField,
 )
 from django.db.models.expressions import RawSQL
 from django.db.models.functions import Cast, TruncDate
 from django.db.models.functions import Extract, Coalesce, Greatest, Least
 from django.utils.functional import cached_property
 
-from src.base.models import Employment, Shop, ProductionDay, SAWHSettings
+from src.base.models import Employment, Shop, ProductionDay, SAWHSettings, Network
 from src.forecast.models import PeriodClients
-from src.timetable.models import WorkerDay, ProdCal
+from src.timetable.models import WorkerDay, ProdCal, Timesheet
 
 
 def count_daily_stat(data):
@@ -470,7 +470,8 @@ class WorkersStatsGetter:
                     'until_acc_period_end', 0) + wd_dict['work_hours_until_acc_period_end']
 
             # за прошлые месяцы отработанные часы берем из факта подтвержденного
-            if wd_dict['is_fact'] and wd_dict['is_approved'] and wd_dict['dt__month'] in prev_months:
+            if self.network.prev_months_work_hours_source == Network.WD_FACT_APPROVED \
+                    and wd_dict['is_fact'] and wd_dict['is_approved'] and wd_dict['dt__month'] in prev_months:
                 for work_hours in work_hours_dicts:
                     work_hours['prev_months'] = work_hours.get('prev_months', 0) + wd_dict['work_hours_total']
                 empl_dict['work_hours_prev_months'] = empl_dict.get('work_hours_prev_months', 0) + wd_dict[
@@ -483,6 +484,36 @@ class WorkersStatsGetter:
             if not wd_dict['is_fact'] and not wd_dict['is_approved']:
                 empl_dict.setdefault('work_hours_outside_of_selected_period_plan_not_approved', {})[wd_dict['dt__month']] = empl_dict.get(
                     'work_hours_outside_of_selected_period_plan_not_approved', {}).get(wd_dict['dt__month'], 0) + wd_dict['work_hours_outside_of_selected_period']
+
+        if self.network.prev_months_work_hours_source in [Network.FACT_TIMESHEET, Network.MAIN_TIMESHEET]:
+            hours_field_name_mapping = {
+                Network.FACT_TIMESHEET: ('fact_timesheet_total_hours', 'fact_timesheet_type'),
+                Network.MAIN_TIMESHEET: ('main_timesheet_total_hours', 'main_timesheet_type'),
+            }
+            hours_field, type_field = hours_field_name_mapping.get(self.network.prev_months_work_hours_source)
+
+            timesheet_prev_months_work_hours = list(Timesheet.objects.filter(
+                prev_months_q,
+                employee_id__in=self.employees_dict.keys(),
+                # {f'{type_field}__is_work_hours': True},
+            ).values(
+                'employee_id',
+            ).annotate(
+                prev_months_work_hours=Sum(hours_field),
+            ).values_list('employee_id', 'prev_months_work_hours'))
+
+            for is_fact_key in ['plan', 'fact']:
+                for is_approved_key in ['approved', 'not_approved']:
+                    for employee_id, prev_months_work_hours in timesheet_prev_months_work_hours:
+                        res.setdefault(
+                            employee_id, {}
+                        ).setdefault(
+                            is_fact_key, {}
+                        ).setdefault(
+                            is_approved_key, {}
+                        ).setdefault(
+                            'work_hours', {}
+                        )['prev_months'] = float(prev_months_work_hours or 0)
 
         for employee_id in self.employees_dict.keys():
             employee_dict = res.setdefault(
@@ -724,7 +755,7 @@ class WorkersStatsGetter:
 
         for employee_id, employee_dict in res.items():
             acc_period_months = list(range(self.acc_period_start.month, self.acc_period_end.month + 1))
-            for empl in self.employees_dict.get(employee_id):
+            for empl in self.employees_dict.get(employee_id, []):
                 empl_dict = res.setdefault(
                     employee_id, {}).setdefault('employments', {}).setdefault(empl.id, {})
                 norm_hours_by_months = empl_dict.get('norm_hours_by_months', {})
@@ -903,7 +934,19 @@ class WorkersStatsGetter:
                             sawh_hours['selected_period'] = sawh_hours.get('selected_period', 0) + \
                                 empl_dict.get('sawh_hours_plan_approved_selected_period', 0)
 
-                    sawh_hours['curr_month'] = sawh_hours['by_months'].get(curr_month)
+                    is_last_month = curr_month == acc_period_dt_to.month
+                    if self.network.correct_norm_hours_last_month_acc_period and self.network.accounting_period_length > 1 and is_last_month:
+                        acc_period_norm_hours = employee_dict.get(
+                            'plan', {}).get('approved', {}).get('norm_hours', {}).get('acc_period', 0)
+                        work_hours_prev_months = employee_dict.get(
+                            'plan', {}).get('approved', {}).get('work_hours', {}).get('prev_months', 0)
+                        sawh_hours['curr_month'] = min(
+                            sawh_hours.get('by_months', {}).get(curr_month, 0),
+                            acc_period_norm_hours - work_hours_prev_months,
+                        )
+                    else:
+                        sawh_hours['curr_month'] = sawh_hours.get('by_months', {}).get(curr_month, 0)
+
                     work_hours_curr_month = employee_dict.get(
                         is_fact_key).get(is_approved_key).get('work_hours', {}).get('total', 0)
                     work_hours_until_acc_period_end = employee_dict.get(
