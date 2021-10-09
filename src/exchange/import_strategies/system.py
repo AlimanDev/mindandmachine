@@ -120,10 +120,10 @@ class PobedaImportPurchases(PobedaImport):
     data_type = 'purchases'
 
     def load_file(self, dt, filename):
-        load_errors = []
+        load_errors = set()
         f = self.fs_engine.open_file(filename)
         try:
-            df = pd.read_csv(f, dtype=str, delimiter=';', names=[
+            df_chunks = pd.read_csv(f, dtype=str, delimiter=';', names=[
                 'Номер магазина id',
                 'Номер кассы id',
                 'Номер чека',
@@ -136,36 +136,34 @@ class PobedaImportPurchases(PobedaImport):
                 'Стоимость SKU: суммарно по 1 SKU либо 1 единицы SKU',
                 'Способ оплаты: нал/безнал',
                 'Наличие бонусной карты',
-            ])
-            df['receipt_code'] = df.apply(lambda x: hash(tuple(x)), axis=1)
-            for shop_num, grouped_df in df.groupby('Номер магазина id'):
-                shop_id = self.get_shop_id_by_shop_num(shop_num)
-                if not shop_id:
-                    load_errors.append(f'cant map shop_id for shop_num="{shop_num}"')
-                    continue
-                receipt_objs = []
-                Receipt.objects.filter(shop_id=shop_id, data_type=self.data_type, dt=dt).delete()
-                for index, row in grouped_df.iterrows():
+            ], chunksize=1000)
+            for df in df_chunks:
+                df['receipt_code'] = df.apply(lambda x: hash(tuple(x)), axis=1)
+                for index, row in df.iterrows():
+                    shop_num = row['Номер магазина id']
+                    shop_id = self.get_shop_id_by_shop_num(shop_num)
+                    if not shop_id:
+                        load_errors.add(f'cant map shop_id for shop_num="{shop_num}"')
+                        continue
+
                     dttm = datetime.strptime(
                         row['Дата время открытия чека'],
                         self.settings_dict.get('dttm_format', '%d.%m.%Y %H:%M:%S'),
                     )
-                    receipt_objs.append(
-                        Receipt(
-                            code=row['receipt_code'],
+                    Receipt.objects.update_or_create(
+                        code=row['receipt_code'],
+                        defaults=dict(
                             dttm=dttm,
                             dt=dttm.date(),
                             shop_id=shop_id,
                             data_type='purchases',
                             info=row.to_json(),
-                        )
+                        ),
                     )
-                if receipt_objs:
-                    Receipt.objects.bulk_create(receipt_objs, batch_size=10000)
         finally:
             f.close()
 
-        return load_errors
+        return list(load_errors)
 
 
 class PobedaImportBrak(PobedaImport):
