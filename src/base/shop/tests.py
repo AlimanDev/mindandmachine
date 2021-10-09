@@ -838,3 +838,10 @@ class TestDepartment(TestsHelperMixin, APITestCase):
             work_type__isnull=True,
             operation_type_name=otn_clients,
         ).exists())
+
+    def test_empty_shop_time(self):
+        shop_data = self._get_shop_data()
+        shop_data['tm_close_dict']['d0'] = ''
+        put_url = f'{self.url}{shop_data["code"]}/'
+        resp = self.client.put(put_url, data=self.dump_data(shop_data), content_type='application/json')
+        self.assertContains(resp, 'Неправильный формат времени  для значения d0. Формат должен быть', status_code=400)
