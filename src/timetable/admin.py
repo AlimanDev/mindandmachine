@@ -3,6 +3,7 @@ from django.forms import Form
 from django.utils.translation import gettext as _
 from import_export.admin import ExportActionMixin, ImportMixin
 from rangefilter.filter import DateRangeFilter, DateTimeRangeFilter
+from src.base.admin import BaseNotWrapRelatedModelaAdmin
 from src.base.admin_filters import CustomChoiceDropdownFilter, CustomRelatedOnlyDropdownFilter
 
 from src.base.forms import (
@@ -10,7 +11,7 @@ from src.base.forms import (
     CustomConfirmImportFunctionGroupForm,
 )
 from src.recognition.admin import RelatedOnlyDropdownNameOrderedFilter
-from src.timetable.forms import ExchangeSettingsForm
+from src.timetable.forms import ExchangeSettingsForm, GroupWorkerDayPermissionForm
 from src.timetable.models import (
     Cashbox,
     EmploymentWorkType,
@@ -317,7 +318,8 @@ class WorkerDayTypeAdmin(admin.ModelAdmin):
 
 
 @admin.register(GroupWorkerDayPermission)
-class GroupWorkerDayPermissionAdmin(ImportMixin, ExportActionMixin, admin.ModelAdmin):
+class GroupWorkerDayPermissionAdmin(ImportMixin, ExportActionMixin, BaseNotWrapRelatedModelaAdmin):
+    not_wrap_fields = ['worker_day_permission']
     list_display = ('id', 'group', 'worker_day_permission', 'limit_days_in_past', 'limit_days_in_future')
     list_editable = ('limit_days_in_past', 'limit_days_in_future')
     list_filter = [
@@ -328,6 +330,7 @@ class GroupWorkerDayPermissionAdmin(ImportMixin, ExportActionMixin, admin.ModelA
     ]
     list_select_related = ('group', 'worker_day_permission__wd_type')
     resource_class = GroupWorkerDayPermissionResource
+    form = GroupWorkerDayPermissionForm
 
     def get_import_form(self):
         return CustomImportFunctionGroupForm

@@ -8,6 +8,7 @@ from django.contrib.admin.utils import unquote
 from django.contrib.auth.admin import UserAdmin
 from django.contrib.auth.forms import UserChangeForm
 from django.core.exceptions import PermissionDenied
+from django.db import models
 from django.forms import Form
 from django.http import Http404, HttpResponseRedirect
 from django.template.response import TemplateResponse
@@ -22,6 +23,7 @@ from sesame.utils import get_token
 from src.base.admin_filters import CustomChoiceDropdownFilter, RelatedOnlyDropdownLastNameOrderedFilter, RelatedOnlyDropdownNameOrderedFilter
 
 from src.base.forms import (
+    FunctionGroupAdminForm,
     NetworkAdminForm,
     ShopAdminForm,
     ShopSettingsAdminForm,
@@ -49,6 +51,15 @@ from src.base.models import (
     ApiLog,
 )
 from src.timetable.models import GroupWorkerDayPermission
+
+
+class BaseNotWrapRelatedModelaAdmin(admin.ModelAdmin):
+    not_wrap_fields = [] # only foreign key fields
+
+    def formfield_for_dbfield(self, db_field, request, **kwargs):
+        if db_field.name in self.not_wrap_fields and isinstance(db_field, models.ForeignKey):
+            return self.formfield_for_foreignkey(db_field, request, **kwargs)
+        return super().formfield_for_dbfield(db_field, request, **kwargs)
 
 
 class FunctionGroupResource(resources.ModelResource):
@@ -360,6 +371,7 @@ class FunctionGroupAdmin(ImportMixin, ExportActionMixin, admin.ModelAdmin):
     list_select_related = ('group',)
     search_fields = ('id',)
     resource_class = FunctionGroupResource
+    form = FunctionGroupAdminForm
 
     def get_import_form(self):
         return CustomImportFunctionGroupForm
