@@ -91,6 +91,10 @@ class TestOutsource(TestsHelperMixin, APITestCase):
             name='Client position',
             network=cls.client_network,
         )
+        cls.outsource_position = WorkerPosition.objects.create(
+            name='Outsource position',
+            network=cls.outsource_network,
+        )
         
         cls.network_connect = NetworkConnect.objects.create(client=cls.client_network, outsourcing=cls.outsource_network, allow_assign_employements_from_outsource=True, allow_choose_shop_from_client_for_employement=True)
         cls.network_connect2 = NetworkConnect.objects.create(client=cls.client_network, outsourcing=cls.outsource_network2, allow_assign_employements_from_outsource=True, allow_choose_shop_from_client_for_employement=True)
@@ -126,9 +130,9 @@ class TestOutsource(TestsHelperMixin, APITestCase):
         self.assertEquals(len(shops.json()), 8)
         self.assertEquals(len(list(filter(lambda x: x['id'] == self.client_shop.id, shops.json()))), 1)
         positions = self.client.get('/rest_api/worker_position/')
-        self.assertEquals(len(positions.json()), 0)
-        positions = self.client.get('/rest_api/worker_position/?include_clients=true')
         self.assertEquals(len(positions.json()), 1)
+        positions = self.client.get('/rest_api/worker_position/?include_clients=true')
+        self.assertEquals(len(positions.json()), 2)
         self.assertEquals(len(list(filter(lambda x: x['id'] == self.client_position.id, positions.json()))), 1)
 
         create_employment_response = self.client.post(
@@ -182,7 +186,7 @@ class TestOutsource(TestsHelperMixin, APITestCase):
         self.assertEquals(create_employment_response.status_code, 400)
         self.assertEquals(create_employment_response.json(),  {'non_field_errors': ['Вы не можете выбирать магазины из другой сети.']})
         positions = self.client.get('/rest_api/worker_position/?include_clients=true')
-        self.assertEquals(len(positions.json()), 1)
+        self.assertEquals(len(positions.json()), 2)
         self.assertEquals(len(list(filter(lambda x: x['id'] == self.client_position.id, positions.json()))), 0)
         shops = self.client.get('/rest_api/department/?include_possible_clients=true')
         self.assertEquals(len(shops.json()), 6)
@@ -222,3 +226,8 @@ class TestOutsource(TestsHelperMixin, APITestCase):
             }
         )
         self.assertEquals(created_wd.status_code, 201)
+
+    def test_client_can_get_outsource_positions(self):
+        positions = self.client.get('/rest_api/worker_position/?include_outsources=true')
+        self.assertEquals(len(positions.json()), 2)
+        self.assertEquals(len(list(filter(lambda x: x['id'] == self.outsource_position.id, positions.json()))), 1)

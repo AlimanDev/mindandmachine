@@ -9,13 +9,13 @@ from src.exchange.fs_engines.local import LocalEngine
 
 
 class BaseFilesystemConnector(PolymorphicModel):
-    name = models.CharField(max_length=256)
+    name = models.CharField(max_length=256, null=True, blank=True)
 
     def get_fs_engine(self, base_path=None):
         raise NotImplementedError
 
     def __str__(self):
-        return self.name
+        return self.name or str(self.id)
 
     class Meta:
         verbose_name = 'Коннектор к файловой системы'
@@ -31,6 +31,9 @@ class LocalFilesystemConnector(BaseFilesystemConnector):
     class Meta:
         verbose_name = 'Коннектор к локальной файловой системе'
         verbose_name_plural = 'Коннекторы к локальной файловой системе'
+
+    def __str__(self):
+        return self.name or f'local fs connector ({self.default_base_path})'
 
 
 class FtpFilesystemConnector(BaseFilesystemConnector):
@@ -53,16 +56,19 @@ class FtpFilesystemConnector(BaseFilesystemConnector):
         verbose_name = 'Коннектор к FTP'
         verbose_name_plural = 'Коннекторы к FTP'
 
+    def __str__(self):
+        return self.name or f'ftp fs connector {self.host}:{self.port} ({self.default_base_path})'
+
 
 class ImportStrategy(PolymorphicModel):
-    name = models.CharField(max_length=256)
+    name = models.CharField(max_length=256, null=True, blank=True)
 
     class Meta:
         verbose_name = 'Стратегия импорта'
         verbose_name_plural = 'Стратегии импорта'
 
     def __str__(self):
-        return self.name
+        return self.name or str(self.id)
 
     def get_strategy_cls_kwargs(self):
         return {}
@@ -91,6 +97,9 @@ class SystemImportStrategy(ImportStrategy):
         verbose_name = 'Системная стратегия импорта'
         verbose_name_plural = 'Системные стратегии импорта'
 
+    def __str__(self):
+        return self.name or self.get_strategy_type_display() or str(self.id)
+
     def get_strategy_cls_kwargs(self):
         kwargs = super(SystemImportStrategy, self).get_strategy_cls_kwargs()
         kwargs['settings_json'] = self.settings_json
@@ -110,6 +119,9 @@ class ImportJob(AbstractModel):
         verbose_name = 'Задача импорта данных'
         verbose_name_plural = 'Задачи импорта данных'
 
+    def __str__(self):
+        return f'{self.import_strategy}, {self.fs_connector}'
+
     def run(self):
         strategy_cls = self.import_strategy.get_strategy_cls()
         strategy_cls_kwargs = self.import_strategy.get_strategy_cls_kwargs()
@@ -119,14 +131,14 @@ class ImportJob(AbstractModel):
 
 
 class ExportStrategy(PolymorphicModel):
-    name = models.CharField(max_length=256)
+    name = models.CharField(max_length=256, null=True, blank=True)
 
     class Meta:
         verbose_name = 'Стратегия экспорта'
         verbose_name_plural = 'Стратегии экспорта'
 
     def __str__(self):
-        return self.name
+        return self.name or str(self.id)
 
     def get_strategy_cls_kwargs(self):
         return {}
@@ -152,6 +164,9 @@ class SystemExportStrategy(ExportStrategy):
         verbose_name = 'Системная стратегия экспорта'
         verbose_name_plural = 'Системные стратегии экспорта'
 
+    def __str__(self):
+        return self.name or self.get_strategy_type_display() or str(self.id)
+
     def clean(self):
         period_needed_strategies = [SystemExportStrategy.WORK_HOURS_PIVOT_TABLE]
         if self.strategy_type in period_needed_strategies and self.period is None:
@@ -176,6 +191,9 @@ class ExportJob(AbstractModel):
     class Meta:
         verbose_name = 'Задача экспорта данных'
         verbose_name_plural = 'Задачи экспорта данных'
+
+    def __str__(self):
+        return f'{self.export_strategy}, {self.fs_connector}'
 
     def run(self):
         strategy_cls = self.export_strategy.get_strategy_cls()

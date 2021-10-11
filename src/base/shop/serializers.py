@@ -147,10 +147,10 @@ class ShopSerializer(serializers.ModelSerializer):
             for key, value in data.items():
                 if not (key in POSSIBLE_KEYS):
                     raise serializers.ValidationError(_('Invalid key value {key}. Allowed values: {possible_keys}.').format(possible_keys=', '.join(POSSIBLE_KEYS), key=key))
-            try:
-                Converter.parse_time(value)
-            except:
-                raise serializers.ValidationError(_('Invalid time format {time} for value {key}. The format must be {format}.').format(time=value, key=key, format=QOS_TIME_FORMAT))
+                try:
+                    Converter.parse_time(value)
+                except:
+                    raise serializers.ValidationError(_('Invalid time format {time} for value {key}. The format must be {format}.').format(time=value, key=key, format=QOS_TIME_FORMAT))
 
         if self.validated_data.get('tm_open_dict'):
             validate_time(self.validated_data.get('tm_open_dict'))
