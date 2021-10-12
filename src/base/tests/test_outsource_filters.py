@@ -206,3 +206,20 @@ class TestOutsource(TestsHelperMixin, APITestCase):
         positions = self.client.get('/rest_api/worker_position/?include_outsources=true')
         self.assertEquals(len(positions.json()), 2)
         self.assertEquals(len(list(filter(lambda x: x['id'] == self.outsource_position.id, positions.json()))), 1)
+
+    
+    def test_filter_get_employee_with_employments_by_shop_network(self):
+        Employment.objects.create(
+            shop=self.client_shop,
+            employee=self.employee1,
+        )
+        employees = self.client.get('/rest_api/employee/?include_employments=true&show_constraints=true')
+        self.assertEquals(len(employees.json()), 9)
+        self.assertEquals(len(list(filter(lambda x: x['id'] == self.employee1.id, employees.json()))), 1)
+        employee = list(filter(lambda x: x['id'] == self.employee1.id, employees.json()))[0]
+        self.assertEquals(len(employee['employments']), 2)
+        employees = self.client.get(f'/rest_api/employee/?include_employments=true&show_constraints=true&shop_network__in={self.client_network.id}')
+        self.assertEquals(len(employees.json()), 9)
+        self.assertEquals(len(list(filter(lambda x: x['id'] == self.employee1.id, employees.json()))), 1)
+        employee = list(filter(lambda x: x['id'] == self.employee1.id, employees.json()))[0]
+        self.assertEquals(len(employee['employments']), 1)

@@ -1,5 +1,6 @@
 from django.db.models import F, Q
 from django.db.models.functions import Coalesce
+from django.db.models.query import Prefetch
 from django.middleware.csrf import rotate_token
 from django.utils import timezone
 from django.utils.translation import gettext as _
@@ -240,10 +241,12 @@ class EmployeeViewSet(UpdateorCreateViewSet):
         )
 
         if self.request.query_params.get('include_employments'):
-            prefetch = 'employments'
+            queryset = Employment.objects.all()
+            if self.request.query_params.get('shop_network__in'):
+                queryset = queryset.filter(shop__network_id__in=self.request.query_params.get('shop_network__in').split(','))
             if self.request.query_params.get('show_constraints'):
-                prefetch = 'employments__worker_constraints'
-            qs = qs.prefetch_related(prefetch)
+                queryset = queryset.prefetch_related('worker_constraints')
+            qs = qs.prefetch_related(Prefetch('employments', queryset=queryset))
 
         return qs.distinct()
 
