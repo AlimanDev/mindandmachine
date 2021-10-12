@@ -1,5 +1,7 @@
 from django.contrib import admin
+from src.base.admin import BaseNotWrapRelatedModelaAdmin
 from src.base.admin_filters import CustomRelatedOnlyDropdownFilter
+from src.integration.forms import GenericExternalCodeForm, ShopExternalCodeForm
 
 from src.integration.models import (
     ExternalSystem,
@@ -15,10 +17,12 @@ class ExternalSystemAdmin(admin.ModelAdmin):
 
 
 @admin.register(ShopExternalCode)
-class ShopExternalCodeAdmin(admin.ModelAdmin):
+class ShopExternalCodeAdmin(BaseNotWrapRelatedModelaAdmin):
+    not_wrap_fields = ['attendance_area']
     list_display = ('shop', 'attendance_area')
     list_select_related = ('shop', 'attendance_area')
     raw_id_fields = ('shop',)
+    form = ShopExternalCodeForm
 
 
 @admin.register(UserExternalCode)
@@ -29,6 +33,8 @@ class UserExternalCodeAdmin(admin.ModelAdmin):
 
 
 @admin.register(GenericExternalCode)
-class GenericExternalCodeAdmin(admin.ModelAdmin):
+class GenericExternalCodeAdmin(BaseNotWrapRelatedModelaAdmin):
+    not_wrap_fields = ['object_type']
     list_display = ('code', 'external_system', 'object_type', 'object')
     list_filter = (('external_system', CustomRelatedOnlyDropdownFilter), ('object_type', CustomRelatedOnlyDropdownFilter))
+    form = GenericExternalCodeForm

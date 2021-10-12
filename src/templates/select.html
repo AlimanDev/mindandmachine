@@ -1,0 +1,38 @@
+{% load i18n %}
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/selectize.js/0.12.6/js/standalone/selectize.min.js" integrity="sha256-+C0A5Ilqmu4QcSPxrlGpaZxJ04VjsRjKu+G82kl5UJk=" crossorigin="anonymous"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/selectize.js/0.12.6/css/selectize.bootstrap3.min.css" integrity="sha256-ze/OEYGcFbPRmvCnrSeKbRTtjG4vGLHXgOqsyLFTRjg=" crossorigin="anonymous" />
+<style>
+    .selectize-input {
+        border: 1px solid #ccc;
+        padding: 6px 12px;
+        display: inline-block;
+        width: 75%;
+        overflow: hidden;
+        position: relative;
+        z-index: 999;
+        -webkit-box-sizing: border-box;
+        -moz-box-sizing: border-box;
+        box-sizing: border-box;
+        -webkit-box-shadow: none;
+        box-shadow: none;
+        -webkit-border-radius: 4px;
+        -moz-border-radius: 4px;
+        border-radius: 4px;
+    }
+    .field-{{widget.name}} {
+        overflow: visible !important;
+    }
+</style>
+<script type="text/javascript">$(document).ready(function () {
+    $('#id_{{ widget.name }}').selectize({
+        sortField: 'text'
+    });
+});</script>
+<select name="{{ widget.name }}"{% include "django/forms/widgets/attrs.html" %}>
+    {{widget}}{% for group_name, group_choices, group_index in widget.optgroups %}{% if group_name %}
+    <optgroup label="{{ group_name }}">{% endif %}{% for option in group_choices %}
+    {% include option.template_name with widget=option %}{% endfor %}{% if group_name %}
+    </optgroup>{% endif %}{% endfor %}
+</select>
+  
