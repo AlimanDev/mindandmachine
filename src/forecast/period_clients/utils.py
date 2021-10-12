@@ -109,7 +109,7 @@ def upload_demand_util_v3(operation_type_name, demand_file, index_col=None, type
     DTTM_COL = df.columns[1]
     VALUE_COL = df.columns[2]
     df[VALUE_COL] = df[VALUE_COL].astype(float)
-    df[DTTM_COL] = pd.to_datetime(df[VALUE_COL])
+    df[DTTM_COL] = pd.to_datetime(df[DTTM_COL])
     with transaction.atomic():
         shops = df[SHOP_COL].unique()
         shops = Shop.objects.filter(code__in=shops)
