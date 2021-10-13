@@ -183,9 +183,11 @@ def copy_as_excel_cells(from_employee_id, from_dates, to_employee_id, to_dates, 
         'employee__user',
         'employment__shop',
         'shop__settings__breaks',
+        'shop__network__breaks',
     ).order_by('dt')
     if worker_day_types:
         main_worker_days = main_worker_days.filter(type_id__in=worker_day_types)
+    main_worker_days = list(main_worker_days)
     main_worker_days_details_set = list(WorkerDayCashboxDetails.objects.filter(
         worker_day__in=main_worker_days,
     ).select_related('work_type'))
@@ -200,7 +202,7 @@ def copy_as_excel_cells(from_employee_id, from_dates, to_employee_id, to_dates, 
     main_worker_days_grouped_by_dt = OrderedDict()
     if include_spaces:
         main_worker_days_grouped_by_dt = OrderedDict([(dt, []) for dt in from_dates])
-    for main_worker_day in list(main_worker_days):
+    for main_worker_day in main_worker_days:
         key = main_worker_day.dt
         main_worker_days_grouped_by_dt.setdefault(key, []).append(main_worker_day)
 
