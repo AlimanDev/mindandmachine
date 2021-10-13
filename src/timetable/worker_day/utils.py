@@ -179,6 +179,7 @@ def copy_as_excel_cells(from_employee_id, from_dates, to_employee_id, to_dates, 
         is_approved=is_approved,
     ).select_related(
         'employee__user',
+        'employment__shop',
         'shop__settings__breaks',
     ).order_by('dt')
     if worker_day_types:
@@ -227,7 +228,7 @@ def copy_as_excel_cells(from_employee_id, from_dates, to_employee_id, to_dates, 
                 continue
 
             worker_active_empl = Employment.objects.get_active_empl_by_priority(
-                network_id=blank_days[0].employee.user.network_id, employee_id=to_employee_id,
+                network_id=blank_days[0].employment.shop.network_id if blank_days[0].employment else None, employee_id=to_employee_id,
                 dt=dt,
                 priority_shop_id=blank_days[0].shop_id,
             ).select_related(

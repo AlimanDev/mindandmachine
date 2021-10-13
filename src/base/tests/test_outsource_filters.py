@@ -223,3 +223,30 @@ class TestOutsource(TestsHelperMixin, APITestCase):
         self.assertEquals(len(list(filter(lambda x: x['id'] == self.employee1.id, employees.json()))), 1)
         employee = list(filter(lambda x: x['id'] == self.employee1.id, employees.json()))[0]
         self.assertEquals(len(employee['employments']), 1)
+
+
+    def test_can_duplicate_worker_day_of_outsource_employee_for_employee_in_own_shop(self):
+        empl = Employment.objects.create(
+            shop=self.client_shop,
+            employee=self.employee1,
+        )
+        dt = date.today()
+        WorkerDay.objects.create(
+            employment=empl,
+            employee=self.employee1,
+            shop=self.client_shop,
+            dt=dt,
+            type=WorkerDay.TYPE_HOLIDAY,
+        )
+        duplicate = self.client.post(
+            '/rest_api/worker_day/duplicate/',
+            {
+                'from_employee_id': self.employee1.id,
+                'to_employee_id': self.client_employee.id,
+                'from_dates': [str(dt)],
+                'to_dates': [str(dt)],
+                'is_approved': False,
+            }
+        )
+        self.assertEquals(duplicate.status_code, 200)
+        self.assertTrue(WorkerDay.objects.filter(employee=self.client_employee, dt=dt, is_approved=False, type=WorkerDay.TYPE_HOLIDAY).exists())
