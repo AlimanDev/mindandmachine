@@ -181,10 +181,13 @@ def copy_as_excel_cells(from_employee_id, from_dates, to_employee_id, to_dates, 
         is_approved=is_approved,
     ).select_related(
         'employee__user',
+        'employment__shop',
         'shop__settings__breaks',
+        'shop__network__breaks',
     ).order_by('dt')
     if worker_day_types:
         main_worker_days = main_worker_days.filter(type_id__in=worker_day_types)
+    main_worker_days = list(main_worker_days)
     main_worker_days_details_set = list(WorkerDayCashboxDetails.objects.filter(
         worker_day__in=main_worker_days,
     ).select_related('work_type'))
@@ -199,7 +202,7 @@ def copy_as_excel_cells(from_employee_id, from_dates, to_employee_id, to_dates, 
     main_worker_days_grouped_by_dt = OrderedDict()
     if include_spaces:
         main_worker_days_grouped_by_dt = OrderedDict([(dt, []) for dt in from_dates])
-    for main_worker_day in list(main_worker_days):
+    for main_worker_day in main_worker_days:
         key = main_worker_day.dt
         main_worker_days_grouped_by_dt.setdefault(key, []).append(main_worker_day)
 
@@ -228,7 +231,7 @@ def copy_as_excel_cells(from_employee_id, from_dates, to_employee_id, to_dates, 
                 continue
 
             worker_active_empl = Employment.objects.get_active_empl_by_priority(
-                network_id=blank_days[0].employee.user.network_id, employee_id=to_employee_id,
+                network_id=blank_days[0].employment.shop.network_id if blank_days[0].employment else None, employee_id=to_employee_id,
                 dt=dt,
                 priority_shop_id=blank_days[0].shop_id,
             ).select_related(
