@@ -233,7 +233,7 @@ class Timetable_xlsx(Tabel_xlsx):
                     '\n'.join(texts),
                     self.workbook.add_format(cell_format)
                 )
-            self.worksheet.set_row(row_s + row_shift, self._row_height(32 * max_rows / 2, 26 * max_rows))
+            self.worksheet.set_row(row_s + row_shift, self._row_height(32 * max_rows / 2, 28.5 * max_rows))
 
             format_holiday_debt = self.workbook.add_format(fmt(font_size=self._font_size(9), border=1, bg_color='#FEFF99'))
             self.worksheet.write_string(
