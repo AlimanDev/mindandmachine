@@ -4,7 +4,7 @@ from django.utils.translation import gettext as _
 from import_export.admin import ExportActionMixin, ImportMixin
 from rangefilter.filter import DateRangeFilter, DateTimeRangeFilter
 from src.base.admin import BaseNotWrapRelatedModelaAdmin
-from src.base.admin_filters import CustomChoiceDropdownFilter, CustomRelatedOnlyDropdownFilter
+from src.base.admin_filters import CustomRelatedDropdownFilter, CustomRelatedOnlyDropdownFilter
 
 from src.base.forms import (
     CustomImportFunctionGroupForm,
@@ -153,7 +153,7 @@ class WorkerDayAdmin(admin.ModelAdmin):
         'is_fact',
         'is_approved',
         ('shop', CustomRelatedOnlyDropdownFilter),
-        ('type', CustomRelatedOnlyDropdownFilter),
+        ('type', CustomRelatedDropdownFilter),
         ('dttm_modified', DateTimeRangeFilter),
         ('created_by', CustomRelatedOnlyDropdownFilter),
     )
@@ -323,10 +323,10 @@ class GroupWorkerDayPermissionAdmin(ImportMixin, ExportActionMixin, BaseNotWrapR
     list_display = ('id', 'group', 'worker_day_permission', 'limit_days_in_past', 'limit_days_in_future')
     list_editable = ('limit_days_in_past', 'limit_days_in_future')
     list_filter = [
-        ('group', RelatedOnlyDropdownNameOrderedFilter),
+        ('group', CustomRelatedDropdownFilter),
         'worker_day_permission__action',
         'worker_day_permission__graph_type',
-        ('worker_day_permission__wd_type', RelatedOnlyDropdownNameOrderedFilter),
+        ('worker_day_permission__wd_type', CustomRelatedDropdownFilter),
     ]
     list_select_related = ('group', 'worker_day_permission__wd_type')
     resource_class = GroupWorkerDayPermissionResource
