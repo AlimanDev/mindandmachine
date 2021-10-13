@@ -804,8 +804,8 @@ class WorkerDay(AbstractModel):
     def save(self, *args, **kwargs): # todo: aa: частая модель для сохранения, отправлять запросы при сохранении накладно
         self.dttm_work_start_tabel, self.dttm_work_end_tabel, self.work_hours = self._calc_wh()
 
-        if self.last_edited_by is None:
-            self.last_edited_by = self.created_by
+        if self.last_edited_by_id is None:
+            self.last_edited_by_id = self.created_by_id
 
         is_new = self.id is None
 
