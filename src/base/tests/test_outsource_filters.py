@@ -261,7 +261,7 @@ class TestOutsource(TestsHelperMixin, APITestCase):
             employee=self.employee1,
             shop=self.client_shop,
             dt=dt,
-            type=WorkerDay.TYPE_HOLIDAY,
+            type_id=WorkerDay.TYPE_HOLIDAY,
         )
         duplicate = self.client.post(
             '/rest_api/worker_day/duplicate/',
@@ -274,4 +274,4 @@ class TestOutsource(TestsHelperMixin, APITestCase):
             }
         )
         self.assertEquals(duplicate.status_code, 200)
-        self.assertTrue(WorkerDay.objects.filter(employee=self.client_employee, dt=dt, is_approved=False, type=WorkerDay.TYPE_HOLIDAY).exists())
+        self.assertTrue(WorkerDay.objects.filter(employee=self.client_employee, dt=dt, is_approved=False, type_id=WorkerDay.TYPE_HOLIDAY).exists())
