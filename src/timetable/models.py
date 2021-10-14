@@ -1,5 +1,7 @@
 import datetime
 import json
+from decimal import Decimal
+
 from django.conf import settings
 from django.contrib.auth.models import (
     UserManager
@@ -1341,6 +1343,74 @@ class WorkerDay(AbstractModel):
                     delta_in_secs=delta_in_secs,
                 ).values('id')[:1])
             )
+
+
+class TimesheetItem(AbstractModel):  # TODO: датамиграция из Timesheet, удаление Timesheet, переименование TimesheetItem в Timesheet
+    """
+    Табель учета рабочего времени
+    """
+
+    HOURS_TYPE_DAY = 'D'
+    HOURS_TYPE_NIGHT = 'N'
+    # HOURS_TYPE_CELEBRATION = 'C'
+    # HOURS_TYPE_OVERTIME = 'O'
+
+    HOURS_TYPE_CHOICES = (
+        (HOURS_TYPE_DAY, 'Явился и трудился в дневное время'),
+        (HOURS_TYPE_NIGHT, 'Работал в ночное время'),
+        # (HOURS_TYPE_CELEBRATION, 'Вышел в праздник или выходной'),
+        # (HOURS_TYPE_OVERTIME, 'Трудился сверхурочно'),
+    )
+
+    TIMESHEET_TYPE_FACT = 'F'
+    TIMESHEET_TYPE_MAIN = 'M'
+    TIMESHEET_TYPE_ADDITIONAL = 'A'
+
+    TIMESHEET_TYPE_CHOICES = (
+        (TIMESHEET_TYPE_FACT, 'Фактический'),  # все оплачиваемые часы
+        (TIMESHEET_TYPE_MAIN, 'Основной'),  # рабочие часы, которые идут в осн. табель
+        (TIMESHEET_TYPE_ADDITIONAL, 'Дополнительный'),  # рабочие часы, которые идут в доп. табель
+    )
+
+    SOURCE_TYPE_PLAN = 'P'
+    SOURCE_TYPE_FACT = 'F'
+    SOURCE_TYPE_MANUAL = 'M'
+    SOURCE_TYPE_SYSTEM = 'S'
+
+    SOURCE_TYPES = (
+        (SOURCE_TYPE_PLAN, _('Planned timetable')),  # плановый график
+        (SOURCE_TYPE_FACT, _('Attendance records')),  # отметки
+        (SOURCE_TYPE_MANUAL, _('Manual changes')),  # ручные корректировки (заготовка, пока нет такого)
+        (SOURCE_TYPE_SYSTEM, _('Determined by the system')),  # определены системой
+    )
+
+    timesheet_type = models.CharField(
+        max_length=32, choices=TIMESHEET_TYPE_CHOICES, verbose_name='Тип табеля')
+    shop = models.ForeignKey(
+        'base.Shop', on_delete=models.PROTECT, null=True, blank=True, verbose_name='Поздразделение выхода сотрудника')
+    position = models.ForeignKey(
+        'base.WorkerPosition', on_delete=models.PROTECT, null=True, blank=True, verbose_name='Должность')
+    work_type_name = models.ForeignKey(
+        'timetable.WorkTypeName', on_delete=models.PROTECT, null=True, blank=True, verbose_name='Тип работ')
+    employee = models.ForeignKey('base.Employee', on_delete=models.CASCADE, verbose_name='Сотрудник')
+    dt = models.DateField()
+    day_type = models.ForeignKey(
+        'timetable.WorkerDayType', on_delete=models.PROTECT, verbose_name='Тип дня'
+    )
+    hours_type = models.CharField(
+        max_length=32, choices=HOURS_TYPE_CHOICES,
+        null=True, blank=True, verbose_name='Тип времени',
+        help_text='Актуально для рабочих типов дней',
+    )
+    hours = models.DecimalField(max_digits=4, decimal_places=2, default=Decimal("0.00"))
+    source = models.CharField(
+        choices=SOURCE_TYPES, max_length=12, blank=True,
+        verbose_name='Источник данных',
+    )
+
+    class Meta:
+        verbose_name = 'Запись в табеле'
+        verbose_name_plural = 'Записи в табеле'
 
 
 class Timesheet(AbstractModel):

@@ -1,10 +1,12 @@
 from datetime import date, datetime, time
 from unittest import mock
 
+import pandas as pd
 from django.test import override_settings
 from rest_framework.test import APITestCase
 
 from src.base.tests.factories import EmployeeFactory
+from src.timetable.models import TimesheetItem, WorkerDay
 from src.timetable.tests.factories import WorkerDayFactory
 from ._base import TestTimesheetMixin
 
@@ -110,3 +112,50 @@ class TestTimesheetApiView(TestTimesheetMixin, APITestCase):
         resp = self.client.post(
             self.get_url('Timesheet-recalc'), data=self.dump_data(data), content_type='application/json')
         self.assertContains(resp, 'Не найдено сотрудников удовлетворяющих условиям запроса.', status_code=400)
+
+    def test_timesheet_lines(self):
+        self.add_group_perm(self.group_worker, 'Timesheet_lines', 'GET')
+        for dt in pd.date_range('2021-01-01', '2021-01-31').date:
+            TimesheetItem.objects.create(
+                timesheet_type=TimesheetItem.TIMESHEET_TYPE_FACT,
+                shop=self.shop,
+                position=self.position_worker,
+                employee=self.employee_worker,
+                dt=dt,
+                day_type_id=WorkerDay.TYPE_WORKDAY,
+                hours_type=TimesheetItem.HOURS_TYPE_DAY,
+                hours=8,
+            )
+            TimesheetItem.objects.create(
+                timesheet_type=TimesheetItem.TIMESHEET_TYPE_MAIN,
+                shop=self.shop,
+                position=self.position_worker,
+                employee=self.employee_worker,
+                dt=dt,
+                day_type_id=WorkerDay.TYPE_WORKDAY,
+                hours_type=TimesheetItem.HOURS_TYPE_DAY,
+                hours=8,
+            )
+        TimesheetItem.objects.create(
+            timesheet_type=TimesheetItem.TIMESHEET_TYPE_FACT,
+            shop=self.shop,
+            position=self.position_worker,
+            employee=self.employee_worker,
+            dt='2021-01-01',
+            day_type_id=WorkerDay.TYPE_QUALIFICATION,
+            hours_type=TimesheetItem.HOURS_TYPE_DAY,
+            hours=4,
+        )
+        TimesheetItem.objects.create(
+            timesheet_type=TimesheetItem.TIMESHEET_TYPE_FACT,
+            shop=self.shop,
+            position=self.position_worker,
+            employee=self.employee_worker,
+            dt='2021-01-01',
+            day_type_id=WorkerDay.TYPE_WORKDAY,
+            hours_type=TimesheetItem.HOURS_TYPE_NIGHT,
+            hours=4,
+        )
+
+        resp = self.client.get(self.get_url('Timesheet-lines'))
+        self.print_resp(resp)

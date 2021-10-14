@@ -1,4 +1,3 @@
-from django.db.models import F
 from django.utils.translation import gettext as _
 from drf_yasg.utils import swagger_auto_schema
 from rest_framework.decorators import action
@@ -18,7 +17,7 @@ from .filters import TimesheetFilter
 from .serializers import TimesheetSerializer, TimesheetRecalcSerializer
 from .tasks import calc_timesheets
 from .utils import get_timesheet_stats
-from ..models import Timesheet
+from ..models import Timesheet, TimesheetItem
 
 
 class TimesheetViewSet(BaseModelViewSet):
@@ -56,6 +55,49 @@ class TimesheetViewSet(BaseModelViewSet):
             user=self.request.user,
         )
         return Response(timesheet_stats)
+
+    @swagger_auto_schema(
+        operation_description='''
+        Возвращает данные табеля построчно с группировкой по (сотрудник, тип табеля, подразделение выхода, должность)
+        ''',
+        responses={},
+    )
+    @action(detail=False, methods=['get'])
+    def lines(self, *args, **kwargs):
+        ts_values_list = TimesheetItem.objects.values_list(
+            'timesheet_type',
+            'shop__code',
+            'position__code',
+            'employee__tabel_code',
+            'dt',
+            'day_type',
+            'hours_type',
+            'hours',
+        )
+        ts_lines = {}
+        for ts_type, shop_code, position_code, employee_table_code, dt, day_type, hours_type, hours in ts_values_list:
+            ts_lines.setdefault(
+                (ts_type, shop_code, position_code, employee_table_code), {}).setdefault((dt, day_type, hours_type), hours)
+        res = []
+        for (ts_type, shop_code, position_code, employee__tabel_code), days_dict in ts_lines.items():
+            ts_line_data = {}
+            ts_line_data['timesheet_type'] = ts_type
+            ts_line_data['shop_code'] = shop_code
+            ts_line_data['position_code'] = position_code
+            ts_line_data['employee__tabel_code'] = employee__tabel_code
+            days_list = []
+            for (dt, day_type, hours_type), hours in days_dict.items():
+                days_list.append(
+                    {
+                        "dt": dt,
+                        "day_type": day_type,
+                        "hours_type": hours_type,
+                        "hours": hours,
+                    }
+                )
+            ts_line_data['days'] = days_list
+            res.append(ts_line_data)
+        return Response(res)
 
     @swagger_auto_schema(
         request_body=TimesheetRecalcSerializer,
