@@ -537,7 +537,7 @@ class TestAutoWorkerExchange(APITestCase):
 
     def test_workers_hard_exchange_holidays_3days(self):
         self.create_users(1)
-        self.dt_now = self.dt_now + datetime.timedelta(days=8)
+        self.dt_now = self.dt_now + datetime.timedelta(days=9)
         vacancy = self.create_vacancy(9, 21, self.work_type2)
         employment = Employment.objects.exclude(pk=self.employment_dir.id).first()
         dt = self.dt_now
@@ -552,7 +552,7 @@ class TestAutoWorkerExchange(APITestCase):
 
     def test_workers_hard_exchange_holidays_2days_first(self):
         self.create_users(2)
-        self.dt_now = self.dt_now + datetime.timedelta(days=8)
+        self.dt_now = self.dt_now + datetime.timedelta(days=9)
         vacancy = self.create_vacancy(9, 21, self.work_type2)
         employment1 = Employment.objects.first()
         employment2 = Employment.objects.last()
@@ -575,7 +575,7 @@ class TestAutoWorkerExchange(APITestCase):
 
     def test_workers_hard_exchange_holidays_2days_last(self):
         self.create_users(3)
-        self.dt_now = self.dt_now + datetime.timedelta(days=8)
+        self.dt_now = self.dt_now + datetime.timedelta(days=9)
         vacancy = self.create_vacancy(9, 21, self.work_type2)
         employments = list(Employment.objects.all())
         employment1 = employments[0]
@@ -607,7 +607,7 @@ class TestAutoWorkerExchange(APITestCase):
 
     def test_workers_hard_exchange_holidays_1day(self):
         self.create_users(3)
-        self.dt_now = self.dt_now + datetime.timedelta(days=8)
+        self.dt_now = self.dt_now + datetime.timedelta(days=9)
         vacancy = self.create_vacancy(9, 21, self.work_type2)
         employments = list(Employment.objects.all())
         employment1 = employments[0]
@@ -630,7 +630,7 @@ class TestAutoWorkerExchange(APITestCase):
         self.update_or_create_holidays(employment3, self.dt_now + datetime.timedelta(days=12), 2)
 
         holiday_workers_exchange()
-        vacancy = WorkerDay.objects.get(is_vacancy=True, is_approved=True)
+        vacancy.refresh_from_db()
         self.assertEqual(vacancy.employment, employment2)
 
     def test_worker_exchange_cant_apply_vacancy(self):
@@ -658,12 +658,13 @@ class TestAutoWorkerExchange(APITestCase):
         self.assertEqual(result, {'status_code': 200, 'text': 'Вакансия успешно принята.'})
 
     def test_shift_elongation(self):
+        self.dt_now += datetime.timedelta(1)
         resp = self.create_users(1)
         user = resp[0][0]
         self.create_vacancy(9, 21, self.work_type2)
         self.create_worker_days(Employment.objects.get(employee__user=user), self.dt_now, 1, 10, 18)
         worker_shift_elongation()
-        wd = WorkerDay.objects.get(employee__user=user, is_approved=False)  # FIXME: почему падает?
+        wd = WorkerDay.objects.get(employee__user=user, is_approved=False)
         self.assertEqual(wd.dttm_work_start, datetime.datetime.combine(self.dt_now, datetime.time(9)))
         self.assertEqual(wd.dttm_work_end, datetime.datetime.combine(self.dt_now, datetime.time(21)))
 

@@ -4179,11 +4179,14 @@ class TestAditionalFunctions(TestsHelperMixin, APITestCase):
         url = f'{self.url}exchange_approved/'
         response = self.client.post(url, data, format='json')
         data = response.json()
-        self.assertEqual(len(data), 4)
-        #self.assertIsNone(data[0]['employment_id'])  # FIXME: почему должен быть None?
-        self.assertEqual(data[1]['employment_id'], self.employment3.id)
-        self.assertEqual(data[1]['shop_id'], self.employment3.shop.id)
-        self.assertEqual(data[1]['work_hours'], '08:45:00')
+        self.assertEquals(len(data), 4)
+        employment3_worker_day = list(filter(lambda x: x['employment_id'] == self.employment3.id and x['type'] == WorkerDay.TYPE_WORKDAY, data))[0]
+        self.assertEquals(employment3_worker_day['shop_id'], self.employment3.shop.id)
+        self.assertEquals(employment3_worker_day['work_hours'], '08:45:00')
+        self.assertTrue(WorkerDay.objects.filter(type_id=WorkerDay.TYPE_HOLIDAY, dt=dt_from, is_approved=True, employment=self.employment2).exists())
+        self.assertTrue(WorkerDay.objects.filter(type_id=WorkerDay.TYPE_WORKDAY, dt=dt_from + timedelta(1), is_approved=True, employment=self.employment2).exists())
+        self.assertTrue(WorkerDay.objects.filter(type_id=WorkerDay.TYPE_WORKDAY, dt=dt_from, is_approved=True, employment=self.employment3).exists())
+        self.assertTrue(WorkerDay.objects.filter(type_id=WorkerDay.TYPE_HOLIDAY, dt=dt_from + timedelta(1), is_approved=True, employment=self.employment3).exists())
 
     def test_exchange_not_approved(self):
         dt_from = date.today()
