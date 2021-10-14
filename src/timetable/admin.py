@@ -30,6 +30,7 @@ from src.timetable.models import (
     WorkerDayType,
     GroupWorkerDayPermission,
     WorkerDayPermission,
+    TimesheetItem,
 )
 from .resources import GroupWorkerDayPermissionResource
 
@@ -350,3 +351,9 @@ class GroupWorkerDayPermissionAdmin(ImportMixin, ExportActionMixin, BaseNotWrapR
             groups = form.cleaned_data['groups']
             kwargs.update({'groups': groups.values_list('id', flat=True)})
         return super().get_import_data_kwargs(request, *args, **kwargs)
+
+
+@admin.register(TimesheetItem)
+class TimesheetItemAdmin(admin.ModelAdmin):
+    save_as = True
+    raw_id_fields = ('shop', 'position', 'work_type_name', 'employee')

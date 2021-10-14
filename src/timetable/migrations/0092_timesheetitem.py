@@ -31,8 +31,8 @@ class Migration(migrations.Migration):
                 ('work_type_name', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.PROTECT, to='timetable.WorkTypeName', verbose_name='Тип работ')),
             ],
             options={
-                'verbose_name': 'Запись в табеле',
-                'verbose_name_plural': 'Записи в табеле',
+                'verbose_name': 'Запись в табеле учета рабочего времени',
+                'verbose_name_plural': 'Записи в табеле учета рабочего времени'
             },
             bases=(src.util.mixins.bulk_update_or_create.BatchUpdateOrCreateModelMixin, models.Model),
         ),

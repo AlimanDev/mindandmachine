@@ -1409,8 +1409,8 @@ class TimesheetItem(AbstractModel):  # TODO: датамиграция из Times
     )
 
     class Meta:
-        verbose_name = 'Запись в табеле'
-        verbose_name_plural = 'Записи в табеле'
+        verbose_name = 'Запись в табеле учета рабочего времени'
+        verbose_name_plural = 'Записи в табеле учета рабочего времени'
 
 
 class Timesheet(AbstractModel):
