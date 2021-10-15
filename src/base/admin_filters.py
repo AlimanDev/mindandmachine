@@ -1,9 +1,12 @@
-from django_admin_listfilter_dropdown.filters import RelatedOnlyDropdownFilter, ChoiceDropdownFilter
+from django_admin_listfilter_dropdown.filters import RelatedOnlyDropdownFilter, ChoiceDropdownFilter, RelatedDropdownFilter
 
 class CustomChoiceDropdownFilter(ChoiceDropdownFilter):
     template = 'dropdown_filter.html'
 
 class CustomRelatedOnlyDropdownFilter(RelatedOnlyDropdownFilter):
+    template = 'dropdown_filter.html'
+
+class CustomRelatedDropdownFilter(RelatedDropdownFilter):
     template = 'dropdown_filter.html'
 
 class RelatedOnlyDropdownOrderedFilter(CustomRelatedOnlyDropdownFilter):
