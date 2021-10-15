@@ -1,4 +1,5 @@
 from django.contrib import admin
+from src.base.admin_filters import RelatedOnlyDropdownNameOrderedFilter
 from src.forecast.models import (
     PeriodClients,
     PeriodDemandChangeLog,
@@ -17,9 +18,12 @@ from src.forecast.forms import LoadTemplateAdminForm
 @admin.register(OperationType)
 class OperationTypeAdmin(admin.ModelAdmin):
     list_display = ('id', 'work_type_name', 'operation_type_name', 'period_demand_params', 'shop')
-    list_filter = ('shop',)
+    list_filter = (
+        ('shop', RelatedOnlyDropdownNameOrderedFilter),
+    )
     search_fields = ('shop__name', 'shop__code', 'operation_type_name__name', 'operation_type_name__code')
     raw_id_fields = ('shop', 'work_type', 'operation_type_name')
+    list_select_related = ('work_type__work_type_name', 'operation_type_name')
     save_as = True
 
     @staticmethod
@@ -31,8 +35,12 @@ class OperationTypeAdmin(admin.ModelAdmin):
 class WorkTypeAdmin(admin.ModelAdmin):
     list_display = ('work_type_name', 'shop_title', 'parent_title', 'dttm_added', 'id')
     search_fields = ('work_type_name__name', 'shop__name', 'shop__parent__name', 'id')
-    list_filter = ('work_type_name', 'shop', )
+    list_filter = (
+        ('work_type_name', RelatedOnlyDropdownNameOrderedFilter), 
+        ('shop', RelatedOnlyDropdownNameOrderedFilter),
+    )
     raw_id_fields = ('shop', 'work_type_name')
+    list_select_related = ('work_type_name', 'shop', 'shop__parent')
     save_as = True
 
     @staticmethod
@@ -48,7 +56,12 @@ class WorkTypeAdmin(admin.ModelAdmin):
 class PeriodClientsAdmin(admin.ModelAdmin):
     list_display = ('id', 'operation_type_name', 'value', 'dttm_forecast', 'type',)
     search_fields = ('dttm_forecast', 'id')
-    list_filter = ('operation_type__work_type_id', 'type')
+    list_filter = (
+        ('operation_type__operation_type_name__work_type_name', RelatedOnlyDropdownNameOrderedFilter), 
+        'type'
+    )
+    list_select_related = ('operation_type__operation_type_name',)
+    raw_id_fields = ('operation_type',)
     change_list_template = 'period_clients_change_list.html'
 
     @staticmethod

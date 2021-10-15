@@ -3,6 +3,9 @@ from django import forms
 from import_export.forms import ImportForm, ConfirmImportForm
 from src.base.models import Group
 
+class CustomSelectWidget(forms.Select):
+    template_name = 'select.html'
+
 class DefaultOverrideAdminWidgetsForm(forms.ModelForm):
     json_fields = []
     def __init__(self, *args, **kwargs):
@@ -42,10 +45,18 @@ class BreakAdminForm(DefaultOverrideAdminWidgetsForm):
     ]
 
 
+class FunctionGroupAdminForm(DefaultOverrideAdminWidgetsForm):
+    class Meta:
+        widgets = {
+            'func': CustomSelectWidget
+        }
+
+
 class CustomImportFunctionGroupForm(ImportForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields['groups'] = forms.ModelMultipleChoiceField(queryset=Group.objects.all(), required=True)
+
 
 class CustomConfirmImportFunctionGroupForm(ConfirmImportForm):
     def __init__(self, *args, **kwargs):

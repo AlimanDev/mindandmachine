@@ -16,6 +16,7 @@ from src.base.message import Message
 from src.base.models import (
     Employment,
     Network,
+    NetworkConnect,
     User,
     FunctionGroup,
     WorkerPosition,
@@ -53,7 +54,7 @@ class NetworkSerializer(serializers.ModelSerializer):
     def get_default_stats(self, obj: Network):
         default_stats = json.loads(obj.settings_values).get('default_stats', {})
         return {
-            'timesheet_employee_top': default_stats.get('timesheet_employee_top', 'fact_total_hours_sum'),
+            'timesheet_employee_top': default_stats.get('timesheet_employee_top', 'fact_total_all_hours_sum'),
             'timesheet_employee_bottom': default_stats.get('timesheet_employee_bottom', 'sawh_hours'),
             'employee_top': default_stats.get('employee_top', 'work_hours_total'),
             'employee_bottom': default_stats.get('employee_bottom', 'norm_hours_curr_month'),
@@ -97,6 +98,7 @@ class NetworkSerializer(serializers.ModelSerializer):
             'forbid_edit_employments_came_through_integration',
             'show_remaking_choice',
             'display_employee_tabs_in_the_schedule',
+            'allow_creation_several_wdays_for_one_employee_for_one_date',
         ]
 
 class NetworkListSerializer(serializers.Serializer):
@@ -291,6 +293,8 @@ class EmploymentSerializer(serializers.ModelSerializer):
         "no_user_with_user_id": _("There is {amount} models of user with user_id: {user_id}."),
         "no_shop": _("There is {amount} models of shop with code: {code}."),
         "no_position": _("There is {amount} models of position with code: {code}."),
+        "no_network_connect": _("You are not allowed to choose shops from other network."),
+        "bad_network_shop_position": _("Network of shop and position should be equal.")
     }
 
     position_id = serializers.IntegerField(required=False)
@@ -377,6 +381,24 @@ class EmploymentSerializer(serializers.ModelSerializer):
                 attrs['shop_id'] = shops[0].id
             else:
                 self.fail('no_shop', amount=len(shops), code=shop['code'])
+        if attrs.get('shop_id'):
+            shop = Shop.objects.get(id=attrs['shop_id'])
+            connector = NetworkConnect.objects.filter(
+                outsourcing_id=self.context['request'].user.network_id,
+                client_id=shop.network_id,
+                allow_choose_shop_from_client_for_employement=True,
+            )
+            if not (shop.network_id == self.context['request'].user.network_id) and not connector.exists():
+                raise serializers.ValidationError(self.error_messages['no_network_connect'])
+        elif self.instance:
+            shop = self.instance.shop
+        else:
+            raise ValidationError({'shop_id': self.error_messages['required']})
+        
+        if attrs.get('position_id'):
+            position = WorkerPosition.objects.get(id=attrs['position_id'])
+            if shop.network_id != position.network_id:
+                raise serializers.ValidationError(self.error_messages['bad_network_shop_position'])
 
         if self.context['request'].user.network.descrease_employment_dt_fired_in_api:
             if 'dt_hired' in attrs and attrs['dt_fired']:
@@ -468,6 +490,11 @@ class WorkerPositionSerializer(BaseNetworkSerializer):
             )
         )
 
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        data['network_id'] = instance.network_id # create/read-only field
+        return data
+
 
 class EventSerializer(serializers.ModelSerializer):
     shop_id = serializers.IntegerField()
@@ -493,7 +520,7 @@ class NotificationSerializer(serializers.ModelSerializer):
         message = Message(lang=lang)
         if event.type == 'vacancy':
             details = event.worker_day
-            params = {'details': details, 'dt': details.dt, 'shop': event.shop, 'domain': settings.DOMAIN}
+            params = {'details': details, 'dt': details.dt, 'shop': event.shop, 'domain': settings.EXTERNAL_HOST}
         else:
             params = event.params
         return message.get_message(event.type, params)

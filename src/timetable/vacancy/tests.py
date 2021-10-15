@@ -269,7 +269,7 @@ class TestAutoWorkerExchange(APITestCase):
         wd = WorkerDay.objects.create(
             dttm_work_start=datetime.datetime.combine(self.dt_now, datetime.time(tm_from)),
             dttm_work_end=datetime.datetime.combine(self.dt_now, datetime.time(tm_to)),
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             is_vacancy=True,
             is_approved=True,
             dt=self.dt_now,
@@ -327,7 +327,7 @@ class TestAutoWorkerExchange(APITestCase):
                 employee_id=employment.employee_id,
                 shop=employment.shop,
                 dt=self.dt_now,
-                type=WorkerDay.TYPE_WORKDAY,
+                type_id=WorkerDay.TYPE_WORKDAY,
                 dttm_work_start=datetime.datetime.combine(self.dt_now, datetime.time(9)),
                 dttm_work_end=datetime.datetime.combine(self.dt_now, datetime.time(21)),
                 is_approved=True,
@@ -347,7 +347,7 @@ class TestAutoWorkerExchange(APITestCase):
                 is_fact=False,
                 is_approved=True,
                 defaults=dict(
-                    type=WorkerDay.TYPE_HOLIDAY,
+                    type_id=WorkerDay.TYPE_HOLIDAY,
                     shop=employment.shop,
                     employment=employment,
                 )
@@ -361,7 +361,7 @@ class TestAutoWorkerExchange(APITestCase):
                 employee_id=employment.employee_id,
                 shop=employment.shop,
                 dt=date,
-                type=WorkerDay.TYPE_WORKDAY,
+                type_id=WorkerDay.TYPE_WORKDAY,
                 dttm_work_start=datetime.datetime.combine(date, datetime.time(from_tm)),
                 dttm_work_end=datetime.datetime.combine(date, datetime.time(to_tm)),
                 is_approved=True,
@@ -513,7 +513,7 @@ class TestAutoWorkerExchange(APITestCase):
         workers_exchange()
 
         worker_days = WorkerDay.objects.filter(is_approved=True)
-        self.assertEqual(len(worker_days), 4)
+        self.assertEqual(len(worker_days), 4)  # TODO: скорее всего падает из-за переделок в confirm_vacancy, надо пофиксить
         self.assertIsNotNone(worker_days.filter(is_vacancy=True).first().employee_id)
 
     # Предикшн в 4 человека -> 4 человека в работе -> никого не перекидывает.
@@ -680,7 +680,11 @@ class TestAutoWorkerExchange(APITestCase):
         dttm_to = dttm_from.replace(hour=21, minute=0, second=0, microsecond=0).strftime('%Y-%m-%d %H:%M:%S')
         dttm_from = dttm_from.strftime('%Y-%m-%d %H:%M:%S')
         work_type = self.work_type1.work_type_name.name
-        self.assertEquals(mail.outbox[0].body, f'Здравствуйте, {self.user_dir.first_name}!\n\nВ отделе {shop_name} автомтически создана вакансия на {dt} с {dttm_from} по {dttm_to} для типа работ {work_type}\n\nПисьмо отправлено роботом.')
+        self.assertEquals(
+            mail.outbox[0].body, 
+            f'Здравствуйте, {self.user_dir.first_name}!\n\n\n\n\n\n\nВ подразделении {shop_name} автоматически создана вакансия для типа работ {work_type}\n'
+            f'Дата: {dt}\nВремя с {dttm_from} по {dttm_to}\n\n\n\n\n\nПисьмо отправлено роботом. Подробности можно узнать по ссылке'
+        )
 
     def test_cancel_vacancy_notification_without_employee(self):
         self.create_vacancy(9, 20, self.work_type1)
@@ -697,7 +701,11 @@ class TestAutoWorkerExchange(APITestCase):
         dttm_from = datetime.datetime.combine(self.dt_now, datetime.time(9, 0))
         dttm_to = dttm_from.replace(hour=20, minute=0, second=0, microsecond=0).strftime('%Y-%m-%d %H:%M:%S')
         dttm_from = dttm_from.strftime('%Y-%m-%d %H:%M:%S')
-        self.assertEquals(mail.outbox[0].body, f'Здравствуйте, {self.user_dir.first_name}!\n\nВ отделе {shop_name} отменена вакансия без сотрудника на {dt} с {dttm_from} по {dttm_to}\n\nПисьмо отправлено роботом.')
+        self.assertEquals(
+            mail.outbox[0].body, 
+            f'Здравствуйте, {self.user_dir.first_name}!\n\n\n\n\n\n\nВ подразделении {shop_name} отменена вакансия без сотрудника \n'
+            f'Дата: {dt}\nВремя с {dttm_from} по {dttm_to}\n\n\n\n\n\nПисьмо отправлено роботом. Подробности можно узнать по ссылке'
+        )
 
     def test_cancel_vacancy_notification_with_employee(self):
         self.create_users(2)
@@ -716,7 +724,7 @@ class TestAutoWorkerExchange(APITestCase):
         self.assertEqual(vacancies.count(), 2)
         cancel_vacancies(self.shop.id, self.work_type1.id, approved=True)
         wd = WorkerDay.objects.filter(employee_id=employments[0].employee_id, is_approved=True).first()
-        self.assertEquals(wd.type, WorkerDay.TYPE_HOLIDAY)
+        self.assertEquals(wd.type_id, WorkerDay.TYPE_HOLIDAY)
         self.assertFalse(wd.is_vacancy)
         self.assertEqual(vacancies.count(), 1)
         self.assertEqual(len(mail.outbox), 2)
@@ -731,8 +739,16 @@ class TestAutoWorkerExchange(APITestCase):
         dttm_from = dttm_from.strftime('%Y-%m-%d %H:%M:%S')
         user = employments[0].employee.user
         user = f'{user.last_name} {user.first_name}'
-        self.assertEquals(mail.outbox[0].body, f'Здравствуйте, {employments[0].employee.user.first_name}!\n\nУ вас была автоматически отменена вакансия в отделе {shop_name} на {dt} с {dttm_from} по {dttm_to}\n\nПисьмо отправлено роботом.')
-        self.assertEquals(mail.outbox[1].body, f'Здравствуйте, {self.user_dir.first_name}!\n\nВ отделе {shop_name} отменена вакансия у сотрудника {user} без табельного номера на {dt} с {dttm_from} по {dttm_to}\n\nПисьмо отправлено роботом.')
+        self.assertEquals(
+            mail.outbox[0].body, 
+            f'Здравствуйте, {employments[0].employee.user.first_name}!\n\n\n\n\n\n\nУ вас была автоматически отменена вакансия в подразделении {shop_name}.\n'
+            f'Дата: {dt}\nВремя работы с {dttm_from} по {dttm_to}\n\n\n\n\n\nПисьмо отправлено роботом. Подробности можно узнать по ссылке'
+        )
+        self.assertEquals(
+            mail.outbox[1].body, 
+            f'Здравствуйте, {self.user_dir.first_name}!\n\n\n\n\n\n\nВ подразделении {shop_name} отменена вакансия у сотрудника {user} без табельного номера \n'
+            f'Дата: {dt}\nВремя с {dttm_from} по {dttm_to}\n\n\n\n\n\nПисьмо отправлено роботом. Подробности можно узнать по ссылке'
+        )
 
     def test_create_vacancy_without_outsource(self):
         self.create_period_clients(1, self.operation_type)
@@ -762,7 +778,7 @@ class TestAutoWorkerExchange(APITestCase):
     def test_create_vacancy_on_approve(self):
         self.create_period_clients(1, self.operation_type)
         WorkerDay.objects.create(
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dt=self.dt_now,
             employee=self.employee_dir,
             employment=self.employment_dir,
@@ -821,7 +837,7 @@ class TestAutoWorkerExchange(APITestCase):
         self.assertEquals(WorkerDay.objects.filter(is_vacancy=True).count(), 2)
         self.assertEquals(WorkerDay.objects.filter(is_vacancy=True, canceled=True).first().id, vacancy.id)
         wd = WorkerDay.objects.filter(employee_id=employment.employee_id, is_approved=True).first()
-        self.assertEquals(wd.type, WorkerDay.TYPE_HOLIDAY)
+        self.assertEquals(wd.type_id, WorkerDay.TYPE_HOLIDAY)
         self.assertFalse(wd.is_vacancy)
         self.assertNotEquals(wd.id, vacancy.id)
         self.assertEqual(len(mail.outbox), 3)
@@ -833,7 +849,11 @@ class TestAutoWorkerExchange(APITestCase):
         dttm_to = dttm_from.replace(hour=21, minute=0, second=0, microsecond=0).strftime('%Y-%m-%d %H:%M:%S')
         dttm_from = dttm_from.strftime('%Y-%m-%d %H:%M:%S')
         user = employment.employee.user
-        self.assertEquals(mail.outbox[2].body, f'Здравствуйте, {user.first_name}!\n\nУ вас была отменена вакансия в отделе {shop_name} на {dt} с {dttm_from} по {dttm_to}\n\nПисьмо отправлено роботом.')
+        self.assertEquals(
+            mail.outbox[2].body, 
+            f'Здравствуйте, {user.first_name}!\n\n\n\n\n\n\nУ вас была отменена вакансия в подразделении {shop_name}.\n'
+            f'Дата: {dt}\nВремя работы с {dttm_from} по {dttm_to}\n\n\n\n\n\nПисьмо отправлено роботом. Подробности можно узнать по ссылке'
+        )
         create_vacancies_and_notify(self.shop.id, self.work_type1.id)
         self.assertEquals(WorkerDay.objects.filter(is_vacancy=True).count(), 2)
         self.assertEquals(WorkerDay.objects.filter(is_vacancy=True, canceled=True).first().id, vacancy.id)

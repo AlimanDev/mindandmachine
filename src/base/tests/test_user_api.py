@@ -247,7 +247,7 @@ class TestUserViewSet(TestsHelperMixin, APITestCase):
     def test_get_user_with_network_default_stats(self):
         resp = self.client.get('/rest_api/auth/user/')
         data = {
-            'timesheet_employee_top': 'fact_total_hours_sum',
+            'timesheet_employee_top': 'fact_total_all_hours_sum',
             'timesheet_employee_bottom': 'sawh_hours',
             'employee_top': 'work_hours_total',
             'employee_bottom': 'norm_hours_curr_month',

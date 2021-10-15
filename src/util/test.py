@@ -340,7 +340,7 @@ class LocalTestCase(LocalTestCaseAsserts, TestCase):
                 wd = WorkerDay.objects.create(
                     dttm_work_start=datetime.datetime.combine(dt, time_start),
                     dttm_work_end=datetime.datetime.combine(dt + datetime.timedelta(days=1), time_end),
-                    type=WorkerDay.TYPE_WORKDAY,
+                    type_id=WorkerDay.TYPE_WORKDAY,
                     dt=dt,
                     worker=user
                 )
@@ -363,13 +363,13 @@ class LocalTestCase(LocalTestCaseAsserts, TestCase):
             dt,
             dttm_work_start,
             dttm_work_end,
-            type=WorkerDay.TYPE_WORKDAY
+            type_id=WorkerDay.TYPE_WORKDAY
     ):
         worker_day = WorkerDay.objects.create(
             employment=employment,
             worker=employment.user,
             shop=employment.shop,
-            type=type,
+            type_id=type_id,
             dt=dt,
             dttm_work_start=dttm_work_start,
             dttm_work_end=dttm_work_end,

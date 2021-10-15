@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.template import Template, Context
 
 from src.base.models import Shop
@@ -13,6 +14,7 @@ from .models import (
 def enrich_context(context):
     if 'shop_id' in context:
         context['shop'] = Shop.objects.filter(id=context['shop_id']).first()
+    context['host'] = settings.EXTERNAL_HOST
 
 
 @app.task

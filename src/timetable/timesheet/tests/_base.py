@@ -55,11 +55,12 @@ class TestTimesheetMixin(TestsHelperMixin):
                 employment=cls.employment_worker,
                 employee=cls.employee_worker,
                 dt=dt,
-                type=WorkerDay.TYPE_WORKDAY,
+                type_id=WorkerDay.TYPE_WORKDAY,
                 dttm_work_start=datetime.combine(dt, time(10)),
                 dttm_work_end=datetime.combine(dt, time(20)),
             )
         cls.add_group_perm(cls.group_worker, 'Timesheet', 'GET')
+        cls.add_group_perm(cls.group_worker, 'Timesheet_stats', 'GET')
         fill_calendar.fill_days('2021.01.1', '2021.12.31', cls.shop.region.id)
 
     def _calc_timesheets(self, dt_from=None, dt_to=None, dttm_now=None):

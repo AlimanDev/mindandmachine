@@ -1,4 +1,7 @@
 from django.contrib import admin
+from src.base.admin import BaseNotWrapRelatedModelaAdmin
+
+from src.notifications.forms import EventEmailNotificationForm
 
 from .models import (
     EventEmailNotification,
@@ -9,7 +12,7 @@ from .models import (
 )
 
 
-class BaseEventNotificationAdmin(admin.ModelAdmin):
+class BaseEventNotificationAdmin(BaseNotWrapRelatedModelaAdmin):
     pass
 
 
@@ -19,7 +22,8 @@ class BaseEventNotificationWithRecipientsAdmin(BaseEventNotificationAdmin):
 
 @admin.register(EventEmailNotification)
 class EventEmailNotificationAdmin(BaseEventNotificationWithRecipientsAdmin):
-    pass
+    form = EventEmailNotificationForm
+    not_wrap_fields = ['event_type']
 
 
 # @admin.register(EventOnlineNotification)

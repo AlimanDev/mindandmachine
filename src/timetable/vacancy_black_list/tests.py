@@ -96,7 +96,7 @@ class TestVacancyBlackList(APITestCase):
         )
         dt_now = date.today()
         WorkerDay.objects.create(
-            type=WorkerDay.TYPE_HOLIDAY,
+            type_id=WorkerDay.TYPE_HOLIDAY,
             dt=dt_now,
             shop=self.work_type1.shop,
             employment=self.employment1,
@@ -104,7 +104,7 @@ class TestVacancyBlackList(APITestCase):
         wd = WorkerDay.objects.create(
             dttm_work_start=datetime.combine(dt_now, time(10)),
             dttm_work_end=datetime.combine(dt_now, time(20)),
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             is_vacancy=True,
             is_approved=True,
             dt=dt_now,

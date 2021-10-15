@@ -1,5 +1,7 @@
 {% extends 'notifications/email/base.html' %}
 
 {% block content %}
-<p>Сотрудник {{user.last_name}} {{user.first_name}} откликнулся на вакансию {{dt}} с типом работ {{work_type}}</p>
+<p style="font-size:15px">Сотрудник <b>{{user.last_name}} {{user.first_name}}</b> откликнулся на вакансию с тип{% if work_types|length == 1 %}ом{% else %}ами{% endif %} работ <b>{{ work_types|join:", " }}</b></p>
+<p style="font-size:15px">Дата: <b>{{dt}}</b></p>
+<p style="font-size:15px">Подразделение: <b>{{shop.name}}</b></p>
 {% endblock %}

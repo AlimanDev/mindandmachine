@@ -19,15 +19,15 @@ class ApproveEvent(BaseRegisteredEvent):
 
     def get_recipients(self):
         # TODO: добавить пользователей, для которых был подтвержден график
-        # TODO: подтверждаются все неподтвержденные дни периода, даже если они не отличаются от планового, что делать?
         return []
+
 
 class VacancyConfirmedEvent(BaseRegisteredEvent):
     name = 'Сотрудник откликнулся на вакансию'
     code = VACANCY_CONFIRMED_TYPE
 
 class VacancyCreatedEvent(BaseRegisteredEvent):
-    name = 'Автоматически создана вакансия'
+    name = 'Создана вакансия'
     code = VACANCY_CREATED
     write_history = True
 

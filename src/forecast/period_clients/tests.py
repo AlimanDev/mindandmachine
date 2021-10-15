@@ -542,9 +542,9 @@ class TestDemand(APITestCase):
 
     def test_upload_demand_shops(self):
         file = open('etc/scripts/demand_shops.xlsx', 'rb')
-        self.shop.code = 'adcd'
+        self.shop.code = '0123'
         self.shop.save()
-        self.shop2.code = 'adce'
+        self.shop2.code = '122'
         self.shop2.save()
         OperationType.objects.create(
             operation_type_name=self.op_type_name,
@@ -552,7 +552,7 @@ class TestDemand(APITestCase):
         )
         response = self.client.post(f'{self.url}upload_demand/', {'file': file, 'type': 'F', 'operation_type_name_id': self.op_type_name.id})
         file.close()
-        self.assertEquals(response.json(), [['adcd', 20], ['adce', 20]])
+        self.assertEquals(response.json(), [['0123', 20], ['122', 20]])
         self.assertEqual(response.status_code, 200)
         self.assertEqual(
             PeriodClients.objects.filter(

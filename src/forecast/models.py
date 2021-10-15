@@ -410,10 +410,14 @@ class Receipt(AbstractModel):
     class Meta:
         verbose_name = 'Событийные данные'
         verbose_name_plural = 'Событийные данные'
+        index_together = (
+            ('dt', 'data_type', 'shop'),
+        )
 
     # id = models.BigAutoField(primary_key=True)
-    code = models.UUIDField()
+    code = models.CharField(max_length=256, db_index=True)
     dttm = models.DateTimeField(verbose_name='Дата и время события')
+    dt = models.DateField(verbose_name='Дата события')
     dttm_added = models.DateTimeField(auto_now_add=True)
     shop = models.ForeignKey(Shop, on_delete=models.PROTECT, blank=True, null=True)
     info = models.TextField()

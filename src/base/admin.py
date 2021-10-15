@@ -8,6 +8,7 @@ from django.contrib.admin.utils import unquote
 from django.contrib.auth.admin import UserAdmin
 from django.contrib.auth.forms import UserChangeForm
 from django.core.exceptions import PermissionDenied
+from django.db import models
 from django.forms import Form
 from django.http import Http404, HttpResponseRedirect
 from django.template.response import TemplateResponse
@@ -15,13 +16,14 @@ from django.urls import path, reverse, resolve
 from django.utils.html import escape
 from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
-from django_admin_listfilter_dropdown.filters import ChoiceDropdownFilter
 from import_export import resources
 from import_export.admin import ExportActionMixin, ImportMixin
 from import_export.fields import Field
 from sesame.utils import get_token
+from src.base.admin_filters import CustomChoiceDropdownFilter, RelatedOnlyDropdownLastNameOrderedFilter, RelatedOnlyDropdownNameOrderedFilter
 
 from src.base.forms import (
+    FunctionGroupAdminForm,
     NetworkAdminForm,
     ShopAdminForm,
     ShopSettingsAdminForm,
@@ -46,9 +48,18 @@ from src.base.models import (
     ShopSchedule,
     Employee,
     NetworkConnect,
+    ApiLog,
 )
 from src.timetable.models import GroupWorkerDayPermission
-from src.recognition.admin import RelatedOnlyDropdownNameOrderedFilter
+
+
+class BaseNotWrapRelatedModelaAdmin(admin.ModelAdmin):
+    not_wrap_fields = [] # only foreign key fields
+
+    def formfield_for_dbfield(self, db_field, request, **kwargs):
+        if db_field.name in self.not_wrap_fields and isinstance(db_field, models.ForeignKey):
+            return self.formfield_for_foreignkey(db_field, request, **kwargs)
+        return super().formfield_for_dbfield(db_field, request, **kwargs)
 
 
 class FunctionGroupResource(resources.ModelResource):
@@ -81,7 +92,17 @@ class NetworkAdmin(admin.ModelAdmin):
     form = NetworkAdminForm
     fieldsets = (
         (_('Basic settings'), {'fields': ('logo', 'url', 'primary_color', 'secondary_color', 'name', 'code', 'okpo')}),
-        (_('Time attendance settings'), {'fields': ('allowed_interval_for_late_arrival', 'allowed_interval_for_early_departure', 'allowed_geo_distance_km', 'enable_camera_ticks')}),
+        (_('Time attendance settings'), {
+            'fields': (
+                'allowed_interval_for_late_arrival',
+                'allowed_interval_for_early_departure',
+                'allowed_geo_distance_km',
+                'enable_camera_ticks',
+                'max_work_shift_seconds',
+                'skip_leaving_tick',
+                'max_plan_diff_in_seconds',
+            )
+        }),
         (_('Time tracking settings'), {
             'fields': (
                 'crop_work_hours_by_shop_schedule',
@@ -95,7 +116,12 @@ class NetworkAdmin(admin.ModelAdmin):
         }),
         (_('Vacancy settings'), {'fields': ('need_symbol_for_vacancy', 'allow_workers_confirm_outsource_vacancy')}),
         (_('Format settings'), {'fields': ('download_tabel_template', 'convert_tabel_to', 'timetable_format', 'add_users_from_excel')}),
-        (_('Timetable settings'), {'fields': ('show_worker_day_additional_info', 'show_worker_day_tasks', 'copy_plan_to_fact_crossing')}),
+        (_('Timetable settings'), {'fields': (
+            'show_worker_day_additional_info',
+            'show_worker_day_tasks',
+            'copy_plan_to_fact_crossing',
+            'display_employee_tabs_in_the_schedule',
+        )}),
         (_('Integration settings'), {'fields': (
             'descrease_employment_dt_fired_in_api',
             'ignore_parent_code_when_updating_department_via_api',
@@ -107,6 +133,11 @@ class NetworkAdmin(admin.ModelAdmin):
             'settings_values',
             'show_user_biometrics_block',
             'forbid_edit_employments_came_through_integration',
+            'allow_creation_several_wdays_for_one_employee_for_one_date',
+            'run_recalc_fact_from_att_records_on_plan_approve',
+            'edit_manual_fact_on_recalc_fact_from_att_records',
+            'set_closest_plan_approved_delta_for_manual_fact',
+            'clean_wdays_on_employment_dt_change',
         )}),
     )
 
@@ -289,18 +320,10 @@ class GroupWorkerDayPermissionInline(admin.TabularInline):
 
 @admin.register(Group)
 class GroupAdmin(admin.ModelAdmin):
-    list_dispaly = ('id', 'dttm_added', 'name', 'subordinates')
-    list_filter = ('id', 'name')
-    inlines = (
-        GroupWorkerDayPermissionInline,
-    )
+    list_display = ('id', 'name', 'code', 'network',)
+    list_filter = ('network',)
+    search_fields = ('name', 'code',)
     save_as = True
-
-    def get_actions(self, request):
-        from src.util.wd_perms.utils import WdPermsHelper
-        actions = super().get_actions(request)
-        actions.update(WdPermsHelper.get_preset_actions())
-        return actions
 
     def save_model(self, request, obj, form, change):
         obj.save()
@@ -322,6 +345,19 @@ class GroupAdmin(admin.ModelAdmin):
                     for f in funcs
                 ]
             )
+            from src.timetable.models import GroupWorkerDayPermission
+            gwdps = GroupWorkerDayPermission.objects.filter(group_id=original_pk)
+            GroupWorkerDayPermission.objects.bulk_create(
+                [
+                    GroupWorkerDayPermission(
+                        group=obj,
+                        worker_day_permission=gwdp.worker_day_permission,
+                        limit_days_in_past=gwdp.limit_days_in_past,
+                        limit_days_in_future=gwdp.limit_days_in_future,
+                    )
+                    for gwdp in gwdps
+                ]
+            )
 
 
 @admin.register(FunctionGroup)
@@ -329,12 +365,13 @@ class FunctionGroupAdmin(ImportMixin, ExportActionMixin, admin.ModelAdmin):
     list_display = ('id', 'access_type', 'group', 'func', 'method', 'level_down', 'level_up')
     list_filter = [
         ('group', RelatedOnlyDropdownNameOrderedFilter),
-        ('func', ChoiceDropdownFilter),
+        ('func', CustomChoiceDropdownFilter),
     ]
     # list_filter = ('access_type', 'group', 'func')
     list_select_related = ('group',)
     search_fields = ('id',)
     resource_class = FunctionGroupResource
+    form = FunctionGroupAdminForm
 
     def get_import_form(self):
         return CustomImportFunctionGroupForm
@@ -424,3 +461,25 @@ class ShopScheduleAdmin(admin.ModelAdmin):
     def save_model(self, request, obj, form, change):
         obj.modified_by = request.user
         obj.save(recalc_wdays=True)
+
+
+@admin.register(ApiLog)
+class ApiLogAdmin(admin.ModelAdmin):
+    list_display = (
+        'view_func',
+        'http_method',
+        'url_kwargs',
+        'request_datetime',
+        'user',
+        'response_ms',
+        'response_status_code',
+    )
+    list_filter = (
+        'view_func',
+        'http_method',
+        ('user', RelatedOnlyDropdownLastNameOrderedFilter),
+        'response_status_code',
+    )
+    search_fields = ('url_kwargs',)
+    raw_id_fields = ('user',)
+    list_select_related = ('user',)

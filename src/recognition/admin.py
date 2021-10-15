@@ -9,8 +9,8 @@ from django.db.models.functions import Coalesce
 from django.http import HttpResponse
 from django.utils.html import format_html
 from django.utils.timezone import now
-from django_admin_listfilter_dropdown.filters import RelatedOnlyDropdownFilter
 from rangefilter.filter import DateTimeRangeFilter
+from src.base.admin_filters import CustomRelatedOnlyDropdownFilter, RelatedOnlyDropdownLastNameOrderedFilter, RelatedOnlyDropdownNameOrderedFilter
 
 from src.recognition.models import TickPoint, Tick, TickPhoto, UserConnecter
 from src.timetable.models import User, Employment
@@ -19,13 +19,7 @@ from src.util.dg.ticks_report import TicksOdsReportGenerator, TicksOdtReportGene
 admin.site.unregister(Group)
 
 
-class RelatedOnlyDropdownNameOrderedFilter(RelatedOnlyDropdownFilter):
-    def field_choices(self, field, request, model_admin):
-        pk_qs = model_admin.get_queryset(request).distinct().values_list('%s__pk' % self.field_path, flat=True)
-        return field.get_choices(include_blank=False, limit_choices_to={'pk__in': pk_qs}, ordering=['name',])
-
-
-class UserListFilter(admin.SimpleListFilter):
+class UserListFilter(CustomRelatedOnlyDropdownFilter):
     title = 'User'
     parameter_name = 'user__id__exact'
     related_filter_parameter = 'tick_point__shop__id__exact'
@@ -109,7 +103,7 @@ class TickAdmin(admin.ModelAdmin):
         ('tick_point__shop', RelatedOnlyDropdownNameOrderedFilter),
         ('dttm', DateTimeRangeFilter),
         'type',
-        UserListFilter,
+        ('user', UserListFilter),
     ]
 
     actions = ['download_old', 'ticks_report_xlsx', 'ticks_report_docx']
@@ -217,11 +211,12 @@ class TickPhotoAdmin(admin.ModelAdmin):
     list_filter = [('liveness', RangeNumericFilter),
                    ('dttm', DateTimeRangeFilter),
                    'type',
-                   ('tick__tick_point__shop', RelatedOnlyDropdownFilter),
-                   PhotoUserListFilter,
+                   ('tick__tick_point__shop', CustomRelatedOnlyDropdownFilter),
+                   ('tick__user', PhotoUserListFilter),
                    ]
     list_display = ['id', 'user', 'type', 'tick_point', 'liveness', 'verified_score', 'dttm', 'image_tag']
     readonly_fields = ['image_tag', 'tick']
+    list_select_related = ('tick__user', 'tick__tick_point')
     save_as = True
 
     def user(self, obj):
@@ -241,12 +236,16 @@ class TickPhotoAdmin(admin.ModelAdmin):
 
 @admin.register(TickPoint)
 class TickPointAdmin(admin.ModelAdmin):
-    list_filter = ['shop']
+    list_filter = [('shop', RelatedOnlyDropdownNameOrderedFilter),]
     list_display = ['id', 'name', 'shop', 'dttm_added', 'is_active']
+    list_select_related = ('shop',)
+    raw_id_fields = ('shop',)
 
 
 @admin.register(UserConnecter)
 class UserConnecterAdmin(admin.ModelAdmin):
     search_fields = ['user__last_name', 'user__first_name', 'user__id', 'user__username', 'partner_id']
-    list_filter = ['user']
+    list_filter = [('user', RelatedOnlyDropdownLastNameOrderedFilter),]
     list_display = ['partner_id', 'user']
+    list_select_related = ('user',)
+    raw_id_fields = ('user',)

@@ -28,7 +28,7 @@ def get_worker_days_with_no_ticks(dttm: datetime):
                     dttm_work_start_plan__gte=dttm_from_comming, 
                     dttm_work_start_plan__lt=dttm_from_comming + timedelta(minutes=1), 
                     ticks_comming_fact_count=0,
-                    wd_type=WorkerDay.TYPE_WORKDAY,
+                    wd_type_id=WorkerDay.TYPE_WORKDAY,
                     shop=shop,
                 ).select_related(
                     'shop',
@@ -43,7 +43,7 @@ def get_worker_days_with_no_ticks(dttm: datetime):
                     dttm_work_end_plan__gte=dttm_from_leaving, 
                     dttm_work_end_plan__lt=dttm_from_leaving + timedelta(minutes=1), 
                     ticks_leaving_fact_count=0,
-                    wd_type=WorkerDay.TYPE_WORKDAY,
+                    wd_type_id=WorkerDay.TYPE_WORKDAY,
                     shop=shop,
                 ).select_related(
                     'shop',

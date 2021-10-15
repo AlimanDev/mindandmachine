@@ -29,7 +29,7 @@ from src.reports.reports import (
     URV_VIOLATORS_REPORT, 
     URV_STAT_V2,
 )
-from src.reports.models import ReportConfig, ReportType
+from src.reports.models import ReportConfig, ReportType, Period
 from src.timetable.models import WorkerDay, AttendanceRecords
 from src.timetable.tests.factories import WorkerDayFactory
 from src.util.mixins.tests import TestsHelperMixin
@@ -42,6 +42,7 @@ class TestSendUrvStatEventNotifications(TestsHelperMixin, APITestCase):
     @classmethod
     def setUpTestData(cls):
         cls.network = NetworkFactory()
+        cls.period = Period.objects.create()
         cls.root_shop = ShopFactory(network=cls.network)
         cls.shop = ShopFactory(
             parent=cls.root_shop,
@@ -90,7 +91,7 @@ class TestSendUrvStatEventNotifications(TestsHelperMixin, APITestCase):
             employment=cls.employment_worker,
             employee=cls.employee_worker,
             dt=cls.dt,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
         )
         cls.plan_approved2 = WorkerDayFactory(
             is_approved=True,
@@ -99,7 +100,7 @@ class TestSendUrvStatEventNotifications(TestsHelperMixin, APITestCase):
             employment=cls.employment_worker2,
             employee=cls.employee_worker2,
             dt=cls.dt,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
         )
 
     def setUp(self):
@@ -110,6 +111,7 @@ class TestSendUrvStatEventNotifications(TestsHelperMixin, APITestCase):
             subject = 'Отчет УРВ'
             report_config = ReportConfig.objects.create(
                 report_type=self.urv_stat_report,
+                period=self.period,
                 subject=subject,
                 email_text='Отчет УРВ',
                 cron=self.cron,
@@ -173,6 +175,7 @@ class TestSendUrvStatEventNotifications(TestsHelperMixin, APITestCase):
             subject = 'Отчет УРВ'
             report_config = ReportConfig.objects.create(
                 report_type=self.urv_stat_report,
+                period=self.period,
                 subject=subject,
                 email_text='Отчет УРВ',
                 cron=self.cron,
@@ -213,6 +216,7 @@ class TestSendUrvStatTodayEventNotifications(TestsHelperMixin, APITestCase):
     @classmethod
     def setUpTestData(cls):
         cls.network = NetworkFactory()
+        cls.period = Period.objects.create()
         cls.root_shop = ShopFactory(network=cls.network)
         cls.shop = ShopFactory(
             parent=cls.root_shop,
@@ -261,7 +265,7 @@ class TestSendUrvStatTodayEventNotifications(TestsHelperMixin, APITestCase):
             employment=cls.employment_worker,
             employee=cls.employee_worker,
             dt=cls.dt,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
         )
         cls.plan_approved = WorkerDayFactory(
             is_approved=True,
@@ -270,7 +274,7 @@ class TestSendUrvStatTodayEventNotifications(TestsHelperMixin, APITestCase):
             employment=cls.employment_worker2,
             employee=cls.employee_worker2,
             dt=cls.dt,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
         )
 
     def setUp(self):
@@ -281,6 +285,7 @@ class TestSendUrvStatTodayEventNotifications(TestsHelperMixin, APITestCase):
             subject = 'Отчет УРВ за сегодня'
             report_config = ReportConfig.objects.create(
                 report_type=self.urv_stat_report,
+                period=self.period,
                 subject=subject,
                 email_text='Отчет УРВ за сегодня',
                 cron=self.cron,
@@ -326,6 +331,7 @@ class TestSendUrvStatTodayEventNotifications(TestsHelperMixin, APITestCase):
             subject = 'Отчет УРВ за сегодня'
             report_config = ReportConfig.objects.create(
                 report_type=self.urv_stat_report,
+                period=self.period,
                 subject=subject,
                 email_text='Отчет УРВ за сегодня',
                 cron=self.cron,
@@ -353,11 +359,11 @@ class TestSendUrvStatTodayEventNotifications(TestsHelperMixin, APITestCase):
             self.assertEqual(df.to_dict('records'), data)
 
 
-
 class TestSendUrvViolatorsEventNotifications(TestsHelperMixin, APITestCase):
     @classmethod
     def setUpTestData(cls):
         cls.network = NetworkFactory()
+        cls.period = Period.objects.create()
         cls.root_shop = ShopFactory(network=cls.network)
         cls.shop = ShopFactory(
             parent=cls.root_shop,
@@ -406,7 +412,7 @@ class TestSendUrvViolatorsEventNotifications(TestsHelperMixin, APITestCase):
             employment=cls.employment_worker,
             employee=cls.employee_worker,
             dt=cls.dt,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
         )
         cls.plan_approved_dir = WorkerDayFactory(
             is_approved=True,
@@ -415,7 +421,7 @@ class TestSendUrvViolatorsEventNotifications(TestsHelperMixin, APITestCase):
             employment=cls.employment_dir,
             employee=cls.employee_dir,
             dt=cls.dt,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
         )
         cls.plan_approved2 = WorkerDayFactory(
             is_approved=True,
@@ -424,7 +430,7 @@ class TestSendUrvViolatorsEventNotifications(TestsHelperMixin, APITestCase):
             employment=cls.employment_worker2,
             employee=cls.employee_worker2,
             dt=cls.dt,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
         )
 
         AttendanceRecords.objects.create(
@@ -442,6 +448,7 @@ class TestSendUrvViolatorsEventNotifications(TestsHelperMixin, APITestCase):
             subject = 'Отчет о нарушителях УРВ'
             report_config = ReportConfig.objects.create(
                 report_type=self.urv_violators_report,
+                period=self.period,
                 subject=subject,
                 email_text='Отчет о нарушителях УРВ',
                 cron=self.cron,
@@ -497,6 +504,7 @@ class TestSendUrvViolatorsEventNotifications(TestsHelperMixin, APITestCase):
             subject = 'Отчет о нарушителях УРВ'
             report_config = ReportConfig.objects.create(
                 report_type=self.urv_violators_report,
+                period=self.period,
                 subject=subject,
                 email_text='Отчет о нарушителях УРВ',
                 cron=self.cron,
@@ -529,6 +537,7 @@ class TestSendUrvStatV2EventNotifications(TestsHelperMixin, APITestCase):
     @classmethod
     def setUpTestData(cls):
         cls.network = NetworkFactory()
+        cls.period = Period.objects.create()
         cls.root_shop = ShopFactory(network=cls.network)
         cls.shop = ShopFactory(
             parent=cls.root_shop,
@@ -603,6 +612,7 @@ class TestSendUrvStatV2EventNotifications(TestsHelperMixin, APITestCase):
             subject = 'Отчет УРВ версия 2'
             report_config = ReportConfig.objects.create(
                 report_type=self.urv_stat_report,
+                period=self.period,
                 subject=subject,
                 email_text='Отчет УРВ версия 2',
                 cron=self.cron,
@@ -666,6 +676,7 @@ class TestSendUrvStatV2EventNotifications(TestsHelperMixin, APITestCase):
             subject = 'Отчет УРВ версия 2'
             report_config = ReportConfig.objects.create(
                 report_type=self.urv_stat_report,
+                period=self.period,
                 subject=subject,
                 email_text='Отчет УРВ версия 2',
                 cron=self.cron,
@@ -730,38 +741,38 @@ class TestEmployeeNotCheckedEventNotifications(TestsHelperMixin, APITestCase):
         cls.event_out, _created = EventType.objects.get_or_create(
             code=EMPLOYEE_NOT_CHECKED_OUT, network=cls.network)
         
-        cls.dt = datetime.now().date()
-        cls.now = datetime.now() + timedelta(hours=cls.shop.get_tz_offset())
-        WorkerDayFactory(
-            is_approved=True,
-            is_fact=False,
-            shop=cls.shop,
-            employment=cls.employment_worker,
-            employee=cls.employee_worker,
-            dt=cls.dt,
-            type=WorkerDay.TYPE_WORKDAY,
-            dttm_work_start=cls.now - timedelta(minutes=5),
-            dttm_work_end=cls.now + timedelta(hours=6),
-        )
-        WorkerDayFactory(
-            is_approved=True,
-            is_fact=False,
-            shop=cls.shop,
-            employment=cls.employment_dir,
-            employee=cls.employee_dir,
-            dt=cls.dt,
-            type=WorkerDay.TYPE_WORKDAY,
-            dttm_work_start=cls.now - timedelta(hours=6),
-            dttm_work_end=cls.now - timedelta(minutes=5),
-        )
-        AttendanceRecords.objects.create(
-            shop=cls.shop,
-            type=AttendanceRecords.TYPE_COMING,
-            user=cls.user_dir,
-            dttm=cls.now - timedelta(hours=6, minutes=23)
-        )
 
     def setUp(self):
+        self.dt = datetime.now().date()
+        self.now = datetime.now() + timedelta(hours=self.shop.get_tz_offset())
+        WorkerDayFactory(
+            is_approved=True,
+            is_fact=False,
+            shop=self.shop,
+            employment=self.employment_worker,
+            employee=self.employee_worker,
+            dt=self.dt,
+            type_id=WorkerDay.TYPE_WORKDAY,
+            dttm_work_start=self.now - timedelta(minutes=5),
+            dttm_work_end=self.now + timedelta(hours=6),
+        )
+        WorkerDayFactory(
+            is_approved=True,
+            is_fact=False,
+            shop=self.shop,
+            employment=self.employment_dir,
+            employee=self.employee_dir,
+            dt=self.dt,
+            type_id=WorkerDay.TYPE_WORKDAY,
+            dttm_work_start=self.now - timedelta(hours=6),
+            dttm_work_end=self.now - timedelta(minutes=5),
+        )
+        AttendanceRecords.objects.create(
+            shop=self.shop,
+            type=AttendanceRecords.TYPE_COMING,
+            user=self.user_dir,
+            dttm=self.now - timedelta(hours=6, minutes=23)
+        )
         self.client.force_authenticate(user=self.user_dir)
 
     def test_employee_not_checked_notification_sent(self):
@@ -788,10 +799,16 @@ class TestEmployeeNotCheckedEventNotifications(TestsHelperMixin, APITestCase):
             self.assertEqual(mail.outbox[1].subject, subject_out)
             self.assertEqual(mail.outbox[0].to[0], self.user_dir.email)
             dttm = (self.now - timedelta(minutes=5)).replace(second=0).strftime('%Y-%m-%d %H:%M:%S')
-            body1 = f'Здравствуйте, {self.user_dir.first_name}!\n\nСотрудник {self.user_worker.last_name} {self.user_worker.first_name} не отметился на приход в {dttm}.\n\nПисьмо отправлено роботом.'
-            self.assertEqual(mail.outbox[0].body, body1)
-            body2 = f'Здравствуйте, {self.user_dir.first_name}!\n\nСотрудник {self.user_dir.last_name} {self.user_dir.first_name} не отметился на уход в {dttm}.\n\nПисьмо отправлено роботом.'
-            self.assertEqual(mail.outbox[1].body, body2)
+            self.assertEqual(
+                mail.outbox[0].body,
+                f'Здравствуйте, {self.user_dir.first_name}!\n\n\n\n\n\n\nСотрудник {self.user_worker.last_name} {self.user_worker.first_name} не отметился на приход.\n\n'
+                f'Время начала смены: {dttm}.\n\nПодразделение: {self.shop.name}.\n\n\n\n\n\n\nПисьмо отправлено роботом. Подробности можно узнать по ссылке'
+            )
+            self.assertEqual(
+                mail.outbox[1].body, 
+                f'Здравствуйте, {self.user_dir.first_name}!\n\n\n\n\n\n\nСотрудник {self.user_dir.last_name} {self.user_dir.first_name} не отметился на уход.\n\n'
+                f'Время окончания смены: {dttm}.\n\nПодразделение: {self.shop.name}.\n\n\n\n\n\n\nПисьмо отправлено роботом. Подробности можно узнать по ссылке'
+            )
 
     
     def test_employee_not_checked_notification_sent_only_one(self):
@@ -823,13 +840,16 @@ class TestEmployeeNotCheckedEventNotifications(TestsHelperMixin, APITestCase):
             self.assertEqual(mail.outbox[0].subject, subject_in)
             self.assertEqual(mail.outbox[0].to[0], self.user_dir.email)
             dttm = (self.now - timedelta(minutes=5)).replace(second=0).strftime('%Y-%m-%d %H:%M:%S')
-            body1 = f'Здравствуйте, {self.user_dir.first_name}!\n\nСотрудник {self.user_worker.last_name} {self.user_worker.first_name} не отметился на приход в {dttm}.\n\nПисьмо отправлено роботом.'
-            self.assertEqual(mail.outbox[0].body, body1)
+            self.assertEqual(
+                mail.outbox[0].body, 
+                f'Здравствуйте, {self.user_dir.first_name}!\n\n\n\n\n\n\nСотрудник {self.user_worker.last_name} {self.user_worker.first_name} не отметился на приход.\n\n'
+                f'Время начала смены: {dttm}.\n\nПодразделение: {self.shop.name}.\n\n\n\n\n\n\nПисьмо отправлено роботом. Подробности можно узнать по ссылке'
+            )
 
     def test_employee_not_checked_notification_sent_custom_deltas(self):
         self.network.settings_values = json.dumps(
             {
-                'delta_for_comming_in_secs': 120,
+                'delta_for_comming_in_secs': 125,
                 'delta_for_leaving_in_secs': 240,
             }
         )
@@ -861,8 +881,11 @@ class TestEmployeeNotCheckedEventNotifications(TestsHelperMixin, APITestCase):
             self.assertEqual(mail.outbox[0].subject, subject_in)
             self.assertEqual(mail.outbox[0].to[0], self.user_dir.email)
             dttm = (self.now - timedelta(minutes=2)).replace(second=0).strftime('%Y-%m-%d %H:%M:%S')
-            body1 = f'Здравствуйте, {self.user_dir.first_name}!\n\nСотрудник {self.user_worker.last_name} {self.user_worker.first_name} не отметился на приход в {dttm}.\n\nПисьмо отправлено роботом.'
-            self.assertEqual(mail.outbox[0].body, body1)
+            self.assertEqual(
+                mail.outbox[0].body, 
+                f'Здравствуйте, {self.user_dir.first_name}!\n\n\n\n\n\n\nСотрудник {self.user_worker.last_name} {self.user_worker.first_name} не отметился на приход.\n\n'
+                f'Время начала смены: {dttm}.\n\nПодразделение: {self.shop.name}.\n\n\n\n\n\n\nПисьмо отправлено роботом. Подробности можно узнать по ссылке'
+            )
 
 
 class TestEmployeeWorkingNotAccordingToPlanEventNotifications(TestsHelperMixin, APITestCase):
@@ -907,7 +930,7 @@ class TestEmployeeWorkingNotAccordingToPlanEventNotifications(TestsHelperMixin, 
             employment=cls.employment_dir,
             employee=cls.employee_dir,
             dt=cls.dt,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             dttm_work_start=datetime.combine(cls.dt, time(8)),
             dttm_work_end=datetime.combine(cls.dt, time(20)),
         )
@@ -948,5 +971,8 @@ class TestEmployeeWorkingNotAccordingToPlanEventNotifications(TestsHelperMixin, 
             self.assertEqual(mail.outbox[0].subject, subject)
             self.assertEqual(mail.outbox[0].to[0], self.user_dir.email)
             dttm = datetime.combine(self.dt, time(9, 3)).strftime('%Y-%m-%d %H:%M:%S')
-            body = f'Здравствуйте, {self.user_dir.first_name}!\n\nСотрудник {self.user_worker.last_name} {self.user_worker.first_name} вышел не по плану в {dttm}.\n\nПисьмо отправлено роботом.'
-            self.assertEqual(mail.outbox[0].body, body)
+            self.assertEqual(
+                mail.outbox[0].body,
+                f'Здравствуйте, {self.user_dir.first_name}!\n\n\n\n\n\n\nСотрудник {self.user_worker.last_name} {self.user_worker.first_name} вышел не по плану.\n'
+                f'Время: {dttm}\nПодразделение: {self.shop.name}\n\n\n\n\n\nПисьмо отправлено роботом. Подробности можно узнать по ссылке'
+            )

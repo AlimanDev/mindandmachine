@@ -6,7 +6,7 @@ from django.db import transaction
 from django.utils import timezone
 from rest_framework.test import APITestCase
 
-from src.base.models import WorkerPosition, Employment, Break
+from src.base.models import WorkerPosition, Employment, Break, ApiLog
 from src.celery.tasks import delete_inactive_employment_groups
 from src.timetable.models import WorkTypeName, EmploymentWorkType, WorkerDay
 from src.timetable.tests.factories import WorkerDayFactory
@@ -135,6 +135,17 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
         ).first().norm_work_hours, 123.0)
 
     def test_put_by_code(self):
+        self.network.set_settings_value("api_log_settings", {
+            "delete_gap_days": 90,
+            "log_funcs": {
+                "Employment": {
+                    "by_code": True,
+                    "http_methods": ['POST', 'PUT'],
+                    "save_response_codes": [400],
+                }
+            }
+        })
+
         self.shop2.code = str(self.shop2.id)
         self.shop2.save()
         self.user2.username = f'u-{self.user2.id}'
@@ -198,6 +209,8 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
         e.refresh_from_db(fields=['shop', 'employee'])
         self.assertEqual(e.shop.id, self.shop3.id)
         self.assertEqual(e.employee.tabel_code, self.employee2.tabel_code)  # cant change tabel_code for existing employment
+        
+        self.assertEqual(ApiLog.objects.count(), 3)
 
     def test_auto_timetable(self):
         Employment.objects.all().update(auto_timetable=True)
@@ -214,9 +227,8 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(Employment.objects.get_active(self.network, shop=self.shop, auto_timetable=False).count(), 2)
         self.assertEqual(list(
-            Employment.objects.get_active(self.network, shop=self.shop, auto_timetable=False).values_list('id',
-                                                                                                          flat=True)),
-            employment_ids)
+            Employment.objects.get_active(self.network, shop=self.shop, auto_timetable=False).values_list('id', flat=True).order_by('id')),
+            sorted(employment_ids))
 
     def test_work_hours_change_on_update_position(self):
         dt = date.today()
@@ -242,7 +254,7 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
             WorkerDay.objects.create(
                 employment_id=resp['id'],
                 employee=self.employee2,
-                type=WorkerDay.TYPE_WORKDAY,
+                type_id=WorkerDay.TYPE_WORKDAY,
                 dttm_work_start=datetime.combine(dt + timedelta(i), time(10)),
                 dttm_work_end=datetime.combine(dt + timedelta(i), time(20)),
                 shop=self.shop,
@@ -253,6 +265,7 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
                 employment_id=resp['id'],
                 employee=self.employee2,
                 dt=dt + timedelta(i + 3),
+                type_id=WorkerDay.TYPE_EMPTY,
             )
         self.assertEqual(WorkerDay.objects.get(employment_id=resp['id'], dt=dt).work_hours, timedelta(hours=9))
         self.assertEqual(WorkerDay.objects.get(employment_id=resp['id'], dt=dt + timedelta(1)).work_hours,
@@ -306,7 +319,7 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
                 employment=self.employment2,
                 dt=dt + timedelta(days=50),
                 is_fact=False,
-                type=WorkerDay.TYPE_WORKDAY,
+                type_id=WorkerDay.TYPE_WORKDAY,
                 dttm_work_start=datetime.combine(dt, time(8, 0, 0)),
                 dttm_work_end=datetime.combine(dt, time(20, 0, 0)),
                 is_approved=True,
@@ -317,7 +330,7 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
                 employment=self.employment2,
                 dt=dt + timedelta(days=25),
                 is_fact=False,
-                type=WorkerDay.TYPE_WORKDAY,
+                type_id=WorkerDay.TYPE_WORKDAY,
                 dttm_work_start=datetime.combine(dt, time(8, 0, 0)),
                 dttm_work_end=datetime.combine(dt, time(20, 0, 0)),
                 is_approved=True,
@@ -328,7 +341,7 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
                 employment=self.employment2,
                 dt=dt + timedelta(days=20),
                 is_fact=False,
-                type=WorkerDay.TYPE_HOLIDAY,
+                type_id=WorkerDay.TYPE_HOLIDAY,
                 is_approved=True,
             )
             wd_count_before_save = WorkerDay.objects.count()
@@ -531,7 +544,7 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
                     employee=self.employee2,
                     employment=empl1,
                     shop=self.shop2,
-                    type=WorkerDay.TYPE_WORKDAY,
+                    type_id=WorkerDay.TYPE_WORKDAY,
                     is_fact=False,
                     is_approved=True,
                 )
@@ -580,7 +593,7 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
             employee=self.employee2,
             employment=empl1,
             shop=self.shop2,
-            type=WorkerDay.TYPE_WORKDAY,
+            type_id=WorkerDay.TYPE_WORKDAY,
             is_fact=False,
             is_approved=True,
         )
