@@ -145,9 +145,11 @@ class TestOutsource(TestsHelperMixin, APITestCase):
             format='json'
         )
     
-    def _create_and_apply_vacancy(self):
+    def _create_and_apply_vacancy(self, night_shift=False):
         dt_now = self.dt_now
-        vacancy = self._create_vacancy(dt_now, datetime.combine(dt_now, time(8)), datetime.combine(dt_now, time(20)), outsources=[self.outsource_network.id,]).json()
+        dttm_work_start = datetime.combine(dt_now, time(20)) if night_shift else datetime.combine(dt_now, time(8))
+        dttm_work_end = datetime.combine(dt_now + timedelta(1), time(8)) if night_shift else datetime.combine(dt_now, time(20))
+        vacancy = self._create_vacancy(dt_now, dttm_work_start, dttm_work_end, outsources=[self.outsource_network.id,]).json()
         WorkerDay.objects.all().update(is_approved=True)
         self.client.force_authenticate(user=self.user1)
         response = self.client.post(f'/rest_api/worker_day/{vacancy["id"]}/confirm_vacancy/')
@@ -384,7 +386,7 @@ class TestOutsource(TestsHelperMixin, APITestCase):
         self.assertEqual(len(list(filter(lambda x: x['id'] == self.root_shop.id, response.json()))), 1)
 
     def test_get_worker_days_for_urv(self):
-        vacancy = self._create_and_apply_vacancy()
+        vacancy = self._create_and_apply_vacancy(night_shift=True)
         self.client.logout()
         self._authorize_tick_point()
         response = self.client.get(self.get_url('TimeAttendanceWorkerDay-list'))
