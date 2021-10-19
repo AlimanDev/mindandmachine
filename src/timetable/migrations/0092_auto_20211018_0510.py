@@ -30,7 +30,7 @@ def replace_view_plan_and_fact_hours(apps, schema_editor):
     COALESCE(sum(date_part('epoch'::text, GREATEST(wd.work_hours, '00:00:00'::interval)) / 3600::double precision) FILTER (WHERE wd.closest_plan_approved_id IS NULL AND wd.is_fact IS TRUE), 0::double precision) AS fact_without_plan_work_hours,
     (count (*) FILTER (WHERE wd.closest_plan_approved_id IS NULL AND wd.is_fact IS TRUE)) as fact_without_plan_count,
     
-    sum(COALESCE(GREATEST(date_part('epoch'::text, (wd.work_hours - COALESCE(wd_fact.work_hours, '00:00:00'::interval))::interval) / 3600::double precision, 0::double precision), 0::double precision)) FILTER (WHERE wd.is_fact IS FALSE) AS lost_work_hours,
+    COALESCE(sum(COALESCE(GREATEST(date_part('epoch'::text, (wd.work_hours - COALESCE(wd_fact.work_hours, '00:00:00'::interval))::interval) / 3600::double precision, 0::double precision), 0::double precision)) FILTER (WHERE wd.is_fact IS FALSE), 0::double precision) AS lost_work_hours,
     (count(*) FILTER (WHERE COALESCE(GREATEST(date_part('epoch'::text, (wd.work_hours - COALESCE(wd_fact.work_hours, '00:00:00'::interval))::interval) / 3600::double precision, 0::double precision), 0::double precision) > 0 AND wd.is_fact IS FALSE)) as lost_work_hours_count,
     
         CASE
