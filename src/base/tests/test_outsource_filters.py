@@ -9,6 +9,7 @@ from django.test import override_settings
 from rest_framework.test import APITestCase
 
 from src.timetable.models import (
+    Timesheet,
     WorkerDay, 
     WorkType, 
     WorkTypeName, 
@@ -20,6 +21,7 @@ from src.timetable.models import (
 from src.base.models import Shop, NetworkConnect, Network, User, Employee, Employment, Group, FunctionGroup, WorkerPosition
 from src.recognition.models import TickPoint, Tick
 from src.timetable.models import ShopMonthStat
+from src.timetable.timesheet.tasks import calc_timesheets
 from src.util.mixins.tests import TestsHelperMixin
 
 @override_settings(OUTSOURCE=True)
@@ -275,3 +277,30 @@ class TestOutsource(TestsHelperMixin, APITestCase):
         )
         self.assertEquals(duplicate.status_code, 200)
         self.assertTrue(WorkerDay.objects.filter(employee=self.client_employee, dt=dt, is_approved=False, type_id=WorkerDay.TYPE_HOLIDAY).exists())
+
+    
+    def test_get_timesheet_for_ousource_worker(self):
+        empl = Employment.objects.create(
+            shop=self.client_shop,
+            employee=self.employee1,
+        )
+        dt = date.today()
+        WorkerDay.objects.create(
+            employment=empl,
+            employee=self.employee1,
+            shop=self.client_shop,
+            dt=dt,
+            type_id=WorkerDay.TYPE_WORKDAY,
+            dttm_work_start=datetime.combine(dt, time(8)),
+            dttm_work_end=datetime.combine(dt, time(20)),
+            is_approved=True,
+        )
+        with override_settings(FISCAL_SHEET_DIVIDER_ALIAS='nahodka'):
+            calc_timesheets(employee_id__in=[self.employee1.id], dt_from=dt, dt_to=dt+timedelta(1))
+        response = self.client.get('/rest_api/timesheet/')
+        self.assertEquals(len(response.json()), 2)
+        self.network_connect.allow_assign_employements_from_outsource = False
+        self.network_connect.allow_choose_shop_from_client_for_employement = False
+        self.network_connect.save()
+        response = self.client.get('/rest_api/timesheet/')
+        self.assertEquals(len(response.json()), 0)
