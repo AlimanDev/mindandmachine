@@ -591,6 +591,14 @@ class TestScheduleDeviation(APITestCase):
             dttm_work_end=datetime.combine(dt, time(20)),
             dt=dt,
         )
+        wd_plan3 = WorkerDayFactory(
+            employee=self.employee1,
+            employment=self.employment1,
+            is_approved=True,
+            type_id=WorkerDay.TYPE_HOLIDAY,
+            is_fact=False,
+            dt=dt + timedelta(1),
+        )
         WorkerDayFactory(
             employee=self.employee1,
             employment=self.employment1,
@@ -617,7 +625,7 @@ class TestScheduleDeviation(APITestCase):
             dt=dt,
             closest_plan_approved=wd_plan2,
         )
-        report = self.client.get(f'/rest_api/report/schedule_deviation/?dt_from={dt}&dt_to={dt}')
+        report = self.client.get(f'/rest_api/report/schedule_deviation/?dt_from={dt}&dt_to={dt+timedelta(1)}')
         BytesIO = pd.io.common.BytesIO
         data = pd.read_excel(BytesIO(report.content), engine='xlrd').fillna('')
         self.assertEquals(
