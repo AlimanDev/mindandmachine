@@ -119,8 +119,8 @@ def urv_stat_v1(dt_from, dt_to, title=None, shop_codes=None, shop_ids=None, comm
                 plan_ticks=Sum('ticks_plan_count'),
                 fact_comming_ticks=Sum('ticks_comming_fact_count'),
                 fact_leaving_ticks=Sum('ticks_leaving_fact_count'),
-                lates=Sum('late_arrival'),
-                earlies=Sum('early_departure'),
+                lates=Sum('late_arrival_count'),
+                earlies=Sum('early_departure_count'),
                 hours_count_plan=Sum('plan_work_hours'),
                 hours_count_fact=Sum('fact_work_hours'),
             )

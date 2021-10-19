@@ -2,7 +2,8 @@ from src.base.permissions import Permission
 from rest_framework.viewsets import ViewSet
 from rest_framework.decorators import action
 from src.reports.utils.pivot_tabel import PlanAndFactPivotTabel
-from src.reports.serializers import PivotTabelSerializer
+from src.reports.serializers import PivotTabelSerializer, ScheduleDevationSerializer
+from src.reports.utils.schedule_deviation import schedule_deviation_report_response
 
 class ReportsViewSet(ViewSet):
     permission_classes = [Permission]
@@ -31,3 +32,14 @@ class ReportsViewSet(ViewSet):
 
         pt = PlanAndFactPivotTabel()
         return pt.get_response(**filters)
+
+    @action(detail=False, methods=['get'])
+    def schedule_deviation(self, request):
+        data = ScheduleDevationSerializer(data=request.query_params)
+        data.is_valid(raise_exception=True)
+        data = data.validated_data
+        filters = {}
+        if 'employee_ids' in data:
+            filters['employee_id__in'] = data['employee_ids']
+
+        return schedule_deviation_report_response(data['dt_from'], data['dt_to'], created_by_id=request.user.id, shop_ids=data.get('shop_ids'), **filters)
