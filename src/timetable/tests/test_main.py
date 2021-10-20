@@ -3786,6 +3786,60 @@ class TestVacancy(TestsHelperMixin, APITestCase):
         self.assertEqual(resp.json()['results'][0]['dt'], self.dt_now.strftime('%Y-%m-%d'))
 
 
+    def test_update_vacancy_type_to_deleted(self):
+        self.work_type_name = WorkTypeName.objects.create(name='Магазин', network=self.network)
+        self.work_type = WorkType.objects.create(
+            work_type_name=self.work_type_name,
+            shop=self.shop2,
+        )
+        vacancy = WorkerDay.objects.create(
+            shop=self.shop2,
+            employee=self.employee2,
+            employment=self.employment2,
+            dttm_work_start=datetime.combine(self.dt_now, time(9)),
+            dttm_work_end=datetime.combine(self.dt_now, time(20)),
+            type_id=WorkerDay.TYPE_WORKDAY,
+            dt=self.dt_now,
+            is_vacancy=True,
+            comment='Test',
+        )
+        response = self.client.put(
+            f'/rest_api/worker_day/{vacancy.id}/',
+            {
+                "dt": vacancy.dt,
+                "is_fact": False,
+                "type": WorkerDay.TYPE_EMPTY,
+            }
+        )
+        self.assertEquals(response.status_code, 200)
+        vacancy.refresh_from_db()
+        self.assertFalse(vacancy.is_vacancy)
+        response = self.client.put(
+            f'/rest_api/worker_day/{vacancy.id}/',
+            self.dump_data(
+                {
+                    "employee_id": self.employee2.id,
+                    "shop_id": self.shop2.id,
+                    "dt": vacancy.dt,
+                    "dttm_work_start": datetime.combine(vacancy.dt, time(8, 0, 0)),
+                    "dttm_work_end": datetime.combine(vacancy.dt, time(20, 0, 0)),
+                    "type": WorkerDay.TYPE_WORKDAY,
+                    "is_fact": False,
+                    "worker_day_details": [
+                        {
+                            "work_part": 1.0,
+                            "work_type_id": self.work_type.id
+                        },
+                    ]
+                }
+            ),
+            content_type='application/json',
+        )
+        self.assertEquals(response.status_code, 200)
+        vacancy.refresh_from_db()
+        self.assertTrue(vacancy.is_vacancy)
+        
+
 class TestAditionalFunctions(TestsHelperMixin, APITestCase):
     USER_USERNAME = "user1"
     USER_EMAIL = "q@q.q"
