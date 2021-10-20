@@ -630,6 +630,6 @@ class TestScheduleDeviation(APITestCase):
         data = pd.read_excel(BytesIO(report.content), engine='xlrd').fillna('')
         self.assertEquals(
             list(data.iloc[9, :].values), 
-            ['1', 'Shop1', '19.10.2021', 'Васнецов Иван ', '', '-', 'штат', 'Работа', '10.0',
+            ['1', 'Shop1', dt.strftime('%d.%m.%Y'), 'Васнецов Иван ', '', '-', 'штат', 'Работа', '10.0',
             '10.5', '0.0', '0.5', '1', '0.5', '1', '0.0', '0', '1.0', '2', '0.0', '0', '0.0', '0']
         )
