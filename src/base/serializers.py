@@ -50,6 +50,7 @@ class NetworkSerializer(serializers.ModelSerializer):
     show_tabel_graph = serializers.SerializerMethodField()
     unaccounted_overtime_threshold = serializers.SerializerMethodField()
     show_remaking_choice = serializers.SerializerMethodField()
+    shop_name_form = serializers.SerializerMethodField()
 
     def get_default_stats(self, obj: Network):
         default_stats = json.loads(obj.settings_values).get('default_stats', {})
@@ -60,6 +61,27 @@ class NetworkSerializer(serializers.ModelSerializer):
             'employee_bottom': default_stats.get('employee_bottom', 'norm_hours_curr_month'),
             'day_top': default_stats.get('day_top', 'covering'),
             'day_bottom': default_stats.get('day_bottom', 'deadtime'),
+        }
+    
+    def get_shop_name_form(self, obj: Network):
+        shop_name_form = json.loads(obj.settings_values).get('shop_name_form', {})
+        return {
+            "singular": {
+                "I": shop_name_form.get("singular", {}).get("I", "магазин"),
+                "R": shop_name_form.get("singular", {}).get("R", "магазина"),
+                "D": shop_name_form.get("singular", {}).get("D", "магазину"),
+                "V": shop_name_form.get("singular", {}).get("V", "магазин"),
+                "T": shop_name_form.get("singular", {}).get("T", "магазином"),
+                "P": shop_name_form.get("singular", {}).get("P", "магазине")
+            },
+            "plural": {
+                "I": shop_name_form.get("plural", {}).get("I", "магазины"),
+                "R": shop_name_form.get("plural", {}).get("R", "магазинов"),
+                "D": shop_name_form.get("plural", {}).get("D", "магазинам"),
+                "V": shop_name_form.get("plural", {}).get("V", "магазины"),
+                "T": shop_name_form.get("plural", {}).get("T", "магазинами"),
+                "P": shop_name_form.get("plural", {}).get("P", "магазинах")
+            }
         }
 
     def get_show_tabel_graph(self, obj:Network):
@@ -99,6 +121,7 @@ class NetworkSerializer(serializers.ModelSerializer):
             'show_remaking_choice',
             'display_employee_tabs_in_the_schedule',
             'allow_creation_several_wdays_for_one_employee_for_one_date',
+            'shop_name_form',
         ]
 
 class NetworkListSerializer(serializers.Serializer):
@@ -203,7 +226,7 @@ class EmployeeSerializer(BaseNetworkSerializer):
         request = self.context.get('request')
         if request and request.query_params.get('include_employments'):
             self.fields['employments'] = EmploymentSerializer(
-                required=False, many=True, read_only=True, context=self.context)
+                required=False, many=True, read_only=True, context=self.context, source='employments_list')
 
 
 class AuthUserSerializer(UserSerializer):
@@ -304,8 +327,8 @@ class EmploymentSerializer(serializers.ModelSerializer):
     user_id = serializers.IntegerField(required=False, source='employee.user_id')
     employee_id = serializers.IntegerField(required=False)
     function_group_id = serializers.IntegerField(required=False, allow_null=True)
-    work_types = EmploymentWorkTypeSerializer(many=True, read_only=True)
-    worker_constraints = WorkerConstraintSerializer(many=True)
+    work_types = EmploymentWorkTypeSerializer(many=True, read_only=True, source='work_types_list')
+    worker_constraints = WorkerConstraintSerializer(many=True, source='worker_constraints_list')
     username = serializers.CharField(required=False, source='employee.user.username')
     dt_hired = serializers.DateField(required=True)
     dt_fired = serializers.DateField(required=False, default=None)

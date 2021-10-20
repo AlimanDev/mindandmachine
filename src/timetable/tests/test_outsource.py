@@ -441,6 +441,24 @@ class TestOutsource(TestsHelperMixin, APITestCase):
                     'unaccounted_overtime_threshold': 60,
                     'forbid_edit_employments_came_through_integration': True,
                     'show_remaking_choice': False,
+                    'shop_name_form': {
+                        "singular": {
+                            "I": "магазин",
+                            "R": "магазина",
+                            "D": "магазину",
+                            "V": "магазин",
+                            "T": "магазином",
+                            "P": "магазине"
+                        },
+                        "plural": {
+                            "I": "магазины",
+                            "R": "магазинов",
+                            "D": "магазинам",
+                            "V": "магазины",
+                            "T": "магазинами",
+                            "P": "магазинах"
+                        }
+                    }
                 }
             }
         ]

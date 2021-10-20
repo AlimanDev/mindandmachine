@@ -773,6 +773,7 @@ class WorkerDayViewSet(BaseModelViewSet):
         queryset = filterset_class.filter_queryset(
             self.get_queryset().filter(
                 is_vacancy=True,
+                type__is_work_hours=True,
             ).annotate(
                 worker_day_outsource_network_exitst=Exists(worker_day_outsource_network_subq),
             ).filter(
