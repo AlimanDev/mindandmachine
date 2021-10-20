@@ -206,6 +206,9 @@ class WorkerDaySerializer(serializers.ModelSerializer, UnaccountedOvertimeMixin)
                 )
             })
 
+        if not wd_type_obj.is_work_hours:
+            attrs['is_vacancy'] = False
+
         shop_id = attrs.get('shop_id')
         if wd_type_obj.is_dayoff:
             attrs['dttm_work_start'] = None
@@ -267,7 +270,7 @@ class WorkerDaySerializer(serializers.ModelSerializer, UnaccountedOvertimeMixin)
                 raise ValidationError({
                     "employment": self.error_messages['user_mismatch']
                 })
-
+        employee_active_empl = None
         if attrs.get('employee_id'):
             outsourcing_network_qs = list(
                 NetworkConnect.objects.filter(
@@ -306,6 +309,10 @@ class WorkerDaySerializer(serializers.ModelSerializer, UnaccountedOvertimeMixin)
                 ).only('id').first()
                 if closest_plan_approved:
                     attrs['closest_plan_approved_id'] = closest_plan_approved.id
+
+        employment = employee_active_empl or (self.instance.employment if self.instance else None)
+        if employment and wd_type_obj.is_work_hours and employment.shop_id != attrs['shop_id']:
+            attrs['is_vacancy'] = True
 
         outsources_ids = attrs.pop('outsources_ids', []) or []
         if attrs.get('is_outsource'):
