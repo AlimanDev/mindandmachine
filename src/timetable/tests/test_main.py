@@ -3818,6 +3818,7 @@ class TestVacancy(TestsHelperMixin, APITestCase):
             f'/rest_api/worker_day/{vacancy.id}/',
             self.dump_data(
                 {
+                    "employee_id": self.employee2.id,
                     "shop_id": self.shop2.id,
                     "dt": vacancy.dt,
                     "dttm_work_start": datetime.combine(vacancy.dt, time(8, 0, 0)),
