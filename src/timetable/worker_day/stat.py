@@ -21,7 +21,7 @@ from django.utils.functional import cached_property
 
 from src.base.models import Employment, Shop, ProductionDay, SAWHSettings, Network
 from src.forecast.models import PeriodClients
-from src.timetable.models import WorkerDay, ProdCal, Timesheet, WorkerDayType
+from src.timetable.models import WorkerDay, ProdCal, TimesheetItem, WorkerDayType
 
 
 def count_daily_stat(data):
@@ -501,19 +501,20 @@ class WorkersStatsGetter:
 
         if self.network.prev_months_work_hours_source in [Network.FACT_TIMESHEET, Network.MAIN_TIMESHEET]:
             hours_field_name_mapping = {
-                Network.FACT_TIMESHEET: ('fact_timesheet_total_hours', 'fact_timesheet_type'),
-                Network.MAIN_TIMESHEET: ('main_timesheet_total_hours', 'main_timesheet_type'),
+                Network.FACT_TIMESHEET: TimesheetItem.TIMESHEET_TYPE_FACT,
+                Network.MAIN_TIMESHEET: TimesheetItem.TIMESHEET_TYPE_MAIN,
             }
-            hours_field, type_field = hours_field_name_mapping.get(self.network.prev_months_work_hours_source)
+            timesheet_type = hours_field_name_mapping.get(self.network.prev_months_work_hours_source)
 
-            timesheet_prev_months_work_hours = list(Timesheet.objects.filter(
+            timesheet_prev_months_work_hours = list(TimesheetItem.objects.filter(
                 prev_months_q,
+                timesheet_type=timesheet_type,
                 employee_id__in=self.employees_dict.keys(),
-                **{f'{type_field}__is_work_hours': True},
+                day_type__is_work_hours=True,
             ).values(
                 'employee_id',
             ).annotate(
-                prev_months_work_hours=Sum(hours_field),
+                prev_months_work_hours=Sum('day_hours') + Sum('night_hours'),
             ).values_list('employee_id', 'prev_months_work_hours'))
 
             for is_fact_key in ['plan', 'fact']:

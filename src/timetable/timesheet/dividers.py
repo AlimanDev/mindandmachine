@@ -2,20 +2,28 @@ import datetime
 import logging
 
 import pandas as pd
+from django.db.models import Q, Subquery, OuterRef, Sum
 
-from ..models import WorkerDay, Timesheet, WorkerDayType
+from .common import _flatten_fact_timesheet_data, _create_timesheet_items
+from ..models import WorkerDay, TimesheetItem, WorkerDayType
 
 logger = logging.getLogger('calc_timesheets')
 
 
 class BaseTimesheetDivider:
-    def __init__(self, employee, fiscal_sheet_dict, dt_start, dt_end, wd_types_dict=None):
+    def __init__(self, employee, fact_timesheet_data, dt_start, dt_end, wd_types_dict=None):
         self.wd_types_dict = wd_types_dict or WorkerDayType.get_wd_types_dict()
         self.employee = employee
-        self.fiscal_sheet_dict = fiscal_sheet_dict
-        self.fiscal_sheet_list = sorted(list(fiscal_sheet_dict.values()), key=lambda i: i['dt'])
+        self.fiscal_sheet_dict = fact_timesheet_data
+        self.fiscal_sheet_list = sorted(list(fact_timesheet_data.values()), key=lambda i: i['dt'])
         self.dt_start = dt_start
         self.dt_end = dt_end
+
+
+class NahodkaTimesheetDivider(BaseTimesheetDivider):
+    def __init__(self, *args, fact_timesheet_data, **kwargs):
+        fact_timesheet_data = _flatten_fact_timesheet_data(fact_timesheet_data)
+        super(NahodkaTimesheetDivider, self).__init__(*args, fact_timesheet_data=fact_timesheet_data, **kwargs)
 
     def _is_holiday(self, item_data):
         if not item_data:
@@ -42,16 +50,27 @@ class BaseTimesheetDivider:
                 if day != first_dt_weekday_num:
                     dates_before_period.append(dt)
 
-            outside_period_data = {i['dt']: i for i in Timesheet.objects.filter(
+            outside_period_data = {i['dt']: i for i in TimesheetItem.objects.filter(
                 employee=self.employee,
                 dt__in=dates_before_period,
             ).values(
                 'employee_id',
                 'dt',
-                'fact_timesheet_type_id',
-                'fact_timesheet_total_hours',
-                'main_timesheet_type_id',
-                'main_timesheet_total_hours',
+            ).annotate(
+                fact_timesheet_type_id=Subquery(TimesheetItem.objects.filter(
+                    employee_id=OuterRef('employee_id'),
+                    dt=OuterRef('dt'),
+                    timesheet_type=TimesheetItem.TIMESHEET_TYPE_FACT,
+                ).order_by('-day_type__ordering').values('day_type_id')[:1]),
+                fact_timesheet_total_hours=Sum('day_hours', filter=Q(timesheet_type=TimesheetItem.TIMESHEET_TYPE_FACT))
+                    + Sum('night_hours', filter=Q(timesheet_type=TimesheetItem.TIMESHEET_TYPE_FACT)),
+                main_timesheet_type_id=Subquery(TimesheetItem.objects.filter(
+                    employee_id=OuterRef('employee_id'),
+                    dt=OuterRef('dt'),
+                    timesheet_type=TimesheetItem.TIMESHEET_TYPE_MAIN,
+                ).order_by('-day_type__ordering').values('day_type_id')[:1]),
+                main_timesheet_total_hours=Sum('day_hours', filter=Q(timesheet_type=TimesheetItem.TIMESHEET_TYPE_MAIN))
+                    + Sum('night_hours', filter=Q(timesheet_type=TimesheetItem.TIMESHEET_TYPE_MAIN)),
             ).order_by(
                 'dt',
             )}
@@ -157,20 +176,21 @@ class BaseTimesheetDivider:
         if main_timesheet_type_obj and not main_timesheet_type_obj.is_dayoff:
             hours_overflow = data.get('main_timesheet_total_hours') - threshold_hours
             if hours_overflow > 0:
-                logger.debug(f'dt: {data["dt"]} has overflow threshold_hours: {threshold_hours} hours_overflow: {hours_overflow}')
+                logger.debug(
+                    f'dt: {data["dt"]} has overflow threshold_hours: {threshold_hours} hours_overflow: {hours_overflow}')
                 if data['main_timesheet_night_hours']:
                     logger.debug(f'has night hours: {data["main_timesheet_night_hours"]}')
                     if hours_overflow < data['main_timesheet_night_hours']:
                         logger.debug("hours_overflow < data['main_timesheet_night_hours']")
                         logger.debug(f"prev hours: main n: {data['main_timesheet_night_hours']} main t "
-                            f"{data['main_timesheet_total_hours']} add h {data.get('additional_timesheet_hours', 0.0)}")
+                                     f"{data['main_timesheet_total_hours']} add h {data.get('additional_timesheet_hours', 0.0)}")
                         data['main_timesheet_night_hours'] = data['main_timesheet_night_hours'] - hours_overflow
                         data['main_timesheet_total_hours'] = threshold_hours
                         data['additional_timesheet_hours'] = data.get('additional_timesheet_hours',
                                                                       0.0) + hours_overflow
 
                         logger.debug(f"new hours: main n: {data['main_timesheet_night_hours']} main t "
-                            f"{data['main_timesheet_total_hours']} add h {data.get('additional_timesheet_hours', 0.0)}")
+                                     f"{data['main_timesheet_total_hours']} add h {data.get('additional_timesheet_hours', 0.0)}")
                         return hours_overflow
                     else:
                         logger.debug("hours_overflow >= data['main_timesheet_night_hours']")
@@ -303,12 +323,24 @@ class BaseTimesheetDivider:
         self._check_weekly_continuous_holidays()
         self._check_not_more_than_12_hours()
         self._check_overtimes()
+        _create_timesheet_items(
+            timesheet_dict=timesheet_data,
+            timesheet_type_key='main',
+            day_hours_field='main_timesheet_day_hours',
+            night_hours_field='main_timesheet_night_hours',
+            timesheet_type=TimesheetItem.TIMESHEET_TYPE_MAIN,
+            create_timesheet_item_cond_func=lambda i: i.get('main_timesheet_type_id') is not None
+        )
+        _create_timesheet_items(
+            timesheet_dict=timesheet_data,
+            timesheet_type_key='additional',
+            day_hours_field='additional_timesheet_hours',
+            night_hours_field=None,
+            timesheet_type=TimesheetItem.TIMESHEET_TYPE_ADDITIONAL,
+            create_timesheet_item_cond_func=lambda i: i.get('additional_timesheet_hours')
+        )
         logger.info(f'finish fiscal sheet divide')
         return timesheet_data
-
-
-class NahodkaTimesheetDivider(BaseTimesheetDivider):
-    pass
 
 
 FISCAL_SHEET_DIVIDERS_MAPPING = {

@@ -841,8 +841,8 @@ msgid "Planned timetable"
 msgstr "Расписание"
 
 #: src/timetable/models.py:1357
-msgid "Attendance records"
-msgstr "Отметки о приходе/уходе"
+msgid "Actual timetable"
+msgstr "Фактический график"
 
 #: src/timetable/models.py:1358
 msgid "Manual changes"

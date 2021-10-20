@@ -357,3 +357,22 @@ class GroupWorkerDayPermissionAdmin(ImportMixin, ExportActionMixin, BaseNotWrapR
 class TimesheetItemAdmin(admin.ModelAdmin):
     save_as = True
     raw_id_fields = ('shop', 'position', 'work_type_name', 'employee')
+    list_filter = (
+        ('shop', CustomRelatedDropdownFilter),
+        ('position', CustomRelatedDropdownFilter),
+        ('work_type_name', CustomRelatedDropdownFilter),
+        ('employee', CustomRelatedDropdownFilter),
+        'timesheet_type',
+        'day_type',
+    )
+    list_display = (
+        'id',
+        'timesheet_type',
+        'employee',
+        'shop',
+        'position',
+        'work_type_name',
+        'day_type',
+        'day_hours',
+        'night_hours',
+    )

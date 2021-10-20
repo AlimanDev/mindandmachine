@@ -123,8 +123,7 @@ class TestTimesheetApiView(TestTimesheetMixin, APITestCase):
                 employee=self.employee_worker,
                 dt=dt,
                 day_type_id=WorkerDay.TYPE_WORKDAY,
-                hours_type=TimesheetItem.HOURS_TYPE_DAY,
-                hours=8,
+                day_hours=8,
             )
             TimesheetItem.objects.create(
                 timesheet_type=TimesheetItem.TIMESHEET_TYPE_MAIN,
@@ -133,8 +132,7 @@ class TestTimesheetApiView(TestTimesheetMixin, APITestCase):
                 employee=self.employee_worker,
                 dt=dt,
                 day_type_id=WorkerDay.TYPE_WORKDAY,
-                hours_type=TimesheetItem.HOURS_TYPE_DAY,
-                hours=8,
+                day_hours=8,
             )
         TimesheetItem.objects.create(
             timesheet_type=TimesheetItem.TIMESHEET_TYPE_FACT,
@@ -143,8 +141,7 @@ class TestTimesheetApiView(TestTimesheetMixin, APITestCase):
             employee=self.employee_worker,
             dt='2021-01-01',
             day_type_id=WorkerDay.TYPE_QUALIFICATION,
-            hours_type=TimesheetItem.HOURS_TYPE_DAY,
-            hours=4,
+            day_hours=4,
         )
         TimesheetItem.objects.create(
             timesheet_type=TimesheetItem.TIMESHEET_TYPE_FACT,
@@ -153,9 +150,8 @@ class TestTimesheetApiView(TestTimesheetMixin, APITestCase):
             employee=self.employee_worker,
             dt='2021-01-01',
             day_type_id=WorkerDay.TYPE_WORKDAY,
-            hours_type=TimesheetItem.HOURS_TYPE_NIGHT,
-            hours=4,
+            night_hours=4,
         )
 
         resp = self.client.get(self.get_url('Timesheet-lines'))
-        self.print_resp(resp)
+        self.assertEqual(resp.status_code, 200)

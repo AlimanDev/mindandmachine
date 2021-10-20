@@ -8,8 +8,9 @@ from django.db import transaction
 from django.utils import timezone
 
 from src.base.models import Employee
+from .common import _create_timesheet_items
 from .dividers import FISCAL_SHEET_DIVIDERS_MAPPING
-from ..models import WorkerDay, Timesheet, WorkerDayType
+from ..models import WorkerDay, TimesheetItem, WorkerDayType
 
 logger = logging.getLogger('calc_timesheets')
 
@@ -66,49 +67,17 @@ class TimesheetCalculator:
             'work_hours',
             'dttm_work_start_tabel',
             'dttm_work_end_tabel',
-        ).order_by('employee_id', 'dt', 'dttm_work_start_tabel', 'dttm_work_end_tabel')
+        ).prefetch_related(
+            'work_types',
+        ).order_by(
+            'employee_id',
+            'dt',
+            'dttm_work_start_tabel',
+            'dttm_work_end_tabel',
+        )
 
     def _get_empl_key(self, employee_id, dt):
         return dt
-
-    def _flatten_fact_timesheet_data(self, fact_timesheet_data):
-        new_fact_timesheet_data = {}
-        for empl_key, wd_data_list in fact_timesheet_data.items():
-            if len(wd_data_list) == 1:
-                new_fact_timesheet_data[empl_key] = wd_data_list[0]
-            else:
-                new_wd_data = new_fact_timesheet_data.setdefault(empl_key, {})
-
-                # т.к. считаем, что тип в рамках 1 дня у 1 сотрудника не может различаться,
-                # то берем эти данные из первого workerday
-                first_wd_data = wd_data_list[0]
-                new_wd_data['employee_id'] = first_wd_data['employee_id']
-                new_wd_data['dt'] = first_wd_data['dt']
-                new_wd_data['shop_id'] = first_wd_data['shop_id']
-                new_wd_data['fact_timesheet_type_id'] = first_wd_data['fact_timesheet_type_id']
-                new_wd_data['fact_timesheet_source'] = first_wd_data['fact_timesheet_source']
-
-                # благодаря сортировке по времени можем брать временя начала из первого wd, а время конца из последнего
-                if 'fact_timesheet_dttm_work_start' in first_wd_data and first_wd_data['fact_timesheet_dttm_work_start']:
-                    new_wd_data['fact_timesheet_dttm_work_start'] = first_wd_data['fact_timesheet_dttm_work_start']
-
-                last_wd_data = wd_data_list[-1]
-                if 'fact_timesheet_dttm_work_end' in last_wd_data and last_wd_data['fact_timesheet_dttm_work_end']:
-                    new_wd_data['fact_timesheet_dttm_work_end'] = last_wd_data['fact_timesheet_dttm_work_end']
-
-                # часы для всех wd -- суммируем
-                for wd_data in wd_data_list:
-                    if 'fact_timesheet_total_hours' in wd_data and wd_data['fact_timesheet_total_hours']:
-                        new_wd_data['fact_timesheet_total_hours'] = new_wd_data.get('fact_timesheet_total_hours', 0) + \
-                                                                    wd_data['fact_timesheet_total_hours']
-                    if 'fact_timesheet_day_hours' in wd_data and wd_data['fact_timesheet_day_hours']:
-                        new_wd_data['fact_timesheet_day_hours'] = new_wd_data.get('fact_timesheet_day_hours', 0) + \
-                                                                  wd_data['fact_timesheet_day_hours']
-                    if 'fact_timesheet_night_hours' in wd_data and wd_data['fact_timesheet_night_hours']:
-                        new_wd_data['fact_timesheet_night_hours'] = new_wd_data.get('fact_timesheet_night_hours', 0) + \
-                                                                    wd_data['fact_timesheet_night_hours']
-
-        return new_fact_timesheet_data
 
     def _get_fact_timesheet_data(self, dt_start, dt_end):
         wdays_qs = self._get_timesheet_wdays_qs(self.employee, dt_start, dt_end)
@@ -117,9 +86,13 @@ class TimesheetCalculator:
             wd_dict = {
                 'employee_id': self.employee.id,
                 'dt': worker_day.dt,
-                'shop_id': worker_day.shop_id,
+                'shop_id': worker_day.shop_id if not worker_day.type.is_dayoff else None,
+                # TODO: замена типа работ на должность
+                'position_id': worker_day.employment.position_id if not worker_day.type.is_dayoff else None,
+                # TODO: поддержка нескольких типов работ?
+                'work_type_name_id': worker_day.work_types.first().work_type_name_id if worker_day.type_id == WorkerDay.TYPE_WORKDAY else None,
                 'fact_timesheet_type_id': worker_day.type_id,
-                'fact_timesheet_source': Timesheet.SOURCE_TYPE_FACT if worker_day.is_fact else Timesheet.SOURCE_TYPE_PLAN,
+                'fact_timesheet_source': TimesheetItem.SOURCE_TYPE_FACT if worker_day.is_fact else TimesheetItem.SOURCE_TYPE_PLAN,
             }
             if not worker_day.type.is_dayoff:
                 total_hours, day_hours, night_hours = worker_day.calc_day_and_night_work_hours()
@@ -141,6 +114,8 @@ class TimesheetCalculator:
         ).select_related(
             'employee__user__network',
             'shop__network',
+        ).prefetch_related(
+            'work_types',
         )
         plan_wdays_dict = {}
         for wd in plan_wdays_qs:
@@ -161,7 +136,7 @@ class TimesheetCalculator:
                     'dt': dt,
                     'shop_id': None,
                     'fact_timesheet_type_id': WorkerDay.TYPE_HOLIDAY,
-                    'fact_timesheet_source': Timesheet.SOURCE_TYPE_SYSTEM,
+                    'fact_timesheet_source': TimesheetItem.SOURCE_TYPE_SYSTEM,
                 }
                 fact_timesheet_dict.setdefault(empl_dt_key, []).append(d)
                 continue
@@ -175,8 +150,12 @@ class TimesheetCalculator:
                         'employee_id': self.employee.id,
                         'dt': dt,
                         'shop_id': None if day_in_past else plan_wd.shop_id,
+                        'position_id': plan_wd.employment.position_id if (not day_in_past and not plan_wd.is_dayoff) else None,
+                        # TODO: замена типа работ на должность
+                        'work_type_name_id': plan_wd.work_types.first().work_type_name_id if (not day_in_past and plan_wd.type_id == WorkerDay.TYPE_WORKDAY) else None,
+                        # TODO: поддержка нескольких типов работ?
                         'fact_timesheet_type_id': WorkerDay.TYPE_ABSENSE if day_in_past else plan_wd.type_id,
-                        'fact_timesheet_source': Timesheet.SOURCE_TYPE_SYSTEM if day_in_past else Timesheet.SOURCE_TYPE_PLAN,
+                        'fact_timesheet_source': TimesheetItem.SOURCE_TYPE_SYSTEM if day_in_past else TimesheetItem.SOURCE_TYPE_PLAN,
                     }
                     if not day_in_past:
                         total_hours, day_hours, night_hours = plan_wd.calc_day_and_night_work_hours()
@@ -191,29 +170,37 @@ class TimesheetCalculator:
                     if day_in_past:
                         break
 
-        return self._flatten_fact_timesheet_data(fact_timesheet_dict)
+        return fact_timesheet_dict
 
     def _calc(self, dt_start, dt_end):
         logger.info(f'start receiving fact timesheet')
-        fiscal_sheet_dict = self._get_fact_timesheet_data(dt_start, dt_end)
-        logger.info(f'fact timesheet received')
-        if settings.FISCAL_SHEET_DIVIDER_ALIAS:
-            fiscal_sheet_divider_cls = FISCAL_SHEET_DIVIDERS_MAPPING.get(settings.FISCAL_SHEET_DIVIDER_ALIAS)
-            if fiscal_sheet_divider_cls:
-                fiscal_sheet_dict = fiscal_sheet_divider_cls(
-                    employee=self.employee,
-                    fiscal_sheet_dict=fiscal_sheet_dict,
-                    dt_start=dt_start, dt_end=dt_end,
-                    wd_types_dict=self.wd_types_dict,
-                ).divide()
+        fact_timesheet_data = self._get_fact_timesheet_data(dt_start, dt_end)
 
         with transaction.atomic():
-            Timesheet.objects.filter(
+            TimesheetItem.objects.filter(
                 employee=self.employee,
                 dt__gte=dt_start,
                 dt__lte=dt_end,
             ).delete()
-            Timesheet.objects.bulk_create(Timesheet(**d) for d in fiscal_sheet_dict.values())
+            _create_timesheet_items(
+                timesheet_dict=fact_timesheet_data,
+                timesheet_type_key='fact',
+                day_hours_field='fact_timesheet_day_hours',
+                night_hours_field='fact_timesheet_night_hours',
+                timesheet_type=TimesheetItem.TIMESHEET_TYPE_FACT,
+                create_timesheet_item_cond_func=lambda i: i.get('fact_timesheet_type_id') is not None
+            )
+
+            logger.info(f'fact timesheet received')
+            if settings.FISCAL_SHEET_DIVIDER_ALIAS:
+                fiscal_sheet_divider_cls = FISCAL_SHEET_DIVIDERS_MAPPING.get(settings.FISCAL_SHEET_DIVIDER_ALIAS)
+                if fiscal_sheet_divider_cls:
+                    fiscal_sheet_divider_cls(
+                        employee=self.employee,
+                        fact_timesheet_data=fact_timesheet_data,
+                        dt_start=dt_start, dt_end=dt_end,
+                        wd_types_dict=self.wd_types_dict,
+                    ).divide()
 
     def calc(self):
         logger.info(

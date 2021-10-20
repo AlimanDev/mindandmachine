@@ -38,6 +38,7 @@ from src.timetable.models import (
     ShopMonthStat,
     WorkerDayPermission,
     WorkerDayType,
+    TimesheetItem,
 )
 from src.timetable.timesheet.tasks import calc_timesheets
 from src.timetable.vacancy.utils import cancel_vacancies, cancel_vacancy, confirm_vacancy, notify_vacancy_created
@@ -1417,20 +1418,15 @@ class WorkerDayViewSet(BaseModelViewSet):
         dt_from = serializer.validated_data.get('dt_from')
         dt_to = serializer.validated_data.get('dt_to')
         convert_to = serializer.validated_data.get('convert_to')
-        type = serializer.validated_data.get('tabel_type')
+        timesheet_type = serializer.validated_data.get('tabel_type')
         tabel_generator_cls = get_tabel_generator_cls(tabel_format=shop.network.download_tabel_template)
-        tabel_generator = tabel_generator_cls(shop, dt_from, dt_to, type=type)
+        tabel_generator = tabel_generator_cls(shop, dt_from, dt_to, timesheet_type=timesheet_type)
         response = HttpResponse(
             tabel_generator.generate(convert_to=shop.network.convert_tabel_to or convert_to),
             content_type='application/octet-stream',
         )
-        types = {
-            DownloadTabelSerializer.TYPE_FACT: _('Fact'),
-            DownloadTabelSerializer.TYPE_MAIN: _('Main'),
-            DownloadTabelSerializer.TYPE_ADDITIONAL: _('Additional'),
-        }
         filename = _('{}_timesheet_for_shop_{}_from_{}.{}').format(
-            types.get(type, ''),
+            dict(TimesheetItem.TIMESHEET_TYPE_CHOICES).get(timesheet_type, ''),
             shop.code,
             timezone.now().strftime("%Y-%m-%d"),
             shop.network.convert_tabel_to or convert_to,

@@ -1472,6 +1472,7 @@ class FunctionGroup(AbstractModel):
         ('Timesheet_stats', 'Статистика табеля (Получить) (timesheet/stats/)'),
         ('Timesheet_recalc', 'Запустить пересчет табеля (Создать) (timesheet/recalc/)'),
         ('Timesheet_lines', 'Табель построчно (Получить) (timesheet/lines/)'),
+        ('Timesheet_items', 'Сырые данные табеля (Получить) (timesheet/items/)'),
         ('User', 'Пользователь (user)'),
         ('User_change_password', 'Сменить пароль пользователю (Создать) (auth/password/change/)'),
         ('User_delete_biometrics', 'Удалить биометрию пользователя (Создать) (user/delete_biometrics/)'),

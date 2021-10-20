@@ -1345,31 +1345,15 @@ class WorkerDay(AbstractModel):
             )
 
 
-class TimesheetItem(AbstractModel):  # TODO: датамиграция из Timesheet, удаление Timesheet, переименование TimesheetItem в Timesheet
-    """
-    Табель учета рабочего времени
-    """
-
-    HOURS_TYPE_DAY = 'D'
-    HOURS_TYPE_NIGHT = 'N'
-    # HOURS_TYPE_CELEBRATION = 'C'
-    # HOURS_TYPE_OVERTIME = 'O'
-
-    HOURS_TYPE_CHOICES = (
-        (HOURS_TYPE_DAY, 'Явился и трудился в дневное время'),
-        (HOURS_TYPE_NIGHT, 'Работал в ночное время'),
-        # (HOURS_TYPE_CELEBRATION, 'Вышел в праздник или выходной'),
-        # (HOURS_TYPE_OVERTIME, 'Трудился сверхурочно'),
-    )
-
+class TimesheetItem(AbstractModel):
     TIMESHEET_TYPE_FACT = 'F'
     TIMESHEET_TYPE_MAIN = 'M'
     TIMESHEET_TYPE_ADDITIONAL = 'A'
 
     TIMESHEET_TYPE_CHOICES = (
-        (TIMESHEET_TYPE_FACT, 'Фактический'),  # все оплачиваемые часы
-        (TIMESHEET_TYPE_MAIN, 'Основной'),  # рабочие часы, которые идут в осн. табель
-        (TIMESHEET_TYPE_ADDITIONAL, 'Дополнительный'),  # рабочие часы, которые идут в доп. табель
+        (TIMESHEET_TYPE_FACT, _('Fact')),  # все оплачиваемые часы
+        (TIMESHEET_TYPE_MAIN, _('Main')),  # рабочие часы, которые идут в осн. табель
+        (TIMESHEET_TYPE_ADDITIONAL, _('Additional')),  # рабочие часы, которые идут в доп. табель
     )
 
     SOURCE_TYPE_PLAN = 'P'
@@ -1379,7 +1363,7 @@ class TimesheetItem(AbstractModel):  # TODO: датамиграция из Times
 
     SOURCE_TYPES = (
         (SOURCE_TYPE_PLAN, _('Planned timetable')),  # плановый график
-        (SOURCE_TYPE_FACT, _('Attendance records')),  # отметки
+        (SOURCE_TYPE_FACT, _('Actual timetable')),  # фактический график
         (SOURCE_TYPE_MANUAL, _('Manual changes')),  # ручные корректировки (заготовка, пока нет такого)
         (SOURCE_TYPE_SYSTEM, _('Determined by the system')),  # определены системой
     )
@@ -1387,22 +1371,25 @@ class TimesheetItem(AbstractModel):  # TODO: датамиграция из Times
     timesheet_type = models.CharField(
         max_length=32, choices=TIMESHEET_TYPE_CHOICES, verbose_name='Тип табеля')
     shop = models.ForeignKey(
-        'base.Shop', on_delete=models.PROTECT, null=True, blank=True, verbose_name='Поздразделение выхода сотрудника')
+        'base.Shop', on_delete=models.PROTECT, null=True, blank=True, verbose_name='Поздразделение выхода сотрудника',
+        help_text='Для выходных магазин берется из трудоустройства',
+    )
     position = models.ForeignKey(
-        'base.WorkerPosition', on_delete=models.PROTECT, null=True, blank=True, verbose_name='Должность')
+        'base.WorkerPosition', on_delete=models.PROTECT, null=True, blank=True, verbose_name='Должность',
+        help_text='Определяется на основе должности трудоустройства, либо через сопоставление с типами работ, если включена настройка ')  # TODO: добавить название настройки
     work_type_name = models.ForeignKey(
-        'timetable.WorkTypeName', on_delete=models.PROTECT, null=True, blank=True, verbose_name='Тип работ')
+        'timetable.WorkTypeName', on_delete=models.PROTECT, null=True, blank=True, verbose_name='Тип работ',
+        help_text='Определяется на основе первого типа работ в рабочем дне',  # TODO: поддержка нескольких типов работ для 1 раб. дня?
+    )
     employee = models.ForeignKey('base.Employee', on_delete=models.CASCADE, verbose_name='Сотрудник')
     dt = models.DateField()
     day_type = models.ForeignKey(
-        'timetable.WorkerDayType', on_delete=models.PROTECT, verbose_name='Тип дня'
+        'timetable.WorkerDayType', on_delete=models.PROTECT, verbose_name='Тип дня',
     )
-    hours_type = models.CharField(
-        max_length=32, choices=HOURS_TYPE_CHOICES,
-        null=True, blank=True, verbose_name='Тип времени',
-        help_text='Актуально для рабочих типов дней',
-    )
-    hours = models.DecimalField(max_digits=4, decimal_places=2, default=Decimal("0.00"))
+    dttm_work_start = models.DateTimeField(null=True, blank=True)
+    dttm_work_end = models.DateTimeField(null=True, blank=True)
+    day_hours = models.DecimalField(max_digits=4, decimal_places=2, default=Decimal("0.00"))
+    night_hours = models.DecimalField(max_digits=4, decimal_places=2, default=Decimal("0.00"))
     source = models.CharField(
         choices=SOURCE_TYPES, max_length=12, blank=True,
         verbose_name='Источник данных',
@@ -1411,56 +1398,6 @@ class TimesheetItem(AbstractModel):  # TODO: датамиграция из Times
     class Meta:
         verbose_name = 'Запись в табеле учета рабочего времени'
         verbose_name_plural = 'Записи в табеле учета рабочего времени'
-
-
-class Timesheet(AbstractModel):
-    """
-    Табель учета рабочего времени (фактический + фискальный -- разделение на основной и дополнительный)
-    """
-    SOURCE_TYPE_PLAN = 'plan'
-    SOURCE_TYPE_FACT = 'fact'
-    SOURCE_TYPE_MANUAL = 'manual'
-    SOURCE_TYPE_SYSTEM = 'system'
-
-    SOURCE_TYPES = (
-        (SOURCE_TYPE_PLAN, _('Planned timetable')),  # плановый график
-        (SOURCE_TYPE_FACT, _('Attendance records')),  # отметки
-        (SOURCE_TYPE_MANUAL, _('Manual changes')),  # ручные корректировки (заготовка, пока нет такого)
-        (SOURCE_TYPE_SYSTEM, _('Determined by the system')),  # определены системой
-    )
-
-    employee = models.ForeignKey('base.Employee', on_delete=models.CASCADE, verbose_name='Сотрудник')
-    dt = models.DateField(verbose_name='Дата')
-    shop = models.ForeignKey(
-        'base.Shop', on_delete=models.CASCADE, null=True, blank=True, verbose_name='Поздразделение')  # TODO: нужен?
-    fact_timesheet_source = models.CharField(
-        choices=SOURCE_TYPES, max_length=12, blank=True,
-        verbose_name='Источник данных для фактического табеля',
-    )
-    fact_timesheet_type = models.ForeignKey(
-        'timetable.WorkerDayType', on_delete=models.PROTECT, null=True, blank=True, related_name='fact_timesheet',
-    )
-    fact_timesheet_dttm_work_start = models.DateTimeField(null=True, blank=True)
-    fact_timesheet_dttm_work_end = models.DateTimeField(null=True, blank=True)
-    # TODO: добавить или высчитывать через (fact_timesheet_dttm_work_end - fact_timesheet_dttm_work_start) - fact_timesheet_total_hours ?
-    #fact_timesheet_break_time_minutes = models.IntegerField(null=True, blank=True)
-    fact_timesheet_total_hours = models.DecimalField(max_digits=4, decimal_places=2, null=True, blank=True)
-    fact_timesheet_day_hours = models.DecimalField(max_digits=4, decimal_places=2, null=True, blank=True)
-    fact_timesheet_night_hours = models.DecimalField(max_digits=4, decimal_places=2, null=True, blank=True)
-    main_timesheet_type = models.ForeignKey(
-        'timetable.WorkerDayType', on_delete=models.PROTECT, null=True, blank=True, related_name='main_timesheet',
-    )
-    main_timesheet_total_hours = models.DecimalField(max_digits=4, decimal_places=2, null=True, blank=True)
-    main_timesheet_day_hours = models.DecimalField(max_digits=4, decimal_places=2, null=True, blank=True)
-    main_timesheet_night_hours = models.DecimalField(max_digits=4, decimal_places=2, null=True, blank=True)
-    additional_timesheet_hours = models.DecimalField(max_digits=4, decimal_places=2, null=True, blank=True)
-
-    class Meta:
-        verbose_name = 'Запись в табеле'
-        verbose_name_plural = 'Записи в табеле'
-        unique_together = (
-            ('dt', 'employee'),
-        )
 
 
 class WorkerDayCashboxDetailsManager(models.Manager):
