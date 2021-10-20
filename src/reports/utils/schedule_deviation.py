@@ -20,7 +20,7 @@ def schedule_deviation_report(dt_from, dt_to, *args, title=None, in_memory=False
     if not title:
         title = f'Schedule_deviation_{dt_from}-{dt_to}.xlsx'
 
-    data = PlanAndFactHours.objects.filter(Q(fact_work_hours__gt=0) | Q(plan_work_hours__gt=0),*args, dt__gte=dt_from, dt__lte=dt_to, **kwargs)
+    data = PlanAndFactHours.objects.filter(Q(fact_work_hours__gt=0) | Q(plan_work_hours__gt=0), dt__gte=dt_from, dt__lte=dt_to).filter(*args, **kwargs)
 
     if shop_ids:
         data = data.filter(shop_id__in=shop_ids)

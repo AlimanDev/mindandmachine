@@ -12,7 +12,7 @@ class ValidateMixin:
         return data
 
 
-class PivotTabelSerializer(serializers.Serializer, ValidateMixin):
+class ReportFilterSerializer(serializers.Serializer, ValidateMixin):
     shop_ids = serializers.CharField(required=False)
     employee_ids = serializers.CharField(required=False)
     user_ids = serializers.CharField(required=False)
@@ -33,17 +33,4 @@ class PivotTabelSerializer(serializers.Serializer, ValidateMixin):
         attrs = self._validate_bool_value(attrs, 'is_vacancy')
         attrs = self._validate_bool_value(attrs, 'is_outsource')
 
-        return attrs
-
-class ScheduleDevationSerializer(serializers.Serializer, ValidateMixin):
-    shop_ids = serializers.CharField(required=False)
-    employee_ids = serializers.CharField(required=False)
-    dt_from = serializers.DateField()
-    dt_to = serializers.DateField()
-
-    def validate(self, attrs):
-        attrs = super().validate(attrs)
-
-        attrs = self._validate_ids_value(attrs, 'shop_ids')
-        attrs = self._validate_ids_value(attrs, 'employee_ids')
         return attrs
