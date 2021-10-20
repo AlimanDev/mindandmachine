@@ -226,7 +226,7 @@ class EmployeeSerializer(BaseNetworkSerializer):
         request = self.context.get('request')
         if request and request.query_params.get('include_employments'):
             self.fields['employments'] = EmploymentSerializer(
-                required=False, many=True, read_only=True, context=self.context)
+                required=False, many=True, read_only=True, context=self.context, source='employments_list')
 
 
 class AuthUserSerializer(UserSerializer):
@@ -327,8 +327,8 @@ class EmploymentSerializer(serializers.ModelSerializer):
     user_id = serializers.IntegerField(required=False, source='employee.user_id')
     employee_id = serializers.IntegerField(required=False)
     function_group_id = serializers.IntegerField(required=False, allow_null=True)
-    work_types = EmploymentWorkTypeSerializer(many=True, read_only=True)
-    worker_constraints = WorkerConstraintSerializer(many=True)
+    work_types = EmploymentWorkTypeSerializer(many=True, read_only=True, source='work_types_list')
+    worker_constraints = WorkerConstraintSerializer(many=True, source='worker_constraints_list')
     username = serializers.CharField(required=False, source='employee.user.username')
     dt_hired = serializers.DateField(required=True)
     dt_fired = serializers.DateField(required=False, default=None)
