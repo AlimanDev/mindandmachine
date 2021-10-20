@@ -34,7 +34,7 @@ def vacancies_create_and_cancel_for_shop(shop_id):
     """
 
     for work_type in WorkType.objects.qos_filter_active(datetime.date.today(), datetime.date.today(), shop_id=shop_id):
-        cancel_vacancies(shop_id, work_type.id)
+        cancel_vacancies(shop_id, work_type.id, approved=True)
         create_vacancies_and_notify(shop_id, work_type.id)
 
 
