@@ -20,7 +20,7 @@ def schedule_deviation_report(dt_from, dt_to, *args, title=None, in_memory=False
     if not title:
         title = f'Schedule_deviation_{dt_from}-{dt_to}.xlsx'
 
-    data = PlanAndFactHours.objects.filter(Q(fact_work_hours__gt=0) | Q(plan_work_hours__gt=0),*args, dt__gte=dt_from, dt__lte=dt_to, **kwargs)
+    data = PlanAndFactHours.objects.filter(Q(fact_work_hours__gt=0) | Q(plan_work_hours__gt=0), dt__gte=dt_from, dt__lte=dt_to).filter(*args, **kwargs)
 
     if shop_ids:
         data = data.filter(shop_id__in=shop_ids)
@@ -78,7 +78,7 @@ def schedule_deviation_report(dt_from, dt_to, *args, title=None, in_memory=False
     worksheet.write_string(1, 2, '"Отчет по отклонениям от планового графика"')
     worksheet.write_string(3, 1, 'Период анализа:')
     worksheet.write_string(3, 2, f'(от): {dt_from.strftime("%d.%m.%Y")}')
-    worksheet.write_string(3, 3, f'(до): {dt_from.strftime("%d.%m.%Y")}')
+    worksheet.write_string(3, 3, f'(до): {dt_to.strftime("%d.%m.%Y")}')
     worksheet.write_string(5, 1, 'Объект:')
     worksheet.write_string(5, 2, shop_object)
     worksheet.write_string(7, 1, 'Данные о формировании отчета:')
