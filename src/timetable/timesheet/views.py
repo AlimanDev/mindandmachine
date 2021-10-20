@@ -7,6 +7,7 @@ from rest_framework.response import Response
 
 from src.base.models import (
     Employment,
+    NetworkConnect,
     Shop,
 )
 from src.base.permissions import Permission
@@ -33,8 +34,13 @@ class TimesheetViewSet(BaseModelViewSet):
         return TimesheetItemSerializer
 
     def get_queryset(self):
+        allowed_networks = list(NetworkConnect.objects.filter(
+            Q(allow_assign_employements_from_outsource=True) |
+            Q(allow_choose_shop_from_client_for_employement=True),
+            client_id=self.request.user.network_id,
+        ).values_list('outsourcing_id', flat=True)) + [self.request.user.network_id]
         qs = TimesheetItem.objects.filter(
-            employee__user__network_id=self.request.user.network_id,
+            employee__user__network_id__in=allowed_networks,
         )
         if self.request.query_params.get('by_code'):
             qs = qs.select_related(

@@ -10,6 +10,7 @@ URV_STAT_V2 = 'urv_stat_v2'
 UNACCOUNTED_OVERTIME = 'unaccounted_overtime'
 OVERTIMES_UNDERTIMES = 'overtimes_undertimes'
 PIVOT_TABEL = 'pivot_tabel'
+SCHEDULE_DEVATION = 'schedule_devation'
 
 
 class DatesReportMixin:
@@ -104,3 +105,13 @@ class PivotTabelReport(BaseRegisteredReport, DatesReportMixin):
             'file': pt.get_pivot_file(dt__gte=dt_from, dt__lte=dt_to, shop__network_id=self.network_id, **shop_filter),
             'type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         }
+
+class ScheduleDevationReport(BaseRegisteredReport, DatesReportMixin):
+    name = 'Отчет по отклонениям от планового графика'
+    code = SCHEDULE_DEVATION
+
+    def get_file(self):
+        from src.reports.utils.schedule_deviation import schedule_deviation_report
+        dt_from, dt_to = self.get_dates(self.context)
+        title = f'Scedule_deviation_{dt_from}-{dt_to}.xlsx'
+        return schedule_deviation_report(dt_from, dt_to, title, in_memory=True, shop_ids=self.context.get('shop_ids'))

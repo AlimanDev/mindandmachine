@@ -92,6 +92,10 @@ class Network(AbstractActiveModel):
         verbose_name=_('Allowed interval for late_arrival'), default=datetime.timedelta(seconds=0))
     allowed_interval_for_early_departure = models.DurationField(
         verbose_name=_('Allowed interval for early departure'), default=datetime.timedelta(seconds=0))
+    allowed_interval_for_early_arrival = models.DurationField(
+        verbose_name=_('Allowed interval for early arrival'), default=datetime.timedelta(seconds=0))
+    allowed_interval_for_late_departure = models.DurationField(
+        verbose_name=_('Allowed interval for late departure'), default=datetime.timedelta(seconds=0))
     allow_workers_confirm_outsource_vacancy = models.BooleanField(
         verbose_name=_('Allow workers confirm outsource vacancy'), default=False)
     okpo = models.CharField(blank=True, null=True, max_length=15, verbose_name=_('OKPO code'))
@@ -1461,6 +1465,7 @@ class FunctionGroup(AbstractModel):
         ('PeriodClients_download', 'Скачать нагрузку (Получить) (timeserie_value/download/)'),
         ('Receipt', 'Чек (receipt)'),
         ('Reports_pivot_tabel', 'Скачать сводный табель (Получить) (report/pivot_tabel/)'),
+        ('Reports_schedule_deviation', 'Скачать отчет по отклонениям от планового графика (Получить) (report/schedule_deviation/)'),
         ('Group', 'Группа доступа (group)'),
         ('Shop', 'Отдел (department)'),
         ('Shop_stat', 'Статистика по отделам (Получить) (department/stat/)'),
