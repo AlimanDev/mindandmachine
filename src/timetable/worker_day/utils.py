@@ -1,6 +1,6 @@
 import datetime
 import json
-from collections import OrderedDict
+
 from collections import OrderedDict
 
 from django.conf import settings
@@ -33,7 +33,7 @@ def exchange(data, error_messages):
         employment = wd_target.employment
         if (wd_source.type_id == WorkerDay.TYPE_WORKDAY and employment is None):
             employment = Employment.objects.get_active_empl_by_priority(
-                network_id=wd_source.employee.network_id, employee_id=wd_target.employee_id,  # TODO: тест
+                network_id=wd_source.employee.user.network_id, employee_id=wd_target.employee_id,  # TODO: тест
                 dt=wd_source.dt,
                 priority_shop_id=wd_source.shop_id,
             ).select_related(
