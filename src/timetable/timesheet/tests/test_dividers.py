@@ -187,7 +187,7 @@ class TestNahodkaDivider(TestTimesheetMixin, TestCase):
             for dt in pd.date_range(date(2021, 6, date_range[0]), date(2021, 6, date_range[1])).date:
                 WorkerDayFactory(
                     is_approved=True,
-                    is_fact=True,
+                    is_fact=False,
                     shop=self.shop,
                     employment=self.employment_worker,
                     employee=self.employee_worker,
@@ -198,3 +198,19 @@ class TestNahodkaDivider(TestTimesheetMixin, TestCase):
         self._calc_timesheets()
         timesheet = Timesheet.objects.get(employee=self.employee_worker, dt=date(2021, 6, 1))
         self.assertEqual(timesheet.main_timesheet_type_id, WorkerDay.TYPE_VACATION)
+
+    def test_calc_timesheet_with_start_time_only(self):
+        WorkerDay.objects.all().delete()
+        WorkerDayFactory(
+            is_approved=True,
+            is_fact=True,
+            shop=self.shop,
+            employment=self.employment_worker,
+            employee=self.employee_worker,
+            dttm_work_start=datetime(2021, 6, 1, 9, 45),
+            dttm_work_end=None,
+            dt=date(2021, 6, 1),
+            type_id=WorkerDay.TYPE_WORKDAY,
+        )
+        self._calc_timesheets(reraise_exc=True)
+        self.assertEqual(Timesheet.objects.filter(fact_timesheet_type_id=WorkerDay.TYPE_WORKDAY).count(), 0)
