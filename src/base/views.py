@@ -99,7 +99,7 @@ class EmploymentViewSet(UpdateorCreateViewSet):
             Q(employee__user__network_id=self.request.user.network_id), # чтобы можно было аутсорсу редактировать трудоустройтсва своих сотрудников
         ).order_by('-dt_hired')
         if self.action in ['list', 'retrieve']:
-            qs = qs.select_related('employee', 'employee__user', 'shop').prefetch_related('work_types', 'worker_constraints')
+            qs = qs.select_related('position', 'employee', 'employee__user', 'shop').prefetch_related(Prefetch('work_types', to_attr='work_types_list'), Prefetch('worker_constraints', to_attr='worker_constraints_list'))
         return qs
 
     def get_serializer_class(self):
@@ -241,12 +241,17 @@ class EmployeeViewSet(UpdateorCreateViewSet):
         )
 
         if self.request.query_params.get('include_employments'):
-            queryset = Employment.objects.all()
+            queryset = Employment.objects.all().prefetch_related(Prefetch('work_types', to_attr='work_types_list')).select_related(
+                'position',
+                'shop',
+                'employee',
+                'employee__user',
+            )
             if self.request.query_params.get('shop_network__in'):
                 queryset = queryset.filter(shop__network_id__in=self.request.query_params.get('shop_network__in').split(','))
             if self.request.query_params.get('show_constraints'):
-                queryset = queryset.prefetch_related('worker_constraints')
-            qs = qs.prefetch_related(Prefetch('employments', queryset=queryset))
+                queryset = queryset.prefetch_related(Prefetch('worker_constraints', to_attr='worker_constraints_list'))
+            qs = qs.prefetch_related(Prefetch('employments', queryset=queryset, to_attr='employments_list'))
 
         return qs.distinct()
 
