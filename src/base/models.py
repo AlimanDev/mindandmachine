@@ -911,8 +911,8 @@ class Group(AbstractActiveNetworkSpecificCodeNamedModel):
     @classmethod
     def check_has_perm_to_group(cls, user, group=None, groups=[]):
         group_perm = True
-        groups = groups or [group,]
-        if groups:
+        if groups or group:
+            groups = groups or [group,]
             group_perm = cls.objects.filter(
                 Q(employments__employee__user=user) | Q(workerposition__employment__employee__user=user),
                 subordinates__id__in=groups,
@@ -922,7 +922,7 @@ class Group(AbstractActiveNetworkSpecificCodeNamedModel):
 
     @classmethod
     def check_has_perm_to_edit_group_objects(cls, group_from, group_to, user):
-        if not cls.check_has_perm_to_group(user, group=group_from) and cls.check_has_perm_to_group(user, group=group_to):
+        if not (cls.check_has_perm_to_group(user, group=group_from) and cls.check_has_perm_to_group(user, group=group_to)):
             raise PermissionDenied()
 
 
