@@ -10,6 +10,7 @@ from django.db.models import (
     Subquery, OuterRef, Max, Q, Case, When, Value, FloatField, F, IntegerField, Exists, BooleanField, Min
 )
 from django.db.models import UniqueConstraint
+from django.db.models.fields import PositiveSmallIntegerField
 from django.db.models.functions import Abs, Cast, Extract, Least
 from django.db.models.query import QuerySet
 from django.utils import timezone
@@ -509,6 +510,22 @@ class WorkerDay(AbstractModel):
         TYPE_EMPTY,
     ]
 
+    SOURCE_FAST_EDITOR = 0
+    SOURCE_FULL_EDITOR = 1
+    SOURCE_DUPLICATE = 2
+    SOURCE_ALGO = 3
+    SOURCE_AUTO_CREATED_VACANCY = 4
+    SOURCE_CHANGE_RANGE = 5
+
+    SOURCES = [
+        (SOURCE_FAST_EDITOR, 'Создание рабочего дня через быстрый редактор'),
+        (SOURCE_FULL_EDITOR, 'Создание рабочего дня через полный редактор'),
+        (SOURCE_DUPLICATE, 'Создание через копирование в графике (ctrl-c + ctrl-v)'),
+        (SOURCE_ALGO, 'Автоматическое создание алгоритмом'),
+        (SOURCE_AUTO_CREATED_VACANCY, 'Автоматическое создание биржей смен'),
+        (SOURCE_CHANGE_RANGE, 'Создание смен через change_range (Обычно используется для получения отпусков/больничных из 1С ЗУП)'),
+    ]
+
     def __str__(self):
         return '{}, {}, {}, {}, {}, {}, {}, {}'.format(
             self.employee.user.last_name if (self.employee and self.employee.user_id) else 'No worker',
@@ -831,6 +848,8 @@ class WorkerDay(AbstractModel):
     closest_plan_approved = models.ForeignKey(
         'self', null=True, blank=True, on_delete=models.SET_NULL, related_name='related_facts',
         help_text='Используется в факте (и в черновике и подтв. версии) для связи с планом подтвержденным')
+    
+    source = PositiveSmallIntegerField('Источник создания', choices=SOURCES, default=SOURCE_FAST_EDITOR)
 
     objects = WorkerDayManager.from_queryset(WorkerDayQuerySet)()  # исключает раб. дни у которых employment_id is null
     objects_with_excluded = models.Manager.from_queryset(WorkerDayQuerySet)()
