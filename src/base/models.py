@@ -22,6 +22,7 @@ from django.utils.functional import cached_property
 from django.utils.translation import gettext_lazy as _
 from model_utils import FieldTracker
 from mptt.models import MPTTModel, TreeForeignKey
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.serializers import ValidationError
 from timezone_field import TimeZoneField
 
@@ -906,6 +907,24 @@ class Group(AbstractActiveNetworkSpecificCodeNamedModel):
             self.code,
             # ', '.join(list(self.subordinates.values_list('name', flat=True)))
         )
+
+    @classmethod
+    def check_has_perm_to_edit_group_objects(cls, group_from, group_to, user):
+        group_from_perm = True
+        if group_from:
+            group_from_perm = cls.objects.filter(
+                Q(employments__employee__user=user) | Q(workerposition__employment__employee__user=user),
+                subordinates__id=group_from,
+            ).exists()
+        group_to_perm = True
+        if group_to:
+            group_to_perm = cls.objects.filter(
+                Q(employments__employee__user=user) | Q(workerposition__employment__employee__user=user),
+                subordinates__id=group_to,
+            ).exists()
+        has_perm = group_from_perm and group_to_perm
+        if not has_perm:
+            raise PermissionDenied()
 
 
 class ProductionDay(AbstractModel):
