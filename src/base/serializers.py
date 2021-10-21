@@ -470,21 +470,12 @@ class EmploymentSerializer(serializers.ModelSerializer):
             user = self.context['request'].user
             group_from = instance.function_group_id
             group_to = validated_data.get('function_group_id')
-            group_from_perm = True
-            if group_from:
-                group_from_perm = Group.objects.filter(
-                    Q(employments__employee__user=user) | Q(workerposition__employment__employee__user=user),
-                    subordinates__id=group_from,
-                ).exists()
-            group_to_perm = True
-            if group_to:
-                group_to_perm = Group.objects.filter(
-                    Q(employments__employee__user=user) | Q(workerposition__employment__employee__user=user),
-                    subordinates__id=group_to,
-                ).exists()
-            has_perm = group_from_perm and group_to_perm
-            if not has_perm:
-                raise PermissionDenied()
+            Group.check_has_perm_to_edit_group_objects(group_from, group_to, user)
+        if instance.position_id != validated_data.get('position_id', instance.position_id):
+            user = self.context['request'].user
+            position_from = WorkerPosition.objects.filter(id=instance.position_id).first()
+            position_to =  WorkerPosition.objects.filter(id=validated_data.get('position_id')).first()
+            Group.check_has_perm_to_edit_group_objects(position_from.group_id if position_from else None, position_to.group_id if position_to else None, user)
         if instance.is_visible != validated_data.get('is_visible', True):
             Employment.objects.filter(
                 shop_id=instance.shop_id, 
@@ -499,9 +490,10 @@ class EmploymentSerializer(serializers.ModelSerializer):
 
 
 class WorkerPositionSerializer(BaseNetworkSerializer):
+    group_id = serializers.IntegerField(required=False, allow_null=True)
     class Meta:
         model = WorkerPosition
-        fields = ['id', 'name', 'network_id', 'code', 'breaks_id']
+        fields = ['id', 'name', 'network_id', 'code', 'breaks_id', 'group_id']
 
     def __init__(self, *args, **kwargs):
         super(WorkerPositionSerializer, self).__init__(*args, **kwargs)
@@ -517,6 +509,14 @@ class WorkerPositionSerializer(BaseNetworkSerializer):
         data = super().to_representation(instance)
         data['network_id'] = instance.network_id # create/read-only field
         return data
+
+    def update(self, instance, validated_data, *args, **kwargs):
+        if instance.group_id != validated_data.get('group_id', instance.group_id):
+            user = self.context['request'].user
+            group_from = instance.group_id
+            group_to = validated_data.get('group_id')
+            Group.check_has_perm_to_edit_group_objects(group_from, group_to, user)
+        return super().update(instance, validated_data, *args, **kwargs)
 
 
 class EventSerializer(serializers.ModelSerializer):
