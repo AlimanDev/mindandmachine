@@ -339,6 +339,7 @@ class TestOutsource(TestsHelperMixin, APITestCase):
             dt=dt_now,
             type_id=WorkerDay.TYPE_HOLIDAY,
             employee=self.client_employee,
+            employment=self.client_employment,
             is_approved=True,
         )
         response = self.client.post(f'/rest_api/worker_day/{vacancy["id"]}/confirm_vacancy/')

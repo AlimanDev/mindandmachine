@@ -62,6 +62,13 @@ class WorkTypeManager(AbstractActiveModelManager):
 
 
 class WorkTypeName(AbstractActiveNetworkSpecificCodeNamedModel):
+    position = models.ForeignKey(
+        'base.WorkerPosition', null=True, blank=True, on_delete=models.PROTECT,
+        verbose_name='С какой должностью соотносится тип работ',
+        help_text='Используется при формировании табеля для получения должности по типу работ, если включена настройка'
+                  '"Получать должность по типу работ при формировании фактического табеля"'
+    )
+
     class Meta(AbstractActiveNetworkSpecificCodeNamedModel.Meta):
         verbose_name = 'Название типа работ'
         verbose_name_plural = 'Названия типов работ'
@@ -333,8 +340,7 @@ class WorkerDayQuerySet(AnnotateValueEqualityQSMixin, QuerySet):
 
 class WorkerDayManager(models.Manager):
     def get_queryset(self):
-        return super().get_queryset().exclude(
-            type__is_dayoff=False, employment_id__isnull=True, employee_id__isnull=False)
+        return super().get_queryset().exclude(employment_id__isnull=True, employee_id__isnull=False)
 
     def qos_current_version(self, approved_only=False):
         if approved_only:
@@ -1399,6 +1405,15 @@ class TimesheetItem(AbstractModel):
         verbose_name = 'Запись в табеле учета рабочего времени'
         verbose_name_plural = 'Записи в табеле учета рабочего времени'
 
+    def __str__(self):
+        return '{}, {}, {}, {}, {}, {}'.format(
+            self.id,
+            self.dt,
+            self.employee_id,
+            self.day_type_id,
+            self.timesheet_type,
+            self.day_hours + self.night_hours,
+        )
 
 class WorkerDayCashboxDetailsManager(models.Manager):
     def qos_current_version(self):

@@ -5,12 +5,13 @@ import pandas as pd
 from dateutil.relativedelta import relativedelta
 from django.conf import settings
 from django.db import transaction
+from django.db.models.query import Prefetch
 from django.utils import timezone
 
 from src.base.models import Employee
 from .common import _create_timesheet_items
 from .dividers import FISCAL_SHEET_DIVIDERS_MAPPING
-from ..models import WorkerDay, TimesheetItem, WorkerDayType
+from ..models import WorkerDay, TimesheetItem, WorkerDayType, WorkType
 
 logger = logging.getLogger('calc_timesheets')
 
@@ -68,29 +69,46 @@ class TimesheetCalculator:
             'dttm_work_start_tabel',
             'dttm_work_end_tabel',
         ).prefetch_related(
-            'work_types',
+            Prefetch('work_types', queryset=WorkType.objects.all().select_related('work_type_name'),
+                     to_attr='work_types_list'),
         ).order_by(
             'employee_id',
             'dt',
             'dttm_work_start_tabel',
             'dttm_work_end_tabel',
-        )
+        ).distinct()
 
     def _get_empl_key(self, employee_id, dt):
         return dt
+
+    def _get_shop_id(self, worker_day):
+        if worker_day.type.is_dayoff:
+            return worker_day.employment.shop_id
+        return worker_day.shop_id
+
+    def _get_position_id(self, worker_day, work_type_name=None):
+        if not worker_day.type.is_dayoff \
+                and worker_day.shop \
+                and worker_day.shop.network \
+                and worker_day.shop.network.get_position_from_work_type_name_in_calc_timesheet \
+                and work_type_name \
+                and work_type_name.position_id:
+            return work_type_name.position_id
+        return worker_day.employment.position_id
 
     def _get_fact_timesheet_data(self, dt_start, dt_end):
         wdays_qs = self._get_timesheet_wdays_qs(self.employee, dt_start, dt_end)
         fact_timesheet_dict = {}
         for worker_day in wdays_qs:
+            # TODO: нужна поддержка нескольких типов работ?
+            work_type_name = worker_day.work_types_list[0].work_type_name if \
+                (worker_day.type_id == WorkerDay.TYPE_WORKDAY and worker_day.work_types_list) else None
             wd_dict = {
                 'employee_id': self.employee.id,
                 'dt': worker_day.dt,
-                'shop_id': worker_day.shop_id if not worker_day.type.is_dayoff else None,
-                # TODO: замена типа работ на должность
-                'position_id': worker_day.employment.position_id if not worker_day.type.is_dayoff else None,
-                # TODO: поддержка нескольких типов работ?
-                'work_type_name_id': worker_day.work_types.first().work_type_name_id if worker_day.type_id == WorkerDay.TYPE_WORKDAY else None,
+                'shop_id': self._get_shop_id(worker_day),
+                'position_id': self._get_position_id(worker_day, work_type_name=work_type_name),
+                'work_type_name_id': work_type_name.id if work_type_name else None,
                 'fact_timesheet_type_id': worker_day.type_id,
                 'fact_timesheet_source': TimesheetItem.SOURCE_TYPE_FACT if worker_day.is_fact else TimesheetItem.SOURCE_TYPE_PLAN,
             }
@@ -115,7 +133,8 @@ class TimesheetCalculator:
             'employee__user__network',
             'shop__network',
         ).prefetch_related(
-            'work_types',
+            Prefetch('work_types', queryset=WorkType.objects.all().select_related('work_type_name'),
+                     to_attr='work_types_list'),
         )
         plan_wdays_dict = {}
         for wd in plan_wdays_qs:
@@ -146,14 +165,14 @@ class TimesheetCalculator:
             if plan_wd_list:
                 for plan_wd in plan_wd_list:
                     day_in_past = dt < dt_now
+                    work_type_name = plan_wd.work_types_list[0].work_type_name if \
+                        (plan_wd.type_id == WorkerDay.TYPE_WORKDAY and plan_wd.work_types_list) else None
                     d = {
                         'employee_id': self.employee.id,
                         'dt': dt,
-                        'shop_id': None if day_in_past else plan_wd.shop_id,
-                        'position_id': plan_wd.employment.position_id if (not day_in_past and not plan_wd.is_dayoff) else None,
-                        # TODO: замена типа работ на должность
-                        'work_type_name_id': plan_wd.work_types.first().work_type_name_id if (not day_in_past and plan_wd.type_id == WorkerDay.TYPE_WORKDAY) else None,
-                        # TODO: поддержка нескольких типов работ?
+                        'shop_id': self._get_shop_id(plan_wd),
+                        'position_id': self._get_position_id(plan_wd, work_type_name=work_type_name),
+                        'work_type_name_id': work_type_name.id if work_type_name else None,
                         'fact_timesheet_type_id': WorkerDay.TYPE_ABSENSE if day_in_past else plan_wd.type_id,
                         'fact_timesheet_source': TimesheetItem.SOURCE_TYPE_SYSTEM if day_in_past else TimesheetItem.SOURCE_TYPE_PLAN,
                     }

@@ -9,13 +9,8 @@ from src.timetable.models import WorkerDay
 
 
 @app.task
-def clean_wdays(filter_kwargs: dict = None, exclude_kwargs: dict = None, only_logging=True, clean_plan_empl=False):
-    clean_wdays_helper = CleanWdaysHelper(
-        filter_kwargs=filter_kwargs,
-        exclude_kwargs=exclude_kwargs,
-        only_logging=only_logging,
-        clean_plan_empl=clean_plan_empl,
-    )
+def clean_wdays(**kwargs):
+    clean_wdays_helper = CleanWdaysHelper(**kwargs)
     clean_wdays_helper.run()
 
 

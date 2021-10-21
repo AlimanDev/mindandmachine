@@ -358,6 +358,7 @@ class TimesheetItemAdmin(admin.ModelAdmin):
     save_as = True
     raw_id_fields = ('shop', 'position', 'work_type_name', 'employee')
     list_filter = (
+        ('dt', DateRangeFilter),
         ('shop', CustomRelatedDropdownFilter),
         ('position', CustomRelatedDropdownFilter),
         ('work_type_name', CustomRelatedDropdownFilter),
@@ -367,6 +368,7 @@ class TimesheetItemAdmin(admin.ModelAdmin):
     )
     list_display = (
         'id',
+        'dt',
         'timesheet_type',
         'employee',
         'shop',

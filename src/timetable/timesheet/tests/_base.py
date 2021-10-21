@@ -14,7 +14,7 @@ from src.base.tests.factories import (
     WorkerPositionFactory,
     BreakFactory,
 )
-from src.timetable.models import WorkerDay
+from src.timetable.models import WorkerDay, WorkType, WorkTypeName
 from src.timetable.tests.factories import WorkerDayFactory
 from src.timetable.timesheet.tasks import calc_timesheets
 from src.util.mixins.tests import TestsHelperMixin
@@ -45,6 +45,16 @@ class TestTimesheetMixin(TestsHelperMixin):
         )
         cls.employment_worker = EmploymentFactory(
             employee=cls.employee_worker, shop=cls.shop, position=cls.position_worker,
+        )
+        cls.work_type_name_worker = WorkTypeName.objects.create(
+            position=cls.position_worker,
+            network=cls.network,
+            name='worker',
+            code='worker',
+        )
+        cls.work_type_worker = WorkType.objects.create(
+            work_type_name=cls.work_type_name_worker,
+            shop=cls.shop,
         )
 
         for dt in pd.date_range(date(2021, 6, 7), date(2021, 6, 13)).date:

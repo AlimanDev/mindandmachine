@@ -414,6 +414,7 @@ def cancel_vacancy(vacancy_id, auto=True):
     if vacancy:
         shop = vacancy.shop
         employee = vacancy.employee
+        vac_employment_id = vacancy.employment_id
         if auto or vacancy.created_by_id:
             vacancy.delete()
         else:
@@ -437,7 +438,7 @@ def cancel_vacancy(vacancy_id, auto=True):
                 dttm_work_end=None,
                 shop_id=None,
                 type_id=WorkerDay.TYPE_HOLIDAY,
-                employment=None,
+                employment_id=vac_employment_id,
                 is_vacancy=False,
                 is_outsource=False,
             )

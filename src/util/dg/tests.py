@@ -205,7 +205,8 @@ class TestGenerateTabel(TestsHelperMixin, TestCase):
         # self.assertNotEqual(data['users'][ind]['tabel_code'], data['users'][ind + 1]['tabel_code'])
 
     def test_generate_custom_t13_tabel_fact(self):
-        g = T13TabelDataGetter(shop=self.shop, dt_from=self.dt_from, dt_to=self.dt_to, timesheet_type=TimesheetItem.TIMESHEET_TYPE_FACT)
+        g = T13TabelDataGetter(
+            shop=self.shop, dt_from=self.dt_from, dt_to=self.dt_to, timesheet_type=TimesheetItem.TIMESHEET_TYPE_FACT)
         data = g.get_data()
         # self.assertEqual(len(data['users']), 7)
         for user in data['users']:
@@ -234,7 +235,10 @@ class TestGenerateTabel(TestsHelperMixin, TestCase):
                     )
                     continue
                 type = self.types_mapping[values['code']]
-                wd = TimesheetItem.objects.filter(timesheet_type=TimesheetItem.TIMESHEET_TYPE_FACT, dt=dt, day_type_id=type, employee=employee).first()
+                wd = TimesheetItem.objects.filter(
+                    timesheet_type=TimesheetItem.TIMESHEET_TYPE_FACT,
+                    dt=dt, day_type_id=type, employee=employee,
+                ).first()
                 self.assertIsNotNone(wd)
                 if wd.day_type_id == WorkerDay.TYPE_WORKDAY:
                     self.assertEqual(wd.day_hours + wd.night_hours, values['value'])

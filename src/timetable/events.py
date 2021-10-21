@@ -35,6 +35,7 @@ class VacancyCreatedEvent(BaseRegisteredEvent):
         from src.base.models import User
         return [User(id=uuid4(), email=self.context.get('director', {}).get('email'), first_name=self.context.get('director', {}).get('name', '')), ]
 
+
 class VacancyDeletedEvent(BaseRegisteredEvent):
     name = 'Автоматически удалена вакансия'
     code = VACANCY_DELETED
@@ -43,6 +44,7 @@ class VacancyDeletedEvent(BaseRegisteredEvent):
     def get_recipients(self):
         from src.base.models import User
         return [User(id=uuid4(), email=self.context.get('director', {}).get('email'), first_name=self.context.get('director', {}).get('name', '')), ]
+
 
 class VacancyDeletedEvent(BaseRegisteredEvent):
     name = 'Удалена вакансия для сотрудника'

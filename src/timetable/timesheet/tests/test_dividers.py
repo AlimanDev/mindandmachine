@@ -263,4 +263,4 @@ class TestNahodkaDivider(TestTimesheetMixin, TestCase):
             type_id=WorkerDay.TYPE_WORKDAY,
         )
         self._calc_timesheets(reraise_exc=True)
-        self.assertEqual(Timesheet.objects.filter(fact_timesheet_type_id=WorkerDay.TYPE_WORKDAY).count(), 0)
+        self.assertEqual(TimesheetItem.objects.filter(timesheet_type=TimesheetItem.TIMESHEET_TYPE_FACT, day_type_id=WorkerDay.TYPE_WORKDAY).count(), 0)
