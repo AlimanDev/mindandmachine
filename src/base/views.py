@@ -15,6 +15,7 @@ from rest_framework.parsers import MultiPartParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
+from rest_framework.exceptions import PermissionDenied
 
 from src.base.filters import (
     NotificationFilter,
@@ -153,6 +154,12 @@ class UserViewSet(UpdateorCreateViewSet):
     @action(detail=True, methods=['post'])
     def change_password(self, request, pk=None):
         user = self.get_object()
+        groups = Employment.objects.filter(
+            employee__user=user,
+        ).values_list('position__group_id', 'function_group_id')
+        groups = set(list(map(lambda x: x[0], groups)) + list(map(lambda x: x[1], groups)))
+        if not Group.check_has_perm_to_group(request.user, groups=groups) and user.id != request.user.id:
+            raise PermissionDenied()
         serializer = PasswordSerializer(data=request.data, instance=user, context={'request':request})
 
         if serializer.is_valid():

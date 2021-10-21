@@ -347,3 +347,54 @@ class TestUserViewSet(TestsHelperMixin, APITestCase):
         token = resp.client.cookies.get('csrftoken')
         resp = self.client.get('/rest_api/auth/user/')
         self.assertEquals(resp.client.cookies.get('csrftoken'), token)
+
+    def test_change_password_self(self):
+        response = self.client.post(f'/rest_api/user/{self.user1.id}/change_password/', 
+            {
+                'confirmation_password': self.USER_PASSWORD,
+                'new_password1': 'test_password_1234',
+                'new_password2': 'test_password_1234',
+            }
+        )
+        self.assertEquals(response.status_code, 200)
+        self.user1.refresh_from_db()
+        self.assertTrue(self.user1.check_password('test_password_1234'))
+        self.user1.set_password(self.USER_PASSWORD)
+        self.user1.save()
+
+    def _test_change_password_subordinates(self, status_code, changed):
+        self.user4.set_password('')
+        self.user4.save()
+        response = self.client.post(f'/rest_api/user/{self.user4.id}/change_password/', 
+            {
+                'confirmation_password': self.USER_PASSWORD,
+                'new_password1': 'test_password_1234',
+                'new_password2': 'test_password_1234',
+            }
+        )
+        self.assertEquals(response.status_code, status_code)
+        self.user4.refresh_from_db()
+        if changed:
+            self.assertTrue(self.user4.check_password('test_password_1234'))
+        else:
+            self.assertFalse(self.user4.check_password('test_password_1234'))
+
+    def test_change_password_subordinates(self):
+        self._test_change_password_subordinates(403, False)
+        self.employment4.function_group = self.chief_group
+        self.employment4.save()
+        self._test_change_password_subordinates(403, False)
+        self.admin_group.subordinates.add(self.chief_group)
+        self._test_change_password_subordinates(200, True)
+        self.worker_position.group = self.chief_group
+        self.worker_position.save()
+        self.employment4.function_group = None
+        self.employment4.position = self.worker_position
+        self.employment4.save()
+        self._test_change_password_subordinates(200, True)
+        self.worker_position.group = self.employee_group
+        self.worker_position.save()
+        self._test_change_password_subordinates(403, False)
+        self.employment4.function_group = self.chief_group
+        self.employment4.save()
+        self._test_change_password_subordinates(200, True)
