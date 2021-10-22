@@ -1123,9 +1123,8 @@ class User(DjangoAbstractUser, AbstractModel):
         )
 
     def get_group_ids(self, shop=None):
-        return self.get_active_employments(shop=shop).annotate(
-            group_id=Coalesce(F('function_group_id'), F('position__group_id')),
-        ).values_list('group_id', flat=True)
+        groups = self.get_active_employments(shop=shop).values_list('position__group_id', 'function_group_id')
+        return list(set(list(map(lambda x: x[0], groups)) + list(map(lambda x: x[1], groups))))
 
     def save(self, *args, **kwargs):
         if not self.password and settings.SET_USER_PASSWORD_AS_LOGIN:
