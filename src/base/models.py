@@ -909,21 +909,20 @@ class Group(AbstractActiveNetworkSpecificCodeNamedModel):
         )
 
     @classmethod
+    def check_has_perm_to_group(cls, user, group=None, groups=[]):
+        group_perm = True
+        if groups or group:
+            groups = groups or [group,]
+            group_perm = cls.objects.filter(
+                Q(employments__employee__user=user) | Q(workerposition__employment__employee__user=user),
+                subordinates__id__in=groups,
+            ).exists()
+
+        return group_perm
+
+    @classmethod
     def check_has_perm_to_edit_group_objects(cls, group_from, group_to, user):
-        group_from_perm = True
-        if group_from:
-            group_from_perm = cls.objects.filter(
-                Q(employments__employee__user=user) | Q(workerposition__employment__employee__user=user),
-                subordinates__id=group_from,
-            ).exists()
-        group_to_perm = True
-        if group_to:
-            group_to_perm = cls.objects.filter(
-                Q(employments__employee__user=user) | Q(workerposition__employment__employee__user=user),
-                subordinates__id=group_to,
-            ).exists()
-        has_perm = group_from_perm and group_to_perm
-        if not has_perm:
+        if not (cls.check_has_perm_to_group(user, group=group_from) and cls.check_has_perm_to_group(user, group=group_to)):
             raise PermissionDenied()
 
 
@@ -1124,9 +1123,8 @@ class User(DjangoAbstractUser, AbstractModel):
         )
 
     def get_group_ids(self, shop=None):
-        return self.get_active_employments(shop=shop).annotate(
-            group_id=Coalesce(F('function_group_id'), F('position__group_id')),
-        ).values_list('group_id', flat=True)
+        groups = self.get_active_employments(shop=shop).values_list('position__group_id', 'function_group_id')
+        return list(set(list(map(lambda x: x[0], groups)) + list(map(lambda x: x[1], groups))))
 
     def save(self, *args, **kwargs):
         if not self.password and settings.SET_USER_PASSWORD_AS_LOGIN:
