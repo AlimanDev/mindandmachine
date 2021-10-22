@@ -43,7 +43,7 @@ def move_old_timesheet_data_to_new_timesheet(apps, schema_editor):
                         source=SOURCE_MAPPING.get(timesheet.fact_timesheet_source, ''),
                     )
                 )
-            elif timesheet.fact_timesheet_total_hours:
+            else:
                 fact_timesheet_items.append(
                     TimesheetItem(
                         timesheet_type=TIMESHEET_TYPE_FACT,
@@ -69,7 +69,7 @@ def move_old_timesheet_data_to_new_timesheet(apps, schema_editor):
                         day_type=timesheet.main_timesheet_type,
                     )
                 )
-            elif timesheet.main_timesheet_total_hours:
+            else:
                 main_timesheet_items.append(
                     TimesheetItem(
                         timesheet_type=TIMESHEET_TYPE_MAIN,
