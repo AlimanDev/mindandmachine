@@ -646,6 +646,7 @@ class WorkerDayViewSet(BaseModelViewSet):
                             is_blocked=approved_wd.is_blocked,
                             closest_plan_approved_id=approved_wd.closest_plan_approved_id,
                             parent_worker_day_id=approved_wd.id,
+                            source=WorkerDay.SOURCE_ON_APPROVE,
                         )
                         for approved_wd in approved_wds_list if approved_wd.employee_id
                         # не копируем день без сотрудника (вакансию) в неподтв. версию
@@ -901,6 +902,7 @@ class WorkerDayViewSet(BaseModelViewSet):
 
                 vacancy.id = None
                 vacancy.is_approved = False
+                vacancy.source = WorkerDay.SOURCE_ON_APPROVE
                 vacancy.save()
 
                 WorkerDayCashboxDetails.objects.bulk_create(
@@ -945,6 +947,7 @@ class WorkerDayViewSet(BaseModelViewSet):
                 parent_worker_day=vacancy,
                 is_vacancy=True,
                 is_outsource=vacancy.is_outsource,
+                source=WorkerDay.SOURCE_EDITABLE_VACANCY,
             )
             WorkerDayCashboxDetails.objects.bulk_create([
                 WorkerDayCashboxDetails(
@@ -994,6 +997,7 @@ class WorkerDayViewSet(BaseModelViewSet):
                             is_fact=is_fact,
                             type=wd_type,
                             created_by=self.request.user,
+                            source=WorkerDay.SOURCE_CHANGE_RANGE,
                         )
                     )
         WorkerDay.objects.bulk_create(wdays_to_create)
@@ -1136,6 +1140,7 @@ class WorkerDayViewSet(BaseModelViewSet):
                         closest_plan_approved_id=wd.id if (
                                 is_copying_to_fact and wd.is_plan and wd.is_approved) else None,
                         need_count_wh=True,
+                        source=data['source'],
                     )
                     for wd in source_wdays_list
                 ]
