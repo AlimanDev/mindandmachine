@@ -71,7 +71,7 @@ class TimesheetViewSet(BaseModelViewSet):
                 )[:1]
             ),
             fact_timesheet_total_hours=Sum(F('day_hours') + F('night_hours'), filter=Q(
-                Q(day_hours__gt=0) | Q(night_hours__gt=0), timesheet_type=TimesheetItem.TIMESHEET_TYPE_FACT)),
+                day_type__is_dayoff=False, timesheet_type=TimesheetItem.TIMESHEET_TYPE_FACT)),
             fact_timesheet_day_hours=Sum('day_hours', filter=Q(day_hours__gt=0, timesheet_type=TimesheetItem.TIMESHEET_TYPE_FACT)),
             fact_timesheet_night_hours=Sum('night_hours', filter=Q(night_hours__gt=0, timesheet_type=TimesheetItem.TIMESHEET_TYPE_FACT)),
             main_timesheet_type=Subquery(
@@ -86,11 +86,11 @@ class TimesheetViewSet(BaseModelViewSet):
                 )[:1]
             ),
             main_timesheet_total_hours=Sum(F('day_hours') + F('night_hours'), filter=Q(
-                Q(day_hours__gt=0) | Q(night_hours__gt=0), timesheet_type=TimesheetItem.TIMESHEET_TYPE_MAIN)),
+                day_type__is_dayoff=False, timesheet_type=TimesheetItem.TIMESHEET_TYPE_MAIN)),
             main_timesheet_day_hours=Sum('day_hours', filter=Q(day_hours__gt=0, timesheet_type=TimesheetItem.TIMESHEET_TYPE_MAIN)),
             main_timesheet_night_hours=Sum('night_hours', filter=Q(night_hours__gt=0, timesheet_type=TimesheetItem.TIMESHEET_TYPE_MAIN)),
             additional_timesheet_hours=Sum(F('day_hours') + F('night_hours'), filter=Q(
-                Q(day_hours__gt=0) | Q(night_hours__gt=0), timesheet_type=TimesheetItem.TIMESHEET_TYPE_ADDITIONAL)),
+                day_type__is_dayoff=False, timesheet_type=TimesheetItem.TIMESHEET_TYPE_ADDITIONAL)),
         )
 
         page = self.paginate_queryset(grouped_qs)
