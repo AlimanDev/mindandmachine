@@ -200,6 +200,17 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
         response = self.client.post(self.url_approve, data, format='json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(WorkerDay.objects.get(id=self.worker_day_fact_not_approved.id).is_approved, True)
+        self.assertEqual(
+            WorkerDay.objects.filter(
+                dt=self.worker_day_fact_not_approved.dt, 
+                shop=self.worker_day_fact_not_approved.shop,
+                employee=self.worker_day_fact_not_approved.employee,
+                employment=self.worker_day_fact_not_approved.employment,
+                is_approved=False,
+                is_fact=True,
+            ).first().source, 
+            WorkerDay.SOURCE_ON_APPROVE
+        )
         self.assertFalse(WorkerDay.objects.filter(id=self.worker_day_fact_approved.id).exists())
         self.assertTrue(WorkerDay.objects.filter(id=self.worker_day_plan_not_approved.id).exists())
 
@@ -225,6 +236,7 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         plan_id = response.json()['id']
         self.assertEqual(WorkerDayCashboxDetails.objects.filter(worker_day_id=plan_id).count(), 0)
+        self.assertEqual(WorkerDay.objects.get(id=plan_id).source, WorkerDay.SOURCE_FULL_EDITOR)
 
         # edit not approved plan
         data = {
@@ -462,6 +474,7 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
 
         self.assertEqual(WorkerDay.objects.filter(is_fact=False, is_approved=True).count(), 0)
         self.assertEqual(WorkerDay.objects.filter(is_fact=True, is_approved=True).count(), 3)
+        self.assertEquals(WorkerDay.objects.filter(is_fact=True, is_approved=True, source=WorkerDay.SOURCE_AUTO_FACT).count(), 3)
         data = {
             'shop_id': self.shop.id,
             'dt_from': dt,
@@ -1951,6 +1964,7 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
             is_fact=False,
         )
         self.assertEqual(wdays_qs.count(), 2)
+        self.assertEquals(wdays_qs.filter(source=WorkerDay.SOURCE_FAST_EDITOR).count(), 2)
         self.assertEqual(WorkerDayCashboxDetails.objects.filter(worker_day__in=wdays_qs).count(), 2)
         time_module.sleep(0.1)
         resp_data.get('data').pop(1)
