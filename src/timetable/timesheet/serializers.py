@@ -10,6 +10,7 @@ class TimesheetItemSerializer(serializers.ModelSerializer):
     employee__tabel_code = serializers.CharField(read_only=True)
     shop_code = serializers.CharField(read_only=True)
     position_code = serializers.CharField(read_only=True)
+    work_type_name_code = serializers.CharField(read_only=True)
 
     class Meta:
         model = TimesheetItem
@@ -22,6 +23,8 @@ class TimesheetItemSerializer(serializers.ModelSerializer):
             'shop_code',
             'position_id',
             'position_code',
+            'work_type_name_id',
+            'work_type_name_code',
             'day_type',
             'dttm_work_start',
             'dttm_work_end',
