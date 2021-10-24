@@ -16,6 +16,7 @@ class TimesheetItemSerializer(serializers.ModelSerializer):
         model = TimesheetItem
         fields = (
             'id',
+            'timesheet_type',
             'employee_id',
             'employee__tabel_code',
             'dt',
