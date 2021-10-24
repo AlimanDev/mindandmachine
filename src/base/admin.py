@@ -108,8 +108,6 @@ class NetworkAdmin(admin.ModelAdmin):
                 'crop_work_hours_by_shop_schedule',
                 'accounting_period_length',
                 'only_fact_hours_that_in_approved_plan',
-                'consider_remaining_hours_in_prev_months_when_calc_norm_hours',
-                'correct_norm_hours_last_month_acc_period',
                 'prev_months_work_hours_source',
                 'fines_settings',
             ),
@@ -121,6 +119,11 @@ class NetworkAdmin(admin.ModelAdmin):
             'show_worker_day_tasks',
             'copy_plan_to_fact_crossing',
             'display_employee_tabs_in_the_schedule',
+        )}),
+        (_('Timesheet settings'), {'fields': (
+            'consider_remaining_hours_in_prev_months_when_calc_norm_hours',
+            'correct_norm_hours_last_month_acc_period',
+            'get_position_from_work_type_name_in_calc_timesheet',
         )}),
         (_('Integration settings'), {'fields': (
             'descrease_employment_dt_fired_in_api',
