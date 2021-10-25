@@ -642,6 +642,7 @@ class WorkerDay(AbstractModel):
     @classmethod
     def _batch_update_extra_handler(cls, obj):
         obj.dttm_work_start_tabel, obj.dttm_work_end_tabel, obj.work_hours = obj._calc_wh()
+        obj.work_hours = obj._round_wh()
         return {
             'dttm_work_start_tabel',
             'dttm_work_end_tabel',
@@ -707,7 +708,7 @@ class WorkerDay(AbstractModel):
 
     def _calc_wh(self):
         position_break_triplet_cond = self.employment and self.employment.position and self.employment.position.breaks
-        if self.dttm_work_end and self.dttm_work_start and self.shop and (
+        if not self.type.is_dayoff and self.dttm_work_end and self.dttm_work_start and self.shop and (
                 self.shop.settings or position_break_triplet_cond or self.shop.network.breaks):
             breaks = self.employment.position.breaks.breaks if position_break_triplet_cond else self.shop.settings.breaks.breaks if self.shop.settings else self.shop.network.breaks.breaks
             dttm_work_start = _dttm_work_start = self.dttm_work_start
@@ -781,12 +782,54 @@ class WorkerDay(AbstractModel):
 
             return dttm_work_start, dttm_work_end, self.count_work_hours(breaks, dttm_work_start, dttm_work_end, break_time=break_time, fine=fine)
 
+        if self.type.is_dayoff and self.type.is_work_hours:
+            # TODO: продумать настройки и логику, сделать нормально
+            work_hours = 0
+            if self.type.code == WorkerDay.TYPE_VACATION:
+                from src.timetable.worker_day.stat import WorkersStatsGetter
+                employee_stats = WorkersStatsGetter(
+                    employee_id=self.employee_id,
+                    dt_from=self.dt,
+                    dt_to=self.dt,
+                    shop_id=self.employment.shop_id,
+                ).run()
+                work_hours = employee_stats.get(
+                    self.employee_id, {}
+                ).get(
+                    'employments', {}
+                ).get(
+                    self.employment_id, {}
+                ).get(
+                    'one_day_value', {}
+                ).get(
+                    self.dt.month, 0
+                )
+            elif self.type.code == WorkerDay.TYPE_SICK:
+                return None, None, self.work_hours
+
+            return None, None, datetime.timedelta(hours=work_hours)
+
         return self.dttm_work_start, self.dttm_work_end, datetime.timedelta(0)
+
+    def _round_wh(self):
+        if self.work_hours > datetime.timedelta(0):
+            network = None
+            if self.shop_id and self.shop.network_id:
+                network = self.shop.network
+            elif self.employee_id and self.employee.user.network_id:
+                network = self.employee.user.network
+
+            if network and network.round_work_hours_alg is not None:
+                round_wh_alg_func = Network.ROUND_WH_ALGS.get(network.round_work_hours_alg)
+                self.work_hours = datetime.timedelta(hours=round_wh_alg_func(self.work_hours.total_seconds() / 3600))
+
+        return self.work_hours
 
     def __init__(self, *args, need_count_wh=False, **kwargs):
         super().__init__(*args, **kwargs)
         if need_count_wh:
             self.dttm_work_start_tabel, self.dttm_work_end_tabel, self.work_hours = self._calc_wh()
+            self.work_hours = self._round_wh()
 
     id = models.BigAutoField(primary_key=True, db_index=True)
     shop = models.ForeignKey(Shop, on_delete=models.PROTECT, null=True)
@@ -930,6 +973,7 @@ class WorkerDay(AbstractModel):
 
     def save(self, *args, **kwargs): # todo: aa: частая модель для сохранения, отправлять запросы при сохранении накладно
         self.dttm_work_start_tabel, self.dttm_work_end_tabel, self.work_hours = self._calc_wh()
+        self.work_hours = self._round_wh()
 
         if self.last_edited_by_id is None:
             self.last_edited_by_id = self.created_by_id

@@ -264,3 +264,10 @@ class TestNahodkaDivider(TestTimesheetMixin, TestCase):
         )
         self._calc_timesheets(reraise_exc=True)
         self.assertEqual(TimesheetItem.objects.filter(timesheet_type=TimesheetItem.TIMESHEET_TYPE_FACT, day_type_id=WorkerDay.TYPE_WORKDAY).count(), 0)
+
+
+@override_settings(FISCAL_SHEET_DIVIDER_ALIAS='pobeda')
+class TestPobedaDivider(TestTimesheetMixin, TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()

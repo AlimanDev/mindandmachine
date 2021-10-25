@@ -48,6 +48,7 @@ class UrvStatTodayReport(BaseRegisteredReport):
 
         return urv_stat_v1(dt, dt, title=title, shop_ids=self.context.get('shop_ids', []), network_id=self.network_id, comming_only=True, in_memory=True)
 
+
 class UrvViolatorsReport(BaseRegisteredReport, DatesReportMixin):
     name = 'Отчет по нарушителям УРВ'
     code = URV_VIOLATORS_REPORT
@@ -70,6 +71,7 @@ class UrvStatV2Report(BaseRegisteredReport, DatesReportMixin):
 
         return urv_stat_v2(dt_from, dt_to, title=title, network_id=self.network_id, shop_ids=self.context.get('shop_ids', []), in_memory=True)
 
+
 class UnaccountedOvertivmeReport(BaseRegisteredReport, DatesReportMixin):
     name = 'Отчет по неучтенным переработкам'
     code = UNACCOUNTED_OVERTIME
@@ -78,6 +80,7 @@ class UnaccountedOvertivmeReport(BaseRegisteredReport, DatesReportMixin):
         from src.reports.utils.unaccounted_overtime import unaccounted_overtimes_xlsx
         dt_from, dt_to = self.get_dates(self.context)
         return unaccounted_overtimes_xlsx(self.network_id, dt_from=dt_from, dt_to=dt_to, shop_ids=self.context.get('shop_ids', []), in_memory=True)
+
 
 class UndertimesOvertimesReport(BaseRegisteredReport):
     name = 'Отчет по переработкам/недоработкам'
@@ -105,6 +108,7 @@ class PivotTabelReport(BaseRegisteredReport, DatesReportMixin):
             'file': pt.get_pivot_file(dt__gte=dt_from, dt__lte=dt_to, shop__network_id=self.network_id, **shop_filter),
             'type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         }
+
 
 class ScheduleDevationReport(BaseRegisteredReport, DatesReportMixin):
     name = 'Отчет по отклонениям от планового графика'

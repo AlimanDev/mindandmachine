@@ -110,6 +110,7 @@ class NetworkAdmin(admin.ModelAdmin):
                 'only_fact_hours_that_in_approved_plan',
                 'prev_months_work_hours_source',
                 'fines_settings',
+                'round_work_hours_alg',
             ),
         }),
         (_('Vacancy settings'), {'fields': ('need_symbol_for_vacancy', 'allow_workers_confirm_outsource_vacancy')}),

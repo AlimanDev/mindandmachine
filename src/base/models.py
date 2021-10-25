@@ -24,7 +24,6 @@ from model_utils import FieldTracker
 from mptt.models import MPTTModel, TreeForeignKey
 from rest_framework.serializers import ValidationError
 from timezone_field import TimeZoneField
-
 from src.base.models_abstract import (
     AbstractActiveModel,
     AbstractModel,
@@ -73,6 +72,15 @@ class Network(AbstractActiveModel):
     CONVERT_TABEL_TO_CHOICES = (
         ('xlsx', 'xlsx'),
         ('pdf', 'PDF'),
+    )
+
+
+    ROUND_TO_HALF_AN_HOUR = 0
+    ROUND_WH_ALGS = {
+        ROUND_TO_HALF_AN_HOUR: lambda wh: round(wh * 2) / 2,
+    }
+    ROUND_WORK_HOURS_ALG_CHOICES = (
+        (ROUND_TO_HALF_AN_HOUR, 'Округление до получаса'),
     )
 
     class Meta:
@@ -236,6 +244,11 @@ class Network(AbstractActiveModel):
     get_position_from_work_type_name_in_calc_timesheet = models.BooleanField(
         default=False,
         verbose_name='Получать должность по типу работ при формировании фактического табеля',
+    )
+    round_work_hours_alg = models.PositiveSmallIntegerField(
+        null=True, blank=True,
+        choices=ROUND_WORK_HOURS_ALG_CHOICES,
+        verbose_name='Алгоритм округления рабочих часов',
     )
 
     DEFAULT_NIGHT_EDGES = (

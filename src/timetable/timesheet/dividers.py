@@ -20,6 +20,14 @@ class BaseTimesheetDivider:
         self.dt_end = dt_end
 
 
+class PobedaTimesheetDivider(BaseTimesheetDivider):
+    def divide(self):
+        logger.info(f'start pobeda fiscal sheet divide')
+        timesheet_data = self.fiscal_sheet_dict
+        logger.info(f'finish pobeda fiscal sheet divide')
+        return timesheet_data
+
+
 class NahodkaTimesheetDivider(BaseTimesheetDivider):
     def __init__(self, *args, fact_timesheet_data, **kwargs):
         fact_timesheet_data = _flatten_fact_timesheet_data(fact_timesheet_data)
@@ -344,5 +352,6 @@ class NahodkaTimesheetDivider(BaseTimesheetDivider):
 
 
 FISCAL_SHEET_DIVIDERS_MAPPING = {
-    'nahodka': NahodkaTimesheetDivider
+    'nahodka': NahodkaTimesheetDivider,
+    'pobeda': PobedaTimesheetDivider,
 }

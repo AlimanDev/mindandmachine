@@ -380,6 +380,7 @@ class WorkerDayViewSet(BaseModelViewSet):
                 'employee_id',
                 'dt',
                 'type_id',
+                'work_hours',
                 'dttm_work_start',
                 'dttm_work_end',
                 'shop_id',
@@ -631,6 +632,7 @@ class WorkerDayViewSet(BaseModelViewSet):
                             shop=approved_wd.shop,
                             employee_id=approved_wd.employee_id,
                             employment=approved_wd.employment,
+                            work_hours=approved_wd.work_hours,
                             dttm_work_start=approved_wd.dttm_work_start,
                             dttm_work_end=approved_wd.dttm_work_end,
                             dt=approved_wd.dt,
@@ -995,6 +997,7 @@ class WorkerDayViewSet(BaseModelViewSet):
                             is_fact=is_fact,
                             type=wd_type,
                             created_by=self.request.user,
+                            need_count_wh=True,
                         )
                     )
         WorkerDay.objects.bulk_create(wdays_to_create)
@@ -1121,6 +1124,7 @@ class WorkerDayViewSet(BaseModelViewSet):
                         shop=wd.shop,
                         employee_id=wd.employee_id,
                         employment=wd.employment,
+                        work_hours=wd.work_hours,
                         dttm_work_start=wd.dttm_work_start,
                         dttm_work_end=wd.dttm_work_end,
                         dt=wd.dt,
