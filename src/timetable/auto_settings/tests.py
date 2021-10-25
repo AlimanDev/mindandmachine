@@ -136,7 +136,8 @@ class TestAutoSettings(APITestCase):
             dt=dt,
             dttm_work_start=datetime.combine(dt, tm_from),
             dttm_work_end=datetime.combine(dt, tm_to),
-            type_id=WorkerDay.TYPE_WORKDAY
+            type_id=WorkerDay.TYPE_WORKDAY,
+            source=WorkerDay.SOURCE_ALGO,
         )
         self.assertEqual(len(wd), 1)
 
@@ -151,7 +152,8 @@ class TestAutoSettings(APITestCase):
             dt=dt,
             shop__isnull=True,
             dttm_work_start__isnull=True,
-            dttm_work_end__isnull=True
+            dttm_work_end__isnull=True,
+            source=WorkerDay.SOURCE_ALGO,
         ).count(), 1)
 
     @expectedFailure
@@ -279,7 +281,8 @@ class TestAutoSettings(APITestCase):
             dttm_work_end=datetime.combine(dt, tm_to),
             type_id=WorkerDay.TYPE_WORKDAY,
             id=self.wd1_plan_not_approved.id,
-            is_approved=False
+            is_approved=False,
+            source=WorkerDay.SOURCE_ALGO,
         )
         self.assertEqual(len(wd1), 1)
 

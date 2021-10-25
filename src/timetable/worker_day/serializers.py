@@ -198,7 +198,7 @@ class WorkerDaySerializer(serializers.ModelSerializer, UnaccountedOvertimeMixin)
 
         if not self.instance:
             attrs['source'] = WorkerDay.SOURCE_FULL_EDITOR
-            if self.context['request'].query_params.get('by_code'):
+            if (attrs.get('shop_id') is None) and ('shop_code' in attrs) or (attrs.get('employee_id') is None) and ('username' in attrs):
                 attrs['source'] = WorkerDay.SOURCE_INTEGRATION
             elif self.context.get('batch'):
                 attrs['source'] = WorkerDay.SOURCE_FAST_EDITOR
