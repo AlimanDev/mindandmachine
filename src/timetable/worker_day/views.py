@@ -41,8 +41,8 @@ from src.timetable.models import (
     TimesheetItem,
 )
 from src.timetable.timesheet.tasks import calc_timesheets
-from src.timetable.vacancy.utils import cancel_vacancies, cancel_vacancy, confirm_vacancy, notify_vacancy_created
 from src.timetable.vacancy.tasks import vacancies_create_and_cancel_for_shop
+from src.timetable.vacancy.utils import cancel_vacancies, cancel_vacancy, confirm_vacancy, notify_vacancy_created
 from src.timetable.worker_day.serializers import (
     OvertimesUndertimesReportSerializer,
     ChangeListSerializer,
@@ -66,6 +66,7 @@ from src.timetable.worker_day.serializers import (
     RecalcWdaysSerializer,
 )
 from src.timetable.worker_day.stat import count_daily_stat
+from src.timetable.worker_day.stat import get_month_range
 from src.timetable.worker_day.tasks import recalc_wdays, recalc_fact_from_records
 from src.timetable.worker_day.timetable import get_timetable_generator_cls
 from src.timetable.worker_day.utils import check_worker_day_permissions, create_worker_days_range, exchange, \
@@ -670,10 +671,10 @@ class WorkerDayViewSet(BaseModelViewSet):
                     ]
                 )
 
+                dttm_now = timezone.now()
                 # если план
                 if not serializer.data['is_fact']:
                     # отмечаем, что график подтвержден
-                    dttm_now = timezone.now()
                     ShopMonthStat.objects.update_or_create(
                         shop_id=serializer.validated_data['shop_id'],
                         dt=serializer.validated_data['dt_from'].replace(day=1),
@@ -709,11 +710,26 @@ class WorkerDayViewSet(BaseModelViewSet):
                     context=event_context,
                 ))
 
-                transaction.on_commit(lambda: calc_timesheets.apply_async(
-                    kwargs=dict(
-                        employee_id__in=list(worker_dates_dict.keys())
-                    ))
-                )
+                # запуск пересчета табеля на периоды для которых были изменены дни сотрудников,
+                # но не нарушая ограничения CALC_TIMESHEET_PREV_MONTH_THRESHOLD_DAYS
+                dt_now = dttm_now.date()
+                for employee_id, dates in worker_dates_dict.items():
+                    periods = set()
+                    for dt in dates:
+                        dt_start, dt_end = get_month_range(year=dt.year, month_num=dt.month)
+                        if (dt_now - dt_end).days <= settings.CALC_TIMESHEET_PREV_MONTH_THRESHOLD_DAYS:
+                            periods.add((dt_start, dt_end))
+                    if periods:
+                        for period_start, period_end in periods:
+                            transaction.on_commit(
+                                lambda _employee_id=employee_id, _period_start=Converter.convert_date(period_start),
+                                       _period_end=Converter.convert_date(period_end): calc_timesheets.apply_async(
+                                    kwargs=dict(
+                                        employee_id__in=[_employee_id],
+                                        dt_from=_period_start,
+                                        dt_to=_period_end,
+                                    ))
+                                )
 
                 WorkerDay.check_work_time_overlap(
                     employee_days_q=employee_days_q,

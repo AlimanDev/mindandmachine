@@ -441,6 +441,7 @@ class TestOutsource(TestsHelperMixin, APITestCase):
                     'show_user_biometrics_block': False,
                     'unaccounted_overtime_threshold': 60,
                     'forbid_edit_employments_came_through_integration': True,
+                    'get_position_from_work_type_name_in_calc_timesheet': False,
                     'show_remaking_choice': False,
                     'shop_name_form': {
                         "singular": {

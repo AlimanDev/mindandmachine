@@ -28,11 +28,34 @@ def fill_timesheet_items_position_and_shop(apps, schema_editor):
     )
 
 
+def add_timesheet_items_perms(apps, schema_editor):
+    Group = apps.get_model('base', 'Group')
+    FunctionGroup = apps.get_model('base', 'FunctionGroup')
+    for group in Group.objects.all():
+        FunctionGroup.objects.get_or_create(
+            group=group,
+            func='Timesheet_items',
+            method='GET',
+            defaults=dict(
+                access_type='A',
+            )
+        )
+        FunctionGroup.objects.get_or_create(
+            group=group,
+            func='Timesheet_lines',
+            method='GET',
+            defaults=dict(
+                access_type='A',
+            )
+        )
+
+
 class Migration(migrations.Migration):
     dependencies = [
         ('timetable', '0098_auto_20211022_1639'),
     ]
 
     operations = [
-        migrations.RunPython(fill_timesheet_items_position_and_shop, migrations.RunPython.noop)
+        migrations.RunPython(fill_timesheet_items_position_and_shop, migrations.RunPython.noop),
+        migrations.RunPython(add_timesheet_items_perms, migrations.RunPython.noop),
     ]

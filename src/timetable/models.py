@@ -560,7 +560,7 @@ class WorkerDay(AbstractModel):
     def _enrich_create_or_update_perms_data(cls, create_or_update_perms_data, obj_dict):
         action = WorkerDayPermission.CREATE_OR_UPDATE
         graph_type = WorkerDayPermission.FACT if obj_dict.get('is_fact') else WorkerDayPermission.PLAN
-        wd_type_id = obj_dict.get('type_id')
+        wd_type_id = obj_dict.get('type_id') or obj_dict.get('type').code
         dt = obj_dict.get('dt')
         shop_id = obj_dict.get('shop_id')
         k = f'{graph_type}_{action}_{wd_type_id}_{shop_id}'

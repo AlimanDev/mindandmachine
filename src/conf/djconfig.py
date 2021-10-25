@@ -503,6 +503,10 @@ ENV_LVL = env.str('ENV_LVL', default='')
 
 API_LOG_DELETE_GAP = 90
 
+# если текущий день месяца > {CALC_TIMESHEET_PREV_MONTH_THRESHOLD_DAYS},
+# то за прошлый месяца автоматически пересчет не запускается
+CALC_TIMESHEET_PREV_MONTH_THRESHOLD_DAYS = 4
+
 if is_config_exists('djconfig_local.py'):
     from .djconfig_local import *
 

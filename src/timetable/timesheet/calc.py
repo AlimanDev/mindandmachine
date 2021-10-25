@@ -24,7 +24,7 @@ def _get_calc_periods(dt_hired=None, dt_fired=None, dt_from=None, dt_to=None):
     if (dt_from is None and dt_to is None):
         dt_now = timezone.now().date()
 
-        if dt_now.day <= 4:
+        if dt_now.day <= settings.CALC_TIMESHEET_PREV_MONTH_THRESHOLD_DAYS:
             prev_month_start = (dt_now - relativedelta(months=1)).replace(day=1)
             prev_month_end = (prev_month_start + relativedelta(months=1)).replace(day=1) - datetime.timedelta(days=1)
             dt_start = max(dt_hired, prev_month_start)
