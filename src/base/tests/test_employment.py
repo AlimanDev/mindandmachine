@@ -712,3 +712,94 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
         )
         employment = Employment.objects.get(id=resp.json()['id'])
         self.assertEqual(employment.shop_id, self.shop2.id)
+
+    def _test_update_worker_position_permissions(self, position_id, status_code, assert_position_id):
+        response = self.client.put(
+            f'/rest_api/employment/{self.employment3.id}/', 
+            data=self.dump_data(
+                {
+                    'position_id': position_id,
+                    'dt_hired': (timezone.now() - timedelta(days=300)).strftime('%Y-%m-%d'),
+                    'shop_id': self.shop2.id,
+                    'employee_id': self.employee2.id,
+                }
+            ),
+            content_type='application/json',
+        )
+        self.assertEquals(response.status_code, status_code)
+        self.employment3.refresh_from_db()
+        self.assertEquals(self.employment3.position_id, assert_position_id)
+
+    def test_update_worker_position_permissions(self):
+        self.employment3.worker_position = None
+        self.employment3.save()
+        worker_position_with_chief_group = WorkerPosition.objects.create(
+            name='worker_position_with_chief_group',
+            network=self.network,
+            group=self.chief_group,
+        )
+        worker_position_with_employee_group = WorkerPosition.objects.create(
+            name='worker_position_with_employee_group',
+            network=self.network,
+            group=self.employee_group,
+        )
+        # нет subordunates
+        self._test_update_worker_position_permissions(worker_position_with_chief_group.id, 403, None)
+        self.admin_group.subordinates.add(self.chief_group)
+        # есть chief_group в subordunates
+        self._test_update_worker_position_permissions(worker_position_with_chief_group.id, 200, worker_position_with_chief_group.id)
+        # нет employee_group в subordunates
+        self._test_update_worker_position_permissions(worker_position_with_employee_group.id, 403, worker_position_with_chief_group.id)
+        self.admin_group.subordinates.add(self.employee_group)
+        self.admin_group.subordinates.remove(self.chief_group)
+        # есть employee_group в subordunates, но нет chief_group в subordunates
+        self._test_update_worker_position_permissions(worker_position_with_employee_group.id, 403, worker_position_with_chief_group.id)
+        self.admin_group.subordinates.add(self.chief_group)
+        # все есть в subordunates
+        self._test_update_worker_position_permissions(worker_position_with_employee_group.id, 200, worker_position_with_employee_group.id)
+        self.admin_group.subordinates.clear()
+        self.employment3.worker_position = None
+        self.employment3.save()
+
+    def _test_update_group_permissions(self, group_id, status_code, assert_group_id):
+        response = self.client.put(
+            f'/rest_api/employment/{self.employment3.id}/', 
+            data=self.dump_data(
+                {
+                    'function_group_id': group_id,
+                    'dt_hired': (timezone.now() - timedelta(days=300)).strftime('%Y-%m-%d'),
+                    'shop_id': self.shop2.id,
+                    'employee_id': self.employee2.id,
+                }
+            ),
+            content_type='application/json',
+        )
+        self.assertEquals(response.status_code, status_code)
+        self.employment3.refresh_from_db()
+        self.assertEquals(self.employment3.function_group_id, assert_group_id)
+
+    def test_update_group_permissions(self):
+        self.employment3.function_group_id = None
+        self.employment3.worker_position = None
+        self.employment3.save()
+        # нет subordunates
+        self._test_update_group_permissions(self.chief_group.id, 403, None)
+        self.admin_group.subordinates.add(self.chief_group)
+        # есть chief_group в subordunates
+        self._test_update_group_permissions(self.chief_group.id, 200, self.chief_group.id)
+        # нет employee_group в subordunates
+        self._test_update_group_permissions(self.employee_group.id, 403, self.chief_group.id)
+        self.admin_group.subordinates.add(self.employee_group)
+        self.admin_group.subordinates.remove(self.chief_group)
+        # есть employee_group в subordunates, но нет chief_group в subordunates
+        self._test_update_group_permissions(self.employee_group.id, 403, self.chief_group.id)
+        self.admin_group.subordinates.add(self.chief_group)
+        # все есть в subordunates
+        self._test_update_group_permissions(self.employee_group.id, 200, self.employee_group.id)
+        self.admin_group.subordinates.clear()
+        # нет subordunates, не можем очистить группу
+        self._test_update_group_permissions(None, 403, self.employee_group.id)
+        # есть employee_group в subordunates
+        self.admin_group.subordinates.add(self.employee_group)
+        self._test_update_group_permissions(None, 200, None)
+        self.admin_group.subordinates.clear()
