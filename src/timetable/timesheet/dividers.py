@@ -324,6 +324,15 @@ class NahodkaTimesheetDivider(BaseTimesheetDivider):
                     f'main t h: {self._get_main_timesheet_total_hours()} '
                     f'add h: {self._get_additional_timesheet_hours()}')
 
+    def _set_main_timesheet_start_and_end_time(self):
+        for data in self.fiscal_sheet_dict.values():
+            if data.get('fact_timesheet_dttm_work_start') and data.get('fact_timesheet_dttm_work_end'):
+                main_timesheet_type_obj = self.wd_types_dict.get(data['main_timesheet_type_id'])
+                if not main_timesheet_type_obj.is_dayoff:
+                    data['main_timesheet_dttm_work_start'] = data.get('fact_timesheet_dttm_work_start')
+                    data['main_timesheet_dttm_work_end'] = (data.get('fact_timesheet_dttm_work_end') - datetime.timedelta(
+                        hours=(data.get('fact_timesheet_total_hours') or 0) - (data.get('main_timesheet_total_hours') or 0))) if data.get('fact_timesheet_dttm_work_end') else None
+
     def divide(self):
         logger.info(f'start fiscal sheet divide')
         timesheet_data = self.fiscal_sheet_dict
@@ -331,6 +340,7 @@ class NahodkaTimesheetDivider(BaseTimesheetDivider):
         self._check_weekly_continuous_holidays()
         self._check_not_more_than_12_hours()
         self._check_overtimes()
+        self._set_main_timesheet_start_and_end_time()
         _create_timesheet_items(
             timesheet_dict=timesheet_data,
             timesheet_type_key='main',

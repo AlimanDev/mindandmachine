@@ -198,8 +198,9 @@ class WorkerDaySerializer(serializers.ModelSerializer, UnaccountedOvertimeMixin)
             raise ValidationError({"error": "Нельзя менять подтвержденную версию."})
 
         is_fact = attrs['is_fact'] if 'is_fact' in attrs else getattr(self.instance, 'is_fact', None)
-        wd_type = attrs['type_id']
+        wd_type = attrs.pop('type_id')
         wd_type_obj = self.wd_types_dict.get(wd_type)
+        attrs['type'] = wd_type_obj
         if is_fact and not wd_type_obj.use_in_fact:
             raise ValidationError({
                 "error": "Для фактической неподтвержденной версии можно установить только {}".format(
