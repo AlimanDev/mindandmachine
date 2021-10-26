@@ -53,7 +53,8 @@ def fmt3(**kwargs):
 
 
 class Timetable_xlsx(Tabel_xlsx):
-    def __init__(self, *args, **kwargs):
+    wd_type_field = 'type'
+    def __init__(self, *args,  for_inspection=False, **kwargs):
         super().__init__(*args, **kwargs)
         self.day_type = {
             'font_size': self._font_size(14),
@@ -80,6 +81,8 @@ class Timetable_xlsx(Tabel_xlsx):
                 'timetable_add_vacation_count_field', False),
         )
         self.additional_fields_count = sum(self.additional_fields_settings.values())
+        if for_inspection:
+            self.wd_type_field = 'day_type'
 
     def format_cells(self, users_len):
         super().format_cells(users_len)
@@ -197,7 +200,7 @@ class Timetable_xlsx(Tabel_xlsx):
                     wds = workdays.get(employment.employee_id, {}).get(dt.dt)
                     if len(wds) > max_rows:
                         max_rows = len(wds)
-                    wd_types = list(set(map(lambda x: x.type_id, wds)))
+                    wd_types = list(set(map(lambda x: getattr(x, self.wd_type_field + '_id'), wds)))
                     font_color = COLOR_BLACK
                     bg_color = COLOR_WHITE
 
@@ -205,13 +208,13 @@ class Timetable_xlsx(Tabel_xlsx):
                         font_color = self.WORKERDAY_TYPE_COLORS[wd_types[0]][0]
                         bg_color = self.WORKERDAY_TYPE_COLORS[wd_types[0]][1]
                     for wd in wds:
-                        if not wd.type.is_dayoff:
+                        if not getattr(wd, self.wd_type_field).is_dayoff:
                             text = '{}-{}'.format(wd.dttm_work_start.time().strftime(QOS_SHORT_TIME_FORMAT),
                                                     wd.dttm_work_end.time().strftime(QOS_SHORT_TIME_FORMAT))
-                            if not wd.type_id == WorkerDay.TYPE_WORKDAY:
-                                text = mapping[wd.type_id] + text
+                            if not getattr(wd, self.wd_type_field + '_id') == WorkerDay.TYPE_WORKDAY:
+                                text = mapping[getattr(wd, self.wd_type_field + '_id')] + text
                         else:
-                            text = mapping[wd.type_id]
+                            text = mapping[getattr(wd, self.wd_type_field + '_id')]
                         
                         texts.append(text)
                     
@@ -372,13 +375,13 @@ class Timetable_xlsx(Tabel_xlsx):
                     if len(wds) > max_rows[xdt.weekday()]:
                         max_rows[xdt.weekday()] = len(wds)
                     for wd in wds:
-                        if not wd.type.is_dayoff:
+                        if not getattr(wd, self.wd_type_field).is_dayoff:
                             text = '{}-{}'.format(wd.dttm_work_start.time().strftime(QOS_SHORT_TIME_FORMAT),
                                                     wd.dttm_work_end.time().strftime(QOS_SHORT_TIME_FORMAT))
-                            if not wd.type_id == WorkerDay.TYPE_WORKDAY:
-                                text = mapping[wd.type_id] + text
+                            if not getattr(wd, self.wd_type_field + '_id') == WorkerDay.TYPE_WORKDAY:
+                                text = mapping[getattr(wd, self.wd_type_field + '_id')] + text
                         else:
-                            text = mapping[wd.type_id]
+                            text = mapping[getattr(wd, self.wd_type_field + '_id')]
                         texts.append(text)
 
                     cell_data.append(Cell('\n'.join(texts),

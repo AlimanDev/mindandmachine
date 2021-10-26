@@ -4,6 +4,7 @@ from copy import deepcopy
 from datetime import timedelta, time, datetime, date
 
 from django.test.utils import override_settings
+from src.timetable.timesheet.tasks import calc_timesheets
 from src.timetable.worker_day.utils import create_fact_from_attendance_records
 from unittest import skip, mock
 
@@ -15,7 +16,7 @@ from rest_framework.test import APITestCase
 from etc.scripts.fill_calendar import main as fill_calendar
 from src.base.models import Employee, ProductionDay, Region, User, WorkerPosition, Employment
 from src.forecast.models import PeriodClients, OperationType, OperationTypeName
-from src.timetable.models import AttendanceRecords, WorkerDay, WorkType, WorkTypeName
+from src.timetable.models import AttendanceRecords, TimesheetItem, WorkerDay, WorkType, WorkTypeName
 from src.tasks.models import Task
 from src.timetable.tests.factories import WorkerDayFactory
 from src.util.mixins.tests import TestsHelperMixin
@@ -838,6 +839,54 @@ class TestUploadDownload(APITestCase):
         self.assertEqual(tabel[tabel.columns[1]][0], 'Магазин: Shop1') #fails with python > 3.6
         self.assertEqual(tabel[tabel.columns[1]][10], 'Иванов Иван Иванович')
         self.assertEqual(tabel[tabel.columns[27]][13], 'В')
+
+    @override_settings(FISCAL_SHEET_DIVIDER_ALIAS='nahodka')
+    def test_download_timetable_for_inspection(self):
+        fill_calendar('2020.4.1', '2021.12.31', self.region.id)
+        file = open('etc/scripts/timetable.xlsx', 'rb')
+        self.client.post(f'{self.url}upload/', {'shop_id': self.shop.id, 'file': file}, HTTP_ACCEPT_LANGUAGE='ru')
+        file.close()
+        WorkerDay.objects.update(is_approved=True)
+        calc_timesheets(dt_from=date(2020, 4, 1), dt_to=date(2020, 4, 30))
+        response = self.client.get(
+            f'{self.url}download_timetable/?shop_id={self.shop.id}&dt_from=2020-04-01&inspection_version=True')
+        self.assertEqual(response.status_code, 200)
+        tabel = pandas.read_excel(io.BytesIO(response.content))
+        self.assertEqual(tabel[tabel.columns[1]][0], 'Магазин: Shop1') #fails with python > 3.6
+        self.assertEqual(tabel[tabel.columns[1]][10], 'Иванов Иван Иванович')
+        self.assertEqual(tabel[tabel.columns[27]][13], 'В')
+        self.assertEqual(tabel[tabel.columns[4]][15], 'НН')
+        self.assertEqual(tabel[tabel.columns[5]][15], 'НН')
+        employment = Employment.objects.get(
+            employee__user__last_name='Сидоров',
+            employee__user__first_name='Сергей',
+        )
+        TimesheetItem.objects.filter(
+            employee=employment.employee,
+            dt=date(2020, 4, 1),
+        ).update(
+            dttm_work_start=datetime(2020, 4, 1, 10),
+            dttm_work_end=datetime(2020, 4, 1, 20),
+            day_type=WorkerDay.TYPE_WORKDAY,
+        )
+        TimesheetItem.objects.filter(
+            employee=employment.employee,
+            dt=date(2020, 4, 2),
+        ).update(
+            dttm_work_start=datetime(2020, 4, 2, 10),
+            dttm_work_end=datetime(2020, 4, 2, 21),
+            day_type=WorkerDay.TYPE_BUSINESS_TRIP,
+        )
+        
+        response = self.client.get(
+            f'{self.url}download_timetable/?shop_id={self.shop.id}&dt_from=2020-04-01&inspection_version=True')
+        self.assertEqual(response.status_code, 200)
+        tabel = pandas.read_excel(io.BytesIO(response.content))
+        self.assertEqual(tabel[tabel.columns[1]][0], 'Магазин: Shop1') #fails with python > 3.6
+        self.assertEqual(tabel[tabel.columns[1]][10], 'Иванов Иван Иванович')
+        self.assertEqual(tabel[tabel.columns[27]][13], 'В')
+        self.assertEqual(tabel[tabel.columns[4]][15], '10:00-20:00')
+        self.assertEqual(tabel[tabel.columns[5]][15], 'К10:00-21:00')
 
     def test_download_timetable_with_child_region(self):
         fill_calendar('2020.4.1', '2021.12.31', self.region.id)
