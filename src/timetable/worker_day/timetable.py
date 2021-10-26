@@ -28,6 +28,7 @@ from src.base.models import (
 )
 from src.timetable.models import (
     EmploymentWorkType,
+    TimesheetItem,
     WorkerDay,
     WorkType,
     WorkerDayType,
@@ -109,26 +110,27 @@ class BaseUploadDownloadTimeTable:
             'position',
         ).order_by('employee__user__last_name', 'employee__user__first_name', 'employee__user__middle_name', 'employee_id')
 
-    def _get_worker_day_qs(self, employee_ids=[], dt_from=None, dt_to=None, is_approved=True):
+    def _get_worker_day_qs(self, employee_ids=[], dt_from=None, dt_to=None, is_approved=True, for_inspection=False):
         workdays = WorkerDay.objects.select_related('employee', 'employee__user', 'shop', 'type').filter(
             Q(dt__lte=F('employment__dt_fired')) | Q(employment__dt_fired__isnull=True) | Q(employment__isnull=True),
             (Q(dt__gte=F('employment__dt_hired')) | Q(employment__isnull=True)) & Q(dt__gte=dt_from),
-            employee_id__in=employee_ids,
             dt__lte=dt_to,
             is_approved=is_approved,
             is_fact=False,
-        ).order_by(
-            'employee__user__last_name', 'employee__user__first_name', 'employee__user__middle_name', 'employee_id', 'dt', 'dttm_work_start')
+        )
 
-        return workdays
-        # .get_last_ordered(
-        #     is_fact=False,
-        #     order_by=[
-        #         '-is_approved' if is_approved else 'is_approved',
-        #         '-is_vacancy',
-        #         '-id',
-        #     ]
-        # )
+        if for_inspection:
+            workdays = TimesheetItem.objects.select_related('employee', 'employee__user', 'shop', 'day_type').filter(
+                dt__gte=dt_from,
+                dt__lte=dt_to,
+                timesheet_type=TimesheetItem.TIMESHEET_TYPE_MAIN,
+            )
+
+        return workdays.filter(
+            employee_id__in=employee_ids,
+        ).order_by(
+            'employee__user__last_name', 'employee__user__first_name', 'employee__user__middle_name', 'employee_id', 'dt', 'dttm_work_start',
+        )
 
     def _get_employee_qs(self, network_id, shop_id, dt_from, dt_to, employee_id__in):
         employee_qs = Employee.objects.filter(
@@ -539,6 +541,7 @@ class UploadDownloadTimetableCells(BaseUploadDownloadTimeTable):
             worksheet=ws,
             prod_days=None,
             on_print=form['on_print'],
+            for_inspection=form.get('inspection_version', False),
         )
 
         employments = self._get_employment_qs(shop.network, shop.id, dt_from=timetable.prod_days[0].dt, dt_to=timetable.prod_days[-1].dt)
@@ -552,10 +555,7 @@ class UploadDownloadTimetableCells(BaseUploadDownloadTimeTable):
         stat_type = 'approved' if form['is_approved'] else 'not_approved'
         norm_type = shop.network.settings_values_prop.get('download_timetable_norm_field', 'norm_work_hours')
 
-        workdays = self._get_worker_day_qs(employee_ids=employee_ids, dt_from=timetable.prod_days[0].dt, dt_to=timetable.prod_days[-1].dt, is_approved=form['is_approved'])
-
-        if form.get('inspection_version', False):
-            timetable.change_for_inspection(timetable.prod_month.get('norm_work_hours', 0), workdays)
+        workdays = self._get_worker_day_qs(employee_ids=employee_ids, dt_from=timetable.prod_days[0].dt, dt_to=timetable.prod_days[-1].dt, is_approved=form['is_approved'], for_inspection=form.get('inspection_version', False))
 
         timetable.format_cells(len(employments))
 
