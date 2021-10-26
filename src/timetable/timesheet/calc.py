@@ -65,6 +65,7 @@ class TimesheetCalculator:
             'dt',
             'type',
             'type__is_dayoff',
+            'type__is_work_hours',
             'work_hours',
             'dttm_work_start_tabel',
             'dttm_work_end_tabel',
@@ -119,6 +120,11 @@ class TimesheetCalculator:
                 wd_dict['fact_timesheet_total_hours'] = total_hours
                 wd_dict['fact_timesheet_day_hours'] = day_hours
                 wd_dict['fact_timesheet_night_hours'] = night_hours
+            if (worker_day.type.is_dayoff and worker_day.type.is_work_hours):
+                dayoff_work_hours = worker_day.work_hours.total_seconds() / 3600
+                wd_dict['fact_timesheet_total_hours'] = dayoff_work_hours
+                wd_dict['fact_timesheet_day_hours'] = dayoff_work_hours
+                wd_dict['fact_timesheet_night_hours'] = 0
             fact_timesheet_dict.setdefault(self._get_empl_key(self.employee.id, worker_day.dt), []).append(wd_dict)
 
         plan_wdays_qs = WorkerDay.objects.filter(
@@ -177,12 +183,19 @@ class TimesheetCalculator:
                         'fact_timesheet_source': TimesheetItem.SOURCE_TYPE_SYSTEM if day_in_past else TimesheetItem.SOURCE_TYPE_PLAN,
                     }
                     if not day_in_past:
-                        total_hours, day_hours, night_hours = plan_wd.calc_day_and_night_work_hours()
-                        d['fact_timesheet_dttm_work_start'] = plan_wd.dttm_work_start_tabel
-                        d['fact_timesheet_dttm_work_end'] = plan_wd.dttm_work_end_tabel
-                        d['fact_timesheet_total_hours'] = total_hours
-                        d['fact_timesheet_day_hours'] = day_hours
-                        d['fact_timesheet_night_hours'] = night_hours
+                        if not plan_wd.type.is_dayoff:
+                            total_hours, day_hours, night_hours = plan_wd.calc_day_and_night_work_hours()
+                            d['fact_timesheet_dttm_work_start'] = plan_wd.dttm_work_start_tabel
+                            d['fact_timesheet_dttm_work_end'] = plan_wd.dttm_work_end_tabel
+                            d['fact_timesheet_total_hours'] = total_hours
+                            d['fact_timesheet_day_hours'] = day_hours
+                            d['fact_timesheet_night_hours'] = night_hours
+                        if (plan_wd.type.is_dayoff and plan_wd.type.is_work_hours):
+                            dayoff_work_hours = worker_day.work_hours.total_seconds() / 3600
+                            d['fact_timesheet_total_hours'] = dayoff_work_hours
+                            d['fact_timesheet_day_hours'] = dayoff_work_hours
+                            d['fact_timesheet_night_hours'] = 0
+
                     fact_timesheet_dict.setdefault(empl_dt_key, []).append(d)
 
                     # если день в прошлом, то ставим только 1 прогул, независимо от того сколько workerday в плане

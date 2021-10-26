@@ -2075,7 +2075,7 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
             self.get_url('WorkerDay-batch-update-or-create'), self.dump_data(data), content_type='application/json')
         self.assertContains(
             resp, 'Операция не может быть выполнена. '
-                  'Невозможно создать разные типы дней на одну дату для одного сотрудника.', status_code=400)
+                  'Невозможно создать несколько нерабочих дней на одну дату для одного сотрудника.', status_code=400)
 
     def test_cant_create_multiple_wdays_on_one_date_if_setting_is_enabled(self):
         WorkerDay.objects.all().delete()

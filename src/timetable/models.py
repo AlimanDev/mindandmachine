@@ -1197,7 +1197,6 @@ class WorkerDay(AbstractModel):
                     dt=OuterRef('dt'),
                     is_fact=OuterRef('is_fact'),
                     is_approved=OuterRef('is_approved'),
-                    type__is_dayoff=True,
                 )
             )
         ).filter(
