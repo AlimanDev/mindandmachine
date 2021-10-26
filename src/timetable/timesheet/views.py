@@ -71,7 +71,8 @@ class TimesheetViewSet(BaseModelViewSet):
                 )[:1]
             ),
             fact_timesheet_total_hours=Sum(F('day_hours') + F('night_hours'), filter=Q(
-                day_type__is_dayoff=False, timesheet_type=TimesheetItem.TIMESHEET_TYPE_FACT)),
+                Q(day_type__is_dayoff=False) | Q(day_type__is_dayoff=True, day_type__is_work_hours=True),
+                timesheet_type=TimesheetItem.TIMESHEET_TYPE_FACT)),
             fact_timesheet_day_hours=Sum('day_hours', filter=Q(day_hours__gt=0, timesheet_type=TimesheetItem.TIMESHEET_TYPE_FACT)),
             fact_timesheet_night_hours=Sum('night_hours', filter=Q(night_hours__gt=0, timesheet_type=TimesheetItem.TIMESHEET_TYPE_FACT)),
             main_timesheet_type=Subquery(
