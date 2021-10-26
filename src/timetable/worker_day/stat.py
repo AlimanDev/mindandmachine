@@ -939,6 +939,8 @@ class WorkersStatsGetter:
 
                             sawh_hours['selected_period'] = sawh_hours.get('selected_period', 0) + \
                                 empl_dict.get('sawh_hours_plan_not_approved_selected_period', 0)
+                            sawh_hours['curr_month_without_reduce_norm'] = empl_dict.get('sawh_hours_by_months',
+                                                                                         {}).get(curr_month, 0)
 
                     else:
                         for empl_id, empl_dict in employee_dict.get('employments', {}).items():
@@ -949,6 +951,8 @@ class WorkersStatsGetter:
 
                             sawh_hours['selected_period'] = sawh_hours.get('selected_period', 0) + \
                                 empl_dict.get('sawh_hours_plan_approved_selected_period', 0)
+                            sawh_hours['curr_month_without_reduce_norm'] = empl_dict.get('sawh_hours_by_months', {}).get(
+                                curr_month, 0)
 
                     is_last_month = curr_month == acc_period_dt_to.month
                     if self.network.correct_norm_hours_last_month_acc_period and self.network.accounting_period_length > 1 and is_last_month:
