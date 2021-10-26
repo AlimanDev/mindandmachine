@@ -42,7 +42,7 @@ class MultipleWDTypesOnOneDateForOneEmployee(Exception):
         )
         return gettext(
                 'Операция не может быть выполнена. '
-                'Невозможно создать разные типы дней на одну дату для одного сотрудника. ({error_str})').format(
+                'Невозможно создать несколько нерабочих дней на одну дату для одного сотрудника. ({error_str})').format(
             error_str=error_str
         )
 

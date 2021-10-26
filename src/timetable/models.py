@@ -1152,12 +1152,14 @@ class WorkerDay(AbstractModel):
                                 user_id__in=None, dt=None, dt__in=None, is_fact=None, is_approved=None, raise_exc=True,
                                 exc_cls=None):
         """
-        Проверка, что нету различных типов рабочих дней на 1 дату для 1 сотрудника
+        Проверка, что нету нескольких нерабочих типов дней на 1 дату для 1 сотрудника
         """
         if not (employee_days_q or employee_id or employee_id__in or user_id or user_id__in):
             return
 
-        lookup = {}
+        lookup = {
+            'type__is_dayoff': True,
+        }
         if is_fact is not None:
             lookup['is_fact'] = is_fact
 
@@ -1195,6 +1197,7 @@ class WorkerDay(AbstractModel):
                     dt=OuterRef('dt'),
                     is_fact=OuterRef('is_fact'),
                     is_approved=OuterRef('is_approved'),
+                    type__is_dayoff=True,
                 )
             )
         ).filter(
