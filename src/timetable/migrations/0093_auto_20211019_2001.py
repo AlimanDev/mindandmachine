@@ -77,9 +77,10 @@ def move_old_timesheet_data_to_new_timesheet(apps, schema_editor):
                         employee_id=timesheet.employee_id,
                         dt=timesheet.dt,
                         dttm_work_start=timesheet.fact_timesheet_dttm_work_start,
-                        dttm_work_end=(timesheet.fact_timesheet_dttm_work_start - timedelta(
-                            hours=float(timesheet.main_timesheet_day_hours or 0) + float(
-                                timesheet.main_timesheet_night_hours or 0))) if timesheet.fact_timesheet_dttm_work_start else None,
+                        dttm_work_end=(timesheet.fact_timesheet_dttm_work_end - timedelta(
+                            hours=(float(timesheet.fact_timesheet_day_hours or 0) + float(
+                                timesheet.fact_timesheet_night_hours or 0)) - ((float(timesheet.main_timesheet_day_hours or 0) + float(
+                                timesheet.main_timesheet_night_hours or 0))))) if timesheet.fact_timesheet_dttm_work_end else None,
                         day_type=timesheet.main_timesheet_type,
                         day_hours=timesheet.main_timesheet_day_hours or Decimal('0.00'),
                         night_hours=timesheet.main_timesheet_night_hours or Decimal('0.00'),
@@ -93,9 +94,6 @@ def move_old_timesheet_data_to_new_timesheet(apps, schema_editor):
                     timesheet_type=TIMESHEET_TYPE_ADDITIONAL,
                     employee_id=timesheet.employee_id,
                     dt=timesheet.dt,
-                    dttm_work_start=(timesheet.fact_timesheet_dttm_work_end - timedelta(
-                        hours=float(timesheet.additional_timesheet_hours or 0))) if timesheet.fact_timesheet_dttm_work_end else None,
-                    dttm_work_end=timesheet.fact_timesheet_dttm_work_end,
                     day_type_id='W',
                     day_hours=timesheet.additional_timesheet_hours,
                     shop_id=timesheet.shop_id,
