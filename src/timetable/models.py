@@ -467,15 +467,6 @@ class WorkerDay(AbstractModel):
     class Meta:
         verbose_name = 'Рабочий день сотрудника'
         verbose_name_plural = 'Рабочие дни сотрудников'
-        constraints = (
-            UniqueConstraint(
-                fields=['dt', 'employee', 'is_fact', 'is_approved'],
-                # TODO: нельзя делать ограничения по джоинам, как быть?
-                #   пока захардкодил коды для типов, которые есть или будут is_dayoff=False
-                condition=~Q(type_id__in=['W', 'Q', 'T', 'SD', 'R']),
-                name='unique_dt_employee_is_fact_is_approved_if_not_workday'
-            ),
-        )
 
     TYPE_HOLIDAY = 'H'
     TYPE_WORKDAY = 'W'
@@ -1152,7 +1143,9 @@ class WorkerDay(AbstractModel):
                                 user_id__in=None, dt=None, dt__in=None, is_fact=None, is_approved=None, raise_exc=True,
                                 exc_cls=None):
         """
-        Проверка, что нету нескольких нерабочих типов дней на 1 дату для 1 сотрудника
+        Проверка,
+            - не может быть нескольких нерабочих дней на 1 дату
+            - не может быть одновременные нерабочий день и рабочий день на 1 дату
         """
         if not (employee_days_q or employee_id or employee_id__in or user_id or user_id__in):
             return
@@ -1189,18 +1182,28 @@ class WorkerDay(AbstractModel):
             q &= employee_days_q
 
         has_multiple_workday_types_qs = cls.objects.filter(q).annotate(
-            has_multiple_workday_types=Exists(
+            has_multiple_dayoff_types=Exists(
                 WorkerDay.objects.filter(
                     ~Q(id=OuterRef('id')),
-                    ~Q(type_id=OuterRef('type_id')),
+                    type__is_dayoff=True,
                     employee_id=OuterRef('employee_id'),
                     dt=OuterRef('dt'),
                     is_fact=OuterRef('is_fact'),
                     is_approved=OuterRef('is_approved'),
                 )
-            )
+            ),
+            has_dayoff_and_not_dayoff=Exists(
+                WorkerDay.objects.filter(
+                    ~Q(id=OuterRef('id')),
+                    type__is_dayoff=False,
+                    employee_id=OuterRef('employee_id'),
+                    dt=OuterRef('dt'),
+                    is_fact=OuterRef('is_fact'),
+                    is_approved=OuterRef('is_approved'),
+                )
+            ),
         ).filter(
-            has_multiple_workday_types=True,
+            Q(has_multiple_dayoff_types=True) | Q(has_dayoff_and_not_dayoff=True),
         ).values('employee__user__last_name', 'employee__user__first_name', 'dt').distinct()
 
         multiple_workday_types_data = list(has_multiple_workday_types_qs)
