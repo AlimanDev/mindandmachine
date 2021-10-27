@@ -256,7 +256,7 @@ class Timetable_xlsx(Tabel_xlsx):
                 )
                 n += 1
 
-            plan_hours = None
+            plan_hours = int(round(stat.get(employment.employee_id, {}).get('plan', {}).get(stat_type, {}).get('work_hours', {}).get('total', 0)))
             if self.additional_fields_settings.get('timetable_add_work_hours_field'):
                 plan_hours = int(round(stat.get(employment.employee_id, {}).get('plan', {}).get(stat_type, {}).get('work_hours', {}).get('total', 0)))
                 self.worksheet.write_string(
@@ -266,7 +266,7 @@ class Timetable_xlsx(Tabel_xlsx):
                 )
                 n += 1
 
-            norm_hours = None
+            norm_hours = int(round(stat.get(employment.employee_id, {}).get('plan', {}).get(stat_type, {}).get(norm_type, {}).get('curr_month', 0)))
             if self.additional_fields_settings.get('timetable_add_norm_hours_field'):
                 norm_hours = int(round(stat.get(employment.employee_id, {}).get('plan', {}).get(stat_type, {}).get(norm_type, {}).get('curr_month', 0)))
                 self.worksheet.write_string(
