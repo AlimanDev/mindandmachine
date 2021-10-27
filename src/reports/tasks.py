@@ -14,13 +14,6 @@ def send_report_emails(report_config_id: int, zone: str):
     ).get(
         id=report_config_id,
     )
-    message_content = report_config.email_text or ''
-    subject = report_config.subject
-    recipients = report_config.get_recipients()
-
-    if report_config.email_addresses:
-        recipients.extend(report_config.email_addresses.split(','))
-    datatuple = []
     dates = report_config.get_dates(zone)
     context = {
         'dt_from': dates['dt_from'],
@@ -28,6 +21,13 @@ def send_report_emails(report_config_id: int, zone: str):
         'shop_ids': list(report_config.shops.all().values_list('id', flat=True)),
         'period_step': report_config.get_acc_period()
     }
+    message_content = report_config.email_text or ''
+    subject = report_config.subject
+    recipients = report_config.get_recipients(context)
+
+    if report_config.email_addresses:
+        recipients.extend(report_config.email_addresses.split(','))
+    datatuple = []
     if report_config.send_by_group_employments_shops:
         groups = list(report_config.groups.all())
         employments = Employment.objects.get_active().filter(

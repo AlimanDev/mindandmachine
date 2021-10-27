@@ -38,3 +38,6 @@ class BaseRegisteredReport(metaclass=ReportRegistryHolder):
 
     def get_file(self):
         return None
+
+    def get_recipients_shops(self):
+        return []

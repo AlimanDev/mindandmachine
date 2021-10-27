@@ -498,6 +498,20 @@ class TestSendUrvViolatorsEventNotifications(TestsHelperMixin, APITestCase):
                 },
             ]
             self.assertEqual(df.to_dict('records'), data)
+            # проверяем, что УРСу не придет, так как его магазина нет в данных
+            report_config.filter_recipients_by_shops_in_data = True
+            report_config.save()
+            mail.outbox.clear()
+            cron_report()
+            self.assertEqual(len(mail.outbox), 2)
+            self.assertEqual(mail.outbox[0].subject, subject)
+            emails = sorted(
+                [
+                    outbox.to[0]
+                    for outbox in mail.outbox
+                ]
+            )
+            self.assertEqual(emails, [self.user_dir.email, self.shop.email])
 
     def test_urv_violators_email_notification_sent_to_shop(self):
         with self.settings(CELERY_TASK_ALWAYS_EAGER=True):
