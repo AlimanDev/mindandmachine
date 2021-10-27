@@ -1,14 +1,13 @@
-from datetime import date, datetime, time
+from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 
 import pandas as pd
 from django.db.models import Sum, Q
 from django.test import TestCase, override_settings
-
-from src.base.models import WorkerPosition
+from src.base.models import SAWHSettings, SAWHSettingsMapping, Network, WorkerPosition
 from src.base.tests.factories import ShopFactory
 from src.timetable.models import TimesheetItem, WorkerDay
-from src.timetable.models import WorkTypeName, WorkType
+from src.timetable.models import WorkTypeName, WorkType, WorkerDayType
 from src.timetable.tests.factories import WorkerDayFactory
 from ._base import TestTimesheetMixin
 
@@ -269,11 +268,31 @@ class TestNahodkaDivider(TestTimesheetMixin, TestCase):
         self.assertEqual(TimesheetItem.objects.filter(timesheet_type=TimesheetItem.TIMESHEET_TYPE_FACT, day_type_id=WorkerDay.TYPE_WORKDAY).count(), 0)
 
 
-@override_settings(FISCAL_SHEET_DIVIDER_ALIAS='pobeda')
+@override_settings(FISCAL_SHEET_DIVIDER_ALIAS='pobeda', TIMESHEET_MIN_HOURS_THRESHOLD=Decimal('5.00'))
 class TestPobedaDivider(TestTimesheetMixin, TestCase):
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
+        cls.network.round_work_hours_alg = Network.ROUND_TO_HALF_AN_HOUR
+        cls.network.save()
+        cls.san_day = cls._create_san_day()
+        sawh_settings = SAWHSettings.objects.create(
+            network=cls.network,
+            work_hours_by_months={
+                'm6': 175,
+            },
+            type=SAWHSettings.FIXED_HOURS,
+        )
+        sawh_settings_mapping = SAWHSettingsMapping.objects.create(
+            sawh_settings=sawh_settings,
+            year=2021,
+        )
+        sawh_settings_mapping.positions.add(cls.position_worker)
+        WorkerDayType.objects.filter(
+            code__in=[WorkerDay.TYPE_VACATION, WorkerDay.TYPE_MATERNITY, WorkerDay.TYPE_SICK, WorkerDay.TYPE_ABSENSE]
+        ).update(
+            is_work_hours=True,
+        )
 
     def test_calc_timesheets(self):
         self._calc_timesheets(reraise_exc=True)
@@ -349,3 +368,80 @@ class TestPobedaDivider(TestTimesheetMixin, TestCase):
                          self.employment_worker.position_id)
         self.assertEqual(TimesheetItem.objects.filter(
             timesheet_type=TimesheetItem.TIMESHEET_TYPE_ADDITIONAL, dt=date(2021, 6, 7), position=other_position).count(), 1)
+
+    def test_vacation_and_sick_hours_divide(self):
+        WorkerDay.objects.all().delete()
+        wdays = (
+            ((WorkerDay.TYPE_HOLIDAY, None, None, None), (
+                date(2021, 6, 2),
+                date(2021, 6, 3),
+            )),
+            ((WorkerDay.TYPE_SICK, None, None, timedelta(hours=12)), (
+                date(2021, 6, 18),
+                date(2021, 6, 19),
+            )),
+            ((WorkerDay.TYPE_VACATION, None, None, None), (
+                date(2021, 6, 6),
+                date(2021, 6, 7),
+                date(2021, 6, 8),
+                date(2021, 6, 9),
+                date(2021, 6, 10),
+                date(2021, 6, 11),
+                date(2021, 6, 12),
+            )),
+            ((WorkerDay.TYPE_WORKDAY, time(8), time(21), None), (
+                date(2021, 6, 1),
+                date(2021, 6, 4),
+                date(2021, 6, 5),
+                date(2021, 6, 13),
+                date(2021, 6, 14),
+                date(2021, 6, 15),
+                date(2021, 6, 16),
+                date(2021, 6, 17),
+                date(2021, 6, 20),
+                date(2021, 6, 21),
+                date(2021, 6, 22),
+                date(2021, 6, 23),
+            )),
+            ((WorkerDay.TYPE_WORKDAY, time(8), time(18), None), (
+                date(2021, 6, 24),
+            )),
+        )
+        for (wd_type_id, tm_start, tm_end, work_hours), dates in wdays:
+            for dt in dates:
+                is_night_work = False
+                if tm_start and tm_end and tm_end < tm_start:
+                    is_night_work = True
+
+                is_work_day = wd_type_id == WorkerDay.TYPE_WORKDAY
+                WorkerDayFactory(
+                    type_id=wd_type_id,
+                    dt=dt,
+                    shop=self.shop,
+                    employee=self.employee_worker,
+                    employment=self.employment_worker,
+                    dttm_work_start=datetime.combine(dt, tm_start) if is_work_day else None,
+                    dttm_work_end=datetime.combine(dt + timedelta(days=1) if is_night_work else dt,
+                                                   tm_end) if is_work_day else None,
+                    is_fact=is_work_day,
+                    is_approved=True,
+                    work_hours=work_hours,
+                )
+
+        data = WorkerDay.objects.filter(type__is_work_hours=True).aggregate(work_hours_sum=Sum('work_hours'))
+        self.assertEqual(data['work_hours_sum'].total_seconds() / 3600, 219)
+        self._calc_timesheets(reraise_exc=True)
+        self.assertEqual(TimesheetItem.objects.get(
+            timesheet_type=TimesheetItem.TIMESHEET_TYPE_MAIN, dt='2021-06-12').day_type_id, WorkerDay.TYPE_HOLIDAY)
+        self.assertEqual(TimesheetItem.objects.get(
+            timesheet_type=TimesheetItem.TIMESHEET_TYPE_MAIN, dt='2021-06-13').day_type_id, WorkerDay.TYPE_HOLIDAY)
+        self.assertEqual(TimesheetItem.objects.get(
+            timesheet_type=TimesheetItem.TIMESHEET_TYPE_MAIN, dt='2021-06-06').day_hours, 7)
+        self.assertEqual(TimesheetItem.objects.get(
+            timesheet_type=TimesheetItem.TIMESHEET_TYPE_MAIN, dt='2021-06-18').day_type_id, WorkerDay.TYPE_ABSENSE)
+        self.assertEqual(TimesheetItem.objects.get(
+            timesheet_type=TimesheetItem.TIMESHEET_TYPE_MAIN, dt='2021-06-18').day_hours, 12)
+        self.assertEqual(TimesheetItem.objects.get(
+            timesheet_type=TimesheetItem.TIMESHEET_TYPE_MAIN, dt='2021-06-19').day_type_id, WorkerDay.TYPE_HOLIDAY)
+        self.assertEqual(TimesheetItem.objects.filter(
+            timesheet_type=TimesheetItem.TIMESHEET_TYPE_ADDITIONAL, dt='2021-06-19').first(), None)

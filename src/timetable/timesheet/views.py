@@ -87,11 +87,13 @@ class TimesheetViewSet(BaseModelViewSet):
                 )[:1]
             ),
             main_timesheet_total_hours=Sum(F('day_hours') + F('night_hours'), filter=Q(
-                day_type__is_dayoff=False, timesheet_type=TimesheetItem.TIMESHEET_TYPE_MAIN)),
+                Q(day_type__is_dayoff=False) | Q(day_type__is_dayoff=True, day_type__is_work_hours=True),
+                timesheet_type=TimesheetItem.TIMESHEET_TYPE_MAIN)),
             main_timesheet_day_hours=Sum('day_hours', filter=Q(day_hours__gt=0, timesheet_type=TimesheetItem.TIMESHEET_TYPE_MAIN)),
             main_timesheet_night_hours=Sum('night_hours', filter=Q(night_hours__gt=0, timesheet_type=TimesheetItem.TIMESHEET_TYPE_MAIN)),
             additional_timesheet_hours=Sum(F('day_hours') + F('night_hours'), filter=Q(
-                day_type__is_dayoff=False, timesheet_type=TimesheetItem.TIMESHEET_TYPE_ADDITIONAL)),
+                Q(day_type__is_dayoff=False) | Q(day_type__is_dayoff=True, day_type__is_work_hours=True),
+                timesheet_type=TimesheetItem.TIMESHEET_TYPE_ADDITIONAL)),
         )
 
         page = self.paginate_queryset(grouped_qs)

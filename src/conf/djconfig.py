@@ -9,6 +9,7 @@ config importance
 import enum
 import os
 import sys
+from decimal import Decimal
 
 import environ
 from celery.schedules import crontab
@@ -506,6 +507,9 @@ API_LOG_DELETE_GAP = 90
 # если текущий день месяца > {CALC_TIMESHEET_PREV_MONTH_THRESHOLD_DAYS},
 # то за прошлый месяца автоматически пересчет не запускается
 CALC_TIMESHEET_PREV_MONTH_THRESHOLD_DAYS = 4
+
+TIMESHEET_MAX_HOURS_THRESHOLD = Decimal('12.00')
+TIMESHEET_MIN_HOURS_THRESHOLD = Decimal('4.00')
 
 if is_config_exists('djconfig_local.py'):
     from .djconfig_local import *

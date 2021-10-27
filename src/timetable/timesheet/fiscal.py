@@ -11,9 +11,10 @@ from src.timetable.models import (
 
 
 class TimesheetItem:
-    def __init__(self, shop, position, day_type,
+    def __init__(self, dt, shop, position, day_type,
                  day_hours=None, night_hours=None,
                  work_type_name=None, dttm_work_start=None, dttm_work_end=None, source=None):
+        self.dt = dt
         self.shop = shop
         self.position = position
         self.work_type_name = work_type_name
@@ -30,6 +31,7 @@ class TimesheetItem:
 
     def copy(self, overrides=None):
         kwargs = dict(
+            dt=self.dt,
             shop=self.shop,
             position=self.position,
             work_type_name=self.work_type_name,
@@ -56,18 +58,20 @@ class TimesheetItem:
             if field_hours > 0:
                 if field_hours > hours_left_to_subtract:
                     setattr(self, field, field_hours - hours_left_to_subtract)
-                    new_dttm_work_end = self.dttm_work_end - timedelta(hours=float(hours_left_to_subtract))
-                    self.dttm_work_end = new_dttm_work_end
+                    if not self.day_type.is_dayoff:
+                        new_dttm_work_end = self.dttm_work_end - timedelta(hours=float(hours_left_to_subtract))
+                        self.dttm_work_end = new_dttm_work_end
+                        subtracted_item.dttm_work_start = new_dttm_work_end
                     setattr(subtracted_item, field,
                             getattr(subtracted_item, field) + hours_left_to_subtract)
-                    subtracted_item.dttm_work_start = new_dttm_work_end
                     break
                 else:
                     setattr(self, field, Decimal('0.00'))
-                    new_dttm_work_end = self.dttm_work_end - timedelta(hours=float(field_hours))
-                    self.dttm_work_end = new_dttm_work_end
+                    if not self.day_type.is_dayoff:
+                        new_dttm_work_end = self.dttm_work_end - timedelta(hours=float(field_hours))
+                        self.dttm_work_end = new_dttm_work_end
+                        subtracted_item.dttm_work_start = new_dttm_work_end
                     setattr(subtracted_item, field, getattr(subtracted_item, field) + field_hours)
-                    subtracted_item.dttm_work_start = new_dttm_work_end
                     hours_left_to_subtract = hours_left_to_subtract - field_hours
         return subtracted_item
 
@@ -78,32 +82,35 @@ class Timesheet:
         self._timesheet_items = OrderedDict()
         self.timesheet_type = timesheet_type
 
-    def _get_hours_sum(self, dt, fields):
+    def _get_hours_sum(self, dt, fields, filter_func=None):
         hours_sum = Decimal('0.00')
-        timesheet_items = self.get_items(dt=dt)
+        timesheet_items = self.get_items(dt=dt, filter_func=filter_func)
         for timesheet_item in timesheet_items:
             for field in fields:
                 hours_sum += getattr(timesheet_item, field, None) or Decimal('0.00')
         return hours_sum
 
-    def get_items(self, dt=None):
-        return self._timesheet_items.get(dt, []) if dt else list(
+    def get_items(self, dt=None, filter_func=None):
+        items = self._timesheet_items.get(dt, []) if dt else list(
             item for sublist in self._timesheet_items.values() for item in sublist)
+        if filter_func:
+            items = list(filter(filter_func, items))
+        return items
 
     def is_holiday(self, dt):
         items = self.get_items(dt=dt)
         return not items or \
-               any(item.day_type.is_dayoff for item in items) or \
+               any((item.day_type.is_dayoff and not item.day_type.is_work_hours) for item in items) or \
                self.get_total_hours_sum(dt=dt) == 0
 
-    def get_day_hours_sum(self, dt=None):
-        return self._get_hours_sum(dt=dt, fields=['day_hours'])
+    def get_day_hours_sum(self, dt=None, filter_func=None):
+        return self._get_hours_sum(dt=dt, filter_func=filter_func, fields=['day_hours'])
 
-    def get_night_hours_sum(self, dt=None):
-        return self._get_hours_sum(dt=dt, fields=['night_hours'])
+    def get_night_hours_sum(self, dt=None, filter_func=None):
+        return self._get_hours_sum(dt=dt, filter_func=filter_func, fields=['night_hours'])
 
-    def get_total_hours_sum(self, dt=None):
-        return self._get_hours_sum(dt=dt, fields=['day_hours', 'night_hours'])
+    def get_total_hours_sum(self, dt=None, filter_func=None):
+        return self._get_hours_sum(dt=dt, filter_func=filter_func, fields=['day_hours', 'night_hours'])
 
     def add(self, dt, timesheet_item):
         if isinstance(timesheet_item, list):
@@ -197,6 +204,7 @@ class FiscalTimesheet:
         for dt, fact_timesheet_data_items in fact_timesheet_data.items():
             for fact_timesheet_item_dict in fact_timesheet_data_items:
                 self.fact_timesheet.add(dt, TimesheetItem(
+                    dt=fact_timesheet_item_dict.get('dt'),
                     shop=fact_timesheet_item_dict.get('shop'),
                     position=fact_timesheet_item_dict.get('position'),
                     work_type_name=fact_timesheet_item_dict.get('work_type_name'),
