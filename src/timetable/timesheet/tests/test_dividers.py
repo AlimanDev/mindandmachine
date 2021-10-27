@@ -1,11 +1,14 @@
-from datetime import datetime, time, date
+from datetime import date, datetime, time
 from decimal import Decimal
 
 import pandas as pd
 from django.db.models import Sum, Q
 from django.test import TestCase, override_settings
 
+from src.base.models import WorkerPosition
+from src.base.tests.factories import ShopFactory
 from src.timetable.models import TimesheetItem, WorkerDay
+from src.timetable.models import WorkTypeName, WorkType
 from src.timetable.tests.factories import WorkerDayFactory
 from ._base import TestTimesheetMixin
 
@@ -276,4 +279,73 @@ class TestPobedaDivider(TestTimesheetMixin, TestCase):
         self._calc_timesheets(reraise_exc=True)
         self.assertEqual(TimesheetItem.objects.filter(timesheet_type=TimesheetItem.TIMESHEET_TYPE_FACT).count(), 30)
         self.assertEqual(TimesheetItem.objects.filter(timesheet_type=TimesheetItem.TIMESHEET_TYPE_MAIN).count(), 30)
-        self.assertEqual(TimesheetItem.objects.filter(timesheet_type=TimesheetItem.TIMESHEET_TYPE_ADDITIONAL).count(), 30)
+
+    def test_work_in_other_shop_moved_to_additional_timesheet(self):
+        another_shop = ShopFactory(
+            parent=self.root_shop,
+            name='SHOP_NAME2',
+            network=self.network,
+            email='shop2@example.com',
+            settings__breaks=self.breaks,
+        )
+        WorkerDay.objects.filter(
+            is_approved=True,
+            is_fact=True,
+            dt=date(2021, 6, 7),
+            employee=self.employee_worker,
+        ).update(
+            shop=another_shop,
+        )
+        self._calc_timesheets(reraise_exc=True)
+        self.assertEqual(TimesheetItem.objects.filter(
+            timesheet_type=TimesheetItem.TIMESHEET_TYPE_ADDITIONAL, dt=date(2021, 6, 7)).count(), 1)
+        self.assertEqual(TimesheetItem.objects.filter(
+            timesheet_type=TimesheetItem.TIMESHEET_TYPE_MAIN, dt=date(2021, 6, 7)).count(), 1)
+        self.assertEqual(TimesheetItem.objects.filter(
+            timesheet_type=TimesheetItem.TIMESHEET_TYPE_MAIN, dt=date(2021, 6, 7)).get().day_type_id,
+                         WorkerDay.TYPE_HOLIDAY)
+
+    def test_other_position_work_moved_to_additional_timesheet(self):
+        self.network.get_position_from_work_type_name_in_calc_timesheet = True
+        self.network.save()
+        other_position = WorkerPosition.objects.create(
+            network=self.network,
+            name='Работник',
+            group=self.group_worker,
+        )
+        other_work_type_name = WorkTypeName.objects.create(
+            position=other_position,
+            network=self.network,
+            name='other',
+            code='other',
+        )
+        other_work_type = WorkType.objects.create(
+            work_type_name=other_work_type_name,
+            shop=self.shop,
+        )
+        dt = date(2021, 6, 7)
+        WorkerDayFactory(
+            is_approved=True,
+            is_fact=True,
+            shop=self.shop,
+            employment=self.employment_worker,
+            employee=self.employee_worker,
+            dt=dt,
+            type_id=WorkerDay.TYPE_WORKDAY,
+            dttm_work_start=datetime.combine(dt, time(20)),
+            dttm_work_end=datetime.combine(dt, time(23)),
+            cashbox_details__work_type=other_work_type,
+        )
+        self._calc_timesheets(reraise_exc=True)
+        self.assertEqual(TimesheetItem.objects.filter(
+            timesheet_type=TimesheetItem.TIMESHEET_TYPE_ADDITIONAL, day_type_id=WorkerDay.TYPE_WORKDAY).count(), 3)
+        self.assertEqual(TimesheetItem.objects.filter(
+            timesheet_type=TimesheetItem.TIMESHEET_TYPE_MAIN, dt=date(2021, 6, 7)).count(), 1)
+        self.assertEqual(TimesheetItem.objects.filter(
+            timesheet_type=TimesheetItem.TIMESHEET_TYPE_MAIN, dt=date(2021, 6, 7)).get().day_type_id,
+                         WorkerDay.TYPE_WORKDAY)
+        self.assertEqual(TimesheetItem.objects.filter(
+            timesheet_type=TimesheetItem.TIMESHEET_TYPE_MAIN, dt=date(2021, 6, 7)).get().position_id,
+                         self.employment_worker.position_id)
+        self.assertEqual(TimesheetItem.objects.filter(
+            timesheet_type=TimesheetItem.TIMESHEET_TYPE_ADDITIONAL, dt=date(2021, 6, 7), position=other_position).count(), 1)

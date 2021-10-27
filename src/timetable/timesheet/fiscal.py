@@ -117,11 +117,17 @@ class Timesheet:
     def pop(self, dt):
         return self._timesheet_items.pop(dt)
 
-    def subtract_hours(self, dt, hours_to_subtract):
+    def remove(self, dt, item):
+        return self._timesheet_items[dt].remove(item)
+
+    def subtract_hours(self, dt, hours_to_subtract, filters=None):
         items = self.pop(dt)
         subtracted_items = []
         hours_left_to_subtract = hours_to_subtract
         for item in items:
+            if filters:
+                if not all(getattr(item, k) == v for k, v in filters.items()):
+                    continue
             if hours_left_to_subtract > item.total_hours:
                 items.remove(item)
                 subtracted_items.append(item)

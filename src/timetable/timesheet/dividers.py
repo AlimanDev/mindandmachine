@@ -18,13 +18,6 @@ class BaseTimesheetDivider:
     def __init__(self, fiscal_timesheet: FiscalTimesheet):
         self.fiscal_timesheet = fiscal_timesheet
 
-
-class PobedaTimesheetDivider(BaseTimesheetDivider):
-    def divide(self):
-        raise NotImplementedError
-
-
-class NahodkaTimesheetDivider(BaseTimesheetDivider):
     def _is_holiday(self, item_data):
         if not item_data:
             return True
@@ -149,21 +142,6 @@ class NahodkaTimesheetDivider(BaseTimesheetDivider):
 
         logger.info(f'finish weekly continuous holidays check')
 
-    def _fill_main_timesheet(self):
-        for dt in pd.date_range(self.fiscal_timesheet.dt_from, self.fiscal_timesheet.dt_to).date:
-            fact_timesheet_items = filter(
-                lambda i: i.day_type.is_dayoff or i.day_type.is_work_hours, self.fiscal_timesheet.fact_timesheet.get_items(dt))
-            if fact_timesheet_items:
-                for fact_timesheet_item in fact_timesheet_items:
-                    self.fiscal_timesheet.main_timesheet.add(dt=dt, timesheet_item=fact_timesheet_item.copy())
-            else:
-                active_employment = self.fiscal_timesheet._get_active_employment(dt)
-                self.fiscal_timesheet.main_timesheet.add(TimesheetItem(
-                    shop=active_employment.shop,
-                    position=active_employment.position,
-                    day_type=self.fiscal_timesheet.wd_types_dict.get(WorkerDay.TYPE_HOLIDAY),
-                ))
-
     def _check_not_more_than_threshold_hours(self):
         for dt in pd.date_range(self.fiscal_timesheet.dt_from, self.fiscal_timesheet.dt_to).date:
             main_timesheet_total_hours_sum = self.fiscal_timesheet.main_timesheet.get_total_hours_sum(dt)
@@ -176,6 +154,9 @@ class NahodkaTimesheetDivider(BaseTimesheetDivider):
 
     def _get_overtime(self, norm_hours):
         return self.fiscal_timesheet.main_timesheet.get_total_hours_sum() - norm_hours
+
+    def _get_subtract_filters(self, dt):
+        return {}
 
     def _check_overtimes(self):
         logger.info(
@@ -204,6 +185,7 @@ class NahodkaTimesheetDivider(BaseTimesheetDivider):
         logger.info(f'overtime_plan at the beginning: {overtime_plan}')
 
         for dt in pd.date_range(self.fiscal_timesheet.dt_from, self.fiscal_timesheet.dt_to).date:
+            subtract_filters = self._get_subtract_filters(dt=dt)
             if overtime_plan == 0.0:  # не будет ли проблем из-за того, что часы у нас не целые часы?
                 logger.debug('overtime_plan == 0.0, break')
                 break
@@ -218,7 +200,9 @@ class NahodkaTimesheetDivider(BaseTimesheetDivider):
                 hours_transfer = min(hours_overflow, overtime_plan)
 
                 subtracted_items = self.fiscal_timesheet.main_timesheet.subtract_hours(
-                    dt=dt, hours_to_subtract=hours_transfer)
+                    dt=dt, hours_to_subtract=hours_transfer,
+                    filters=subtract_filters,
+                )
                 self.fiscal_timesheet.additional_timesheet.add(dt=dt, timesheet_item=subtracted_items)
                 if subtracted_items:
                     moved_hours = sum(i.total_hours for i in subtracted_items)
@@ -238,15 +222,20 @@ class NahodkaTimesheetDivider(BaseTimesheetDivider):
                 if abs(overtime_plan) >= additional_timesheet_hours:
                     if main_timesheet_total_hours + additional_timesheet_hours <= TIMESHEET_MAX_HOURS_THRESHOLD:
                         hours_transfer = additional_timesheet_hours
-                        items = self.fiscal_timesheet.additional_timesheet.pop(dt=dt)
-                        self.fiscal_timesheet.main_timesheet.add(dt=dt, timesheet_item=items)
+                        subtracted_items = self.fiscal_timesheet.additional_timesheet.subtract_hours(
+                            dt=dt, hours_to_subtract=hours_transfer,
+                            filters=subtract_filters,
+                        )
+                        self.fiscal_timesheet.main_timesheet.add(dt=dt, timesheet_item=subtracted_items)
                         overtime_plan += hours_transfer
                         continue
                     else:
                         threshold_hours = TIMESHEET_MAX_HOURS_THRESHOLD
                         hours_transfer = threshold_hours - main_timesheet_total_hours
                         subtracted_items = self.fiscal_timesheet.additional_timesheet.subtract_hours(
-                            dt=dt, hours_to_subtract=hours_transfer)
+                            dt=dt, hours_to_subtract=hours_transfer,
+                            filters=subtract_filters,
+                        )
                         self.fiscal_timesheet.main_timesheet.add(dt=dt, timesheet_item=subtracted_items)
                         overtime_plan += hours_transfer
                         continue
@@ -254,7 +243,9 @@ class NahodkaTimesheetDivider(BaseTimesheetDivider):
                     if main_timesheet_total_hours + abs(overtime_plan) <= TIMESHEET_MAX_HOURS_THRESHOLD:
                         hours_transfer = abs(overtime_plan)
                         subtracted_items = self.fiscal_timesheet.additional_timesheet.subtract_hours(
-                            dt=dt, hours_to_subtract=hours_transfer)
+                            dt=dt, hours_to_subtract=hours_transfer,
+                            filters=subtract_filters,
+                        )
                         self.fiscal_timesheet.main_timesheet.add(dt=dt, timesheet_item=subtracted_items)
                         overtime_plan += hours_transfer
                         continue
@@ -262,7 +253,9 @@ class NahodkaTimesheetDivider(BaseTimesheetDivider):
                         threshold_hours = TIMESHEET_MAX_HOURS_THRESHOLD
                         hours_transfer = threshold_hours - main_timesheet_total_hours
                         subtracted_items = self.fiscal_timesheet.additional_timesheet.subtract_hours(
-                            dt=dt, hours_to_subtract=hours_transfer)
+                            dt=dt, hours_to_subtract=hours_transfer,
+                            filters=subtract_filters,
+                        )
                         self.fiscal_timesheet.main_timesheet.add(dt=dt, timesheet_item=subtracted_items)
                         overtime_plan += hours_transfer
                         continue
@@ -271,6 +264,62 @@ class NahodkaTimesheetDivider(BaseTimesheetDivider):
                     f'main t h: {self.fiscal_timesheet.main_timesheet.get_total_hours_sum()} '
                     f'add h: {self.fiscal_timesheet.additional_timesheet.get_total_hours_sum()}')
 
+    def _fill_main_timesheet(self):
+        for dt in pd.date_range(self.fiscal_timesheet.dt_from, self.fiscal_timesheet.dt_to).date:
+            fact_timesheet_items = filter(
+                lambda i: i.day_type.is_dayoff or i.day_type.is_work_hours, self.fiscal_timesheet.fact_timesheet.get_items(dt))
+            if fact_timesheet_items:
+                for fact_timesheet_item in fact_timesheet_items:
+                    self.fiscal_timesheet.main_timesheet.add(dt=dt, timesheet_item=fact_timesheet_item.copy())
+            else:
+                active_employment = self.fiscal_timesheet._get_active_employment(dt)
+                self.fiscal_timesheet.main_timesheet.add(TimesheetItem(
+                    shop=active_employment.shop,
+                    position=active_employment.position,
+                    day_type=self.fiscal_timesheet.wd_types_dict.get(WorkerDay.TYPE_HOLIDAY),
+                ))
+
+
+class PobedaTimesheetDivider(BaseTimesheetDivider):
+    def _move_other_shop_or_position_work_to_additional_timesheet(self):
+        for dt in pd.date_range(self.fiscal_timesheet.dt_from, self.fiscal_timesheet.dt_to).date:
+            active_employment = self.fiscal_timesheet._get_active_employment(dt)
+            for main_timesheet_item in self.fiscal_timesheet.main_timesheet.get_items(dt=dt):
+                if main_timesheet_item.position != active_employment.position \
+                        or main_timesheet_item.shop != active_employment.shop:
+                    self.fiscal_timesheet.main_timesheet.remove(dt, main_timesheet_item)
+                    self.fiscal_timesheet.additional_timesheet.add(dt, main_timesheet_item)
+
+    def _fill_empty_dates_as_holidays_in_main_timesheet(self):
+        for dt in pd.date_range(self.fiscal_timesheet.dt_from, self.fiscal_timesheet.dt_to).date:
+            active_employment = self.fiscal_timesheet._get_active_employment(dt)
+            main_timesheet_items = self.fiscal_timesheet.main_timesheet.get_items(dt=dt)
+            if not main_timesheet_items:
+                self.fiscal_timesheet.main_timesheet.add(dt=dt, timesheet_item=TimesheetItem(
+                    shop=active_employment.shop,
+                    position=active_employment.position,
+                    day_type=self.fiscal_timesheet.wd_types_dict.get(WorkerDay.TYPE_HOLIDAY),
+                ))
+
+    def _get_subtract_filters(self, dt):
+        active_employment = self.fiscal_timesheet._get_active_employment(dt)
+        return {
+            'position': active_employment.position,
+            'shop': active_employment.shop,
+        }
+
+    def divide(self):
+        logger.info(f'start fiscal sheet divide')
+        self._fill_main_timesheet()
+        self._move_other_shop_or_position_work_to_additional_timesheet()
+        self._check_weekly_continuous_holidays()
+        self._check_not_more_than_threshold_hours()
+        self._check_overtimes()
+        self._fill_empty_dates_as_holidays_in_main_timesheet()
+        logger.info(f'finish fiscal sheet divide')
+
+
+class NahodkaTimesheetDivider(BaseTimesheetDivider):
     def divide(self):
         logger.info(f'start fiscal sheet divide')
         self._fill_main_timesheet()

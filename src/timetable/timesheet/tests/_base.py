@@ -23,7 +23,7 @@ from src.util.mixins.tests import TestsHelperMixin
 class TestTimesheetMixin(TestsHelperMixin):
     @classmethod
     def setUpTestData(cls):
-        breaks = BreakFactory(value='[[0, 2040, [60]]]', code='1h')
+        cls.breaks = breaks = BreakFactory(value='[[0, 2040, [60]]]', code='1h')
         cls.network = NetworkFactory(breaks=breaks)
         cls.root_shop = ShopFactory(
             network=cls.network,
