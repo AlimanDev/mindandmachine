@@ -2,7 +2,7 @@ import datetime
 import io
 import re
 import time
-from django.db.models.aggregates import Count, Sum
+from django.db.models.functions import Coalesce
 
 import pandas as pd
 import xlsxwriter
@@ -10,7 +10,7 @@ from dateutil.parser import parse
 from dateutil.relativedelta import relativedelta
 from django.conf import settings
 from django.db import transaction
-from django.db.models import Q, F
+from django.db.models import Q, F, Count, Sum
 from django.db.models.expressions import OuterRef, Subquery
 from django.http.response import HttpResponse
 from django.utils.encoding import escape_uri_path
@@ -564,17 +564,20 @@ class UploadDownloadTimetableCells(BaseUploadDownloadTimeTable):
                     dt__gte=timetable.prod_days[0].dt,
                     dt__lte=timetable.prod_days[-1].dt,
                     timesheet_type=TimesheetItem.TIMESHEET_TYPE_MAIN,
-                    day_type__is_work_hours=True,
                 ).values(
                     'employee_id',
                 ).annotate(
-                    work_hours=Sum('day_hours') + Sum('night_hours'),
-                    work_days=Count('*'),
-                ).values('employee_id', 'work_hours', 'work_days')
+                    work_hours=Coalesce(Sum('day_hours', filter=Q(day_type__is_work_hours=True)), 0) + Coalesce(Sum('night_hours', filter=Q(day_type__is_work_hours=True)), 0),
+                    work_days=Count('id', filter=Q(day_type__is_work_hours=True, day_type__is_dayoff=False)),
+                    holidays=Count('id', filter=Q(day_type_id=WorkerDay.TYPE_HOLIDAY)),
+                    vacations=Count('id', filter=Q(day_type_id=WorkerDay.TYPE_VACATION)),
+                ).values('employee_id', 'work_hours', 'work_days', 'holidays', 'vacations')
             }
             for e in stat.keys():
                 stat.setdefault(e, {}).setdefault('plan', {}).setdefault(stat_type, {}).setdefault('work_days', {})['total'] = main_stat.get(e, {}).get('work_days', 0)
                 stat.setdefault(e, {}).setdefault('plan', {}).setdefault(stat_type, {}).setdefault('work_hours', {})['total'] = main_stat.get(e, {}).get('work_hours', 0)
+                stat.setdefault(e, {}).setdefault('plan', {}).setdefault(stat_type, {}).setdefault('day_type', {})['H'] = main_stat.get(e, {}).get('holidays', 0)
+                stat.setdefault(e, {}).setdefault('plan', {}).setdefault(stat_type, {}).setdefault('day_type', {})['V'] = main_stat.get(e, {}).get('vacations', 0)
 
         workdays = self._get_worker_day_qs(employee_ids=employee_ids, dt_from=timetable.prod_days[0].dt, dt_to=timetable.prod_days[-1].dt, is_approved=form['is_approved'], for_inspection=form.get('inspection_version', False))
 

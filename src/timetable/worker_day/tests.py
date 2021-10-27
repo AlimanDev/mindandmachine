@@ -846,6 +846,9 @@ class TestUploadDownload(APITestCase):
         file = open('etc/scripts/timetable.xlsx', 'rb')
         self.client.post(f'{self.url}upload/', {'shop_id': self.shop.id, 'file': file}, HTTP_ACCEPT_LANGUAGE='ru')
         file.close()
+        self.network.set_settings_value('timetable_add_holiday_count_field', True)
+        self.network.set_settings_value('timetable_add_vacation_count_field', True)
+        self.network.save()
         WorkerDay.objects.update(is_approved=True)
         calc_timesheets(dt_from=date(2020, 4, 1), dt_to=date(2020, 4, 30))
         response = self.client.get(
@@ -879,6 +882,12 @@ class TestUploadDownload(APITestCase):
             day_type=WorkerDay.TYPE_BUSINESS_TRIP,
             day_hours=9.5,
         )
+        TimesheetItem.objects.filter(
+            employee=employment.employee,
+            dt=date(2020, 4, 3),
+        ).update(
+            day_type=WorkerDay.TYPE_VACATION,
+        )
         
         response = self.client.get(
             f'{self.url}download_timetable/?shop_id={self.shop.id}&dt_from=2020-04-01&inspection_version=True')
@@ -891,6 +900,8 @@ class TestUploadDownload(APITestCase):
         self.assertEqual(tabel[tabel.columns[5]][15], 'К10:00-21:00')
         self.assertEqual(tabel[tabel.columns[34]][15], '2')
         self.assertEqual(tabel[tabel.columns[35]][15], '18')
+        self.assertEqual(tabel[tabel.columns[38]][15], '14')
+        self.assertEqual(tabel[tabel.columns[39]][15], '1')
 
     def test_download_timetable_with_child_region(self):
         fill_calendar('2020.4.1', '2021.12.31', self.region.id)
