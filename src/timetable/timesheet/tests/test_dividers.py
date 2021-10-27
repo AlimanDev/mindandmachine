@@ -271,3 +271,9 @@ class TestPobedaDivider(TestTimesheetMixin, TestCase):
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
+
+    def test_calc_timesheets(self):
+        self._calc_timesheets(reraise_exc=True)
+        self.assertEqual(TimesheetItem.objects.filter(timesheet_type=TimesheetItem.TIMESHEET_TYPE_FACT).count(), 30)
+        self.assertEqual(TimesheetItem.objects.filter(timesheet_type=TimesheetItem.TIMESHEET_TYPE_MAIN).count(), 30)
+        self.assertEqual(TimesheetItem.objects.filter(timesheet_type=TimesheetItem.TIMESHEET_TYPE_ADDITIONAL).count(), 30)

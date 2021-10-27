@@ -1,7 +1,7 @@
 from datetime import datetime, time, date
-from unittest import mock
 
 import pandas as pd
+from freezegun import freeze_time
 
 from etc.scripts import fill_calendar
 from src.base.tests.factories import (
@@ -74,6 +74,6 @@ class TestTimesheetMixin(TestsHelperMixin):
         fill_calendar.fill_days('2021.01.1', '2021.12.31', cls.shop.region.id)
 
     def _calc_timesheets(self, dt_from=None, dt_to=None, dttm_now=None, reraise_exc=True):
-        with mock.patch('src.timetable.timesheet.calc.timezone.now') as _now_mock:
-            _now_mock.return_value = dttm_now or datetime.combine(date(2021, 6, 7), time(10, 10, 10))
+        dttm_now = dttm_now or datetime.combine(date(2021, 6, 7), time(10, 10, 10))
+        with freeze_time(dttm_now):
             calc_timesheets(employee_id__in=[self.employee_worker.id], dt_from=dt_from, dt_to=dt_to, reraise_exc=reraise_exc)
