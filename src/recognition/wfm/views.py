@@ -63,7 +63,7 @@ class WorkerDayViewSet(viewsets.ReadOnlyModelViewSet):
             Q(dt=dt_from, dttm_work_start__isnull=False, dttm_work_end__isnull=False) |
             Q(dt=dt_from - timedelta(1), dttm_work_end__date=dt_from), # чтобы ночные смены попадали
             shop_id=tick_point.shop_id,
-            child__id__isnull=True,
+            # child__id__isnull=True,
             is_fact=False,
             is_approved=True,
         )
