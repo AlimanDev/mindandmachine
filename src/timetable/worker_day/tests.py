@@ -868,6 +868,7 @@ class TestUploadDownload(APITestCase):
             dttm_work_start=datetime(2020, 4, 1, 10),
             dttm_work_end=datetime(2020, 4, 1, 20),
             day_type=WorkerDay.TYPE_WORKDAY,
+            day_hours=8.5,
         )
         TimesheetItem.objects.filter(
             employee=employment.employee,
@@ -876,6 +877,7 @@ class TestUploadDownload(APITestCase):
             dttm_work_start=datetime(2020, 4, 2, 10),
             dttm_work_end=datetime(2020, 4, 2, 21),
             day_type=WorkerDay.TYPE_BUSINESS_TRIP,
+            day_hours=9.5,
         )
         
         response = self.client.get(
@@ -887,6 +889,8 @@ class TestUploadDownload(APITestCase):
         self.assertEqual(tabel[tabel.columns[27]][13], 'В')
         self.assertEqual(tabel[tabel.columns[4]][15], '10:00-20:00')
         self.assertEqual(tabel[tabel.columns[5]][15], 'К10:00-21:00')
+        self.assertEqual(tabel[tabel.columns[34]][15], '2')
+        self.assertEqual(tabel[tabel.columns[35]][15], '18')
 
     def test_download_timetable_with_child_region(self):
         fill_calendar('2020.4.1', '2021.12.31', self.region.id)

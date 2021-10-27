@@ -2,6 +2,7 @@ import datetime
 import io
 import re
 import time
+from django.db.models.aggregates import Count, Sum
 
 import pandas as pd
 import xlsxwriter
@@ -554,6 +555,26 @@ class UploadDownloadTimetableCells(BaseUploadDownloadTimeTable):
         ).run()
         stat_type = 'approved' if form['is_approved'] else 'not_approved'
         norm_type = shop.network.settings_values_prop.get('download_timetable_norm_field', 'norm_work_hours')
+        if form.get('inspection_version', False):
+            main_stat = { 
+                s['employee_id'] : s 
+                for s in TimesheetItem.objects.filter(
+                    employee_id__in=employee_ids,
+                    shop_id=shop.id,
+                    dt__gte=timetable.prod_days[0].dt,
+                    dt__lte=timetable.prod_days[-1].dt,
+                    timesheet_type=TimesheetItem.TIMESHEET_TYPE_MAIN,
+                    day_type__is_work_hours=True,
+                ).values(
+                    'employee_id',
+                ).annotate(
+                    work_hours=Sum('day_hours') + Sum('night_hours'),
+                    work_days=Count('*'),
+                ).values('employee_id', 'work_hours', 'work_days')
+            }
+            for e in stat.keys():
+                stat.setdefault(e, {}).setdefault('plan', {}).setdefault(stat_type, {}).setdefault('work_days', {})['total'] = main_stat.get(e, {}).get('work_days', 0)
+                stat.setdefault(e, {}).setdefault('plan', {}).setdefault(stat_type, {}).setdefault('work_hours', {})['total'] = main_stat.get(e, {}).get('work_hours', 0)
 
         workdays = self._get_worker_day_qs(employee_ids=employee_ids, dt_from=timetable.prod_days[0].dt, dt_to=timetable.prod_days[-1].dt, is_approved=form['is_approved'], for_inspection=form.get('inspection_version', False))
 
