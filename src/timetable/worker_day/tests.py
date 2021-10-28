@@ -839,7 +839,7 @@ class TestUploadDownload(APITestCase):
         tabel = pandas.read_excel(io.BytesIO(response.content))
         self.assertEqual(tabel[tabel.columns[1]][0], 'Магазин: Shop1') #fails with python > 3.6
         self.assertEqual(tabel[tabel.columns[1]][10], 'Иванов Иван Иванович')
-        self.assertEqual(tabel[tabel.columns[7]][10], 'ОТ 8')
+        self.assertEqual(tabel[tabel.columns[7]][10], 'ОТ 8.0')
         self.assertEqual(tabel[tabel.columns[27]][13], 'В')
         self.assertEqual(tabel[tabel.columns[4]][15], '10:00-14:00\n18:00-20:00')
         self.assertEqual(tabel[tabel.columns[5]][15], 'К10:00-21:00')
@@ -913,7 +913,7 @@ class TestUploadDownload(APITestCase):
         self.assertEqual(tabel[tabel.columns[27]][13], 'В')
         self.assertEqual(tabel[tabel.columns[4]][15], '10:00-20:00')
         self.assertEqual(tabel[tabel.columns[5]][15], 'К10:00-21:00')
-        self.assertEqual(tabel[tabel.columns[6]][15], 'ОТ 8')
+        self.assertEqual(tabel[tabel.columns[6]][15], 'ОТ 8.0')
         self.assertEqual(tabel[tabel.columns[34]][15], '2')
         self.assertEqual(tabel[tabel.columns[35]][15], '26')
         self.assertEqual(tabel[tabel.columns[38]][15], '14')
