@@ -1,9 +1,12 @@
 import datetime
 
+from django.conf import settings
+from django.db.models import Case, When, Sum, Value, IntegerField
+
 from src.base.models import ProductionDay
 from src.timetable.worker_day.xlsx_utils.colors import *
 from src.util.models_converter import Converter
-from django.db.models import Case, When, Sum, Value, IntegerField, Q, BooleanField, Subquery, OuterRef
+
 
 class Xlsx_base:
     WEEKDAY_TRANSLATION = [
@@ -160,7 +163,7 @@ class Xlsx_base:
         date_format = self.workbook.add_format(format_s)
 
         col_func_dict = {
-            'code': (lambda e: e.employee.tabel_code or '', bold_text_format, self.worksheet.write_string),
+            'code': (settings.DOWNLOAD_TIMETABLE_GET_CODE_FUNC, bold_text_format, self.worksheet.write_string),
             'fio': (lambda e: '{} {} {}'.format(e.employee.user.last_name, e.employee.user.first_name, e.employee.user.middle_name), text_format,
                     self.worksheet.write_string),
             'position': (lambda e: e.position.name if e.position else 'Не указано', text_format, self.worksheet.write_string),

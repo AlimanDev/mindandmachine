@@ -511,6 +511,8 @@ CALC_TIMESHEET_PREV_MONTH_THRESHOLD_DAYS = 4
 TIMESHEET_MAX_HOURS_THRESHOLD = Decimal('12.00')
 TIMESHEET_MIN_HOURS_THRESHOLD = Decimal('4.00')
 
+DOWNLOAD_TIMETABLE_GET_CODE_FUNC = lambda e: e.employee.tabel_code or ''
+
 if is_config_exists('djconfig_local.py'):
     from .djconfig_local import *
 
