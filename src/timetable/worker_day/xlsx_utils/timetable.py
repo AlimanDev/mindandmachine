@@ -216,7 +216,7 @@ class Timetable_xlsx(Tabel_xlsx):
                             if not getattr(wd, self.wd_type_field + '_id') == WorkerDay.TYPE_WORKDAY:
                                 text = mapping[getattr(wd, self.wd_type_field + '_id')] + text
                         elif getattr(wd, self.wd_type_field).is_dayoff and getattr(wd, self.wd_type_field).is_work_hours:
-                            text = mapping[getattr(wd, self.wd_type_field + '_id')] + ' ' + str(round(getattr(wd, self.work_hours_field)))
+                            text = mapping[getattr(wd, self.wd_type_field + '_id')] + ' ' + str(round(getattr(wd, self.work_hours_field), 1))
                         else:
                             text = mapping[getattr(wd, self.wd_type_field + '_id')]
                         
