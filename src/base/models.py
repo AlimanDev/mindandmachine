@@ -22,6 +22,7 @@ from django.utils.functional import cached_property
 from django.utils.translation import gettext_lazy as _
 from model_utils import FieldTracker
 from mptt.models import MPTTModel, TreeForeignKey
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.serializers import ValidationError
 from timezone_field import TimeZoneField
 from src.base.models_abstract import (
@@ -924,6 +925,23 @@ class Group(AbstractActiveNetworkSpecificCodeNamedModel):
             # ', '.join(list(self.subordinates.values_list('name', flat=True)))
         )
 
+    @classmethod
+    def check_has_perm_to_group(cls, user, group=None, groups=[]):
+        group_perm = True
+        if groups or group:
+            groups = groups or [group,]
+            group_perm = cls.objects.filter(
+                Q(employments__employee__user=user) | Q(workerposition__employment__employee__user=user),
+                subordinates__id__in=groups,
+            ).exists()
+
+        return group_perm
+
+    @classmethod
+    def check_has_perm_to_edit_group_objects(cls, group_from, group_to, user):
+        if not (cls.check_has_perm_to_group(user, group=group_from) and cls.check_has_perm_to_group(user, group=group_to)):
+            raise PermissionDenied()
+
 
 class ProductionDay(AbstractModel):
     """
@@ -1122,9 +1140,8 @@ class User(DjangoAbstractUser, AbstractModel):
         )
 
     def get_group_ids(self, shop=None):
-        return self.get_active_employments(shop=shop).annotate(
-            group_id=Coalesce(F('function_group_id'), F('position__group_id')),
-        ).values_list('group_id', flat=True)
+        groups = self.get_active_employments(shop=shop).values_list('position__group_id', 'function_group_id')
+        return list(set(list(map(lambda x: x[0], groups)) + list(map(lambda x: x[1], groups))))
 
     def save(self, *args, **kwargs):
         if not self.password and settings.SET_USER_PASSWORD_AS_LOGIN:
