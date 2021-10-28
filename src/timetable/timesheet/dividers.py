@@ -175,7 +175,7 @@ class BaseTimesheetDivider:
         ).run()
 
         try:
-            norm_hours = Decimal(worker_stats[self.fiscal_timesheet.employee.id]['plan']['approved']['sawh_hours']['curr_month_without_reduce_norm'])
+            norm_hours = Decimal(worker_stats[self.fiscal_timesheet.employee.id]['plan']['approved']['sawh_hours'][self._get_sawh_hours_key()])
         except KeyError:
             logger.exception(
                 f'cant get norm_hours, stop overtime checking employee_id: {self.fiscal_timesheet.employee.id}, worker_stats: {worker_stats}')
