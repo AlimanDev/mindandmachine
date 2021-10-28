@@ -54,6 +54,7 @@ def fmt3(**kwargs):
 
 class Timetable_xlsx(Tabel_xlsx):
     wd_type_field = 'type'
+    work_hours_field = 'rounded_work_hours'
     def __init__(self, *args,  for_inspection=False, **kwargs):
         super().__init__(*args, **kwargs)
         self.day_type = {
@@ -83,6 +84,7 @@ class Timetable_xlsx(Tabel_xlsx):
         self.additional_fields_count = sum(self.additional_fields_settings.values())
         if for_inspection:
             self.wd_type_field = 'day_type'
+            self.work_hours_field = 'day_hours'
 
     def format_cells(self, users_len):
         super().format_cells(users_len)
@@ -213,6 +215,8 @@ class Timetable_xlsx(Tabel_xlsx):
                                                     wd.dttm_work_end.time().strftime(QOS_SHORT_TIME_FORMAT))
                             if not getattr(wd, self.wd_type_field + '_id') == WorkerDay.TYPE_WORKDAY:
                                 text = mapping[getattr(wd, self.wd_type_field + '_id')] + text
+                        elif getattr(wd, self.wd_type_field).is_dayoff and getattr(wd, self.wd_type_field).is_work_hours:
+                            text = mapping[getattr(wd, self.wd_type_field + '_id')] + ' ' + str(round(getattr(wd, self.work_hours_field)))
                         else:
                             text = mapping[getattr(wd, self.wd_type_field + '_id')]
                         
