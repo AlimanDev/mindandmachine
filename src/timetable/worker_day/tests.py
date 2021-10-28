@@ -839,10 +839,10 @@ class TestUploadDownload(APITestCase):
         tabel = pandas.read_excel(io.BytesIO(response.content))
         self.assertEqual(tabel[tabel.columns[1]][0], 'Магазин: Shop1') #fails with python > 3.6
         self.assertEqual(tabel[tabel.columns[1]][10], 'Иванов Иван Иванович')
-        self.assertEqual(tabel[tabel.columns[7]][10], 'ОТ 8.0')
-        self.assertEqual(tabel[tabel.columns[27]][13], 'В')
-        self.assertEqual(tabel[tabel.columns[4]][15], '10:00-14:00\n18:00-20:00')
-        self.assertEqual(tabel[tabel.columns[5]][15], 'К10:00-21:00')
+        self.assertEqual(tabel[tabel.columns[6]][10], 'ОТ 8.0')
+        self.assertEqual(tabel[tabel.columns[26]][13], 'В')
+        self.assertEqual(tabel[tabel.columns[3]][15], '10:00-14:00\n18:00-20:00')
+        self.assertEqual(tabel[tabel.columns[4]][15], 'К10:00-21:00')
         self.network.set_settings_value('download_timetable_norm_field', 'sawh_hours')
         self.network.save()
         response = self.client.get(
@@ -851,7 +851,7 @@ class TestUploadDownload(APITestCase):
         tabel = pandas.read_excel(io.BytesIO(response.content))
         self.assertEqual(tabel[tabel.columns[1]][0], 'Магазин: Shop1') #fails with python > 3.6
         self.assertEqual(tabel[tabel.columns[1]][10], 'Иванов Иван Иванович')
-        self.assertEqual(tabel[tabel.columns[27]][13], 'В')
+        self.assertEqual(tabel[tabel.columns[26]][13], 'В')
 
     @override_settings(FISCAL_SHEET_DIVIDER_ALIAS='nahodka')
     def test_download_timetable_for_inspection(self):
@@ -871,9 +871,9 @@ class TestUploadDownload(APITestCase):
         tabel = pandas.read_excel(io.BytesIO(response.content))
         self.assertEqual(tabel[tabel.columns[1]][0], 'Магазин: Shop1') #fails with python > 3.6
         self.assertEqual(tabel[tabel.columns[1]][10], 'Иванов Иван Иванович')
-        self.assertEqual(tabel[tabel.columns[27]][13], 'В')
+        self.assertEqual(tabel[tabel.columns[26]][13], 'В')
+        self.assertEqual(tabel[tabel.columns[3]][15], 'НН')
         self.assertEqual(tabel[tabel.columns[4]][15], 'НН')
-        self.assertEqual(tabel[tabel.columns[5]][15], 'НН')
         employment = Employment.objects.get(
             employee__user__last_name='Сидоров',
             employee__user__first_name='Сергей',
@@ -910,14 +910,14 @@ class TestUploadDownload(APITestCase):
         tabel = pandas.read_excel(io.BytesIO(response.content))
         self.assertEqual(tabel[tabel.columns[1]][0], 'Магазин: Shop1') #fails with python > 3.6
         self.assertEqual(tabel[tabel.columns[1]][10], 'Иванов Иван Иванович')
-        self.assertEqual(tabel[tabel.columns[27]][13], 'В')
-        self.assertEqual(tabel[tabel.columns[4]][15], '10:00-20:00')
-        self.assertEqual(tabel[tabel.columns[5]][15], 'К10:00-21:00')
-        self.assertEqual(tabel[tabel.columns[6]][15], 'ОТ 8.0')
-        self.assertEqual(tabel[tabel.columns[34]][15], '2')
-        self.assertEqual(tabel[tabel.columns[35]][15], '26')
-        self.assertEqual(tabel[tabel.columns[38]][15], '14')
-        self.assertEqual(tabel[tabel.columns[39]][15], '1')
+        self.assertEqual(tabel[tabel.columns[26]][13], 'В')
+        self.assertEqual(tabel[tabel.columns[3]][15], '10:00-20:00')
+        self.assertEqual(tabel[tabel.columns[4]][15], 'К10:00-21:00')
+        self.assertEqual(tabel[tabel.columns[5]][15], 'ОТ 8.0')
+        self.assertEqual(tabel[tabel.columns[33]][15], '2')
+        self.assertEqual(tabel[tabel.columns[34]][15], '26')
+        self.assertEqual(tabel[tabel.columns[37]][15], '14')
+        self.assertEqual(tabel[tabel.columns[38]][15], '1')
 
     def test_download_timetable_with_child_region(self):
         fill_calendar('2020.4.1', '2021.12.31', self.region.id)
@@ -942,7 +942,7 @@ class TestUploadDownload(APITestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(tabel[tabel.columns[1]][0], 'Магазин: Shop1') #fails with python > 3.6
         self.assertEqual(tabel[tabel.columns[1]][10], 'Иванов Иван Иванович')
-        self.assertEqual(tabel[tabel.columns[27]][13], 'В')
+        self.assertEqual(tabel[tabel.columns[26]][13], 'В')
 
     def test_download_timetable_example_no_active_epmpls(self):
         fill_calendar('2020.4.1', '2021.12.31', self.region.id)
