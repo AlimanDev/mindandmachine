@@ -368,7 +368,7 @@ def create_worker_days_range(dates, type_id=WorkerDay.TYPE_WORKDAY, shop_id=None
         if cashbox_details:
             priority_work_type_id = sorted(cashbox_details, key=lambda x: x['work_part'])[0]['work_type_id']
         for date in dates:
-            if employee_id and type_id == WorkerDay.TYPE_WORKDAY:
+            if employee_id:
                 employment = Employment.objects.get_active_empl_by_priority(
                     network_id=None,
                     employee_id=employee_id,

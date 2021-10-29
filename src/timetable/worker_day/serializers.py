@@ -19,6 +19,7 @@ from src.timetable.models import (
     WorkerDayCashboxDetails,
     WorkType,
     WorkerDayType,
+    TimesheetItem,
 )
 
 
@@ -204,8 +205,9 @@ class WorkerDaySerializer(serializers.ModelSerializer, UnaccountedOvertimeMixin)
                 attrs['source'] = WorkerDay.SOURCE_FAST_EDITOR
 
         is_fact = attrs['is_fact'] if 'is_fact' in attrs else getattr(self.instance, 'is_fact', None)
-        wd_type = attrs['type_id']
+        wd_type = attrs.pop('type_id')
         wd_type_obj = self.wd_types_dict.get(wd_type)
+        attrs['type'] = wd_type_obj
         if is_fact and not wd_type_obj.use_in_fact:
             raise ValidationError({
                 "error": "Для фактической неподтвержденной версии можно установить только {}".format(
@@ -673,15 +675,12 @@ class DownloadSerializer(serializers.Serializer):
 
 
 class DownloadTabelSerializer(serializers.Serializer):
-    TYPE_FACT = 'F'
-    TYPE_MAIN = 'M'
-    TYPE_ADDITIONAL = 'A'
-
     dt_from = serializers.DateField(format=QOS_DATE_FORMAT)
     dt_to = serializers.DateField(format=QOS_DATE_FORMAT)
     shop_id = serializers.IntegerField()
     convert_to = serializers.ChoiceField(required=False, choices=['pdf', 'xlsx'], default='xlsx')
-    tabel_type = serializers.ChoiceField(required=False, choices=[TYPE_FACT, TYPE_MAIN, TYPE_ADDITIONAL], default=TYPE_FACT)
+    tabel_type = serializers.ChoiceField(
+        required=False, choices=TimesheetItem.TIMESHEET_TYPE_CHOICES, default=TimesheetItem.TIMESHEET_TYPE_FACT)
 
 
 class BlockOrUnblockWorkerDaySerializer(serializers.ModelSerializer):

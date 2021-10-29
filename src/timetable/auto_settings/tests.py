@@ -14,7 +14,7 @@ from rest_framework.test import APITestCase
 from src.base.models import Break, WorkerPosition, Employment
 from src.forecast.models import OperationType, OperationTypeName
 from src.timetable.models import ShopMonthStat, WorkerDay, WorkerDayCashboxDetails, WorkType, WorkTypeName, \
-    EmploymentWorkType
+    EmploymentWorkType, WorkerDayType
 from src.timetable.tests.factories import WorkerDayFactory
 from src.util.models_converter import Converter
 from src.util.test import create_departments_and_users
@@ -1657,3 +1657,30 @@ class TestAutoSettings(APITestCase):
             dt=dt,
             employee_id=self.employee2.id,
         ).count(), 2)
+
+    @expectedFailure  # TODO: отдельная алгоритм расчета рекомендуемой нормы для автосоставления? Или доп. признак в типе дня?
+    def test_create_tt_full_month_with_vacation_is_work_hours_true_and_is_reduce_norm_false(self):
+        WorkerDayType.objects.filter(code=WorkerDay.TYPE_VACATION).update(
+            is_work_hours=True,
+            is_reduce_norm=False,
+        )
+        dt_from = date(2021, 2, 1)
+        dt_to = date(2021, 2, 28)
+        dt = dt_from
+        for day in range(3):
+            dt = dt + timedelta(days=1)
+            wd = WorkerDay.objects.create(
+                employment=self.employment2,
+                employee=self.employment2.employee,
+                shop=self.employment2.shop,
+                dt=dt,
+                type_id=WorkerDay.TYPE_VACATION,
+                is_approved=False,
+            )
+            self.assertEqual(wd.work_hours.total_seconds()/3600, 5.392857142777778)
+        data = self._test_create_tt(dt_from, dt_to)
+
+        employment2Info = list(filter(lambda x: x['general_info']['id'] == self.employee2.id, data['cashiers']))[0]
+        employment3Info = list(filter(lambda x: x['general_info']['id'] == self.employee3.id, data['cashiers']))[0]
+        self.assertEqual(round(employment2Info['norm_work_amount'], 5), round(134.82142857142856, 5))
+        self.assertEqual(employment3Info['norm_work_amount'], 151.0)
