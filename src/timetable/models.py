@@ -10,6 +10,7 @@ from django.db.models import (
     Subquery, OuterRef, Max, Q, Case, When, Value, FloatField, F, IntegerField, Exists, BooleanField, Min
 )
 from django.db.models import UniqueConstraint
+from django.db.models.fields import PositiveSmallIntegerField
 from django.db.models.functions import Abs, Cast, Extract, Least
 from django.db.models.query import QuerySet
 from django.utils import timezone
@@ -509,6 +510,52 @@ class WorkerDay(AbstractModel):
         TYPE_EMPTY,
     ]
 
+    SOURCE_FAST_EDITOR = 0
+    SOURCE_FULL_EDITOR = 1
+    SOURCE_DUPLICATE = 2
+    SOURCE_ALGO = 3
+    SOURCE_AUTO_CREATED_VACANCY = 4
+    SOURCE_CHANGE_RANGE = 5
+    SOURCE_COPY_RANGE = 6
+    SOURCE_EXCHANGE = 7
+    SOURCE_EXCHANGE_APPROVED = 8
+    SOURCE_UPLOAD = 9
+    SOURCE_CHANGE_LIST = 10
+    SOURCE_SHIFT_ELONGATION = 11
+    SOURCE_ON_CANCEL_VACANCY = 12
+    SOURCE_ON_CONFIRM_VACANCY = 13
+    SOURCE_INTEGRATION = 14
+    SOURCE_ON_APPROVE = 15
+    SOURCE_EDITABLE_VACANCY = 16
+    SOURCE_COPY_APPROVED_PLAN_TO_PLAN = 17
+    SOURCE_COPY_APPROVED_PLAN_TO_FACT = 18
+    SOURCE_COPY_APPROVED_FACT_TO_FACT = 19
+    SOURCE_AUTO_FACT = 20
+
+    SOURCES = [
+        (SOURCE_FAST_EDITOR, 'Создание рабочего дня через быстрый редактор'),
+        (SOURCE_FULL_EDITOR, 'Создание рабочего дня через полный редактор'),
+        (SOURCE_DUPLICATE, 'Создание через копирование в графике (ctrl-c + ctrl-v)'),
+        (SOURCE_ALGO, 'Автоматическое создание алгоритмом'),
+        (SOURCE_AUTO_CREATED_VACANCY, 'Автоматическое создание биржей смен'),
+        (SOURCE_CHANGE_RANGE, 'Создание смен через change_range (Обычно используется для получения отпусков/больничных из 1С ЗУП)'),
+        (SOURCE_COPY_RANGE, 'Создание смен через copy_range (Копирование по датам)'),
+        (SOURCE_EXCHANGE, 'Создание смен через exchange (Обмен сменами)'),
+        (SOURCE_EXCHANGE_APPROVED, 'Создание смен через exchange_approved (Обмен сменами в подтвержденной версии)'),
+        (SOURCE_UPLOAD, 'Создание смен через загрузку графика'),
+        (SOURCE_CHANGE_LIST, 'Создание смен через change_list (Проставление типов дней на промежуток для сотрудника)'),
+        (SOURCE_SHIFT_ELONGATION, 'Автоматическое создание смен через shift_elongation (Расширение смен)'),
+        (SOURCE_ON_CANCEL_VACANCY, 'Автоматическое создание смен при отмене вакансии'),
+        (SOURCE_ON_CONFIRM_VACANCY, 'Автоматическое создание смен при принятии вакансии'),
+        (SOURCE_INTEGRATION, 'Создание смен через интеграцию'),
+        (SOURCE_ON_APPROVE, 'Создание смен при подтверждении графика'),
+        (SOURCE_EDITABLE_VACANCY, 'Создание смен при получении редактируемой вакансии'),
+        (SOURCE_COPY_APPROVED_PLAN_TO_PLAN, 'Создание смен через copy_approved (Копирование из плана в план)'),
+        (SOURCE_COPY_APPROVED_PLAN_TO_FACT, 'Создание смен через copy_approved (Копирование из плана в факт)'),
+        (SOURCE_COPY_APPROVED_FACT_TO_FACT, 'Создание смен через copy_approved (Копирование из факта в факт)'),
+        (SOURCE_AUTO_FACT, 'Создание смен во время отметок'),
+    ]
+
     def __str__(self):
         return '{}, {}, {}, {}, {}, {}, {}, {}'.format(
             self.employee.user.last_name if (self.employee and self.employee.user_id) else 'No worker',
@@ -831,6 +878,8 @@ class WorkerDay(AbstractModel):
     closest_plan_approved = models.ForeignKey(
         'self', null=True, blank=True, on_delete=models.SET_NULL, related_name='related_facts',
         help_text='Используется в факте (и в черновике и подтв. версии) для связи с планом подтвержденным')
+    
+    source = PositiveSmallIntegerField('Источник создания', choices=SOURCES, default=SOURCE_FAST_EDITOR)
 
     objects = WorkerDayManager.from_queryset(WorkerDayQuerySet)()  # исключает раб. дни у которых employment_id is null
     objects_with_excluded = models.Manager.from_queryset(WorkerDayQuerySet)()
@@ -1834,6 +1883,7 @@ class AttendanceRecords(AbstractModel):
                         is_outsource=fact_approved_to_copy.is_outsource,
                         created_by_id=fact_approved_to_copy.created_by_id,
                         last_edited_by_id=fact_approved_to_copy.last_edited_by_id,
+                        source=WorkerDay.SOURCE_AUTO_FACT,
                     )
                     WorkerDay.check_work_time_overlap(
                         employee_id=fact_approved.employee_id, dt=fact_approved.dt, is_fact=True)
@@ -1954,6 +2004,7 @@ class AttendanceRecords(AbstractModel):
                         'type_id': closest_plan_approved.type_id if closest_plan_approved else WorkerDay.TYPE_WORKDAY,
                         self.TYPE_2_DTTM_FIELD[self.type]: self.dttm,
                         'is_vacancy': active_user_empl.shop_id != self.shop_id if active_user_empl else False,
+                        'source': WorkerDay.SOURCE_AUTO_FACT,
                         # TODO: пока не стал проставлять is_outsource, т.к. придется делать доп. действие в интерфейсе,
                         # чтобы посмотреть что за сотрудник при правке факта из отдела аутсорс-клиента
                         #'is_outsource': active_user_empl.shop.network_id != self.shop.network_id,

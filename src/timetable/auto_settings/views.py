@@ -888,6 +888,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
                             type_id=wd['type'],
                             created_by_id=None,
                             last_edited_by_id=None,
+                            source=WorkerDay.SOURCE_ALGO,
                         )
 
                         employee_key = f'{wd["dt"]}_{uid}'

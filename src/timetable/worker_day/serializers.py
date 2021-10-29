@@ -196,6 +196,13 @@ class WorkerDaySerializer(serializers.ModelSerializer, UnaccountedOvertimeMixin)
         if self.instance and self.instance.is_approved:
             raise ValidationError({"error": "Нельзя менять подтвержденную версию."})
 
+        if not self.instance:
+            attrs['source'] = WorkerDay.SOURCE_FULL_EDITOR
+            if (attrs.get('shop_id') is None) and ('shop_code' in attrs) or (attrs.get('employee_id') is None) and ('username' in attrs):
+                attrs['source'] = WorkerDay.SOURCE_INTEGRATION
+            elif self.context.get('batch'):
+                attrs['source'] = WorkerDay.SOURCE_FAST_EDITOR
+
         is_fact = attrs['is_fact'] if 'is_fact' in attrs else getattr(self.instance, 'is_fact', None)
         wd_type = attrs['type_id']
         wd_type_obj = self.wd_types_dict.get(wd_type)
@@ -546,11 +553,22 @@ class CopyApprovedSerializer(serializers.Serializer):
         (TYPE_PLAN_TO_FACT, 'План в факт'),
         (TYPE_FACT_TO_FACT, 'Факт в факт'),
     ]
+    SOURCES = {
+        TYPE_PLAN_TO_PLAN: WorkerDay.SOURCE_COPY_APPROVED_PLAN_TO_PLAN,
+        TYPE_PLAN_TO_FACT: WorkerDay.SOURCE_COPY_APPROVED_PLAN_TO_FACT,
+        TYPE_FACT_TO_FACT: WorkerDay.SOURCE_COPY_APPROVED_FACT_TO_FACT,
+    }
 
     employee_ids = serializers.ListField(child=serializers.IntegerField())
     dates = serializers.ListField(child=serializers.DateField())
     type = serializers.ChoiceField(choices=TYPES, default=TYPE_PLAN_TO_PLAN)
     to_fact = serializers.BooleanField(default=False)
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        attrs['source'] = self.SOURCES[attrs['type']]
+
+        return attrs
 
 
 class DuplicateSrializer(serializers.Serializer):
