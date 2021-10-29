@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from decimal import Decimal
 from unittest import mock
 
@@ -125,6 +125,16 @@ class TestDepartment(TestsHelperMixin, APITestCase):
         shops = response.json()
         # self.assertEqual(len(shops), 1)
         # self.assertEqual(shops[0]['id'], self.shop.id)
+    
+    def test_get_list_exclude_deleted(self):
+        response = self.client.get(self.url)
+        self.assertEquals(len(response.json()), 6)
+        self.shop.dttm_deleted = datetime.now() - timedelta(hours=2)
+        self.shop.save()
+        response = self.client.get(self.url)
+        self.assertEquals(len(response.json()), 5)
+        self.shop.dttm_deleted = None
+        self.shop.save()
 
     def test_get(self):
         # Админ
