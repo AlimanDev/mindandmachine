@@ -519,7 +519,8 @@ class UploadDownloadTimetableCells(BaseUploadDownloadTimeTable):
                             dttm_work_start=dttm_work_start,
                             dttm_work_end=dttm_work_end,
                             delta_in_secs=self.user.network.set_closest_plan_approved_delta_for_manual_fact,
-                        ).first() if (is_fact and not wd_type_obj.is_dayoff) else None
+                        ).first() if (is_fact and not wd_type_obj.is_dayoff) else None,
+                        source=WorkerDay.SOURCE_UPLOAD,
                     )
                     if wd_type_id == WorkerDay.TYPE_WORKDAY:
                         new_wd_dict['worker_day_details'] = [
@@ -861,7 +862,8 @@ class UploadDownloadTimetableRows(BaseUploadDownloadTimeTable):
                         dttm_work_start=dttm_work_start,
                         dttm_work_end=dttm_work_end,
                         delta_in_secs=self.user.network.set_closest_plan_approved_delta_for_manual_fact,
-                    ).first() if (is_fact and not wd_type_obj.is_dayoff) else None
+                    ).first() if (is_fact and not wd_type_obj.is_dayoff) else None,
+                    source=WorkerDay.SOURCE_UPLOAD,
                 )
                 if type_of_work == WorkerDay.TYPE_WORKDAY:
                     new_wd_data['worker_day_details'] = [

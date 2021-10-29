@@ -362,6 +362,7 @@ def do_shift_elongation(vacancy, max_working_hours):
                 'shop_id': worker_day.shop_id,
                 'type': worker_day.type,
                 'employment': worker_day.employment,
+                'source': WorkerDay.SOURCE_SHIFT_ELONGATION,
             }
         )
         if created:
@@ -441,6 +442,7 @@ def cancel_vacancy(vacancy_id, auto=True):
                 employment_id=vac_employment_id,
                 is_vacancy=False,
                 is_outsource=False,
+                source=WorkerDay.SOURCE_ON_CANCEL_VACANCY,
             )
             event_signal.send(
                 sender=None,
@@ -491,6 +493,7 @@ def create_vacancy(dttm_from, dttm_to, shop_id, work_type_id, outsources=[]):
         shop_id=shop_id,
         is_outsource=is_outsource,
         is_approved=True, # чтобы в покрытии учитывалось при автоматическом создании вакансий
+        source=WorkerDay.SOURCE_AUTO_CREATED_VACANCY,
     )
     worker_day.outsources.add(*outsources)
     WorkerDayCashboxDetails.objects.create(
@@ -721,6 +724,7 @@ def confirm_vacancy(vacancy_id, user, employee_id=None, exchange=False, reconfir
                     with transaction.atomic():
                         vacancy.id = None
                         vacancy.is_approved = False
+                        vacancy.source = WorkerDay.SOURCE_ON_CONFIRM_VACANCY
                         vacancy.save()
 
                         WorkerDayCashboxDetails.objects.bulk_create(

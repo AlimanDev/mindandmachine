@@ -748,7 +748,7 @@ class TestUploadDownload(APITestCase):
             response = self.client.post(f'{self.url}upload/', {'shop_id': self.shop.id, 'file': file}, HTTP_ACCEPT_LANGUAGE='ru')
         file.close()
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(WorkerDay.objects.filter(is_approved=False).count(), 181)
+        self.assertEqual(WorkerDay.objects.filter(is_approved=False, source=WorkerDay.SOURCE_UPLOAD).count(), 181)
         self.assertEqual(WorkerDay.objects.filter(
             employee__user__last_name='Сидоров', dt='2020-04-01',
             type_id=WorkerDay.TYPE_WORKDAY, is_fact=False, is_approved=False).count(), 2)
@@ -979,7 +979,7 @@ class TestUploadDownload(APITestCase):
         response = self.client.post(f'{self.url}upload/', {'shop_id': self.shop.id, 'file': file}, HTTP_ACCEPT_LANGUAGE='ru')
         file.close()
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(WorkerDay.objects.filter(is_approved=False).count(), 180)
+        self.assertEqual(WorkerDay.objects.filter(is_approved=False, source=WorkerDay.SOURCE_UPLOAD).count(), 180)
         self.assertEquals(User.objects.filter(last_name='Смешнов').count(), 1)
         user = User.objects.filter(last_name='Смешнов').first()
         self.assertEquals(Employee.objects.filter(user=user).count(), 2)

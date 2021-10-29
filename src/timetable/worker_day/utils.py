@@ -50,6 +50,7 @@ def exchange(data, error_messages):
             is_approved=data['is_approved'],
             is_vacancy=wd_source.is_vacancy,
             shop_id=wd_source.shop_id,
+            source=WorkerDay.SOURCE_EXCHANGE_APPROVED if data['is_approved'] else WorkerDay.SOURCE_EXCHANGE,
         )
         wd_new.save()
         new_wds.append(wd_new)
@@ -185,6 +186,9 @@ def copy_as_excel_cells(from_employee_id, from_dates, to_employee_id, to_dates, 
         'shop__settings__breaks',
         'shop__network__breaks',
     ).order_by('dt')
+    source = WorkerDay.SOURCE_DUPLICATE
+    if include_spaces:
+        source = WorkerDay.SOURCE_COPY_RANGE
     if worker_day_types:
         main_worker_days = main_worker_days.filter(type_id__in=worker_day_types)
     main_worker_days = list(main_worker_days)
@@ -264,6 +268,7 @@ def copy_as_excel_cells(from_employee_id, from_dates, to_employee_id, to_dates, 
                     is_fact=False,
                     created_by_id=created_by,
                     last_edited_by_id=created_by,
+                    source=source,
                 )
                 created_wds.append(new_wd)
 
@@ -396,6 +401,7 @@ def create_worker_days_range(dates, type_id=WorkerDay.TYPE_WORKDAY, shop_id=None
                 is_outsource=bool(outsources),
                 created_by=created_by,
                 last_edited_by=created_by,
+                source=WorkerDay.SOURCE_CHANGE_LIST,
             )
             if type_id == WorkerDay.TYPE_WORKDAY:
                 if outsources and is_vacancy:
