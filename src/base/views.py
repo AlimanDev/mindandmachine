@@ -136,8 +136,13 @@ class UserViewSet(UpdateorCreateViewSet):
 
     def get_queryset(self):
         user = self.request.user
+        allowed_networks = list(NetworkConnect.objects.filter(
+            Q(allow_assign_employements_from_outsource=True) | 
+            Q(allow_choose_shop_from_client_for_employement=True),
+            client_id=user.network_id,
+        ).values_list('outsourcing_id', flat=True)) + [user.network_id]
         return User.objects.filter(
-            network_id=user.network_id,
+            network_id__in=allowed_networks,
         ).annotate(
             userconnecter_id=F('userconnecter'),
         ).distinct()

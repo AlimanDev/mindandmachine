@@ -304,3 +304,12 @@ class TestOutsource(TestsHelperMixin, APITestCase):
         self.network_connect.save()
         response = self.client.get('/rest_api/timesheet/')
         self.assertEquals(len(response.json()), 0)
+
+    def test_client_can_get_outsource_user(self):
+        response = self.client.get(f'/rest_api/user/?id={self.user1.id}')
+        self.assertEquals(len(response.json()), 1)
+        self.network_connect.allow_assign_employements_from_outsource = False
+        self.network_connect.allow_choose_shop_from_client_for_employement = False
+        self.network_connect.save()
+        response = self.client.get(f'/rest_api/user/?id={self.user1.id}')
+        self.assertEquals(len(response.json()), 0)
