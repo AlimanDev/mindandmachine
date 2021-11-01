@@ -2394,7 +2394,9 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
         self.assertEqual(plan_approved_qs.count(), 2)
 
         fact_not_approved_wdays[0].refresh_from_db()
+        self.assertIsNotNone(fact_not_approved_wdays[0].closest_plan_approved_id)
         fact_not_approved_wdays[1].refresh_from_db()
+        self.assertIsNotNone(fact_not_approved_wdays[1].closest_plan_approved_id)
         self.assertEqual(fact_not_approved_wdays[0].work_hours, timedelta(seconds=3.5*60*60))
         self.assertEqual(fact_not_approved_wdays[1].work_hours, timedelta(seconds=6*60*60))
 
@@ -2596,6 +2598,88 @@ class TestWorkerDayCreateFact(TestsHelperMixin, APITestCase):
         fact_id = resp.json()['id']
         fact = WorkerDay.objects.get(id=fact_id)
         self.assertEqual(fact.closest_plan_approved_id, plan_approved.id)
+
+    def test_closest_plan_approved_set_on_fact_creation_when_single_plan_far_from_fact(self):
+        plan_approved = WorkerDayFactory(
+            is_fact=False,
+            is_approved=True,
+            dt=self.dt,
+            employee=self.employee2,
+            employment=self.employment2,
+            shop=self.shop,
+            type_id=WorkerDay.TYPE_WORKDAY,
+            dttm_work_start=datetime.combine(self.dt, time(8, 0, 0)),
+            dttm_work_end=datetime.combine(self.dt, time(20, 0, 0)),
+            cashbox_details__work_type=self.work_type,
+        )
+
+        data = {
+            "shop_id": self.shop.id,
+            "employee_id": self.employee2.id,
+            "employment_id": self.employment2.id,
+            "dt": self.dt,
+            "is_fact": True,
+            "type": WorkerDay.TYPE_WORKDAY,
+            "dttm_work_start": datetime.combine(self.dt, time(12, 0, 0)),
+            "dttm_work_end": datetime.combine(self.dt, time(20, 0, 0)),
+            "worker_day_details": [{
+                "work_part": 1.0,
+                "work_type_id": self.work_type.id}
+            ]
+        }
+
+        resp = self.client.post(self.url, self.dump_data(data), content_type='application/json')
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
+        fact_id = resp.json()['id']
+        fact = WorkerDay.objects.get(id=fact_id)
+        self.assertEqual(fact.closest_plan_approved_id, plan_approved.id)
+
+    def test_closest_plan_approved_not_set_on_fact_creation_when_multiple_plan_exists(self):
+        WorkerDayFactory(
+            is_fact=False,
+            is_approved=True,
+            dt=self.dt,
+            employee=self.employee2,
+            employment=self.employment2,
+            shop=self.shop,
+            type_id=WorkerDay.TYPE_WORKDAY,
+            dttm_work_start=datetime.combine(self.dt, time(10, 0, 0)),
+            dttm_work_end=datetime.combine(self.dt, time(14, 0, 0)),
+            cashbox_details__work_type=self.work_type,
+        )
+        WorkerDayFactory(
+            is_fact=False,
+            is_approved=True,
+            dt=self.dt,
+            employee=self.employee2,
+            employment=self.employment2,
+            shop=self.shop,
+            type_id=WorkerDay.TYPE_WORKDAY,
+            dttm_work_start=datetime.combine(self.dt, time(18, 0, 0)),
+            dttm_work_end=datetime.combine(self.dt, time(21, 0, 0)),
+            cashbox_details__work_type=self.work_type,
+        )
+
+        data = {
+            "shop_id": self.shop.id,
+            "employee_id": self.employee2.id,
+            "employment_id": self.employment2.id,
+            "dt": self.dt,
+            "is_fact": True,
+            "type": WorkerDay.TYPE_WORKDAY,
+            "dttm_work_start": datetime.combine(self.dt, time(12, 0, 0)),
+            "dttm_work_end": datetime.combine(self.dt, time(20, 0, 0)),
+            "worker_day_details": [{
+                "work_part": 1.0,
+                "work_type_id": self.work_type.id}
+            ]
+        }
+
+        resp = self.client.post(self.url, self.dump_data(data), content_type='application/json')
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
+        fact_id = resp.json()['id']
+        fact = WorkerDay.objects.get(id=fact_id)
+        self.assertEqual(fact.closest_plan_approved_id, None)
 
 
 @override_settings(TRUST_TICK_REQUEST=True)

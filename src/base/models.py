@@ -231,7 +231,7 @@ class Network(AbstractActiveModel):
     set_closest_plan_approved_delta_for_manual_fact = models.PositiveIntegerField(
         verbose_name='Макс. разница времени начала и времени окончания в факте и в плане '
                      'при проставлении ближайшего плана в ручной факт (в секундах)',
-        default=60 * 70,
+        default=60 * 60 * 5,
     )
 
     DEFAULT_NIGHT_EDGES = (
