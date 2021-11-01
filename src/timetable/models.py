@@ -409,6 +409,17 @@ class WorkerDayOutsourceNetwork(AbstractModel):
 
 
 class WorkerDayType(AbstractModel):
+    GET_WORK_HOURS_METHOD_TYPE_MONTH_AVERAGE_SAWH_HOURS = 'average_sawh_hours'
+    GET_WORK_HOURS_METHOD_TYPE_NORM_HOURS = 'norm_hours'
+    GET_WORK_HOURS_METHOD_TYPE_MANUAL = 'manual'
+
+    GET_WORK_HOURS_METHOD_TYPES = (
+        (GET_WORK_HOURS_METHOD_TYPE_MONTH_AVERAGE_SAWH_HOURS,
+         'Расчет часов на основе среднемесячного значения рекомендуемой нормы'),
+        (GET_WORK_HOURS_METHOD_TYPE_NORM_HOURS, 'Расчет часов на основе нормы по производственному календарю'),
+        (GET_WORK_HOURS_METHOD_TYPE_MANUAL, 'Ручное проставление часов'),
+    )
+
     code = models.CharField(max_length=64, primary_key=True, verbose_name='Код', help_text='Первычный ключ')
     name = models.CharField(max_length=64, verbose_name='Имя')
     short_name = models.CharField('Для отображения в ячейке', max_length=8)
@@ -436,6 +447,13 @@ class WorkerDayType(AbstractModel):
     show_stat_in_hours = models.BooleanField(
         'Отображать в статистике по сотрудникам сумму часов отдельно для этого типа',
         default=False,
+    )
+    get_work_hours_method = models.CharField(
+        'Способ получения рабочих часов',
+        help_text='Актуально для нерабочих типов дней. '
+                  'Для рабочих типов кол-во часов считается на основе времени начала и окончания.',
+        max_length=32, blank=True,
+        choices=GET_WORK_HOURS_METHOD_TYPES,
     )
     ordering = models.PositiveSmallIntegerField(default=0)
     is_active = models.BooleanField(default=True)
@@ -820,10 +838,11 @@ class WorkerDay(AbstractModel):
 
             return dttm_work_start, dttm_work_end, self.count_work_hours(breaks, dttm_work_start, dttm_work_end, break_time=break_time, fine=fine)
 
+        # потенциально только для is_dayoff == true ? -- чтобы было наглядней сколько часов вычитается из нормы?
+        # + вычитать из нормы из work_hours в типах is_reduce_norm?
         if self.type.is_dayoff and self.type.is_work_hours:
-            # TODO: продумать настройки и логику, сделать нормально
             work_hours = 0
-            if self.type.code == WorkerDay.TYPE_VACATION:
+            if self.type.get_work_hours_method == WorkerDayType.GET_WORK_HOURS_METHOD_TYPE_MONTH_AVERAGE_SAWH_HOURS:
                 from src.timetable.worker_day.stat import WorkersStatsGetter
                 employee_stats = WorkersStatsGetter(
                     employee_id=self.employee_id,
@@ -842,7 +861,16 @@ class WorkerDay(AbstractModel):
                 ).get(
                     self.dt.month, 0
                 )
-            elif self.type.code == WorkerDay.TYPE_SICK:
+            elif self.type.get_work_hours_method == WorkerDayType.GET_WORK_HOURS_METHOD_TYPE_NORM_HOURS:
+                prod_cal = ProdCal.objects.filter(
+                    employee_id=self.employee_id,
+                    dt=self.dt,
+                    shop_id=self.employment.shop_id,
+                ).first()
+                if prod_cal:
+                    work_hours = prod_cal.norm_hours
+
+            elif self.type.get_work_hours_method == WorkerDayType.GET_WORK_HOURS_METHOD_TYPE_MANUAL:
                 return None, None, self.work_hours
 
             return None, None, datetime.timedelta(hours=work_hours)
