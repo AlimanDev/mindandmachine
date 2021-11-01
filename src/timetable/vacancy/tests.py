@@ -402,7 +402,7 @@ class TestAutoWorkerExchange(APITestCase):
         len_vacancies = len(WorkerDay.objects.filter(is_vacancy=True))
         self.assertEqual(len_vacancies, 0)
         create_vacancies_and_notify(self.shop.id, self.work_type1.id)
-        vacancies = WorkerDay.objects.filter(is_vacancy=True).order_by('dttm_work_start')
+        vacancies = WorkerDay.objects.filter(is_vacancy=True, source=WorkerDay.SOURCE_AUTO_CREATED_VACANCY).order_by('dttm_work_start')
         print(vacancies.count(), '!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
         self.assertEqual([vacancies[0].dttm_work_start.time(), vacancies[0].dttm_work_end.time()],
                          [datetime.time(9, 0), datetime.time(21, 0)])
@@ -664,7 +664,7 @@ class TestAutoWorkerExchange(APITestCase):
         self.create_vacancy(9, 21, self.work_type2)
         self.create_worker_days(Employment.objects.get(employee__user=user), self.dt_now, 1, 10, 18)
         worker_shift_elongation()
-        wd = WorkerDay.objects.get(employee__user=user, is_approved=False)
+        wd = WorkerDay.objects.get(employee__user=user, is_approved=False, source=WorkerDay.SOURCE_SHIFT_ELONGATION)  # FIXME: почему падает?
         self.assertEqual(wd.dttm_work_start, datetime.datetime.combine(self.dt_now, datetime.time(9)))
         self.assertEqual(wd.dttm_work_end, datetime.datetime.combine(self.dt_now, datetime.time(21)))
 
@@ -724,7 +724,7 @@ class TestAutoWorkerExchange(APITestCase):
         vacancies = WorkerDay.objects.filter(is_vacancy=True)
         self.assertEqual(vacancies.count(), 2)
         cancel_vacancies(self.shop.id, self.work_type1.id, approved=True)
-        wd = WorkerDay.objects.filter(employee_id=employments[0].employee_id, is_approved=True).first()
+        wd = WorkerDay.objects.filter(employee_id=employments[0].employee_id, is_approved=True, source=WorkerDay.SOURCE_ON_CANCEL_VACANCY).first()
         self.assertEquals(wd.type_id, WorkerDay.TYPE_HOLIDAY)
         self.assertFalse(wd.is_vacancy)
         self.assertEqual(vacancies.count(), 1)

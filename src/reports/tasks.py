@@ -1,11 +1,14 @@
-from src.base.models import Employment, Shop
-from src.notifications.helpers import send_mass_html_mail
-from src.celery.celery import app
-from django_celery_beat.models import CrontabSchedule
-from django.db.models import Q
 from datetime import datetime
-from src.reports.models import ReportConfig
+
+from django.db.models import Q
+from django_celery_beat.models import CrontabSchedule
+
+from src.base.models import Employment, Shop
+from src.celery.celery import app
+from src.notifications.helpers import send_mass_html_mail
 from src.reports.helpers import get_datatuple
+from src.reports.models import ReportConfig
+
 
 @app.task
 def send_report_emails(report_config_id: int, zone: str):

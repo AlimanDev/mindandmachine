@@ -1,7 +1,7 @@
 from datetime import datetime, time, date
-from unittest import mock
 
 import pandas as pd
+from freezegun import freeze_time
 
 from etc.scripts import fill_calendar
 from src.base.tests.factories import (
@@ -14,7 +14,7 @@ from src.base.tests.factories import (
     WorkerPositionFactory,
     BreakFactory,
 )
-from src.timetable.models import WorkerDay
+from src.timetable.models import WorkerDay, WorkType, WorkTypeName
 from src.timetable.tests.factories import WorkerDayFactory
 from src.timetable.timesheet.tasks import calc_timesheets
 from src.util.mixins.tests import TestsHelperMixin
@@ -23,7 +23,7 @@ from src.util.mixins.tests import TestsHelperMixin
 class TestTimesheetMixin(TestsHelperMixin):
     @classmethod
     def setUpTestData(cls):
-        breaks = BreakFactory(value='[[0, 2040, [60]]]', code='1h')
+        cls.breaks = breaks = BreakFactory(value='[[0, 2040, [60]]]', code='1h')
         cls.network = NetworkFactory(breaks=breaks)
         cls.root_shop = ShopFactory(
             network=cls.network,
@@ -46,6 +46,16 @@ class TestTimesheetMixin(TestsHelperMixin):
         cls.employment_worker = EmploymentFactory(
             employee=cls.employee_worker, shop=cls.shop, position=cls.position_worker,
         )
+        cls.work_type_name_worker = WorkTypeName.objects.create(
+            position=cls.position_worker,
+            network=cls.network,
+            name='worker',
+            code='worker',
+        )
+        cls.work_type_worker = WorkType.objects.create(
+            work_type_name=cls.work_type_name_worker,
+            shop=cls.shop,
+        )
 
         for dt in pd.date_range(date(2021, 6, 7), date(2021, 6, 13)).date:
             WorkerDayFactory(
@@ -63,7 +73,7 @@ class TestTimesheetMixin(TestsHelperMixin):
         cls.add_group_perm(cls.group_worker, 'Timesheet_stats', 'GET')
         fill_calendar.fill_days('2021.01.1', '2021.12.31', cls.shop.region.id)
 
-    def _calc_timesheets(self, dt_from=None, dt_to=None, dttm_now=None):
-        with mock.patch('src.timetable.timesheet.calc.timezone.now') as _now_mock:
-            _now_mock.return_value = dttm_now or datetime.combine(date(2021, 6, 7), time(10, 10, 10))
-            calc_timesheets(employee_id__in=[self.employee_worker.id], dt_from=dt_from, dt_to=dt_to)
+    def _calc_timesheets(self, dt_from=None, dt_to=None, dttm_now=None, reraise_exc=True):
+        dttm_now = dttm_now or datetime.combine(date(2021, 6, 7), time(10, 10, 10))
+        with freeze_time(dttm_now):
+            calc_timesheets(employee_id__in=[self.employee_worker.id], dt_from=dt_from, dt_to=dt_to, reraise_exc=reraise_exc)

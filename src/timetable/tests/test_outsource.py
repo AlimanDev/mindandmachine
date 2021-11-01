@@ -341,6 +341,7 @@ class TestOutsource(TestsHelperMixin, APITestCase):
             dt=dt_now,
             type_id=WorkerDay.TYPE_HOLIDAY,
             employee=self.client_employee,
+            employment=self.client_employment,
             is_approved=True,
         )
         response = self.client.post(f'/rest_api/worker_day/{vacancy["id"]}/confirm_vacancy/')
@@ -442,7 +443,26 @@ class TestOutsource(TestsHelperMixin, APITestCase):
                     'show_user_biometrics_block': False,
                     'unaccounted_overtime_threshold': 60,
                     'forbid_edit_employments_came_through_integration': True,
+                    'get_position_from_work_type_name_in_calc_timesheet': False,
                     'show_remaking_choice': False,
+                    'shop_name_form': {
+                        "singular": {
+                            "I": "магазин",
+                            "R": "магазина",
+                            "D": "магазину",
+                            "V": "магазин",
+                            "T": "магазином",
+                            "P": "магазине"
+                        },
+                        "plural": {
+                            "I": "магазины",
+                            "R": "магазинов",
+                            "D": "магазинам",
+                            "V": "магазины",
+                            "T": "магазинами",
+                            "P": "магазинах"
+                        }
+                    }
                 }
             }
         ]

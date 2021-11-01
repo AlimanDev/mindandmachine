@@ -15,6 +15,7 @@ from rest_framework.parsers import MultiPartParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
+from rest_framework.exceptions import PermissionDenied
 
 from src.base.filters import (
     NotificationFilter,
@@ -99,7 +100,7 @@ class EmploymentViewSet(UpdateorCreateViewSet):
             Q(employee__user__network_id=self.request.user.network_id), # чтобы можно было аутсорсу редактировать трудоустройтсва своих сотрудников
         ).order_by('-dt_hired')
         if self.action in ['list', 'retrieve']:
-            qs = qs.select_related('employee', 'employee__user', 'shop').prefetch_related('work_types', 'worker_constraints')
+            qs = qs.select_related('position', 'employee', 'employee__user', 'shop').prefetch_related(Prefetch('work_types', to_attr='work_types_list'), Prefetch('worker_constraints', to_attr='worker_constraints_list'))
         return qs
 
     def get_serializer_class(self):
@@ -136,8 +137,13 @@ class UserViewSet(UpdateorCreateViewSet):
 
     def get_queryset(self):
         user = self.request.user
+        allowed_networks = list(NetworkConnect.objects.filter(
+            Q(allow_assign_employements_from_outsource=True) | 
+            Q(allow_choose_shop_from_client_for_employement=True),
+            client_id=user.network_id,
+        ).values_list('outsourcing_id', flat=True)) + [user.network_id]
         return User.objects.filter(
-            network_id=user.network_id,
+            network_id__in=allowed_networks,
         ).annotate(
             userconnecter_id=F('userconnecter'),
         ).distinct()
@@ -153,6 +159,9 @@ class UserViewSet(UpdateorCreateViewSet):
     @action(detail=True, methods=['post'])
     def change_password(self, request, pk=None):
         user = self.get_object()
+        groups = user.get_group_ids()
+        if not Group.check_has_perm_to_group(request.user, groups=groups) and user.id != request.user.id:
+            raise PermissionDenied()
         serializer = PasswordSerializer(data=request.data, instance=user, context={'request':request})
 
         if serializer.is_valid():
@@ -241,12 +250,17 @@ class EmployeeViewSet(UpdateorCreateViewSet):
         )
 
         if self.request.query_params.get('include_employments'):
-            queryset = Employment.objects.all()
+            queryset = Employment.objects.all().prefetch_related(Prefetch('work_types', to_attr='work_types_list')).select_related(
+                'position',
+                'shop',
+                'employee',
+                'employee__user',
+            )
             if self.request.query_params.get('shop_network__in'):
                 queryset = queryset.filter(shop__network_id__in=self.request.query_params.get('shop_network__in').split(','))
             if self.request.query_params.get('show_constraints'):
-                queryset = queryset.prefetch_related('worker_constraints')
-            qs = qs.prefetch_related(Prefetch('employments', queryset=queryset))
+                queryset = queryset.prefetch_related(Prefetch('worker_constraints', to_attr='worker_constraints_list'))
+            qs = qs.prefetch_related(Prefetch('employments', queryset=queryset, to_attr='employments_list'))
 
         return qs.distinct()
 

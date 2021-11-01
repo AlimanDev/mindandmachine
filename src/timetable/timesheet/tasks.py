@@ -12,7 +12,7 @@ logger = logging.getLogger('calc_timesheets')
 
 
 @app.task
-def calc_timesheets(employee_id__in: list = None, dt_from=None, dt_to=None):
+def calc_timesheets(employee_id__in: list = None, dt_from=None, dt_to=None, reraise_exc=False):
     assert (dt_from and dt_to) or (dt_from is None and dt_to is None)
     if dt_from and dt_to:
         if isinstance(dt_from, str):
@@ -43,4 +43,6 @@ def calc_timesheets(employee_id__in: list = None, dt_from=None, dt_to=None):
             TimesheetCalculator(employee=employee, dt_from=dt_from, dt_to=dt_to, wd_types_dict=wd_types_dict).calc()
         except Exception as e:
             logger.exception(e)
+            if reraise_exc:
+                raise e
     logger.info('finish calc_timesheets')
