@@ -29,7 +29,7 @@ def _get_calc_periods(dt_hired=None, dt_fired=None, dt_from=None, dt_to=None):
             dt_start = max(dt_hired, prev_month_start)
             dt_end = min(dt_fired, prev_month_end)
             if dt_start <= dt_end:
-                periods.append((dt_start, dt_end), )
+                periods.add((dt_start, dt_end), )
 
         curr_month_start = dt_now.replace(day=1)
         curr_month_end = (dt_now + relativedelta(months=1)).replace(day=1) - datetime.timedelta(days=1)
