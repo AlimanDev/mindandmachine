@@ -1391,7 +1391,7 @@ class WorkerDay(AbstractModel):
                     use_annotated_filter=False,
                 ).values('id')[:1])
             )
-            qs.filter(Q(plan_approved_count__isnull=True) | Q(plan_approved_count=1)).update(
+            qs.filter(plan_approved_count=1).update(
                 closest_plan_approved=Subquery(WorkerDay.objects.filter(
                     employee_id=OuterRef('employee_id'),
                     dt=OuterRef('dt'),
