@@ -9,7 +9,11 @@ from django.db.models import OuterRef, Subquery, Count, IntegerField, Q
 def fix_closest_plan_approved(apps, schema_editor):
     Network = apps.get_model('base', 'Network')
     delta_in_secs = 60 * 60 * 5
-    Network.objects.all().update(set_closest_plan_approved_delta_for_manual_fact=delta_in_secs)
+    Network.objects.all().update(
+        set_closest_plan_approved_delta_for_manual_fact=delta_in_secs,
+        max_work_shift_seconds=(60 * 60 * 23) + (59 * 60),
+        max_plan_diff_in_seconds=60 * 60 * 7,
+    )
     WorkerDay = apps.get_model('timetable', 'WorkerDay')
     qs = WorkerDay.objects.filter(
         dt__gte=date(2021, 10, 1),

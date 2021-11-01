@@ -13,7 +13,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='network',
             name='max_plan_diff_in_seconds',
-            field=models.PositiveIntegerField(default=18000, verbose_name='Max difference between the start or end time to "pull" to the planned work day'),
+            field=models.PositiveIntegerField(default=60*60*7, verbose_name='Max difference between the start or end time to "pull" to the planned work day'),
         ),
         migrations.AddField(
             model_name='network',

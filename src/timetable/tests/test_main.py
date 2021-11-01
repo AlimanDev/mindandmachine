@@ -3555,6 +3555,59 @@ class TestAttendanceRecords(TestsHelperMixin, APITestCase):
         ar_start.save()
         self.assertEqual(fact_approved_qs.count(), 1)  # не должен создаться дополнительный факт
 
+    def test_night_shift_leaving_tick_diff_more_than_in_settings(self):
+        WorkerDay.objects.filter(
+            id__in=[
+                self.worker_day_plan_approved.id,
+                self.worker_day_plan_not_approved.id,
+            ],
+        ).update(
+            dt=self.dt,
+            dttm_work_start=datetime.combine(self.dt, time(8)),
+            dttm_work_end=datetime.combine(self.dt + timedelta(days=1), time(7)),
+        )
+        WorkerDay.objects.filter(
+            id__in=[
+                self.worker_day_fact_approved.id,
+                self.worker_day_fact_not_approved.id,
+            ],
+        ).delete()
+
+        fact_dttm_start = datetime.combine(self.dt, time(7, 47))
+        ar_start = AttendanceRecords.objects.create(
+            shop=self.shop,
+            user=self.user2,
+            dttm=fact_dttm_start,
+            type=AttendanceRecords.TYPE_COMING,
+        )
+
+        fact_qs = WorkerDay.objects.filter(
+            employee_id=ar_start.employee_id,
+            dt=self.dt,
+            dttm_work_start=fact_dttm_start,
+            type_id=WorkerDay.TYPE_WORKDAY,
+            is_fact=True,
+        )
+        fact_approved_qs = fact_qs.filter(is_approved=True)
+        fact_approved = fact_approved_qs.get()
+        fact_not_approved_qs = fact_qs.filter(is_approved=False)
+        fact_not_approved = fact_not_approved_qs.get()
+        self.assertIsNone(fact_not_approved.created_by_id)
+        self.assertIsNone(fact_not_approved.last_edited_by_id)
+        # при отметке должен был проставиться closest_plan_approved
+        self.assertEqual(fact_approved.closest_plan_approved.id, self.worker_day_plan_approved.id)
+        self.assertEqual(fact_not_approved.closest_plan_approved.id, self.worker_day_plan_approved.id)
+
+        fact_dttm_end = datetime.combine(self.dt + timedelta(days=1), time(1, 40))
+        AttendanceRecords.objects.create(
+            shop=self.shop,
+            user=self.user2,
+            dttm=fact_dttm_end,
+            type=AttendanceRecords.TYPE_LEAVING,
+        )
+        fact_approved.refresh_from_db()
+        self.assertEqual(fact_approved.dttm_work_end, fact_dttm_end)
+
 
 class TestVacancy(TestsHelperMixin, APITestCase):
     @classmethod
