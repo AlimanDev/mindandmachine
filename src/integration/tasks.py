@@ -241,7 +241,7 @@ def sync_att_area_zkteco():
             print(f"Sync attendance area {area.name} with code {area.code}")
 
 @app.task
-def export_employment_zkteco(employment_id):
+def export_or_delete_employment_zkteco(employment_id):
     zkteco = ZKTeco()
     ext_system, _created = ExternalSystem.objects.get_or_create(code='zkteco')
     employment = Employment.objects_with_excluded.get(id=employment_id)
@@ -254,16 +254,18 @@ def export_employment_zkteco(employment_id):
         shop_id=employment.shop_id,
         attendance_area__external_system=ext_system,
     ).first()
-    if active_employments and shop_code:
-        with transaction.atomic():
-            user_code, created = UserExternalCode.objects.get_or_create(
-                user_id=employment.employee.user_id,
-                external_system=ext_system,
-                defaults={
-                    'code': employment.employee.user_id + settings.ZKTECO_USER_ID_SHIFT
-                }
-            )
-            if created:
+    with transaction.atomic():
+        user_code = UserExternalCode.objects.filter(
+            user_id=employment.employee.user_id,
+            external_system=ext_system,
+        ).first()
+        if active_employments and shop_code:
+            if not user_code:
+                user_code = UserExternalCode.objects.create(
+                    user_id=employment.employee.user_id,
+                    external_system=ext_system,
+                    code=employment.employee.user_id + settings.ZKTECO_USER_ID_SHIFT,
+                )
                 res = zkteco.add_user(user_code.user, user_code.code)
                 if 'code' in res and res['code'] == 0:
                     print(f'Added user {user_code.user} to zkteco with ext code {user_code.code}')
@@ -272,35 +274,16 @@ def export_employment_zkteco(employment_id):
             res_area = zkteco.add_personarea(user_code, shop_code.attendance_area)
             if not('code' in res and res['code'] == 0):
                 raise ValueError(f'Error in {res_area} while set area for user {user_code.user} to zkteco')
-
-@app.task
-def delete_employment_zkteco(employment_id):
-    zkteco = ZKTeco()
-    ext_system, _created = ExternalSystem.objects.get_or_create(code='zkteco')
-    employment = Employment.objects_with_excluded.get(id=employment_id)
-    active_employments = Employment.objects.get_active(
-        shop_id=employment.shop_id,
-        employee__user_id=employment.employee.user_id,
-        position__isnull=False,
-    ).exists()
-    shop_code = ShopExternalCode.objects.filter(
-        shop_id=employment.shop_id,
-        attendance_area__external_system=ext_system,
-    ).first()
-    user_code = UserExternalCode.objects.filter(
-        user_id=employment.employee.user_id,
-        external_system=ext_system,
-    ).first()
-    if not active_employments and shop_code and user_code:            
-        res = zkteco.delete_personarea(user_code, shop_code.attendance_area)
-        if 'code' in res and res['code'] == 0:
-            print(f"Delete area for fired user {user_code.user} {employment}")
-            active_employments = Employment.objects.get_active(
-                employee__user_id=employment.employee.user_id,
-                position__isnull=False,
-            ).exists()
-            if not active_employments:
-                user_code.delete()
-                print(f"Delete userexternalcode for fired user {user_code.user}")
-        else:
-            print(f"Failed delete area and userexternalcode for fired user {employment}: {res}")
+        elif not active_employments and shop_code and user_code:            
+            res = zkteco.delete_personarea(user_code, shop_code.attendance_area)
+            if 'code' in res and res['code'] == 0:
+                print(f"Delete area for fired user {user_code.user} {employment}")
+                active_employments = Employment.objects.get_active(
+                    employee__user_id=employment.employee.user_id,
+                    position__isnull=False,
+                ).exists()
+                if not active_employments:
+                    user_code.delete()
+                    print(f"Delete userexternalcode for fired user {user_code.user}")
+            else:
+                print(f"Failed delete area and userexternalcode for fired user {employment}: {res}")
