@@ -5288,6 +5288,37 @@ class TestAditionalFunctions(TestsHelperMixin, APITestCase):
         self.assertEqual(len(response.json()), 10)
         self.assertEqual(WorkerDay.objects.filter(employee=self.employee3, is_approved=False).count(), 10)
 
+    def test_duplicate_work_days_with_manual_work_hours(self):
+        dt_now = date.today()
+        WorkerDayType.objects.filter(
+            code=WorkerDay.TYPE_SICK,
+        ).update(
+            is_work_hours=True,
+            get_work_hours_method=WorkerDayType.GET_WORK_HOURS_METHOD_TYPE_MANUAL,
+        )
+        WorkerDayFactory(
+            employee=self.employee2,
+            employment=self.employment2,
+            dt=dt_now,
+            type_id=WorkerDay.TYPE_SICK,
+            is_approved=False,
+            is_fact=False,
+            work_hours=timedelta(hours=12),
+        )
+        data = {
+            'from_employee_id': self.employee2.id,
+            'from_dates': [Converter.convert_date(dt_now)],
+            'to_employee_id': self.employee3.id,
+            'to_dates': [Converter.convert_date(dt_now + timedelta(i)) for i in range(5)],
+            'is_approved': False,
+        }
+        url = f'{self.url}duplicate/'
+        response = self.client.post(url, data, format='json')
+        self.assertEqual(response.status_code, 200)
+        resp_data = response.json()
+        self.assertEqual(len(resp_data), 5)
+        self.assertEqual(WorkerDay.objects.get(id=resp_data[0]['id']).work_hours, timedelta(hours=12))
+
 
 class TestFineLogic(APITestCase):
     USER_USERNAME = "user1"
