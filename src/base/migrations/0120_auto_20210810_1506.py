@@ -28,6 +28,6 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='network',
             name='set_closest_plan_approved_delta_for_manual_fact',
-            field=models.PositiveIntegerField(default=4200, verbose_name='Макс. разница времени начала и времени окончания в факте и в плане при проставлении ближайшего плана в ручной факт (в секундах)'),
+            field=models.PositiveIntegerField(default=18000, verbose_name='Макс. разница времени начала и времени окончания в факте и в плане при проставлении ближайшего плана в ручной факт (в секундах)'),
         ),
     ]
