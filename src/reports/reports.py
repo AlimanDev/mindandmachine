@@ -1,4 +1,5 @@
 from django.db.models import Q
+from django.utils.functional import cached_property
 from src.reports.registry import BaseRegisteredReport
 
 from datetime import date, timedelta, datetime
@@ -49,6 +50,7 @@ class UrvStatTodayReport(BaseRegisteredReport):
 
         return urv_stat_v1(dt, dt, title=title, shop_ids=self.context.get('shop_ids', []), network_id=self.network_id, comming_only=True, in_memory=True)
 
+
 class UrvViolatorsReport(BaseRegisteredReport, DatesReportMixin):
     name = 'Отчет по нарушителям УРВ'
     code = URV_VIOLATORS_REPORT
@@ -57,14 +59,17 @@ class UrvViolatorsReport(BaseRegisteredReport, DatesReportMixin):
         from src.reports.utils.urv_violators import urv_violators_report_xlsx
         dt_from, dt_to = self.get_dates(self.context)
 
-        return urv_violators_report_xlsx(self.network_id, dt_from=dt_from, dt_to=dt_to, shop_ids=self.context.get('shop_ids', []), in_memory=True)
+        return urv_violators_report_xlsx(dt_from=dt_from, dt_to=dt_to, in_memory=True, data=self.report_data)
 
-    def get_recipients_shops(self):
+    @cached_property
+    def report_data(self):
         from src.reports.utils.urv_violators import urv_violators_report
         dt_from, dt_to = self.get_dates(self.context)
-        data = urv_violators_report(self.network_id, dt_from=dt_from, dt_to=dt_to, shop_ids=self.context.get('shop_ids', []))
+        return urv_violators_report(self.network_id, dt_from=dt_from, dt_to=dt_to, shop_ids=self.context.get('shop_ids', []))
+
+    def get_recipients_shops(self):
         shop_ids = []
-        for d in data.values():
+        for d in self.report_data.values():
             shop_ids += list(set(map(lambda x: x['shop_id'], d.values())))
 
         return set(shop_ids)
@@ -80,7 +85,7 @@ class UrvStatV2Report(BaseRegisteredReport, DatesReportMixin):
         title = f'URV_users_{dt_from}-{dt_to}.xlsx'
 
         return urv_stat_v2(dt_from, dt_to, title=title, network_id=self.network_id, shop_ids=self.context.get('shop_ids', []), in_memory=True)
-    
+
     def get_recipients_shops(self):
         from src.timetable.models import AttendanceRecords
         dt_from, dt_to = self.get_dates(self.context)
@@ -94,6 +99,7 @@ class UrvStatV2Report(BaseRegisteredReport, DatesReportMixin):
             **shop_filter,
         ).values_list('shop_id', flat=True))
 
+
 class UnaccountedOvertivmeReport(BaseRegisteredReport, DatesReportMixin):
     name = 'Отчет по неучтенным переработкам'
     code = UNACCOUNTED_OVERTIME
@@ -101,13 +107,16 @@ class UnaccountedOvertivmeReport(BaseRegisteredReport, DatesReportMixin):
     def get_file(self):
         from src.reports.utils.unaccounted_overtime import unaccounted_overtimes_xlsx
         dt_from, dt_to = self.get_dates(self.context)
-        return unaccounted_overtimes_xlsx(self.network_id, dt_from=dt_from, dt_to=dt_to, shop_ids=self.context.get('shop_ids', []), in_memory=True)
+        return unaccounted_overtimes_xlsx(dt_from=dt_from, dt_to=dt_to, in_memory=True, data=self.report_data)
 
-    def get_recipients_shops(self):
+    @cached_property
+    def report_data(self):
         from src.reports.utils.unaccounted_overtime import get_unaccounted_overtimes
         dt_from, dt_to = self.get_dates(self.context)
+        return get_unaccounted_overtimes(self.network_id, dt_from=dt_from, dt_to=dt_to, shop_ids=self.context.get('shop_ids', []))
 
-        return set(get_unaccounted_overtimes(self.network_id, dt_from=dt_from, dt_to=dt_to, shop_ids=self.context.get('shop_ids', [])).values_list('shop_id', flat=True))
+    def get_recipients_shops(self):
+        return set(self.report_data.values_list('shop_id', flat=True))
 
 class UndertimesOvertimesReport(BaseRegisteredReport):
     name = 'Отчет по переработкам/недоработкам'
@@ -135,6 +144,7 @@ class PivotTabelReport(BaseRegisteredReport, DatesReportMixin):
             'file': pt.get_pivot_file(dt__gte=dt_from, dt__lte=dt_to, shop__network_id=self.network_id, **shop_filter),
             'type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         }
+
 
 class ScheduleDevationReport(BaseRegisteredReport, DatesReportMixin):
     name = 'Отчет по отклонениям от планового графика'

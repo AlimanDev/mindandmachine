@@ -100,6 +100,12 @@ class BatchUpdateOrCreateModelMixin:
         pass
 
     @classmethod
+    def _get_batch_delete_manager(cls,):
+        if hasattr(cls, 'objects_with_excluded'):
+            return cls.objects_with_excluded
+        return cls.objects
+
+    @classmethod
     def batch_update_or_create(
             cls, data: list, update_key_field: str = 'id', delete_scope_fields_list: list = None,
             delete_scope_values_list: list = None, stats=None, user=None):
@@ -239,7 +245,8 @@ class BatchUpdateOrCreateModelMixin:
                     for delete_scope_values_tuples in delete_scope_values_set:
                         q_for_delete |= Q(**dict(delete_scope_values_tuples))
 
-                    delete_qs = cls.objects.filter(
+                    delete_manager = cls._get_batch_delete_manager()
+                    delete_qs = delete_manager.filter(
                         q_for_delete).exclude(id__in=list(obj.id for obj in objs if obj.id))
                     if user:
                         cls._check_batch_delete_qs_perms(user, delete_qs, **check_perms_extra_kwargs)

@@ -35,11 +35,10 @@ class TestCleanWdays(TestsHelperMixin, TestCase):
             type_id=WorkerDay.TYPE_WORKDAY,
         )
 
-        clean_wdays_helper = CleanWdaysHelper(only_logging=False)
+        clean_wdays_helper = CleanWdaysHelper()
         with mock.patch.object(transaction, 'on_commit', lambda t: t()):
-            results = clean_wdays_helper.run()
+            clean_wdays_helper.run()
 
-        self.assertDictEqual(results, {'changed': 0, 'skipped': 0, 'not_found': 0, 'empl_cleaned': 1})
         self.assertTrue(WorkerDay.objects_with_excluded.filter(id=wd.id).exists())
         wd.refresh_from_db()
         self.assertIsNone(wd.employment_id)
@@ -61,43 +60,13 @@ class TestCleanWdays(TestsHelperMixin, TestCase):
             type_id=WorkerDay.TYPE_WORKDAY,
         )
 
-        clean_wdays_helper = CleanWdaysHelper(only_logging=False)
+        clean_wdays_helper = CleanWdaysHelper()
         with mock.patch.object(transaction, 'on_commit', lambda t: t()):
-            results = clean_wdays_helper.run()
+            clean_wdays_helper.run()
 
-        self.assertDictEqual(results, {'changed': 1, 'skipped': 0, 'not_found': 0, 'empl_cleaned': 0})
         self.assertTrue(WorkerDay.objects_with_excluded.filter(id=wd.id).exists())
         wd.refresh_from_db()
         self.assertEqual(wd.employment_id, active_empl.id)
-        self.assertFalse(wd.is_vacancy)
-
-    def test_empl_cleaned_if_is_plan_and_shops_differs_and_is_vacancy_false(self):
-        inactive_empl = EmploymentFactory(
-            employee=self.employee, shop=self.shop,
-            dt_hired=self.dt_now - timedelta(days=30), dt_fired=self.dt_now - timedelta(days=1),
-        )
-        other_shop = ShopFactory()
-        EmploymentFactory(
-            employee=self.employee, shop=other_shop,
-            dt_hired=self.dt_now, dt_fired=self.dt_now + timedelta(days=50),
-        )
-        wd = WorkerDayFactory(
-            dt=self.dt_now + timedelta(days=1),
-            employee=self.employee,
-            shop=self.shop,
-            employment=inactive_empl,
-            type_id=WorkerDay.TYPE_WORKDAY,
-            is_vacancy=False,
-        )
-
-        clean_wdays_helper = CleanWdaysHelper(only_logging=False, clean_plan_empl=True)
-        with mock.patch.object(transaction, 'on_commit', lambda t: t()):
-            results = clean_wdays_helper.run()
-
-        self.assertDictEqual(results, {'changed': 0, 'skipped': 0, 'not_found': 0, 'empl_cleaned': 1})
-        self.assertTrue(WorkerDay.objects_with_excluded.filter(id=wd.id).exists())
-        wd.refresh_from_db()
-        self.assertIsNone(wd.employment_id)
         self.assertFalse(wd.is_vacancy)
 
     def test_wday_inactive_employment_replaced_with_active_employment_from_other_shop_if_is_vacancy_true(self):
@@ -119,11 +88,10 @@ class TestCleanWdays(TestsHelperMixin, TestCase):
             is_vacancy=True,
         )
 
-        clean_wdays_helper = CleanWdaysHelper(only_logging=False)
+        clean_wdays_helper = CleanWdaysHelper()
         with mock.patch.object(transaction, 'on_commit', lambda t: t()):
-            results = clean_wdays_helper.run()
+            clean_wdays_helper.run()
 
-        self.assertDictEqual(results, {'changed': 1, 'skipped': 0, 'not_found': 0, 'empl_cleaned': 0})
         self.assertTrue(WorkerDay.objects_with_excluded.filter(id=wd.id).exists())
         wd.refresh_from_db()
         self.assertEqual(wd.employment_id, active_empl_in_other_shop.id)
@@ -146,9 +114,8 @@ class TestCleanWdays(TestsHelperMixin, TestCase):
     #
     #     clean_wdays_helper = CleanWdaysHelper(only_logging=False)
     #     with mock.patch.object(transaction, 'on_commit', lambda t: t()):
-    #         results = clean_wdays_helper.run()
+    #         clean_wdays_helper.run()
     #
-    #     self.assertDictEqual(results, {'changed': 1, 'skipped': 0, 'not_found': 0, 'empl_cleaned': 0})
     #     self.assertTrue(WorkerDay.objects_with_excluded.filter(id=wd.id).exists())
     #     wd.refresh_from_db()
     #     self.assertEqual(wd.employment_id, active_empl_in_other_shop.id)
@@ -170,11 +137,10 @@ class TestCleanWdays(TestsHelperMixin, TestCase):
             type_id=WorkerDay.TYPE_WORKDAY,
         )
 
-        clean_wdays_helper = CleanWdaysHelper(only_logging=False)
+        clean_wdays_helper = CleanWdaysHelper()
         with mock.patch.object(transaction, 'on_commit', lambda t: t()):
-            results = clean_wdays_helper.run()
+            clean_wdays_helper.run()
 
-        self.assertDictEqual(results, {'changed': 0, 'skipped': 0, 'not_found': 0, 'empl_cleaned': 1})
         self.assertTrue(WorkerDay.objects_with_excluded.filter(id=wd.id).exists())
         wd.refresh_from_db()
         self.assertIsNone(wd.employment_id)

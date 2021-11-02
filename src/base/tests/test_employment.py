@@ -347,7 +347,8 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
             wd_count_before_save = WorkerDay.objects.count()
             self.employment2.dt_hired = dt
             self.employment2.dt_fired = dt + timedelta(days=30)
-            self.employment2.save()
+            with mock.patch.object(transaction, 'on_commit', lambda t: t()):
+                self.employment2.save()
             self.assertTrue(WorkerDay.objects_with_excluded.filter(id=wd1.id).exists())
             wd1.refresh_from_db()
             self.assertIsNone(wd1.employment_id)

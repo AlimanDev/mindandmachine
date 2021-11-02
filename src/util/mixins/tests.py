@@ -191,7 +191,8 @@ class TestsHelperMixin:
                 self.get_url('WorkerDay-approve'), data=self.dump_data(approve_data), content_type='application/json')
         return resp
 
-    def _create_san_day(self):
+    @classmethod
+    def _create_san_day(cls):
         return WorkerDayTypeFactory(
             code='SD',
             name='Санитарный день',
