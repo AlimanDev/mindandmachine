@@ -269,6 +269,7 @@ def copy_as_excel_cells(from_employee_id, from_dates, to_employee_id, to_dates, 
                     created_by_id=created_by,
                     last_edited_by_id=created_by,
                     source=source,
+                    work_hours=blank_day.work_hours,
                 )
                 created_wds.append(new_wd)
 
