@@ -1323,11 +1323,13 @@ class Employment(AbstractActiveModel):
     def delete(self, **kwargs):
         from src.timetable.models import WorkerDay
         from src.timetable.worker_day.tasks import clean_wdays
+        from src.integration.tasks import export_or_delete_employment_zkteco
         with transaction.atomic():
             wdays_ids = list(WorkerDay.objects.filter(employment=self).values_list('id', flat=True))
             WorkerDay.objects.filter(employment=self).update(employment_id=None)
             if self.employee.user.network.clean_wdays_on_employment_dt_change:
                 transaction.on_commit(lambda: clean_wdays.delay(id__in=wdays_ids))
+            transaction.on_commit(lambda: export_or_delete_employment_zkteco.delay(self.id))
             return super(Employment, self).delete(**kwargs)
 
     def __init__(self, *args, **kwargs):
@@ -1346,6 +1348,7 @@ class Employment(AbstractActiveModel):
             self.position = WorkerPosition.objects.get(code=position_code)
 
     def save(self, *args, **kwargs):
+        from src.integration.tasks import export_or_delete_employment_zkteco
         if hasattr(self, 'shop_code'):
             self.shop = Shop.objects.get(code=self.shop_code)
         if hasattr(self, 'username'):
@@ -1422,6 +1425,9 @@ class Employment(AbstractActiveModel):
                 }
 
             transaction.on_commit(lambda: clean_wdays.apply_async(**kwargs))
+
+        if (is_new or self.tracker.has_changed('dt_hired') or self.tracker.has_changed('dt_fired')) and settings.ZKTECO_INTEGRATION:
+            transaction.on_commit(lambda: export_or_delete_employment_zkteco.delay(self.id))
 
         return res
 
