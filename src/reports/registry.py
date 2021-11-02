@@ -1,3 +1,5 @@
+from django.utils.functional import cached_property
+
 class ReportRegistryHolder(type):
     registry = {}
 
@@ -37,4 +39,11 @@ class BaseRegisteredReport(metaclass=ReportRegistryHolder):
         return self.__str__()
 
     def get_file(self):
+        return None
+
+    def get_recipients_shops(self):
+        return []
+
+    @cached_property
+    def report_data(self):
         return None
