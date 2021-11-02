@@ -3924,7 +3924,7 @@ class TestVacancy(TestsHelperMixin, APITestCase):
         )
 
         self.assertFalse(WorkerDay.objects.filter(id=pawd.id).exists())
-        self.assertTrue(WorkerDay.objects.filter(is_approved=False, dt=self.vacancy2.dt, employee=self.employee2, source=WorkerDay.SOURCE_ON_CONFIRM_VACANCY).exists())
+        self.assertTrue(WorkerDay.objects.filter(is_approved=False, dt=self.vacancy2.dt, employee=self.employee2).exists())
 
         # можно откликнуться на вакансию,
         # если время не пересекается с другой вакансией на которую уже откликнулся или назначен
