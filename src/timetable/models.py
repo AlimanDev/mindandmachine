@@ -9,7 +9,7 @@ from django.contrib.auth.models import (
 from django.db import models
 from django.db import transaction
 from django.db.models import (
-    Subquery, OuterRef, Max, Q, Case, When, Value, FloatField, F, IntegerField, Exists, BooleanField, Min
+    Subquery, OuterRef, Max, Q, Case, When, Value, FloatField, F, IntegerField, Exists, BooleanField, Min, Count
 )
 from django.db.models import UniqueConstraint
 from django.db.models.fields import PositiveSmallIntegerField
@@ -409,6 +409,17 @@ class WorkerDayOutsourceNetwork(AbstractModel):
 
 
 class WorkerDayType(AbstractModel):
+    GET_WORK_HOURS_METHOD_TYPE_MONTH_AVERAGE_SAWH_HOURS = 'average_sawh_hours'
+    GET_WORK_HOURS_METHOD_TYPE_NORM_HOURS = 'norm_hours'
+    GET_WORK_HOURS_METHOD_TYPE_MANUAL = 'manual'
+
+    GET_WORK_HOURS_METHOD_TYPES = (
+        (GET_WORK_HOURS_METHOD_TYPE_MONTH_AVERAGE_SAWH_HOURS,
+         'Расчет часов на основе среднемесячного значения рекомендуемой нормы'),
+        (GET_WORK_HOURS_METHOD_TYPE_NORM_HOURS, 'Расчет часов на основе нормы по производственному календарю'),
+        (GET_WORK_HOURS_METHOD_TYPE_MANUAL, 'Ручное проставление часов'),
+    )
+
     code = models.CharField(max_length=64, primary_key=True, verbose_name='Код', help_text='Первычный ключ')
     name = models.CharField(max_length=64, verbose_name='Имя')
     short_name = models.CharField('Для отображения в ячейке', max_length=8)
@@ -436,6 +447,13 @@ class WorkerDayType(AbstractModel):
     show_stat_in_hours = models.BooleanField(
         'Отображать в статистике по сотрудникам сумму часов отдельно для этого типа',
         default=False,
+    )
+    get_work_hours_method = models.CharField(
+        'Способ получения рабочих часов',
+        help_text='Актуально для нерабочих типов дней. '
+                  'Для рабочих типов кол-во часов считается на основе времени начала и окончания.',
+        max_length=32, blank=True,
+        choices=GET_WORK_HOURS_METHOD_TYPES,
     )
     ordering = models.PositiveSmallIntegerField(default=0)
     is_active = models.BooleanField(default=True)
@@ -820,10 +838,11 @@ class WorkerDay(AbstractModel):
 
             return dttm_work_start, dttm_work_end, self.count_work_hours(breaks, dttm_work_start, dttm_work_end, break_time=break_time, fine=fine)
 
+        # потенциально только для is_dayoff == true ? -- чтобы было наглядней сколько часов вычитается из нормы?
+        # + вычитать из нормы из work_hours в типах is_reduce_norm?
         if self.type.is_dayoff and self.type.is_work_hours:
-            # TODO: продумать настройки и логику, сделать нормально
             work_hours = 0
-            if self.type.code == WorkerDay.TYPE_VACATION:
+            if self.type.get_work_hours_method == WorkerDayType.GET_WORK_HOURS_METHOD_TYPE_MONTH_AVERAGE_SAWH_HOURS:
                 from src.timetable.worker_day.stat import WorkersStatsGetter
                 employee_stats = WorkersStatsGetter(
                     employee_id=self.employee_id,
@@ -842,7 +861,16 @@ class WorkerDay(AbstractModel):
                 ).get(
                     self.dt.month, 0
                 )
-            elif self.type.code == WorkerDay.TYPE_SICK:
+            elif self.type.get_work_hours_method == WorkerDayType.GET_WORK_HOURS_METHOD_TYPE_NORM_HOURS:
+                prod_cal = ProdCal.objects.filter(
+                    employee_id=self.employee_id,
+                    dt=self.dt,
+                    shop_id=self.employment.shop_id,
+                ).first()
+                if prod_cal:
+                    work_hours = prod_cal.norm_hours
+
+            elif self.type.get_work_hours_method == WorkerDayType.GET_WORK_HOURS_METHOD_TYPE_MANUAL:
                 return None, None, self.work_hours
 
             return None, None, datetime.timedelta(hours=work_hours)
@@ -920,7 +948,7 @@ class WorkerDay(AbstractModel):
     closest_plan_approved = models.ForeignKey(
         'self', null=True, blank=True, on_delete=models.SET_NULL, related_name='related_facts',
         help_text='Используется в факте (и в черновике и подтв. версии) для связи с планом подтвержденным')
-    
+
     source = PositiveSmallIntegerField('Источник создания', choices=SOURCES, default=SOURCE_FAST_EDITOR)
 
     objects = WorkerDayManager.from_queryset(WorkerDayQuerySet)()  # исключает раб. дни у которых employment_id is null
@@ -1024,15 +1052,18 @@ class WorkerDay(AbstractModel):
         fines = self.employment.position.wp_fines if self.employment and self.employment.position else None
 
         # запускаем пересчет часов для факта, если изменились часы в подтвержденном плане
-        if self.shop and (self.shop.network.only_fact_hours_that_in_approved_plan or fines) and \
-                self.tracker.has_changed('work_hours') and \
-                not self.type.is_dayoff and \
-                self.is_plan and self.is_approved:
+        if self.shop \
+                and (self.shop.network.only_fact_hours_that_in_approved_plan or fines) \
+                and self.tracker.has_changed('work_hours') \
+                and not self.type.is_dayoff \
+                and self.is_plan \
+                and self.is_approved:
             fact_qs = WorkerDay.objects.filter(
                 dt=self.dt,
                 employee_id=self.employee_id,
                 is_fact=True,
-                type__is_dayoff=False
+                type__is_dayoff=False,
+                closest_plan_approved_id=self.id,
             ).select_related(
                 'shop',
                 'employment',
@@ -1407,17 +1438,46 @@ class WorkerDay(AbstractModel):
         return exc_data
 
     @classmethod
-    def get_closest_plan_approved_q(cls, employee_id, dt, dttm_work_start, dttm_work_end, delta_in_secs):
-        return WorkerDay.objects.filter(
-            Q(dttm_work_start__gte=dttm_work_start - datetime.timedelta(seconds=delta_in_secs)) &
-            Q(dttm_work_start__lte=dttm_work_start + datetime.timedelta(seconds=delta_in_secs)),
-            Q(dttm_work_end__gte=dttm_work_end - datetime.timedelta(seconds=delta_in_secs)) &
-            Q(dttm_work_end__lte=dttm_work_end + datetime.timedelta(seconds=delta_in_secs)),
+    def get_closest_plan_approved_q(
+            cls, employee_id, dt, dttm_work_start, dttm_work_end, delta_in_secs, use_annotated_filter=True):
+        plan_approved_qs = WorkerDay.objects.filter(
             employee_id=employee_id,
             dt=dt,
             is_fact=False,
             is_approved=True,
         )
+        if use_annotated_filter:
+            plan_approved_qs = plan_approved_qs.annotate(
+                plan_approved_count=Subquery(WorkerDay.objects.filter(
+                    employee_id=OuterRef(employee_id) if isinstance(employee_id, OuterRef) else employee_id,
+                    dt=OuterRef(dt) if isinstance(dt, OuterRef) else dt,
+                    is_fact=False,
+                    is_approved=True,
+                    type__is_dayoff=False,
+                ).values(
+                    'employee_id',
+                    'dt',
+                    'is_fact',
+                    'is_approved',
+                ).annotate(
+                    objs_count=Count('*'),
+                ).values('objs_count')[:1], output_field=IntegerField())
+            ).filter(
+                Q(Q(plan_approved_count__gt=1) & Q(
+                    Q(dttm_work_start__gte=dttm_work_start - datetime.timedelta(seconds=delta_in_secs)) &
+                    Q(dttm_work_start__lte=dttm_work_start + datetime.timedelta(seconds=delta_in_secs)),
+                    Q(dttm_work_end__gte=dttm_work_end - datetime.timedelta(seconds=delta_in_secs)) &
+                    Q(dttm_work_end__lte=dttm_work_end + datetime.timedelta(seconds=delta_in_secs))
+                )) | Q(plan_approved_count=1),
+            )
+        else:
+            plan_approved_qs = plan_approved_qs.filter(
+                Q(dttm_work_start__gte=dttm_work_start - datetime.timedelta(seconds=delta_in_secs)) &
+                Q(dttm_work_start__lte=dttm_work_start + datetime.timedelta(seconds=delta_in_secs)) &
+                Q(dttm_work_end__gte=dttm_work_end - datetime.timedelta(seconds=delta_in_secs)) &
+                Q(dttm_work_end__lte=dttm_work_end + datetime.timedelta(seconds=delta_in_secs))
+            )
+        return plan_approved_qs
 
     @classmethod
     def set_closest_plan_approved(cls, q_obj, delta_in_secs, is_approved=None):
@@ -1436,15 +1496,42 @@ class WorkerDay(AbstractModel):
             if is_approved is not None:
                 filter_kwargs['is_approved'] = is_approved
 
-            cls.objects.filter(
+            qs = cls.objects.filter(
                 q_obj, **filter_kwargs,
-            ).update(
+            ).annotate(
+                plan_approved_count=Subquery(WorkerDay.objects.filter(
+                    employee_id=OuterRef('employee_id'),
+                    dt=OuterRef('dt'),
+                    is_fact=False,
+                    is_approved=True,
+                    type__is_dayoff=False,
+                ).values(
+                    'employee_id',
+                    'dt',
+                    'is_fact',
+                    'is_approved',
+                ).annotate(
+                    objs_count=Count('*'),
+                ).values('objs_count')[:1], output_field=IntegerField())
+            )
+
+            qs.filter(plan_approved_count__gt=1).update(
                 closest_plan_approved=Subquery(cls.get_closest_plan_approved_q(
                     employee_id=OuterRef('employee_id'),
                     dt=OuterRef('dt'),
                     dttm_work_start=OuterRef('dttm_work_start'),
                     dttm_work_end=OuterRef('dttm_work_end'),
                     delta_in_secs=delta_in_secs,
+                    use_annotated_filter=False,
+                ).values('id')[:1])
+            )
+            qs.filter(plan_approved_count=1).update(
+                closest_plan_approved=Subquery(WorkerDay.objects.filter(
+                    employee_id=OuterRef('employee_id'),
+                    dt=OuterRef('dt'),
+                    is_fact=False,
+                    is_approved=True,
+                    type__is_dayoff=False,
                 ).values('id')[:1])
             )
 
@@ -1954,6 +2041,7 @@ class AttendanceRecords(AbstractModel):
                         is_outsource=fact_approved_to_copy.is_outsource,
                         created_by_id=fact_approved_to_copy.created_by_id,
                         last_edited_by_id=fact_approved_to_copy.last_edited_by_id,
+                        closest_plan_approved_id=fact_approved_to_copy.closest_plan_approved_id,
                         source=WorkerDay.SOURCE_AUTO_FACT,
                     )
                     WorkerDay.check_work_time_overlap(

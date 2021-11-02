@@ -289,9 +289,21 @@ class TestPobedaDivider(TestTimesheetMixin, TestCase):
         )
         sawh_settings_mapping.positions.add(cls.position_worker)
         WorkerDayType.objects.filter(
-            code__in=[WorkerDay.TYPE_VACATION, WorkerDay.TYPE_MATERNITY, WorkerDay.TYPE_SICK, WorkerDay.TYPE_ABSENSE]
+            code__in=[WorkerDay.TYPE_VACATION, WorkerDay.TYPE_MATERNITY]
         ).update(
             is_work_hours=True,
+            get_work_hours_method=WorkerDayType.GET_WORK_HOURS_METHOD_TYPE_MONTH_AVERAGE_SAWH_HOURS,
+        )
+        WorkerDayType.objects.filter(
+            code__in=[WorkerDay.TYPE_ABSENSE],
+        ).update(
+            is_work_hours=True,
+        )
+        WorkerDayType.objects.filter(
+            code__in=[WorkerDay.TYPE_SICK],
+        ).update(
+            is_work_hours=True,
+            get_work_hours_method=WorkerDayType.GET_WORK_HOURS_METHOD_TYPE_MANUAL,
         )
 
     def test_calc_timesheets(self):
