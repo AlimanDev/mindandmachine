@@ -39,6 +39,7 @@ def copy_approved(dt_from, dt_to=None):
                 shop=wd.shop,
                 employee_id=wd.employee_id,
                 employment=wd.employment,
+                work_hours=wd.work_hours,
                 dttm_work_start=wd.dttm_work_start,
                 dttm_work_end=wd.dttm_work_end,
                 dt=wd.dt,

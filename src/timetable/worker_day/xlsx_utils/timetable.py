@@ -53,10 +53,12 @@ def fmt3(**kwargs):
 
 
 class Timetable_xlsx(Tabel_xlsx):
-    def __init__(self, *args, **kwargs):
+    wd_type_field = 'type'
+    work_hours_field = 'rounded_work_hours'
+    def __init__(self, *args,  for_inspection=False, **kwargs):
         super().__init__(*args, **kwargs)
         self.day_type = {
-            'font_size': self._font_size(14),
+            'font_size': self._font_size(14, 7),
             'font_name': 'Arial',
             'bold': False,
             'align': 'center',
@@ -80,6 +82,9 @@ class Timetable_xlsx(Tabel_xlsx):
                 'timetable_add_vacation_count_field', False),
         )
         self.additional_fields_count = sum(self.additional_fields_settings.values())
+        if for_inspection:
+            self.wd_type_field = 'day_type'
+            self.work_hours_field = 'day_hours'
 
     def format_cells(self, users_len):
         super().format_cells(users_len)
@@ -91,7 +96,7 @@ class Timetable_xlsx(Tabel_xlsx):
         normalized = 6.23820623
 
         self.worksheet.set_column(0, 0, self._column_width(70, 45) / normalized)
-        self.worksheet.set_column(1, 1, self._column_width(100, 70) / normalized)
+        self.worksheet.set_column(1, 1, self._column_width(100, 75) / normalized)
         self.worksheet.set_column(2, 2, self._column_width(100, 70) / normalized)
         self.worksheet.set_column(3, 3, self._column_width(15) / normalized)
         self.worksheet.set_column(4, 5, 40 / normalized)
@@ -100,24 +105,24 @@ class Timetable_xlsx(Tabel_xlsx):
         self.worksheet.set_column(37, 39, 60 / normalized)
 
         normalized_row = 1
-        set_rows(7, 9, 66 / normalized_row)
+        set_rows(7, 9, 23 / normalized_row)
         set_rows(8, 10, 15 / normalized_row)
         set_rows(9, 11 + users_len, 45 / normalized_row)
 
-        border_fmt = self.workbook.add_format(fmt(border=1))
-        self.worksheet.conditional_format(
-            0, 0, 9, len(self.prod_days) + 5 + self.additional_fields_count, {'type': 'blanks', 'format': border_fmt})
+        # border_fmt = self.workbook.add_format(fmt(border=1))
+        # self.worksheet.conditional_format(
+        #     0, 0, 9, len(self.prod_days) + 5 + self.additional_fields_count, {'type': 'blanks', 'format': border_fmt})
 
     def add_main_info(self):
         # format
-        format_header_text = self.workbook.add_format(fmt(font_size=self._font_size(10), border=2, text_wrap=True))
-        format_meta_bold = self.workbook.add_format(fmt(font_size=self._font_size(11), bold=True, align='left', border=1, text_wrap=True))
+        format_header_text = self.workbook.add_format(fmt(font_size=self._font_size(12, 8), border=2, text_wrap=True))
+        format_meta_bold = self.workbook.add_format(fmt(font_size=self._font_size(11, 11), bold=True, align='left', text_wrap=True))
         format_meta_bold_bottom = self.workbook.add_format(
-            fmt(font_size=self._font_size(11), bold=True, align='left', border=1, text_wrap=False, bottom=1))
+            fmt(font_size=self._font_size(11, 11), bold=True, align='left', text_wrap=False))
 
         # merged cells
         h1_merge_format = self.workbook.add_format(
-            fmt(font_size=self._font_size(12, 10), bold=True, border=1, text_wrap=True))
+            fmt(font_size=self._font_size(12, 12), bold=True, text_wrap=True))
         self.worksheet.merge_range(
             1, 4, 1, 3 + len(self.prod_days),
                  force_text(_('Employee work timetable for')) +
@@ -127,12 +132,12 @@ class Timetable_xlsx(Tabel_xlsx):
                  force_text(self.dt.year),
             h1_merge_format,
         )
-        self.worksheet.merge_range(2, 1, 2, 4, _('Shop: {}').format(self.shop.name), format_meta_bold)
+        self.worksheet.merge_range(2, 1, 2, 8, _('Shop: {}').format(self.shop.name), format_meta_bold)
         sign_text_merge_format = self.workbook.add_format(
-            fmt(font_size=self._font_size(10), bold=True, border=1, text_wrap=False))
+            fmt(font_size=self._font_size(10), bold=True, text_wrap=False))
         self.worksheet.merge_range(4, 2, 4, 4, '', sign_text_merge_format)
         format_signature_text = self.workbook.add_format(
-            fmt(font_size=self._font_size(10), bold=True, valign='top', align='right', border=1, text_wrap=False))
+            fmt(font_size=self._font_size(10, 8), bold=True, valign='top', top=1, align='right', text_wrap=False))
         self.worksheet.merge_range(5, 1, 5, 4, _('signature') + '/' + _('transcript'), format_signature_text)
 
         # top left info
@@ -142,18 +147,26 @@ class Timetable_xlsx(Tabel_xlsx):
         self.worksheet.write_string(7, 0, '№', format_header_text)
         self.worksheet.write_string(7, 1, _('full name'), format_header_text)
         self.worksheet.write_string(7, 2, _('POSITION'), format_header_text)
-        self.worksheet.write_string(7, 3, '', format_header_text)
-        count_of_days = len(self.prod_days) + 4
+        count_of_days = len(self.prod_days) + 3
+
+        format_from_to_text = self.workbook.add_format(
+            fmt(font_size=self._font_size(10, 8), bold=True, valign='bottom', border=1, align='center', text_wrap=False))
+        self.worksheet.merge_range(2, count_of_days - 2, 2, count_of_days + 1, _('From'), format_from_to_text)
+        self.worksheet.merge_range(2, count_of_days + 2, 2, count_of_days + 3, _('To'), format_from_to_text)
+        format_from_to_date = self.workbook.add_format(
+            fmt(font_size=self._font_size(10, 8), bold=False, valign='bottom', border=1, align='left', text_wrap=False))
+        self.worksheet.merge_range(3, count_of_days - 2, 3, count_of_days + 1, self.prod_days[0].dt.strftime('%d.%m.%Y'), format_from_to_date)
+        self.worksheet.merge_range(3, count_of_days + 2, 3, count_of_days + 3, self.prod_days[-1].dt.strftime('%d.%m.%Y'), format_from_to_date)
 
         # right info
         n = 0
         if self.additional_fields_settings.get('timetable_add_work_days_field'):
             self.worksheet.set_column(count_of_days, count_of_days, self._column_width(75) / 6.23820623)
-            self.worksheet.write_string(7, count_of_days, _('days'), format_header_text)
+            self.worksheet.write_string(7, count_of_days, _('Days'), format_header_text)
             n += 1
         if self.additional_fields_settings.get('timetable_add_work_hours_field'):
             self.worksheet.set_column(count_of_days + n, count_of_days + n, self._column_width(75) / 6.23820623)
-            self.worksheet.write_string(7, count_of_days + n, _('hours'), format_header_text)
+            self.worksheet.write_string(7, count_of_days + n, _('Hours'), format_header_text)
             n += 1
         if self.additional_fields_settings.get('timetable_add_norm_hours_field'):
             self.worksheet.set_column(count_of_days + n, count_of_days + n, self._column_width(100) / 6.23820623)
@@ -168,7 +181,7 @@ class Timetable_xlsx(Tabel_xlsx):
         n += 1
         self.worksheet.set_column(count_of_days + n, count_of_days + n, self._column_width(150) / 6.23820623)
         self.worksheet.write_string(7, count_of_days + n,
-                                    _('I have read the work schedule**. I agree to work on public holidays'),
+                                    _('I have read the work schedule**.'),
                                     format_header_text)
         n += 1
         if self.additional_fields_settings.get('timetable_add_holiday_count_field'):
@@ -177,7 +190,7 @@ class Timetable_xlsx(Tabel_xlsx):
             n += 1
         if self.additional_fields_settings.get('timetable_add_vacation_count_field'):
             self.worksheet.set_column(count_of_days + n, count_of_days + n, self._column_width(75) / 6.23820623)
-            self.worksheet.write_string(7, count_of_days + n, _('V'), format_header_text)
+            self.worksheet.write_string(7, count_of_days + n, _('V'), format_header_text)        
 
     def fill_table(self, workdays, employments, stat, row_s, col_s, stat_type='approved', norm_type='norm_hours', mapping=None):
         """
@@ -190,14 +203,14 @@ class Timetable_xlsx(Tabel_xlsx):
         mapping = mapping or self.WD_TYPE_MAPPING
         cell_format = dict(self.day_type)
         for row_shift, employment in enumerate(employments):
-            max_rows = 2
+            max_rows = 1.1
             for day, dt in enumerate(self.prod_days):
                 texts = []
                 if workdays.get(employment.employee_id, {}).get(dt.dt):
                     wds = workdays.get(employment.employee_id, {}).get(dt.dt)
                     if len(wds) > max_rows:
                         max_rows = len(wds)
-                    wd_types = list(set(map(lambda x: x.type_id, wds)))
+                    wd_types = list(set(map(lambda x: getattr(x, self.wd_type_field + '_id'), wds)))
                     font_color = COLOR_BLACK
                     bg_color = COLOR_WHITE
 
@@ -205,13 +218,15 @@ class Timetable_xlsx(Tabel_xlsx):
                         font_color = self.WORKERDAY_TYPE_COLORS[wd_types[0]][0]
                         bg_color = self.WORKERDAY_TYPE_COLORS[wd_types[0]][1]
                     for wd in wds:
-                        if not wd.type.is_dayoff:
+                        if not getattr(wd, self.wd_type_field).is_dayoff:
                             text = '{}-{}'.format(wd.dttm_work_start.time().strftime(QOS_SHORT_TIME_FORMAT),
                                                     wd.dttm_work_end.time().strftime(QOS_SHORT_TIME_FORMAT))
-                            if not wd.type_id == WorkerDay.TYPE_WORKDAY:
-                                text = mapping[wd.type_id] + text
+                            if not getattr(wd, self.wd_type_field + '_id') == WorkerDay.TYPE_WORKDAY:
+                                text = mapping[getattr(wd, self.wd_type_field + '_id')] + text
+                        elif getattr(wd, self.wd_type_field).is_dayoff and getattr(wd, self.wd_type_field).is_work_hours:
+                            text = mapping[getattr(wd, self.wd_type_field + '_id')] + ' ' + str(round(getattr(wd, self.work_hours_field), 1))
                         else:
-                            text = mapping[wd.type_id]
+                            text = mapping[getattr(wd, self.wd_type_field + '_id')]
                         
                         texts.append(text)
                     
@@ -233,16 +248,9 @@ class Timetable_xlsx(Tabel_xlsx):
                     '\n'.join(texts),
                     self.workbook.add_format(cell_format)
                 )
-            self.worksheet.set_row(row_s + row_shift, self._row_height(32 * max_rows / 2, 26 * max_rows))
+            self.worksheet.set_row(row_s + row_shift, self._row_height(32 * max_rows / 2, 28.5 * max_rows))
 
-            format_holiday_debt = self.workbook.add_format(fmt(font_size=self._font_size(9), border=1, bg_color='#FEFF99'))
-            self.worksheet.write_string(
-                row_s + row_shift, col_s - 1,
-                '',
-                format_holiday_debt
-            )
-
-            format_text = self.workbook.add_format(fmt(font_size=self._font_size(12), border=1, bold=True))
+            format_text = self.workbook.add_format(fmt(font_size=self._font_size(12, 9), border=1, bold=True))
 
             n = 1
             if self.additional_fields_settings.get('timetable_add_work_days_field'):
@@ -253,7 +261,7 @@ class Timetable_xlsx(Tabel_xlsx):
                 )
                 n += 1
 
-            plan_hours = None
+            plan_hours = int(round(stat.get(employment.employee_id, {}).get('plan', {}).get(stat_type, {}).get('work_hours', {}).get('total', 0)))
             if self.additional_fields_settings.get('timetable_add_work_hours_field'):
                 plan_hours = int(round(stat.get(employment.employee_id, {}).get('plan', {}).get(stat_type, {}).get('work_hours', {}).get('total', 0)))
                 self.worksheet.write_string(
@@ -263,7 +271,7 @@ class Timetable_xlsx(Tabel_xlsx):
                 )
                 n += 1
 
-            norm_hours = None
+            norm_hours = int(round(stat.get(employment.employee_id, {}).get('plan', {}).get(stat_type, {}).get(norm_type, {}).get('curr_month', 0)))
             if self.additional_fields_settings.get('timetable_add_norm_hours_field'):
                 norm_hours = int(round(stat.get(employment.employee_id, {}).get('plan', {}).get(stat_type, {}).get(norm_type, {}).get('curr_month', 0)))
                 self.worksheet.write_string(
@@ -372,13 +380,13 @@ class Timetable_xlsx(Tabel_xlsx):
                     if len(wds) > max_rows[xdt.weekday()]:
                         max_rows[xdt.weekday()] = len(wds)
                     for wd in wds:
-                        if not wd.type.is_dayoff:
+                        if not getattr(wd, self.wd_type_field).is_dayoff:
                             text = '{}-{}'.format(wd.dttm_work_start.time().strftime(QOS_SHORT_TIME_FORMAT),
                                                     wd.dttm_work_end.time().strftime(QOS_SHORT_TIME_FORMAT))
-                            if not wd.type_id == WorkerDay.TYPE_WORKDAY:
-                                text = mapping[wd.type_id] + text
+                            if not getattr(wd, self.wd_type_field + '_id') == WorkerDay.TYPE_WORKDAY:
+                                text = mapping[getattr(wd, self.wd_type_field + '_id')] + text
                         else:
-                            text = mapping[wd.type_id]
+                            text = mapping[getattr(wd, self.wd_type_field + '_id')]
                         texts.append(text)
 
                     cell_data.append(Cell('\n'.join(texts),

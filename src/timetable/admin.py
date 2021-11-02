@@ -4,7 +4,7 @@ from django.utils.translation import gettext as _
 from import_export.admin import ExportActionMixin, ImportMixin
 from rangefilter.filter import DateRangeFilter, DateTimeRangeFilter
 from src.base.admin import BaseNotWrapRelatedModelaAdmin
-from src.base.admin_filters import CustomChoiceDropdownFilter, CustomRelatedOnlyDropdownFilter
+from src.base.admin_filters import CustomRelatedDropdownFilter, CustomRelatedOnlyDropdownFilter
 
 from src.base.forms import (
     CustomImportFunctionGroupForm,
@@ -30,6 +30,7 @@ from src.timetable.models import (
     WorkerDayType,
     GroupWorkerDayPermission,
     WorkerDayPermission,
+    TimesheetItem,
 )
 from .resources import GroupWorkerDayPermissionResource
 
@@ -153,7 +154,7 @@ class WorkerDayAdmin(admin.ModelAdmin):
         'is_fact',
         'is_approved',
         ('shop', CustomRelatedOnlyDropdownFilter),
-        ('type', CustomRelatedOnlyDropdownFilter),
+        ('type', CustomRelatedDropdownFilter),
         ('dttm_modified', DateTimeRangeFilter),
         ('created_by', CustomRelatedOnlyDropdownFilter),
     )
@@ -323,10 +324,10 @@ class GroupWorkerDayPermissionAdmin(ImportMixin, ExportActionMixin, BaseNotWrapR
     list_display = ('id', 'group', 'worker_day_permission', 'limit_days_in_past', 'limit_days_in_future')
     list_editable = ('limit_days_in_past', 'limit_days_in_future')
     list_filter = [
-        ('group', RelatedOnlyDropdownNameOrderedFilter),
+        ('group', CustomRelatedDropdownFilter),
         'worker_day_permission__action',
         'worker_day_permission__graph_type',
-        ('worker_day_permission__wd_type', RelatedOnlyDropdownNameOrderedFilter),
+        ('worker_day_permission__wd_type', CustomRelatedDropdownFilter),
     ]
     list_select_related = ('group', 'worker_day_permission__wd_type')
     resource_class = GroupWorkerDayPermissionResource
@@ -350,3 +351,30 @@ class GroupWorkerDayPermissionAdmin(ImportMixin, ExportActionMixin, BaseNotWrapR
             groups = form.cleaned_data['groups']
             kwargs.update({'groups': groups.values_list('id', flat=True)})
         return super().get_import_data_kwargs(request, *args, **kwargs)
+
+
+@admin.register(TimesheetItem)
+class TimesheetItemAdmin(admin.ModelAdmin):
+    save_as = True
+    raw_id_fields = ('shop', 'position', 'work_type_name', 'employee')
+    list_filter = (
+        ('dt', DateRangeFilter),
+        ('shop', CustomRelatedDropdownFilter),
+        ('position', CustomRelatedDropdownFilter),
+        ('work_type_name', CustomRelatedDropdownFilter),
+        ('employee', CustomRelatedDropdownFilter),
+        'timesheet_type',
+        'day_type',
+    )
+    list_display = (
+        'id',
+        'dt',
+        'timesheet_type',
+        'employee',
+        'shop',
+        'position',
+        'work_type_name',
+        'day_type',
+        'day_hours',
+        'night_hours',
+    )

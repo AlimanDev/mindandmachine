@@ -1,6 +1,18 @@
 from rest_framework import serializers
 
-class PivotTabelSerializer(serializers.Serializer):
+class ValidateMixin:
+    def _validate_ids_value(self, data, name):
+        if name in data:
+            data[name] = list(map(int, data[name].split(',')))
+        return data
+    
+    def _validate_bool_value(self, data, name):
+        if name in data:
+            data[name] = bool(data[name])
+        return data
+
+
+class ReportFilterSerializer(serializers.Serializer, ValidateMixin):
     shop_ids = serializers.CharField(required=False)
     employee_ids = serializers.CharField(required=False)
     user_ids = serializers.CharField(required=False)
@@ -13,21 +25,12 @@ class PivotTabelSerializer(serializers.Serializer):
 
     def validate(self, attrs):
         attrs = super().validate(attrs)
-        def _validate_ids_value(data, name):
-            if name in data:
-                data[name] = list(map(int, data[name].split(',')))
-            return data
 
-        def _validate_bool_value(data, name):
-            if name in data:
-                data[name] = bool(data[name])
-            return data
-
-        attrs = _validate_ids_value(attrs, 'shop_ids')
-        attrs = _validate_ids_value(attrs, 'employee_ids')
-        attrs = _validate_ids_value(attrs, 'user_ids')
-        attrs = _validate_ids_value(attrs, 'network_ids')
-        attrs = _validate_bool_value(attrs, 'is_vacancy')
-        attrs = _validate_bool_value(attrs, 'is_outsource')
+        attrs = self._validate_ids_value(attrs, 'shop_ids')
+        attrs = self._validate_ids_value(attrs, 'employee_ids')
+        attrs = self._validate_ids_value(attrs, 'user_ids')
+        attrs = self._validate_ids_value(attrs, 'network_ids')
+        attrs = self._validate_bool_value(attrs, 'is_vacancy')
+        attrs = self._validate_bool_value(attrs, 'is_outsource')
 
         return attrs

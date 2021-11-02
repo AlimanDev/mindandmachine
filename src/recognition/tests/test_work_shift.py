@@ -11,6 +11,7 @@ from src.recognition.models import TickPoint
 from src.util.mixins.tests import TestsHelperMixin
 from src.util.models_converter import Converter
 
+
 class TestWorkShiftViewSet(TestsHelperMixin, APITestCase):
     maxDiff = None
 
@@ -85,6 +86,38 @@ class TestWorkShiftViewSet(TestsHelperMixin, APITestCase):
         wd.dttm_work_end = dttm_end
         wd.save()
         self._test_work_shift(self.dt_str, self.user2.username, dttm_start, dttm_end, self.shop2.code)
+
+    def test_work_shift_with_type_empty_excluded(self):
+        self._test_work_shift(self.dt_str, self.user2.username, None, None)
+
+        WorkerDay.objects.create(
+            dttm_work_start=datetime.combine(self.today, time(10)),
+            dttm_work_end=datetime.combine(self.today, time(20)),
+            type_id=WorkerDay.TYPE_EMPTY,
+            is_fact=True,
+            is_approved=True,
+            dt=self.dt_str,
+            shop=self.work_type1.shop,
+            employee=self.employee2,
+            employment=self.employment2,
+        )
+        self._test_work_shift(self.dt_str, self.user2.username, None, None)
+
+    def test_work_shift_with_empty_shop_excluded(self):
+        self._test_work_shift(self.dt_str, self.user2.username, None, None)
+
+        WorkerDay.objects.create(
+            dttm_work_start=datetime.combine(self.today, time(10)),
+            dttm_work_end=datetime.combine(self.today, time(20)),
+            type_id=WorkerDay.TYPE_WORKDAY,
+            is_fact=True,
+            is_approved=True,
+            dt=self.dt_str,
+            shop=None,
+            employee=self.employee2,
+            employment=self.employment2,
+        )
+        self._test_work_shift(self.dt_str, self.user2.username, None, None)
 
     def test_cant_get_work_shift_for_someones_user(self):
         resp = self.client.get(
@@ -225,8 +258,27 @@ class TestWorkShiftViewSet(TestsHelperMixin, APITestCase):
                 'show_user_biometrics_block': False,
                 'unaccounted_overtime_threshold': 60,
                 'forbid_edit_employments_came_through_integration': True,
+                'get_position_from_work_type_name_in_calc_timesheet': False,
                 'show_remaking_choice': False,
-                'url': None
+                'url': None,
+                'shop_name_form': {
+                    "singular": {
+                        "I": "магазин",
+                        "R": "магазина",
+                        "D": "магазину",
+                        "V": "магазин",
+                        "T": "магазином",
+                        "P": "магазине"
+                    },
+                    "plural": {
+                        "I": "магазины",
+                        "R": "магазинов",
+                        "D": "магазинам",
+                        "V": "магазины",
+                        "T": "магазинами",
+                        "P": "магазинах"
+                    }
+                }
             },
         }
         self.assertEqual(len(resp.json()), 5)
@@ -353,8 +405,27 @@ class TestWorkShiftViewSet(TestsHelperMixin, APITestCase):
                 'show_user_biometrics_block': False,
                 'unaccounted_overtime_threshold': 60,
                 'forbid_edit_employments_came_through_integration': True,
+                'get_position_from_work_type_name_in_calc_timesheet': False,
                 'show_remaking_choice': False,
-                'url': None
+                'url': None,
+                'shop_name_form': {
+                    "singular": {
+                        "I": "магазин",
+                        "R": "магазина",
+                        "D": "магазину",
+                        "V": "магазин",
+                        "T": "магазином",
+                        "P": "магазине"
+                    },
+                    "plural": {
+                        "I": "магазины",
+                        "R": "магазинов",
+                        "D": "магазинам",
+                        "V": "магазины",
+                        "T": "магазинами",
+                        "P": "магазинах"
+                    }
+                }
             },
         }
         self.assertEqual(len(resp.json()), 5)
@@ -487,8 +558,27 @@ class TestWorkShiftViewSet(TestsHelperMixin, APITestCase):
                 'show_user_biometrics_block': False,
                 'unaccounted_overtime_threshold': 60,
                 'forbid_edit_employments_came_through_integration': True,
+                'get_position_from_work_type_name_in_calc_timesheet': False,
                 'show_remaking_choice': False,
-                'url': None
+                'url': None,
+                'shop_name_form': {
+                    "singular": {
+                        "I": "магазин",
+                        "R": "магазина",
+                        "D": "магазину",
+                        "V": "магазин",
+                        "T": "магазином",
+                        "P": "магазине"
+                    },
+                    "plural": {
+                        "I": "магазины",
+                        "R": "магазинов",
+                        "D": "магазинам",
+                        "V": "магазины",
+                        "T": "магазинами",
+                        "P": "магазинах"
+                    }
+                }
             },
         }
         self.assertEqual(len(resp.json()), 5)

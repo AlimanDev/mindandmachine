@@ -63,7 +63,7 @@ class WorkerDayViewSet(viewsets.ReadOnlyModelViewSet):
             Q(dt=dt_from, dttm_work_start__isnull=False, dttm_work_end__isnull=False) |
             Q(dt=dt_from - timedelta(1), dttm_work_end__date=dt_from), # чтобы ночные смены попадали
             shop_id=tick_point.shop_id,
-            child__id__isnull=True,
+            # child__id__isnull=True,
             is_fact=False,
             is_approved=True,
         )
@@ -130,10 +130,12 @@ class WorkerDayViewSet(viewsets.ReadOnlyModelViewSet):
         wd_kwargs = dict(
             employee__user__username=data.get('worker'),
             dt=data.get('dt'),
+            shop__isnull=False,
         )
         if data.get('shop'):
             wd_kwargs['shop__code'] = data.get('shop')
-        work_shift = WorkerDay.objects.filter(**wd_kwargs, is_fact=True, is_approved=True).last()
+        work_shift = WorkerDay.objects.filter(**wd_kwargs, is_fact=True, is_approved=True).exclude(
+            type_id=WorkerDay.TYPE_EMPTY).last()
         if work_shift is None:
             resp_dict = self.request.query_params.dict()
             resp_dict['dttm_work_start'] = None

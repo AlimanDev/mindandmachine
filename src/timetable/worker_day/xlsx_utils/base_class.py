@@ -1,9 +1,12 @@
 import datetime
 
+from django.conf import settings
+from django.db.models import Case, When, Sum, Value, IntegerField
+
 from src.base.models import ProductionDay
 from src.timetable.worker_day.xlsx_utils.colors import *
 from src.util.models_converter import Converter
-from django.db.models import Case, When, Sum, Value, IntegerField, Q, BooleanField, Subquery, OuterRef
+
 
 class Xlsx_base:
     WEEKDAY_TRANSLATION = [
@@ -25,7 +28,7 @@ class Xlsx_base:
             self.worksheet = worksheet
 
         self.default_text_settings = {
-            'font_size': self._font_size(10),
+            'font_size': self._font_size(10, 8),
             'font_name': 'Arial',
             'align': 'center',
             'valign': 'vcenter',
@@ -87,7 +90,7 @@ class Xlsx_base:
         """
 
         text_dict = {
-            'font_size': self._font_size(11),
+            'font_size': self._font_size(11, 8),
             'font_name': 'Arial',
             'bold': True,
             'align': 'center',
@@ -96,6 +99,9 @@ class Xlsx_base:
             'border': 1,
             'bg_color': '',
         }
+        
+        if format == '%w':
+            text_dict['font_size'] = self._font_size(11, 11)
 
         if (xlsx_format == str) :
             writer = self.worksheet.write_string
@@ -120,7 +126,7 @@ class Xlsx_base:
             if format == '%w':
                 self.worksheet.write_string(row, col + i,
                                             self.WEEKDAY_TRANSLATION[int(item.dt.strftime(format))], text_type)
-                self.worksheet.set_column(col + i, col + i, self._column_width(16, 5.5))
+                self.worksheet.set_column(col + i, col + i, self._column_width(16, 4))
             else:
                 cell_str = item.dt.strftime(format)
                 cell_str = int(cell_str) if xlsx_format==int else cell_str
@@ -149,12 +155,15 @@ class Xlsx_base:
         format_s = dict(self.default_text_settings)
         format_s['border'] = 1
         format_s['text_wrap'] = True
+        format_s['bold'] = False
         text_format = self.workbook.add_format(format_s)
+        format_s['bold'] = True
+        bold_text_format = self.workbook.add_format(format_s)
         format_s['num_format'] = 'dd.mm.yyyy'
         date_format = self.workbook.add_format(format_s)
 
         col_func_dict = {
-            'code': (lambda e: e.employee.tabel_code or '', text_format, self.worksheet.write_string),
+            'code': (settings.DOWNLOAD_TIMETABLE_GET_CODE_FUNC, bold_text_format, self.worksheet.write_string),
             'fio': (lambda e: '{} {} {}'.format(e.employee.user.last_name, e.employee.user.first_name, e.employee.user.middle_name), text_format,
                     self.worksheet.write_string),
             'position': (lambda e: e.position.name if e.position else 'Не указано', text_format, self.worksheet.write_string),

@@ -1,26 +1,20 @@
 from datetime import datetime, date, timedelta, time
 
-from django.core import mail
-from src.notifications.models.event_notification import EventEmailNotification
-from src.timetable.events import VACANCY_CONFIRMED_TYPE
-from src.events.models import EventType
-
 from django.test import override_settings
 from rest_framework.test import APITestCase
 
+from src.base.models import Shop, NetworkConnect, Network, User, Employee, Employment, Group, FunctionGroup, \
+    WorkerPosition
 from src.timetable.models import (
-    WorkerDay, 
-    WorkType, 
-    WorkTypeName, 
-    GroupWorkerDayPermission, 
+    WorkerDay,
+    WorkType,
+    WorkTypeName,
+    GroupWorkerDayPermission,
     WorkerDayPermission,
-    ShopMonthStat,
-    AttendanceRecords,
 )
-from src.base.models import Shop, NetworkConnect, Network, User, Employee, Employment, Group, FunctionGroup, WorkerPosition
-from src.recognition.models import TickPoint, Tick
-from src.timetable.models import ShopMonthStat
+from src.timetable.timesheet.tasks import calc_timesheets
 from src.util.mixins.tests import TestsHelperMixin
+
 
 @override_settings(OUTSOURCE=True)
 class TestOutsource(TestsHelperMixin, APITestCase):
@@ -248,3 +242,65 @@ class TestOutsource(TestsHelperMixin, APITestCase):
         self.assertEquals(len(list(filter(lambda x: x['id'] == self.employee1.id, employees.json()))), 1)
         employee = list(filter(lambda x: x['id'] == self.employee1.id, employees.json()))[0]
         self.assertEquals(len(employee['employments']), 1)
+
+
+    def test_can_duplicate_worker_day_of_outsource_employee_for_employee_in_own_shop(self):
+        empl = Employment.objects.create(
+            shop=self.client_shop,
+            employee=self.employee1,
+        )
+        dt = date.today()
+        WorkerDay.objects.create(
+            employment=empl,
+            employee=self.employee1,
+            shop=self.client_shop,
+            dt=dt,
+            type_id=WorkerDay.TYPE_HOLIDAY,
+        )
+        duplicate = self.client.post(
+            '/rest_api/worker_day/duplicate/',
+            {
+                'from_employee_id': self.employee1.id,
+                'to_employee_id': self.client_employee.id,
+                'from_dates': [str(dt)],
+                'to_dates': [str(dt)],
+                'is_approved': False,
+            }
+        )
+        self.assertEquals(duplicate.status_code, 200)
+        self.assertTrue(WorkerDay.objects.filter(employee=self.client_employee, dt=dt, is_approved=False, type_id=WorkerDay.TYPE_HOLIDAY).exists())
+
+    def test_get_timesheet_for_outsource_worker(self):
+        empl = Employment.objects.create(
+            shop=self.client_shop,
+            employee=self.employee1,
+        )
+        dt = date.today()
+        WorkerDay.objects.create(
+            employment=empl,
+            employee=self.employee1,
+            shop=self.client_shop,
+            dt=dt,
+            type_id=WorkerDay.TYPE_WORKDAY,
+            dttm_work_start=datetime.combine(dt, time(8)),
+            dttm_work_end=datetime.combine(dt, time(20)),
+            is_approved=True,
+        )
+        with override_settings(FISCAL_SHEET_DIVIDER_ALIAS='nahodka'):
+            calc_timesheets(employee_id__in=[self.employee1.id], dt_from=dt, dt_to=dt+timedelta(1), reraise_exc=True)
+        response = self.client.get('/rest_api/timesheet/')
+        self.assertEquals(len(response.json()), 2)
+        self.network_connect.allow_assign_employements_from_outsource = False
+        self.network_connect.allow_choose_shop_from_client_for_employement = False
+        self.network_connect.save()
+        response = self.client.get('/rest_api/timesheet/')
+        self.assertEquals(len(response.json()), 0)
+
+    def test_client_can_get_outsource_user(self):
+        response = self.client.get(f'/rest_api/user/?id={self.user1.id}')
+        self.assertEquals(len(response.json()), 1)
+        self.network_connect.allow_assign_employements_from_outsource = False
+        self.network_connect.allow_choose_shop_from_client_for_employement = False
+        self.network_connect.save()
+        response = self.client.get(f'/rest_api/user/?id={self.user1.id}')
+        self.assertEquals(len(response.json()), 0)

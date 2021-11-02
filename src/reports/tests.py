@@ -14,7 +14,7 @@ from src.base.tests.factories import EmployeeFactory, EmploymentFactory, GroupFa
 from src.reports.models import ReportConfig, ReportType, Period
 from src.reports.reports import PIVOT_TABEL
 from src.reports.tasks import cron_report
-from src.timetable.models import WorkerDay
+from src.timetable.models import PlanAndFactHours, WorkerDay
 from src.timetable.tests.factories import WorkerDayFactory
 from src.util.mixins.tests import TestsHelperMixin
 from src.util.test import create_departments_and_users
@@ -414,3 +414,222 @@ class TestReportsViewSet(TestsHelperMixin, APITestCase):
         self.assertEquals(list(df.iloc[0, 5:].values), [0.00, 10.75, 10.75])
         self.assertEquals(list(df.iloc[1, 5:].values), [10.75, 10.75, 21.50])
         self.assertEquals(list(df.iloc[2, 5:].values), [10.75, 21.50, 32.25])
+
+
+class TestScheduleDeviation(APITestCase):
+    USER_USERNAME = "user1"
+    USER_EMAIL = "q@q.q"
+    USER_PASSWORD = "4242"
+
+    def setUp(self):
+        super().setUp()
+        create_departments_and_users(self)
+        self.client.force_authenticate(self.user1)
+
+    def assertHours(self, 
+        fact_work_hours=.0, 
+        plan_work_hours=.0, 
+        fact_manual_work_hours=.0, 
+        late_arrival_hours=.0, 
+        early_departure_hours=.0,
+        early_arrival_hours=.0,
+        late_departure_hours=.0,
+        fact_without_plan_work_hours=.0,
+        lost_work_hours=.0,
+        late_arrival_count=0,
+        early_departure_count=0,
+        early_arrival_count=0,
+        late_departure_count=0,
+        fact_without_plan_count=0,
+        lost_work_hours_count=0,
+    ):
+        data = {
+            'fact_work_hours': fact_work_hours, 
+            'plan_work_hours': plan_work_hours, 
+            'fact_manual_work_hours': fact_manual_work_hours, 
+            'late_arrival_hours': late_arrival_hours, 
+            'early_departure_hours': early_departure_hours,
+            'early_arrival_hours': early_arrival_hours, 
+            'late_departure_hours': late_departure_hours, 
+            'fact_without_plan_work_hours': fact_without_plan_work_hours, 
+            'lost_work_hours': lost_work_hours, 
+            'late_arrival_count': late_arrival_count, 
+            'early_departure_count': early_departure_count, 
+            'early_arrival_count': early_arrival_count, 
+            'late_departure_count': late_departure_count, 
+            'fact_without_plan_count': fact_without_plan_count, 
+            'lost_work_hours_count': lost_work_hours_count,
+        }
+        self.assertEquals(PlanAndFactHours.objects.values(*data.keys())[0], data)
+
+    def test_plan_and_fact_hours_values(self):
+        dt = date.today()
+        wd_plan = WorkerDayFactory(
+            employee=self.employee1,
+            employment=self.employment1,
+            shop=self.shop,
+            is_approved=True,
+            type_id=WorkerDay.TYPE_WORKDAY,
+            is_fact=False,
+            cashbox_details__work_type__work_type_name__name='Работа',
+            dttm_work_start=datetime.combine(dt, time(8)),
+            dttm_work_end=datetime.combine(dt, time(20)),
+            dt=dt,
+        )
+        self.assertHours(plan_work_hours=10.75, lost_work_hours=10.75, lost_work_hours_count=1)
+
+        wd_fact = WorkerDayFactory(
+            employee=self.employee1,
+            employment=self.employment1,
+            shop=self.shop,
+            is_approved=True,
+            type_id=WorkerDay.TYPE_WORKDAY,
+            is_fact=True,
+            cashbox_details__work_type__work_type_name__name='Работа',
+            dttm_work_start=datetime.combine(dt, time(8)),
+            dttm_work_end=datetime.combine(dt, time(20)),
+            dt=dt,
+            closest_plan_approved=wd_plan,
+        )
+        
+        wd_fact_not_approved = WorkerDayFactory(
+            employee=self.employee1,
+            employment=self.employment1,
+            shop=self.shop,
+            is_approved=False,
+            type_id=WorkerDay.TYPE_WORKDAY,
+            is_fact=True,
+            cashbox_details__work_type__work_type_name__name='Работа',
+            dttm_work_start=datetime.combine(dt, time(8)),
+            dttm_work_end=datetime.combine(dt, time(20)),
+            dt=dt,
+            closest_plan_approved=wd_plan,
+        )
+        self.assertHours(plan_work_hours=10.75, fact_work_hours=10.75)
+        wd_fact.created_by = self.user1
+        wd_fact.save()
+        self.assertHours(plan_work_hours=10.75, fact_work_hours=10.75, fact_manual_work_hours=10.75)
+        wd_fact.dttm_work_start = datetime.combine(dt, time(7))
+        wd_fact.dttm_work_end = datetime.combine(dt, time(19))
+        wd_fact.created_by = None
+        wd_fact.save()
+        self.assertHours(plan_work_hours=10.75, fact_work_hours=10.75, early_arrival_hours=1.0, early_arrival_count=1, early_departure_hours=1.0, early_departure_count=1)
+        wd_fact.dttm_work_start = datetime.combine(dt, time(9))
+        wd_fact.dttm_work_end = datetime.combine(dt, time(20, 30))
+        wd_fact.save()
+        self.assertHours(plan_work_hours=10.75, fact_work_hours=10.25, late_arrival_hours=1.0, late_arrival_count=1, late_departure_hours=0.5, late_departure_count=1, lost_work_hours=0.5, lost_work_hours_count=1)
+        wd_plan.dttm_work_start = datetime.combine(dt, time(9))
+        wd_plan.dttm_work_end = datetime.combine(dt, time(14))
+        wd_plan.save()
+        wd_fact.dttm_work_start = datetime.combine(dt, time(14))
+        wd_fact.dttm_work_end = datetime.combine(dt, time(19))
+        wd_fact.closest_plan_approved = None
+        wd_fact.save()
+        self.assertHours(plan_work_hours=4.5, fact_work_hours=4.5, lost_work_hours=4.5, lost_work_hours_count=1, fact_without_plan_work_hours=4.5, fact_without_plan_count=1)
+        wd_fact2 = WorkerDayFactory(
+            employee=self.employee1,
+            employment=self.employment1,
+            shop=self.shop,
+            is_approved=True,
+            type_id=WorkerDay.TYPE_WORKDAY,
+            is_fact=True,
+            cashbox_details__work_type__work_type_name__name='Работа',
+            dttm_work_start=datetime.combine(dt, time(20)),
+            dttm_work_end=datetime.combine(dt, time(23)),
+            dt=dt,
+        )
+        self.assertHours(plan_work_hours=4.5, fact_work_hours=7.0, lost_work_hours=4.5, lost_work_hours_count=1, fact_without_plan_work_hours=7.0, fact_without_plan_count=2)
+
+        wd_plan2 = WorkerDayFactory(
+            employee=self.employee1,
+            employment=self.employment1,
+            shop=self.shop,
+            is_approved=True,
+            type_id=WorkerDay.TYPE_WORKDAY,
+            is_fact=False,
+            cashbox_details__work_type__work_type_name__name='Работа',
+            dttm_work_start=datetime.combine(dt, time(15)),
+            dttm_work_end=datetime.combine(dt, time(20)),
+            dt=dt,
+        )
+        wd_fact.dttm_work_start = datetime.combine(dt, time(8, 30))
+        wd_fact.dttm_work_end = datetime.combine(dt, time(14))
+        wd_fact.closest_plan_approved = wd_plan
+        wd_fact.save()
+        wd_fact2.dttm_work_start = datetime.combine(dt, time(14, 30))
+        wd_fact2.dttm_work_end = datetime.combine(dt, time(20, 30))
+        wd_fact2.closest_plan_approved = wd_plan2
+        wd_fact2.save()
+        self.assertHours(plan_work_hours=9.0, fact_work_hours=10.5, early_arrival_hours=1.0, early_arrival_count=2, late_departure_hours=0.5, late_departure_count=1)
+        wd_fact.dttm_work_start = datetime.combine(dt, time(9, 30))
+        wd_fact.save()
+        self.assertHours(plan_work_hours=9.0, fact_work_hours=9.5, early_arrival_hours=0.5, early_arrival_count=1, late_departure_hours=0.5, late_departure_count=1, late_arrival_count=1, late_arrival_hours=0.5, lost_work_hours_count=1, lost_work_hours=0.5)
+
+    def test_get_schedule_deviation(self):
+        dt = date.today()
+        wd_plan1 = WorkerDayFactory(
+            employee=self.employee1,
+            employment=self.employment1,
+            shop=self.shop,
+            is_approved=True,
+            type_id=WorkerDay.TYPE_WORKDAY,
+            is_fact=False,
+            cashbox_details__work_type__work_type_name__name='Работа',
+            dttm_work_start=datetime.combine(dt, time(8)),
+            dttm_work_end=datetime.combine(dt, time(14)),
+            dt=dt,
+        )
+        wd_plan2 = WorkerDayFactory(
+            employee=self.employee1,
+            employment=self.employment1,
+            shop=self.shop,
+            is_approved=True,
+            type_id=WorkerDay.TYPE_WORKDAY,
+            is_fact=False,
+            cashbox_details__work_type__work_type_name__name='Работа',
+            dttm_work_start=datetime.combine(dt, time(15)),
+            dttm_work_end=datetime.combine(dt, time(20)),
+            dt=dt,
+        )
+        wd_plan3 = WorkerDayFactory(
+            employee=self.employee1,
+            employment=self.employment1,
+            is_approved=True,
+            type_id=WorkerDay.TYPE_HOLIDAY,
+            is_fact=False,
+            dt=dt + timedelta(1),
+        )
+        WorkerDayFactory(
+            employee=self.employee1,
+            employment=self.employment1,
+            shop=self.shop,
+            is_approved=True,
+            type_id=WorkerDay.TYPE_WORKDAY,
+            is_fact=True,
+            cashbox_details__work_type__work_type_name__name='Работа',
+            dttm_work_start=datetime.combine(dt, time(7, 30)),
+            dttm_work_end=datetime.combine(dt, time(14, 30)),
+            dt=dt,
+            closest_plan_approved=wd_plan1,
+        )
+        WorkerDayFactory(
+            employee=self.employee1,
+            employment=self.employment1,
+            shop=self.shop,
+            is_approved=True,
+            type_id=WorkerDay.TYPE_WORKDAY,
+            is_fact=True,
+            cashbox_details__work_type__work_type_name__name='Работа',
+            dttm_work_start=datetime.combine(dt, time(15, 30)),
+            dttm_work_end=datetime.combine(dt, time(20, 30)),
+            dt=dt,
+            closest_plan_approved=wd_plan2,
+        )
+        report = self.client.get(f'/rest_api/report/schedule_deviation/?dt_from={dt}&dt_to={dt+timedelta(1)}')
+        BytesIO = pd.io.common.BytesIO
+        data = pd.read_excel(BytesIO(report.content), engine='xlrd').fillna('')
+        self.assertEquals(
+            list(data.iloc[9, :].values), 
+            ['1', 'Shop1', dt.strftime('%d.%m.%Y'), 'Васнецов Иван ', '', '-', 'штат', 'Работа', '10.0',
+            '10.5', '0.0', '0.5', '1', '0.5', '1', '0.0', '0', '1.0', '2', '0.0', '0', '0.0', '0']
+        )

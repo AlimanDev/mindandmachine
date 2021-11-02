@@ -1,6 +1,6 @@
 import datetime
 import json
-from collections import OrderedDict
+
 from collections import OrderedDict
 
 from django.conf import settings
@@ -33,7 +33,7 @@ def exchange(data, error_messages):
         employment = wd_target.employment
         if (wd_source.type_id == WorkerDay.TYPE_WORKDAY and employment is None):
             employment = Employment.objects.get_active_empl_by_priority(
-                network_id=wd_source.employee.network_id, employee_id=wd_target.employee_id,  # TODO: тест
+                network_id=wd_source.employee.user.network_id, employee_id=wd_target.employee_id,  # TODO: тест
                 dt=wd_source.dt,
                 priority_shop_id=wd_source.shop_id,
             ).select_related(
@@ -50,6 +50,7 @@ def exchange(data, error_messages):
             is_approved=data['is_approved'],
             is_vacancy=wd_source.is_vacancy,
             shop_id=wd_source.shop_id,
+            source=WorkerDay.SOURCE_EXCHANGE_APPROVED if data['is_approved'] else WorkerDay.SOURCE_EXCHANGE,
         )
         wd_new.save()
         new_wds.append(wd_new)
@@ -181,10 +182,16 @@ def copy_as_excel_cells(from_employee_id, from_dates, to_employee_id, to_dates, 
         is_approved=is_approved,
     ).select_related(
         'employee__user',
+        'employment__shop',
         'shop__settings__breaks',
+        'shop__network__breaks',
     ).order_by('dt')
+    source = WorkerDay.SOURCE_DUPLICATE
+    if include_spaces:
+        source = WorkerDay.SOURCE_COPY_RANGE
     if worker_day_types:
         main_worker_days = main_worker_days.filter(type_id__in=worker_day_types)
+    main_worker_days = list(main_worker_days)
     main_worker_days_details_set = list(WorkerDayCashboxDetails.objects.filter(
         worker_day__in=main_worker_days,
     ).select_related('work_type'))
@@ -199,7 +206,7 @@ def copy_as_excel_cells(from_employee_id, from_dates, to_employee_id, to_dates, 
     main_worker_days_grouped_by_dt = OrderedDict()
     if include_spaces:
         main_worker_days_grouped_by_dt = OrderedDict([(dt, []) for dt in from_dates])
-    for main_worker_day in list(main_worker_days):
+    for main_worker_day in main_worker_days:
         key = main_worker_day.dt
         main_worker_days_grouped_by_dt.setdefault(key, []).append(main_worker_day)
 
@@ -228,7 +235,7 @@ def copy_as_excel_cells(from_employee_id, from_dates, to_employee_id, to_dates, 
                 continue
 
             worker_active_empl = Employment.objects.get_active_empl_by_priority(
-                network_id=blank_days[0].employee.user.network_id, employee_id=to_employee_id,
+                network_id=blank_days[0].employment.shop.network_id if blank_days[0].employment else None, employee_id=to_employee_id,
                 dt=dt,
                 priority_shop_id=blank_days[0].shop_id,
             ).select_related(
@@ -261,6 +268,7 @@ def copy_as_excel_cells(from_employee_id, from_dates, to_employee_id, to_dates, 
                     is_fact=False,
                     created_by_id=created_by,
                     last_edited_by_id=created_by,
+                    source=source,
                 )
                 created_wds.append(new_wd)
 
@@ -360,7 +368,7 @@ def create_worker_days_range(dates, type_id=WorkerDay.TYPE_WORKDAY, shop_id=None
         if cashbox_details:
             priority_work_type_id = sorted(cashbox_details, key=lambda x: x['work_part'])[0]['work_type_id']
         for date in dates:
-            if employee_id and type_id == WorkerDay.TYPE_WORKDAY:
+            if employee_id:
                 employment = Employment.objects.get_active_empl_by_priority(
                     network_id=None,
                     employee_id=employee_id,
@@ -393,6 +401,7 @@ def create_worker_days_range(dates, type_id=WorkerDay.TYPE_WORKDAY, shop_id=None
                 is_outsource=bool(outsources),
                 created_by=created_by,
                 last_edited_by=created_by,
+                source=WorkerDay.SOURCE_CHANGE_LIST,
             )
             if type_id == WorkerDay.TYPE_WORKDAY:
                 if outsources and is_vacancy:

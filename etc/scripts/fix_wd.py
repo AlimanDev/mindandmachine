@@ -1,24 +1,10 @@
 from datetime import datetime, timedelta
 
 from django.db import transaction
-from django.db.models import Q, OuterRef, Subquery, F
+from django.db.models import Q, OuterRef, F, Exists, Prefetch
 from django.db.utils import IntegrityError
 
-from src.base.models import Employment
-from src.timetable.models import WorkerDay, AttendanceRecords
-
-
-def fix_wd_employments():
-    WorkerDay.objects.filter(
-        Q(employment__isnull=True) |
-        Q(Q(dt__lt=F('employment__dt_hired')) | Q(dt__gt=F('employment__dt_fired'))),
-    ).update(
-        employment_id=Subquery(Employment.objects.get_active_empl_by_priority(
-            dt=OuterRef('dt'),
-            employee_id=OuterRef('employee_id'),
-            norm_work_hours__gt=0,
-        ).values('id')[:1]),
-    )
+from src.timetable.models import WorkType, WorkerDay, AttendanceRecords, WorkerDayCashboxDetails
 
 
 def fix_plan_night_shifts(**kwargs):
@@ -72,3 +58,48 @@ def fix_wrong_att_records(**kwargs):
                     print(f'IntegrityError: {str(e)}')
 
     print(fixed_count)
+
+
+def fix_wrong_work_types(**kwargs):
+    worker_days = WorkerDay.objects.filter(**kwargs).annotate(
+        cashbox_details=Exists(
+            WorkerDayCashboxDetails.objects.filter(
+                worker_day_id=OuterRef('pk'),
+            )
+        ),
+        cashbox_details_not_same_shop=Exists(
+            WorkerDayCashboxDetails.objects.filter(
+                worker_day_id=OuterRef('pk'),
+            ).exclude(
+                work_type__shop_id=OuterRef('shop_id'),
+            )
+        )
+    ).filter(
+        cashbox_details=True,
+        cashbox_details_not_same_shop=True,
+    ).prefetch_related(Prefetch('worker_day_details', queryset=WorkerDayCashboxDetails.objects.select_related('work_type')))
+
+    work_types = {}
+    for wt in WorkType.objects.filter(shop_id__in=worker_days.values_list('shop_id', flat=True)):
+        work_types.setdefault(wt.shop_id, {})[wt.work_type_name_id] = wt
+    
+    details_to_update = []
+    for wd in worker_days:
+        for detail in wd.worker_day_details.all():
+            if detail.work_type.shop_id != wd.shop_id:
+                shop_work_types = work_types.get(wd.shop_id)
+                if not shop_work_types:
+                    print(f'WARN: {wd.shop} has no work types')
+                    continue
+                work_type = shop_work_types.get(detail.work_type.work_type_name_id)
+                if not work_type:
+                    print(f'WARN: {wd.shop} has no work type {detail.work_type.work_type_name}')
+                    work_type = list(shop_work_types.values())[0]
+                detail.work_type = work_type
+                details_to_update.append(detail)
+
+    WorkerDayCashboxDetails.objects.bulk_update(
+        details_to_update,
+        fields=['work_type'],
+    )
+    print(f'fixed {len(details_to_update)} work types')

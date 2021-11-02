@@ -22,9 +22,9 @@ from django.utils.functional import cached_property
 from django.utils.translation import gettext_lazy as _
 from model_utils import FieldTracker
 from mptt.models import MPTTModel, TreeForeignKey
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.serializers import ValidationError
 from timezone_field import TimeZoneField
-
 from src.base.models_abstract import (
     AbstractActiveModel,
     AbstractModel,
@@ -75,6 +75,15 @@ class Network(AbstractActiveModel):
         ('pdf', 'PDF'),
     )
 
+
+    ROUND_TO_HALF_AN_HOUR = 0
+    ROUND_WH_ALGS = {
+        ROUND_TO_HALF_AN_HOUR: lambda wh: round(wh * 2) / 2,
+    }
+    ROUND_WORK_HOURS_ALG_CHOICES = (
+        (ROUND_TO_HALF_AN_HOUR, 'Округление до получаса'),
+    )
+
     class Meta:
         verbose_name = 'Сеть магазинов'
         verbose_name_plural = 'Сети магазинов'
@@ -92,6 +101,10 @@ class Network(AbstractActiveModel):
         verbose_name=_('Allowed interval for late_arrival'), default=datetime.timedelta(seconds=0))
     allowed_interval_for_early_departure = models.DurationField(
         verbose_name=_('Allowed interval for early departure'), default=datetime.timedelta(seconds=0))
+    allowed_interval_for_early_arrival = models.DurationField(
+        verbose_name=_('Allowed interval for early arrival'), default=datetime.timedelta(seconds=0))
+    allowed_interval_for_late_departure = models.DurationField(
+        verbose_name=_('Allowed interval for late departure'), default=datetime.timedelta(seconds=0))
     allow_workers_confirm_outsource_vacancy = models.BooleanField(
         verbose_name=_('Allow workers confirm outsource vacancy'), default=False)
     okpo = models.CharField(blank=True, null=True, max_length=15, verbose_name=_('OKPO code'))
@@ -228,6 +241,15 @@ class Network(AbstractActiveModel):
         verbose_name='Макс. разница времени начала и времени окончания в факте и в плане '
                      'при проставлении ближайшего плана в ручной факт (в секундах)',
         default=60 * 70,
+    )
+    get_position_from_work_type_name_in_calc_timesheet = models.BooleanField(
+        default=False,
+        verbose_name='Получать должность по типу работ при формировании фактического табеля',
+    )
+    round_work_hours_alg = models.PositiveSmallIntegerField(
+        null=True, blank=True,
+        choices=ROUND_WORK_HOURS_ALG_CHOICES,
+        verbose_name='Алгоритм округления рабочих часов',
     )
 
     DEFAULT_NIGHT_EDGES = (
@@ -903,6 +925,23 @@ class Group(AbstractActiveNetworkSpecificCodeNamedModel):
             # ', '.join(list(self.subordinates.values_list('name', flat=True)))
         )
 
+    @classmethod
+    def check_has_perm_to_group(cls, user, group=None, groups=[]):
+        group_perm = True
+        if groups or group:
+            groups = groups or [group,]
+            group_perm = cls.objects.filter(
+                Q(employments__employee__user=user) | Q(workerposition__employment__employee__user=user),
+                subordinates__id__in=groups,
+            ).exists()
+
+        return group_perm
+
+    @classmethod
+    def check_has_perm_to_edit_group_objects(cls, group_from, group_to, user):
+        if not (cls.check_has_perm_to_group(user, group=group_from) and cls.check_has_perm_to_group(user, group=group_to)):
+            raise PermissionDenied()
+
 
 class ProductionDay(AbstractModel):
     """
@@ -1101,9 +1140,8 @@ class User(DjangoAbstractUser, AbstractModel):
         )
 
     def get_group_ids(self, shop=None):
-        return self.get_active_employments(shop=shop).annotate(
-            group_id=Coalesce(F('function_group_id'), F('position__group_id')),
-        ).values_list('group_id', flat=True)
+        groups = self.get_active_employments(shop=shop).values_list('position__group_id', 'function_group_id')
+        return list(set(list(map(lambda x: x[0], groups)) + list(map(lambda x: x[1], groups))))
 
     def save(self, *args, **kwargs):
         if not self.password and settings.SET_USER_PASSWORD_AS_LOGIN:
@@ -1198,12 +1236,7 @@ class EmploymentQuerySet(AnnotateValueEqualityQSMixin, QuerySet):
             wdays_ids = list(WorkerDay.objects.filter(employment__in=self).values_list('id', flat=True))
             WorkerDay.objects.filter(employment__in=self).update(employment_id=None)
             self.update(dttm_deleted=timezone.now())
-            transaction.on_commit(lambda: clean_wdays.delay(
-                only_logging=False,
-                filter_kwargs=dict(
-                    id__in=wdays_ids,
-                ),
-            ))
+            transaction.on_commit(lambda: clean_wdays.delay(id__in=wdays_ids))
 
 
 class Employee(AbstractModel):
@@ -1294,12 +1327,7 @@ class Employment(AbstractActiveModel):
             wdays_ids = list(WorkerDay.objects.filter(employment=self).values_list('id', flat=True))
             WorkerDay.objects.filter(employment=self).update(employment_id=None)
             if self.employee.user.network.clean_wdays_on_employment_dt_change:
-                transaction.on_commit(lambda: clean_wdays.delay(
-                    only_logging=False,
-                    filter_kwargs=dict(
-                        id__in=wdays_ids,
-                    ),
-                ))
+                transaction.on_commit(lambda: clean_wdays.delay(id__in=wdays_ids))
             return super(Employment, self).delete(**kwargs)
 
     def __init__(self, *args, **kwargs):
@@ -1373,32 +1401,27 @@ class Employment(AbstractActiveModel):
             from src.timetable.worker_day.tasks import clean_wdays
             from src.timetable.models import WorkerDay
             from src.util.models_converter import Converter
-            kwargs = {
-                'only_logging': False,
-                'clean_plan_empl': True,
-            }
+            kwargs = {}
             if is_new:
-                kwargs['filter_kwargs'] = {
-                    'type__is_dayoff': False,
+                kwargs = {
                     'employee_id': self.employee_id,
                 }
                 if self.dt_hired:
-                    kwargs['filter_kwargs']['dt__gte'] = Converter.convert_date(self.dt_hired)
+                    kwargs['dt__gte'] = Converter.convert_date(self.dt_hired)
                 if self.dt_fired:
-                    kwargs['filter_kwargs']['dt__lt'] = Converter.convert_date(self.dt_fired)
+                    kwargs['dt__lt'] = Converter.convert_date(self.dt_fired)
             else:
                 prev_dt_hired = self.tracker.previous('dt_hired')
                 if prev_dt_hired and prev_dt_hired < self.dt_hired:
                     dt__gte = prev_dt_hired
                 else:
                     dt__gte = self.dt_hired
-                kwargs['filter_kwargs'] = {
-                    'type__is_dayoff': False,
+                kwargs = {
                     'employee_id': self.employee_id,
                     'dt__gte': Converter.convert_date(dt__gte),
                 }
 
-            clean_wdays.apply_async(kwargs=kwargs)
+            transaction.on_commit(lambda: clean_wdays.apply_async(**kwargs))
 
         return res
 
@@ -1461,6 +1484,7 @@ class FunctionGroup(AbstractModel):
         ('PeriodClients_download', 'Скачать нагрузку (Получить) (timeserie_value/download/)'),
         ('Receipt', 'Чек (receipt)'),
         ('Reports_pivot_tabel', 'Скачать сводный табель (Получить) (report/pivot_tabel/)'),
+        ('Reports_schedule_deviation', 'Скачать отчет по отклонениям от планового графика (Получить) (report/schedule_deviation/)'),
         ('Group', 'Группа доступа (group)'),
         ('Shop', 'Отдел (department)'),
         ('Shop_stat', 'Статистика по отделам (Получить) (department/stat/)'),
@@ -1471,6 +1495,8 @@ class FunctionGroup(AbstractModel):
         ('Timesheet', 'Табель (timesheet)'),
         ('Timesheet_stats', 'Статистика табеля (Получить) (timesheet/stats/)'),
         ('Timesheet_recalc', 'Запустить пересчет табеля (Создать) (timesheet/recalc/)'),
+        ('Timesheet_lines', 'Табель построчно (Получить) (timesheet/lines/)'),
+        ('Timesheet_items', 'Сырые данные табеля (Получить) (timesheet/items/)'),
         ('User', 'Пользователь (user)'),
         ('User_change_password', 'Сменить пароль пользователю (Создать) (auth/password/change/)'),
         ('User_delete_biometrics', 'Удалить биометрию пользователя (Создать) (user/delete_biometrics/)'),
