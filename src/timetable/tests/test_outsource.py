@@ -312,7 +312,7 @@ class TestOutsource(TestsHelperMixin, APITestCase):
         vacancy.refresh_from_db()
         self.assertEqual(vacancy.employee_id, self.employee3.id)
         self.assertEqual(vacancy.employment_id, self.employment3.id)
-        self.assertIsNone(WorkerDay.objects.filter(employee_id=self.employee2.id).first())
+        self.assertIsNone(WorkerDay.objects.filter(employee_id=self.employee2.id, is_vacancy=True).first())
         WorkerDayFactory(
             dt=dt_now,
             is_fact=True,
