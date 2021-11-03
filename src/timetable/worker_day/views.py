@@ -1506,7 +1506,11 @@ class WorkerDayViewSet(BaseModelViewSet):
         employee_ids = list(employee_ids)
         if not employee_ids:
             raise ValidationError({'detail': _('No employees satisfying the conditions.')})
-        recalc_wdays.delay(employee_id__in=employee_ids)
+        recalc_wdays.delay(
+            employee_id__in=employee_ids,
+            dt__gte=serializer.data['dt_from'],
+            dt__lte=serializer.data['dt_to'],
+        )
         return Response({'detail': _('Hours recalculation started successfully.')})
 
     @swagger_auto_schema(
