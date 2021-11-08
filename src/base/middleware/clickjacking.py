@@ -3,7 +3,7 @@ import re
 from django.conf import settings
 from django.middleware.clickjacking import XFrameOptionsMiddleware as XFrameOptionsMiddlewareOriginal
 
-DEFAULT_HTTP_REFERER_PATTERN = r'^https?:\/\/([^\/]+\.)?(.+\.mindandmachine\.ru\:11111|webvisor\.com|metri[ck]a\.yandex\.(com|ru|com\.tr))\/'
+DEFAULT_HTTP_REFERER_PATTERN = r'^https?:\/\/([^\/]+\.)?(.+\.mindandmachine\.ru|webvisor\.com|metri[ck]a\.yandex\.(com|ru|com\.tr))\/'
 
 
 class XFrameOptionsMiddleware(XFrameOptionsMiddlewareOriginal):

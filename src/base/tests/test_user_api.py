@@ -412,3 +412,8 @@ class TestUserViewSet(TestsHelperMixin, APITestCase):
     def test_x_frame_options_sameorigin_for_empty_referer(self):
         resp = self.client.get('/rest_api/auth/user/')
         self.assertEqual(resp.get('X-Frame-Options'), 'SAMEORIGIN')
+
+    def test_x_frame_options_allowall_for_mm_referer(self):
+        self.client.defaults['HTTP_REFERER'] = 'https://local.mindandmachine.ru/'
+        resp = self.client.get('/rest_api/auth/user/')
+        self.assertEqual(resp.get('X-Frame-Options'), 'ALLOWALL')
