@@ -398,3 +398,17 @@ class TestUserViewSet(TestsHelperMixin, APITestCase):
         self.employment4.function_group = self.chief_group
         self.employment4.save()
         self._test_change_password_subordinates(200, True)
+
+    def test_x_frame_options_allowall_for_ym(self):
+        self.client.defaults['HTTP_REFERER'] = 'https://metrica.yandex.ru/'
+        resp = self.client.get('/rest_api/auth/user/')
+        self.assertEqual(resp.get('X-Frame-Options'), 'ALLOWALL')
+
+    def test_x_frame_options_sameorigin_for_random_referer(self):
+        self.client.defaults['HTTP_REFERER'] = 'https://random.example.ru/'
+        resp = self.client.get('/rest_api/auth/user/')
+        self.assertEqual(resp.get('X-Frame-Options'), 'SAMEORIGIN')
+
+    def test_x_frame_options_sameorigin_for_empty_referer(self):
+        resp = self.client.get('/rest_api/auth/user/')
+        self.assertEqual(resp.get('X-Frame-Options'), 'SAMEORIGIN')
