@@ -919,10 +919,14 @@ class WorkerDayViewSet(BaseModelViewSet):
                 vacancy_details = WorkerDayCashboxDetails.objects.filter(
                     worker_day=vacancy).values('work_type_id', 'work_part')
 
+                parent_id = vacancy.id
+                outsources = list(vacancy.outsources.all())
                 vacancy.id = None
+                vacancy.parent_worker_day_id = parent_id
                 vacancy.is_approved = False
                 vacancy.source = WorkerDay.SOURCE_ON_APPROVE
                 vacancy.save()
+                vacancy.outsources.add(*outsources)
 
                 WorkerDayCashboxDetails.objects.bulk_create(
                     WorkerDayCashboxDetails(

@@ -263,6 +263,9 @@ class TestOutsource(TestsHelperMixin, APITestCase):
         vacancy = WorkerDay.objects.get(id=vacancy['id'])
         self.assertEqual(vacancy.employee_id, self.employee1.id)
         self.assertEqual(vacancy.employment_id, self.employment1.id)
+        not_approved_vacancy = WorkerDay.objects.filter(parent_worker_day_id=vacancy.id).first()
+        self.assertIsNotNone(not_approved_vacancy)
+        self.assertEquals(list(not_approved_vacancy.outsources.all()), list(vacancy.outsources.all()))
 
     def test_confirm_vacancy_to_worker(self):
         dt_now = self.dt_now
@@ -515,6 +518,22 @@ class TestOutsource(TestsHelperMixin, APITestCase):
         response = self.client.post(f"/rest_api/worker_day/{vacancy['id']}/approve_vacancy/")
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.json(), ['Вы не можете подтвердить вакансию из другой сети.'])
+
+    def test_approve_vacancy_with_worker_copy_outsources(self):
+        dt_now = self.dt_now
+        vacancy = self._create_vacancy(dt_now, datetime.combine(dt_now, time(8)), datetime.combine(dt_now, time(20)), outsources=[self.outsource_network.id,]).json()
+        WorkerDay.objects.all().update(is_approved=False)
+        wd = WorkerDay.objects.get(id=vacancy['id'])
+        wd.employee = self.employee1
+        wd.employment = self.employment1
+        wd.save()
+        response = self.client.post(f"/rest_api/worker_day/{vacancy['id']}/approve_vacancy/")
+        self.assertEqual(response.status_code, 200)
+        wd.refresh_from_db()
+        self.assertTrue(wd.is_approved)
+        nawd = WorkerDay.objects.filter(parent_worker_day=wd).first()
+        self.assertIsNotNone(nawd)
+        self.assertEquals(list(nawd.outsources.all()), list(wd.outsources.all()))
 
     def test_client_can_get_and_approve_wd_for_employee_from_other_network_emploeed_in_own_shop(self):
         self.employment2.shop = self.client_shop
