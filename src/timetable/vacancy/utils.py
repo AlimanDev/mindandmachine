@@ -758,11 +758,13 @@ def confirm_vacancy(vacancy_id, user, employee_id=None, exchange=False, reconfir
                 try:
                     with transaction.atomic():
                         parent_id = vacancy.id
+                        outsources = list(vacancy.outsources.all())
                         vacancy.id = None
                         vacancy.is_approved = False
                         vacancy.parent_worker_day_id = parent_id
                         vacancy.source = WorkerDay.SOURCE_ON_CONFIRM_VACANCY
                         vacancy.save()
+                        vacancy.outsources.add(*outsources)
 
                         WorkerDayCashboxDetails.objects.bulk_create(
                             WorkerDayCashboxDetails(
