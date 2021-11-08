@@ -132,7 +132,7 @@ MIDDLEWARE = [
     'sesame.middleware.AuthenticationMiddleware',
     # 'src.main.auth.middleware.JWTAuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
-    'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'src.base.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
 ROOT_URLCONF = 'src.urls'
