@@ -7,7 +7,7 @@ from django.conf import settings
 from django.contrib.postgres.aggregates import StringAgg
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import transaction
-from django.db.models import Q, F, Value, CharField
+from django.db.models import Q, F, Value, CharField, Prefetch
 from django.db.models.functions import Concat, Cast
 from django.utils.translation import gettext as _
 from rest_framework.exceptions import ValidationError, PermissionDenied
@@ -19,6 +19,7 @@ from src.base.models import (
 )
 from src.timetable.models import (
     AttendanceRecords,
+    WorkerDayOutsourceNetwork,
     WorkerDayPermission,
     GroupWorkerDayPermission,
     WorkerDay,
@@ -54,6 +55,7 @@ def exchange(data, error_messages):
         )
         wd_new.save()
         new_wds.append(wd_new)
+        wd_new.outsources.add(*wd_source.outsources_list)
         WorkerDayCashboxDetails.objects.bulk_create([
             WorkerDayCashboxDetails(
                 worker_day_id=wd_new.id,
@@ -72,6 +74,10 @@ def exchange(data, error_messages):
             is_fact=False,
         ).prefetch_related(
             'worker_day_details__work_type__work_type_name',
+            Prefetch(
+                'outsources',
+                to_attr='outsources_list',
+            ),
         ).select_related(
             'employee__user',
             'employment',
@@ -185,6 +191,11 @@ def copy_as_excel_cells(from_employee_id, from_dates, to_employee_id, to_dates, 
         'employment__shop',
         'shop__settings__breaks',
         'shop__network__breaks',
+    ).prefetch_related(
+        Prefetch(
+            'outsources',
+            to_attr='outsources_list',
+        ),
     ).order_by('dt')
     source = WorkerDay.SOURCE_DUPLICATE
     if include_spaces:
@@ -225,6 +236,7 @@ def copy_as_excel_cells(from_employee_id, from_dates, to_employee_id, to_dates, 
     ).delete()
     created_wds = []
     wdcds_list_to_create = []
+    wd_outsource_network_to_create = []
 
     if main_worker_days:
         for i, dt in enumerate(to_dates):
@@ -271,6 +283,15 @@ def copy_as_excel_cells(from_employee_id, from_dates, to_employee_id, to_dates, 
                     source=source,
                     work_hours=blank_day.work_hours,
                 )
+                wd_outsource_network_to_create.extend(
+                    [
+                        WorkerDayOutsourceNetwork(
+                            workerday=new_wd,
+                            network=network,
+                        )
+                        for network in blank_day.outsources_list
+                    ]
+                )
                 created_wds.append(new_wd)
 
                 new_wdcds = main_worker_days_details.get(blank_day.id, [])
@@ -285,6 +306,9 @@ def copy_as_excel_cells(from_employee_id, from_dates, to_employee_id, to_dates, 
 
     if wdcds_list_to_create:
         WorkerDayCashboxDetails.objects.bulk_create(wdcds_list_to_create)
+
+    if wd_outsource_network_to_create:
+        WorkerDayOutsourceNetwork.objects.bulk_create(wd_outsource_network_to_create)
 
     work_types = [
         (wdcds.work_type.shop_id, wdcds.work_type_id)

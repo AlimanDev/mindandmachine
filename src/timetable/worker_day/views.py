@@ -36,6 +36,7 @@ from src.timetable.models import (
     WorkerDay,
     WorkerDayCashboxDetails,
     ShopMonthStat,
+    WorkerDayOutsourceNetwork,
     WorkerDayPermission,
     WorkerDayType,
     TimesheetItem,
@@ -624,6 +625,10 @@ class WorkerDayViewSet(BaseModelViewSet):
                         'shop__settings__breaks',
                     ).prefetch_related(
                         'worker_day_details',
+                        Prefetch(
+                            'outsources',
+                            to_attr='outsources_list',
+                        ),
                     ).distinct()
                 )
 
@@ -659,6 +664,17 @@ class WorkerDayViewSet(BaseModelViewSet):
                 search_wds = {}
                 for not_approved_wd in not_approved_wds_list:
                     search_wds[not_approved_wd.parent_worker_day_id] = not_approved_wd
+
+                WorkerDayOutsourceNetwork.objects.bulk_create(
+                    [
+                        WorkerDayOutsourceNetwork(
+                            workerday=search_wds[approved_wd.id],
+                            network=network,
+                        )
+                        for approved_wd in approved_wds_list if approved_wd.employee_id
+                        for network in approved_wd.outsources_list
+                    ]
+                )
 
                 WorkerDayCashboxDetails.objects.bulk_create(
                     [
@@ -980,6 +996,7 @@ class WorkerDayViewSet(BaseModelViewSet):
                 )
                 for d in WorkerDayCashboxDetails.objects.filter(worker_day=vacancy)
             ])
+            editable_vacancy.outsources.add(*vacancy.outsources.all())
         return Response(WorkerDaySerializer(editable_vacancy).data)
 
     def _change_range(self, is_fact, is_approved, dt_from, dt_to, wd_type, employee_tabel_code, res=None):
@@ -1102,6 +1119,10 @@ class WorkerDayViewSet(BaseModelViewSet):
                     'shop__settings__breaks',
                 ).prefetch_related(
                     'worker_day_details',
+                    Prefetch(
+                        'outsources',
+                        to_attr='outsources_list',
+                    ),
                 )
             )
             is_copying_to_fact = data['type'] in (
@@ -1133,6 +1154,10 @@ class WorkerDayViewSet(BaseModelViewSet):
                     'shop__settings__breaks',
                 ).prefetch_related(
                     'worker_day_details',
+                    Prefetch(
+                        'outsources',
+                        to_attr='outsources_list',
+                    ),
                 )
                 popped_keys = set()
                 for wd in wds_approved:
@@ -1181,6 +1206,19 @@ class WorkerDayViewSet(BaseModelViewSet):
             search_wds = {}
             for copied_wd in copied_wdays_qs:
                 search_wds[copied_wd.parent_worker_day_id] = copied_wd
+
+            # в факт не копируем outsources
+            if not is_copying_to_fact:
+                WorkerDayOutsourceNetwork.objects.bulk_create(
+                    [
+                        WorkerDayOutsourceNetwork(
+                            workerday=search_wds[source_wd.id],
+                            network=network,
+                        )
+                        for source_wd in source_wdays_list
+                        for network in source_wd.outsources_list
+                    ]
+                )
 
             WorkerDayCashboxDetails.objects.bulk_create(
                 [
