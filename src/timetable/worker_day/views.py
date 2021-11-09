@@ -72,7 +72,7 @@ from src.timetable.worker_day.tasks import recalc_wdays, recalc_fact_from_record
 from src.timetable.worker_day.timetable import get_timetable_generator_cls
 from src.timetable.worker_day.utils import check_worker_day_permissions, create_worker_days_range, exchange, \
     copy_as_excel_cells
-from src.util.dg.tabel import get_tabel_generator_cls
+from src.util.dg.timesheet import get_tabel_generator_cls
 from src.util.models_converter import Converter
 from src.util.openapi.responses import (
     worker_stat_response_schema_dictionary,

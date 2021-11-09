@@ -18,7 +18,7 @@ from src.util.models_converter import Converter
 from .filters import TimesheetFilter
 from .serializers import TimesheetItemSerializer, TimesheetSummarySerializer, TimesheetRecalcSerializer
 from .tasks import calc_timesheets
-from .utils import get_timesheet_stats
+from .utils import get_timesheet_stats, get_timesheet_lines_data
 from ..models import TimesheetItem
 
 
@@ -146,57 +146,8 @@ class TimesheetViewSet(BaseModelViewSet):
     @action(detail=False, methods=['get'])
     def lines(self, *args, **kwargs):
         filtered_qs = self.filter_queryset(self.get_queryset())
-        ts_lines = filtered_qs.values(
-            'timesheet_type',
-            'shop_id',
-            'shop__code',
-            'position_id',
-            'position__code',
-            'employee_id',
-            'employee__tabel_code',
-        ).distinct()
-        for ts_line in ts_lines:
-            ts_line_days = []
-            days_qs = filtered_qs.filter(
-                timesheet_type=ts_line['timesheet_type'],
-                shop_id=ts_line['shop_id'],
-                position_id=ts_line['position_id'],
-                employee_id=ts_line['employee_id'],
-            ).values(
-                'dt',
-                'day_type',
-            ).annotate(
-                day_hours_sum=Sum('day_hours'),
-                night_hours_sum=Sum('night_hours'),
-            ).values_list(
-                'dt',
-                'day_type',
-                'day_hours_sum',
-                'night_hours_sum',
-            )
-            for dt, day_type, day_hours_sum, night_hours_sum in days_qs:
-                if day_hours_sum or night_hours_sum:
-                    if day_hours_sum:
-                        ts_line_days.append({
-                            'dt': dt,
-                            'day_type': day_type,
-                            'hours_type': 'D',
-                            'hours': day_hours_sum,
-                        })
-                    if night_hours_sum:
-                        ts_line_days.append({
-                            'dt': dt,
-                            'day_type': day_type,
-                            'hours_type': 'N',
-                            'hours': night_hours_sum,
-                        })
-                else:
-                    ts_line_days.append({
-                        'dt': dt,
-                        'day_type': day_type,
-                    })
-            ts_line['days'] = ts_line_days
-        return Response(ts_lines)
+        ts_lines_data = get_timesheet_lines_data(timesheet_qs=filtered_qs)
+        return Response(ts_lines_data)
 
     @swagger_auto_schema(
         request_body=TimesheetRecalcSerializer,
