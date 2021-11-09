@@ -49,6 +49,7 @@ class BatchUpdateOrCreateViewMixin:
     def get_batch_update_or_create_serializer(self, *args, **kwargs):
         batch_update_or_create_serializer_cls = self.get_batch_update_or_create_serializer_cls()
         kwargs['context'] = self.get_serializer_context()
+        kwargs['context']['batch'] = True
         return batch_update_or_create_serializer_cls(*args, **kwargs)
 
     def _get_model_from_serializer(self, serializer):

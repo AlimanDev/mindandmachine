@@ -876,6 +876,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
                 workerdays_data = []
                 for uid, v in data['users'].items():
                     uid = int(uid)
+                    employment = employments.get(uid)
                     for wd in v['workdays']:
                         if wd['type'] == 'R':
                             continue
@@ -885,9 +886,11 @@ class AutoSettingsViewSet(viewsets.ViewSet):
                             is_fact=False,
                             dt=wd['dt'],
                             employee_id=uid,
+                            employment_id=employment.id if employment else None,
                             type_id=wd['type'],
                             created_by_id=None,
                             last_edited_by_id=None,
+                            source=WorkerDay.SOURCE_ALGO,
                         )
 
                         employee_key = f'{wd["dt"]}_{uid}'
@@ -899,7 +902,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
                                 continue
 
                             # если есть хотя бы 1 день из другого магазина, то пропускаем
-                            if any((not wd.type.is_dayoff and wd.shop_id and wd.shop_id) for wd in plan_draft_wdays):
+                            if any((not wd.type.is_dayoff and wd.shop_id and wd.shop_id != shop.id) for wd in plan_draft_wdays):
                                 continue
 
                             # если день на дату единственный, то обновляем его, а не (удаляем + создаем новый)
@@ -908,8 +911,6 @@ class AutoSettingsViewSet(viewsets.ViewSet):
 
                         if wd['type'] == WorkerDay.TYPE_WORKDAY:
                             wd_data['shop_id'] = shop.id
-                            employment = employments.get(uid)
-                            wd_data['employment_id'] = employment.id if employment else None
 
                             wd_details = wd.get('details', [])
                             for wdd_data in wd_details:
@@ -925,7 +926,6 @@ class AutoSettingsViewSet(viewsets.ViewSet):
                             wd_data['dttm_work_end'] = None
                             wd_data['work_hours'] = timedelta(hours=0)
                             wd_data['shop_id'] = None
-                            wd_data['employment_id'] = None
 
                         workerdays_data.append(wd_data)
 

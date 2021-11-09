@@ -55,7 +55,7 @@ def get_unaccounted_overtimes(network_id, dt_from=None, dt_to=None, shop_ids=Non
     )
 
 
-def unaccounted_overtimes_xlsx(network_id, dt_from=None, dt_to=None, title=None, shop_ids=None, in_memory=False):
+def unaccounted_overtimes_xlsx(network_id=None, dt_from=None, dt_to=None, title=None, shop_ids=None, in_memory=False, data=None):
     if not dt_from:
         dt_from = date.today() - timedelta(1)
     if not dt_to:
@@ -68,7 +68,7 @@ def unaccounted_overtimes_xlsx(network_id, dt_from=None, dt_to=None, title=None,
     TABEL_CODE = 3
     FIO = 4
     OVERTIME = 5
-    data = get_unaccounted_overtimes(network_id, dt_from=dt_from, dt_to=dt_to, shop_ids=shop_ids)
+    data = data if not (data is None) else get_unaccounted_overtimes(network_id, dt_from=dt_from, dt_to=dt_to, shop_ids=shop_ids)
 
     if in_memory:
         output = io.BytesIO()

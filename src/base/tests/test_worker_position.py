@@ -120,6 +120,45 @@ class TestWorkerPositionAPI(TestsHelperMixin, APITestCase):
         self.assertEqual(
             WorkerPosition.objects.filter(dttm_deleted__isnull=True).count(), self.worker_positions_count - 1)
 
+    def _test_update_group(self, group_id, status_code, assert_group_id):
+        response = self.client.put(
+            f'/rest_api/worker_position/{self.worker_position.id}/', 
+            data=self.dump_data(
+                {
+                    'name': 'test_name',
+                    'network_id': self.network.id,
+                    'code': 'test_code',
+                    'group_id':group_id,
+                }
+            ),
+            content_type='application/json',
+        )
+        self.assertEquals(response.status_code, status_code)
+        self.worker_position.refresh_from_db()
+        self.assertEquals(self.worker_position.group_id, assert_group_id)
+
+    def test_update_group_id(self):
+        # нет subordunates
+        self._test_update_group(self.chief_group.id, 403, None)
+        self.admin_group.subordinates.add(self.chief_group)
+        # есть chief_group в subordunates
+        self._test_update_group(self.chief_group.id, 200, self.chief_group.id)
+        # нет employee_group в subordunates
+        self._test_update_group(self.employee_group.id, 403, self.chief_group.id)
+        self.admin_group.subordinates.add(self.employee_group)
+        self.admin_group.subordinates.remove(self.chief_group)
+        # есть employee_group в subordunates, но нет chief_group в subordunates
+        self._test_update_group(self.employee_group.id, 403, self.chief_group.id)
+        self.admin_group.subordinates.add(self.chief_group)
+        # все есть в subordunates
+        self._test_update_group(self.employee_group.id, 200, self.employee_group.id)
+        self.admin_group.subordinates.clear()
+        # нет subordunates, не можем очистить группу
+        self._test_update_group(None, 403, self.employee_group.id)
+        # есть employee_group в subordunates
+        self.admin_group.subordinates.add(self.employee_group)
+        self._test_update_group(None, 200, None)
+
 
 class TestSetWorkerPositionDefaultsModel(TestsHelperMixin, TestCase):
     @classmethod

@@ -1,4 +1,5 @@
 from rest_framework import serializers
+
 from src.timetable.models import WorkerDayType
 
 
@@ -21,4 +22,5 @@ class WorkerDayTypeSerializer(serializers.ModelSerializer):
             'show_stat_in_hours',
             'ordering',
             'is_active',
+            'get_work_hours_method',
         )

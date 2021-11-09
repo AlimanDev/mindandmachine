@@ -1,7 +1,7 @@
-from django.db.models import Q
+from django.db.models import Q, F
 from django.db.models import Sum
 
-from ..models import WorkerDayType
+from ..models import WorkerDayType, TimesheetItem
 from ..worker_day.stat import WorkersStatsGetter
 
 
@@ -9,14 +9,20 @@ def get_timesheet_stats(filtered_qs, dt_from, dt_to, user):
     timesheet_stats_qs = filtered_qs.values(
         'employee_id',
     ).annotate(
-        fact_total_all_hours_sum=Sum('fact_timesheet_total_hours'),
-        fact_total_work_hours_sum=Sum('fact_timesheet_total_hours', filter=Q(fact_timesheet_type__is_work_hours=True)),
-        fact_day_work_hours_sum=Sum('fact_timesheet_day_hours', filter=Q(fact_timesheet_type__is_work_hours=True)),
-        fact_night_work_hours_sum=Sum('fact_timesheet_night_hours', filter=Q(fact_timesheet_type__is_work_hours=True)),
-        main_total_hours_sum=Sum('main_timesheet_total_hours'),
-        main_day_hours_sum=Sum('main_timesheet_day_hours'),
-        main_night_hours_sum=Sum('main_timesheet_night_hours'),
-        additional_hours_sum=Sum('additional_timesheet_hours'),
+        fact_total_all_hours_sum=Sum(F('day_hours') + F('night_hours'), filter=Q(
+            timesheet_type=TimesheetItem.TIMESHEET_TYPE_FACT)),
+        fact_total_work_hours_sum=Sum(F('day_hours') + F('night_hours'), filter=Q(
+            timesheet_type=TimesheetItem.TIMESHEET_TYPE_FACT, day_type__is_work_hours=True)),
+        fact_day_work_hours_sum=Sum('day_hours', filter=Q(
+            timesheet_type=TimesheetItem.TIMESHEET_TYPE_FACT, day_type__is_work_hours=True)),
+        fact_night_work_hours_sum=Sum('night_hours', filter=Q(
+            timesheet_type=TimesheetItem.TIMESHEET_TYPE_FACT, day_type__is_work_hours=True)),
+        main_total_hours_sum=Sum(F('day_hours') + F('night_hours'), filter=Q(
+            timesheet_type=TimesheetItem.TIMESHEET_TYPE_MAIN)),
+        main_day_hours_sum=Sum('day_hours', filter=Q(timesheet_type=TimesheetItem.TIMESHEET_TYPE_MAIN)),
+        main_night_hours_sum=Sum('night_hours', filter=Q(timesheet_type=TimesheetItem.TIMESHEET_TYPE_MAIN)),
+        additional_hours_sum=Sum(F('day_hours') + F('night_hours'), filter=Q(
+            timesheet_type=TimesheetItem.TIMESHEET_TYPE_ADDITIONAL)),
     )
     hours_by_types = list(WorkerDayType.objects.filter(
         is_active=True,
@@ -26,7 +32,8 @@ def get_timesheet_stats(filtered_qs, dt_from, dt_to, user):
         hours_by_types_annotates = {}
         for type_id in hours_by_types:
             hours_by_types_annotates[f'hours_by_type_{type_id}'] = Sum(
-                'fact_timesheet_total_hours', filter=Q(fact_timesheet_type_id=type_id))
+                F('day_hours') + F('night_hours'), filter=Q(
+                    timesheet_type=TimesheetItem.TIMESHEET_TYPE_FACT, day_type_id=type_id))
         timesheet_stats_qs = timesheet_stats_qs.annotate(**hours_by_types_annotates)
 
     timesheet_stats = {}

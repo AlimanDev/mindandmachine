@@ -1,27 +1,24 @@
 from datetime import datetime
-from src.timetable.worker_day.utils import create_fact_from_attendance_records
+
 from django.conf import settings
 from django.db import transaction
+from django.db.models import Q
 
 from src.celery.celery import app
-from src.timetable.utils import CleanWdaysHelper
 from src.timetable.models import WorkerDay
+from src.timetable.utils import CleanWdaysHelper
+from src.timetable.worker_day.utils import create_fact_from_attendance_records
 
 
 @app.task
-def clean_wdays(filter_kwargs: dict = None, exclude_kwargs: dict = None, only_logging=True, clean_plan_empl=False):
-    clean_wdays_helper = CleanWdaysHelper(
-        filter_kwargs=filter_kwargs,
-        exclude_kwargs=exclude_kwargs,
-        only_logging=only_logging,
-        clean_plan_empl=clean_plan_empl,
-    )
+def clean_wdays(**kwargs):
+    clean_wdays_helper = CleanWdaysHelper(**kwargs)
     clean_wdays_helper.run()
 
 
 @app.task
 def recalc_wdays(**kwargs):
-    wdays_qs = WorkerDay.objects.filter(type__is_dayoff=False, **kwargs)
+    wdays_qs = WorkerDay.objects.filter(Q(type__is_dayoff=False) | Q(type__is_dayoff=True, type__is_work_hours=True), **kwargs)
     for wd_id in wdays_qs.values_list('id', flat=True):
         with transaction.atomic():
             wd_obj = WorkerDay.objects.filter(id=wd_id).select_for_update().first()

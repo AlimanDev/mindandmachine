@@ -2,6 +2,7 @@ import datetime
 import io
 import re
 import time
+from django.db.models.functions import Coalesce
 
 import pandas as pd
 import xlsxwriter
@@ -9,7 +10,7 @@ from dateutil.parser import parse
 from dateutil.relativedelta import relativedelta
 from django.conf import settings
 from django.db import transaction
-from django.db.models import Q, F
+from django.db.models import Q, F, Count, Sum
 from django.db.models.expressions import OuterRef, Subquery
 from django.http.response import HttpResponse
 from django.utils.encoding import escape_uri_path
@@ -28,6 +29,7 @@ from src.base.models import (
 )
 from src.timetable.models import (
     EmploymentWorkType,
+    TimesheetItem,
     WorkerDay,
     WorkType,
     WorkerDayType,
@@ -109,26 +111,27 @@ class BaseUploadDownloadTimeTable:
             'position',
         ).order_by('employee__user__last_name', 'employee__user__first_name', 'employee__user__middle_name', 'employee_id')
 
-    def _get_worker_day_qs(self, employee_ids=[], dt_from=None, dt_to=None, is_approved=True):
+    def _get_worker_day_qs(self, employee_ids=[], dt_from=None, dt_to=None, is_approved=True, for_inspection=False):
         workdays = WorkerDay.objects.select_related('employee', 'employee__user', 'shop', 'type').filter(
             Q(dt__lte=F('employment__dt_fired')) | Q(employment__dt_fired__isnull=True) | Q(employment__isnull=True),
             (Q(dt__gte=F('employment__dt_hired')) | Q(employment__isnull=True)) & Q(dt__gte=dt_from),
-            employee_id__in=employee_ids,
             dt__lte=dt_to,
             is_approved=is_approved,
             is_fact=False,
-        ).order_by(
-            'employee__user__last_name', 'employee__user__first_name', 'employee__user__middle_name', 'employee_id', 'dt', 'dttm_work_start')
+        )
 
-        return workdays
-        # .get_last_ordered(
-        #     is_fact=False,
-        #     order_by=[
-        #         '-is_approved' if is_approved else 'is_approved',
-        #         '-is_vacancy',
-        #         '-id',
-        #     ]
-        # )
+        if for_inspection:
+            workdays = TimesheetItem.objects.select_related('employee', 'employee__user', 'shop', 'day_type').filter(
+                dt__gte=dt_from,
+                dt__lte=dt_to,
+                timesheet_type=TimesheetItem.TIMESHEET_TYPE_MAIN,
+            )
+
+        return workdays.filter(
+            employee_id__in=employee_ids,
+        ).order_by(
+            'employee__user__last_name', 'employee__user__first_name', 'employee__user__middle_name', 'employee_id', 'dt', 'dttm_work_start',
+        )
 
     def _get_employee_qs(self, network_id, shop_id, dt_from, dt_to, employee_id__in):
         employee_qs = Employee.objects.filter(
@@ -504,7 +507,7 @@ class UploadDownloadTimetableCells(BaseUploadDownloadTimeTable):
                         dt=dt,
                         is_fact=is_fact,
                         is_approved=False,
-                        employment=employment if not wd_type_obj.is_dayoff else None,
+                        employment=employment,
                         dttm_work_start=dttm_work_start,
                         dttm_work_end=dttm_work_end,
                         type_id=wd_type_id,
@@ -516,7 +519,8 @@ class UploadDownloadTimetableCells(BaseUploadDownloadTimeTable):
                             dttm_work_start=dttm_work_start,
                             dttm_work_end=dttm_work_end,
                             delta_in_secs=self.user.network.set_closest_plan_approved_delta_for_manual_fact,
-                        ).first() if (is_fact and not wd_type_obj.is_dayoff) else None
+                        ).first() if (is_fact and not wd_type_obj.is_dayoff) else None,
+                        source=WorkerDay.SOURCE_UPLOAD,
                     )
                     if wd_type_id == WorkerDay.TYPE_WORKDAY:
                         new_wd_dict['worker_day_details'] = [
@@ -539,6 +543,7 @@ class UploadDownloadTimetableCells(BaseUploadDownloadTimeTable):
             worksheet=ws,
             prod_days=None,
             on_print=form['on_print'],
+            for_inspection=form.get('inspection_version', False),
         )
 
         employments = self._get_employment_qs(shop.network, shop.id, dt_from=timetable.prod_days[0].dt, dt_to=timetable.prod_days[-1].dt)
@@ -551,19 +556,39 @@ class UploadDownloadTimetableCells(BaseUploadDownloadTimeTable):
         ).run()
         stat_type = 'approved' if form['is_approved'] else 'not_approved'
         norm_type = shop.network.settings_values_prop.get('download_timetable_norm_field', 'norm_work_hours')
-
-        workdays = self._get_worker_day_qs(employee_ids=employee_ids, dt_from=timetable.prod_days[0].dt, dt_to=timetable.prod_days[-1].dt, is_approved=form['is_approved'])
-
         if form.get('inspection_version', False):
-            timetable.change_for_inspection(timetable.prod_month.get('norm_work_hours', 0), workdays)
+            main_stat = { 
+                s['employee_id'] : s 
+                for s in TimesheetItem.objects.filter(
+                    employee_id__in=employee_ids,
+                    shop_id=shop.id,
+                    dt__gte=timetable.prod_days[0].dt,
+                    dt__lte=timetable.prod_days[-1].dt,
+                    timesheet_type=TimesheetItem.TIMESHEET_TYPE_MAIN,
+                ).values(
+                    'employee_id',
+                ).annotate(
+                    work_hours=Coalesce(Sum('day_hours', filter=Q(day_type__is_work_hours=True)), 0) + Coalesce(Sum('night_hours', filter=Q(day_type__is_work_hours=True)), 0),
+                    work_days=Count('id', filter=Q(day_type__is_work_hours=True, day_type__is_dayoff=False)),
+                    holidays=Count('id', filter=Q(day_type_id=WorkerDay.TYPE_HOLIDAY)),
+                    vacations=Count('id', filter=Q(day_type_id=WorkerDay.TYPE_VACATION)),
+                ).values('employee_id', 'work_hours', 'work_days', 'holidays', 'vacations')
+            }
+            for e in stat.keys():
+                stat.setdefault(e, {}).setdefault('plan', {}).setdefault(stat_type, {}).setdefault('work_days', {})['total'] = main_stat.get(e, {}).get('work_days', 0)
+                stat.setdefault(e, {}).setdefault('plan', {}).setdefault(stat_type, {}).setdefault('work_hours', {})['total'] = main_stat.get(e, {}).get('work_hours', 0)
+                stat.setdefault(e, {}).setdefault('plan', {}).setdefault(stat_type, {}).setdefault('day_type', {})['H'] = main_stat.get(e, {}).get('holidays', 0)
+                stat.setdefault(e, {}).setdefault('plan', {}).setdefault(stat_type, {}).setdefault('day_type', {})['V'] = main_stat.get(e, {}).get('vacations', 0)
+
+        workdays = self._get_worker_day_qs(employee_ids=employee_ids, dt_from=timetable.prod_days[0].dt, dt_to=timetable.prod_days[-1].dt, is_approved=form['is_approved'], for_inspection=form.get('inspection_version', False))
 
         timetable.format_cells(len(employments))
 
         # construct weekday
-        timetable.construct_dates('%w', 6, 4)
+        timetable.construct_dates('%w', 6, 3)
 
         # construct day 2
-        timetable.construct_dates('%d.%m', 7, 4)
+        timetable.construct_dates('%d.%m', 7, 3)
         timetable.add_main_info()
 
         # construct user info
@@ -572,7 +597,7 @@ class UploadDownloadTimetableCells(BaseUploadDownloadTimeTable):
         groupped_days = self._group_worker_days(workdays)
 
         # fill page 1
-        timetable.fill_table(groupped_days, employments, stat, 9, 4, stat_type=stat_type, norm_type=norm_type, mapping=self.wd_type_mapping)
+        timetable.fill_table(groupped_days, employments, stat, 9, 3, stat_type=stat_type, norm_type=norm_type, mapping=self.wd_type_mapping)
 
         # fill page 2
         timetable.fill_table2(shop, timetable.prod_days[-1].dt, groupped_days)
@@ -825,7 +850,7 @@ class UploadDownloadTimetableRows(BaseUploadDownloadTimeTable):
                     dt=dt,
                     is_fact=is_fact,
                     is_approved=False,
-                    employment=employment if not wd_type_obj.is_dayoff else None,
+                    employment=employment,
                     dttm_work_start=dttm_work_start,
                     dttm_work_end=dttm_work_end,
                     type_id=type_of_work,
@@ -837,7 +862,8 @@ class UploadDownloadTimetableRows(BaseUploadDownloadTimeTable):
                         dttm_work_start=dttm_work_start,
                         dttm_work_end=dttm_work_end,
                         delta_in_secs=self.user.network.set_closest_plan_approved_delta_for_manual_fact,
-                    ).first() if (is_fact and not wd_type_obj.is_dayoff) else None
+                    ).first() if (is_fact and not wd_type_obj.is_dayoff) else None,
+                    source=WorkerDay.SOURCE_UPLOAD,
                 )
                 if type_of_work == WorkerDay.TYPE_WORKDAY:
                     new_wd_data['worker_day_details'] = [

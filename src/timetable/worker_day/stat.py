@@ -21,7 +21,7 @@ from django.utils.functional import cached_property
 
 from src.base.models import Employment, Shop, ProductionDay, SAWHSettings, Network
 from src.forecast.models import PeriodClients
-from src.timetable.models import WorkerDay, ProdCal, Timesheet, WorkerDayType
+from src.timetable.models import WorkerDay, ProdCal, TimesheetItem, WorkerDayType
 
 
 def count_daily_stat(data):
@@ -413,37 +413,37 @@ class WorkersStatsGetter:
         ).annotate(
             work_days_selected_shop=Coalesce(Count('id', filter=Q(selected_period_q, shop_id=self.shop_id,
                                                                   work_hours__gte=timedelta(0),
-                                                                  type__is_dayoff=False, type__is_work_hours=True)), 0),
+                                                                  type__is_work_hours=True)), 0),
             work_days_other_shops=Coalesce(Count('id', filter=Q(selected_period_q, ~Q(shop_id=self.shop_id),
                                                                 work_hours__gte=timedelta(0),
-                                                                type__is_dayoff=False, type__is_work_hours=True)), 0),
+                                                                type__is_work_hours=True)), 0),
             work_days_selected_period=Coalesce(Count('id', filter=Q(selected_period_q, work_hours__gte=timedelta(0),
-                                                          type__is_dayoff=False, type__is_work_hours=True)), 0),
+                                                          type__is_work_hours=True)), 0),
             work_hours_selected_shop=Coalesce(Sum(Extract(F('work_hours'), 'epoch') / 3600,
                                                   filter=Q(selected_period_q, shop_id=self.shop_id,
                                                            work_hours__gte=timedelta(0),
-                                                           type__is_dayoff=False, type__is_work_hours=True),
+                                                           type__is_work_hours=True),
                                                   output_field=FloatField()), 0),
             work_hours_other_shops=Coalesce(Sum(Extract(F('work_hours'), 'epoch') / 3600,
                                                 filter=Q(selected_period_q, ~Q(shop_id=self.shop_id),
                                                          work_hours__gte=timedelta(0),
-                                                         type__is_dayoff=False, type__is_work_hours=True),
+                                                         type__is_work_hours=True),
                                                 output_field=FloatField()), 0),
             work_hours_selected_period=Coalesce(Sum(Extract(F('work_hours'), 'epoch') / 3600,
                                           filter=Q(selected_period_q, work_hours__gte=timedelta(0),
-                                                   type__is_dayoff=False, type__is_work_hours=True),
+                                                   type__is_work_hours=True),
                                           output_field=FloatField()), 0),
             work_hours_total=Coalesce(Sum(Extract(F('work_hours'), 'epoch') / 3600,
                                                 filter=Q(work_hours__gte=timedelta(0),
-                                                         type__is_dayoff=False, type__is_work_hours=True),
+                                                         type__is_work_hours=True),
                                                 output_field=FloatField()), 0),
             work_hours_until_acc_period_end=Coalesce(Sum(Extract(F('work_hours'), 'epoch') / 3600,
                                                          filter=Q(until_acc_period_end_q, work_hours__gte=timedelta(0),
-                                                                  type__is_dayoff=False, type__is_work_hours=True),
+                                                                  type__is_work_hours=True),
                                                          output_field=FloatField()), 0),
             work_hours_outside_of_selected_period=Coalesce(Sum(Extract(F('work_hours'), 'epoch') / 3600,
                                                          filter=Q(outside_of_selected_period_q, work_hours__gte=timedelta(0),
-                                                                  type__is_dayoff=False, type__is_work_hours=True),
+                                                                  type__is_work_hours=True),
                                                          output_field=FloatField()), 0)
         ).order_by('employee_id', '-is_fact', '-is_approved')  # такая сортировка нужна для work_hours_prev_months
         if self.hours_by_types:
@@ -501,19 +501,20 @@ class WorkersStatsGetter:
 
         if self.network.prev_months_work_hours_source in [Network.FACT_TIMESHEET, Network.MAIN_TIMESHEET]:
             hours_field_name_mapping = {
-                Network.FACT_TIMESHEET: ('fact_timesheet_total_hours', 'fact_timesheet_type'),
-                Network.MAIN_TIMESHEET: ('main_timesheet_total_hours', 'main_timesheet_type'),
+                Network.FACT_TIMESHEET: TimesheetItem.TIMESHEET_TYPE_FACT,
+                Network.MAIN_TIMESHEET: TimesheetItem.TIMESHEET_TYPE_MAIN,
             }
-            hours_field, type_field = hours_field_name_mapping.get(self.network.prev_months_work_hours_source)
+            timesheet_type = hours_field_name_mapping.get(self.network.prev_months_work_hours_source)
 
-            timesheet_prev_months_work_hours = list(Timesheet.objects.filter(
+            timesheet_prev_months_work_hours = list(TimesheetItem.objects.filter(
                 prev_months_q,
+                timesheet_type=timesheet_type,
                 employee_id__in=self.employees_dict.keys(),
-                **{f'{type_field}__is_work_hours': True},
+                day_type__is_work_hours=True,
             ).values(
                 'employee_id',
             ).annotate(
-                prev_months_work_hours=Sum(hours_field),
+                prev_months_work_hours=Sum('day_hours') + Sum('night_hours'),
             ).values_list('employee_id', 'prev_months_work_hours'))
 
             for is_fact_key in ['plan', 'fact']:
@@ -938,6 +939,8 @@ class WorkersStatsGetter:
 
                             sawh_hours['selected_period'] = sawh_hours.get('selected_period', 0) + \
                                 empl_dict.get('sawh_hours_plan_not_approved_selected_period', 0)
+                            sawh_hours['curr_month_without_reduce_norm'] = empl_dict.get('sawh_hours_by_months',
+                                                                                         {}).get(curr_month, 0)
 
                     else:
                         for empl_id, empl_dict in employee_dict.get('employments', {}).items():
@@ -948,6 +951,8 @@ class WorkersStatsGetter:
 
                             sawh_hours['selected_period'] = sawh_hours.get('selected_period', 0) + \
                                 empl_dict.get('sawh_hours_plan_approved_selected_period', 0)
+                            sawh_hours['curr_month_without_reduce_norm'] = empl_dict.get('sawh_hours_by_months', {}).get(
+                                curr_month, 0)
 
                     is_last_month = curr_month == acc_period_dt_to.month
                     if self.network.correct_norm_hours_last_month_acc_period and self.network.accounting_period_length > 1 and is_last_month:
