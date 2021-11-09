@@ -9,7 +9,7 @@ from src.base.tests.factories import NetworkFactory, ShopFactory, UserFactory, E
 from src.timetable.models import TimesheetItem, WorkTypeName, WorkType, WorkerDay, WorkerDayType
 from src.timetable.tests.factories import WorkerDayFactory
 from src.timetable.timesheet.tasks import calc_timesheets
-from src.util.dg.tabel import T13TabelDataGetter, MtsTabelDataGetter
+from src.util.dg.timesheet import T13TimesheetDataGetter, MtsTimesheetDataGetter, TimesheetLinesDataGetter
 from src.util.mixins.tests import TestsHelperMixin
 
 
@@ -102,7 +102,7 @@ class TestGenerateTabel(TestsHelperMixin, TestCase):
         self.outsource_employment.refresh_from_db()
 
     def test_generate_mts_tabel(self):
-        g = MtsTabelDataGetter(shop=self.shop, dt_from=self.dt_from, dt_to=self.dt_to)
+        g = MtsTimesheetDataGetter(shop=self.shop, dt_from=self.dt_from, dt_to=self.dt_to)
         data = g.get_data()
         for pfh in data['plan_and_fact_hours']:
             dt = pfh.dt
@@ -138,24 +138,24 @@ class TestGenerateTabel(TestsHelperMixin, TestCase):
             dt_hired=self.dt_from + timedelta(2),
             salary=100,
         )
-        g = MtsTabelDataGetter(shop=self.shop, dt_from=self.dt_from, dt_to=self.dt_to)
+        g = MtsTimesheetDataGetter(shop=self.shop, dt_from=self.dt_from, dt_to=self.dt_to)
         second_data = g.get_data()
         self.assertEqual(len(data['plan_and_fact_hours']), len(second_data['plan_and_fact_hours']))
 
     def test_generate_mts_tabel_for_outsource_shop(self):
-        g = MtsTabelDataGetter(shop=self.outsource_shop, dt_from=self.dt_from, dt_to=self.dt_to)
+        g = MtsTimesheetDataGetter(shop=self.outsource_shop, dt_from=self.dt_from, dt_to=self.dt_to)
         data = g.get_data()
         self.assertEqual(len(data['plan_and_fact_hours']), 0)
 
         self.outsource_network.set_settings_value('tabel_include_other_shops_wdays', True)
         self.outsource_network.save()
 
-        g = MtsTabelDataGetter(shop=self.outsource_shop, dt_from=self.dt_from, dt_to=self.dt_to)
+        g = MtsTimesheetDataGetter(shop=self.outsource_shop, dt_from=self.dt_from, dt_to=self.dt_to)
         data = g.get_data()
         self.assertEqual(len(data['plan_and_fact_hours']), 1)
 
     def test_generate_custom_t13_tabel_main(self):
-        g = T13TabelDataGetter(shop=self.shop, dt_from=self.dt_from, dt_to=self.dt_to, timesheet_type=TimesheetItem.TIMESHEET_TYPE_MAIN)
+        g = T13TimesheetDataGetter(shop=self.shop, dt_from=self.dt_from, dt_to=self.dt_to, timesheet_type=TimesheetItem.TIMESHEET_TYPE_MAIN)
         data = g.get_data()
         # self.assertEqual(len(data['users']), 7)
         for user in data['users']:
@@ -201,11 +201,11 @@ class TestGenerateTabel(TestsHelperMixin, TestCase):
             self.assertEqual(user['second_half_month_wdays'], second_half_month_wdays)
             self.assertEqual(user['second_half_month_whours'], second_half_month_whours)
         ind = list(map(lambda x: x['fio'], data['users'])).index(f'{self.user2.last_name} {self.user2.first_name}')
-        # self.assertEqual(data['users'][ind]['fio'], data['users'][ind + 1]['fio'])
-        # self.assertNotEqual(data['users'][ind]['tabel_code'], data['users'][ind + 1]['tabel_code'])
+        self.assertEqual(data['users'][ind]['fio'], data['users'][ind + 1]['fio'])
+        self.assertNotEqual(data['users'][ind]['tabel_code'], data['users'][ind + 1]['tabel_code'])
 
     def test_generate_custom_t13_tabel_fact(self):
-        g = T13TabelDataGetter(
+        g = T13TimesheetDataGetter(
             shop=self.shop, dt_from=self.dt_from, dt_to=self.dt_to, timesheet_type=TimesheetItem.TIMESHEET_TYPE_FACT)
         data = g.get_data()
         # self.assertEqual(len(data['users']), 7)
@@ -255,11 +255,11 @@ class TestGenerateTabel(TestsHelperMixin, TestCase):
             self.assertEqual(user['second_half_month_wdays'], second_half_month_wdays)
             self.assertEqual(user['second_half_month_whours'], second_half_month_whours)
         ind = list(map(lambda x: x['fio'], data['users'])).index(f'{self.user2.last_name} {self.user2.first_name}')
-        # self.assertEqual(data['users'][ind]['fio'], data['users'][ind + 1]['fio'])
-        # self.assertNotEqual(data['users'][ind]['tabel_code'], data['users'][ind + 1]['tabel_code'])
+        self.assertEqual(data['users'][ind]['fio'], data['users'][ind + 1]['fio'])
+        self.assertNotEqual(data['users'][ind]['tabel_code'], data['users'][ind + 1]['tabel_code'])
 
     def test_generate_custom_t13_tabel_additional(self):
-        g = T13TabelDataGetter(
+        g = T13TimesheetDataGetter(
             shop=self.shop, dt_from=self.dt_from, dt_to=self.dt_to, timesheet_type=TimesheetItem.TIMESHEET_TYPE_ADDITIONAL)
         data = g.get_data()
         self.assertEqual(len(data['users']), TimesheetItem.objects.filter(
@@ -308,7 +308,7 @@ class TestGenerateTabel(TestsHelperMixin, TestCase):
             self.assertNotEqual(two_empls[0]['tabel_code'], two_empls[1]['tabel_code'])
 
     def test_generate_custom_t13_tabel_for_outsource_shop_main(self):
-        g = T13TabelDataGetter(shop=self.outsource_shop, dt_from=self.dt_from, dt_to=self.dt_to, timesheet_type=TimesheetItem.TIMESHEET_TYPE_MAIN)
+        g = T13TimesheetDataGetter(shop=self.outsource_shop, dt_from=self.dt_from, dt_to=self.dt_to, timesheet_type=TimesheetItem.TIMESHEET_TYPE_MAIN)
         data = g.get_data()
         self.assertEqual(len(data['users']), 1)
         user_data = data['users'][0]
@@ -319,7 +319,7 @@ class TestGenerateTabel(TestsHelperMixin, TestCase):
         self.outsource_network.set_settings_value('tabel_include_other_shops_wdays', True)
         self.outsource_network.save()
 
-        g = T13TabelDataGetter(shop=self.outsource_shop, dt_from=self.dt_from, dt_to=self.dt_to, timesheet_type=TimesheetItem.TIMESHEET_TYPE_MAIN)
+        g = T13TimesheetDataGetter(shop=self.outsource_shop, dt_from=self.dt_from, dt_to=self.dt_to, timesheet_type=TimesheetItem.TIMESHEET_TYPE_MAIN)
         data = g.get_data()
         self.assertEqual(len(data['users']), 1)
         user_data = data['users'][0]
@@ -328,7 +328,7 @@ class TestGenerateTabel(TestsHelperMixin, TestCase):
         self.assertEqual(len(list(filter(lambda x: x['value'] != '', user_data['days'].values()))), 1)
 
     def test_generate_custom_t13_tabel_for_outsource_shop_fact(self):
-        g = T13TabelDataGetter(shop=self.outsource_shop, dt_from=self.dt_from, dt_to=self.dt_to, timesheet_type=TimesheetItem.TIMESHEET_TYPE_FACT)
+        g = T13TimesheetDataGetter(shop=self.outsource_shop, dt_from=self.dt_from, dt_to=self.dt_to, timesheet_type=TimesheetItem.TIMESHEET_TYPE_FACT)
         data = g.get_data()
         self.assertEqual(len(data['users']), 1)
         user_data = data['users'][0]
@@ -339,7 +339,7 @@ class TestGenerateTabel(TestsHelperMixin, TestCase):
         self.outsource_network.set_settings_value('tabel_include_other_shops_wdays', True)
         self.outsource_network.save()
 
-        g = T13TabelDataGetter(shop=self.outsource_shop, dt_from=self.dt_from, dt_to=self.dt_to, timesheet_type=TimesheetItem.TIMESHEET_TYPE_FACT)
+        g = T13TimesheetDataGetter(shop=self.outsource_shop, dt_from=self.dt_from, dt_to=self.dt_to, timesheet_type=TimesheetItem.TIMESHEET_TYPE_FACT)
         data = g.get_data()
         self.assertEqual(len(data['users']), 1)
         user_data = data['users'][0]
@@ -348,14 +348,14 @@ class TestGenerateTabel(TestsHelperMixin, TestCase):
         self.assertEqual(len(list(filter(lambda x: x['value'] != '', user_data['days'].values()))), 1)
 
     def test_generate_custom_t13_tabel_for_outsource_shop_additional(self):
-        g = T13TabelDataGetter(shop=self.outsource_shop, dt_from=self.dt_from, dt_to=self.dt_to, timesheet_type=TimesheetItem.TIMESHEET_TYPE_ADDITIONAL)
+        g = T13TimesheetDataGetter(shop=self.outsource_shop, dt_from=self.dt_from, dt_to=self.dt_to, timesheet_type=TimesheetItem.TIMESHEET_TYPE_ADDITIONAL)
         data = g.get_data()
         self.assertEqual(len(data['users']), 0)
 
         self.outsource_network.set_settings_value('tabel_include_other_shops_wdays', True)
         self.outsource_network.save()
 
-        g = T13TabelDataGetter(shop=self.outsource_shop, dt_from=self.dt_from, dt_to=self.dt_to, timesheet_type=TimesheetItem.TIMESHEET_TYPE_ADDITIONAL)
+        g = T13TimesheetDataGetter(shop=self.outsource_shop, dt_from=self.dt_from, dt_to=self.dt_to, timesheet_type=TimesheetItem.TIMESHEET_TYPE_ADDITIONAL)
         data = g.get_data()
         self.assertEqual(len(data['users']), 1)
         user_data = data['users'][0]
@@ -374,6 +374,36 @@ class TestGenerateTabel(TestsHelperMixin, TestCase):
             dt_hired=self.dt_from + timedelta(12),
             salary=100,
         )
-        g = T13TabelDataGetter(shop=self.shop, dt_from=self.dt_from, dt_to=self.dt_to)
+        g = T13TimesheetDataGetter(shop=self.shop, dt_from=self.dt_from, dt_to=self.dt_to)
         data = g.get_data()
-        # self.assertEqual(len(data['users']), 7)
+        self.assertEqual(len(data['users']), 7)
+
+    def test_timesheet_lines_generator_get_data(self):
+        self.second_empl.dt_fired = self.dt_from + timedelta(10)
+        self.second_empl.save()
+        Employment.objects.create(
+            code=f'{self.user2.username}:{uuid.uuid4()}:{uuid.uuid4()}',
+            employee=self.seconds_employee,
+            shop=self.shop,
+            function_group=self.employee_group,
+            dt_hired=self.dt_from + timedelta(12),
+            salary=100,
+        )
+        g = TimesheetLinesDataGetter(shop=self.shop, dt_from=self.dt_from, dt_to=self.dt_to)
+        data = g.get_data()
+        self.assertEqual(len(data['users']), 7)
+
+        self.shop.network.set_settings_value('timesheet_include_curr_shop_employees_wdays', False)
+        g = TimesheetLinesDataGetter(shop=self.shop, dt_from=self.dt_from, dt_to=self.dt_to)
+        data = g.get_data()
+        self.assertEqual(len(data['users']), 7)
+
+        self.shop.network.set_settings_value('timesheet_include_curr_shop_wdays', False)
+        g = TimesheetLinesDataGetter(shop=self.shop, dt_from=self.dt_from, dt_to=self.dt_to)
+        data = g.get_data()
+        self.assertEqual(len(data['users']), 0)
+
+        self.shop.network.set_settings_value('timesheet_include_curr_shop_employees_wdays', True)
+        g = TimesheetLinesDataGetter(shop=self.shop, dt_from=self.dt_from, dt_to=self.dt_to)
+        data = g.get_data()
+        self.assertEqual(len(data['users']), 6)

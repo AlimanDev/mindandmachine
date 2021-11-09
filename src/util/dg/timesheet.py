@@ -33,7 +33,7 @@ class T13WdTypeMapper(BaseWdTypeMapper):
         self.wd_type_to_tabel_type_mapping = dict(WorkerDayType.objects.values_list('code', 'excel_load_code'))
 
 
-class BaseTabelDataGetter:
+class BaseTimesheetDataGetter:
     wd_type_mapper_cls = DummyWdTypeMapper
 
     def __init__(self, shop, dt_from, dt_to, timesheet_type=TimesheetItem.TIMESHEET_TYPE_FACT, wd_types_dict=None):
@@ -54,29 +54,35 @@ class BaseTabelDataGetter:
     def _get_tabel_type(self, wd_type):
         return self.wd_type_mapper.get_tabel_type(wd_type.code)
 
-    def _get_tabel_wdays_qs(self):
-        tabel_wdays = TimesheetItem.objects.filter(
+    def _get_timesheet_qs(self):
+        timesheet_qs = TimesheetItem.objects.filter(
             dt__gte=self.dt_from,
             dt__lte=self.dt_to,
             timesheet_type=self.timesheet_type,
         ).select_related(
             'day_type',
         )
-        employment_extra_q = Q()
-        if self.shop.network.settings_values_prop.get('timesheet_exclude_invisible_employments', True):
-            employment_extra_q &= Q(
-                is_visible=True,
-            )
-        shop_employees_part_q = Q(day_type__is_dayoff=True)
-        if self.shop.network.settings_values_prop.get('tabel_include_other_shops_wdays', False):  # TODO: сделать в виде параметра на фронте? Или так ок?
-            shop_employees_part_q |= Q(Q(day_type__is_dayoff=False) & ~Q(shop=self.shop))
 
-        tabel_wdays = tabel_wdays.filter(
-            Q(
+        wdays_q = Q()
+
+        if self.shop.network.settings_values_prop.get('timesheet_include_curr_shop_wdays', True):
+            wdays_q |= Q(
                 day_type__is_dayoff=False,
                 shop=self.shop,
-            ) |
-            Q(
+            )
+
+        if self.shop.network.settings_values_prop.get('timesheet_include_curr_shop_employees_wdays', True):
+            shop_employees_part_q = Q(Q(shop=self.shop) | Q(day_type__is_dayoff=True))
+            if self.shop.network.settings_values_prop.get('tabel_include_other_shops_wdays', False):
+                shop_employees_part_q |= Q(Q(day_type__is_dayoff=False) & ~Q(shop=self.shop))
+
+            employment_extra_q = Q()
+            if self.shop.network.settings_values_prop.get('timesheet_exclude_invisible_employments', True):
+                employment_extra_q &= Q(
+                    is_visible=True,
+                )
+
+            wdays_q |= Q(
                 shop_employees_part_q,
                 Q(employee__in=Employment.objects.get_active(
                     network_id=self.network.id,
@@ -85,12 +91,17 @@ class BaseTabelDataGetter:
                     shop=self.shop,
                     extra_q=employment_extra_q,
                 ).distinct().values_list('employee', flat=True))
-            ),
-        )
+            )
 
-        return tabel_wdays.select_related(
+        if wdays_q:
+            timesheet_qs = timesheet_qs.filter(wdays_q)
+        else:
+            timesheet_qs = TimesheetItem.objects.none()
+
+        return timesheet_qs.select_related(
             'employee__user',
             'shop',
+            'position',
         ).order_by(
             'employee__user__last_name',
             'employee__user__first_name',
@@ -102,13 +113,34 @@ class BaseTabelDataGetter:
         raise NotImplementedError
 
 
-class T13TabelDataGetter(BaseTabelDataGetter):
+class T13TimesheetDataGetter(BaseTimesheetDataGetter):
     wd_type_mapper_cls = T13WdTypeMapper
 
     def set_day_data(self, day_data, wday):
         day_data['code'] = self._get_tabel_type(wday.day_type) if wday else ''
         day_data['value'] = (wday.day_hours + wday.night_hours) if \
             (wday and not wday.day_type.is_dayoff) else ''
+
+    def get_extra_grouping_attrs(self):
+        pass
+
+    def _get_grouping_attrs(self):
+        grouping_attrs = [
+            'employee_id',  # должен быть всегда
+        ]
+        extra_grouping_attrs = self.get_extra_grouping_attrs()
+        if extra_grouping_attrs:
+            grouping_attrs.extend(extra_grouping_attrs)
+        return grouping_attrs
+
+    def _get_user_key_func(self):
+        return lambda wd: tuple(getattr(wd, attr_name) for attr_name in self._get_grouping_attrs())
+
+    def get_shop_name(self, e, ts_items):
+        return e.shop.name if e.shop else ''
+
+    def get_position_name(self, e, ts_items):
+        return e.position.name if e.position else ''
 
     def get_data(self):
         def _get_active_empl(wd, empls):
@@ -120,19 +152,20 @@ class T13TabelDataGetter(BaseTabelDataGetter):
             if active_empls:
                 return active_empls[0]
 
-        tabel_wdays = self._get_tabel_wdays_qs()
+        timesheet_qs = self._get_timesheet_qs()
 
         empls = {}
         empls_qs = Employment.objects.get_active(
             dt_from=self.dt_from,
             dt_to=self.dt_to,
-            employee__id__in=tabel_wdays.values_list('employee', flat=True),
+            employee__id__in=timesheet_qs.values_list('employee', flat=True),
         ).annotate_value_equality(
             'is_equal_shops', 'shop_id', self.shop.id,
         ).select_related(
             'employee',
             'employee__user',
             'position',
+            'shop',
         ).order_by('-is_equal_shops')
         for e in empls_qs:
             empls.setdefault(e.employee_id, []).append(e)
@@ -141,12 +174,14 @@ class T13TabelDataGetter(BaseTabelDataGetter):
 
         users = []
         grouped_worker_days = {}
-        for wd in tabel_wdays:
+        get_user_key_func = self._get_user_key_func()
+        for wd in timesheet_qs:
             if not wd.day_type.is_dayoff and not _get_active_empl(wd, empls):
                 continue
-            grouped_worker_days.setdefault(wd.employee_id, []).append(wd)
+            grouped_worker_days.setdefault(get_user_key_func(wd), []).append(wd)
 
-        for employee_id, wds in grouped_worker_days.items():
+        for grouped_attrs, wds in grouped_worker_days.items():
+            employee_id = grouped_attrs[0]
             first_half_month_wdays = 0
             first_half_month_whours = 0
             second_half_month_wdays = 0
@@ -171,7 +206,8 @@ class T13TabelDataGetter(BaseTabelDataGetter):
                 'tabel_code': e.employee.tabel_code,
                 'fio_and_position': e.get_short_fio_and_position(),
                 'fio': e.employee.user.fio,
-                'position': e.position.name if e.position else '',
+                'position': self.get_position_name(e, wds),
+                'shop': self.get_shop_name(e, wds),
                 'days': days,
                 'first_half_month_wdays': first_half_month_wdays,
                 'first_half_month_whours': first_half_month_whours,
@@ -201,7 +237,7 @@ class T13TabelDataGetter(BaseTabelDataGetter):
         }
 
 
-class MtsTabelDataGetter(BaseTabelDataGetter):
+class MtsTimesheetDataGetter(BaseTimesheetDataGetter):
     def get_data(self):
         shop_q = Q(shop=self.shop)
         if self.shop.network.settings_values_prop.get('tabel_include_other_shops_wdays', False):
@@ -227,13 +263,40 @@ class MtsTabelDataGetter(BaseTabelDataGetter):
         }
 
 
-class AigulTabelDataGetter(T13TabelDataGetter):
+class AigulTimesheetDataGetter(T13TimesheetDataGetter):
     def set_day_data(self, day_data, wday):
         day_data['value'] = (wday.day_hours + wday.night_hours) if (
                     wday and not wday.day_type.is_dayoff) else self._get_tabel_type(wday.day_type) if wday else ''
 
 
-class BaseTabelGenerator(BaseDocGenerator):
+class TimesheetLinesDataGetter(AigulTimesheetDataGetter):
+    def set_day_data(self, day_data, wday):
+        if not wday:
+            day_data['value'] = ''
+            return
+
+        if not wday.day_type.is_dayoff:
+            day_data['value'] = wday.day_hours + wday.night_hours
+        elif wday.day_type.is_dayoff and wday.day_type.is_work_hours:
+            day_data['value'] = self._get_tabel_type(wday.day_type) + ' ' + '{0:g}'.format(
+                float(wday.day_hours + wday.night_hours))
+        else:
+            day_data['value'] = self._get_tabel_type(wday.day_type)
+
+    def get_extra_grouping_attrs(self):
+        return [
+            'position_id',
+            'shop_id',
+        ]
+
+    def get_shop_name(self, e, ts_items):
+        return ts_items[0].shop.name if ts_items and ts_items[0].shop_id else ''
+
+    def get_position_name(self, e, ts_items):
+        return ts_items[0].position.name if ts_items and ts_items[0].position_id else ''
+
+
+class BaseTimesheetGenerator(BaseDocGenerator):
     """
     Базовый класс для генерации табеля
     """
@@ -288,6 +351,7 @@ class BaseTabelGenerator(BaseDocGenerator):
                 'days': _('Days'),
                 'hours': _('Hours'),
                 'position': _('Position'),
+                'shop': _('Shop'),
                 'total_hours': _('Total hours'),
                 'total_days': _('Total days'),
                 'date': _('Date'),
@@ -313,17 +377,17 @@ class BaseTabelGenerator(BaseDocGenerator):
         return table_data_getter.get_data()
 
 
-class T13TabelGenerator(BaseTabelGenerator):
+class T13TimesheetGenerator(BaseTimesheetGenerator):
     """
     Класс для генерации табеля в формате т-13
     """
-    tabel_data_getter_cls = T13TabelDataGetter
+    tabel_data_getter_cls = T13TimesheetDataGetter
 
     def get_template_path(self):
         return os.path.join(settings.BASE_DIR, 'src/util/dg/templates/t_13.ods')
 
 
-class CustomT13TabelGenerator(T13TabelGenerator):
+class CustomT13TimesheetGenerator(T13TimesheetGenerator):
     """
     Класс для генерация табеля в кастомном формате (производном от Т-13).
 
@@ -335,7 +399,7 @@ class CustomT13TabelGenerator(T13TabelGenerator):
         return os.path.join(settings.BASE_DIR, 'src/util/dg/templates/t_custom.ods')
 
 
-class MTSTabelGenerator(BaseTabelGenerator):
+class MTSTimesheetGenerator(BaseTimesheetGenerator):
     """
     Класс для генерация табеля в формате МТС.
 
@@ -343,29 +407,41 @@ class MTSTabelGenerator(BaseTabelGenerator):
         Заготовка.
     """
 
-    tabel_data_getter_cls = MtsTabelDataGetter
+    tabel_data_getter_cls = MtsTimesheetDataGetter
 
     def get_template_path(self):
         return os.path.join(settings.BASE_DIR, 'src/util/dg/templates/t_mts.ods')
 
 
-class AigulTabelGenerator(BaseTabelGenerator):
+class AigulTimesheetGenerator(BaseTimesheetGenerator):
     """
     Шаблон табеля для Айгуль
     """
 
-    tabel_data_getter_cls = AigulTabelDataGetter
+    tabel_data_getter_cls = AigulTimesheetDataGetter
 
     def get_template_path(self):
         return os.path.join(settings.BASE_DIR, 'src/util/dg/templates/t_aigul.ods')
 
 
+class TimesheetLinesGenerator(BaseTimesheetGenerator):
+    """
+    Шаблон табеля построчно -- сотрудник, должность, подразделение выхода
+    """
+
+    tabel_data_getter_cls = TimesheetLinesDataGetter
+
+    def get_template_path(self):
+        return os.path.join(settings.BASE_DIR, 'src/util/dg/templates/t_lines.ods')
+
+
 tabel_formats = {  # TODO: поменять имена клиентов на какие-то общие названия
-    'default': MTSTabelGenerator,
-    'mts': MTSTabelGenerator,
-    't13': T13TabelGenerator,
-    't13_custom': CustomT13TabelGenerator,
-    'aigul': AigulTabelGenerator,
+    'default': MTSTimesheetGenerator,
+    'mts': MTSTimesheetGenerator,
+    't13': T13TimesheetGenerator,
+    't13_custom': CustomT13TimesheetGenerator,
+    'aigul': AigulTimesheetGenerator,
+    'lines': TimesheetLinesGenerator,
 }
 
 
