@@ -66,14 +66,10 @@ def get_timesheet_lines_data(timesheet_qs, extra_values_list: list = None):
         'timesheet_type',
         'shop_id',
         'shop__code',
-        'shop__name',
         'position_id',
         'position__code',
-        'position__name',
         'employee_id',
         'employee__tabel_code',
-        'employee__user__last_name',
-        'employee__user__first_name',
     ]
     if extra_values_list:
         ts_values.extend(extra_values_list)
