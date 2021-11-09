@@ -512,6 +512,7 @@ class TestScheduleDeviation(APITestCase):
         wd_fact.dttm_work_start = datetime.combine(dt, time(7))
         wd_fact.dttm_work_end = datetime.combine(dt, time(19))
         wd_fact.created_by = None
+        wd_fact.last_edited_by = None
         wd_fact.save()
         self.assertHours(plan_work_hours=10.75, fact_work_hours=10.75, early_arrival_hours=1.0, early_arrival_count=1, early_departure_hours=1.0, early_departure_count=1)
         wd_fact.dttm_work_start = datetime.combine(dt, time(9))
@@ -624,12 +625,31 @@ class TestScheduleDeviation(APITestCase):
             dttm_work_end=datetime.combine(dt, time(20, 30)),
             dt=dt,
             closest_plan_approved=wd_plan2,
+            last_edited_by=self.user1,
+        )
+        vacancy = WorkerDayFactory(
+            is_vacancy=True,
+            employee=None,
+            employment=None,
+            shop=self.shop,
+            is_approved=True,
+            type_id=WorkerDay.TYPE_WORKDAY,
+            is_fact=False,
+            cashbox_details__work_type__work_type_name__name='Грузчик',
+            dttm_work_start=datetime.combine(dt, time(8)),
+            dttm_work_end=datetime.combine(dt, time(18)),
+            dt=dt,
         )
         report = self.client.get(f'/rest_api/report/schedule_deviation/?dt_from={dt}&dt_to={dt+timedelta(1)}')
         BytesIO = pd.io.common.BytesIO
         data = pd.read_excel(BytesIO(report.content), engine='xlrd').fillna('')
         self.assertEquals(
             list(data.iloc[9, :].values), 
-            ['1', 'Shop1', dt.strftime('%d.%m.%Y'), 'Васнецов Иван ', '', '-', 'штат', 'Работа', '10.0',
-            '10.5', '0.0', '0.5', '1', '0.5', '1', '0.0', '0', '1.0', '2', '0.0', '0', '0.0', '0']
+            [1, 'Shop1', dt.strftime('%d.%m.%Y'), 'Васнецов Иван ', '-', '-', 'штат', 'Работа', 10,
+            10.5, 4.5, 0.5, 1, 0.5, 1, 0, 0, 1, 2, 0, 0, 0, 0]
+        )
+        self.assertEquals(
+            list(data.iloc[10, :].values), 
+            [2, 'Shop1', dt.strftime('%d.%m.%Y'), '-', '-', '-', '-', 'Грузчик', 8.75,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8.75, 1]
         )
