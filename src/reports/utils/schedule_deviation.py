@@ -173,6 +173,13 @@ def schedule_deviation_report(dt_from, dt_to, *args, title=None, in_memory=False
         'align': 'center',
         'bg_color': '#d9d9d9',
     })
+    date_format = workbook.add_format({
+        'border': 1,
+        'valign': 'vcenter',
+        'align': 'center',
+        'text_wrap': True,
+        'num_format': 'dd.mm.yyyy',
+    })
 
     # add info
     worksheet.write_string(1, 1, 'Наименование')
@@ -240,7 +247,7 @@ def schedule_deviation_report(dt_from, dt_to, *args, title=None, in_memory=False
     for i, row in df.iterrows():
         worksheet.write_number(11 + i, NUMBER, i+1, def_format)
         worksheet.write_string(11 + i, SHOP, row.shop_name, def_format)
-        worksheet.write_string(11 + i, DATE, row['dt'].strftime('%d.%m.%Y'), def_format)
+        worksheet.write_datetime(11 + i, DATE, row['dt'], date_format)
         worksheet.write_string(11 + i, FIO, row.worker_fio, def_format)
         worksheet.write_string(11 + i, TABEL_CODE, row.tabel_code, def_format)
         worksheet.write_string(11 + i, NETWORK, row.user_network if row.is_outsource else '-', def_format)
