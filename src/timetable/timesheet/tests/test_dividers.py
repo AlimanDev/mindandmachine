@@ -1,9 +1,11 @@
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
+from unittest import expectedFailure
 
 import pandas as pd
 from django.db.models import Sum, Q
 from django.test import TestCase, override_settings
+
 from src.base.models import SAWHSettings, SAWHSettingsMapping, Network, WorkerPosition
 from src.base.tests.factories import ShopFactory
 from src.timetable.models import TimesheetItem, WorkerDay
@@ -266,6 +268,48 @@ class TestNahodkaDivider(TestTimesheetMixin, TestCase):
         )
         self._calc_timesheets(reraise_exc=True)
         self.assertEqual(TimesheetItem.objects.filter(timesheet_type=TimesheetItem.TIMESHEET_TYPE_FACT, day_type_id=WorkerDay.TYPE_WORKDAY).count(), 0)
+
+    @expectedFailure
+    def test_make_holiday_in_prev_months(self):
+        WorkerDay.objects.all().delete()
+        date_ranges = (
+            ((1, 3, 10), WorkerDay.TYPE_WORKDAY),
+            ((27, 27, 9), WorkerDay.TYPE_HOLIDAY),
+            ((28, 30, 9), WorkerDay.TYPE_WORKDAY),
+        )
+        for date_range, wd_type_id in date_ranges:
+            for dt in pd.date_range(date(2021, date_range[2], date_range[0]), date(2021, date_range[2], date_range[1])).date:
+                WorkerDayFactory(
+                    is_approved=True,
+                    is_fact=True,
+                    shop=self.shop,
+                    employment=self.employment_worker,
+                    employee=self.employee_worker,
+                    dt=dt,
+                    type_id=wd_type_id,
+                    dttm_work_start=datetime.combine(dt, time(8)),
+                    dttm_work_end=datetime.combine(dt, time(22)),
+                )
+
+        self._calc_timesheets(dt_from=date(2021, 9, 1), dt_to=date(2021, 9, 30))
+        self._calc_timesheets(dt_from=date(2021, 10, 1), dt_to=date(2021, 10, 31))
+        self.assertEqual(TimesheetItem.objects.filter(timesheet_type=TimesheetItem.TIMESHEET_TYPE_MAIN,
+                                                      dt='2021-10-01').get().day_type_id, WorkerDay.TYPE_WORKDAY)
+        # TODO: какое желаемое поведение в данном случае? -- один из вариантов:
+        self.assertEqual(TimesheetItem.objects.filter(timesheet_type=TimesheetItem.TIMESHEET_TYPE_MAIN,
+                                                      dt='2021-10-02').get().day_type_id, WorkerDay.TYPE_HOLIDAY)
+        self.assertEqual(TimesheetItem.objects.filter(timesheet_type=TimesheetItem.TIMESHEET_TYPE_MAIN,
+                                                      dt='2021-10-03').get().day_type_id, WorkerDay.TYPE_HOLIDAY)
+
+    def test_shop_and_position_set_for_system_holidays(self):
+        WorkerDay.objects.all().delete()
+
+        self._calc_timesheets(dt_from=date(2021, 10, 1), dt_to=date(2021, 10, 31))
+        main_ts_item = TimesheetItem.objects.filter(
+            timesheet_type=TimesheetItem.TIMESHEET_TYPE_MAIN, dt='2021-10-01').get()
+        self.assertEqual(main_ts_item.day_type_id, WorkerDay.TYPE_HOLIDAY)
+        self.assertIsNotNone(main_ts_item.position_id)
+        self.assertIsNotNone(main_ts_item.shop_id)
 
 
 @override_settings(FISCAL_SHEET_DIVIDER_ALIAS='pobeda', TIMESHEET_MIN_HOURS_THRESHOLD=Decimal('5.00'))

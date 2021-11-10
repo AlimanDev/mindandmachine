@@ -6,8 +6,9 @@ from dateutil.relativedelta import relativedelta
 from django.conf import settings
 from django.db.models.query import Prefetch
 from django.utils import timezone
+from django.utils.functional import cached_property
 
-from src.base.models import Employee
+from src.base.models import Employee, Employment
 from .dividers import FISCAL_SHEET_DIVIDERS_MAPPING
 from .fiscal import FiscalTimesheet
 from ..models import WorkerDay, TimesheetItem, WorkerDayType, WorkType
@@ -93,6 +94,22 @@ class TimesheetCalculator:
             return work_type_name.position
         return worker_day.employment.position
 
+    @cached_property
+    def active_employments(self):
+        return list(Employment.objects.get_active(
+            employee=self.employee,
+            dt_from=self.dt_from,
+            dt_to=self.dt_to,
+        ).select_related(
+            'shop',
+            'position',
+        ))
+
+    def get_active_employment(self, dt):
+        for employment in self.active_employments:
+            if employment.is_active(dt=dt):
+                return employment
+
     def _get_fact_timesheet_data(self, dt_start, dt_end):
         wdays_qs = self._get_timesheet_wdays_qs(self.employee, dt_start, dt_end)
         fact_timesheet_dict = {}
@@ -143,6 +160,7 @@ class TimesheetCalculator:
         for wd in plan_wdays_qs:
             plan_wdays_dict.setdefault(self._get_empl_key(wd.employee_id, wd.dt), []).append(wd)
         dt_now = timezone.now().date()
+
         for dt in pd.date_range(dt_start, dt_end).date:
             empl_dt_key = self._get_empl_key(self.employee.id, dt)
             resp_wd = fact_timesheet_dict.get(empl_dt_key)
@@ -153,10 +171,14 @@ class TimesheetCalculator:
 
             # Если нет ни плана ни факта
             if not plan_wd_list:
+                active_employment = self.get_active_employment(dt)
+                if not active_employment:  # не создаем запись в табеле если нету активного трудоустройства
+                    continue
                 d = {
                     'employee_id': self.employee.id,
                     'dt': dt,
-                    'shop_id': None,
+                    'shop': active_employment.shop,
+                    'position': active_employment.position,
                     'fact_timesheet_type_id': WorkerDay.TYPE_HOLIDAY,
                     'fact_timesheet_source': TimesheetItem.SOURCE_TYPE_SYSTEM,
                 }
