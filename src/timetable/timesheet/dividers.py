@@ -71,6 +71,10 @@ class BaseTimesheetDivider:
         return outside_period_data
 
     def _make_holiday(self, dt):
+        if not self.fiscal_timesheet.dt_from <= dt <= self.fiscal_timesheet.dt_to:
+            logger.info(f'can\'t make holiday {dt} for oustside period')  # TODO: за прошлый период надо проставлять выходной?
+            return
+
         logger.info(f'make holiday {dt}')
         active_employment = self.fiscal_timesheet._get_active_employment(dt)
         main_timesheet_items = self.fiscal_timesheet.main_timesheet.pop(dt)
@@ -275,6 +279,7 @@ class BaseTimesheetDivider:
             else:
                 active_employment = self.fiscal_timesheet._get_active_employment(dt)
                 self.fiscal_timesheet.main_timesheet.add(TimesheetItem(
+                    dt=dt,
                     shop=active_employment.shop,
                     position=active_employment.position,
                     day_type=self.fiscal_timesheet.wd_types_dict.get(WorkerDay.TYPE_HOLIDAY),

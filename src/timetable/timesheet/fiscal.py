@@ -128,6 +128,9 @@ class Timesheet:
         return self._timesheet_items[dt].remove(item)
 
     def subtract_hours(self, dt, hours_to_subtract, filters=None):
+        if not hours_to_subtract:
+            return []
+
         items = self.pop(dt)
         subtracted_items = []
         hours_left_to_subtract = hours_to_subtract
