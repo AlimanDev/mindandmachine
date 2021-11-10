@@ -91,7 +91,7 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='network',
             name='download_tabel_template',
-            field=models.CharField(choices=[('mts', 'MTSTabelGenerator'), ('t13_custom', 'CustomT13TabelGenerator'), ('aigul', 'AigulTabelGenerator')], default='mts', max_length=64, verbose_name='Download tabel template'),
+            field=models.CharField(choices=[('mts', 'MTSTimesheetGenerator'), ('t13_custom', 'CustomT13TimesheetGenerator'), ('aigul', 'AigulTimesheetGenerator'), ('lines', 'TimesheetLinesGenerator')], default='mts', max_length=64, verbose_name='Download tabel template'),
         ),
         migrations.AlterField(
             model_name='network',

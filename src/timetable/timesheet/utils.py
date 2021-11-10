@@ -59,3 +59,60 @@ def get_timesheet_stats(filtered_qs, dt_from, dt_to, user):
             employee_id, {}).get('plan', {}).get('approved', {}).get('sawh_hours', {}).get('curr_month', None)
 
     return timesheet_stats
+
+
+def get_timesheet_lines_data(timesheet_qs, extra_values_list: list = None):
+    ts_values = [
+        'timesheet_type',
+        'shop_id',
+        'shop__code',
+        'position_id',
+        'position__code',
+        'employee_id',
+        'employee__tabel_code',
+    ]
+    if extra_values_list:
+        ts_values.extend(extra_values_list)
+    ts_lines = timesheet_qs.values(*ts_values).distinct()
+    for ts_line in ts_lines:
+        ts_line_days = []
+        days_qs = timesheet_qs.filter(
+            timesheet_type=ts_line['timesheet_type'],
+            shop_id=ts_line['shop_id'],
+            position_id=ts_line['position_id'],
+            employee_id=ts_line['employee_id'],
+        ).values(
+            'dt',
+            'day_type',
+        ).annotate(
+            day_hours_sum=Sum('day_hours'),
+            night_hours_sum=Sum('night_hours'),
+        ).values_list(
+            'dt',
+            'day_type',
+            'day_hours_sum',
+            'night_hours_sum',
+        )
+        for dt, day_type, day_hours_sum, night_hours_sum in days_qs:
+            if day_hours_sum or night_hours_sum:
+                if day_hours_sum:
+                    ts_line_days.append({
+                        'dt': dt,
+                        'day_type': day_type,
+                        'hours_type': 'D',
+                        'hours': day_hours_sum,
+                    })
+                if night_hours_sum:
+                    ts_line_days.append({
+                        'dt': dt,
+                        'day_type': day_type,
+                        'hours_type': 'N',
+                        'hours': night_hours_sum,
+                    })
+            else:
+                ts_line_days.append({
+                    'dt': dt,
+                    'day_type': day_type,
+                })
+        ts_line['days'] = ts_line_days
+    return ts_lines

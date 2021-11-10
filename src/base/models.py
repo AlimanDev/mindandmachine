@@ -60,9 +60,10 @@ class Network(AbstractActiveModel):
     )
 
     TABEL_FORMAT_CHOICES = (
-        ('mts', 'MTSTabelGenerator'),
-        ('t13_custom', 'CustomT13TabelGenerator'),
-        ('aigul', 'AigulTabelGenerator'),
+        ('mts', 'MTSTimesheetGenerator'),
+        ('t13_custom', 'CustomT13TimesheetGenerator'),
+        ('aigul', 'AigulTimesheetGenerator'),
+        ('lines', 'TimesheetLinesGenerator'),
     )
 
     TIMETABLE_FORMAT_CHOICES = (
