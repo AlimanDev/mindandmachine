@@ -244,7 +244,7 @@ class TestOutsource(TestsHelperMixin, APITestCase):
         dt_now = self.dt_now
         vacancy_without_outsource = self._create_vacancy(dt_now, datetime.combine(dt_now, time(8)), datetime.combine(dt_now, time(20)), is_outsource=False).json()
         vacancy_without_outsources = self._create_vacancy(dt_now, datetime.combine(dt_now, time(8)), datetime.combine(dt_now, time(20)), outsources=[self.outsource_network2.id,]).json()
-        vacancy = self._create_vacancy(dt_now, datetime.combine(dt_now, time(8)), datetime.combine(dt_now, time(20)), outsources=[self.outsource_network.id,]).json()
+        vacancy = self._create_vacancy(dt_now, datetime.combine(dt_now, time(8)), datetime.combine(dt_now, time(20)), outsources=[self.outsource_network.id, self.outsource_network2.id]).json()
         WorkerDay.objects.all().update(is_approved=True)
         self.client.force_authenticate(user=self.user1)
         response = self.client.post(f'/rest_api/worker_day/{vacancy_without_outsource["id"]}/confirm_vacancy/')
@@ -266,7 +266,8 @@ class TestOutsource(TestsHelperMixin, APITestCase):
         self.assertEqual(vacancy.employment_id, self.employment1.id)
         not_approved_vacancy = WorkerDay.objects.filter(parent_worker_day_id=vacancy.id).first()
         self.assertIsNotNone(not_approved_vacancy)
-        self.assertEquals(list(not_approved_vacancy.outsources.all()), list(vacancy.outsources.all()))
+        self.assertEquals(list(not_approved_vacancy.outsources.all()), [self.outsource_network,])
+        self.assertEquals(list(vacancy.outsources.all()), [self.outsource_network,])
 
     def test_confirm_vacancy_to_worker(self):
         dt_now = self.dt_now

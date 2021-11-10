@@ -667,6 +667,8 @@ def confirm_vacancy(vacancy_id, user, employee_id=None, exchange=False, reconfir
                 **employee_filter,
             ).select_related(
                 'shop',
+                'employee',
+                'employee__user',
             ).first()
 
             # на даем откликнуться на вакансию, если нет активного трудоустройства в день вакансии
@@ -754,6 +756,11 @@ def confirm_vacancy(vacancy_id, user, employee_id=None, exchange=False, reconfir
 
                 vacancy_details = WorkerDayCashboxDetails.objects.filter(
                     worker_day=vacancy).values('work_type_id', 'work_part')
+
+                vacancy.outsources.clear()
+
+                if vacancy_shop.network_id != vacancy.employee.user.network_id:
+                    vacancy.outsources.add(vacancy.employee.user.network_id)
 
                 try:
                     with transaction.atomic():
