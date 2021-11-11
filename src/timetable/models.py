@@ -455,6 +455,15 @@ class WorkerDayType(AbstractModel):
         max_length=32, blank=True,
         choices=GET_WORK_HOURS_METHOD_TYPES,
     )
+    has_details = models.BooleanField('Есть детали рабочего дня', default=False)
+    allowed_additional_types = models.ManyToManyField(
+        'self', blank=True,
+        verbose_name='Типы дней, которые можно добавлять одновременно с текущим типом дня (только для нерабочих типов дней)',
+        help_text='Например, если необходимо разрешить создание рабочих дней в отпуск, то '
+                  'для типа дня "Отпуск" нужно добавить в это поле тип дня "Рабочий день',
+        symmetrical=False,
+        related_name='allowed_as_additional_for',
+    )
     ordering = models.PositiveSmallIntegerField(default=0)
     is_active = models.BooleanField(default=True)
 
@@ -472,7 +481,7 @@ class WorkerDayType(AbstractModel):
 
     @classmethod
     def get_wd_types_dict(cls):
-        return {wdt.code: wdt for wdt in cls.objects.all()}
+        return {wdt.code: wdt for wdt in cls.objects.prefetch_related('allowed_additional_types', 'allowed_as_additional_for')}
 
 
 class WorkerDay(AbstractModel):
@@ -1225,7 +1234,8 @@ class WorkerDay(AbstractModel):
         """
         Проверка,
             - не может быть нескольких нерабочих дней на 1 дату
-            - не может быть одновременные нерабочий день и рабочий день на 1 дату
+            - не может быть одновременные нерабочий день и рабочий день на 1 дату, кроме случаев
+                когда у нерабочего типа дня есть allowed_additional_types
         """
         if not (employee_days_q or employee_id or employee_id__in or user_id or user_id__in):
             return
@@ -1272,9 +1282,10 @@ class WorkerDay(AbstractModel):
                     is_approved=OuterRef('is_approved'),
                 )
             ),
-            has_dayoff_and_not_dayoff=Exists(
+            has_dayoff_and_not_allowed_workday_types=Exists(
                 WorkerDay.objects.filter(
                     ~Q(id=OuterRef('id')),
+                    ~Q(type_id=OuterRef('type__allowed_additional_types__code')),  # TODO: проверить в django 3, привильно будет работать или нет
                     type__is_dayoff=False,
                     employee_id=OuterRef('employee_id'),
                     dt=OuterRef('dt'),
@@ -1283,9 +1294,10 @@ class WorkerDay(AbstractModel):
                 )
             ),
         ).filter(
-            Q(has_multiple_dayoff_types=True) | Q(has_dayoff_and_not_dayoff=True),
+            Q(has_multiple_dayoff_types=True) | Q(has_dayoff_and_not_allowed_workday_types=True),
         ).values('employee__user__last_name', 'employee__user__first_name', 'dt').distinct()
 
+        print(has_multiple_workday_types_qs.query)
         multiple_workday_types_data = list(has_multiple_workday_types_qs)
 
         if multiple_workday_types_data and raise_exc:
@@ -1445,6 +1457,7 @@ class WorkerDay(AbstractModel):
             dt=dt,
             is_fact=False,
             is_approved=True,
+            type__is_dayoff=False,
         )
         if use_annotated_filter:
             plan_approved_qs = plan_approved_qs.annotate(

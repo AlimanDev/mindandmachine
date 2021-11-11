@@ -1000,6 +1000,20 @@ class WorkerDayViewSet(BaseModelViewSet):
         return Response(WorkerDaySerializer(editable_vacancy).data)
 
     def _change_range(self, is_fact, is_approved, dt_from, dt_to, wd_type, employee_tabel_code, res=None):
+        employee_dt_pairs_list = list(WorkerDay.objects.filter(
+            employee__tabel_code=employee_tabel_code,
+            dt__gte=dt_from,
+            dt__lte=dt_to,
+            is_approved=is_approved,
+            is_fact=is_fact,
+            type=wd_type,
+        ).values_list('employee_id', 'dt').distinct())
+        employee_dt_pairs_q = Q()
+        existing_dates = []
+        for employee_id, dt in employee_dt_pairs_list:
+            employee_dt_pairs_q |= Q(employee_id=employee_id, dt=dt)
+            existing_dates.append(dt)
+
         deleted = WorkerDay.objects.filter(
             employee__tabel_code=employee_tabel_code,
             dt__gte=dt_from,
@@ -1007,17 +1021,8 @@ class WorkerDayViewSet(BaseModelViewSet):
             is_approved=is_approved,
             is_fact=is_fact,
         ).exclude(
-            type=wd_type,
+            employee_dt_pairs_q,  # TODO: тест, что не удалиться отпуск + работа из отпуска.
         ).delete()
-
-        existing_dates = list(WorkerDay.objects.filter(
-            employee__tabel_code=employee_tabel_code,
-            dt__gte=dt_from,
-            dt__lte=dt_to,
-            is_approved=is_approved,
-            is_fact=is_fact,
-            type=wd_type,
-        ).values_list('dt', flat=True))
 
         wdays_to_create = []
         for dt in [d.date() for d in pd.date_range(dt_from, dt_to)]:

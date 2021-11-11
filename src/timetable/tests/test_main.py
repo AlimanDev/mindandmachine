@@ -2061,6 +2061,8 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
         self.assertEqual(wd.work_hours, timedelta(seconds=8.75*60*60))
 
     def test_cant_batch_create_different_wday_types_on_one_date_for_one_employee(self):
+        self.network.allow_creation_several_wdays_for_one_employee_for_one_date = True
+        self.network.save()
         WorkerDay.objects.all().delete()
         data = {
             'data': [
