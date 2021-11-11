@@ -1,3 +1,4 @@
+from django.db.models import Prefetch
 from rest_framework.viewsets import ModelViewSet
 
 from src.base.permissions import Permission
@@ -11,4 +12,9 @@ class WorkerDayTypeViewSet(ModelViewSet):
     openapi_tags = ['WorkerDayType', ]
 
     def get_queryset(self):
-        return WorkerDayType.objects
+        return WorkerDayType.objects.prefetch_related(
+            Prefetch(
+                'allowed_additional_types',
+                to_attr='allowed_additional_types_list',
+            )
+        )
