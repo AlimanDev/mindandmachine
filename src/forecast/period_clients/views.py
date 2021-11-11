@@ -12,7 +12,7 @@ from rest_framework.decorators import action
 from src.base.models import Shop, Employment, FunctionGroup
 from src.util.models_converter import Converter
 from src.forecast.load_template.utils import apply_reverse_formula # чтобы тесты не падали
-from src.forecast.period_clients.utils import upload_demand_util, download_demand_xlsx_util, create_demand, upload_demand_util_v3
+from src.forecast.period_clients.utils import upload_demand, download_demand_xlsx_util, create_demand, upload_demand_util_v3
 from src.util.upload import get_uploaded_file
 import json
 from src.base.views_abstract import BaseModelViewSet
@@ -57,7 +57,8 @@ class PeriodClientsCreateSerializer(serializers.Serializer):
 
 
 class UploadSerializer(serializers.Serializer):
-    shop_id = serializers.IntegerField()
+    shop_id = serializers.IntegerField(required=False)
+    type = serializers.ChoiceField(choices=['F', 'L'], default='L')
     file = serializers.FileField()
 
 class UploadDemandSerializer(serializers.Serializer):
@@ -68,7 +69,15 @@ class UploadDemandSerializer(serializers.Serializer):
 class DownloadSerializer(serializers.Serializer):
     dt_from = serializers.DateField(format=QOS_DATE_FORMAT)
     dt_to = serializers.DateField(format=QOS_DATE_FORMAT)
+    operation_type_name_ids = serializers.CharField(required=False)
+    type = serializers.ChoiceField(choices=['F', 'L'], default='L')
     shop_id = serializers.IntegerField()
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        if 'operation_type_name_ids' in attrs:
+            attrs['operation_type_name_ids'] = attrs['operation_type_name_ids'].split(',')
+        return attrs
 
 
 class PeriodClientsFilter(FilterSet):
@@ -381,7 +390,7 @@ class PeriodClientsViewSet(BaseModelViewSet):
     def upload(self, request, file):
         data = UploadSerializer(data=request.data)
         data.is_valid(raise_exception=True)
-        return upload_demand_util(file, data.validated_data['shop_id'], lang=request.user.lang)
+        return upload_demand(file, data.validated_data.get('shop_id'), data.validated_data['type'])
 
     @swagger_auto_schema(
         request_body=UploadSerializer, 

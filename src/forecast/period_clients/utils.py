@@ -67,7 +67,7 @@ def upload_demand_util_v1(df, shop_id, lang):
     return Response()
 
 
-def upload_demand_util_v2(new_workload, shop_id, lang):
+def upload_demand_util_v2(new_workload, shop_id, type=PeriodClients.LONG_FORECASE_TYPE):
     dttm_min = new_workload.dttm.min()
     dttm_max = new_workload.dttm.max()
     op_types = {
@@ -78,27 +78,55 @@ def upload_demand_util_v2(new_workload, shop_id, lang):
         )
     }
     period_clients = []
-    for worktype in set(new_workload.columns) - {'dttm'}:
-        operation = op_types.get(worktype)
+    for operation_type in set(new_workload.columns) - {'dttm'}:
+        operation = op_types.get(operation_type)
         if not operation:
             raise ValidationError(_('There is no such work type or it is not associated with the operation type {work_type}.').format(work_type=worktype))
-        period_clients += [
-            PeriodClients(
-                dttm_forecast=row['dttm'],
-                operation_type=operation,
-                type=PeriodClients.LONG_FORECASE_TYPE,
-                value=row[worktype]
+        period_clients.extend(
+            [
+                PeriodClients(
+                    dttm_forecast=row['dttm'],
+                    operation_type=operation,
+                    type=type,
+                    value=row[operation_type]
 
-            ) for _not_used, row in new_workload[['dttm', worktype]].iterrows()
-        ]
+                ) for _not_used, row in new_workload[['dttm', operation_type]].iterrows()
+            ]
+        )
     PeriodClients.objects.filter(
         dttm_forecast__gte=dttm_min,
         dttm_forecast__lte=dttm_max,
         operation_type__in=op_types.values(),
-        type=PeriodClients.LONG_FORECASE_TYPE
+        type=type,
     ).delete()
     PeriodClients.objects.bulk_create(period_clients)
     return Response()
+
+
+def upload_demand(demand_file, shop_id=None, type=PeriodClients.LONG_FORECASE_TYPE):
+    try:
+        df = pd.read_excel(demand_file, dtype=str)
+    except:
+        try:
+            df = pd.read_csv(demand_file, dtype=str)
+        except:
+            raise ValidationError(_("Files with this extension are not supported."))
+    with transaction.atomic():
+        operation_types = set(df.columns) - {'dttm', 'shop_code'}
+        df[operation_types] = df[operation_types].astype(float)
+        df.loc[:, 'dttm'] = pd.to_datetime(df.dttm)
+        if 'shop_code' in df.columns:
+            shops = Shop.objects.filter(code__in=df.shop_code.unique())
+            for s in shops:
+                upload_demand_util_v2(df.loc[df.shop_code==s.code, set(df.columns) - {'shop_code'}], s.id, type)
+        else:
+            if shop_id:
+                raise ValidationError(_("Shop id should be defined"))
+
+            upload_demand_util_v2(df, shop_id, type)
+    
+    return Response()
+
 
 def upload_demand_util_v3(operation_type_name, demand_file, index_col=None, type='F'):
     if index_col:
@@ -148,7 +176,7 @@ def upload_demand_util(demand_file, shop_id, lang='ru'):
         raise ValidationError(_('Failed to open active sheet.'))
 
     if 'dttm' in df.columns:
-        return upload_demand_util_v2(df, shop_id, lang)
+        return upload_demand_util_v2(df, shop_id)
     
     return upload_demand_util_v1(df, shop_id, lang)
 
@@ -170,87 +198,59 @@ def download_demand_xlsx_util(request, workbook, form):
     from_dt = form['dt_from']
     to_dt = form['dt_to']
 
-    shop = Shop.objects.get(id=form['shop_id'])
-    timestep = shop.forecast_step_minutes.hour * 60 + shop.forecast_step_minutes.minute  # minutes
+    TYPES = {
+        'F': "Фактическая",
+        'L': "Прогнозируемая",
+    }
 
+    shop = Shop.objects.get(id=form['shop_id'])
+    timestep = pd.DateOffset(hours=shop.forecast_step_minutes.hour, minutes=shop.forecast_step_minutes.minute, seconds=shop.forecast_step_minutes.second)
+
+
+    # TODO: нужно ли это ограничение?
     if (to_dt - from_dt).days > 90:
         raise ValidationError(_('Please select a period of no more than 90 days.'))
+    
+    sheet_name = '{}-{}'.format(from_dt.strftime('%Y.%m.%d'), to_dt.strftime('%Y.%m.%d'))
+    operation_types = OperationType.objects.filter(shop=shop).select_related('operation_type_name')
+    if 'operation_type_name_ids' in form:
+        operation_types = operation_types.filter(operation_type_name_id__in=form['operation_type_name_ids'])
+    
+    dttms = pd.date_range(from_dt, to_dt, freq=timestep)
 
-    worksheet = workbook.add_worksheet('{}-{}'.format(from_dt.strftime('%Y.%m.%d'), to_dt.strftime('%Y.%m.%d')))
-    worksheet.set_column(0, 3, 30)
-    worksheet.write(0, 0, 'Тип работ')
-    worksheet.write(0, 1, 'Время')
-    worksheet.write(0, 2, 'Значение(долгосрочный)')
-    worksheet.write(0, 3, 'Значение(фактический)')
+    df = pd.DataFrame(data=dttms, columns=['dttm']).set_index('dttm')
+    
+    for operation_type in operation_types:
+        demand_data = list(
+            PeriodClients.objects.filter(
+                operation_type=operation_type,
+                dttm_forecast__date__gte=from_dt,
+                dttm_forecast__date__lte=to_dt,
+                type=form['type'],
+            ).order_by('dttm_forecast').values_list(
+                'value',
+                'dttm_forecast',
+            )
+        )
+        if not demand_data:
+            demand_data = [(0, dttms[0])]
+        demand_df = pd.DataFrame(data=demand_data, columns=[operation_type.operation_type_name.name, 'dttm']).set_index('dttm')
+        df = df.merge(demand_df, how='left', left_index=True, right_index=True)
 
-
-    period_demands = list(PeriodClients.objects.select_related(
-        'operation_type__work_type', 
-        'operation_type__operation_type_name',
-        'operation_type__work_type__work_type_name',
-    ).filter(
-        operation_type__work_type__shop_id=form['shop_id'],
-        dttm_forecast__date__gte=from_dt,
-        dttm_forecast__date__lte=to_dt,
-        type__in=[PeriodClients.FACT_TYPE, PeriodClients.LONG_FORECASE_TYPE]
-    ).order_by('dttm_forecast', 'operation_type_id', 'type'))
-
-    work_types = list(WorkType.objects.filter(shop_id=form['shop_id']).order_by('id'))
-    operation_types = list(OperationType.objects.filter(work_type__in=work_types).select_related(
-        'operation_type_name',
-        'work_type',
-        'work_type__work_type_name',
-    ).order_by('id'))
-    amount_operation_types = len(operation_types)
-
-    dttm = datetime.combine(from_dt, time(0, 0))
-    expected_record_amount = (to_dt - from_dt).days * amount_operation_types * 24 * 60 // timestep
-
-    demand_index = 0
-    period_demands_len = len(period_demands)
-    if period_demands_len == 0:
-        demand = PeriodClients()  # null model if no data
-
-    for index in range(expected_record_amount):
-        operation_type_index = index % amount_operation_types
-        operation_type = operation_types[operation_type_index]
-        work_type = operation_type.work_type
-
-        # work_type_index = index % amount_work_types
-        # work_type_name = work_types[work_type_index].name
-
-        if period_demands_len > demand_index:
-            demand = period_demands[demand_index]
-
-        worksheet.write(index + 1, 0, work_type.work_type_name.name + ' ' + operation_type.operation_type_name.name)
-        worksheet.write(index + 1, 1, dttm.strftime('%d.%m.%Y %H:%M:%S'))
-
-        if (demand.dttm_forecast == dttm and
-            demand.operation_type.work_type.work_type_name.name == work_type.work_type_name.name and
-            demand.operation_type.operation_type_name.name == operation_type.operation_type_name.name):
-            if demand.type == PeriodClients.FACT_TYPE:
-                worksheet.write(index + 1, 3, round(demand.value, 1))
-                demand_index += 1
-
-                if index != expected_record_amount - 1:
-                    next_demand = period_demands[demand_index]
-                    if next_demand.type == PeriodClients.LONG_FORECASE_TYPE and \
-                            next_demand.dttm_forecast == demand.dttm_forecast and \
-                            next_demand.operation_type.work_type.work_type_name.name == demand.operation_type.work_type.work_type_name.name:
-                        worksheet.write(index + 1, 2, round(next_demand.value, 1))
-                        demand_index += 1
-            else:
-                worksheet.write(index + 1, 2, round(demand.value, 1))
-                worksheet.write(index + 1, 3, 'Нет данных')
-                demand_index += 1
-
-        else:
-            worksheet.write(index + 1, 2, 'Нет данных')
-            worksheet.write(index + 1, 3, 'Нет данных')
-        if index % amount_operation_types == amount_operation_types - 1 and index != 0:
-            dttm += timedelta(minutes=timestep)
-
-    return workbook, '{}-{}'.format(
+    df.fillna(0, inplace=True)
+    
+    df.to_excel(workbook, sheet_name=sheet_name)
+    worksheet = workbook.sheets[sheet_name]
+    header_format = workbook.book.add_format(dict(border=1, align='center', valign='vcenter', text_wrap=True, bold=True))
+    value_format = workbook.book.add_format(dict(align='right'))
+    for i, o_type in enumerate(operation_types):
+        worksheet.write_string(0, i + 1, o_type.operation_type_name.name, header_format)
+        worksheet.set_column(i + 1, i + 1, len(o_type.operation_type_name.name) + 1, value_format)
+    worksheet.set_column(0, 0, 21, workbook.book.add_format(dict(align='center', valign='vcenter', text_wrap=True, bold=True)))
+    
+    return workbook, '{} нагрузка для {} за {}-{}'.format(
+        TYPES[form['type']],
+        shop.name,
         from_dt.strftime('%Y.%m.%d'),
         to_dt.strftime('%Y.%m.%d'),
     )
