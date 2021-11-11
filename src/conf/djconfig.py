@@ -122,7 +122,7 @@ FCM_DJANGO_SETTINGS = {
 
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
-    'django_cookies_samesite.middleware.CookiesSameSite',
+    # 'django_cookies_samesite.middleware.CookiesSameSite',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.locale.LocaleMiddleware',
@@ -512,6 +512,10 @@ TIMESHEET_MAX_HOURS_THRESHOLD = Decimal('12.00')
 TIMESHEET_MIN_HOURS_THRESHOLD = Decimal('4.00')
 
 DOWNLOAD_TIMETABLE_GET_CODE_FUNC = lambda e: e.employee.tabel_code or ''
+
+DEFAULT_AUTO_FIELD = 'django.db.models.AutoField'
+
+X_FRAME_OPTIONS = 'SAMEORIGIN'
 
 if is_config_exists('djconfig_local.py'):
     from .djconfig_local import *

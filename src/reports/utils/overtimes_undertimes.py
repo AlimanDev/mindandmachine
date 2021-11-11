@@ -52,8 +52,9 @@ def overtimes_undertimes(period_step=6, employee_id__in=None, shop_ids=None):
                     output_field=FloatField(),
                 ), 
                 1,
+                output_field=FloatField(),
             ),
-            0
+            0.0
         ),
         fact=Coalesce(
             RoundWithPlaces(
@@ -66,8 +67,9 @@ def overtimes_undertimes(period_step=6, employee_id__in=None, shop_ids=None):
                     output_field=FloatField(),
                 ), 
                 1,
+                output_field=FloatField(),
             ),
-            0
+            0.0
         ),
         fact_celebration=Coalesce(
             RoundWithPlaces(
@@ -80,8 +82,9 @@ def overtimes_undertimes(period_step=6, employee_id__in=None, shop_ids=None):
                     output_field=FloatField(),
                 ), 
                 1,
+                output_field=FloatField(),
             ),
-            0
+            0.0
         ),
     ).order_by('employee__tabel_code')
 
@@ -94,12 +97,12 @@ def overtimes_undertimes(period_step=6, employee_id__in=None, shop_ids=None):
         'dt__month',
     ).annotate(
         norm=Coalesce(
-            RoundWithPlaces(Sum('norm_hours', filter=~Q(dt__in=celebration_dates)), 1), 
-            0
+            RoundWithPlaces(Sum('norm_hours', filter=~Q(dt__in=celebration_dates)), 1, output_field=FloatField()),
+            0.0
         ),
         norm_celebration=Coalesce(
-            RoundWithPlaces(Sum('norm_hours', filter=Q(dt__in=celebration_dates)), 1), 
-            0
+            RoundWithPlaces(Sum('norm_hours', filter=Q(dt__in=celebration_dates)), 1, output_field=FloatField()),
+            0.0
         ),
     ).order_by('employee__tabel_code')
 

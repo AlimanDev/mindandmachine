@@ -523,8 +523,9 @@ class TestOvertimesUndertimes(APITestCase):
                         output_field=FloatField(),
                     ), 
                     1,
+                    output_field=FloatField(),
                 ),
-                0
+                0.0
             ),
         )['plan']
 
@@ -542,8 +543,9 @@ class TestOvertimesUndertimes(APITestCase):
                         output_field=FloatField(),
                     ), 
                     1,
+                    output_field=FloatField(),
                 ),
-                0
+                0.0
             ),
         )['plan']
 
@@ -664,7 +666,7 @@ class TestOvertimesUndertimes(APITestCase):
                 'Плановое количество часов': '10.8'
             }
         ]
-        self.assertEquals(data.to_dict('records')[:5], assert_data)
+        self.assertListEqual(data.to_dict('records')[:5], assert_data)
         self._test_accounting_period_xlsx(3)
         self._test_accounting_period_xlsx(6)
         self._test_accounting_period_xlsx(12)

@@ -642,7 +642,7 @@ class TestDemand(APITestCase):
             f'{self.url}download/?dt_from={dt_from}&dt_to={dt_to}&shop_id={self.shop.id}')
         tabel = pandas.read_excel(io.BytesIO(response.content))
         self.assertEquals(response.status_code, 200)
-        self.assertEquals(list(tabel.columns), ['dttm', 'Кассы', 'Торговый зал', 'O_TYPE3', 'O_TYPE4', 'O_TYPE5'])
+        self.assertListEqual(list(tabel.columns), ['dttm', 'Кассы', 'Торговый зал', 'O_TYPE3', 'O_TYPE4', 'O_TYPE5'])
         self.assertEquals(tabel[tabel.columns[0]][0], datetime(2019, 5, 30))
         self.assertEquals(tabel[tabel.columns[1]][0], 0)
         response = self.client.get(

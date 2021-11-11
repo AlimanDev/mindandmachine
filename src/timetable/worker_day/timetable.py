@@ -2,7 +2,7 @@ import datetime
 import io
 import re
 import time
-from django.db.models.functions import Coalesce
+from decimal import Decimal
 
 import pandas as pd
 import xlsxwriter
@@ -12,6 +12,7 @@ from django.conf import settings
 from django.db import transaction
 from django.db.models import Q, F, Count, Sum
 from django.db.models.expressions import OuterRef, Subquery
+from django.db.models.functions import Coalesce
 from django.http.response import HttpResponse
 from django.utils.encoding import escape_uri_path
 from django.utils.translation import gettext as _
@@ -568,7 +569,7 @@ class UploadDownloadTimetableCells(BaseUploadDownloadTimeTable):
                 ).values(
                     'employee_id',
                 ).annotate(
-                    work_hours=Coalesce(Sum('day_hours', filter=Q(day_type__is_work_hours=True)), 0) + Coalesce(Sum('night_hours', filter=Q(day_type__is_work_hours=True)), 0),
+                    work_hours=Coalesce(Sum('day_hours', filter=Q(day_type__is_work_hours=True)), Decimal('0')) + Coalesce(Sum('night_hours', filter=Q(day_type__is_work_hours=True)), Decimal('0')),
                     work_days=Count('id', filter=Q(day_type__is_work_hours=True, day_type__is_dayoff=False)),
                     holidays=Count('id', filter=Q(day_type_id=WorkerDay.TYPE_HOLIDAY)),
                     vacations=Count('id', filter=Q(day_type_id=WorkerDay.TYPE_VACATION)),
