@@ -269,16 +269,26 @@ class BaseTimesheetDivider:
                     f'main t h: {self.fiscal_timesheet.main_timesheet.get_total_hours_sum()} '
                     f'add h: {self.fiscal_timesheet.additional_timesheet.get_total_hours_sum()}')
 
-    def _fill_main_timesheet(self):
+    def _init_main_and_additional_timesheets(self):
         for dt in pd.date_range(self.fiscal_timesheet.dt_from, self.fiscal_timesheet.dt_to).date:
-            fact_timesheet_items = filter(
-                lambda i: i.day_type.is_dayoff or i.day_type.is_work_hours, self.fiscal_timesheet.fact_timesheet.get_items(dt))
+            fact_timesheet_items = list(filter(
+                lambda i: i.day_type.is_dayoff or i.day_type.is_work_hours, self.fiscal_timesheet.fact_timesheet.get_items(dt)))
             if fact_timesheet_items:
-                for fact_timesheet_item in fact_timesheet_items:
-                    self.fiscal_timesheet.main_timesheet.add(dt=dt, timesheet_item=fact_timesheet_item.copy())
+                dayoff_items = list(filter(lambda i: i.day_type.is_dayoff, fact_timesheet_items))
+                if dayoff_items:
+                    dayoff_item = dayoff_items[0]
+                    self.fiscal_timesheet.main_timesheet.add(dt=dt, timesheet_item=dayoff_item.copy())
+
+                    workday_items = list(filter(lambda i: not i.day_type.is_dayoff, fact_timesheet_items))
+                    if workday_items:
+                        for workday_item in workday_items:
+                            self.fiscal_timesheet.additional_timesheet.add(dt=dt, timesheet_item=workday_item.copy())
+                else:
+                    for fact_timesheet_item in fact_timesheet_items:
+                        self.fiscal_timesheet.main_timesheet.add(dt=dt, timesheet_item=fact_timesheet_item.copy())
             else:
                 active_employment = self.fiscal_timesheet._get_active_employment(dt)
-                self.fiscal_timesheet.main_timesheet.add(TimesheetItem(
+                self.fiscal_timesheet.main_timesheet.add(dt=dt, timesheet_item=TimesheetItem(
                     dt=dt,
                     shop=active_employment.shop,
                     position=active_employment.position,
@@ -350,7 +360,7 @@ class PobedaTimesheetDivider(BaseTimesheetDivider):
 
     def divide(self):
         logger.info(f'start fiscal sheet divide')
-        self._fill_main_timesheet()
+        self._init_main_and_additional_timesheets()
         self._move_other_shop_or_position_work_to_additional_timesheet()
         self._replace_sick_with_absence_type()
         self._check_weekly_continuous_holidays()
@@ -365,7 +375,7 @@ class PobedaTimesheetDivider(BaseTimesheetDivider):
 class NahodkaTimesheetDivider(BaseTimesheetDivider):
     def divide(self):
         logger.info(f'start fiscal sheet divide')
-        self._fill_main_timesheet()
+        self._init_main_and_additional_timesheets()
         self._check_weekly_continuous_holidays()
         self._check_not_more_than_threshold_hours()
         self._check_overtimes()

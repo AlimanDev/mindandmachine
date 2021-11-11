@@ -100,7 +100,7 @@ class Timesheet:
     def is_holiday(self, dt):
         items = self.get_items(dt=dt)
         return not items or \
-               any((item.day_type.is_dayoff and not item.day_type.is_work_hours) for item in items) or \
+               any(item.day_type.is_dayoff for item in items) or \
                self.get_total_hours_sum(dt=dt) == 0
 
     def get_day_hours_sum(self, dt=None, filter_func=None):

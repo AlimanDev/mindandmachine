@@ -1021,7 +1021,7 @@ class WorkerDayViewSet(BaseModelViewSet):
             is_approved=is_approved,
             is_fact=is_fact,
         ).exclude(
-            employee_dt_pairs_q,  # TODO: тест, что не удалиться отпуск + работа из отпуска.
+            employee_dt_pairs_q,
         ).delete()
 
         wdays_to_create = []

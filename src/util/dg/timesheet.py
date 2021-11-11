@@ -1,5 +1,6 @@
 import os
 from datetime import datetime
+from decimal import Decimal
 
 from django.conf import settings
 from django.db.models import Q
@@ -192,7 +193,7 @@ class T13TimesheetDataGetter(BaseTimesheetDataGetter):
                 day_data = days.setdefault(day_key, {})
                 self.set_day_data(day_data, wd)
                 days[day_key] = day_data
-                if not wd.day_type.is_dayoff:
+                if not wd.day_type.is_dayoff or (wd.day_type.is_dayoff and wd.day_type.is_work_hours):
                     if wd.dt.day <= 15:  # первая половина месяца
                         first_half_month_wdays += 1
                         first_half_month_whours += wd.day_hours + wd.night_hours
@@ -275,11 +276,9 @@ class TimesheetLinesDataGetter(AigulTimesheetDataGetter):
             day_data['value'] = ''
             return
 
-        if not wday.day_type.is_dayoff:
-            day_data['value'] = wday.day_hours + wday.night_hours
-        elif wday.day_type.is_dayoff and wday.day_type.is_work_hours:
-            day_data['value'] = self._get_tabel_type(wday.day_type) + ' ' + '{0:g}'.format(
-                float(wday.day_hours + wday.night_hours))
+        if not wday.day_type.is_dayoff or (wday.day_type.is_dayoff and wday.day_type.is_work_hours):
+            # TODO: отображать более информативно, чем просто сумму часов?
+            day_data['value'] = day_data.get('value', Decimal('0.0')) + wday.day_hours + wday.night_hours
         else:
             day_data['value'] = self._get_tabel_type(wday.day_type)
 

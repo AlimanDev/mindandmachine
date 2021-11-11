@@ -1631,6 +1631,102 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
         self.assertIsNotNone(wd.created_by)
         self.assertEqual(wd.created_by.id, self.user1.id)
 
+    def test_change_range_for_workday_and_vacation_on_one_date(self):
+        self.employee2.tabel_code = 'empl_2'
+        self.employee2.save()
+
+        workday_type = WorkerDayType.objects.filter(
+            code=WorkerDay.TYPE_WORKDAY,
+        ).get()
+        vacation_type = WorkerDayType.objects.filter(
+            code=WorkerDay.TYPE_VACATION,
+        ).get()
+        vacation_type.get_work_hours_method = WorkerDayType.GET_WORK_HOURS_METHOD_TYPE_MANUAL
+        vacation_type.is_work_hours = True
+        vacation_type.is_dayoff = True
+        vacation_type.save()
+        vacation_type.allowed_additional_types.add(workday_type)
+
+        WorkerDay.objects.all().delete()
+        dt = date(2021, 6, 7)
+        for is_approved in [True, False]:
+            WorkerDayFactory(
+                is_approved=is_approved,
+                is_fact=False,
+                shop=self.shop2,
+                employment=self.employment2,
+                employee=self.employee2,
+                work_hours=timedelta(hours=10),
+                dt=dt,
+                type_id=WorkerDay.TYPE_VACATION,
+            )
+            WorkerDayFactory(
+                is_approved=is_approved,
+                is_fact=False,
+                shop=self.shop,
+                employment=self.employment2,
+                employee=self.employee2,
+                dt=dt,
+                type_id=WorkerDay.TYPE_WORKDAY,
+                dttm_work_start=datetime.combine(dt, time(8)),
+                dttm_work_end=datetime.combine(dt, time(22)),
+            )
+
+        data = {
+          "ranges": [
+            {
+              "worker": self.employee2.tabel_code,
+              "dt_from": dt - timedelta(days=10),
+              "dt_to": dt + timedelta(days=10),
+              "type": WorkerDay.TYPE_VACATION,
+              "is_fact": True,  # проверим, что наличие is_fact True не влияет (через этот метод всегда в план)
+              "is_approved": True
+            }
+          ]
+        }
+        response = self.client.post(reverse('WorkerDay-change-range'), data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertDictEqual(
+            response.json(),
+            {self.employee2.tabel_code: {'created_count': 20, 'deleted_count': 0, 'existing_count': 1}}
+        )
+        self.assertEqual(
+            WorkerDay.objects.filter(
+                employee__tabel_code=self.employee2.tabel_code,
+                type_id=WorkerDay.TYPE_WORKDAY,
+                is_approved=True,
+                is_fact=False,
+            ).count(),
+            1,
+        )
+        self.assertEqual(
+            WorkerDay.objects.filter(
+                employee__tabel_code=self.employee2.tabel_code,
+                type_id=WorkerDay.TYPE_VACATION,
+                is_approved=True,
+                is_fact=False,
+            ).count(),
+            21,
+        )
+        self.assertEqual(
+            WorkerDay.objects.filter(
+                employee__tabel_code=self.employee2.tabel_code,
+                type_id=WorkerDay.TYPE_WORKDAY,
+                is_approved=False,
+                is_fact=False,
+            ).count(),
+            1,
+        )
+        self.assertEqual(
+            WorkerDay.objects.filter(
+                employee__tabel_code=self.employee2.tabel_code,
+                type_id=WorkerDay.TYPE_VACATION,
+                is_approved=False,
+                is_fact=False,
+            ).count(),
+            21,
+        )
+
     def test_cant_create_workday_if_user_has_no_active_employment(self):
         WorkerDay.objects_with_excluded.filter(employee=self.employee2).delete()
         Employment.objects.filter(employee__user=self.user2).delete()
