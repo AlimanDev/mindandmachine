@@ -155,6 +155,6 @@ coverage==5.5
 django-polymorphic==3.0.0
 freezegun==1.1.0
 click==7.1.2
-click-didyoumean=0.3.0
-click-plugins=1.1.1
-click-repl=0.2.0
+click-didyoumean==0.3.0
+click-plugins==1.1.1
+click-repl==0.2.0
