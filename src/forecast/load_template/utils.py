@@ -620,7 +620,7 @@ def download_load_template(request, workbook, load_template_id):
         }
         for o in OperationTypeTemplate.objects.select_related('operation_type_name', 'operation_type_name__work_type_name').filter(load_template_id=load_template_id)
     ]
-    worksheet = workbook.add_worksheet('Шаблон нагрузки')
+    worksheet = workbook.book.add_worksheet('Шаблон нагрузки')
     worksheet.set_column(0, 3, 30)
     worksheet.write(0, 0, 'Тип операции')
     worksheet.write(0, 1, 'Зависимости')
