@@ -522,7 +522,7 @@ class TestPobedaDivider(TestTimesheetMixin, TestCase):
         dt = date(2021, 6, 7)
         WorkerDayFactory(
             is_approved=True,
-            is_fact=True,
+            is_fact=False,
             shop=self.shop,
             employment=self.employment_worker,
             employee=self.employee_worker,

@@ -3795,6 +3795,76 @@ class TestAttendanceRecords(TestsHelperMixin, APITestCase):
         fact_approved.refresh_from_db()
         self.assertEqual(fact_approved.dttm_work_end, fact_dttm_end)
 
+    def test_att_record_when_vacation_and_workday_in_plan(self):
+        workday_type = WorkerDayType.objects.filter(
+            code=WorkerDay.TYPE_WORKDAY,
+        ).get()
+        vacation_type = WorkerDayType.objects.filter(
+            code=WorkerDay.TYPE_VACATION,
+        ).get()
+        vacation_type.get_work_hours_method = WorkerDayType.GET_WORK_HOURS_METHOD_TYPE_MANUAL
+        vacation_type.is_work_hours = True
+        vacation_type.is_dayoff = True
+        vacation_type.save()
+        vacation_type.allowed_additional_types.add(workday_type)
+
+        WorkerDay.objects.all().delete()
+        dt = date(2021, 6, 7)
+
+        for is_approved in [True, False]:
+            WorkerDayFactory(
+                is_approved=is_approved,
+                is_fact=False,
+                shop=self.shop2,
+                employment=self.employment2,
+                employee=self.employee2,
+                work_hours=timedelta(hours=10),
+                dt=dt,
+                type_id=WorkerDay.TYPE_VACATION,
+            )
+            WorkerDayFactory(
+                is_approved=is_approved,
+                is_fact=False,
+                shop=self.shop,
+                employment=self.employment2,
+                employee=self.employee2,
+                dt=dt,
+                type_id=WorkerDay.TYPE_WORKDAY,
+                dttm_work_start=datetime.combine(dt, time(8)),
+                dttm_work_end=datetime.combine(dt, time(22)),
+            )
+        fact_dttm_start = datetime.combine(dt, time(7, 40))
+        ar_start = AttendanceRecords.objects.create(
+            shop=self.shop,
+            user=self.user2,
+            dttm=fact_dttm_start,
+            type=AttendanceRecords.TYPE_COMING,
+        )
+        fact_dttm_end = datetime.combine(dt, time(21, 40))
+        AttendanceRecords.objects.create(
+            shop=self.shop,
+            user=self.user2,
+            dttm=fact_dttm_end,
+            type=AttendanceRecords.TYPE_LEAVING,
+        )
+
+        fact_qs = WorkerDay.objects.filter(
+            employee_id=ar_start.employee_id,
+            dt=dt,
+            dttm_work_start=fact_dttm_start,
+            type_id=WorkerDay.TYPE_WORKDAY,
+            is_fact=True,
+        )
+        fact_approved_qs = fact_qs.filter(is_approved=True)
+        fact_approved = fact_approved_qs.get()
+        fact_not_approved_qs = fact_qs.filter(is_approved=False)
+        fact_not_approved = fact_not_approved_qs.get()
+
+        self.assertFalse(fact_approved.closest_plan_approved.type.is_dayoff)
+        self.assertFalse(fact_not_approved.closest_plan_approved.type.is_dayoff)
+        self.assertEqual(fact_approved.dttm_work_start, fact_dttm_start)
+        self.assertEqual(fact_approved.dttm_work_end, fact_dttm_end)
+
 
 class TestVacancy(TestsHelperMixin, APITestCase):
     @classmethod
