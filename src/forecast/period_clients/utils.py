@@ -81,7 +81,7 @@ def upload_demand_util_v2(new_workload, shop_id, type=PeriodClients.LONG_FORECAS
     for operation_type in set(new_workload.columns) - {'dttm'}:
         operation = op_types.get(operation_type)
         if not operation:
-            raise ValidationError(_('There is no such work type or it is not associated with the operation type {work_type}.').format(work_type=worktype))
+            raise ValidationError(_('There is no such operation type {operation_type}.').format(operation_type=operation_type))
         period_clients.extend(
             [
                 PeriodClients(
@@ -112,7 +112,7 @@ def upload_demand(demand_file, shop_id=None, type=PeriodClients.LONG_FORECASE_TY
         except:
             raise ValidationError(_("Files with this extension are not supported."))
     with transaction.atomic():
-        operation_types = set(df.columns) - {'dttm', 'shop_code'}
+        operation_types = list(set(df.columns) - {'dttm', 'shop_code'})
         df[operation_types] = df[operation_types].astype(float)
         df.loc[:, 'dttm'] = pd.to_datetime(df.dttm)
         if 'shop_code' in df.columns:
@@ -120,7 +120,7 @@ def upload_demand(demand_file, shop_id=None, type=PeriodClients.LONG_FORECASE_TY
             for s in shops:
                 upload_demand_util_v2(df.loc[df.shop_code==s.code, set(df.columns) - {'shop_code'}], s.id, type)
         else:
-            if shop_id:
+            if not shop_id:
                 raise ValidationError(_("Shop id should be defined"))
 
             upload_demand_util_v2(df, shop_id, type)
@@ -237,6 +237,7 @@ def download_demand_xlsx_util(request, workbook, form):
         demand_df = pd.DataFrame(data=demand_data, columns=[operation_type.operation_type_name.name, 'dttm']).set_index('dttm')
         df = df.merge(demand_df, how='left', left_index=True, right_index=True)
 
+    df = df.dropna(how='all')
     df.fillna(0, inplace=True)
     
     df.to_excel(workbook, sheet_name=sheet_name)
