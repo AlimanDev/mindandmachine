@@ -1286,19 +1286,19 @@ class WorkerDay(AbstractModel):
             has_dayoff_and_not_allowed_workday_types=Exists(
                 WorkerDay.objects.filter(
                     ~Q(id=OuterRef('id')),
-                    ~Q(type_id=OuterRef('type__allowed_additional_types__code')),  # TODO: проверить в django 3, привильно будет работать или нет
                     type__is_dayoff=False,
                     employee_id=OuterRef('employee_id'),
                     dt=OuterRef('dt'),
                     is_fact=OuterRef('is_fact'),
                     is_approved=OuterRef('is_approved'),
+                ).exclude(
+                    type__allowed_as_additional_for=OuterRef('type'),
                 )
             ),
         ).filter(
             Q(has_multiple_dayoff_types=True) | Q(has_dayoff_and_not_allowed_workday_types=True),
         ).values('employee__user__last_name', 'employee__user__first_name', 'dt').distinct()
 
-        print(has_multiple_workday_types_qs.query)
         multiple_workday_types_data = list(has_multiple_workday_types_qs)
 
         if multiple_workday_types_data and raise_exc:
