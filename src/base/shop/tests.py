@@ -520,7 +520,7 @@ class TestDepartment(TestsHelperMixin, APITestCase):
                     shop.latitude = 56
                     shop.longitude = 35
                     shop.save()
-                    mock_geolocate.called_once_with(latitude=56, longitude=35)
+                    mock_geolocate.assert_called_once_with(lat=56.0, lon=35.0, name='address')
 
         shop.refresh_from_db(fields=['city'])
         self.assertEqual(shop.city, 'city_name')
@@ -561,7 +561,7 @@ class TestDepartment(TestsHelperMixin, APITestCase):
 
                     shop.fias_code = '09d9d44f-044b-4b9a-97b0-c70f0e327e9f'
                     shop.save()
-                    mock_find_by_id.called_once_with("address", "09d9d44f-044b-4b9a-97b0-c70f0e327e9f")
+                    mock_find_by_id.assert_called_once_with("address", "09d9d44f-044b-4b9a-97b0-c70f0e327e9f")
 
         shop.refresh_from_db()
         self.assertEqual(shop.city, 'Новосибирск')

@@ -1,7 +1,7 @@
 from rest_framework import serializers
 import pytz
 from src.util.drf.fields import RoundingDecimalField
-from django.utils import six
+import six
 
 
 class TimeZoneField(serializers.ChoiceField):

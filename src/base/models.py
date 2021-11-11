@@ -10,7 +10,7 @@ from django.conf import settings
 from django.contrib.auth.models import (
     AbstractUser as DjangoAbstractUser,
 )
-from django.contrib.postgres.fields import JSONField
+
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models
 from django.db import transaction
@@ -687,6 +687,7 @@ class Shop(MPTTModel, AbstractActiveNetworkSpecificCodeNamedModel):
                                 )
                             )
 
+    @tracker
     def save(self, *args, force_create_director_employment=False, force_set_defaults=False, **kwargs):
         is_new = self.id is None
         if self.open_times.keys() != self.close_times.keys():
@@ -706,6 +707,7 @@ class Shop(MPTTModel, AbstractActiveNetworkSpecificCodeNamedModel):
         load_template_changed = self.tracker.has_changed('load_template')
         if load_template_changed and self.load_template_status == self.LOAD_TEMPLATE_PROCESS:
             raise ValidationError(_('It is not possible to change the load template as it is in the calculation process.'))
+
         res = super().save(*args, **kwargs)
         if is_new:
             transaction.on_commit(self._handle_new_shop_created)
@@ -1064,6 +1066,7 @@ class User(DjangoAbstractUser, AbstractModel):
         super().__init__(*args, **kwargs)
 
     id = models.BigAutoField(primary_key=True)
+    first_name = models.CharField(blank=True, max_length=30, verbose_name='first name')
     middle_name = models.CharField(max_length=64, blank=True, null=True)
 
     dttm_added = models.DateTimeField(auto_now_add=True)
@@ -1348,6 +1351,7 @@ class Employment(AbstractActiveModel):
         if position_code:
             self.position = WorkerPosition.objects.get(code=position_code)
 
+    @tracker
     def save(self, *args, **kwargs):
         from src.integration.tasks import export_or_delete_employment_zkteco
         if hasattr(self, 'shop_code'):
@@ -1643,7 +1647,7 @@ class SAWHSettings(AbstractActiveNetworkSpecificCodeNamedModel):
         (FIXED_HOURS, 'Фикс. кол-во часов в месяц'),
     )
 
-    work_hours_by_months = JSONField(
+    work_hours_by_months = models.JSONField(
         verbose_name='Настройки по распределению часов в рамках уч. периода',
     )  # Название ключей должно начинаться с m (например январь -- m1), чтобы можно было фильтровать через django orm
     type = models.PositiveSmallIntegerField(

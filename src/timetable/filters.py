@@ -218,7 +218,6 @@ class EmploymentWorkTypeFilter(FilterSet):
     class Meta:
         model = EmploymentWorkType
         fields = {
-            'shop_id': ['exact'],
             'employment_id': ['exact'],
         }
 

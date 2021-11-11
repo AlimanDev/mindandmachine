@@ -143,7 +143,9 @@ def search_holiday_candidate(vacancy, max_working_hours, constraints, exclude_po
         Q(dt_hired__isnull=True) | Q(dt_hired__lte=vacancy_dt),
         employee_id=OuterRef('pk'),
         shop__in=shop.exchange_shops.filter(dttm_deleted__isnull=True),
-    ).exclude(position__in=exclude_positions)
+    )
+    if exclude_positions:
+        active_employment_subq = active_employment_subq.exclude(position__in=exclude_positions)
     employees = Employee.objects.annotate(
         active_empl=Exists(active_employment_subq),
         workerdays_exists=Exists(
@@ -158,7 +160,7 @@ def search_holiday_candidate(vacancy, max_working_hours, constraints, exclude_po
         ),
         work_types_exists=Exists(
             EmploymentWorkType.objects.filter(
-                employment__in=OuterRef('employments'),
+                Q(employment=OuterRef('employments')),
                 work_type__work_type_name_id__in=work_types,
             )
         ),
