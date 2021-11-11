@@ -116,14 +116,15 @@ class TimesheetCalculator:
         day_in_past = dt < self.dt_now
         work_type_name = plan_wd.work_types_list[0].work_type_name if \
             (plan_wd.type_id == WorkerDay.TYPE_WORKDAY and plan_wd.work_types_list) else None
+        is_absent = day_in_past and not plan_wd.type.is_dayoff
         d = {
             'employee_id': self.employee.id,
             'dt': dt,
             'shop': self._get_shop(plan_wd),
             'position': self._get_position(plan_wd, work_type_name=work_type_name),
             'work_type_name': work_type_name,
-            'fact_timesheet_type_id': WorkerDay.TYPE_ABSENSE if (day_in_past and not plan_wd.type.is_dayoff) else plan_wd.type_id,
-            'fact_timesheet_source': TimesheetItem.SOURCE_TYPE_SYSTEM if (day_in_past and not plan_wd.type.is_dayoff) else TimesheetItem.SOURCE_TYPE_PLAN,
+            'fact_timesheet_type_id': WorkerDay.TYPE_ABSENSE if is_absent else plan_wd.type_id,
+            'fact_timesheet_source': TimesheetItem.SOURCE_TYPE_SYSTEM if is_absent else TimesheetItem.SOURCE_TYPE_PLAN,
         }
         if not day_in_past and not plan_wd.type.is_dayoff:
             total_hours, day_hours, night_hours = plan_wd.calc_day_and_night_work_hours()

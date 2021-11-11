@@ -707,7 +707,7 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
         self.assertContains(resp, text='', status_code=200)
 
 
-class TestUploadDownload(APITestCase):
+class TestUploadDownload(TestsHelperMixin, APITestCase):
     USER_USERNAME = "user1"
     USER_EMAIL = "q@q.q"
     USER_PASSWORD = "4242"
@@ -872,7 +872,7 @@ class TestUploadDownload(APITestCase):
         self.assertEqual(tabel[tabel.columns[1]][0], 'Магазин: Shop1') #fails with python > 3.6
         self.assertEqual(tabel[tabel.columns[1]][10], 'Иванов Иван Иванович')
         self.assertEqual(tabel[tabel.columns[26]][13], 'В')
-        self.assertEqual(tabel[tabel.columns[3]][15], 'НН')
+        self.assertEqual(tabel[tabel.columns[3]][15], 'НН\nНН')
         self.assertEqual(tabel[tabel.columns[4]][15], 'НН')
         employment = Employment.objects.get(
             employee__user__last_name='Сидоров',
@@ -911,11 +911,11 @@ class TestUploadDownload(APITestCase):
         self.assertEqual(tabel[tabel.columns[1]][0], 'Магазин: Shop1') #fails with python > 3.6
         self.assertEqual(tabel[tabel.columns[1]][10], 'Иванов Иван Иванович')
         self.assertEqual(tabel[tabel.columns[26]][13], 'В')
-        self.assertEqual(tabel[tabel.columns[3]][15], '10:00-20:00')
+        self.assertEqual(tabel[tabel.columns[3]][15], '10:00-20:00\n10:00-20:00')
         self.assertEqual(tabel[tabel.columns[4]][15], 'К10:00-21:00')
         self.assertEqual(tabel[tabel.columns[5]][15], 'ОТ 8.0')
-        self.assertEqual(tabel[tabel.columns[33]][15], '2')
-        self.assertEqual(tabel[tabel.columns[34]][15], '26')
+        self.assertEqual(tabel[tabel.columns[33]][15], '3')
+        self.assertEqual(tabel[tabel.columns[34]][15], '34')
         self.assertEqual(tabel[tabel.columns[37]][15], '14')
         self.assertEqual(tabel[tabel.columns[38]][15], '1')
 
