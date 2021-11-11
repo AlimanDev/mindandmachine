@@ -1496,6 +1496,7 @@ class FunctionGroup(AbstractModel):
         ('Shop', 'Отдел (department)'),
         ('Shop_stat', 'Статистика по отделам (Получить) (department/stat/)'),
         ('Shop_tree', 'Дерево отделов (Получить) (department/tree/)'),
+        ('Shop_load_template', 'Дерево отделов (Обновить) (department/{pk}/load_template/)'),
         ('Shop_outsource_tree', 'Дерево отделов клиентов (для аутсорс компаний) (Получить) (department/outsource_tree/)'),
         ('Subscribe', 'Subscribe (subscribe)'),
         ('TickPoint', 'Точка отметки (tick_points)'),
