@@ -559,3 +559,69 @@ class TestPobedaDivider(TestTimesheetMixin, TestCase):
             timesheet_type=TimesheetItem.TIMESHEET_TYPE_MAIN, dt=dt).day_type_id, WorkerDay.TYPE_VACATION)
         self.assertEqual(TimesheetItem.objects.get(
             timesheet_type=TimesheetItem.TIMESHEET_TYPE_ADDITIONAL, dt=dt).day_type_id, WorkerDay.TYPE_WORKDAY)
+
+    def test_divide_weekend_at_the_junction_of_calendar_weeks(self):
+        WorkerDay.objects.all().delete()
+        wdays = (
+            ((WorkerDay.TYPE_HOLIDAY, None, None, None), (
+                date(2021, 6, 6),
+                date(2021, 6, 7),
+                date(2021, 6, 13),
+                date(2021, 6, 14),
+            )),
+            ((WorkerDay.TYPE_WORKDAY, time(8), time(21), None), (
+                date(2021, 6, 1),
+                date(2021, 6, 2),
+                date(2021, 6, 3),
+                date(2021, 6, 4),
+                date(2021, 6, 5),
+                date(2021, 6, 8),
+                date(2021, 6, 9),
+                date(2021, 6, 10),
+                date(2021, 6, 11),
+                date(2021, 6, 12),
+                date(2021, 6, 15),
+                date(2021, 6, 16),
+                date(2021, 6, 17),
+                date(2021, 6, 18),
+                date(2021, 6, 19),
+                date(2021, 6, 20),
+            )),
+        )
+        for (wd_type_id, tm_start, tm_end, work_hours), dates in wdays:
+            for dt in dates:
+                is_night_work = False
+                if tm_start and tm_end and tm_end < tm_start:
+                    is_night_work = True
+
+                is_work_day = wd_type_id == WorkerDay.TYPE_WORKDAY
+                WorkerDayFactory(
+                    type_id=wd_type_id,
+                    dt=dt,
+                    shop=self.shop,
+                    employee=self.employee_worker,
+                    employment=self.employment_worker,
+                    dttm_work_start=datetime.combine(dt, tm_start) if is_work_day else None,
+                    dttm_work_end=datetime.combine(dt + timedelta(days=1) if is_night_work else dt,
+                                                   tm_end) if is_work_day else None,
+                    is_fact=is_work_day,
+                    is_approved=True,
+                    work_hours=work_hours,
+                )
+
+        self._calc_timesheets(reraise_exc=True)
+        self.assertEqual(TimesheetItem.objects.get(
+            timesheet_type=TimesheetItem.TIMESHEET_TYPE_MAIN, dt='2021-06-06').day_type_id, WorkerDay.TYPE_HOLIDAY)
+        self.assertEqual(TimesheetItem.objects.get(
+            timesheet_type=TimesheetItem.TIMESHEET_TYPE_MAIN, dt='2021-06-07').day_type_id, WorkerDay.TYPE_HOLIDAY)
+        self.assertEqual(TimesheetItem.objects.get(
+            timesheet_type=TimesheetItem.TIMESHEET_TYPE_MAIN, dt='2021-06-08').day_type_id, WorkerDay.TYPE_WORKDAY)
+        self.assertEqual(TimesheetItem.objects.get(
+            timesheet_type=TimesheetItem.TIMESHEET_TYPE_MAIN, dt='2021-06-13').day_type_id, WorkerDay.TYPE_HOLIDAY)
+        self.assertEqual(TimesheetItem.objects.get(
+            timesheet_type=TimesheetItem.TIMESHEET_TYPE_MAIN, dt='2021-06-14').day_type_id, WorkerDay.TYPE_HOLIDAY)
+
+        for day_num in range(15, 20):  # TODO: будет 6 рабочих дней в календарной неделе, это ок?
+            self.assertEqual(TimesheetItem.objects.get(
+                timesheet_type=TimesheetItem.TIMESHEET_TYPE_MAIN, dt=date(2021, 6, day_num)).day_type_id,
+                             WorkerDay.TYPE_WORKDAY)
