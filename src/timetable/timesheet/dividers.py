@@ -86,6 +86,13 @@ class BaseTimesheetDivider:
         ))
         self.fiscal_timesheet.additional_timesheet.add(dt, main_timesheet_items)
 
+    def _need_to_skip_week(self, week_dates):
+        prev_week_last_dt = week_dates[0] - datetime.timedelta(days=1)
+        curr_week_first_dt = week_dates[0]
+        if self.fiscal_timesheet.main_timesheet.is_holiday(dt=prev_week_last_dt) and \
+                self.fiscal_timesheet.main_timesheet.is_holiday(dt=curr_week_first_dt):
+            return True
+
     def _check_weekly_continuous_holidays(self):
         logger.info(f'start weekly continuous holidays check')
         first_dt_weekday_num = self.fiscal_timesheet.dt_from.weekday()  # 0 - monday, 6 - sunday
@@ -100,6 +107,11 @@ class BaseTimesheetDivider:
             week_dates = pd.date_range(start_of_week, start_of_week + datetime.timedelta(days=6)).date
             prev_day_is_holiday = False
             logger.debug(f'start week with start_of_week: {start_of_week}')
+
+            if self._need_to_skip_week(week_dates):
+                start_of_week += datetime.timedelta(days=7)
+                continue
+
             for dt in week_dates:
                 if self.fiscal_timesheet.dt_from <= dt <= self.fiscal_timesheet.dt_to:
                     current_day_is_holiday = self.fiscal_timesheet.main_timesheet.is_holiday(dt=dt)
