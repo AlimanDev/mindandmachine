@@ -1,10 +1,10 @@
-from datetime import date, datetime, time
+from datetime import date, datetime, time, timedelta
 
 from django.db.models import Sum
 from django.test import TestCase, override_settings
 
 from src.base.models import WorkerPosition
-from src.timetable.models import WorkerDay, TimesheetItem, WorkTypeName, WorkType
+from src.timetable.models import WorkerDay, TimesheetItem, WorkTypeName, WorkType, WorkerDayType
 from src.timetable.tests.factories import WorkerDayFactory
 from ._base import TestTimesheetMixin
 
@@ -141,4 +141,129 @@ class TestTimesheetCalc(TestTimesheetMixin, TestCase):
             dt=dt,
             employee=self.employee_worker,
             position=other_position,
+        ).count(), 1)
+
+    def test_vacation_added_to_fact_table_if_there_are_allowed_additional_type_in_fact(self):
+        workday_type = WorkerDayType.objects.filter(
+            code=WorkerDay.TYPE_WORKDAY,
+        ).get()
+        vacation_type = WorkerDayType.objects.filter(
+            code=WorkerDay.TYPE_VACATION,
+        ).get()
+        vacation_type.get_work_hours_method = WorkerDayType.GET_WORK_HOURS_METHOD_TYPE_MANUAL
+        vacation_type.is_work_hours = True
+        vacation_type.is_dayoff = True
+        vacation_type.save()
+        vacation_type.allowed_additional_types.add(workday_type)
+        dt = date(2021, 6, 7)
+        WorkerDayFactory(
+            is_approved=True,
+            is_fact=False,
+            shop=self.shop,
+            employment=self.employment_worker,
+            employee=self.employee_worker,
+            dt=dt,
+            type_id=WorkerDay.TYPE_VACATION,
+            work_hours=timedelta(hours=10),
+        )
+        self._calc_timesheets()
+        dt_timesheet = TimesheetItem.objects.filter(
+            timesheet_type=TimesheetItem.TIMESHEET_TYPE_FACT,
+            dt=dt,
+        ).aggregate(
+            total_hours_sum=Sum('day_hours') + Sum('night_hours'),
+        )
+        self.assertEqual(dt_timesheet['total_hours_sum'], 19)
+
+        # проверка пересчета для дней в прошлом
+        self._calc_timesheets(
+            dt_from=date(2021, 6, 1),
+            dt_to=date(2021, 6, 30),
+            dttm_now=datetime(2021, 10, 1),
+        )
+        dt_timesheet = TimesheetItem.objects.filter(
+            timesheet_type=TimesheetItem.TIMESHEET_TYPE_FACT,
+            dt=dt,
+        ).aggregate(
+            total_hours_sum=Sum('day_hours') + Sum('night_hours'),
+        )
+        self.assertEqual(dt_timesheet['total_hours_sum'], 19)
+
+    def test_both_vacation_and_allowed_additional_type_added_from_plan(self):
+        workday_type = WorkerDayType.objects.filter(
+            code=WorkerDay.TYPE_WORKDAY,
+        ).get()
+        vacation_type = WorkerDayType.objects.filter(
+            code=WorkerDay.TYPE_VACATION,
+        ).get()
+        vacation_type.get_work_hours_method = WorkerDayType.GET_WORK_HOURS_METHOD_TYPE_MANUAL
+        vacation_type.is_work_hours = True
+        vacation_type.is_dayoff = True
+        vacation_type.save()
+        vacation_type.allowed_additional_types.add(workday_type)
+        dt = date(2021, 6, 7)
+        WorkerDay.objects.filter(dt=dt, is_fact=True, is_approved=True).delete()
+        WorkerDayFactory(
+            is_approved=True,
+            is_fact=False,
+            shop=self.shop,
+            employment=self.employment_worker,
+            employee=self.employee_worker,
+            dt=dt,
+            type_id=WorkerDay.TYPE_VACATION,
+            work_hours=timedelta(hours=10),
+        )
+        self._calc_timesheets()
+        self.assertEqual(TimesheetItem.objects.filter(
+            timesheet_type=TimesheetItem.TIMESHEET_TYPE_FACT,
+            dt=dt,
+        ).count(), 2)
+        dt_timesheet = TimesheetItem.objects.filter(
+            timesheet_type=TimesheetItem.TIMESHEET_TYPE_FACT,
+            dt=dt,
+        ).aggregate(
+            total_hours_sum=Sum('day_hours') + Sum('night_hours'),
+        )
+        self.assertEqual(dt_timesheet['total_hours_sum'], 19)
+        self.assertEqual(TimesheetItem.objects.filter(
+            timesheet_type=TimesheetItem.TIMESHEET_TYPE_FACT,
+            dt=dt,
+            day_type_id=WorkerDay.TYPE_VACATION,
+            day_hours=10,
+        ).count(), 1)
+        self.assertEqual(TimesheetItem.objects.filter(
+            timesheet_type=TimesheetItem.TIMESHEET_TYPE_FACT,
+            dt=dt,
+            day_type_id=WorkerDay.TYPE_WORKDAY,
+            day_hours=9,
+        ).count(), 1)
+
+        # проверка пересчета для дней в прошлом
+        self._calc_timesheets(
+            dt_from=date(2021, 6, 1),
+            dt_to=date(2021, 6, 30),
+            dttm_now=datetime(2021, 10, 1),
+        )
+        self.assertEqual(TimesheetItem.objects.filter(
+            timesheet_type=TimesheetItem.TIMESHEET_TYPE_FACT,
+            dt=dt,
+        ).count(), 2)
+        dt_timesheet = TimesheetItem.objects.filter(
+            timesheet_type=TimesheetItem.TIMESHEET_TYPE_FACT,
+            dt=dt,
+        ).aggregate(
+            total_hours_sum=Sum('day_hours') + Sum('night_hours'),
+        )
+        self.assertEqual(dt_timesheet['total_hours_sum'], 10)
+        self.assertEqual(TimesheetItem.objects.filter(
+            timesheet_type=TimesheetItem.TIMESHEET_TYPE_FACT,
+            dt=dt,
+            day_type_id=WorkerDay.TYPE_VACATION,
+            day_hours=10,
+        ).count(), 1)
+        self.assertEqual(TimesheetItem.objects.filter(
+            timesheet_type=TimesheetItem.TIMESHEET_TYPE_FACT,
+            dt=dt,
+            day_type_id=WorkerDay.TYPE_ABSENSE,
+            day_hours=0,
         ).count(), 1)

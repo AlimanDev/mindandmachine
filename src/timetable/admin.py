@@ -311,6 +311,9 @@ class WorkerDayTypeAdmin(admin.ModelAdmin):
         'is_active',
     )
     search_fields = ('name', 'short_name', 'code')
+    filter_horizontal = (
+        'allowed_additional_types',
+    )
 
     def has_delete_permission(self, request, obj=None):
         if obj and obj.is_system:

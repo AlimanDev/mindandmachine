@@ -13,7 +13,7 @@ from src.timetable.models import (
 class TimesheetItem:
     def __init__(self, dt, shop, position, day_type,
                  day_hours=None, night_hours=None,
-                 work_type_name=None, dttm_work_start=None, dttm_work_end=None, source=None):
+                 work_type_name=None, dttm_work_start=None, dttm_work_end=None, source=None, freezed=False):
         self.dt = dt
         self.shop = shop
         self.position = position
@@ -24,6 +24,7 @@ class TimesheetItem:
         self.dttm_work_start = dttm_work_start
         self.dttm_work_end = dttm_work_end
         self.source = source
+        self.freezed = freezed
 
     @property
     def total_hours(self):
