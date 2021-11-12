@@ -652,6 +652,11 @@ class TestDemand(APITestCase):
         self.assertEquals(list(tabel.columns), ['dttm', 'Кассы', 'Торговый зал'])
         self.assertEquals(tabel[tabel.columns[0]][0], datetime(2019, 5, 30))
         self.assertEquals(tabel[tabel.columns[1]][0], 0)
+        response = self.client.get(
+            f'{self.url}download/?dt_from={dt_from}&dt_to={dt_to}&shop_id={self.shop.id}&operation_type_ids={self.o_type_1.id},{self.o_type_2.id}')
+        tabel = pandas.read_excel(io.BytesIO(response.content))
+        self.assertEquals(response.status_code, 200)
+        self.assertEquals(list(tabel.columns), ['dttm', 'Кассы', 'O_TYPE4'])
 
     def test_duplicates_dont_created_for_the_same_dttm_forecast_and_operation_type(self):
         initial_pc_count = PeriodClients.objects.count()
