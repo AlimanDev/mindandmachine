@@ -1039,6 +1039,7 @@ class WorkerDay(AbstractModel):
     def type_name(self):
         return self.get_type_display()
 
+    @tracker
     def save(self, *args, **kwargs): # todo: aa: частая модель для сохранения, отправлять запросы при сохранении накладно
         self.dttm_work_start_tabel, self.dttm_work_end_tabel, self.work_hours = self._calc_wh()
         self.work_hours = self._round_wh()

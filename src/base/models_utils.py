@@ -18,7 +18,7 @@ class IntegerListField(models.TextField):
             raise ValidationError('invalid IntegerListType')
         return json.dumps(value)
 
-    def from_db_value(self, value, expression, connection, context):
+    def from_db_value(self, value, expression, connection, context=None):
         if value is None:
             return value
         value = json.loads(value)
