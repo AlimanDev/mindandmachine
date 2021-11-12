@@ -217,7 +217,8 @@ class BaseTimesheetDivider:
                 if not self.fiscal_timesheet.additional_timesheet.get_total_hours_sum():
                     break
 
-                additional_timesheet_hours = self.fiscal_timesheet.additional_timesheet.get_total_hours_sum(dt=dt)
+                additional_timesheet_hours = self.fiscal_timesheet.additional_timesheet.get_total_hours_sum(
+                    dt=dt, filter_func=lambda i: not i.freezed)
                 if not additional_timesheet_hours:
                     continue
 
@@ -282,7 +283,10 @@ class BaseTimesheetDivider:
                     workday_items = list(filter(lambda i: not i.day_type.is_dayoff, fact_timesheet_items))
                     if workday_items:
                         for workday_item in workday_items:
-                            self.fiscal_timesheet.additional_timesheet.add(dt=dt, timesheet_item=workday_item.copy())
+                            self.fiscal_timesheet.additional_timesheet.add(
+                                dt=dt,
+                                timesheet_item=workday_item.copy(overrides={'freezed': True}),
+                            )
                 else:
                     for fact_timesheet_item in fact_timesheet_items:
                         self.fiscal_timesheet.main_timesheet.add(dt=dt, timesheet_item=fact_timesheet_item.copy())
