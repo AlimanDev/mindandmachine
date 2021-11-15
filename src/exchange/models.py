@@ -1,6 +1,7 @@
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
+from django.utils.translation import gettext_lazy as _
 from polymorphic.models import PolymorphicModel
 
 from src.base.models_abstract import AbstractModel
@@ -77,37 +78,101 @@ class ImportStrategy(PolymorphicModel):
         raise NotImplementedError
 
 
-class SystemImportStrategy(ImportStrategy):
-    POBEDA_IMPORT_SHOP_MAPPING = 'pobeda_import_shop_mapping'
-    POBEDA_IMPORT_PURCHASES = 'pobeda_import_purchases'
-    POBEDA_IMPORT_BRAK = 'pobeda_import_brak'
-    POBEDA_IMPORT_DELIVERY = 'pobeda_import_delivery'
-
-    SYSTEM_IMPORT_STRATEGY_CHOICES = (
-        (POBEDA_IMPORT_SHOP_MAPPING, 'Импорт сопоставления кодов магазинов (Победа)'),
-        (POBEDA_IMPORT_PURCHASES, 'Импорт чеков (Победа)'),
-        (POBEDA_IMPORT_BRAK, 'Импорт списаний (Победа)'),
-        (POBEDA_IMPORT_DELIVERY, 'Импорт поставок (Победа)'),
+class ImportShopMappingStrategy(ImportStrategy):
+    FILE_FORMAT_CHOICES = (
+        ('xlsx', 'Excel (xlsx)'),
+        ('csv', 'Comma-separated values (csv)'),
     )
 
-    settings_json = models.TextField(default='{}')
-    strategy_type = models.CharField(max_length=128, choices=SYSTEM_IMPORT_STRATEGY_CHOICES)
+    system_code = models.CharField(max_length=64, verbose_name='Код системы')
+    system_name = models.CharField(max_length=128, verbose_name='Имя системы', null=True, blank=True)
+    filename = models.CharField(max_length=256, verbose_name='Имя файла')
+    file_format = models.CharField(
+        max_length=8, verbose_name='Формат файла', choices=FILE_FORMAT_CHOICES, default='xlsx')
+    wfm_shop_code_field_name = models.CharField(
+        max_length=256, verbose_name='Название поля кода магазина в WFM-системе', null=True, blank=True)
+    wfm_shop_name_field_name = models.CharField(
+        max_length=256, verbose_name='Название поля наименования магазина в WFM-системе', null=True, blank=True)
+    external_shop_code_field_name = models.CharField(
+        max_length=256, verbose_name='Название поля кода магазина в внешней системе')
 
     class Meta:
-        verbose_name = 'Системная стратегия импорта'
-        verbose_name_plural = 'Системные стратегии импорта'
+        verbose_name = 'Стратегия импорт сопоставления кодов магазинов'
+        verbose_name_plural = 'Стратегии импорта сопоставления кодов магазинов'
 
-    def __str__(self):
-        return self.name or self.get_strategy_type_display() or str(self.id)
+    def clean(self):
+        if not (self.wfm_shop_code_field_name or self.wfm_shop_name_field_name):
+            raise ValidationError(_(
+                'Одно из полей "Название поля кода магазина в WFM-системе" или '
+                '"Название поля наименования магазина в WFM-системе" должно быть заполнено.'))
 
     def get_strategy_cls_kwargs(self):
-        kwargs = super(SystemImportStrategy, self).get_strategy_cls_kwargs()
-        kwargs['settings_json'] = self.settings_json
-        return kwargs
+        return {
+            'system_code': self.system_code,
+            'system_name': self.system_name or '',
+            'filename': self.filename,
+            'file_format': self.file_format,
+            'wfm_shop_code_field_name': self.wfm_shop_code_field_name,
+            'wfm_shop_name_field_name': self.wfm_shop_name_field_name,
+            'external_shop_code_field_name': self.external_shop_code_field_name,
+        }
 
     def get_strategy_cls(self):
-        from .import_strategies.system import SYSTEM_IMPORT_STRATEGIES_DICT
-        return SYSTEM_IMPORT_STRATEGIES_DICT.get(self.strategy_type)
+        from .import_strategies.system import ImportShopMappingStrategy
+        return ImportShopMappingStrategy
+
+
+class ImportHistDataStrategy(ImportStrategy):
+    system_code = models.CharField(max_length=64, verbose_name='Код системы')
+    data_type = models.CharField(max_length=64, verbose_name='Тип данных')
+    separated_file_for_each_shop = models.BooleanField(verbose_name='Отдельный файл для каждого магазина', default=False)
+    filename_fmt = models.CharField(
+        max_length=256, verbose_name='Формат файла',
+        help_text="Например: '{data_type}_{year:04d}{month:02d}{day:02d}.csv'",
+    )
+    dt_from = models.CharField(max_length=32, verbose_name='Дата от', default='today')
+    dt_to = models.CharField(max_length=32, verbose_name='Дата до', default='today')
+    csv_delimiter = models.CharField(max_length=1, verbose_name='Разделитель csv', default=';')
+    columns = models.JSONField(
+        null=True, blank=True,
+        verbose_name='Наименование колонок в файле',
+        help_text='Если не указано, то будет использоваться 1 строка как названия колонок',
+    )
+    shop_num_column_name = models.CharField(
+        max_length=128, verbose_name='Ноименование колонки с номером магазина')
+    dt_or_dttm_column_name = models.CharField(
+        max_length=128, verbose_name='Ноименование колонки дата или дата+время')
+    dt_or_dttm_format = models.CharField(
+        max_length=128, verbose_name='Формат загрузки колонки дата или дата+время')
+    receipt_code_columns = models.JSONField(
+        null=True, blank=True,
+        verbose_name='Колонки, используемые для ключа',
+        help_text='Если не указано, то в качестве ключа будет использоваться хэш всех колонок',
+    )
+
+    class Meta:
+        verbose_name = 'Стратегия импорта исторических данных'
+        verbose_name_plural = 'Стратегии импорта исторических данных'
+
+    def get_strategy_cls_kwargs(self):
+        return {
+            'system_code': self.system_code,
+            'data_type': self.data_type,
+            'separated_file_for_each_shop': self.separated_file_for_each_shop,
+            'filename_fmt': self.filename_fmt,
+            'dt_from': self.dt_from,
+            'dt_to': self.dt_to,
+            'csv_delimiter': self.csv_delimiter,
+            'shop_num_column_name': self.shop_num_column_name,
+            'dt_or_dttm_column_name': self.dt_or_dttm_column_name,
+            'dt_or_dttm_format': self.dt_or_dttm_format,
+            'columns': self.columns,
+            'receipt_code_columns': self.receipt_code_columns,
+        }
+
+    def get_strategy_cls(self):
+        from .import_strategies.system import ImportHistDataStrategy
+        return ImportHistDataStrategy
 
 
 class ImportJob(AbstractModel):
