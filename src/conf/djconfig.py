@@ -297,7 +297,6 @@ def add_logger(name, level='DEBUG', formatter='simple', extra_handlers: list = N
 add_logger('clean_wdays')
 add_logger('send_doctors_schedule_to_mis')
 add_logger('calc_timesheets', extra_handlers=['mail_admins'])
-add_logger('send_doctors_schedule_to_mis', extra_handlers=['mail_admins'])
 add_logger('mda_integration', extra_handlers=['mail_admins'])
 add_logger('algo_set_timetable', level='DEBUG' if DEBUG else 'INFO')
 add_logger('import_jobs', extra_handlers=['mail_admins'])
