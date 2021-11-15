@@ -328,7 +328,7 @@ class EmploymentSerializer(serializers.ModelSerializer):
     user_id = serializers.IntegerField(required=False, source='employee.user_id')
     employee_id = serializers.IntegerField(required=False)
     function_group_id = serializers.IntegerField(required=False, allow_null=True)
-    work_types = EmploymentWorkTypeSerializer(many=True, read_only=True, source='work_types_list')
+    work_types = EmploymentWorkTypeSerializer(many=True, read_only=True)
     worker_constraints = WorkerConstraintSerializer(many=True, source='worker_constraints_list')
     username = serializers.CharField(required=False, source='employee.user.username')
     dt_hired = serializers.DateField(required=True)
@@ -443,6 +443,9 @@ class EmploymentSerializer(serializers.ModelSerializer):
 
         if not show_constraints:
             self.fields.pop('worker_constraints')
+
+        if self.context.get('view') and self.context['view'].action in ['list', 'retrieve']:
+            self.fields['work_types'].source = 'work_types_list'
         
         if self.context.get('view') and self.context['view'].action == 'timetable':
             exclude_fields = set(self.Meta.fields).difference(set(self.Meta.timetable_fields))

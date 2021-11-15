@@ -3,7 +3,7 @@ import json
 
 import geopy.distance
 import pytz
-from django.utils import six
+import six
 from django.utils.translation import ugettext_lazy as _
 from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
@@ -81,13 +81,17 @@ def serialize_shop(shop: Shop, request):
     }
 
 
+class SetLoadTemplateSerializer(serializers.Serializer):
+    load_template_id = serializers.IntegerField()
+
+
 class ShopSerializer(serializers.ModelSerializer):
     parent_id = serializers.IntegerField(required=False)
     parent_code = serializers.CharField(required=False)
     region_id = serializers.IntegerField(required=False)
     network_id = serializers.HiddenField(default=CurrentUserNetwork())
     exchange_settings_id = serializers.IntegerField(required=False)
-    load_template_id = serializers.IntegerField(required=False)
+    load_template_id = serializers.IntegerField(required=False, read_only=True)
     settings_id = serializers.IntegerField(required=False)
     tm_open_dict = serializers.JSONField(required=False)
     tm_close_dict = serializers.JSONField(required=False)

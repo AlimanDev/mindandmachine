@@ -433,7 +433,7 @@ class TestDepartment(TestsHelperMixin, APITestCase):
     def test_cant_change_load_template(self):
         self.shop.load_template_status = Shop.LOAD_TEMPLATE_PROCESS
         self.shop.save()
-        response = self.client.put(f'{self.url}{self.shop.id}/', data={'load_template_id': self.load_template.id, 'name': 'Shop Test'})
+        response = self.client.put(self.get_url('Shop-load-template', self.shop.id), data={'load_template_id': self.load_template.id})
         self.assertEqual(response.json(), ['Невозможно изменить шаблон нагрузки, так как он находится в процессе расчета.'])
 
     def test_shop_schedule_filled_on_shop_creating(self):
@@ -520,7 +520,7 @@ class TestDepartment(TestsHelperMixin, APITestCase):
                     shop.latitude = 56
                     shop.longitude = 35
                     shop.save()
-                    mock_geolocate.called_once_with(latitude=56, longitude=35)
+                    mock_geolocate.assert_called_once_with(lat=56.0, lon=35.0, name='address')
 
         shop.refresh_from_db(fields=['city'])
         self.assertEqual(shop.city, 'city_name')
@@ -561,7 +561,7 @@ class TestDepartment(TestsHelperMixin, APITestCase):
 
                     shop.fias_code = '09d9d44f-044b-4b9a-97b0-c70f0e327e9f'
                     shop.save()
-                    mock_find_by_id.called_once_with("address", "09d9d44f-044b-4b9a-97b0-c70f0e327e9f")
+                    mock_find_by_id.assert_called_once_with("address", "09d9d44f-044b-4b9a-97b0-c70f0e327e9f")
 
         shop.refresh_from_db()
         self.assertEqual(shop.city, 'Новосибирск')
@@ -855,3 +855,29 @@ class TestDepartment(TestsHelperMixin, APITestCase):
         put_url = f'{self.url}{shop_data["code"]}/'
         resp = self.client.put(put_url, data=self.dump_data(shop_data), content_type='application/json')
         self.assertContains(resp, 'Неправильный формат времени  для значения d0. Формат должен быть', status_code=400)
+
+    def test_set_load_template(self):
+        self.shop3.load_template_id = self.load_template.id
+        self.shop3.save()
+        self.shop3.load_template_status = 'R'
+        self.shop3.save()
+        lt2 = LoadTemplateFactory(network=self.network, name='Test2')
+        response = self.client.put(
+            self.get_url('Shop-detail', self.shop3.id),
+            {
+                'load_template_id': lt2.id,
+                'name': "Shop3",
+            }
+        )
+        self.assertEquals(response.status_code, 200)
+        self.shop3.refresh_from_db()
+        self.assertEquals(self.shop3.load_template_id, self.load_template.id)
+        response = self.client.put(
+            self.get_url('Shop-load-template', self.shop3.id),
+            {
+                'load_template_id': lt2.id,
+            }
+        )
+        self.assertEquals(response.status_code, 200)
+        self.shop3.refresh_from_db()
+        self.assertEquals(self.shop3.load_template_id, lt2.id)

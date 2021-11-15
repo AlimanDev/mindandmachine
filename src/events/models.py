@@ -1,4 +1,3 @@
-from django.contrib.postgres.fields import JSONField
 from django.db import models
 
 from src.base.models_abstract import AbstractModel, AbstractActiveNetworkSpecificCodeNamedModel
@@ -23,7 +22,7 @@ class EventHistory(AbstractModel):
     event_type = models.ForeignKey('events.EventType', on_delete=models.CASCADE)
     user_author = models.ForeignKey('base.User', null=True, blank=True, on_delete=models.SET_NULL)
     shop = models.ForeignKey('base.Shop', null=True, blank=True, on_delete=models.SET_NULL)
-    context = JSONField(default=dict)
+    context = models.JSONField(default=dict)
 
     class Meta:
         verbose_name = 'История события'

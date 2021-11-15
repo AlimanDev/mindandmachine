@@ -143,7 +143,9 @@ def search_holiday_candidate(vacancy, max_working_hours, constraints, exclude_po
         Q(dt_hired__isnull=True) | Q(dt_hired__lte=vacancy_dt),
         employee_id=OuterRef('pk'),
         shop__in=shop.exchange_shops.filter(dttm_deleted__isnull=True),
-    ).exclude(position__in=exclude_positions)
+    )
+    if exclude_positions:
+        active_employment_subq = active_employment_subq.exclude(position__in=exclude_positions)
     employees = Employee.objects.annotate(
         active_empl=Exists(active_employment_subq),
         workerdays_exists=Exists(
@@ -158,7 +160,7 @@ def search_holiday_candidate(vacancy, max_working_hours, constraints, exclude_po
         ),
         work_types_exists=Exists(
             EmploymentWorkType.objects.filter(
-                employment__in=OuterRef('employments'),
+                Q(employment=OuterRef('employments')),
                 work_type__work_type_name_id__in=work_types,
             )
         ),
@@ -667,6 +669,8 @@ def confirm_vacancy(vacancy_id, user, employee_id=None, exchange=False, reconfir
                 **employee_filter,
             ).select_related(
                 'shop',
+                'employee',
+                'employee__user',
             ).first()
 
             # на даем откликнуться на вакансию, если нет активного трудоустройства в день вакансии
@@ -754,6 +758,11 @@ def confirm_vacancy(vacancy_id, user, employee_id=None, exchange=False, reconfir
 
                 vacancy_details = WorkerDayCashboxDetails.objects.filter(
                     worker_day=vacancy).values('work_type_id', 'work_part')
+
+                vacancy.outsources.clear()
+
+                if vacancy_shop.network_id != vacancy.employee.user.network_id:
+                    vacancy.outsources.add(vacancy.employee.user.network_id)
 
                 try:
                     with transaction.atomic():

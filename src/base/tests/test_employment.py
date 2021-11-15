@@ -74,6 +74,7 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
             data=self.dump_data(put_data), content_type='application/json',
         )
         self.assertEqual(resp.status_code, 200)
+        self.assertIsNotNone(resp.json().get('work_types'))
         self.assertTrue(EmploymentWorkType.objects.filter(
             employment=self.employment2,
             work_type__work_type_name=another_wt_name,
@@ -169,6 +170,7 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
             content_type='application/json',
         )
         self.assertEqual(resp.status_code, 201)  # created
+        self.assertIsNotNone(resp.json().get('work_types'))
         e = Employment.objects.filter(
             code=empl_code,
             shop_id=self.shop2.id,

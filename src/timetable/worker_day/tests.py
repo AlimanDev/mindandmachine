@@ -707,7 +707,7 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
         self.assertContains(resp, text='', status_code=200)
 
 
-class TestUploadDownload(APITestCase):
+class TestUploadDownload(TestsHelperMixin, APITestCase):
     USER_USERNAME = "user1"
     USER_EMAIL = "q@q.q"
     USER_PASSWORD = "4242"

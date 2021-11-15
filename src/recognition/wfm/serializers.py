@@ -1,7 +1,7 @@
 from datetime import timedelta, datetime
 
 from rest_framework import serializers
-from django.utils import six
+import six
 
 
 from src.timetable.models import WorkerDay, WorkerDayCashboxDetails, Shop, User

@@ -1,12 +1,14 @@
 from datetime import date
 import io
-from django.db.models import Q
+import pandas as pd
+from django.db.models import Q, OuterRef, Subquery, CharField, F, FloatField, Value, IntegerField
+from django.db.models.functions import Coalesce, Extract, Cast
 from django.http.response import HttpResponse
 from django.utils.encoding import escape_uri_path
 import xlsxwriter
 from src.base.models import Shop, User
 
-from src.timetable.models import PlanAndFactHours
+from src.timetable.models import PlanAndFactHours, WorkerDay, WorkerDayCashboxDetails
 
 
 def schedule_deviation_report(dt_from, dt_to, *args, title=None, in_memory=False, created_by_id=None, shop_ids=None, **kwargs):
@@ -21,10 +23,109 @@ def schedule_deviation_report(dt_from, dt_to, *args, title=None, in_memory=False
         title = f'Schedule_deviation_{dt_from}-{dt_to}.xlsx'
 
     data = PlanAndFactHours.objects.filter(Q(fact_work_hours__gt=0) | Q(plan_work_hours__gt=0), dt__gte=dt_from, dt__lte=dt_to).filter(*args, **kwargs)
+    unapplied_vacancies = WorkerDay.objects.get_plan_approved(dt__gte=dt_from, dt__lte=dt_to, employee_id__isnull=True, type__is_dayoff=False).annotate(
+        work_type_name=Coalesce(
+            Subquery(
+                WorkerDayCashboxDetails.objects.filter(worker_day_id=OuterRef('id')).values('work_type__work_type_name__name')[:1]
+            ),
+            Value(""),
+            output_field=CharField(),
+        ),
+        shop_name=F('shop__name'),
+        plan_work_hours=Coalesce(Cast(Extract(F('work_hours'), 'epoch') / 3600, FloatField()), 0, output_field=FloatField()),
+        lost_work_hours=F('plan_work_hours'),
+        lost_work_hours_count=Value(1, IntegerField()),
+    )
+
+    if "work_type_name__in" in kwargs:
+        unapplied_vacancies = unapplied_vacancies.filter(work_type_name__in=kwargs['work_type_name__in'])
+    if "is_outsource" in kwargs:
+        unapplied_vacancies = unapplied_vacancies.filter(is_outsource=kwargs['is_outsource'])
 
     if shop_ids:
         data = data.filter(shop_id__in=shop_ids)
+        unapplied_vacancies = unapplied_vacancies.filter(shop_id__in=shop_ids)
         shop_object = ', '.join(Shop.objects.filter(id__in=shop_ids).values_list('name', flat=True))
+
+    df = pd.DataFrame(
+        list(
+            data.values(
+                'dt',
+                'shop_name',
+                'worker_fio',
+                'tabel_code',
+                'user_network',
+                'is_outsource',
+                'work_type_name',
+                'plan_work_hours',
+                'fact_work_hours',
+                'fact_manual_work_hours',
+                'late_arrival_hours',
+                'late_arrival_count',
+                'early_arrival_hours',
+                'early_arrival_count',
+                'early_departure_hours',
+                'early_departure_count',
+                'late_departure_hours',
+                'late_departure_count',
+                'fact_without_plan_work_hours',
+                'fact_without_plan_count',
+                'lost_work_hours',
+                'lost_work_hours_count',
+            )
+        )
+    )
+    unapplied_vacancies = list(
+        unapplied_vacancies.values(
+            'dt',
+            'shop_name',
+            'work_type_name',
+            'plan_work_hours',
+            'lost_work_hours',
+            'lost_work_hours_count',
+        )
+    )
+    if unapplied_vacancies:
+        df = df.append(
+            unapplied_vacancies,
+            ignore_index=True,
+        )
+    
+    df.fillna(
+        dict.fromkeys(
+            [
+                'plan_work_hours',
+                'fact_work_hours',
+                'fact_manual_work_hours',
+                'late_arrival_hours',
+                'late_arrival_count',
+                'early_arrival_hours',
+                'early_arrival_count',
+                'early_departure_hours',
+                'early_departure_count',
+                'late_departure_hours',
+                'late_departure_count',
+                'fact_without_plan_work_hours',
+                'fact_without_plan_count',
+                'lost_work_hours',
+                'lost_work_hours_count',
+            ],
+            0,
+        ),
+        inplace=True,
+    )
+    df.fillna(
+        dict.fromkeys(
+            [
+                'worker_fio',
+                'tabel_code',
+                'user_network',
+            ],
+            '-',
+        ),
+        inplace=True,
+    )
+    df = df.sort_values('dt', kind='mergesort').reset_index()
 
     NUMBER = 0
     SHOP = 1
@@ -71,6 +172,13 @@ def schedule_deviation_report(dt_from, dt_to, *args, title=None, in_memory=False
         'valign': 'vcenter',
         'align': 'center',
         'bg_color': '#d9d9d9',
+    })
+    date_format = workbook.add_format({
+        'border': 1,
+        'valign': 'vcenter',
+        'align': 'center',
+        'text_wrap': True,
+        'num_format': 'dd.mm.yyyy',
     })
 
     # add info
@@ -136,30 +244,30 @@ def schedule_deviation_report(dt_from, dt_to, *args, title=None, in_memory=False
     worksheet.set_column(LOST_HOURS, LOST_HOURS, 14)
     worksheet.set_column(LOST_COUNT, LOST_COUNT, 17)
 
-    for i, row in enumerate(data):
-        worksheet.write_string(11 + i, NUMBER, str(i+1), def_format)
+    for i, row in df.iterrows():
+        worksheet.write_number(11 + i, NUMBER, i+1, def_format)
         worksheet.write_string(11 + i, SHOP, row.shop_name, def_format)
-        worksheet.write_string(11 + i, DATE, row.dt.strftime('%d.%m.%Y'), def_format)
+        worksheet.write_datetime(11 + i, DATE, row['dt'], date_format)
         worksheet.write_string(11 + i, FIO, row.worker_fio, def_format)
-        worksheet.write_string(11 + i, TABEL_CODE, row.tabel_code or '', def_format)
+        worksheet.write_string(11 + i, TABEL_CODE, row.tabel_code, def_format)
         worksheet.write_string(11 + i, NETWORK, row.user_network if row.is_outsource else '-', def_format)
-        worksheet.write_string(11 + i, IS_OUTSOURCE, 'не штат' if row.is_outsource else 'штат', def_format)
+        worksheet.write_string(11 + i, IS_OUTSOURCE, '-' if pd.isna(row.is_outsource) else 'не штат' if row.is_outsource else 'штат', def_format)
         worksheet.write_string(11 + i, WORK_TYPE, row.work_type_name, def_format)
-        worksheet.write_string(11 + i, PLAN_HOURS, str(round(row.plan_work_hours, 2)), def_format)
-        worksheet.write_string(11 + i, FACT_HOURS, str(round(row.fact_work_hours, 2)), def_format)
-        worksheet.write_string(11 + i, MANUAL_HOURS, str(round(row.fact_manual_work_hours, 2)), def_format)
-        worksheet.write_string(11 + i, LATE_ARRIVAL_HOURS, str(round(row.late_arrival_hours, 2)), def_format)
-        worksheet.write_string(11 + i, LATE_ARRIVAL_COUNT, str(row.late_arrival_count), def_format)
-        worksheet.write_string(11 + i, EARLY_ARRIVAL_HOURS, str(round(row.early_arrival_hours, 2)), def_format)
-        worksheet.write_string(11 + i, EARLY_ARRIVAL_COUNT, str(row.early_arrival_count), def_format)
-        worksheet.write_string(11 + i, EARLY_DEPARTURE_HOURS, str(round(row.early_departure_hours, 2)), def_format)
-        worksheet.write_string(11 + i, EARLY_DEPARTURE_COUNT, str(row.early_departure_count), def_format)
-        worksheet.write_string(11 + i, LATE_DEPARTURE_HOURS, str(round(row.late_departure_hours, 2)), def_format)
-        worksheet.write_string(11 + i, LATE_DEPARTURE_COUNT, str(row.late_departure_count), def_format)
-        worksheet.write_string(11 + i, FACT_WITHOUT_PLAN_HOURS, str(round(row.fact_without_plan_work_hours, 2)), def_format)
-        worksheet.write_string(11 + i, FACT_WITHOUT_PLAN_COUNT, str(row.fact_without_plan_count), def_format)
-        worksheet.write_string(11 + i, LOST_HOURS, str(round(row.lost_work_hours, 2)), def_format)
-        worksheet.write_string(11 + i, LOST_COUNT, str(row.lost_work_hours_count), def_format)
+        worksheet.write_number(11 + i, PLAN_HOURS, round(row.plan_work_hours, 2), def_format)
+        worksheet.write_number(11 + i, FACT_HOURS, round(row.fact_work_hours, 2), def_format)
+        worksheet.write_number(11 + i, MANUAL_HOURS, round(row.fact_manual_work_hours, 2), def_format)
+        worksheet.write_number(11 + i, LATE_ARRIVAL_HOURS, round(row.late_arrival_hours, 2), def_format)
+        worksheet.write_number(11 + i, LATE_ARRIVAL_COUNT, row.late_arrival_count, def_format)
+        worksheet.write_number(11 + i, EARLY_ARRIVAL_HOURS, round(row.early_arrival_hours, 2), def_format)
+        worksheet.write_number(11 + i, EARLY_ARRIVAL_COUNT, row.early_arrival_count, def_format)
+        worksheet.write_number(11 + i, EARLY_DEPARTURE_HOURS, round(row.early_departure_hours, 2), def_format)
+        worksheet.write_number(11 + i, EARLY_DEPARTURE_COUNT, row.early_departure_count, def_format)
+        worksheet.write_number(11 + i, LATE_DEPARTURE_HOURS, round(row.late_departure_hours, 2), def_format)
+        worksheet.write_number(11 + i, LATE_DEPARTURE_COUNT, row.late_departure_count, def_format)
+        worksheet.write_number(11 + i, FACT_WITHOUT_PLAN_HOURS, round(row.fact_without_plan_work_hours, 2), def_format)
+        worksheet.write_number(11 + i, FACT_WITHOUT_PLAN_COUNT, row.fact_without_plan_count, def_format)
+        worksheet.write_number(11 + i, LOST_HOURS, round(row.lost_work_hours, 2), def_format)
+        worksheet.write_number(11 + i, LOST_COUNT, row.lost_work_hours_count, def_format)
 
     workbook.close()
     if in_memory:

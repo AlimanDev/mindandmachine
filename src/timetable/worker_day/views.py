@@ -72,7 +72,7 @@ from src.timetable.worker_day.tasks import recalc_wdays, recalc_fact_from_record
 from src.timetable.worker_day.timetable import get_timetable_generator_cls
 from src.timetable.worker_day.utils import check_worker_day_permissions, create_worker_days_range, exchange, \
     copy_as_excel_cells
-from src.util.dg.tabel import get_tabel_generator_cls
+from src.util.dg.timesheet import get_tabel_generator_cls
 from src.util.models_converter import Converter
 from src.util.openapi.responses import (
     worker_stat_response_schema_dictionary,
@@ -1000,6 +1000,20 @@ class WorkerDayViewSet(BaseModelViewSet):
         return Response(WorkerDaySerializer(editable_vacancy).data)
 
     def _change_range(self, is_fact, is_approved, dt_from, dt_to, wd_type, employee_tabel_code, res=None):
+        employee_dt_pairs_list = list(WorkerDay.objects.filter(
+            employee__tabel_code=employee_tabel_code,
+            dt__gte=dt_from,
+            dt__lte=dt_to,
+            is_approved=is_approved,
+            is_fact=is_fact,
+            type=wd_type,
+        ).values_list('employee_id', 'dt').distinct())
+        employee_dt_pairs_q = Q()
+        existing_dates = []
+        for employee_id, dt in employee_dt_pairs_list:
+            employee_dt_pairs_q |= Q(employee_id=employee_id, dt=dt)
+            existing_dates.append(dt)
+
         deleted = WorkerDay.objects.filter(
             employee__tabel_code=employee_tabel_code,
             dt__gte=dt_from,
@@ -1007,17 +1021,8 @@ class WorkerDayViewSet(BaseModelViewSet):
             is_approved=is_approved,
             is_fact=is_fact,
         ).exclude(
-            type=wd_type,
+            employee_dt_pairs_q,
         ).delete()
-
-        existing_dates = list(WorkerDay.objects.filter(
-            employee__tabel_code=employee_tabel_code,
-            dt__gte=dt_from,
-            dt__lte=dt_to,
-            is_approved=is_approved,
-            is_fact=is_fact,
-            type=wd_type,
-        ).values_list('dt', flat=True))
 
         wdays_to_create = []
         for dt in [d.date() for d in pd.date_range(dt_from, dt_to)]:
