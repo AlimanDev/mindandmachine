@@ -756,8 +756,6 @@ class Shop(MPTTModel, AbstractActiveNetworkSpecificCodeNamedModel):
         if is_new or force_set_defaults:
             self._set_shop_defaults()
         
-        if self.tracker.has_changed('parent_id'):
-            Shop.objects.rebuild()
 
         return res
 
