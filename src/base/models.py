@@ -496,7 +496,7 @@ class Shop(MPTTModel, AbstractActiveNetworkSpecificCodeNamedModel):
     city = models.CharField(max_length=128, null=True, blank=True, verbose_name='Город')
 
     tracker = FieldTracker(
-        fields=['tm_open_dict', 'tm_close_dict', 'load_template', 'latitude', 'longitude', 'fias_code', 'director_id', 'parent_id'])
+        fields=['tm_open_dict', 'tm_close_dict', 'load_template', 'latitude', 'longitude', 'fias_code', 'director_id'])
 
     def __str__(self):
         return '{}, {}, {}'.format(
@@ -758,7 +758,6 @@ class Shop(MPTTModel, AbstractActiveNetworkSpecificCodeNamedModel):
 
         if is_new or force_set_defaults:
             self._set_shop_defaults()
-        
 
         return res
 
