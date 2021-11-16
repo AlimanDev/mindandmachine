@@ -89,8 +89,10 @@ class BaseTimesheetDivider:
     def _need_to_skip_week(self, week_dates):
         prev_week_last_dt = week_dates[0] - datetime.timedelta(days=1)
         curr_week_first_dt = week_dates[0]
+        curr_week_last_dt = week_dates[-1]
         if self.fiscal_timesheet.main_timesheet.is_holiday(dt=prev_week_last_dt) and \
-                self.fiscal_timesheet.main_timesheet.is_holiday(dt=curr_week_first_dt):
+                self.fiscal_timesheet.main_timesheet.is_holiday(dt=curr_week_first_dt) and \
+                self.fiscal_timesheet.main_timesheet.is_holiday(dt=curr_week_last_dt):
             return True
 
     def _check_weekly_continuous_holidays(self):
