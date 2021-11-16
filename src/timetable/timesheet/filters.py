@@ -13,6 +13,7 @@ class TimesheetFilter(FilterSet):
         model = TimesheetItem
         fields = {
             'dt': ['exact', 'gte', 'lte', 'in'],
+            'timesheet_type': ['exact', 'in'],
             'employee_id': ['exact'],
             'employee__tabel_code': ['exact', 'in'],
             'shop_id': ['exact', 'in'],
