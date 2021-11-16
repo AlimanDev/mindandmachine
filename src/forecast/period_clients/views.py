@@ -390,7 +390,7 @@ class PeriodClientsViewSet(BaseModelViewSet):
     def upload(self, request, file):
         data = UploadSerializer(data=request.data)
         data.is_valid(raise_exception=True)
-        return upload_demand(file, shop_id=data.validated_data.get('shop_id'), type=data.validated_data['type'])
+        return upload_demand(file, data.validated_data.get('shop_id'), data.validated_data['type'])
 
     @swagger_auto_schema(
         request_body=UploadSerializer, 
