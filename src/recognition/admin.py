@@ -77,7 +77,7 @@ class TickMinLivenessFilter(RangeNumericFilter):
 
     def queryset(self, request, queryset):
         queryset = queryset.annotate(
-            min_liveness=Coalesce(Min('tickphoto__liveness', filter=Q(tickphoto__liveness__gt=0)), 0),
+            min_liveness=Coalesce(Min('tickphoto__liveness', filter=Q(tickphoto__liveness__gt=0)), 0.0),
         )
         return super(TickMinLivenessFilter, self).queryset(request, queryset)
 
