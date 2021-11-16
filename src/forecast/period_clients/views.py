@@ -70,7 +70,6 @@ class DownloadSerializer(serializers.Serializer):
     dt_from = serializers.DateField(format=QOS_DATE_FORMAT)
     dt_to = serializers.DateField(format=QOS_DATE_FORMAT)
     operation_type_name_ids = serializers.CharField(required=False)
-    operation_type_ids = serializers.CharField(required=False)
     type = serializers.ChoiceField(choices=['F', 'L'], default='L')
     shop_id = serializers.IntegerField()
 
@@ -78,8 +77,6 @@ class DownloadSerializer(serializers.Serializer):
         attrs = super().validate(attrs)
         if 'operation_type_name_ids' in attrs:
             attrs['operation_type_name_ids'] = attrs['operation_type_name_ids'].split(',')
-        if 'operation_type_ids' in attrs:
-            attrs['operation_type_ids'] = attrs['operation_type_ids'].split(',')
         return attrs
 
 

@@ -216,9 +216,6 @@ def download_demand_xlsx_util(request, workbook, form):
     if 'operation_type_name_ids' in form:
         operation_types = operation_types.filter(operation_type_name_id__in=form['operation_type_name_ids'])
     
-    if 'operation_type_ids' in form:
-        operation_types = operation_types.filter(id__in=form['operation_type_ids'])
-    
     dttms = pd.date_range(from_dt, to_dt, freq=timestep)
 
     df = pd.DataFrame(data=dttms, columns=['dttm']).set_index('dttm')
