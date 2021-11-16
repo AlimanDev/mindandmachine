@@ -621,7 +621,9 @@ class TestPobedaDivider(TestTimesheetMixin, TestCase):
         self.assertEqual(TimesheetItem.objects.get(
             timesheet_type=TimesheetItem.TIMESHEET_TYPE_MAIN, dt='2021-06-14').day_type_id, WorkerDay.TYPE_HOLIDAY)
 
-        for day_num in range(15, 20):  # TODO: будет 6 рабочих дней в календарной неделе, это ок?
+        self.assertEqual(TimesheetItem.objects.get(
+            timesheet_type=TimesheetItem.TIMESHEET_TYPE_MAIN, dt='2021-06-15').day_type_id, WorkerDay.TYPE_HOLIDAY)
+        for day_num in range(16, 21):
             self.assertEqual(TimesheetItem.objects.get(
                 timesheet_type=TimesheetItem.TIMESHEET_TYPE_MAIN, dt=date(2021, 6, day_num)).day_type_id,
                              WorkerDay.TYPE_WORKDAY)
