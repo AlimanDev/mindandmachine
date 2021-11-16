@@ -347,12 +347,20 @@ def create_demand(data):
             clients = period_demand_value['value']
             clients = 0 if clients < 0 else clients
             operation_type = None
+            error_code = ''
             if period_demand_value.get('timeserie_code', False):
                 operation_type = operation_codes.get(period_demand_value.get('timeserie_code'))
+                error_code = f"code {period_demand_value.get('timeserie_code')}"
             elif period_demand_value.get('timeserie_name', False):
                 operation_type = operation_names.get(period_demand_value.get('timeserie_name'))
+                error_code = f"name_id {period_demand_value.get('timeserie_name')}"
             elif period_demand_value.get('timeserie_id', False):
                 operation_type = operation_ids.get(period_demand_value.get('timeserie_id'))
+                error_code = f"id {period_demand_value.get('timeserie_id')}"
+
+            if not operation_type:
+                raise ValidationError(f"Operation type with {error_code} does not exist in shop {shop.name}")
+            
             models_list.append(
                 PeriodClients(
                     type=forecase_type,

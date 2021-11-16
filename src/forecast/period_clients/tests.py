@@ -75,6 +75,7 @@ class TestDemand(APITestCase):
         )
         op_type_name5 = OperationTypeName.objects.create(
             name='O_TYPE5',
+            code='O_TYPE5',
         )
         self.o_type_1 = OperationType.objects.create(
             work_type=self.work_type1,
@@ -673,3 +674,32 @@ class TestDemand(APITestCase):
         self.assertEqual(initial_pc_count + 8, PeriodClients.objects.count())
         create_demand(deepcopy(data))
         self.assertEqual(initial_pc_count + 8, PeriodClients.objects.count())
+
+    def test_create_with_non_existent_operation_type(self):
+
+        test_data = {
+            "data": json.dumps(
+                {
+                    "status": "R",
+                    "serie": [
+                        {
+                            "dttm": Converter.convert_datetime(datetime(2019, 9, 1, 10)),
+                            "value": 2.1225757598876953,
+                            "timeserie_code": self.o_type_5.operation_type_name.code,
+                        },
+                        {
+                            "dttm": Converter.convert_datetime(datetime(2019, 9, 1, 10)),
+                            "value": 2.2346010208129883,
+                            "timeserie_code": 'non_existent',
+                        }
+                    ],
+                    "dt_from": Converter.convert_date(datetime(2019, 9, 1)),
+                    "dt_to": Converter.convert_date(datetime(2019, 11, 2)),
+                    "shop_code": self.shop.code,
+                }
+            ),
+        }
+
+        response = self.client.post(self.url, test_data)
+        self.assertEqual(response.status_code, 400)
+        self.assertEquals(response.json(), ['Operation type with code non_existent does not exist in shop Shop1'])
