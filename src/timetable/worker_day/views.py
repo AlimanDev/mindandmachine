@@ -147,7 +147,7 @@ class WorkerDayViewSet(BaseModelViewSet):
         return Response(serializer.data)
 
     def perform_destroy(self, worker_day):
-        if worker_day.is_vacancy:
+        if worker_day.is_vacancy and not worker_day.is_fact:
             cancel_vacancy(worker_day.id, auto=False)
             return
         if worker_day.is_approved:

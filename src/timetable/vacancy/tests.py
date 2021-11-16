@@ -965,6 +965,22 @@ class TestAutoWorkerExchange(APITestCase):
         self.assertEqual(result['status_code'], 400)
         self.assertIn('Операция не может быть выполнена. Недопустимое пересечение времени работы.', result['text'])
 
+    def test_fact_vacancy_deleted(self):
+        vacancy = WorkerDay.objects.create(
+            is_fact=True,
+            is_vacancy=True,
+            employee=self.employee_dir,
+            employment=self.employment_dir,
+            dt=self.dt_now,
+            dttm_work_start=datetime.datetime.combine(self.dt_now, datetime.time(8)),
+            shop=self.shop,
+            type_id=WorkerDay.TYPE_WORKDAY,
+        )
+        self.client.force_authenticate(user=self.user_dir)
+        response = self.client.delete(f"/rest_api/worker_day/{vacancy.id}/")
+        self.assertEquals(response.status_code, 204)
+        self.assertIsNone(WorkerDay.objects.filter(id=vacancy.id).first())
+
 
 class TestVacancyActions(APITestCase, TestsHelperMixin):
 
