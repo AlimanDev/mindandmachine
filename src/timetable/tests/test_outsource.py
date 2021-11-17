@@ -33,6 +33,17 @@ class TestOutsource(TestsHelperMixin, APITestCase):
             name='Клиент',
             breaks=cls.breaks,
         )
+        cls.client_network.set_settings_value(
+            'shop_name_form', 
+            {
+                'singular': {
+                    'I': 'подразделение',
+                    'R': 'подразделения',
+                    'P': 'подразделении',
+                }
+            }
+        )
+        cls.client_network.save()
         cls.outsource_network = cls.network
         cls.outsource_network2 = Network.objects.create(
             name='Аутсорс'
