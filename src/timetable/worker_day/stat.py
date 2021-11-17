@@ -14,7 +14,6 @@ from django.db.models import (
     Value,
     FloatField,
 )
-from django.db.models.expressions import RawSQL
 from django.db.models.functions import Cast, TruncDate
 from django.db.models.functions import Extract, Coalesce, Greatest, Least
 from django.utils.functional import cached_property
@@ -22,6 +21,7 @@ from django.utils.functional import cached_property
 from src.base.models import Employment, Shop, ProductionDay, SAWHSettings, Network, SAWHSettingsMapping
 from src.forecast.models import PeriodClients
 from src.timetable.models import WorkerDay, ProdCal, TimesheetItem, WorkerDayType
+from src.util.models_converter import Converter
 
 
 def count_daily_stat(data):
@@ -233,12 +233,12 @@ class WorkersStatsGetter:
         """
         assert shop_id or network
         self.shop_id = shop_id
-        self.dt_from = dt_from
-        self.dt_to = dt_to
+        self.dt_from = Converter.parse_date(dt_from) if isinstance(dt_from, str) else dt_from
+        self.dt_to = Converter.parse_date(dt_to) if isinstance(dt_to, str) else dt_to
         self.employee_id = employee_id
         self.employee_id__in = employee_id__in.split(',') if isinstance(employee_id__in, str) else employee_id__in
-        self.year = dt_from.year
-        self.month = dt_from.month
+        self.year = self.dt_from.year
+        self.month = self.dt_from.month
         self.hours_by_types = hours_by_types or list(WorkerDayType.objects.filter(
             is_active=True,
             show_stat_in_hours=True,

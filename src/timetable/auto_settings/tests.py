@@ -1497,6 +1497,61 @@ class TestAutoSettings(APITestCase):
         self.assertEqual(wd.shop_id, self.shop.id)
         self.assertEqual(wd.type_id, WorkerDay.TYPE_WORKDAY)
 
+    def test_set_timetable_with_is_work_hours_true_vacation(self):
+        vacation_type = WorkerDayType.objects.filter(
+            code=WorkerDay.TYPE_VACATION,
+        ).get()
+        vacation_type.get_work_hours_method = WorkerDayType.GET_WORK_HOURS_METHOD_TYPE_MONTH_AVERAGE_SAWH_HOURS
+        vacation_type.is_work_hours = True
+        vacation_type.is_dayoff = True
+        vacation_type.save()
+
+        timetable = ShopMonthStat.objects.create(
+            shop=self.shop,
+            dt=now().date().replace(day=1),
+            status=ShopMonthStat.PROCESSING,
+            dttm_status_change=now()
+        )
+
+        WorkerDay.objects.create(
+            shop=self.shop,
+            employee=self.employee2,
+            employment=self.employment2,
+            dt=self.dt,
+            type_id=WorkerDay.TYPE_VACATION,
+            is_fact=False,
+            is_approved=False,
+        )
+
+        response = self.client.post(self.url, {
+            'timetable_id': timetable.id,
+            'data': json.dumps({
+                'timetable_status': 'R',
+                'users': {
+                    self.employee2.id: {
+                        'workdays': [
+                            {
+                                'dt': Converter.convert_date(self.dt),
+                                'type': WorkerDay.TYPE_VACATION,
+                                'dttm_work_start': None,
+                                'dttm_work_end': None,
+                                'details': []
+                            },
+                        ]
+                    },
+                }
+            })
+        })
+
+        self.assertEqual(response.status_code, 200)
+
+        vacation = WorkerDay.objects.filter(
+            is_fact=False,
+            type_id=WorkerDay.TYPE_VACATION,
+            is_approved=False,
+        ).first()
+        self.assertTrue(vacation.work_hours > timedelta(0))
+
     def test_multiple_workerday_on_one_date_sent_to_algo(self):
         dt = date(2021, 2, 1)
         WorkerDayFactory(
