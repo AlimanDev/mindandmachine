@@ -11,6 +11,7 @@ def disable_removed_task(apps, schema_editor):
 class Migration(migrations.Migration):
     dependencies = [
         ('base', '0145_auto_20211111_1555'),
+        ('django_celery_beat', '0015_edit_solarschedule_events_choices'),
     ]
 
     operations = [
