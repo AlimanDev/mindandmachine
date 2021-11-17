@@ -772,6 +772,8 @@ class WorkerDay(AbstractModel):
         return work_hours, work_hours_day, work_hours_night
 
     def _calc_wh(self):
+        from src.util.models_converter import Converter
+        self.dt = Converter.parse_date(self.dt) if isinstance(self.dt, str) else self.dt
         position_break_triplet_cond = self.employment and self.employment.position and self.employment.position.breaks
         if not self.type.is_dayoff and self.dttm_work_end and self.dttm_work_start and self.shop and (
                 self.shop.settings or position_break_triplet_cond or self.shop.network.breaks):
@@ -779,9 +781,7 @@ class WorkerDay(AbstractModel):
             dttm_work_start = _dttm_work_start = self.dttm_work_start
             dttm_work_end = _dttm_work_end = self.dttm_work_end
             if self.shop.network.crop_work_hours_by_shop_schedule and self.crop_work_hours_by_shop_schedule:
-                from src.util.models_converter import Converter
-                dt = Converter.parse_date(self.dt) if isinstance(self.dt, str) else self.dt
-                shop_schedule = self.shop.get_schedule(dt=dt)
+                shop_schedule = self.shop.get_schedule(dt=self.dt)
                 if shop_schedule is None:
                     return dttm_work_start, dttm_work_end, datetime.timedelta(0)
 
@@ -790,12 +790,12 @@ class WorkerDay(AbstractModel):
                 shop_24h_open = open_at_0 and close_at_0
 
                 if not shop_24h_open:
-                    dttm_shop_open = datetime.datetime.combine(dt, shop_schedule['tm_open'])
+                    dttm_shop_open = datetime.datetime.combine(self.dt, shop_schedule['tm_open'])
                     if self.dttm_work_start < dttm_shop_open:
                         dttm_work_start = dttm_shop_open
 
                     dttm_shop_close = datetime.datetime.combine(
-                        (dt + datetime.timedelta(days=1)) if close_at_0 else dt, shop_schedule['tm_close'])
+                        (self.dt + datetime.timedelta(days=1)) if close_at_0 else self.dt, shop_schedule['tm_close'])
                     if self.dttm_work_end > dttm_shop_close:
                         dttm_work_end = dttm_shop_close
             break_time = None
