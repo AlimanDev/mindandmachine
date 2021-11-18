@@ -72,6 +72,17 @@ class TestAutoWorkerExchange(APITestCase):
             primary_color='#BDF82',
             secondary_color='#390AC',
         )
+        cls.network.set_settings_value(
+            'shop_name_form', 
+            {
+                'singular': {
+                    'I': 'подразделение',
+                    'R': 'подразделения',
+                    'P': 'подразделении',
+                }
+            }
+        )
+        cls.network.save()
         cls.breaks = Break.objects.create(network=cls.network, name='Default')
         cls.shop_settings = ShopSettings.objects.create(breaks=cls.breaks)
         Shop.objects.all().update(network=cls.network)

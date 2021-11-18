@@ -3871,6 +3871,17 @@ class TestVacancy(TestsHelperMixin, APITestCase):
     def setUpTestData(cls):
         cls.url = '/rest_api/worker_day/vacancy/'
         cls.create_departments_and_users()
+        cls.network.set_settings_value(
+            'shop_name_form', 
+            {
+                'singular': {
+                    'I': 'подразделение',
+                    'R': 'подразделения',
+                    'P': 'подразделении',
+                }
+            }
+        )
+        cls.network.save()
         cls.dt_now = date.today()
         cls.work_type_name1 = WorkTypeName.objects.create(
             name='Кассы',

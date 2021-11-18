@@ -132,7 +132,8 @@ class Timetable_xlsx(Tabel_xlsx):
                  force_text(self.dt.year),
             h1_merge_format,
         )
-        self.worksheet.merge_range(2, 1, 2, 8, _('Shop: {}').format(self.shop.name), format_meta_bold)
+        shop_name_format = self.shop.network.settings_values_prop.get('shop_name_form', {})
+        self.worksheet.merge_range(2, 1, 2, 8, f"{shop_name_format.get('singular', {}).get('I', 'магазин').capitalize()}: {self.shop.name}", format_meta_bold)
         sign_text_merge_format = self.workbook.add_format(
             fmt(font_size=self._font_size(10), bold=True, text_wrap=False))
         self.worksheet.merge_range(4, 2, 4, 4, '', sign_text_merge_format)
