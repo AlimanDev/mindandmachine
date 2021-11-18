@@ -657,9 +657,11 @@ class Shop(MPTTModel, AbstractActiveNetworkSpecificCodeNamedModel):
     def shop_default_values_dict(self):
         shop_default_values = json.loads(self.network.shop_default_values)
         if shop_default_values:
-            for re_pattern, shop_default_values_dict in shop_default_values.items():
-                if re.search(re_pattern, self.name, re.IGNORECASE):
-                    return shop_default_values_dict
+            for re_pattern, shop_default_values_by_name_dict in shop_default_values.items():
+                if re.search(re_pattern, str(self.level), re.IGNORECASE):
+                    for re_pattern, shop_default_values_dict in shop_default_values_by_name_dict.items():
+                        if re.search(re_pattern, self.name, re.IGNORECASE):
+                            return shop_default_values_dict
 
     def _set_shop_defaults(self):
         if self.shop_default_values_dict:
@@ -715,18 +717,28 @@ class Shop(MPTTModel, AbstractActiveNetworkSpecificCodeNamedModel):
             transaction.on_commit(self._handle_schedule_change)
         
         if is_new and self.load_template_id is None:
-            self.load_template_id = self.network.load_template_id
+            from src.forecast.models import LoadTemplate
+            lt = self.network.load_template_id
+            if self.shop_default_values_dict and self.shop_default_values_dict.get('load_template'):
+                lt = LoadTemplate.objects.filter(code=self.shop_default_values_dict.get('load_template')).first()
+                if not lt:
+                    raise ValidationError(_('There is not load template with code {}.').format(self.shop_default_values_dict.get('load_template')))
+                lt = lt.id
+            if lt:
+                self.load_template_id = lt
+                load_template_changed = True
 
         if load_template_changed and not (self.load_template_id is None):
             from src.forecast.load_template.utils import apply_load_template
             from src.forecast.load_template.tasks import calculate_shops_load
             apply_load_template(self.load_template_id, self.id)
-            calculate_shops_load.delay(
-                self.load_template_id,
-                datetime.date.today(),
-                datetime.date.today().replace(day=1) + relativedelta(months=1),
-                shop_id=self.id,
-            )
+            if not is_new:
+                calculate_shops_load.delay(
+                    self.load_template_id,
+                    datetime.date.today(),
+                    datetime.date.today().replace(day=1) + relativedelta(months=1),
+                    shop_id=self.id,
+                )
 
         if is_new or (self.tracker.has_changed('latitude') or self.tracker.has_changed('longitude')) and \
                 settings.FILL_SHOP_CITY_FROM_COORDS:
