@@ -27,5 +27,5 @@ class Migration(migrations.Migration):
             name='info',
             field=src.base.fields.CompressedTextField(),
         ),
-        migrations.RunPython(compress_info, migrations.RunPython.noop),
+        migrations.RunPython(compress_info, migrations.RunPython.noop, atomic=False),
     ]
