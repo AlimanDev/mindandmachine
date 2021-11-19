@@ -233,9 +233,17 @@ class EmployeeSerializer(BaseNetworkSerializer):
 class AuthUserSerializer(UserSerializer):
     network = NetworkWithOutsourcingsAndClientsSerializer()
     shop_id = serializers.CharField(default=UserworkShop())
+    allowed_tabs = serializers.SerializerMethodField()
+
+    def get_allowed_tabs(self, obj: User):
+        allowed_tabs = []
+        for group in Group.objects.filter(id__in=obj.get_group_ids()):
+            allowed_tabs.extend(group.allowed_tabs)
+        
+        return list(set(allowed_tabs))
 
     class Meta(UserSerializer.Meta):
-        fields = UserSerializer.Meta.fields + ['network', 'shop_id']
+        fields = UserSerializer.Meta.fields + ['network', 'shop_id', 'allowed_tabs']
 
 
 class PasswordSerializer(serializers.Serializer):
