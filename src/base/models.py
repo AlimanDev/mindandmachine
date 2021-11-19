@@ -60,6 +60,16 @@ class Network(AbstractActiveModel):
         (MAIN_TIMESHEET, 'Основной табель'),
     )
 
+    TIMESHEET_LINES_GROUP_BY_EMPLOYEE = 1
+    TIMESHEET_LINES_GROUP_BY_EMPLOYEE_POSITION = 2
+    TIMESHEET_LINES_GROUP_BY_EMPLOYEE_POSITION_SHOP = 3
+
+    TIMESHEET_LINES_GROUP_BY_CHOICES = (
+        (TIMESHEET_LINES_GROUP_BY_EMPLOYEE, 'Сотруднику'),
+        (TIMESHEET_LINES_GROUP_BY_EMPLOYEE_POSITION, 'Сотруднику и должности'),
+        (TIMESHEET_LINES_GROUP_BY_EMPLOYEE_POSITION_SHOP, 'Сотруднику, должности и подразделению выхода'),
+    )
+
     TABEL_FORMAT_CHOICES = (
         ('mts', 'MTSTimesheetGenerator'),
         ('t13_custom', 'CustomT13TimesheetGenerator'),
@@ -253,6 +263,9 @@ class Network(AbstractActiveModel):
         choices=ROUND_WORK_HOURS_ALG_CHOICES,
         verbose_name='Алгоритм округления рабочих часов',
     )
+    api_timesheet_lines_group_by = models.PositiveSmallIntegerField(
+        verbose_name='Группировать данные табеля в api методе /rest_api/timesheet/lines/ по',
+        choices=TIMESHEET_LINES_GROUP_BY_CHOICES, default=TIMESHEET_LINES_GROUP_BY_EMPLOYEE_POSITION_SHOP)
 
     DEFAULT_NIGHT_EDGES = (
         '22:00:00',

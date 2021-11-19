@@ -18,7 +18,7 @@ from src.util.models_converter import Converter
 from .filters import TimesheetFilter
 from .serializers import TimesheetItemSerializer, TimesheetSummarySerializer, TimesheetRecalcSerializer
 from .tasks import calc_timesheets
-from .utils import get_timesheet_stats, get_timesheet_lines_data
+from .utils import get_timesheet_stats, TimesheetLinesDataGetter
 from ..models import TimesheetItem
 
 
@@ -146,7 +146,7 @@ class TimesheetViewSet(BaseModelViewSet):
     @action(detail=False, methods=['get'])
     def lines(self, *args, **kwargs):
         filtered_qs = self.filter_queryset(self.get_queryset())
-        ts_lines_data = get_timesheet_lines_data(timesheet_qs=filtered_qs)
+        ts_lines_data = TimesheetLinesDataGetter(timesheet_qs=filtered_qs, user=self.request.user).get()
         return Response(ts_lines_data)
 
     @swagger_auto_schema(
