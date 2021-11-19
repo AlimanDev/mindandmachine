@@ -34,6 +34,7 @@ from src.base.models_abstract import (
 )
 from src.conf.djconfig import QOS_TIME_FORMAT
 from src.util.mixins.qs import AnnotateValueEqualityQSMixin
+from src.base.fields import MultipleChoiceField
 
 
 class Network(AbstractActiveModel):
@@ -912,6 +913,16 @@ class Group(AbstractActiveNetworkSpecificCodeNamedModel):
     class Meta(AbstractActiveNetworkSpecificCodeNamedModel.Meta):
         verbose_name = 'Группа пользователей'
         verbose_name_plural = 'Группы пользователей'
+    
+
+    CHOICE_ALLOWED_TABS = [
+        ('load_forecast', 'Прогноз потребностей'),
+        ('schedule', 'Расписание'),
+        ('employees', 'Сотрудники'),
+        ('shift_exchange', 'Биржа смен'),
+        ('analytics', 'Аналитика'), 
+        ('settings', 'Настройки'),
+    ]
 
     dttm_modified = models.DateTimeField(blank=True, null=True)
     subordinates = models.ManyToManyField("self", blank=True)
@@ -919,6 +930,8 @@ class Group(AbstractActiveNetworkSpecificCodeNamedModel):
         default=False, verbose_name='Может изменять/подтверждать "защищенные" рабочие дни')
     has_perm_to_approve_other_shop_days = models.BooleanField(
         default=False, verbose_name='Может подтверждать дни из других подразделений')
+
+    allowed_tabs = MultipleChoiceField(choices=CHOICE_ALLOWED_TABS)
 
     def __str__(self):
         return '{}, {}, {}'.format(
