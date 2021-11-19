@@ -1,5 +1,5 @@
 from src.timetable.models import AttendanceRecords, WorkerDay, PlanAndFactHours
-from src.base.models import Shop, Employment
+from src.base.models import Network, Shop, Employment
 import xlsxwriter
 import io
 import datetime
@@ -35,6 +35,11 @@ def urv_stat_v1(dt_from, dt_to, title=None, shop_codes=None, shop_ids=None, comm
     FACT_HOURS = 9 + shift
     DIFF_HOURS = 10 + shift
     DIFF_HOURS_PERCENT = 11 + shift
+
+    shop_name_form = {}
+    if network_id:
+        network = Network.objects.get(id=network_id)
+        shop_name_form = network.settings_values_prop.get('shop_name_form', {})
 
     shops = Shop.objects.filter(
         Q(dttm_deleted__isnull=True) | Q(dttm_deleted__gte=dt_to),
@@ -76,7 +81,7 @@ def urv_stat_v1(dt_from, dt_to, title=None, shop_codes=None, shop_ids=None, comm
         'valign': 'vcenter',
         'align': 'center',
     })
-    worksheet.write_string(0, SHOP, 'Магазин', header_format)
+    worksheet.write_string(0, SHOP, shop_name_form.get('singular', {}).get('I', 'магазин').capitalize(), header_format)
     worksheet.set_column(SHOP, SHOP, 12)
     worksheet.write_string(0, DATE, 'Дата', header_format)
     worksheet.write_string(0, PLAN_COMMING, 'Кол-во отметок план, ПРИХОД', header_format)
@@ -189,9 +194,13 @@ def urv_stat_v2(dt_from, dt_to, title=None, shop_ids=None, network_id=None, in_m
         'text_wrap': True,
         'valign': 'top',
     }
-    worksheet.write_string(0, SHOP_CODE, 'Код магазина', workbook.add_format(def_format))
+    shop_name_form = {}
+    if network_id:
+        network = Network.objects.get(id=network_id)
+        shop_name_form = network.settings_values_prop.get('shop_name_form', {})
+    worksheet.write_string(0, SHOP_CODE, f"Код {shop_name_form.get('singular', {}).get('R', 'магазина')}", workbook.add_format(def_format))
     worksheet.set_column(SHOP_CODE, SHOP_CODE, 12)
-    worksheet.write_string(0, SHOP, 'Магазин', workbook.add_format(def_format))
+    worksheet.write_string(0, SHOP, shop_name_form.get('singular', {}).get('I', 'магазин').capitalize(), workbook.add_format(def_format))
     worksheet.set_column(SHOP, SHOP, 25)
     worksheet.write_string(0, DTTM, 'Время события', workbook.add_format(def_format))
     worksheet.set_column(DTTM, DTTM, 20)

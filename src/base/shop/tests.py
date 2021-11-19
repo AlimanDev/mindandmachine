@@ -816,10 +816,12 @@ class TestDepartment(TestsHelperMixin, APITestCase):
         )
         self.network.shop_default_values = self.dump_data({
             '.*': {
-                'wtn_codes_with_otn_codes': [
-                    ('doctor', 'doctor'),
-                    (None, 'clients'),
-                ]
+                '.*': {
+                    'wtn_codes_with_otn_codes': [
+                        ('doctor', 'doctor'),
+                        (None, 'clients'),
+                    ]
+                }
             }
         })
         self.network.save()
@@ -881,3 +883,42 @@ class TestDepartment(TestsHelperMixin, APITestCase):
         self.assertEquals(response.status_code, 200)
         self.shop3.refresh_from_db()
         self.assertEquals(self.shop3.load_template_id, lt2.id)
+
+    def test_set_load_template_from_shop_default_values(self):
+        load_template = LoadTemplateFactory(name='lt', code='lt_code')
+        self.network.shop_default_values = self.dump_data({
+            '.*': {
+                '.*': {
+                    'load_template': 'lt_code'
+                }
+            }
+        })
+        self.network.save()
+        shop = Shop.objects.create(
+            parent_id=self.root_shop.id,
+            name='Test_LT',
+            region=self.region,
+            network=self.network,
+        )
+        self.assertEquals(shop.load_template_id, load_template.id)
+
+    def test_set_load_template_from_shop_default_values_bad_code(self):
+        self.network.shop_default_values = self.dump_data({
+            '.*': {
+                '.*': {
+                    'load_template': 'lt_code'
+                }
+            }
+        })
+        self.network.save()
+        response = self.client.post(
+            self.url, 
+            {
+                'name': 'Test_LT',
+                'parent_id': self.root_shop.id,
+                'region_id': self.region.id,
+                'network_id': self.network.id,
+            }
+        )
+        self.assertEquals(response.status_code, 400)
+        self.assertEquals(response.json(), ['Шаблон нагрузки с кодом lt_code не найден.'])

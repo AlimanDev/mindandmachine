@@ -1,6 +1,6 @@
 {% extends 'notifications/email/base.html' %}
 
 {% block content %}
-<p style="font-size:15px">Подразделение <b>{{ shop.name }}</b> запрашивает подтверждение <b>{% if is_fact %}фактического{% else %}планового{% endif %}</b> графика.</p>
+<p style="font-size:15px">{{ shop_name_form.singular.I | default:'магазин'|capfirst }} <b>{{ shop.name }}</b> запрашивает подтверждение <b>{% if is_fact %}фактического{% else %}планового{% endif %}</b> графика.</p>
 <p style="font-size:15px">Период от <b>{{ dt_from }}</b> до <b>{{ dt_to }}</b>.</p>
 {% endblock %}

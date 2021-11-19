@@ -1,7 +1,7 @@
 {% extends 'notifications/email/base.html' %}
 
 {% block content %}
-<p style="font-size:15px">В подразделении <b>{{ shop_name }}</b> отменена вакансия {% if employee %} у сотрудника <b>{{ employee.last_name }} {{ employee.first_name }}</b> {% if employee.tabel_code %} с табельным номером <b>{{ employee.tabel_code }}</b> {% else %} без табельного номера {% endif %} {% else %} без сотрудника {% endif %}</p>
+<p style="font-size:15px">В {{ shop_name_form.singular.P | default:'магазине' }} <b>{{ shop_name }}</b> отменена вакансия {% if employee %} у сотрудника <b>{{ employee.last_name }} {{ employee.first_name }}</b> {% if employee.tabel_code %} с табельным номером <b>{{ employee.tabel_code }}</b> {% else %} без табельного номера {% endif %} {% else %} без сотрудника {% endif %}</p>
 <p style="font-size:15px">Дата: <b>{{ dt }}</b></p>
 <p style="font-size:15px">Время с <b>{{ dttm_from }}</b> по <b>{{ dttm_to }}</b></p>
 {% endblock %}
