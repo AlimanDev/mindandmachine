@@ -1,4 +1,7 @@
+import zlib
+import base64
 import json
+
 from django import forms
 from django.core import checks, exceptions
 from django.utils import timezone
@@ -24,7 +27,6 @@ class UserworkShop:
             employee__user_id=serializer_field.context['request'].user.id,
         ).first()
         return employment.shop_id if employment else None
-
 
 class MultipleChoiceField(TextField):
 
@@ -101,4 +103,25 @@ class MultipleChoiceField(TextField):
     def from_db_value(self, value, expression, connection):
         if value is None:
             return []
+        return self.to_python(value)
+
+class CompressedTextField(TextField):
+    def to_python(self, value):
+        try:
+            return zlib.decompress(base64.b64decode(bytes(value, 'utf-8'))).decode('utf-8')
+        except:
+            return value
+
+    def value_from_object(self, obj):
+        return self.to_python(getattr(obj, self.attname))
+
+    def get_db_prep_save(self, value, connection):
+        value = self.get_db_prep_value(value, connection=connection, prepared=False)
+        return base64.b64encode(zlib.compress(bytes(value, 'utf-8'))).decode('utf-8')
+
+    def get_prep_value(self, value):
+        value = super().get_prep_value(value)
+        return self.to_python(value)
+
+    def from_db_value(self, value, expression, connection):
         return self.to_python(value)
