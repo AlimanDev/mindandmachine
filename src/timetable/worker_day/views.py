@@ -972,32 +972,10 @@ class WorkerDayViewSet(BaseModelViewSet):
             return Response(WorkerDaySerializer(vacancy).data)
         if vacancy.employee_id:
             raise ValidationError(_('The vacancy cannot be edited because it has already been responded.'))
-        editable_vacancy = WorkerDay.objects.filter(parent_worker_day=vacancy).first()
-        if editable_vacancy is None:
-            editable_vacancy = WorkerDay.objects.create(
-                shop_id=vacancy.shop_id,
-                dt=vacancy.dt,
-                dttm_work_start=vacancy.dttm_work_start,
-                dttm_work_end=vacancy.dttm_work_end,
-                type=vacancy.type,
-                is_approved=False,
-                created_by=vacancy.created_by,
-                comment=vacancy.comment,
-                parent_worker_day=vacancy,
-                is_vacancy=True,
-                is_outsource=vacancy.is_outsource,
-                source=WorkerDay.SOURCE_EDITABLE_VACANCY,
-            )
-            WorkerDayCashboxDetails.objects.bulk_create([
-                WorkerDayCashboxDetails(
-                    worker_day=editable_vacancy,
-                    work_part=d.work_part,
-                    work_type_id=d.work_type_id,
-                )
-                for d in WorkerDayCashboxDetails.objects.filter(worker_day=vacancy)
-            ])
-            editable_vacancy.outsources.add(*vacancy.outsources.all())
-        return Response(WorkerDaySerializer(editable_vacancy).data)
+
+        vacancy.is_approved = False  # "расподтверждаем" открытую подтвержденную вакансию перед редактированием
+        vacancy.save()
+        return Response(WorkerDaySerializer(vacancy).data)
 
     def _change_range(self, is_fact, is_approved, dt_from, dt_to, wd_type, employee_tabel_code, res=None):
         employee_dt_pairs_list = list(WorkerDay.objects.filter(
