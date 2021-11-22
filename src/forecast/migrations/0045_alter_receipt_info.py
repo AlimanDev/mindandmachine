@@ -4,17 +4,6 @@ from django.db import migrations
 import src.base.fields
 
 
-def compress_info(apps, schema_editor):
-    Receipt = apps.get_model('forecast', 'Receipt')
-    receipts = Receipt.objects.all()
-    step = 20000
-    receipts_portion = receipts[:step]
-    i = step
-    while receipts_portion:
-        Receipt.objects.bulk_update(receipts_portion, fields=['info'])
-        receipts_portion = receipts[i:i + step]
-        i = i + step
-
 class Migration(migrations.Migration):
 
     dependencies = [
@@ -27,5 +16,4 @@ class Migration(migrations.Migration):
             name='info',
             field=src.base.fields.CompressedTextField(),
         ),
-        migrations.RunPython(compress_info, migrations.RunPython.noop, atomic=False),
     ]
