@@ -1,5 +1,5 @@
 from django.utils.encoding import escape_uri_path
-import xlsxwriter
+import pandas as pd
 import io
 from functools import wraps
 from django.http.response import HttpResponse
@@ -9,7 +9,7 @@ def xlsx_method(func):
     @wraps(func)
     def wrapper(request, *args, **kwargs):
         output = io.BytesIO()
-        workbook = xlsxwriter.Workbook(output, {'in_memory': True})
+        workbook = pd.ExcelWriter(output, engine='xlsxwriter')
         workbook, name = func(request, workbook, *args, **kwargs)
 
         if name != 'error':

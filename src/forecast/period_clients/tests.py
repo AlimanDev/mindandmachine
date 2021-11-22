@@ -528,17 +528,88 @@ class TestDemand(APITestCase):
 
     # Сервер для обработки алгоритма недоступен.
     def test_upload_demand(self):
-        file = open('etc/scripts/demand.xlsx', 'rb')
-        response = self.client.post(f'{self.url}upload/', {'shop_id': self.shop.id, 'file': file})
+        file = open('etc/scripts/demand_new.xlsx', 'rb')
+        response = self.client.post(f'{self.url}upload/', {'shop_id': self.shop.id, 'file': file, 'type': 'L'})
         file.close()
         self.assertEqual(response.status_code, 200)
         self.assertEqual(
             PeriodClients.objects.filter(
-                operation_type__operation_type_name__in=[self.op_type_name, self.op_type_name2],
-                dttm_forecast__date__gte=datetime(2020, 4, 30),
-                dttm_forecast__date__lte=datetime(2020, 5, 1),
+                operation_type__shop=self.shop,
+                dttm_forecast__date__gte=datetime(2021, 4, 1),
+                dttm_forecast__date__lte=datetime(2021, 4, 2),
+                type=PeriodClients.LONG_FORECASE_TYPE,
             ).count(),
-            40
+            130,
+        )
+        self.assertEqual(
+            PeriodClients.objects.filter(
+                operation_type__shop=self.shop,
+                dttm_forecast__date__gte=datetime(2021, 4, 1),
+                dttm_forecast__date__lte=datetime(2021, 4, 2),
+                type=PeriodClients.FACT_TYPE,
+            ).count(),
+            0,
+        )
+        PeriodClients.objects.filter(
+            operation_type__shop=self.shop,
+            dttm_forecast__date__gte=datetime(2021, 4, 1),
+            dttm_forecast__date__lte=datetime(2021, 4, 2),
+        ).delete()
+        file = open('etc/scripts/demand_new.xlsx', 'rb')
+        response = self.client.post(f'{self.url}upload/', {'shop_id': self.shop.id, 'file': file, 'type': 'F'})
+        file.close()
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            PeriodClients.objects.filter(
+                operation_type__shop=self.shop,
+                dttm_forecast__date__gte=datetime(2021, 4, 1),
+                dttm_forecast__date__lte=datetime(2021, 4, 2),
+                type=PeriodClients.LONG_FORECASE_TYPE,
+            ).count(),
+            0,
+        )
+        self.assertEqual(
+            PeriodClients.objects.filter(
+                operation_type__shop=self.shop,
+                dttm_forecast__date__gte=datetime(2021, 4, 1),
+                dttm_forecast__date__lte=datetime(2021, 4, 2),
+                type=PeriodClients.FACT_TYPE,
+            ).count(),
+            130,
+        )
+
+
+    def test_upload_demand_shops_new_format(self):
+        self.shop.code = '0123'
+        self.shop.save()
+        self.shop2.code = '122'
+        self.shop2.save()
+        for n in OperationTypeName.objects.all():
+            OperationType.objects.create(
+                operation_type_name=n,
+                shop=self.shop2,
+            )
+        file = open('etc/scripts/demand_new_shops.xlsx', 'rb')
+        response = self.client.post(f'{self.url}upload/', {'shop_id': self.shop.id, 'file': file, 'type': 'L'})
+        file.close()
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            PeriodClients.objects.filter(
+                operation_type__shop=self.shop,
+                dttm_forecast__date__gte=datetime(2021, 4, 1),
+                dttm_forecast__date__lte=datetime(2021, 4, 2),
+                type=PeriodClients.LONG_FORECASE_TYPE,
+            ).count(),
+            130,
+        )
+        self.assertEqual(
+            PeriodClients.objects.filter(
+                operation_type__shop=self.shop2,
+                dttm_forecast__date__gte=datetime(2021, 4, 1),
+                dttm_forecast__date__lte=datetime(2021, 4, 2),
+                type=PeriodClients.LONG_FORECASE_TYPE,
+            ).count(),
+            130,
         )
 
     def test_upload_demand_shops(self):
@@ -566,12 +637,27 @@ class TestDemand(APITestCase):
 
 
     def test_get_demand_xlsx(self):
+        dt_from = Converter.convert_date(datetime(2019, 5, 30).date())
+        dt_to = Converter.convert_date(datetime(2019, 6, 2).date())
         response = self.client.get(
-            f'{self.url}download/?dt_from={Converter.convert_date(datetime(2019, 5, 30).date())}&dt_to={Converter.convert_date(datetime(2019, 6, 2).date())}&shop_id={self.shop.id}')
+            f'{self.url}download/?dt_from={dt_from}&dt_to={dt_to}&shop_id={self.shop.id}')
         tabel = pandas.read_excel(io.BytesIO(response.content))
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(tabel[tabel.columns[0]][0], 'Кассы Кассы')
-        self.assertEqual(tabel[tabel.columns[1]][0], '30.05.2019 00:00:00')
+        self.assertEquals(response.status_code, 200)
+        self.assertCountEqual(list(tabel.columns), ['dttm', 'Кассы', 'Торговый зал', 'O_TYPE3', 'O_TYPE4', 'O_TYPE5'])
+        self.assertEquals(tabel[tabel.columns[0]][0], datetime(2019, 5, 30))
+        self.assertEquals(tabel[tabel.columns[1]][0], 0)
+        response = self.client.get(
+            f'{self.url}download/?dt_from={dt_from}&dt_to={dt_to}&shop_id={self.shop.id}&operation_type_name_ids={self.op_type_name.id},{self.op_type_name2.id}')
+        tabel = pandas.read_excel(io.BytesIO(response.content))
+        self.assertEquals(response.status_code, 200)
+        self.assertEquals(list(tabel.columns), ['dttm', 'Кассы', 'Торговый зал'])
+        self.assertEquals(tabel[tabel.columns[0]][0], datetime(2019, 5, 30))
+        self.assertEquals(tabel[tabel.columns[1]][0], 0)
+        response = self.client.get(
+            f'{self.url}download/?dt_from={dt_from}&dt_to={dt_to}&shop_id={self.shop.id}&operation_type_ids={self.o_type_1.id},{self.o_type_2.id}')
+        tabel = pandas.read_excel(io.BytesIO(response.content))
+        self.assertEquals(response.status_code, 200)
+        self.assertCountEqual(list(tabel.columns), ['dttm', 'Кассы', 'O_TYPE4'])
 
     def test_duplicates_dont_created_for_the_same_dttm_forecast_and_operation_type(self):
         initial_pc_count = PeriodClients.objects.count()
