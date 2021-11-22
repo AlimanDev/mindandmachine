@@ -5,7 +5,7 @@ from django.db import migrations
 def compress_info(apps, schema_editor):
     Receipt = apps.get_model('forecast', 'Receipt')
     receipts = Receipt.objects.all()
-    step = 20000
+    step = 100000
     receipts_portion = receipts[:step]
     i = step
     while receipts_portion:
