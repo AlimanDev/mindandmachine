@@ -7,7 +7,7 @@ import src.base.fields
 def compress_info(apps, schema_editor):
     Receipt = apps.get_model('forecast', 'Receipt')
     receipts = Receipt.objects.all()
-    step = 100000
+    step = 20000
     receipts_portion = receipts[:step]
     i = step
     while receipts_portion:
