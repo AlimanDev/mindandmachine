@@ -1,4 +1,5 @@
 from datetime import date, datetime
+from django.db.models.expressions import Exists, OuterRef
 from pytz import timezone
 
 from django.db.models import Q
@@ -121,6 +122,7 @@ class ReportConfig(models.Model):
     name = models.CharField(max_length=128)
     period = models.ForeignKey('reports.Period', on_delete=models.PROTECT)
     send_by_group_employments_shops = models.BooleanField(default=False, verbose_name='Фильтровать рассылку по магазинам трудоустройств групп')
+    filter_recipients_by_shops_in_data = models.BooleanField(default=False, verbose_name='Фильтровать получателей по магазинам в данных')
 
     users = models.ManyToManyField('base.User', blank=True, verbose_name='Оповещать конкретных пользователей')
     groups = models.ManyToManyField(
@@ -160,27 +162,55 @@ class ReportConfig(models.Model):
         else:
             return None
 
-    def get_recipients(self):
+    def get_recipients(self, context):
         """
         :param context:
         :return: Список почт
         """
         recipients = []
-
-        recipients.extend(list(self.users.filter(email__isnull=False).values_list('email', flat=True)))
+        shop_ids = []
+        if self.filter_recipients_by_shops_in_data:
+            report_cls = ReportRegistryHolder.get_registry().get(self.report_type.code)
+            if report_cls:
+                shop_ids = report_cls(
+                    network_id=self.report_type.network_id,
+                    context=context,
+                ).get_recipients_shops()
+        
+        if shop_ids:
+            recipients.extend(
+                list(
+                    self.users.annotate(
+                        empl_exists=Exists(
+                            Employment.objects.get_active(shop_id__in=shop_ids, employee__user_id=OuterRef('id'))
+                        )
+                    ).filter(email__isnull=False, empl_exists=True).values_list('email', flat=True)
+                )
+            )
+        else:
+            recipients.extend(list(self.users.filter(email__isnull=False).values_list('email', flat=True)))
 
         groups = list(self.groups.all())
         if groups and not self.send_by_group_employments_shops:
+            shop_filter = {}
+            if shop_ids:
+                shop_filter = {
+                    'shop_id__in': shop_ids,
+                }
             recipients.extend(
                 list(User.objects.filter(
-                    id__in=Employment.objects.get_active().filter(
+                    id__in=Employment.objects.get_active(**shop_filter).filter(
                         Q(function_group__in=groups) | Q(position__group__in=groups),
                     ).values_list('employee__user_id', flat=True),
                     email__isnull=False,
                 ).values_list('email', flat=True))
             )
 
-        shops = list(self.shops_to_notify.filter(email__isnull=False).values_list('email', flat=True))
+        shops = self.shops_to_notify.filter(email__isnull=False)
+        if shop_ids:
+            shops = shops.filter(id__in=shop_ids)
+
+        shops = list(shops.values_list('email', flat=True))
         if shops:
             recipients.extend(
                 shops

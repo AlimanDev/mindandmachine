@@ -1,10 +1,12 @@
 import datetime
+import copy
 from django.core import mail
 from unittest import mock
 from django.db import transaction
 
 from django.test.utils import override_settings
 from rest_framework.test import APITestCase
+from src.util.mixins.tests import TestsHelperMixin
 from src.notifications.models.event_notification import EventEmailNotification
 from src.timetable.events import EMPLOYEE_VACANCY_DELETED, VACANCY_CREATED, VACANCY_DELETED
 
@@ -44,6 +46,7 @@ from src.timetable.models import (
     WorkerDayPermission,
 )
 from src.timetable.vacancy.utils import (
+    cancel_vacancy,
     create_vacancies_and_notify,
     cancel_vacancies,
     workers_exchange,
@@ -402,7 +405,7 @@ class TestAutoWorkerExchange(APITestCase):
         len_vacancies = len(WorkerDay.objects.filter(is_vacancy=True))
         self.assertEqual(len_vacancies, 0)
         create_vacancies_and_notify(self.shop.id, self.work_type1.id)
-        vacancies = WorkerDay.objects.filter(is_vacancy=True).order_by('dttm_work_start')
+        vacancies = WorkerDay.objects.filter(is_vacancy=True, source=WorkerDay.SOURCE_AUTO_CREATED_VACANCY).order_by('dttm_work_start')
         print(vacancies.count(), '!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
         self.assertEqual([vacancies[0].dttm_work_start.time(), vacancies[0].dttm_work_end.time()],
                          [datetime.time(9, 0), datetime.time(21, 0)])
@@ -537,7 +540,7 @@ class TestAutoWorkerExchange(APITestCase):
 
     def test_workers_hard_exchange_holidays_3days(self):
         self.create_users(1)
-        self.dt_now = self.dt_now + datetime.timedelta(days=8)
+        self.dt_now = self.dt_now + datetime.timedelta(days=9)
         vacancy = self.create_vacancy(9, 21, self.work_type2)
         employment = Employment.objects.exclude(pk=self.employment_dir.id).first()
         dt = self.dt_now
@@ -552,7 +555,7 @@ class TestAutoWorkerExchange(APITestCase):
 
     def test_workers_hard_exchange_holidays_2days_first(self):
         self.create_users(2)
-        self.dt_now = self.dt_now + datetime.timedelta(days=8)
+        self.dt_now = self.dt_now + datetime.timedelta(days=9)
         vacancy = self.create_vacancy(9, 21, self.work_type2)
         employment1 = Employment.objects.first()
         employment2 = Employment.objects.last()
@@ -575,7 +578,7 @@ class TestAutoWorkerExchange(APITestCase):
 
     def test_workers_hard_exchange_holidays_2days_last(self):
         self.create_users(3)
-        self.dt_now = self.dt_now + datetime.timedelta(days=8)
+        self.dt_now = self.dt_now + datetime.timedelta(days=9)
         vacancy = self.create_vacancy(9, 21, self.work_type2)
         employments = list(Employment.objects.all())
         employment1 = employments[0]
@@ -607,7 +610,7 @@ class TestAutoWorkerExchange(APITestCase):
 
     def test_workers_hard_exchange_holidays_1day(self):
         self.create_users(3)
-        self.dt_now = self.dt_now + datetime.timedelta(days=8)
+        self.dt_now = self.dt_now + datetime.timedelta(days=9)
         vacancy = self.create_vacancy(9, 21, self.work_type2)
         employments = list(Employment.objects.all())
         employment1 = employments[0]
@@ -630,7 +633,7 @@ class TestAutoWorkerExchange(APITestCase):
         self.update_or_create_holidays(employment3, self.dt_now + datetime.timedelta(days=12), 2)
 
         holiday_workers_exchange()
-        vacancy = WorkerDay.objects.get(is_vacancy=True, is_approved=True)
+        vacancy.refresh_from_db()
         self.assertEqual(vacancy.employment, employment2)
 
     def test_worker_exchange_cant_apply_vacancy(self):
@@ -658,12 +661,13 @@ class TestAutoWorkerExchange(APITestCase):
         self.assertEqual(result, {'status_code': 200, 'text': 'Вакансия успешно принята.'})
 
     def test_shift_elongation(self):
+        self.dt_now += datetime.timedelta(1)
         resp = self.create_users(1)
         user = resp[0][0]
         self.create_vacancy(9, 21, self.work_type2)
         self.create_worker_days(Employment.objects.get(employee__user=user), self.dt_now, 1, 10, 18)
         worker_shift_elongation()
-        wd = WorkerDay.objects.get(employee__user=user, is_approved=False)  # FIXME: почему падает?
+        wd = WorkerDay.objects.get(employee__user=user, is_approved=False, source=WorkerDay.SOURCE_SHIFT_ELONGATION)  # FIXME: почему падает?
         self.assertEqual(wd.dttm_work_start, datetime.datetime.combine(self.dt_now, datetime.time(9)))
         self.assertEqual(wd.dttm_work_end, datetime.datetime.combine(self.dt_now, datetime.time(21)))
 
@@ -723,7 +727,7 @@ class TestAutoWorkerExchange(APITestCase):
         vacancies = WorkerDay.objects.filter(is_vacancy=True)
         self.assertEqual(vacancies.count(), 2)
         cancel_vacancies(self.shop.id, self.work_type1.id, approved=True)
-        wd = WorkerDay.objects.filter(employee_id=employments[0].employee_id, is_approved=True).first()
+        wd = WorkerDay.objects.filter(employee_id=employments[0].employee_id, is_approved=True, source=WorkerDay.SOURCE_ON_CANCEL_VACANCY).first()
         self.assertEquals(wd.type_id, WorkerDay.TYPE_HOLIDAY)
         self.assertFalse(wd.is_vacancy)
         self.assertEqual(vacancies.count(), 1)
@@ -961,3 +965,425 @@ class TestAutoWorkerExchange(APITestCase):
         result = confirm_vacancy(vac2.id, user, employee_id=employee2.id)
         self.assertEqual(result['status_code'], 400)
         self.assertIn('Операция не может быть выполнена. Недопустимое пересечение времени работы.', result['text'])
+
+    def test_fact_vacancy_deleted(self):
+        vacancy = WorkerDay.objects.create(
+            is_fact=True,
+            is_vacancy=True,
+            employee=self.employee_dir,
+            employment=self.employment_dir,
+            dt=self.dt_now,
+            dttm_work_start=datetime.datetime.combine(self.dt_now, datetime.time(8)),
+            shop=self.shop,
+            type_id=WorkerDay.TYPE_WORKDAY,
+        )
+        self.client.force_authenticate(user=self.user_dir)
+        response = self.client.delete(f"/rest_api/worker_day/{vacancy.id}/")
+        self.assertEquals(response.status_code, 204)
+        self.assertIsNone(WorkerDay.objects.filter(id=vacancy.id).first())
+
+
+class TestVacancyActions(APITestCase, TestsHelperMixin):
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.create_departments_and_users()
+
+
+    def test_cancel_vacancy_without_worker(self):
+        dt = datetime.date.today()
+        approved_vacancy_auto = WorkerDay.objects.create(
+            is_vacancy=True,
+            is_approved=True,
+            dt=dt,
+            dttm_work_start=datetime.datetime.combine(dt, datetime.time(8)),
+            dttm_work_end=datetime.datetime.combine(dt, datetime.time(20)),
+            type_id=WorkerDay.TYPE_WORKDAY,
+            shop=self.shop,
+        )
+        cancel_vacancy(approved_vacancy_auto.id, False)
+        approved_vacancy_auto.refresh_from_db()
+        self.assertIsNotNone(approved_vacancy_auto.id)
+        self.assertTrue(approved_vacancy_auto.canceled)
+
+        approved_vacancy = WorkerDay.objects.create(
+            is_vacancy=True,
+            is_approved=True,
+            dt=dt,
+            dttm_work_start=datetime.datetime.combine(dt, datetime.time(8)),
+            dttm_work_end=datetime.datetime.combine(dt, datetime.time(20)),
+            type_id=WorkerDay.TYPE_WORKDAY,
+            shop=self.shop,
+            created_by=self.user1,
+        )
+        cancel_vacancy(approved_vacancy.id, False)
+        self.assertIsNone(WorkerDay.objects.filter(id=approved_vacancy.id).first())
+
+    def test_cancel_vacancy_with_worker_without_any_worker_days(self):
+        dt = datetime.date.today()
+        approved_vacancy = WorkerDay.objects.create(
+            is_vacancy=True,
+            is_approved=True,
+            dt=dt,
+            dttm_work_start=datetime.datetime.combine(dt, datetime.time(8)),
+            dttm_work_end=datetime.datetime.combine(dt, datetime.time(20)),
+            type_id=WorkerDay.TYPE_WORKDAY,
+            shop=self.shop,
+            employee=self.employee1,
+            employment=self.employment1,
+            created_by=self.user1,
+        )
+        not_approved_vacancy = copy.deepcopy(approved_vacancy)
+        not_approved_vacancy.id = None
+        not_approved_vacancy.is_approved = False
+        not_approved_vacancy.parent_worker_day_id = approved_vacancy.id
+        not_approved_vacancy.save()
+        cancel_vacancy(approved_vacancy.id, False)
+
+        self.assertEquals(WorkerDay.objects.filter(id__in=[approved_vacancy.id, not_approved_vacancy.id]).count(), 0)
+        self.assertTrue(WorkerDay.objects.filter(employee=self.employee1, type_id=WorkerDay.TYPE_HOLIDAY, is_approved=True).exists())
+        self.assertTrue(WorkerDay.objects.filter(employee=self.employee1, type_id=WorkerDay.TYPE_HOLIDAY, is_approved=False).exists())
+        WorkerDay.objects.filter(employee=self.employee1).delete()
+        approved_vacancy.save()
+        not_approved_vacancy.parent_worker_day = approved_vacancy
+        not_approved_vacancy.save()
+
+        cancel_vacancy(not_approved_vacancy.id, False)
+        self.assertEquals(WorkerDay.objects.filter(id=not_approved_vacancy.id).count(), 0)
+        self.assertEquals(WorkerDay.objects.filter(id=approved_vacancy.id).count(), 1)
+        self.assertTrue(WorkerDay.objects.filter(employee=self.employee1, type_id=WorkerDay.TYPE_HOLIDAY, is_approved=False).exists())
+        self.assertFalse(WorkerDay.objects.filter(employee=self.employee1, type_id=WorkerDay.TYPE_HOLIDAY, is_approved=True).exists())
+
+    def test_cancel_vacancy_with_worker_with_worker_days(self):
+        dt = datetime.date.today()
+        approved_vacancy = WorkerDay.objects.create(
+            is_vacancy=True,
+            is_approved=True,
+            dt=dt,
+            dttm_work_start=datetime.datetime.combine(dt, datetime.time(16)),
+            dttm_work_end=datetime.datetime.combine(dt, datetime.time(20)),
+            type_id=WorkerDay.TYPE_WORKDAY,
+            shop=self.shop,
+            employee=self.employee1,
+            employment=self.employment1,
+            created_by=self.user1,
+        )
+        not_approved_vacancy = copy.deepcopy(approved_vacancy)
+        not_approved_vacancy.id = None
+        not_approved_vacancy.is_approved = False
+        not_approved_vacancy.parent_worker_day_id = approved_vacancy.id
+        not_approved_vacancy.save()
+        approved_employee_worker_day = WorkerDay.objects.create(
+            is_vacancy=True,
+            is_approved=True,
+            dt=dt,
+            dttm_work_start=datetime.datetime.combine(dt, datetime.time(8)),
+            dttm_work_end=datetime.datetime.combine(dt, datetime.time(15)),
+            type_id=WorkerDay.TYPE_WORKDAY,
+            shop=self.shop,
+            employee=self.employee1,
+            employment=self.employment1,
+            created_by=self.user1,
+        )
+        not_approved_employee_worker_day = copy.deepcopy(approved_employee_worker_day)
+        not_approved_employee_worker_day.id = None
+        not_approved_employee_worker_day.is_approved = False
+        not_approved_employee_worker_day.parent_worker_day_id = approved_employee_worker_day.id
+        not_approved_employee_worker_day.save()
+        cancel_vacancy(approved_vacancy.id, False)
+
+        self.assertEquals(WorkerDay.objects.filter(id__in=[approved_vacancy.id, not_approved_vacancy.id]).count(), 0)
+        self.assertEquals(WorkerDay.objects.filter(employee=self.employee1, is_approved=True, type_id=WorkerDay.TYPE_WORKDAY).count(), 1)
+        self.assertEquals(WorkerDay.objects.filter(employee=self.employee1, is_approved=False, type_id=WorkerDay.TYPE_WORKDAY).count(), 1)
+        approved_vacancy.save()
+        not_approved_vacancy.parent_worker_day_id = approved_vacancy.id
+        not_approved_vacancy.save()
+
+        cancel_vacancy(not_approved_vacancy.id, False)
+        self.assertEquals(WorkerDay.objects.filter(id=not_approved_vacancy.id).count(), 0)
+        self.assertEquals(WorkerDay.objects.filter(id=approved_vacancy.id).count(), 1)
+        self.assertEquals(WorkerDay.objects.filter(employee=self.employee1, is_approved=True, type_id=WorkerDay.TYPE_WORKDAY).count(), 2)
+        self.assertEquals(WorkerDay.objects.filter(employee=self.employee1, is_approved=False, type_id=WorkerDay.TYPE_WORKDAY).count(), 1)
+
+    def test_cancel_vacancy_with_worker_with_worker_days_only_approved(self):
+        dt = datetime.date.today()
+        approved_vacancy = WorkerDay.objects.create(
+            is_vacancy=True,
+            is_approved=True,
+            dt=dt,
+            dttm_work_start=datetime.datetime.combine(dt, datetime.time(16)),
+            dttm_work_end=datetime.datetime.combine(dt, datetime.time(20)),
+            type_id=WorkerDay.TYPE_WORKDAY,
+            shop=self.shop,
+            employee=self.employee1,
+            employment=self.employment1,
+            created_by=self.user1,
+        )
+        not_approved_vacancy = copy.deepcopy(approved_vacancy)
+        not_approved_vacancy.id = None
+        not_approved_vacancy.is_approved = False
+        not_approved_vacancy.parent_worker_day_id = approved_vacancy.id
+        not_approved_vacancy.save()
+        approved_employee_worker_day = WorkerDay.objects.create(
+            is_vacancy=True,
+            is_approved=True,
+            dt=dt,
+            dttm_work_start=datetime.datetime.combine(dt, datetime.time(8)),
+            dttm_work_end=datetime.datetime.combine(dt, datetime.time(15)),
+            type_id=WorkerDay.TYPE_WORKDAY,
+            shop=self.shop,
+            employee=self.employee1,
+            employment=self.employment1,
+            created_by=self.user1,
+        )
+        cancel_vacancy(approved_vacancy.id, False)
+
+        self.assertEquals(WorkerDay.objects.filter(id__in=[approved_vacancy.id, not_approved_vacancy.id]).count(), 0)
+        self.assertEquals(WorkerDay.objects.filter(employee=self.employee1, is_approved=True, type_id=WorkerDay.TYPE_WORKDAY).count(), 1)
+        self.assertEquals(WorkerDay.objects.filter(employee=self.employee1, is_approved=False, type_id=WorkerDay.TYPE_HOLIDAY).count(), 1)
+        WorkerDay.objects.filter(employee=self.employee1, is_approved=False, type_id=WorkerDay.TYPE_HOLIDAY).delete()
+        approved_vacancy.save()
+        not_approved_vacancy.parent_worker_day_id = approved_vacancy.id
+        not_approved_vacancy.save()
+
+        cancel_vacancy(not_approved_vacancy.id, False)
+        self.assertEquals(WorkerDay.objects.filter(id=not_approved_vacancy.id).count(), 0)
+        self.assertEquals(WorkerDay.objects.filter(id=approved_vacancy.id).count(), 1)
+        self.assertEquals(WorkerDay.objects.filter(employee=self.employee1, is_approved=True, type_id=WorkerDay.TYPE_WORKDAY).count(), 2)
+        self.assertEquals(WorkerDay.objects.filter(employee=self.employee1, is_approved=False, type_id=WorkerDay.TYPE_HOLIDAY).count(), 1)
+    
+    def test_cancel_vacancy_with_worker_with_worker_days_only_not_approved(self):
+        dt = datetime.date.today()
+        approved_vacancy = WorkerDay.objects.create(
+            is_vacancy=True,
+            is_approved=True,
+            dt=dt,
+            dttm_work_start=datetime.datetime.combine(dt, datetime.time(16)),
+            dttm_work_end=datetime.datetime.combine(dt, datetime.time(20)),
+            type_id=WorkerDay.TYPE_WORKDAY,
+            shop=self.shop,
+            employee=self.employee1,
+            employment=self.employment1,
+            created_by=self.user1,
+        )
+        not_approved_vacancy = copy.deepcopy(approved_vacancy)
+        not_approved_vacancy.id = None
+        not_approved_vacancy.is_approved = False
+        not_approved_vacancy.parent_worker_day_id = approved_vacancy.id
+        not_approved_vacancy.save()
+        not_approved_employee_worker_day = WorkerDay.objects.create(
+            is_vacancy=True,
+            is_approved=False,
+            dt=dt,
+            dttm_work_start=datetime.datetime.combine(dt, datetime.time(8)),
+            dttm_work_end=datetime.datetime.combine(dt, datetime.time(15)),
+            type_id=WorkerDay.TYPE_WORKDAY,
+            shop=self.shop,
+            employee=self.employee1,
+            employment=self.employment1,
+            created_by=self.user1,
+        )
+        cancel_vacancy(approved_vacancy.id, False)
+
+        self.assertEquals(WorkerDay.objects.filter(id__in=[approved_vacancy.id, not_approved_vacancy.id]).count(), 0)
+        self.assertEquals(WorkerDay.objects.filter(employee=self.employee1, is_approved=True, type_id=WorkerDay.TYPE_HOLIDAY).count(), 1)
+        self.assertEquals(WorkerDay.objects.filter(employee=self.employee1, is_approved=False, type_id=WorkerDay.TYPE_WORKDAY).count(), 1)
+        WorkerDay.objects.filter(employee=self.employee1, is_approved=True, type_id=WorkerDay.TYPE_HOLIDAY).delete()
+        approved_vacancy.save()
+        not_approved_vacancy.parent_worker_day_id = approved_vacancy.id
+        not_approved_vacancy.save()
+
+        cancel_vacancy(not_approved_vacancy.id, False)
+        self.assertEquals(WorkerDay.objects.filter(id=not_approved_vacancy.id).count(), 0)
+        self.assertEquals(WorkerDay.objects.filter(id=approved_vacancy.id).count(), 1)
+        self.assertEquals(WorkerDay.objects.filter(employee=self.employee1, is_approved=True, type_id=WorkerDay.TYPE_HOLIDAY).count(), 0)
+        self.assertEquals(WorkerDay.objects.filter(employee=self.employee1, is_approved=False, type_id=WorkerDay.TYPE_WORKDAY).count(), 1)
+
+    def test_confirm_vacancy_from_holiday(self):
+        dt = datetime.date.today()
+        approved_vacancy = WorkerDay.objects.create(
+            is_vacancy=True,
+            is_approved=True,
+            dt=dt,
+            dttm_work_start=datetime.datetime.combine(dt, datetime.time(8)),
+            dttm_work_end=datetime.datetime.combine(dt, datetime.time(20)),
+            type_id=WorkerDay.TYPE_WORKDAY,
+            shop=self.shop,
+        )
+        approved_employee_holiday = WorkerDay.objects.create(
+            is_approved=True,
+            dt=dt,
+            type_id=WorkerDay.TYPE_HOLIDAY,
+            employee=self.employee2,
+            employment=self.employment2,
+            created_by=self.user1,
+        )
+        not_approved_employee_holiday = copy.deepcopy(approved_employee_holiday)
+        not_approved_employee_holiday.id = None
+        not_approved_employee_holiday.is_approved = False
+        not_approved_employee_holiday.parent_worker_day_id = approved_employee_holiday.id
+        not_approved_employee_holiday.save()
+
+        confirm_vacancy(approved_vacancy.id, self.user2, employee_id=self.employee2.id)
+
+        self.assertEquals(WorkerDay.objects.filter(id=approved_employee_holiday.id).count(), 0)
+        self.assertEquals(WorkerDay.objects.filter(id=not_approved_employee_holiday.id).count(), 0)
+        self.assertEquals(WorkerDay.objects.filter(id=approved_vacancy.id, employee=self.employee2).count(), 1)
+        wd = WorkerDay.objects.filter(employee=self.employee2, is_approved=False, type_id=WorkerDay.TYPE_WORKDAY, dt=approved_vacancy.dt).first()
+        self.assertIsNotNone(wd)
+        self.assertEquals(wd.parent_worker_day_id, approved_vacancy.id)
+
+    def test_confirm_vacancy_from_holiday_when_not_approved_work_day(self):
+        dt = datetime.date.today()
+        approved_vacancy = WorkerDay.objects.create(
+            is_vacancy=True,
+            is_approved=True,
+            dt=dt,
+            dttm_work_start=datetime.datetime.combine(dt, datetime.time(8)),
+            dttm_work_end=datetime.datetime.combine(dt, datetime.time(20)),
+            type_id=WorkerDay.TYPE_WORKDAY,
+            shop=self.shop,
+        )
+        approved_employee_holiday = WorkerDay.objects.create(
+            is_approved=True,
+            dt=dt,
+            type_id=WorkerDay.TYPE_HOLIDAY,
+            employee=self.employee2,
+            employment=self.employment2,
+            created_by=self.user1,
+        )
+        not_approved_employee_worker_day = copy.deepcopy(approved_employee_holiday)
+        not_approved_employee_worker_day.id = None
+        not_approved_employee_worker_day.is_approved = False
+        not_approved_employee_worker_day.type_id = WorkerDay.TYPE_WORKDAY
+        not_approved_employee_worker_day.dttm_work_start = datetime.datetime.combine(dt, datetime.time(14))
+        not_approved_employee_worker_day.dttm_work_end = datetime.datetime.combine(dt, datetime.time(18))
+        not_approved_employee_worker_day.parent_worker_day_id = approved_employee_holiday.id
+        not_approved_employee_worker_day.save()
+
+        confirm_vacancy(approved_vacancy.id, self.user2, employee_id=self.employee2.id)
+
+        self.assertEquals(WorkerDay.objects.filter(id=approved_employee_holiday.id).count(), 0)
+        self.assertEquals(WorkerDay.objects.filter(id=not_approved_employee_worker_day.id).count(), 1)
+        self.assertEquals(WorkerDay.objects.filter(id=approved_vacancy.id, employee=self.employee2).count(), 1)
+        wd = WorkerDay.objects.filter(employee=self.employee2, is_approved=False, type_id=WorkerDay.TYPE_WORKDAY, dt=approved_vacancy.dt).first()
+        self.assertIsNotNone(wd)
+        self.assertIsNone(wd.parent_worker_day_id)
+
+    def test_confirm_vacancy_with_other_vacancy_exists(self):
+        dt = datetime.date.today()
+        approved_vacancy = WorkerDay.objects.create(
+            is_vacancy=True,
+            is_approved=True,
+            dt=dt,
+            dttm_work_start=datetime.datetime.combine(dt, datetime.time(16)),
+            dttm_work_end=datetime.datetime.combine(dt, datetime.time(20)),
+            type_id=WorkerDay.TYPE_WORKDAY,
+            shop=self.shop,
+        )
+        approved_employee_worker_day = WorkerDay.objects.create(
+            is_vacancy=True,
+            is_approved=True,
+            dt=dt,
+            dttm_work_start=datetime.datetime.combine(dt, datetime.time(8)),
+            dttm_work_end=datetime.datetime.combine(dt, datetime.time(15)),
+            type_id=WorkerDay.TYPE_WORKDAY,
+            shop=self.shop,
+            employee=self.employee2,
+            employment=self.employment2,
+            created_by=self.user1,
+        )
+        not_approved_employee_worker_day = copy.deepcopy(approved_employee_worker_day)
+        not_approved_employee_worker_day.id = None
+        not_approved_employee_worker_day.is_approved = False
+        not_approved_employee_worker_day.parent_worker_day_id = approved_employee_worker_day.id
+        not_approved_employee_worker_day.save()
+
+        confirm_vacancy(approved_vacancy.id, self.user2, employee_id=self.employee2.id)
+
+        self.assertEquals(WorkerDay.objects.filter(id=approved_employee_worker_day.id).count(), 1)
+        self.assertEquals(WorkerDay.objects.filter(id=not_approved_employee_worker_day.id).count(), 1)
+        self.assertEquals(WorkerDay.objects.filter(id=approved_vacancy.id, employee=self.employee2).count(), 1)
+        self.assertEquals(
+            WorkerDay.objects.filter(
+                employee=self.employee2, 
+                is_approved=False, 
+                type_id=WorkerDay.TYPE_WORKDAY, 
+                dt=approved_vacancy.dt, 
+                parent_worker_day=approved_vacancy
+            ).count(), 
+            1,
+        )
+
+    def test_reconfirm_vacancy(self):
+        dt = datetime.date.today()
+        approved_employee1_vacancy = WorkerDay.objects.create(
+            is_vacancy=True,
+            is_approved=True,
+            dt=dt,
+            dttm_work_start=datetime.datetime.combine(dt, datetime.time(8)),
+            dttm_work_end=datetime.datetime.combine(dt, datetime.time(20)),
+            type_id=WorkerDay.TYPE_WORKDAY,
+            shop=self.shop,
+            employee=self.employee1,
+            employment=self.employment1,
+            created_by=self.user1,
+        )
+        not_approved_employee1_vacancy = copy.deepcopy(approved_employee1_vacancy)
+        not_approved_employee1_vacancy.id = None
+        not_approved_employee1_vacancy.is_approved = False
+        not_approved_employee1_vacancy.parent_worker_day_id = approved_employee1_vacancy.id
+        not_approved_employee1_vacancy.save()
+        approved_employee2_holiday = WorkerDay.objects.create(
+            is_approved=True,
+            dt=dt,
+            type_id=WorkerDay.TYPE_HOLIDAY,
+            employee=self.employee2,
+            employment=self.employment2,
+            created_by=self.user1,
+        )
+        not_approved_employee2_holiday = copy.deepcopy(approved_employee2_holiday)
+        not_approved_employee2_holiday.id = None
+        not_approved_employee2_holiday.is_approved = False
+        not_approved_employee2_holiday.parent_worker_day_id = approved_employee2_holiday.id
+        not_approved_employee2_holiday.save()
+
+        confirm_vacancy(approved_employee1_vacancy.id, self.user1, employee_id=self.employee2.id, reconfirm=True)
+
+        approved_employee1_vacancy.refresh_from_db()
+
+        self.assertEquals(approved_employee1_vacancy.employee_id, self.employee2.id)
+        self.assertEquals(approved_employee1_vacancy.employment_id, self.employment2.id)
+        self.assertEquals(
+            WorkerDay.objects.filter(
+                id__in=[not_approved_employee1_vacancy.id, approved_employee2_holiday.id, not_approved_employee2_holiday.id]
+            ).count(), 
+            0,
+        )
+        self.assertTrue(
+            WorkerDay.objects.filter(
+                employee=self.employee1.id, 
+                type_id=WorkerDay.TYPE_HOLIDAY, 
+                dt=approved_employee1_vacancy.dt, 
+                is_approved=True, 
+                source=WorkerDay.SOURCE_ON_CANCEL_VACANCY
+            ).exists()
+        )
+        self.assertTrue(
+            WorkerDay.objects.filter(
+                employee=self.employee1.id, 
+                type_id=WorkerDay.TYPE_HOLIDAY, 
+                dt=approved_employee1_vacancy.dt, 
+                is_approved=False, 
+                source=WorkerDay.SOURCE_ON_CANCEL_VACANCY
+            ).exists()
+        )
+        self.assertTrue(
+            WorkerDay.objects.filter(
+                employee=self.employee2.id, 
+                parent_worker_day_id=approved_employee1_vacancy.id, 
+                type_id=WorkerDay.TYPE_WORKDAY, 
+                is_approved=False, 
+                source=WorkerDay.SOURCE_ON_CONFIRM_VACANCY
+            ).exists()
+        )

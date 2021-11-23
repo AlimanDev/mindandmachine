@@ -14,14 +14,14 @@ from django.db.models import (
     Value,
     FloatField,
 )
-from django.db.models.expressions import RawSQL
 from django.db.models.functions import Cast, TruncDate
 from django.db.models.functions import Extract, Coalesce, Greatest, Least
 from django.utils.functional import cached_property
 
-from src.base.models import Employment, Shop, ProductionDay, SAWHSettings, Network
+from src.base.models import Employment, Shop, ProductionDay, SAWHSettings, Network, SAWHSettingsMapping
 from src.forecast.models import PeriodClients
-from src.timetable.models import WorkerDay, ProdCal, Timesheet, WorkerDayType
+from src.timetable.models import WorkerDay, ProdCal, TimesheetItem, WorkerDayType
+from src.util.models_converter import Converter
 
 
 def count_daily_stat(data):
@@ -233,12 +233,12 @@ class WorkersStatsGetter:
         """
         assert shop_id or network
         self.shop_id = shop_id
-        self.dt_from = dt_from
-        self.dt_to = dt_to
+        self.dt_from = Converter.parse_date(dt_from) if isinstance(dt_from, str) else dt_from
+        self.dt_to = Converter.parse_date(dt_to) if isinstance(dt_to, str) else dt_to
         self.employee_id = employee_id
         self.employee_id__in = employee_id__in.split(',') if isinstance(employee_id__in, str) else employee_id__in
-        self.year = dt_from.year
-        self.month = dt_from.month
+        self.year = self.dt_from.year
+        self.month = self.dt_from.month
         self.hours_by_types = hours_by_types or list(WorkerDayType.objects.filter(
             is_active=True,
             show_stat_in_hours=True,
@@ -300,6 +300,11 @@ class WorkersStatsGetter:
     @cached_property
     def employments_list(self):
         dt_from, dt_to = self.acc_period_range
+        sawh_settings_subq = SAWHSettingsMapping.objects.filter(
+            Q(positions__id=OuterRef('position_id')) | Q(shops__id=OuterRef('shop_id')),
+            ~Q(exclude_positions__id=OuterRef('position_id')),
+            year=self.year,
+        ).order_by('-priority')
         employments = Employment.objects.get_active(
             network_id=self.network.id,
             dt_from=dt_from,
@@ -309,43 +314,9 @@ class WorkersStatsGetter:
         ).order_by(
             'dt_hired'
         ).annotate(
-            sawh_hours_by_months=RawSQL("""SELECT V5."work_hours_by_months"
-                 FROM "base_sawhsettingsmapping" V0
-                          LEFT OUTER JOIN "base_sawhsettingsmapping_positions" V1
-                                          ON (V0."id" = V1."sawhsettingsmapping_id")
-                          LEFT OUTER JOIN "base_sawhsettingsmapping_shops" V3 ON (V0."id" = V3."sawhsettingsmapping_id")
-                          INNER JOIN "base_sawhsettings" V5 ON (V0."sawh_settings_id" = V5."id")
-                 WHERE ((V1."workerposition_id" = "base_employment"."position_id" OR
-                         V3."shop_id" = "base_employment"."shop_id") AND
-                        NOT (V0."id" IN (SELECT U1."sawhsettingsmapping_id"
-                                         FROM "base_sawhsettingsmapping_exclude_positions" U1
-                                         WHERE U1."workerposition_id" = "base_employment"."position_id")) AND
-                        V0."year" = %s)
-                 ORDER BY V0."priority" DESC
-                 LIMIT 1""", (self.year,)),
-            sawh_settings_type=RawSQL("""SELECT V5."type"
-                 FROM "base_sawhsettingsmapping" V0
-                          LEFT OUTER JOIN "base_sawhsettingsmapping_positions" V1
-                                          ON (V0."id" = V1."sawhsettingsmapping_id")
-                          LEFT OUTER JOIN "base_sawhsettingsmapping_shops" V3 ON (V0."id" = V3."sawhsettingsmapping_id")
-                          INNER JOIN "base_sawhsettings" V5 ON (V0."sawh_settings_id" = V5."id")
-                 WHERE ((V1."workerposition_id" = "base_employment"."position_id" OR
-                         V3."shop_id" = "base_employment"."shop_id") AND
-                        NOT (V0."id" IN (SELECT U1."sawhsettingsmapping_id"
-                                         FROM "base_sawhsettingsmapping_exclude_positions" U1
-                                         WHERE U1."workerposition_id" = "base_employment"."position_id")) AND
-                        V0."year" = %s)
-                 ORDER BY V0."priority" DESC
-                 LIMIT 1""", (self.year,))
+            sawh_hours_by_months=Subquery(sawh_settings_subq.values('sawh_settings__work_hours_by_months')[:1]),
+            sawh_settings_type=Subquery(sawh_settings_subq.values('sawh_settings__type')[:1]),
         ).distinct()
-        # в django 2 есть баг, при переходе на django 3 можно будет использовать следующий annotate
-        # ).annotate(
-        #     sawh_hours_by_months=Subquery(SAWHSettingsMapping.objects.filter(
-        #         Q(positions__id=OuterRef('position_id')) | Q(shops__id=OuterRef('shop_id')),
-        #         ~Q(exclude_positions__id=OuterRef('position_id')),
-        #         year=self.year,
-        #     ).order_by('-priority').values('sawh_settings__work_hours_by_months')[:1])
-        # ).distinct()
         if self.employee_id:
             employments = employments.filter(employee_id=self.employee_id)
         elif self.employee_id__in:
@@ -413,44 +384,44 @@ class WorkersStatsGetter:
         ).annotate(
             work_days_selected_shop=Coalesce(Count('id', filter=Q(selected_period_q, shop_id=self.shop_id,
                                                                   work_hours__gte=timedelta(0),
-                                                                  type__is_dayoff=False, type__is_work_hours=True)), 0),
+                                                                  type__is_work_hours=True)), 0),
             work_days_other_shops=Coalesce(Count('id', filter=Q(selected_period_q, ~Q(shop_id=self.shop_id),
                                                                 work_hours__gte=timedelta(0),
-                                                                type__is_dayoff=False, type__is_work_hours=True)), 0),
+                                                                type__is_work_hours=True)), 0),
             work_days_selected_period=Coalesce(Count('id', filter=Q(selected_period_q, work_hours__gte=timedelta(0),
-                                                          type__is_dayoff=False, type__is_work_hours=True)), 0),
+                                                          type__is_work_hours=True)), 0),
             work_hours_selected_shop=Coalesce(Sum(Extract(F('work_hours'), 'epoch') / 3600,
                                                   filter=Q(selected_period_q, shop_id=self.shop_id,
                                                            work_hours__gte=timedelta(0),
-                                                           type__is_dayoff=False, type__is_work_hours=True),
-                                                  output_field=FloatField()), 0),
+                                                           type__is_work_hours=True),
+                                                  output_field=FloatField()), 0.0),
             work_hours_other_shops=Coalesce(Sum(Extract(F('work_hours'), 'epoch') / 3600,
                                                 filter=Q(selected_period_q, ~Q(shop_id=self.shop_id),
                                                          work_hours__gte=timedelta(0),
-                                                         type__is_dayoff=False, type__is_work_hours=True),
-                                                output_field=FloatField()), 0),
+                                                         type__is_work_hours=True),
+                                                output_field=FloatField()), 0.0),
             work_hours_selected_period=Coalesce(Sum(Extract(F('work_hours'), 'epoch') / 3600,
                                           filter=Q(selected_period_q, work_hours__gte=timedelta(0),
-                                                   type__is_dayoff=False, type__is_work_hours=True),
-                                          output_field=FloatField()), 0),
+                                                   type__is_work_hours=True),
+                                          output_field=FloatField()), 0.0),
             work_hours_total=Coalesce(Sum(Extract(F('work_hours'), 'epoch') / 3600,
                                                 filter=Q(work_hours__gte=timedelta(0),
-                                                         type__is_dayoff=False, type__is_work_hours=True),
-                                                output_field=FloatField()), 0),
+                                                         type__is_work_hours=True),
+                                                output_field=FloatField()), 0.0),
             work_hours_until_acc_period_end=Coalesce(Sum(Extract(F('work_hours'), 'epoch') / 3600,
                                                          filter=Q(until_acc_period_end_q, work_hours__gte=timedelta(0),
-                                                                  type__is_dayoff=False, type__is_work_hours=True),
-                                                         output_field=FloatField()), 0),
+                                                                  type__is_work_hours=True),
+                                                         output_field=FloatField()), 0.0),
             work_hours_outside_of_selected_period=Coalesce(Sum(Extract(F('work_hours'), 'epoch') / 3600,
                                                          filter=Q(outside_of_selected_period_q, work_hours__gte=timedelta(0),
-                                                                  type__is_dayoff=False, type__is_work_hours=True),
-                                                         output_field=FloatField()), 0)
+                                                                  type__is_work_hours=True),
+                                                         output_field=FloatField()), 0.0)
         ).order_by('employee_id', '-is_fact', '-is_approved')  # такая сортировка нужна для work_hours_prev_months
         if self.hours_by_types:
             work_days = work_days.annotate(**{
                 'hours_by_type_{}'.format(type_id): Coalesce(Sum(Extract(F('work_hours'), 'epoch') / 3600,
                                           filter=Q(selected_period_q, work_hours__gte=timedelta(0), type_id=type_id),
-                                          output_field=FloatField()), 0) for type_id in self.hours_by_types
+                                          output_field=FloatField()), 0.0) for type_id in self.hours_by_types
             })
         for wd_dict in work_days:
             empl_dict = res.setdefault(
@@ -501,19 +472,20 @@ class WorkersStatsGetter:
 
         if self.network.prev_months_work_hours_source in [Network.FACT_TIMESHEET, Network.MAIN_TIMESHEET]:
             hours_field_name_mapping = {
-                Network.FACT_TIMESHEET: ('fact_timesheet_total_hours', 'fact_timesheet_type'),
-                Network.MAIN_TIMESHEET: ('main_timesheet_total_hours', 'main_timesheet_type'),
+                Network.FACT_TIMESHEET: TimesheetItem.TIMESHEET_TYPE_FACT,
+                Network.MAIN_TIMESHEET: TimesheetItem.TIMESHEET_TYPE_MAIN,
             }
-            hours_field, type_field = hours_field_name_mapping.get(self.network.prev_months_work_hours_source)
+            timesheet_type = hours_field_name_mapping.get(self.network.prev_months_work_hours_source)
 
-            timesheet_prev_months_work_hours = list(Timesheet.objects.filter(
+            timesheet_prev_months_work_hours = list(TimesheetItem.objects.filter(
                 prev_months_q,
+                timesheet_type=timesheet_type,
                 employee_id__in=self.employees_dict.keys(),
-                **{f'{type_field}__is_work_hours': True},
+                day_type__is_work_hours=True,
             ).values(
                 'employee_id',
             ).annotate(
-                prev_months_work_hours=Sum(hours_field),
+                prev_months_work_hours=Sum('day_hours') + Sum('night_hours'),
             ).values_list('employee_id', 'prev_months_work_hours'))
 
             for is_fact_key in ['plan', 'fact']:
@@ -669,15 +641,15 @@ class WorkersStatsGetter:
                 type__is_reduce_norm=True,
             ).values('id'))),
             norm_hours_acc_period=Coalesce(
-                Sum('norm_hours'), 0),
+                Sum('norm_hours'), 0.0),
             norm_hours_prev_months=Coalesce(
-                Sum('norm_hours', filter=prev_months_q), 0),
+                Sum('norm_hours', filter=prev_months_q), 0.0),
             norm_hours_curr_month=Coalesce(
-                Sum('norm_hours', filter=curr_month_q), 0),
+                Sum('norm_hours', filter=curr_month_q), 0.0),
             norm_hours_curr_month_end=Coalesce(
-                Sum('norm_hours', filter=curr_month_end_q), 0),
+                Sum('norm_hours', filter=curr_month_end_q), 0.0),
             norm_hours_selected_period=Coalesce(
-                Sum('norm_hours', filter=selected_period_q), 0),
+                Sum('norm_hours', filter=selected_period_q), 0.0),
             empl_days_count=Count('dt'),
             empl_days_count_selected_period=Count('dt', filter=selected_period_q),
             empl_days_count_outside_of_selected_period=Count('dt', filter=outside_of_selected_period_q),
@@ -938,6 +910,8 @@ class WorkersStatsGetter:
 
                             sawh_hours['selected_period'] = sawh_hours.get('selected_period', 0) + \
                                 empl_dict.get('sawh_hours_plan_not_approved_selected_period', 0)
+                            sawh_hours['curr_month_without_reduce_norm'] = empl_dict.get('sawh_hours_by_months',
+                                                                                         {}).get(curr_month, 0)
 
                     else:
                         for empl_id, empl_dict in employee_dict.get('employments', {}).items():
@@ -948,6 +922,8 @@ class WorkersStatsGetter:
 
                             sawh_hours['selected_period'] = sawh_hours.get('selected_period', 0) + \
                                 empl_dict.get('sawh_hours_plan_approved_selected_period', 0)
+                            sawh_hours['curr_month_without_reduce_norm'] = empl_dict.get('sawh_hours_by_months', {}).get(
+                                curr_month, 0)
 
                     is_last_month = curr_month == acc_period_dt_to.month
                     if self.network.correct_norm_hours_last_month_acc_period and self.network.accounting_period_length > 1 and is_last_month:

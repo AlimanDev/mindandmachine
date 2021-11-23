@@ -8,9 +8,10 @@ from .models import (
     LocalFilesystemConnector,
     FtpFilesystemConnector,
     ImportStrategy,
-    SystemImportStrategy,
     ExportStrategy,
     SystemExportStrategy,
+    ImportShopMappingStrategy,
+    ImportHistDataStrategy,
 )
 
 
@@ -50,15 +51,20 @@ class ImportStrategyChildAdmin(PolymorphicChildModelAdmin):
     base_model = ImportStrategy
 
 
-@admin.register(SystemImportStrategy)
-class SystemImportStrategyAdmin(ImportStrategyChildAdmin):
+@admin.register(ImportShopMappingStrategy)
+class ImportShopMappingStrategyAdmin(ImportStrategyChildAdmin):
+    list_display = ('name',)
+
+
+@admin.register(ImportHistDataStrategy)
+class ImportHistDataStrategyAdmin(ImportStrategyChildAdmin):
     list_display = ('name',)
 
 
 @admin.register(ImportStrategy)
 class ImportStrategyAdmin(PolymorphicParentModelAdmin):
     base_model = ImportStrategy
-    child_models = (SystemImportStrategy,)
+    child_models = (ImportShopMappingStrategy, ImportHistDataStrategy,)
     base_list_display = ('name',)
     list_filter = (PolymorphicChildModelFilter,)
 

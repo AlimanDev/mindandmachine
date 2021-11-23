@@ -1,11 +1,14 @@
-from src.base.models import Employment, Shop
-from src.notifications.helpers import send_mass_html_mail
-from src.celery.celery import app
-from django_celery_beat.models import CrontabSchedule
-from django.db.models import Q
 from datetime import datetime
-from src.reports.models import ReportConfig
+
+from django.db.models import Q
+from django_celery_beat.models import CrontabSchedule
+
+from src.base.models import Employment, Shop
+from src.celery.celery import app
+from src.notifications.helpers import send_mass_html_mail
 from src.reports.helpers import get_datatuple
+from src.reports.models import ReportConfig
+
 
 @app.task
 def send_report_emails(report_config_id: int, zone: str):
@@ -14,13 +17,6 @@ def send_report_emails(report_config_id: int, zone: str):
     ).get(
         id=report_config_id,
     )
-    message_content = report_config.email_text or ''
-    subject = report_config.subject
-    recipients = report_config.get_recipients()
-
-    if report_config.email_addresses:
-        recipients.extend(report_config.email_addresses.split(','))
-    datatuple = []
     dates = report_config.get_dates(zone)
     context = {
         'dt_from': dates['dt_from'],
@@ -28,6 +24,13 @@ def send_report_emails(report_config_id: int, zone: str):
         'shop_ids': list(report_config.shops.all().values_list('id', flat=True)),
         'period_step': report_config.get_acc_period()
     }
+    message_content = report_config.email_text or ''
+    subject = report_config.subject
+    recipients = report_config.get_recipients(context)
+
+    if report_config.email_addresses:
+        recipients.extend(report_config.email_addresses.split(','))
+    datatuple = []
     if report_config.send_by_group_employments_shops:
         groups = list(report_config.groups.all())
         employments = Employment.objects.get_active().filter(

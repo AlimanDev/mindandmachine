@@ -1,28 +1,20 @@
 from datetime import datetime, date, timedelta, time
 
-from django.core import mail
-from src.notifications.models.event_notification import EventEmailNotification
-from src.timetable.events import VACANCY_CONFIRMED_TYPE
-from src.events.models import EventType
-
 from django.test import override_settings
 from rest_framework.test import APITestCase
 
+from src.base.models import Shop, NetworkConnect, Network, User, Employee, Employment, Group, FunctionGroup, \
+    WorkerPosition
 from src.timetable.models import (
-    Timesheet,
-    WorkerDay, 
-    WorkType, 
-    WorkTypeName, 
-    GroupWorkerDayPermission, 
+    WorkerDay,
+    WorkType,
+    WorkTypeName,
+    GroupWorkerDayPermission,
     WorkerDayPermission,
-    ShopMonthStat,
-    AttendanceRecords,
 )
-from src.base.models import Shop, NetworkConnect, Network, User, Employee, Employment, Group, FunctionGroup, WorkerPosition
-from src.recognition.models import TickPoint, Tick
-from src.timetable.models import ShopMonthStat
 from src.timetable.timesheet.tasks import calc_timesheets
 from src.util.mixins.tests import TestsHelperMixin
+
 
 @override_settings(OUTSOURCE=True)
 class TestOutsource(TestsHelperMixin, APITestCase):
@@ -278,8 +270,7 @@ class TestOutsource(TestsHelperMixin, APITestCase):
         self.assertEquals(duplicate.status_code, 200)
         self.assertTrue(WorkerDay.objects.filter(employee=self.client_employee, dt=dt, is_approved=False, type_id=WorkerDay.TYPE_HOLIDAY).exists())
 
-    
-    def test_get_timesheet_for_ousource_worker(self):
+    def test_get_timesheet_for_outsource_worker(self):
         empl = Employment.objects.create(
             shop=self.client_shop,
             employee=self.employee1,
@@ -296,7 +287,7 @@ class TestOutsource(TestsHelperMixin, APITestCase):
             is_approved=True,
         )
         with override_settings(FISCAL_SHEET_DIVIDER_ALIAS='nahodka'):
-            calc_timesheets(employee_id__in=[self.employee1.id], dt_from=dt, dt_to=dt+timedelta(1))
+            calc_timesheets(employee_id__in=[self.employee1.id], dt_from=dt, dt_to=dt+timedelta(1), reraise_exc=True)
         response = self.client.get('/rest_api/timesheet/')
         self.assertEquals(len(response.json()), 2)
         self.network_connect.allow_assign_employements_from_outsource = False

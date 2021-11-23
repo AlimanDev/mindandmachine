@@ -143,7 +143,9 @@ def search_holiday_candidate(vacancy, max_working_hours, constraints, exclude_po
         Q(dt_hired__isnull=True) | Q(dt_hired__lte=vacancy_dt),
         employee_id=OuterRef('pk'),
         shop__in=shop.exchange_shops.filter(dttm_deleted__isnull=True),
-    ).exclude(position__in=exclude_positions)
+    )
+    if exclude_positions:
+        active_employment_subq = active_employment_subq.exclude(position__in=exclude_positions)
     employees = Employee.objects.annotate(
         active_empl=Exists(active_employment_subq),
         workerdays_exists=Exists(
@@ -158,7 +160,7 @@ def search_holiday_candidate(vacancy, max_working_hours, constraints, exclude_po
         ),
         work_types_exists=Exists(
             EmploymentWorkType.objects.filter(
-                employment__in=OuterRef('employments'),
+                Q(employment=OuterRef('employments')),
                 work_type__work_type_name_id__in=work_types,
             )
         ),
@@ -362,6 +364,7 @@ def do_shift_elongation(vacancy, max_working_hours):
                 'shop_id': worker_day.shop_id,
                 'type': worker_day.type,
                 'employment': worker_day.employment,
+                'source': WorkerDay.SOURCE_SHIFT_ELONGATION,
             }
         )
         if created:
@@ -404,7 +407,7 @@ def do_shift_elongation(vacancy, max_working_hours):
             msg.send()
 
 
-def cancel_vacancy(vacancy_id, auto=True):
+def cancel_vacancy(vacancy_id, auto=True, delete=True):
     vacancy = WorkerDay.objects.filter(id=vacancy_id, is_vacancy=True).select_related(
         'shop', 
         'shop__director', 
@@ -414,13 +417,22 @@ def cancel_vacancy(vacancy_id, auto=True):
     if vacancy:
         shop = vacancy.shop
         employee = vacancy.employee
-        if auto or vacancy.created_by_id:
-            vacancy.delete()
+        vac_employment_id = vacancy.employment_id
+        child = vacancy.child.first()
+        if delete:
+            if auto or vacancy.created_by_id:
+                vacancy.delete()
+            else:
+                vacancy.canceled = True
+                vacancy.employee = None
+                vacancy.employment = None
+                vacancy.save()
         else:
-            vacancy.canceled = True
             vacancy.employee = None
             vacancy.employment = None
             vacancy.save()
+        if child and child.is_vacancy:
+            child.delete()
         if employee:
             employee_obj = employee
             employee = {
@@ -428,19 +440,55 @@ def cancel_vacancy(vacancy_id, auto=True):
                 'last_name': employee.user.last_name,
                 'tabel_code': employee.tabel_code or '',
             }
-            WorkerDay.objects.create(
+            wd_exists = WorkerDay.objects.filter(
                 dt=vacancy.dt,
                 employee=employee_obj,
                 is_approved=vacancy.is_approved,
                 is_fact=False,
-                dttm_work_start=None,
-                dttm_work_end=None,
-                shop_id=None,
-                type_id=WorkerDay.TYPE_HOLIDAY,
-                employment=None,
-                is_vacancy=False,
-                is_outsource=False,
-            )
+            ).exists()
+            created_wd = None
+            if not wd_exists:
+                created_wd = WorkerDay.objects.create(
+                    dt=vacancy.dt,
+                    employee=employee_obj,
+                    is_approved=vacancy.is_approved,
+                    is_fact=False,
+                    dttm_work_start=None,
+                    dttm_work_end=None,
+                    shop_id=None,
+                    type_id=WorkerDay.TYPE_HOLIDAY,
+                    employment_id=vac_employment_id,
+                    is_vacancy=False,
+                    is_outsource=False,
+                    source=WorkerDay.SOURCE_ON_CANCEL_VACANCY,
+                )
+            if child and child.is_vacancy:
+                wd_exists = WorkerDay.objects.filter(
+                    dt=child.dt,
+                    employee=employee_obj,
+                    is_approved=child.is_approved,
+                    is_fact=False,
+                ).exists()
+                if not wd_exists and created_wd:
+                    created_wd.id = None
+                    created_wd.is_approved = child.is_approved
+                    created_wd.save()
+                else:
+                    WorkerDay.objects.create(
+                        dt=vacancy.dt,
+                        employee=employee_obj,
+                        is_approved=child.is_approved,
+                        is_fact=False,
+                        dttm_work_start=None,
+                        dttm_work_end=None,
+                        shop_id=None,
+                        type_id=WorkerDay.TYPE_HOLIDAY,
+                        employment_id=vac_employment_id,
+                        is_vacancy=False,
+                        is_outsource=False,
+                        source=WorkerDay.SOURCE_ON_CANCEL_VACANCY,
+                    )
+                    
             event_signal.send(
                 sender=None,
                 network_id=shop.network_id,
@@ -490,6 +538,7 @@ def create_vacancy(dttm_from, dttm_to, shop_id, work_type_id, outsources=[]):
         shop_id=shop_id,
         is_outsource=is_outsource,
         is_approved=True, # чтобы в покрытии учитывалось при автоматическом создании вакансий
+        source=WorkerDay.SOURCE_AUTO_CREATED_VACANCY,
     )
     worker_day.outsources.add(*outsources)
     WorkerDayCashboxDetails.objects.create(
@@ -620,6 +669,8 @@ def confirm_vacancy(vacancy_id, user, employee_id=None, exchange=False, reconfir
                 **employee_filter,
             ).select_related(
                 'shop',
+                'employee',
+                'employee__user',
             ).first()
 
             # на даем откликнуться на вакансию, если нет активного трудоустройства в день вакансии
@@ -681,20 +732,12 @@ def confirm_vacancy(vacancy_id, user, employee_id=None, exchange=False, reconfir
 
                 prev_employee_id = vacancy.employee_id
                 if reconfirm and prev_employee_id:
-                    # возможно надо по-другому сделать (копировать всю подтв. версию в черновик?)
-                    WorkerDay.objects.filter(
-                        is_fact=False,
-                        is_approved=False,
-                        dt=vacancy.dt,
-                        employee_id=prev_employee_id,
-                        is_vacancy=True,
-                        dttm_work_start=vacancy.dttm_work_start,
-                        dttm_work_end=vacancy.dttm_work_end,
-                    ).delete()
+                    # TODO: возможно надо по-другому сделать (копировать всю подтв. версию в черновик?)
+                    # проставлять сотруднику, у которого отменили вакансию, выходной,
+                    # если нет других вакансий и не аутсорс?
+                    # вызывать cancel_vacancy + поправить внутри логику?
+                    cancel_vacancy(vacancy.id, delete=False)
 
-                # TODO: проставлять сотруднику, у которого отменили вакансию, выходной,
-                #  если нет других вакансий и не аутсорс?
-                #  вызывать cancel_vacancy + поправить внутри логику?
 
                 vacancy.employee = active_employment.employee
                 vacancy.employment = active_employment
@@ -705,22 +748,32 @@ def confirm_vacancy(vacancy_id, user, employee_id=None, exchange=False, reconfir
                     )
                 )
 
-                # TODO: тут ведь тоже надо поправить?
                 WorkerDay.objects_with_excluded.filter(
                     dt=vacancy.dt,
                     employee_id=vacancy.employee_id,
-                    is_fact=vacancy.is_fact,
+                    type__is_work_hours=False, 
+                    is_vacancy=False,
                     is_approved=False,
                 ).delete()
 
                 vacancy_details = WorkerDayCashboxDetails.objects.filter(
                     worker_day=vacancy).values('work_type_id', 'work_part')
 
+                vacancy.outsources.clear()
+
+                if vacancy_shop.network_id != vacancy.employee.user.network_id:
+                    vacancy.outsources.add(vacancy.employee.user.network_id)
+
                 try:
                     with transaction.atomic():
+                        parent_id = vacancy.id
+                        outsources = list(vacancy.outsources.all())
                         vacancy.id = None
                         vacancy.is_approved = False
+                        vacancy.parent_worker_day_id = parent_id
+                        vacancy.source = WorkerDay.SOURCE_ON_CONFIRM_VACANCY
                         vacancy.save()
+                        vacancy.outsources.add(*outsources)
 
                         WorkerDayCashboxDetails.objects.bulk_create(
                             WorkerDayCashboxDetails(

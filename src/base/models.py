@@ -10,7 +10,7 @@ from django.conf import settings
 from django.contrib.auth.models import (
     AbstractUser as DjangoAbstractUser,
 )
-from django.contrib.postgres.fields import JSONField
+
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models
 from django.db import transaction
@@ -22,9 +22,9 @@ from django.utils.functional import cached_property
 from django.utils.translation import gettext_lazy as _
 from model_utils import FieldTracker
 from mptt.models import MPTTModel, TreeForeignKey
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.serializers import ValidationError
 from timezone_field import TimeZoneField
-
 from src.base.models_abstract import (
     AbstractActiveModel,
     AbstractModel,
@@ -60,9 +60,10 @@ class Network(AbstractActiveModel):
     )
 
     TABEL_FORMAT_CHOICES = (
-        ('mts', 'MTSTabelGenerator'),
-        ('t13_custom', 'CustomT13TabelGenerator'),
-        ('aigul', 'AigulTabelGenerator'),
+        ('mts', 'MTSTimesheetGenerator'),
+        ('t13_custom', 'CustomT13TimesheetGenerator'),
+        ('aigul', 'AigulTimesheetGenerator'),
+        ('lines', 'TimesheetLinesGenerator'),
     )
 
     TIMETABLE_FORMAT_CHOICES = (
@@ -73,6 +74,15 @@ class Network(AbstractActiveModel):
     CONVERT_TABEL_TO_CHOICES = (
         ('xlsx', 'xlsx'),
         ('pdf', 'PDF'),
+    )
+
+
+    ROUND_TO_HALF_AN_HOUR = 0
+    ROUND_WH_ALGS = {
+        ROUND_TO_HALF_AN_HOUR: lambda wh: round(wh * 2) / 2,
+    }
+    ROUND_WORK_HOURS_ALG_CHOICES = (
+        (ROUND_TO_HALF_AN_HOUR, 'Округление до получаса'),
     )
 
     class Meta:
@@ -232,6 +242,15 @@ class Network(AbstractActiveModel):
         verbose_name='Макс. разница времени начала и времени окончания в факте и в плане '
                      'при проставлении ближайшего плана в ручной факт (в секундах)',
         default=60 * 60 * 5,
+    )
+    get_position_from_work_type_name_in_calc_timesheet = models.BooleanField(
+        default=False,
+        verbose_name='Получать должность по типу работ при формировании фактического табеля',
+    )
+    round_work_hours_alg = models.PositiveSmallIntegerField(
+        null=True, blank=True,
+        choices=ROUND_WORK_HOURS_ALG_CHOICES,
+        verbose_name='Алгоритм округления рабочих часов',
     )
 
     DEFAULT_NIGHT_EDGES = (
@@ -668,6 +687,7 @@ class Shop(MPTTModel, AbstractActiveNetworkSpecificCodeNamedModel):
                                 )
                             )
 
+    @tracker
     def save(self, *args, force_create_director_employment=False, force_set_defaults=False, **kwargs):
         is_new = self.id is None
         if self.open_times.keys() != self.close_times.keys():
@@ -687,6 +707,7 @@ class Shop(MPTTModel, AbstractActiveNetworkSpecificCodeNamedModel):
         load_template_changed = self.tracker.has_changed('load_template')
         if load_template_changed and self.load_template_status == self.LOAD_TEMPLATE_PROCESS:
             raise ValidationError(_('It is not possible to change the load template as it is in the calculation process.'))
+
         res = super().save(*args, **kwargs)
         if is_new:
             transaction.on_commit(self._handle_new_shop_created)
@@ -907,6 +928,23 @@ class Group(AbstractActiveNetworkSpecificCodeNamedModel):
             # ', '.join(list(self.subordinates.values_list('name', flat=True)))
         )
 
+    @classmethod
+    def check_has_perm_to_group(cls, user, group=None, groups=[]):
+        group_perm = True
+        if groups or group:
+            groups = groups or [group,]
+            group_perm = cls.objects.filter(
+                Q(employments__employee__user=user) | Q(workerposition__employment__employee__user=user),
+                subordinates__id__in=groups,
+            ).exists()
+
+        return group_perm
+
+    @classmethod
+    def check_has_perm_to_edit_group_objects(cls, group_from, group_to, user):
+        if not (cls.check_has_perm_to_group(user, group=group_from) and cls.check_has_perm_to_group(user, group=group_to)):
+            raise PermissionDenied()
+
 
 class ProductionDay(AbstractModel):
     """
@@ -1028,6 +1066,7 @@ class User(DjangoAbstractUser, AbstractModel):
         super().__init__(*args, **kwargs)
 
     id = models.BigAutoField(primary_key=True)
+    first_name = models.CharField(blank=True, max_length=30, verbose_name='first name')
     middle_name = models.CharField(max_length=64, blank=True, null=True)
 
     dttm_added = models.DateTimeField(auto_now_add=True)
@@ -1105,9 +1144,8 @@ class User(DjangoAbstractUser, AbstractModel):
         )
 
     def get_group_ids(self, shop=None):
-        return self.get_active_employments(shop=shop).annotate(
-            group_id=Coalesce(F('function_group_id'), F('position__group_id')),
-        ).values_list('group_id', flat=True)
+        groups = self.get_active_employments(shop=shop).values_list('position__group_id', 'function_group_id')
+        return list(set(list(map(lambda x: x[0], groups)) + list(map(lambda x: x[1], groups))))
 
     def save(self, *args, **kwargs):
         if not self.password and settings.SET_USER_PASSWORD_AS_LOGIN:
@@ -1202,12 +1240,7 @@ class EmploymentQuerySet(AnnotateValueEqualityQSMixin, QuerySet):
             wdays_ids = list(WorkerDay.objects.filter(employment__in=self).values_list('id', flat=True))
             WorkerDay.objects.filter(employment__in=self).update(employment_id=None)
             self.update(dttm_deleted=timezone.now())
-            transaction.on_commit(lambda: clean_wdays.delay(
-                only_logging=False,
-                filter_kwargs=dict(
-                    id__in=wdays_ids,
-                ),
-            ))
+            transaction.on_commit(lambda: clean_wdays.delay(id__in=wdays_ids))
 
 
 class Employee(AbstractModel):
@@ -1294,16 +1327,13 @@ class Employment(AbstractActiveModel):
     def delete(self, **kwargs):
         from src.timetable.models import WorkerDay
         from src.timetable.worker_day.tasks import clean_wdays
+        from src.integration.tasks import export_or_delete_employment_zkteco
         with transaction.atomic():
             wdays_ids = list(WorkerDay.objects.filter(employment=self).values_list('id', flat=True))
             WorkerDay.objects.filter(employment=self).update(employment_id=None)
             if self.employee.user.network.clean_wdays_on_employment_dt_change:
-                transaction.on_commit(lambda: clean_wdays.delay(
-                    only_logging=False,
-                    filter_kwargs=dict(
-                        id__in=wdays_ids,
-                    ),
-                ))
+                transaction.on_commit(lambda: clean_wdays.delay(id__in=wdays_ids))
+            transaction.on_commit(lambda: export_or_delete_employment_zkteco.delay(self.id))
             return super(Employment, self).delete(**kwargs)
 
     def __init__(self, *args, **kwargs):
@@ -1321,7 +1351,9 @@ class Employment(AbstractActiveModel):
         if position_code:
             self.position = WorkerPosition.objects.get(code=position_code)
 
+    @tracker
     def save(self, *args, **kwargs):
+        from src.integration.tasks import export_or_delete_employment_zkteco
         if hasattr(self, 'shop_code'):
             self.shop = Shop.objects.get(code=self.shop_code)
         if hasattr(self, 'username'):
@@ -1377,32 +1409,30 @@ class Employment(AbstractActiveModel):
             from src.timetable.worker_day.tasks import clean_wdays
             from src.timetable.models import WorkerDay
             from src.util.models_converter import Converter
-            kwargs = {
-                'only_logging': False,
-                'clean_plan_empl': True,
-            }
+            kwargs = {}
             if is_new:
-                kwargs['filter_kwargs'] = {
-                    'type__is_dayoff': False,
+                kwargs = {
                     'employee_id': self.employee_id,
                 }
                 if self.dt_hired:
-                    kwargs['filter_kwargs']['dt__gte'] = Converter.convert_date(self.dt_hired)
+                    kwargs['dt__gte'] = Converter.convert_date(self.dt_hired)
                 if self.dt_fired:
-                    kwargs['filter_kwargs']['dt__lt'] = Converter.convert_date(self.dt_fired)
+                    kwargs['dt__lt'] = Converter.convert_date(self.dt_fired)
             else:
                 prev_dt_hired = self.tracker.previous('dt_hired')
                 if prev_dt_hired and prev_dt_hired < self.dt_hired:
                     dt__gte = prev_dt_hired
                 else:
                     dt__gte = self.dt_hired
-                kwargs['filter_kwargs'] = {
-                    'type__is_dayoff': False,
+                kwargs = {
                     'employee_id': self.employee_id,
                     'dt__gte': Converter.convert_date(dt__gte),
                 }
 
-            clean_wdays.apply_async(kwargs=kwargs)
+            transaction.on_commit(lambda: clean_wdays.apply_async(**kwargs))
+
+        if (is_new or self.tracker.has_changed('dt_hired') or self.tracker.has_changed('dt_fired')) and settings.ZKTECO_INTEGRATION:
+            transaction.on_commit(lambda: export_or_delete_employment_zkteco.delay(self.id))
 
         return res
 
@@ -1470,12 +1500,15 @@ class FunctionGroup(AbstractModel):
         ('Shop', 'Отдел (department)'),
         ('Shop_stat', 'Статистика по отделам (Получить) (department/stat/)'),
         ('Shop_tree', 'Дерево отделов (Получить) (department/tree/)'),
+        ('Shop_load_template', 'Изменить шаблон нагрузки магазина (Обновить) (department/{pk}/load_template/)'),
         ('Shop_outsource_tree', 'Дерево отделов клиентов (для аутсорс компаний) (Получить) (department/outsource_tree/)'),
         ('Subscribe', 'Subscribe (subscribe)'),
         ('TickPoint', 'Точка отметки (tick_points)'),
         ('Timesheet', 'Табель (timesheet)'),
         ('Timesheet_stats', 'Статистика табеля (Получить) (timesheet/stats/)'),
         ('Timesheet_recalc', 'Запустить пересчет табеля (Создать) (timesheet/recalc/)'),
+        ('Timesheet_lines', 'Табель построчно (Получить) (timesheet/lines/)'),
+        ('Timesheet_items', 'Сырые данные табеля (Получить) (timesheet/items/)'),
         ('User', 'Пользователь (user)'),
         ('User_change_password', 'Сменить пароль пользователю (Создать) (auth/password/change/)'),
         ('User_delete_biometrics', 'Удалить биометрию пользователя (Создать) (user/delete_biometrics/)'),
@@ -1614,7 +1647,7 @@ class SAWHSettings(AbstractActiveNetworkSpecificCodeNamedModel):
         (FIXED_HOURS, 'Фикс. кол-во часов в месяц'),
     )
 
-    work_hours_by_months = JSONField(
+    work_hours_by_months = models.JSONField(
         verbose_name='Настройки по распределению часов в рамках уч. периода',
     )  # Название ключей должно начинаться с m (например январь -- m1), чтобы можно было фильтровать через django orm
     type = models.PositiveSmallIntegerField(

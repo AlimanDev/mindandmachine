@@ -1,8 +1,14 @@
 from rest_framework import serializers
+
 from src.timetable.models import WorkerDayType
 
 
 class WorkerDayTypeSerializer(serializers.ModelSerializer):
+    allowed_additional_types = serializers.SerializerMethodField()
+
+    def get_allowed_additional_types(self, obj):
+        return [t.code for t in obj.allowed_additional_types_list]
+
     class Meta:
         model = WorkerDayType
         fields = (
@@ -21,4 +27,7 @@ class WorkerDayTypeSerializer(serializers.ModelSerializer):
             'show_stat_in_hours',
             'ordering',
             'is_active',
+            'get_work_hours_method',
+            'has_details',
+            'allowed_additional_types',
         )

@@ -4,6 +4,7 @@ from calendar import Calendar
 from datetime import datetime, timedelta, time
 from unittest import mock
 
+import pandas as pd
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import transaction
 from django.urls import reverse
@@ -191,7 +192,8 @@ class TestsHelperMixin:
                 self.get_url('WorkerDay-approve'), data=self.dump_data(approve_data), content_type='application/json')
         return resp
 
-    def _create_san_day(self):
+    @classmethod
+    def _create_san_day(cls):
         return WorkerDayTypeFactory(
             code='SD',
             name='Санитарный день',
@@ -224,3 +226,9 @@ class TestsHelperMixin:
             dttm_work_start=dttm_work_start,
             dttm_work_end=dttm_work_end,
         )
+
+    @staticmethod
+    def save_df_as_excel(df, filename):
+        writer = pd.ExcelWriter(filename, engine='xlsxwriter')
+        df.to_excel(writer)
+        writer.save()

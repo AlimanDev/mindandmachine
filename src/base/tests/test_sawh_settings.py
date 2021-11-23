@@ -20,7 +20,7 @@ from src.base.tests.factories import (
     EmployeeFactory,
     RegionFactory,
 )
-from src.timetable.models import WorkerDay, Timesheet
+from src.timetable.models import WorkerDay, TimesheetItem
 from src.timetable.tests.factories import WorkerDayFactory
 from src.timetable.timesheet.tasks import calc_timesheets
 from src.timetable.timesheet.utils import get_timesheet_stats
@@ -533,7 +533,7 @@ class TestSAWHSettingsQuarterAccPeriod(SawhSettingsHelperMixin, TestCase):
 
         calc_timesheets(employee_id__in=[self.employee.id], dt_from=date(2021, 7, 1), dt_to=date(2021, 7, 31))
 
-        timesheet_qs = Timesheet.objects.filter(
+        timesheet_qs = TimesheetItem.objects.filter(
             employee=self.employee,
             dt__gte=date(2021, 7, 1),
             dt__lte=date(2021, 7, 31),
@@ -557,7 +557,7 @@ class TestSAWHSettingsQuarterAccPeriod(SawhSettingsHelperMixin, TestCase):
         ProductionDay.objects.create(
             region=subregion, dt=date(2021, 8, 30), type=ProductionDay.TYPE_HOLIDAY, is_celebration=True)
 
-        timesheet_qs = Timesheet.objects.filter(
+        timesheet_qs = TimesheetItem.objects.filter(
             employee=self.employee,
             dt__gte=date(2021, 7, 1),
             dt__lte=date(2021, 7, 31),
@@ -590,7 +590,7 @@ class TestSAWHSettingsQuarterAccPeriod(SawhSettingsHelperMixin, TestCase):
         calc_timesheets(employee_id__in=[self.employee.id], dt_from=date(2021, 8, 1), dt_to=date(2021, 8, 31))
         calc_timesheets(employee_id__in=[self.employee.id], dt_from=date(2021, 9, 1), dt_to=date(2021, 9, 30))
 
-        timesheet_qs = Timesheet.objects.filter(
+        timesheet_qs = TimesheetItem.objects.filter(
             employee=self.employee,
             dt__gte=date(2021, 9, 1),
             dt__lte=date(2021, 9, 30),
@@ -609,7 +609,7 @@ class TestSAWHSettingsQuarterAccPeriod(SawhSettingsHelperMixin, TestCase):
         self.network.save()
 
         calc_timesheets(employee_id__in=[self.employee.id], dt_from=date(2021, 9, 1), dt_to=date(2021, 9, 30))
-        timesheet_qs = Timesheet.objects.filter(
+        timesheet_qs = TimesheetItem.objects.filter(
             employee=self.employee,
             dt__gte=date(2021, 9, 1),
             dt__lte=date(2021, 9, 30),
@@ -716,7 +716,7 @@ class TestSAWHSettingsQuarterAccPeriod(SawhSettingsHelperMixin, TestCase):
         )
 
         calc_timesheets(employee_id__in=[self.employee.id], dt_from=date(2021, 7, 1), dt_to=date(2021, 7, 31))
-        timesheet_qs = Timesheet.objects.filter(
+        timesheet_qs = TimesheetItem.objects.filter(
             employee=self.employee,
             dt__gte=date(2021, 7, 1),
             dt__lte=date(2021, 7, 31),
@@ -727,13 +727,13 @@ class TestSAWHSettingsQuarterAccPeriod(SawhSettingsHelperMixin, TestCase):
             dt_to=date(2021, 7, 31),
             user=self.worker,
         )
-        self.assertEqual(timesheet_stats[self.employee.id]['main_total_hours_sum'], None)
+        self.assertEqual(timesheet_stats[self.employee.id]['main_total_hours_sum'], 0)
         self.assertEqual(timesheet_stats[self.employee.id]['sawh_hours'], 176)
 
         calc_timesheets(employee_id__in=[self.employee.id], dt_from=date(2021, 8, 1), dt_to=date(2021, 8, 31))
         calc_timesheets(employee_id__in=[self.employee.id], dt_from=date(2021, 9, 1), dt_to=date(2021, 9, 30))
 
-        timesheet_qs = Timesheet.objects.filter(
+        timesheet_qs = TimesheetItem.objects.filter(
             employee=self.employee,
             dt__gte=date(2021, 9, 1),
             dt__lte=date(2021, 9, 30),
@@ -752,7 +752,7 @@ class TestSAWHSettingsQuarterAccPeriod(SawhSettingsHelperMixin, TestCase):
         self.network.save()
 
         calc_timesheets(employee_id__in=[self.employee.id], dt_from=date(2021, 9, 1), dt_to=date(2021, 9, 30))
-        timesheet_qs = Timesheet.objects.filter(
+        timesheet_qs = TimesheetItem.objects.filter(
             employee=self.employee,
             dt__gte=date(2021, 9, 1),
             dt__lte=date(2021, 9, 30),

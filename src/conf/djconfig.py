@@ -9,6 +9,7 @@ config importance
 import enum
 import os
 import sys
+from decimal import Decimal
 
 import environ
 from celery.schedules import crontab
@@ -121,7 +122,7 @@ FCM_DJANGO_SETTINGS = {
 
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
-    'django_cookies_samesite.middleware.CookiesSameSite',
+    # 'django_cookies_samesite.middleware.CookiesSameSite',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.locale.LocaleMiddleware',
@@ -131,7 +132,7 @@ MIDDLEWARE = [
     'sesame.middleware.AuthenticationMiddleware',
     # 'src.main.auth.middleware.JWTAuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
-    'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'src.base.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
 ROOT_URLCONF = 'src.urls'
@@ -296,7 +297,6 @@ def add_logger(name, level='DEBUG', formatter='simple', extra_handlers: list = N
 add_logger('clean_wdays')
 add_logger('send_doctors_schedule_to_mis')
 add_logger('calc_timesheets', extra_handlers=['mail_admins'])
-add_logger('send_doctors_schedule_to_mis', extra_handlers=['mail_admins'])
 add_logger('mda_integration', extra_handlers=['mail_admins'])
 add_logger('algo_set_timetable', level='DEBUG' if DEBUG else 'INFO')
 add_logger('import_jobs', extra_handlers=['mail_admins'])
@@ -502,6 +502,19 @@ ENV_LVL_LOCAL = 'local'
 ENV_LVL = env.str('ENV_LVL', default='')
 
 API_LOG_DELETE_GAP = 90
+
+# если текущий день месяца > {CALC_TIMESHEET_PREV_MONTH_THRESHOLD_DAYS},
+# то за прошлый месяца автоматически пересчет не запускается
+CALC_TIMESHEET_PREV_MONTH_THRESHOLD_DAYS = 4
+
+TIMESHEET_MAX_HOURS_THRESHOLD = Decimal('12.00')
+TIMESHEET_MIN_HOURS_THRESHOLD = Decimal('4.00')
+
+DOWNLOAD_TIMETABLE_GET_CODE_FUNC = lambda e: e.employee.tabel_code or ''
+
+DEFAULT_AUTO_FIELD = 'django.db.models.AutoField'
+
+X_FRAME_OPTIONS = 'SAMEORIGIN'
 
 if is_config_exists('djconfig_local.py'):
     from .djconfig_local import *

@@ -19,6 +19,7 @@ from src.timetable.models import (
     AttendanceRecords,
 )
 from src.timetable.tests.factories import WorkerDayFactory
+from src.timetable.worker_day.serializers import CopyApprovedSerializer
 from src.util.mixins.tests import TestsHelperMixin
 
 
@@ -145,9 +146,11 @@ class TestOutsource(TestsHelperMixin, APITestCase):
             format='json'
         )
     
-    def _create_and_apply_vacancy(self):
+    def _create_and_apply_vacancy(self, night_shift=False):
         dt_now = self.dt_now
-        vacancy = self._create_vacancy(dt_now, datetime.combine(dt_now, time(8)), datetime.combine(dt_now, time(20)), outsources=[self.outsource_network.id,]).json()
+        dttm_work_start = datetime.combine(dt_now, time(20)) if night_shift else datetime.combine(dt_now, time(8))
+        dttm_work_end = datetime.combine(dt_now + timedelta(1), time(8)) if night_shift else datetime.combine(dt_now, time(20))
+        vacancy = self._create_vacancy(dt_now, dttm_work_start, dttm_work_end, outsources=[self.outsource_network.id,]).json()
         WorkerDay.objects.all().update(is_approved=True)
         self.client.force_authenticate(user=self.user1)
         response = self.client.post(f'/rest_api/worker_day/{vacancy["id"]}/confirm_vacancy/')
@@ -243,7 +246,7 @@ class TestOutsource(TestsHelperMixin, APITestCase):
         dt_now = self.dt_now
         vacancy_without_outsource = self._create_vacancy(dt_now, datetime.combine(dt_now, time(8)), datetime.combine(dt_now, time(20)), is_outsource=False).json()
         vacancy_without_outsources = self._create_vacancy(dt_now, datetime.combine(dt_now, time(8)), datetime.combine(dt_now, time(20)), outsources=[self.outsource_network2.id,]).json()
-        vacancy = self._create_vacancy(dt_now, datetime.combine(dt_now, time(8)), datetime.combine(dt_now, time(20)), outsources=[self.outsource_network.id,]).json()
+        vacancy = self._create_vacancy(dt_now, datetime.combine(dt_now, time(8)), datetime.combine(dt_now, time(20)), outsources=[self.outsource_network.id, self.outsource_network2.id]).json()
         WorkerDay.objects.all().update(is_approved=True)
         self.client.force_authenticate(user=self.user1)
         response = self.client.post(f'/rest_api/worker_day/{vacancy_without_outsource["id"]}/confirm_vacancy/')
@@ -263,6 +266,10 @@ class TestOutsource(TestsHelperMixin, APITestCase):
         vacancy = WorkerDay.objects.get(id=vacancy['id'])
         self.assertEqual(vacancy.employee_id, self.employee1.id)
         self.assertEqual(vacancy.employment_id, self.employment1.id)
+        not_approved_vacancy = WorkerDay.objects.filter(parent_worker_day_id=vacancy.id).first()
+        self.assertIsNotNone(not_approved_vacancy)
+        self.assertEquals(list(not_approved_vacancy.outsources.all()), [self.outsource_network,])
+        self.assertEquals(list(vacancy.outsources.all()), [self.outsource_network,])
 
     def test_confirm_vacancy_to_worker(self):
         dt_now = self.dt_now
@@ -312,7 +319,7 @@ class TestOutsource(TestsHelperMixin, APITestCase):
         vacancy.refresh_from_db()
         self.assertEqual(vacancy.employee_id, self.employee3.id)
         self.assertEqual(vacancy.employment_id, self.employment3.id)
-        self.assertIsNone(WorkerDay.objects.filter(employee_id=self.employee2.id).first())
+        self.assertIsNone(WorkerDay.objects.filter(employee_id=self.employee2.id, is_vacancy=True).first())
         WorkerDayFactory(
             dt=dt_now,
             is_fact=True,
@@ -339,6 +346,7 @@ class TestOutsource(TestsHelperMixin, APITestCase):
             dt=dt_now,
             type_id=WorkerDay.TYPE_HOLIDAY,
             employee=self.client_employee,
+            employment=self.client_employment,
             is_approved=True,
         )
         response = self.client.post(f'/rest_api/worker_day/{vacancy["id"]}/confirm_vacancy/')
@@ -384,7 +392,7 @@ class TestOutsource(TestsHelperMixin, APITestCase):
         self.assertEqual(len(list(filter(lambda x: x['id'] == self.root_shop.id, response.json()))), 1)
 
     def test_get_worker_days_for_urv(self):
-        vacancy = self._create_and_apply_vacancy()
+        vacancy = self._create_and_apply_vacancy(night_shift=True)
         self.client.logout()
         self._authorize_tick_point()
         response = self.client.get(self.get_url('TimeAttendanceWorkerDay-list'))
@@ -440,7 +448,26 @@ class TestOutsource(TestsHelperMixin, APITestCase):
                     'show_user_biometrics_block': False,
                     'unaccounted_overtime_threshold': 60,
                     'forbid_edit_employments_came_through_integration': True,
+                    'get_position_from_work_type_name_in_calc_timesheet': False,
                     'show_remaking_choice': False,
+                    'shop_name_form': {
+                        "singular": {
+                            "I": "магазин",
+                            "R": "магазина",
+                            "D": "магазину",
+                            "V": "магазин",
+                            "T": "магазином",
+                            "P": "магазине"
+                        },
+                        "plural": {
+                            "I": "магазины",
+                            "R": "магазинов",
+                            "D": "магазинам",
+                            "V": "магазины",
+                            "T": "магазинами",
+                            "P": "магазинах"
+                        }
+                    }
                 }
             }
         ]
@@ -496,6 +523,21 @@ class TestOutsource(TestsHelperMixin, APITestCase):
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.json(), ['Вы не можете подтвердить вакансию из другой сети.'])
 
+    def test_approve_vacancy_with_worker_copy_outsources(self):
+        dt_now = self.dt_now
+        vacancy = self._create_vacancy(dt_now, datetime.combine(dt_now, time(8)), datetime.combine(dt_now, time(20)), outsources=[self.outsource_network.id,]).json()
+        wd = WorkerDay.objects.get(id=vacancy['id'])
+        wd.employee = self.employee1
+        wd.employment = self.employment1
+        wd.save()
+        response = self.client.post(f"/rest_api/worker_day/{vacancy['id']}/approve_vacancy/")
+        self.assertEqual(response.status_code, 200)
+        wd.refresh_from_db()
+        self.assertTrue(wd.is_approved)
+        nawd = WorkerDay.objects.filter(parent_worker_day=wd).first()
+        self.assertIsNotNone(nawd)
+        self.assertEquals(list(nawd.outsources.all()), [self.outsource_network,])
+
     def test_client_can_get_and_approve_wd_for_employee_from_other_network_emploeed_in_own_shop(self):
         self.employment2.shop = self.client_shop
         self.employment2.save()
@@ -547,3 +589,106 @@ class TestOutsource(TestsHelperMixin, APITestCase):
         response = self.client.post(f'/rest_api/worker_day/{vacancy["id"]}/reconfirm_vacancy_to_worker/', {'user_id': self.user1.id})
         self.assertEqual(response.status_code, 404)
         self.assertEquals(response.json(), {'result': 'Такой вакансии не существует'})
+
+    def test_approve_with_worker_copy_outsources(self):
+        dt_now = self.dt_now
+        vacancy = self._create_vacancy(dt_now, datetime.combine(dt_now, time(8)), datetime.combine(dt_now, time(20)), outsources=[self.outsource_network.id,]).json()
+        wd = WorkerDay.objects.get(id=vacancy['id'])
+        wd.employee = self.employee1
+        wd.employment = self.employment1
+        wd.save()
+        response = self.client.post(f"/rest_api/worker_day/approve/", {"shop_id": vacancy['shop_id'], "dt_from": dt_now, "dt_to": dt_now})
+        self.assertEqual(response.status_code, 200)
+        wd.refresh_from_db()
+        self.assertTrue(wd.is_approved)
+        nawd = WorkerDay.objects.filter(parent_worker_day=wd).first()
+        self.assertIsNotNone(nawd)
+        self.assertEquals(list(nawd.outsources.all()), [self.outsource_network,])
+
+    def test_copy_plan_to_plan_copy_outsources(self):
+        dt_now = self.dt_now
+        vacancy = self._create_vacancy(dt_now, datetime.combine(dt_now, time(8)), datetime.combine(dt_now, time(20)), outsources=[self.outsource_network.id,]).json()
+        WorkerDay.objects.all().update(is_approved=True)
+        wd = WorkerDay.objects.get(id=vacancy['id'])
+        wd.employee = self.employee1
+        wd.employment = self.employment1
+        wd.save()
+        response = self.client.post(
+            f"/rest_api/worker_day/copy_approved/", 
+            self.dump_data({"employee_ids": [self.employee1.id,], "dates": [dt_now,], "type": CopyApprovedSerializer.TYPE_PLAN_TO_PLAN}),
+            content_type='application/json',
+        )
+        self.assertEqual(response.status_code, 200)
+        copied = WorkerDay.objects.filter(parent_worker_day=wd).first()
+        self.assertIsNotNone(copied)
+        self.assertEquals(list(copied.outsources.all()), [self.outsource_network,])
+
+    def test_copy_plan_to_fact_copy_outsources(self):
+        dt_now = self.dt_now
+        vacancy = self._create_vacancy(dt_now, datetime.combine(dt_now, time(8)), datetime.combine(dt_now, time(20)), outsources=[self.outsource_network.id,]).json()
+        WorkerDay.objects.all().update(is_approved=True)
+        wd = WorkerDay.objects.get(id=vacancy['id'])
+        wd.employee = self.employee1
+        wd.employment = self.employment1
+        wd.save()
+        response = self.client.post(
+            f"/rest_api/worker_day/copy_approved/", 
+            self.dump_data({"employee_ids": [self.employee1.id,], "dates": [dt_now,], "type": CopyApprovedSerializer.TYPE_PLAN_TO_FACT}),
+            content_type='application/json',
+        )
+        self.assertEqual(response.status_code, 200)
+        copied = WorkerDay.objects.filter(parent_worker_day=wd).first()
+        self.assertIsNotNone(copied)
+        self.assertEquals(list(copied.outsources.all()), [])
+
+    def test_copy_range_copy_outsources(self):
+        dt_now = self.dt_now
+        vacancy = self._create_vacancy(dt_now, datetime.combine(dt_now, time(8)), datetime.combine(dt_now, time(20)), outsources=[self.outsource_network.id,]).json()
+        wd = WorkerDay.objects.get(id=vacancy['id'])
+        wd.employee = self.employee1
+        wd.employment = self.employment1
+        wd.save()
+        response = self.client.post(
+            f"/rest_api/worker_day/copy_range/", 
+            self.dump_data({
+                "employee_ids": [self.employee1.id,],
+                "from_copy_dt_from": dt_now, 
+                "from_copy_dt_to": dt_now,
+                "to_copy_dt_from": dt_now + timedelta(1),
+                "to_copy_dt_to": dt_now + timedelta(1),
+            }),
+            content_type='application/json',
+        )
+        self.assertEqual(response.status_code, 200)
+        nawd = WorkerDay.objects.filter(dt=dt_now + timedelta(1), employee=self.employee1.id).first()
+        self.assertIsNotNone(nawd)
+        self.assertEquals(list(nawd.outsources.all()), [self.outsource_network,])
+
+    def test_exhange_copy_outsources(self):
+        dt_now = self.dt_now
+        vacancy = self._create_vacancy(dt_now, datetime.combine(dt_now, time(8)), datetime.combine(dt_now, time(20)), outsources=[self.outsource_network.id,]).json()
+        wd = WorkerDay.objects.get(id=vacancy['id'])
+        wd.employee = self.employee1
+        wd.employment = self.employment1
+        wd.save()
+        WorkerDay.objects.create(
+            type_id=WorkerDay.TYPE_HOLIDAY,
+            dt=dt_now,
+            employee=self.employee2,
+            employment=self.employment2,
+        )
+        response = self.client.post(
+            f"/rest_api/worker_day/exchange/", 
+            self.dump_data({
+                "employee1_id": self.employee1.id,
+                "employee2_id": self.employee2.id,
+                "dates": [dt_now,],
+            }),
+            content_type='application/json',
+        )
+        self.assertEqual(response.status_code, 200)
+        employee1_wd = WorkerDay.objects.filter(employee=self.employee1, dt=dt_now).first()
+        employee2_wd = WorkerDay.objects.filter(employee=self.employee2, dt=dt_now).first()
+        self.assertIsNotNone(employee1_wd)
+        self.assertIsNotNone(employee2_wd)
+        self.assertEquals(list(employee2_wd.outsources.all()), [self.outsource_network,])

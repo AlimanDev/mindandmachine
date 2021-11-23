@@ -1,5 +1,7 @@
 import datetime
 import json
+from decimal import Decimal
+
 from django.conf import settings
 from django.contrib.auth.models import (
     UserManager
@@ -10,6 +12,7 @@ from django.db.models import (
     Subquery, OuterRef, Max, Q, Case, When, Value, FloatField, F, IntegerField, Exists, BooleanField, Min, Count
 )
 from django.db.models import UniqueConstraint
+from django.db.models.fields import PositiveSmallIntegerField
 from django.db.models.functions import Abs, Cast, Extract, Least
 from django.db.models.query import QuerySet
 from django.utils import timezone
@@ -60,6 +63,13 @@ class WorkTypeManager(AbstractActiveModelManager):
 
 
 class WorkTypeName(AbstractActiveNetworkSpecificCodeNamedModel):
+    position = models.ForeignKey(
+        'base.WorkerPosition', null=True, blank=True, on_delete=models.PROTECT,
+        verbose_name='С какой должностью соотносится тип работ',
+        help_text='Используется при формировании табеля для получения должности по типу работ, если включена настройка'
+                  '"Получать должность по типу работ при формировании фактического табеля"'
+    )
+
     class Meta(AbstractActiveNetworkSpecificCodeNamedModel.Meta):
         verbose_name = 'Название типа работ'
         verbose_name_plural = 'Названия типов работ'
@@ -331,8 +341,7 @@ class WorkerDayQuerySet(AnnotateValueEqualityQSMixin, QuerySet):
 
 class WorkerDayManager(models.Manager):
     def get_queryset(self):
-        return super().get_queryset().exclude(
-            type__is_dayoff=False, employment_id__isnull=True, employee_id__isnull=False)
+        return super().get_queryset().exclude(employment_id__isnull=True, employee_id__isnull=False)
 
     def qos_current_version(self, approved_only=False):
         if approved_only:
@@ -400,6 +409,17 @@ class WorkerDayOutsourceNetwork(AbstractModel):
 
 
 class WorkerDayType(AbstractModel):
+    GET_WORK_HOURS_METHOD_TYPE_MONTH_AVERAGE_SAWH_HOURS = 'average_sawh_hours'
+    GET_WORK_HOURS_METHOD_TYPE_NORM_HOURS = 'norm_hours'
+    GET_WORK_HOURS_METHOD_TYPE_MANUAL = 'manual'
+
+    GET_WORK_HOURS_METHOD_TYPES = (
+        (GET_WORK_HOURS_METHOD_TYPE_MONTH_AVERAGE_SAWH_HOURS,
+         'Расчет часов на основе среднемесячного значения рекомендуемой нормы'),
+        (GET_WORK_HOURS_METHOD_TYPE_NORM_HOURS, 'Расчет часов на основе нормы по производственному календарю'),
+        (GET_WORK_HOURS_METHOD_TYPE_MANUAL, 'Ручное проставление часов'),
+    )
+
     code = models.CharField(max_length=64, primary_key=True, verbose_name='Код', help_text='Первычный ключ')
     name = models.CharField(max_length=64, verbose_name='Имя')
     short_name = models.CharField('Для отображения в ячейке', max_length=8)
@@ -428,6 +448,22 @@ class WorkerDayType(AbstractModel):
         'Отображать в статистике по сотрудникам сумму часов отдельно для этого типа',
         default=False,
     )
+    get_work_hours_method = models.CharField(
+        'Способ получения рабочих часов',
+        help_text='Актуально для нерабочих типов дней. '
+                  'Для рабочих типов кол-во часов считается на основе времени начала и окончания.',
+        max_length=32, blank=True,
+        choices=GET_WORK_HOURS_METHOD_TYPES,
+    )
+    has_details = models.BooleanField('Есть детали рабочего дня', default=False)
+    allowed_additional_types = models.ManyToManyField(
+        'self', blank=True,
+        verbose_name='Типы дней, которые можно добавлять одновременно с текущим типом дня (только для нерабочих типов дней)',
+        help_text='Например, если необходимо разрешить создание рабочих дней в отпуск, то '
+                  'для типа дня "Отпуск" нужно добавить в это поле тип дня "Рабочий день',
+        symmetrical=False,
+        related_name='allowed_as_additional_for',
+    )
     ordering = models.PositiveSmallIntegerField(default=0)
     is_active = models.BooleanField(default=True)
 
@@ -445,7 +481,7 @@ class WorkerDayType(AbstractModel):
 
     @classmethod
     def get_wd_types_dict(cls):
-        return {wdt.code: wdt for wdt in cls.objects.all()}
+        return {wdt.code: wdt for wdt in cls.objects.prefetch_related('allowed_additional_types', 'allowed_as_additional_for')}
 
 
 class WorkerDay(AbstractModel):
@@ -459,15 +495,6 @@ class WorkerDay(AbstractModel):
     class Meta:
         verbose_name = 'Рабочий день сотрудника'
         verbose_name_plural = 'Рабочие дни сотрудников'
-        constraints = (
-            UniqueConstraint(
-                fields=['dt', 'employee', 'is_fact', 'is_approved'],
-                # TODO: нельзя делать ограничения по джоинам, как быть?
-                #   пока захардкодил коды для типов, которые есть или будут is_dayoff=False
-                condition=~Q(type_id__in=['W', 'Q', 'T', 'SD', 'R']),
-                name='unique_dt_employee_is_fact_is_approved_if_not_workday'
-            ),
-        )
 
     TYPE_HOLIDAY = 'H'
     TYPE_WORKDAY = 'W'
@@ -507,6 +534,52 @@ class WorkerDay(AbstractModel):
         TYPE_BUSINESS_TRIP,
         TYPE_ETC,
         TYPE_EMPTY,
+    ]
+
+    SOURCE_FAST_EDITOR = 0
+    SOURCE_FULL_EDITOR = 1
+    SOURCE_DUPLICATE = 2
+    SOURCE_ALGO = 3
+    SOURCE_AUTO_CREATED_VACANCY = 4
+    SOURCE_CHANGE_RANGE = 5
+    SOURCE_COPY_RANGE = 6
+    SOURCE_EXCHANGE = 7
+    SOURCE_EXCHANGE_APPROVED = 8
+    SOURCE_UPLOAD = 9
+    SOURCE_CHANGE_LIST = 10
+    SOURCE_SHIFT_ELONGATION = 11
+    SOURCE_ON_CANCEL_VACANCY = 12
+    SOURCE_ON_CONFIRM_VACANCY = 13
+    SOURCE_INTEGRATION = 14
+    SOURCE_ON_APPROVE = 15
+    SOURCE_EDITABLE_VACANCY = 16
+    SOURCE_COPY_APPROVED_PLAN_TO_PLAN = 17
+    SOURCE_COPY_APPROVED_PLAN_TO_FACT = 18
+    SOURCE_COPY_APPROVED_FACT_TO_FACT = 19
+    SOURCE_AUTO_FACT = 20
+
+    SOURCES = [
+        (SOURCE_FAST_EDITOR, 'Создание рабочего дня через быстрый редактор'),
+        (SOURCE_FULL_EDITOR, 'Создание рабочего дня через полный редактор'),
+        (SOURCE_DUPLICATE, 'Создание через копирование в графике (ctrl-c + ctrl-v)'),
+        (SOURCE_ALGO, 'Автоматическое создание алгоритмом'),
+        (SOURCE_AUTO_CREATED_VACANCY, 'Автоматическое создание биржей смен'),
+        (SOURCE_CHANGE_RANGE, 'Создание смен через change_range (Обычно используется для получения отпусков/больничных из 1С ЗУП)'),
+        (SOURCE_COPY_RANGE, 'Создание смен через copy_range (Копирование по датам)'),
+        (SOURCE_EXCHANGE, 'Создание смен через exchange (Обмен сменами)'),
+        (SOURCE_EXCHANGE_APPROVED, 'Создание смен через exchange_approved (Обмен сменами в подтвержденной версии)'),
+        (SOURCE_UPLOAD, 'Создание смен через загрузку графика'),
+        (SOURCE_CHANGE_LIST, 'Создание смен через change_list (Проставление типов дней на промежуток для сотрудника)'),
+        (SOURCE_SHIFT_ELONGATION, 'Автоматическое создание смен через shift_elongation (Расширение смен)'),
+        (SOURCE_ON_CANCEL_VACANCY, 'Автоматическое создание смен при отмене вакансии'),
+        (SOURCE_ON_CONFIRM_VACANCY, 'Автоматическое создание смен при принятии вакансии'),
+        (SOURCE_INTEGRATION, 'Создание смен через интеграцию'),
+        (SOURCE_ON_APPROVE, 'Создание смен при подтверждении графика'),
+        (SOURCE_EDITABLE_VACANCY, 'Создание смен при получении редактируемой вакансии'),
+        (SOURCE_COPY_APPROVED_PLAN_TO_PLAN, 'Создание смен через copy_approved (Копирование из плана в план)'),
+        (SOURCE_COPY_APPROVED_PLAN_TO_FACT, 'Создание смен через copy_approved (Копирование из плана в факт)'),
+        (SOURCE_COPY_APPROVED_FACT_TO_FACT, 'Создание смен через copy_approved (Копирование из факта в факт)'),
+        (SOURCE_AUTO_FACT, 'Создание смен во время отметок'),
     ]
 
     def __str__(self):
@@ -552,7 +625,7 @@ class WorkerDay(AbstractModel):
     def _enrich_create_or_update_perms_data(cls, create_or_update_perms_data, obj_dict):
         action = WorkerDayPermission.CREATE_OR_UPDATE
         graph_type = WorkerDayPermission.FACT if obj_dict.get('is_fact') else WorkerDayPermission.PLAN
-        wd_type_id = obj_dict.get('type_id')
+        wd_type_id = obj_dict.get('type_id') or obj_dict.get('type').code
         dt = obj_dict.get('dt')
         shop_id = obj_dict.get('shop_id')
         k = f'{graph_type}_{action}_{wd_type_id}_{shop_id}'
@@ -634,6 +707,7 @@ class WorkerDay(AbstractModel):
     @classmethod
     def _batch_update_extra_handler(cls, obj):
         obj.dttm_work_start_tabel, obj.dttm_work_end_tabel, obj.work_hours = obj._calc_wh()
+        obj.work_hours = obj._round_wh()
         return {
             'dttm_work_start_tabel',
             'dttm_work_end_tabel',
@@ -698,16 +772,16 @@ class WorkerDay(AbstractModel):
         return work_hours, work_hours_day, work_hours_night
 
     def _calc_wh(self):
+        from src.util.models_converter import Converter
+        self.dt = Converter.parse_date(self.dt) if isinstance(self.dt, str) else self.dt
         position_break_triplet_cond = self.employment and self.employment.position and self.employment.position.breaks
-        if self.dttm_work_end and self.dttm_work_start and self.shop and (
+        if not self.type.is_dayoff and self.dttm_work_end and self.dttm_work_start and self.shop and (
                 self.shop.settings or position_break_triplet_cond or self.shop.network.breaks):
             breaks = self.employment.position.breaks.breaks if position_break_triplet_cond else self.shop.settings.breaks.breaks if self.shop.settings else self.shop.network.breaks.breaks
             dttm_work_start = _dttm_work_start = self.dttm_work_start
             dttm_work_end = _dttm_work_end = self.dttm_work_end
             if self.shop.network.crop_work_hours_by_shop_schedule and self.crop_work_hours_by_shop_schedule:
-                from src.util.models_converter import Converter
-                dt = Converter.parse_date(self.dt) if isinstance(self.dt, str) else self.dt
-                shop_schedule = self.shop.get_schedule(dt=dt)
+                shop_schedule = self.shop.get_schedule(dt=self.dt)
                 if shop_schedule is None:
                     return dttm_work_start, dttm_work_end, datetime.timedelta(0)
 
@@ -716,12 +790,12 @@ class WorkerDay(AbstractModel):
                 shop_24h_open = open_at_0 and close_at_0
 
                 if not shop_24h_open:
-                    dttm_shop_open = datetime.datetime.combine(dt, shop_schedule['tm_open'])
+                    dttm_shop_open = datetime.datetime.combine(self.dt, shop_schedule['tm_open'])
                     if self.dttm_work_start < dttm_shop_open:
                         dttm_work_start = dttm_shop_open
 
                     dttm_shop_close = datetime.datetime.combine(
-                        (dt + datetime.timedelta(days=1)) if close_at_0 else dt, shop_schedule['tm_close'])
+                        (self.dt + datetime.timedelta(days=1)) if close_at_0 else self.dt, shop_schedule['tm_close'])
                     if self.dttm_work_end > dttm_shop_close:
                         dttm_work_end = dttm_shop_close
             break_time = None
@@ -773,12 +847,64 @@ class WorkerDay(AbstractModel):
 
             return dttm_work_start, dttm_work_end, self.count_work_hours(breaks, dttm_work_start, dttm_work_end, break_time=break_time, fine=fine)
 
+        # потенциально только для is_dayoff == true ? -- чтобы было наглядней сколько часов вычитается из нормы?
+        # + вычитать из нормы из work_hours в типах is_reduce_norm?
+        if self.type.is_dayoff and self.type.is_work_hours:
+            work_hours = 0
+            if self.type.get_work_hours_method == WorkerDayType.GET_WORK_HOURS_METHOD_TYPE_MONTH_AVERAGE_SAWH_HOURS:
+                from src.timetable.worker_day.stat import WorkersStatsGetter
+                employee_stats = WorkersStatsGetter(
+                    employee_id=self.employee_id,
+                    dt_from=self.dt,
+                    dt_to=self.dt,
+                    shop_id=self.employment.shop_id,
+                ).run()
+                work_hours = employee_stats.get(
+                    self.employee_id, {}
+                ).get(
+                    'employments', {}
+                ).get(
+                    self.employment_id, {}
+                ).get(
+                    'one_day_value', {}
+                ).get(
+                    self.dt.month, 0
+                )
+            elif self.type.get_work_hours_method == WorkerDayType.GET_WORK_HOURS_METHOD_TYPE_NORM_HOURS:
+                prod_cal = ProdCal.objects.filter(
+                    employee_id=self.employee_id,
+                    dt=self.dt,
+                    shop_id=self.employment.shop_id,
+                ).first()
+                if prod_cal:
+                    work_hours = prod_cal.norm_hours
+
+            elif self.type.get_work_hours_method == WorkerDayType.GET_WORK_HOURS_METHOD_TYPE_MANUAL:
+                return None, None, self.work_hours
+
+            return None, None, datetime.timedelta(hours=work_hours)
+
         return self.dttm_work_start, self.dttm_work_end, datetime.timedelta(0)
+
+    def _round_wh(self):
+        if self.work_hours > datetime.timedelta(0):
+            network = None
+            if self.shop_id and self.shop.network_id:
+                network = self.shop.network
+            elif self.employee_id and self.employee.user.network_id:
+                network = self.employee.user.network
+
+            if network and network.round_work_hours_alg is not None:
+                round_wh_alg_func = Network.ROUND_WH_ALGS.get(network.round_work_hours_alg)
+                self.work_hours = datetime.timedelta(hours=round_wh_alg_func(self.work_hours.total_seconds() / 3600))
+
+        return self.work_hours
 
     def __init__(self, *args, need_count_wh=False, **kwargs):
         super().__init__(*args, **kwargs)
         if need_count_wh:
             self.dttm_work_start_tabel, self.dttm_work_end_tabel, self.work_hours = self._calc_wh()
+            self.work_hours = self._round_wh()
 
     id = models.BigAutoField(primary_key=True, db_index=True)
     shop = models.ForeignKey(Shop, on_delete=models.PROTECT, null=True)
@@ -831,6 +957,8 @@ class WorkerDay(AbstractModel):
     closest_plan_approved = models.ForeignKey(
         'self', null=True, blank=True, on_delete=models.SET_NULL, related_name='related_facts',
         help_text='Используется в факте (и в черновике и подтв. версии) для связи с планом подтвержденным')
+
+    source = PositiveSmallIntegerField('Источник создания', choices=SOURCES, default=SOURCE_FAST_EDITOR)
 
     objects = WorkerDayManager.from_queryset(WorkerDayQuerySet)()  # исключает раб. дни у которых employment_id is null
     objects_with_excluded = models.Manager.from_queryset(WorkerDayQuerySet)()
@@ -920,8 +1048,10 @@ class WorkerDay(AbstractModel):
     def type_name(self):
         return self.get_type_display()
 
+    @tracker
     def save(self, *args, **kwargs): # todo: aa: частая модель для сохранения, отправлять запросы при сохранении накладно
         self.dttm_work_start_tabel, self.dttm_work_end_tabel, self.work_hours = self._calc_wh()
+        self.work_hours = self._round_wh()
 
         if self.last_edited_by_id is None:
             self.last_edited_by_id = self.created_by_id
@@ -1103,12 +1233,17 @@ class WorkerDay(AbstractModel):
                                 user_id__in=None, dt=None, dt__in=None, is_fact=None, is_approved=None, raise_exc=True,
                                 exc_cls=None):
         """
-        Проверка, что нету различных типов рабочих дней на 1 дату для 1 сотрудника
+        Проверка,
+            - не может быть нескольких нерабочих дней на 1 дату
+            - не может быть одновременные нерабочий день и рабочий день на 1 дату, кроме случаев
+                когда у нерабочего типа дня есть allowed_additional_types
         """
         if not (employee_days_q or employee_id or employee_id__in or user_id or user_id__in):
             return
 
-        lookup = {}
+        lookup = {
+            'type__is_dayoff': True,
+        }
         if is_fact is not None:
             lookup['is_fact'] = is_fact
 
@@ -1138,18 +1273,30 @@ class WorkerDay(AbstractModel):
             q &= employee_days_q
 
         has_multiple_workday_types_qs = cls.objects.filter(q).annotate(
-            has_multiple_workday_types=Exists(
+            has_multiple_dayoff_types=Exists(
                 WorkerDay.objects.filter(
                     ~Q(id=OuterRef('id')),
-                    ~Q(type_id=OuterRef('type_id')),
+                    type__is_dayoff=True,
                     employee_id=OuterRef('employee_id'),
                     dt=OuterRef('dt'),
                     is_fact=OuterRef('is_fact'),
                     is_approved=OuterRef('is_approved'),
                 )
-            )
+            ),
+            has_dayoff_and_not_allowed_workday_types=Exists(
+                WorkerDay.objects.filter(
+                    ~Q(id=OuterRef('id')),
+                    type__is_dayoff=False,
+                    employee_id=OuterRef('employee_id'),
+                    dt=OuterRef('dt'),
+                    is_fact=OuterRef('is_fact'),
+                    is_approved=OuterRef('is_approved'),
+                ).exclude(
+                    type__allowed_as_additional_for=OuterRef('type'),
+                )
+            ),
         ).filter(
-            has_multiple_workday_types=True,
+            Q(has_multiple_dayoff_types=True) | Q(has_dayoff_and_not_allowed_workday_types=True),
         ).values('employee__user__last_name', 'employee__user__first_name', 'dt').distinct()
 
         multiple_workday_types_data = list(has_multiple_workday_types_qs)
@@ -1311,6 +1458,7 @@ class WorkerDay(AbstractModel):
             dt=dt,
             is_fact=False,
             is_approved=True,
+            type__is_dayoff=False,
         )
         if use_annotated_filter:
             plan_approved_qs = plan_approved_qs.annotate(
@@ -1402,55 +1550,69 @@ class WorkerDay(AbstractModel):
             )
 
 
-class Timesheet(AbstractModel):
-    """
-    Табель учета рабочего времени (фактический + фискальный -- разделение на основной и дополнительный)
-    """
-    SOURCE_TYPE_PLAN = 'plan'
-    SOURCE_TYPE_FACT = 'fact'
-    SOURCE_TYPE_MANUAL = 'manual'
-    SOURCE_TYPE_SYSTEM = 'system'
+class TimesheetItem(AbstractModel):
+    TIMESHEET_TYPE_FACT = 'F'
+    TIMESHEET_TYPE_MAIN = 'M'
+    TIMESHEET_TYPE_ADDITIONAL = 'A'
+
+    TIMESHEET_TYPE_CHOICES = (
+        (TIMESHEET_TYPE_FACT, _('Fact')),  # все оплачиваемые часы
+        (TIMESHEET_TYPE_MAIN, _('Main')),  # рабочие часы, которые идут в осн. табель
+        (TIMESHEET_TYPE_ADDITIONAL, _('Additional')),  # рабочие часы, которые идут в доп. табель
+    )
+
+    SOURCE_TYPE_PLAN = 'P'
+    SOURCE_TYPE_FACT = 'F'
+    SOURCE_TYPE_MANUAL = 'M'
+    SOURCE_TYPE_SYSTEM = 'S'
 
     SOURCE_TYPES = (
         (SOURCE_TYPE_PLAN, _('Planned timetable')),  # плановый график
-        (SOURCE_TYPE_FACT, _('Attendance records')),  # отметки
+        (SOURCE_TYPE_FACT, _('Actual timetable')),  # фактический график
         (SOURCE_TYPE_MANUAL, _('Manual changes')),  # ручные корректировки (заготовка, пока нет такого)
         (SOURCE_TYPE_SYSTEM, _('Determined by the system')),  # определены системой
     )
 
-    employee = models.ForeignKey('base.Employee', on_delete=models.CASCADE, verbose_name='Сотрудник')
-    dt = models.DateField(verbose_name='Дата')
+    timesheet_type = models.CharField(
+        max_length=32, choices=TIMESHEET_TYPE_CHOICES, verbose_name='Тип табеля')
     shop = models.ForeignKey(
-        'base.Shop', on_delete=models.CASCADE, null=True, blank=True, verbose_name='Поздразделение')  # TODO: нужен?
-    fact_timesheet_source = models.CharField(
+        'base.Shop', on_delete=models.PROTECT, null=True, blank=True, verbose_name='Поздразделение выхода сотрудника',
+        help_text='Для выходных магазин берется из трудоустройства',
+    )
+    position = models.ForeignKey(
+        'base.WorkerPosition', on_delete=models.PROTECT, null=True, blank=True, verbose_name='Должность',
+        help_text='Определяется на основе должности трудоустройства, либо через сопоставление с типами работ, если включена настройка ')  # TODO: добавить название настройки
+    work_type_name = models.ForeignKey(
+        'timetable.WorkTypeName', on_delete=models.PROTECT, null=True, blank=True, verbose_name='Тип работ',
+        help_text='Определяется на основе первого типа работ в рабочем дне',  # TODO: поддержка нескольких типов работ для 1 раб. дня?
+    )
+    employee = models.ForeignKey('base.Employee', on_delete=models.CASCADE, verbose_name='Сотрудник')
+    dt = models.DateField()
+    day_type = models.ForeignKey(
+        'timetable.WorkerDayType', on_delete=models.PROTECT, verbose_name='Тип дня',
+    )
+    dttm_work_start = models.DateTimeField(null=True, blank=True)
+    dttm_work_end = models.DateTimeField(null=True, blank=True)
+    day_hours = models.DecimalField(max_digits=4, decimal_places=2, default=Decimal("0.00"))
+    night_hours = models.DecimalField(max_digits=4, decimal_places=2, default=Decimal("0.00"))
+    source = models.CharField(
         choices=SOURCE_TYPES, max_length=12, blank=True,
-        verbose_name='Источник данных для фактического табеля',
+        verbose_name='Источник данных',
     )
-    fact_timesheet_type = models.ForeignKey(
-        'timetable.WorkerDayType', on_delete=models.PROTECT, null=True, blank=True, related_name='fact_timesheet',
-    )
-    fact_timesheet_dttm_work_start = models.DateTimeField(null=True, blank=True)
-    fact_timesheet_dttm_work_end = models.DateTimeField(null=True, blank=True)
-    # TODO: добавить или высчитывать через (fact_timesheet_dttm_work_end - fact_timesheet_dttm_work_start) - fact_timesheet_total_hours ?
-    #fact_timesheet_break_time_minutes = models.IntegerField(null=True, blank=True)
-    fact_timesheet_total_hours = models.DecimalField(max_digits=4, decimal_places=2, null=True, blank=True)
-    fact_timesheet_day_hours = models.DecimalField(max_digits=4, decimal_places=2, null=True, blank=True)
-    fact_timesheet_night_hours = models.DecimalField(max_digits=4, decimal_places=2, null=True, blank=True)
-    main_timesheet_type = models.ForeignKey(
-        'timetable.WorkerDayType', on_delete=models.PROTECT, null=True, blank=True, related_name='main_timesheet',
-    )
-    main_timesheet_total_hours = models.DecimalField(max_digits=4, decimal_places=2, null=True, blank=True)
-    main_timesheet_day_hours = models.DecimalField(max_digits=4, decimal_places=2, null=True, blank=True)
-    main_timesheet_night_hours = models.DecimalField(max_digits=4, decimal_places=2, null=True, blank=True)
-    additional_timesheet_hours = models.DecimalField(max_digits=4, decimal_places=2, null=True, blank=True)
 
     class Meta:
-        verbose_name = 'Запись в табеле'
-        verbose_name_plural = 'Записи в табеле'
-        unique_together = (
-            ('dt', 'employee'),
-        )
+        verbose_name = 'Запись в табеле учета рабочего времени'
+        verbose_name_plural = 'Записи в табеле учета рабочего времени'
 
+    def __str__(self):
+        return '{}, {}, {}, {}, {}, {}'.format(
+            self.id,
+            self.dt,
+            self.employee_id,
+            self.day_type_id,
+            self.timesheet_type,
+            self.day_hours + self.night_hours,
+        )
 
 class WorkerDayCashboxDetailsManager(models.Manager):
     def qos_current_version(self):
@@ -1894,6 +2056,7 @@ class AttendanceRecords(AbstractModel):
                         created_by_id=fact_approved_to_copy.created_by_id,
                         last_edited_by_id=fact_approved_to_copy.last_edited_by_id,
                         closest_plan_approved_id=fact_approved_to_copy.closest_plan_approved_id,
+                        source=WorkerDay.SOURCE_AUTO_FACT,
                     )
                     WorkerDay.check_work_time_overlap(
                         employee_id=fact_approved.employee_id, dt=fact_approved.dt, is_fact=True)
@@ -1923,7 +2086,7 @@ class AttendanceRecords(AbstractModel):
         )
 
     def _get_fact_approved_extra_q(self, closest_plan_approved):
-        fact_approved_extra_q = Q(closest_plan_approved=closest_plan_approved)
+        fact_approved_extra_q = Q(closest_plan_approved=closest_plan_approved) if closest_plan_approved else Q()
         if self.type == self.TYPE_LEAVING:
             fact_approved_extra_q |= Q(
                 dttm_work_start__isnull=False,
@@ -2014,6 +2177,7 @@ class AttendanceRecords(AbstractModel):
                         'type_id': closest_plan_approved.type_id if closest_plan_approved else WorkerDay.TYPE_WORKDAY,
                         self.TYPE_2_DTTM_FIELD[self.type]: self.dttm,
                         'is_vacancy': active_user_empl.shop_id != self.shop_id if active_user_empl else False,
+                        'source': WorkerDay.SOURCE_AUTO_FACT,
                         # TODO: пока не стал проставлять is_outsource, т.к. придется делать доп. действие в интерфейсе,
                         # чтобы посмотреть что за сотрудник при правке факта из отдела аутсорс-клиента
                         #'is_outsource': active_user_empl.shop.network_id != self.shop.network_id,

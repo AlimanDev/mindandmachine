@@ -1,23 +1,33 @@
-import logging
 from datetime import timedelta
 
-from django.db import transaction
 from django.db.models import (
-    Q, F, Count, Sum, Min, Max, Case, When, Value, IntegerField, DateTimeField, FloatField
+    Count, Sum, Min, Max, Case, When, Value, IntegerField, DateTimeField, FloatField
 )
+from django.db.models import Q, OuterRef, Subquery, F
 from django.db.models.functions import Extract, Coalesce, Cast
 
 from src.base.models import (
-    Employment,
     Break,
 )
-from src.timetable.models import (
-    AttendanceRecords
-)
-from src.timetable.models import (
-    WorkerDay,
-)
-from src.util.utils import dummy_context_mgr
+from src.base.models import Employment
+from src.timetable.models import WorkerDay, AttendanceRecords
+
+
+def fix_wd_employments(**kwargs):
+    WorkerDay.objects_with_excluded.filter(
+        Q(employee__isnull=False),
+        Q(employment__isnull=True) |
+        Q(Q(dt__lt=F('employment__dt_hired')) | Q(dt__gt=F('employment__dt_fired'))),
+        **kwargs,
+    ).exclude(
+        type_id=WorkerDay.TYPE_EMPTY,
+    ).update(
+        employment_id=Subquery(Employment.objects.get_active_empl_by_priority(
+            dt=OuterRef('dt'),
+            employee_id=OuterRef('employee_id'),
+            norm_work_hours__gt=0,
+        ).values('id')[:1]),
+    )
 
 
 # deprecated
@@ -95,155 +105,8 @@ def wd_stat_count_total(worker_days, shop):
 
 
 class CleanWdaysHelper:
-    """
-    Класс, предназначенный для того, чтобы корректировать рабочие дни
-    (изначально делался для того, чтобы пофиксить последствия того, что Ортека шлет трудоустройства задним числом)
-
-    Проходит по всем дням, которые находятся с учетом filter_kwargs и exclude_kwargs
-    Алгоритм для каждого дня:
-    1. Если нету активного трудоустройства:
-    1.1 Если тип дня -- выходной, то КОНЕЦ.
-    1.2 В остальных случаях очищаем employment_id, КОНЕЦ.
-    2. Если есть активное трудоустройство:
-    2.1 Если employment в дне и в активном трудоустройстве не совпадают:
-    2.1.1 Если clean_plan_empl=True и если в дне магазин не равен магазину из активного трудоустройства на этот день и is_vacancy=False,
-        то очищаем employment, КОНЕЦ.
-    2.1.2 В остальных случаях делаем employment в дне равным активному трудоустройству.
-    #2.2 Если тип дня рабочий день (type == 'W'), то корректируем is_vacancy:
-        если магазины в дне и в активном трудоустройстве отличаются, то ставим is_vacancy=True,
-        если не отличаются, то ставим False
-    #2.3 Если тип не в TYPES_WITH_TM_RANGE, то корректируем удаляем shop_id и проставляем is_vacancy=False
-    КОНЕЦ.
-
-    КОНЕЦ -- завершения алгоритма и переход к следующему дню сотрудника.
-    """
-    def __init__(
-            self,
-            filter_kwargs: dict = None,
-            exclude_kwargs: dict = None,
-            only_logging=True,
-            clean_plan_empl=False,
-            logger=logging.getLogger('clean_wdays'),
-    ):
-        self.filter_kwargs = filter_kwargs
-        self.exclude_kwargs = exclude_kwargs
-        self.only_logging = only_logging
-        self.clean_plan_empl = clean_plan_empl
-
-        self.logger = logger
-
-    def _log_wd(self, wd, log_title, log_level='debug', extra=None):
-        getattr(self.logger, log_level)(
-            f'clean_wdays {log_title}: '
-            'id=%s, dt=%s, type=%s, is_fact=%s, is_approved=%s, user=%s, shop_id=%s, employment_id=%s, extra=%s',
-            wd.id, wd.dt, wd.type, wd.is_fact, wd.is_approved, wd.employee.user.username, wd.shop_id, wd.employment_id, extra
-        )
+    def __init__(self, filter_kwargs: dict = None):
+        self.filter_kwargs = filter_kwargs or {}
 
     def run(self):
-        self.logger.info(
-            'clean_wdays started, filter_kwargs: %s, exclude_kwargs: %s, only_logging: %s',
-            self.filter_kwargs, self.exclude_kwargs, self.only_logging
-        )
-
-        wdays_qs = WorkerDay.objects_with_excluded.exclude(
-            employee__isnull=True,
-        ).exclude(
-            type_id=WorkerDay.TYPE_EMPTY,
-        ).order_by('dt', 'employee', 'shop')
-        if self.filter_kwargs:
-            wdays_qs = wdays_qs.filter(**self.filter_kwargs)
-        if self.exclude_kwargs:
-            wdays_qs = wdays_qs.exclude(**self.exclude_kwargs)
-
-        not_found = 0
-        changed = 0
-        skipped = 0
-        empl_cleaned = 0
-
-        for worker_day in wdays_qs:
-            with transaction.atomic() if not self.only_logging else dummy_context_mgr():
-                wd_qs = WorkerDay.objects_with_excluded.filter(id=worker_day.id)
-                if not self.only_logging:
-                    wd_qs = wd_qs.select_for_update()
-                wd = wd_qs.first()
-                if wd is None:
-                    self._log_wd(worker_day, 'not found')
-                    not_found += 1
-                    continue
-
-                changes = {}
-
-                employee_active_empl = Employment.objects.get_active_empl_by_priority(
-                    network_id=wd.employee.user.network_id, employee_id=wd.employee_id, dt=wd.dt,
-                    priority_shop_id=wd.shop_id, priority_employment_id=wd.employment_id,
-                ).first()
-
-                if not employee_active_empl:
-                    if wd.type.is_dayoff:
-                        continue
-
-                    self._log_wd(wd, 'no active empl empl_cleaned')
-                    empl_cleaned += 1
-                    if not self.only_logging:
-                        wd.employment_id = None
-                        wd.save(update_fields=('employment_id',))
-
-                    continue
-
-                if wd.employment_id != employee_active_empl.id:
-                    if self.clean_plan_empl and wd.is_fact is False and wd.shop_id \
-                            and wd.shop_id != employee_active_empl.shop_id and wd.is_vacancy is False:
-                        self._log_wd(wd, 'plan empl_cleaned')
-                        empl_cleaned += 1
-                        if not self.only_logging:
-                            wd.employment_id = None
-                            wd.save(update_fields=('employment_id',))
-                        continue
-
-                    changes.update({'employment_id': {
-                        'from': wd.employment_id,
-                        'to': employee_active_empl.id,
-                    }})
-                    wd.employment_id = employee_active_empl.id
-
-                # if wd.type == WorkerDay.TYPE_WORKDAY:
-                #     if wd.is_vacancy != (not employee_active_empl.is_equal_shops):
-                #         changes.update({'is_vacancy': {
-                #             'from': wd.is_vacancy,
-                #             'to': not employee_active_empl.is_equal_shops,
-                #         }})
-                #         wd.is_vacancy = not employee_active_empl.is_equal_shops
-                #
-                # if wd.type not in WorkerDay.TYPES_WITH_TM_RANGE:
-                #     if wd.shop_id is not None:
-                #         changes.update({'shop_id': {
-                #             'from': wd.shop_id,
-                #             'to': None,
-                #         }})
-                #         wd.shop_id = None
-                #     if wd.is_vacancy is True:
-                #         changes.update({'is_vacancy': {
-                #             'from': wd.is_vacancy,
-                #             'to': False,
-                #         }})
-                #         wd.is_vacancy = False
-
-                if changes:
-                    self._log_wd(wd, 'changed', extra=changes)
-                    changed += 1
-                    if not self.only_logging:
-                        wd.save()
-                else:
-                    self._log_wd(wd, 'skipped', extra=changes)
-                    skipped += 1
-
-        self.logger.info(
-            'clean_wdays finished, results: not_found=%s, changed=%s, skipped=%s, empl_cleaned=%s',
-            not_found, changed, skipped, empl_cleaned,
-        )
-        return {
-            'not_found': not_found,
-            'changed': changed,
-            'skipped': skipped,
-            'empl_cleaned': empl_cleaned,
-        }
+        fix_wd_employments(**self.filter_kwargs)

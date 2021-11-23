@@ -1,8 +1,9 @@
 from rest_framework.test import APITestCase
 
 from src.base.tests.factories import UserFactory, EmploymentFactory, EmployeeFactory, ShopFactory, GroupFactory
-from src.util.mixins.tests import TestsHelperMixin
+from src.timetable.models import WorkerDayType, WorkerDay
 from src.timetable.tests.factories import WorkerDayTypeFactory
+from src.util.mixins.tests import TestsHelperMixin
 
 
 class TestWorkerDayTypeViewSet(TestsHelperMixin, APITestCase):
@@ -53,3 +54,20 @@ class TestWorkerDayTypeViewSet(TestsHelperMixin, APITestCase):
         resp = self._get_wd_types()
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(len(resp.json()), 12)
+
+    def test_get_allowed_additional_types(self):
+        workday_type = WorkerDayType.objects.filter(
+            code=WorkerDay.TYPE_WORKDAY,
+        ).get()
+        vacation_type = WorkerDayType.objects.filter(
+            code=WorkerDay.TYPE_VACATION,
+        ).get()
+        vacation_type.allowed_additional_types.add(workday_type)
+
+        resp = self._get_wd_types()
+        self.assertEqual(resp.status_code, 200)
+        resp_data = resp.json()
+        self.assertEqual(len(resp_data), 11)
+
+        wd_type_data = list(filter(lambda i: i['code'] == WorkerDay.TYPE_VACATION, resp_data))[0]
+        self.assertListEqual(wd_type_data['allowed_additional_types'], ['W'])

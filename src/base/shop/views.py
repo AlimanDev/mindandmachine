@@ -13,7 +13,7 @@ from rest_framework import serializers
 from src.base.filters import BaseActiveNamedModelFilter
 from src.base.models import Employment, Shop, Region, NetworkConnect
 from src.base.permissions import Permission
-from src.base.shop.serializers import ShopSerializer, ShopStatSerializer, serialize_shop
+from src.base.shop.serializers import SetLoadTemplateSerializer, ShopSerializer, ShopStatSerializer, serialize_shop
 from src.base.shop.utils import get_tree
 from src.base.views_abstract import UpdateorCreateViewSet
 from src.util.openapi.responses import shop_tree_response_schema_dict as tree_response_schema_dict
@@ -199,3 +199,13 @@ class ShopViewSet(UpdateorCreateViewSet):
         )
 
         return Response(get_tree(shops))
+
+    @swagger_auto_schema(responses={200: ShopSerializer}, operation_description='Метод для изменения шаблона нагрузки')
+    @action(detail=True, methods=['put'])
+    def load_template(self, request, pk=None):
+        shop = self.get_object()
+        data = SetLoadTemplateSerializer(data=request.data)
+        data.is_valid(raise_exception=True)
+        shop.load_template_id = data.validated_data['load_template_id']
+        shop.save()
+        return Response(ShopSerializer(shop).data)

@@ -206,7 +206,7 @@ def urv_violators_report(network_id, dt_from=None, dt_to=None, exclude_created_b
     return data
 
 
-def urv_violators_report_xlsx(network_id, dt_from=None, dt_to=None, title=None, shop_ids=None, in_memory=False):
+def urv_violators_report_xlsx(network_id=None, dt_from=None, dt_to=None, title=None, shop_ids=None, in_memory=False, data=None):
     if not dt_from:
         dt_from = date.today() - timedelta(1)
     if not dt_to:
@@ -225,7 +225,7 @@ def urv_violators_report_xlsx(network_id, dt_from=None, dt_to=None, title=None, 
     shops = { 
         s.id: s for s in Shop.objects.filter(**shop_filter)
     }
-    data = urv_violators_report(network_id, dt_from=dt_from, dt_to=dt_to, shop_ids=shop_ids, exclude_created_by=True)
+    data = data if not (data is None) else urv_violators_report(network_id, dt_from=dt_from, dt_to=dt_to, shop_ids=shop_ids, exclude_created_by=True)
     employees = {
         e.id: e for e in Employee.objects.select_related('user').filter(
             id__in=data.keys(),
