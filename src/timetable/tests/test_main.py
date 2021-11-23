@@ -3865,6 +3865,41 @@ class TestAttendanceRecords(TestsHelperMixin, APITestCase):
         self.assertEqual(fact_approved.dttm_work_start, fact_dttm_start)
         self.assertEqual(fact_approved.dttm_work_end, fact_dttm_end)
 
+    def test_create_attendance_records_when_closest_plan_does_not_exist(self):
+        WorkerDay.objects.filter(employee=self.employee3).delete()
+        wd_far_approved_fact = WorkerDay.objects.create(
+            employee=self.employee3,
+            employment=self.employment3,
+            shop=self.shop,
+            dt=date(2021, 9, 21),
+            is_approved=True,
+            is_fact=True,
+            dttm_work_start=datetime(2021, 9, 21, 8, 34),
+            type_id=WorkerDay.TYPE_WORKDAY,
+        )
+        record = AttendanceRecords.objects.create(
+            employee=self.employee3,
+            user=self.user3,
+            dttm=datetime(2021, 11, 12, 21, 23),
+            shop=self.shop,
+            type=AttendanceRecords.TYPE_LEAVING,
+        )
+        self.assertEquals(record.dt, date(2021, 11, 12))
+        wd_far_approved_fact.refresh_from_db()
+        self.assertIsNone(wd_far_approved_fact.dttm_work_end)
+        wd_created = WorkerDay.objects.filter(
+            employee=self.employee3,
+            employment=self.employment3,
+            shop=self.shop,
+            dt=date(2021, 11, 12),
+            is_approved=True,
+            is_fact=True,
+            type_id=WorkerDay.TYPE_WORKDAY,
+        ).first()
+        self.assertIsNotNone(wd_created)
+        self.assertIsNone(wd_created.dttm_work_start)
+        self.assertEquals(wd_created.dttm_work_end, datetime(2021, 11, 12, 21, 23))
+
 
 class TestVacancy(TestsHelperMixin, APITestCase):
     @classmethod
