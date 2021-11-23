@@ -7,7 +7,6 @@ import json
 from src.base import models_utils
 import datetime
 from django.utils import timezone
-from src.base.fields import CompressedTextField
 
 from src.base.models_abstract import AbstractModel, AbstractActiveModel, AbstractActiveNetworkSpecificCodeNamedModel
 from src.base.models import Shop, ShopSchedule
@@ -422,6 +421,6 @@ class Receipt(AbstractModel):
     dt = models.DateField(verbose_name='Дата события')
     dttm_added = models.DateTimeField(auto_now_add=True)
     shop = models.ForeignKey(Shop, on_delete=models.PROTECT, blank=True, null=True)
-    info = CompressedTextField()
+    info = models.TextField()
     data_type = models.CharField(max_length=128, verbose_name='Тип данных', null=True, blank=True)
     version = models.IntegerField(verbose_name='Версия объекта', default=0)
