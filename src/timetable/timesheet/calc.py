@@ -114,6 +114,8 @@ class TimesheetCalculator:
 
     def _add_plan(self, plan_wd, dt, fact_timesheet_dict, empl_dt_key):
         day_in_past = dt < self.dt_now
+        if not day_in_past:
+            return
         work_type_name = plan_wd.work_types_list[0].work_type_name if \
             (plan_wd.type_id == WorkerDay.TYPE_WORKDAY and plan_wd.work_types_list) else None
         is_absent = day_in_past and not plan_wd.type.is_dayoff
@@ -145,6 +147,9 @@ class TimesheetCalculator:
         wdays_qs = self._get_timesheet_wdays_qs(self.employee, dt_start, dt_end)
         fact_timesheet_dict = {}
         for worker_day in wdays_qs:
+            day_in_past = worker_day.dt < self.dt_now
+            if not day_in_past:
+                continue
             # TODO: нужна поддержка нескольких типов работ?
             work_type_name = worker_day.work_types_list[0].work_type_name if \
                 (worker_day.type_id == WorkerDay.TYPE_WORKDAY and worker_day.work_types_list) else None
