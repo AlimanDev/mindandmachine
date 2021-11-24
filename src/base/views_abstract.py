@@ -9,7 +9,7 @@ from .mixins import GetObjectByCodeMixin, ApiLogMixin
 
 
 class BatchUpdateOrCreateOptionsSerializer(serializers.Serializer):
-    update_key_field = serializers.CharField(required=False, allow_blank=False, allow_null=False)
+    by_code = serializers.BooleanField(required=False)
     delete_scope_fields_list = serializers.ListField(
         child=serializers.CharField(), required=False, allow_empty=False, allow_null=False)
     delete_scope_values_list = serializers.ListField(
@@ -17,13 +17,10 @@ class BatchUpdateOrCreateOptionsSerializer(serializers.Serializer):
     return_response = serializers.BooleanField(required=False, allow_null=False)
 
 
-def _patch_obj_serializer(obj_serializer, update_key_field=None):
-    update_key_field = update_key_field or 'id'
+def _patch_obj_serializer(obj_serializer, update_key_field='id'):
     obj_serializer.child.fields[update_key_field].read_only = False
     obj_serializer.child.fields[update_key_field].required = False
     obj_serializer.child.fields[update_key_field].allow_null = True
-    if 'dttm_modified' not in obj_serializer.child.fields:
-        obj_serializer.child.fields['dttm_modified'] = serializers.DateTimeField(read_only=True)
 
 
 class BatchUpdateOrCreateViewMixin:
@@ -39,9 +36,10 @@ class BatchUpdateOrCreateViewMixin:
 
             def __init__(self, *args, **kwargs):
                 super(BatchUpdateOrCreateSerializer, self).__init__(*args, **kwargs)
+                by_code = this.request.data.get('options', {}).get('by_code')
                 _patch_obj_serializer(
                     obj_serializer=self.fields['data'],
-                    update_key_field=this.request.data.get('options', {}).get('update_key_field', None)
+                    update_key_field='code' if by_code else 'id'
                 )
 
         return BatchUpdateOrCreateSerializer
@@ -64,18 +62,19 @@ class BatchUpdateOrCreateViewMixin:
         serializer = self.get_batch_update_or_create_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        return_response = serializer.validated_data.get('options', {}).pop('return_response', False)
-
+        options = serializer.validated_data.get('options', {})
         objects, stats = self._get_model_from_serializer(serializer).batch_update_or_create(
             data=serializer.validated_data.get('data'),
+            update_key_field='code' if options.get('by_code') else 'id',
+            delete_scope_fields_list=options.get('delete_scope_fields_list'),
+            delete_scope_values_list=options.get('delete_scope_values_list'),
             user=self.request.user if self.request.user.is_authenticated else None,
-            **serializer.validated_data.get('options', {}),
         )
 
         res = {
             'stats': stats,
         }
-        if return_response:  # скорее всего нужно для перерендеринга на фронте
+        if options.get('return_response', False):  # скорее всего нужно для перерендеринга на фронте
             res['data'] = self.get_batch_update_or_create_serializer(
                 instance={
                     'data': objects,

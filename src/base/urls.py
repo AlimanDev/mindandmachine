@@ -10,7 +10,6 @@ from src.base.auth.views import (
     WFMTokenLoginView,
     OneTimePassView,
 )
-
 from src.base.shop.views import ShopViewSet
 from src.base.views import (
     EmploymentViewSet,
@@ -27,6 +26,7 @@ from src.base.views import (
     ShopScheduleViewSet,
     EmployeeViewSet,
 )
+from .shift_schedule.views import ShiftScheduleViewSet
 
 rest_auth_urls = [
     url(r'^login/$', LoginView.as_view(), name='rest_login'),
@@ -54,6 +54,7 @@ router.register(r'network', NetworkViewSet, basename='Network')
 router.register(r'function_group', FunctionGroupView, basename='FunctionGroupView')
 router.register(r'group', GroupViewSet, basename='Group')
 router.register(r'break', BreakViewSet, basename='Break')
+router.register(r'shift_schedule', ShiftScheduleViewSet, basename='ShiftSchedule')
 
 employment_nested_router = routers.NestedSimpleRouter(router, r'employment', lookup='employment')
 shop_nested_router = routers.NestedSimpleRouter(router, r'department', lookup='department')

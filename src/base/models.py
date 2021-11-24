@@ -2,6 +2,7 @@ import datetime
 import json
 import re
 from calendar import monthrange
+from decimal import Decimal
 
 import pandas as pd
 from celery import chain
@@ -10,12 +11,10 @@ from django.conf import settings
 from django.contrib.auth.models import (
     AbstractUser as DjangoAbstractUser,
 )
-
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models
 from django.db import transaction
-from django.db.models import Case, When, Sum, Value, IntegerField, Subquery, OuterRef, F, Q
-from django.db.models.functions import Coalesce
+from django.db.models import Case, When, Sum, Value, IntegerField, Subquery, OuterRef, Q
 from django.db.models.query import QuerySet
 from django.utils import timezone
 from django.utils.functional import cached_property
@@ -25,6 +24,7 @@ from mptt.models import MPTTModel, TreeForeignKey
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.serializers import ValidationError
 from timezone_field import TimeZoneField
+
 from src.base.models_abstract import (
     AbstractActiveModel,
     AbstractModel,
@@ -1566,6 +1566,7 @@ class FunctionGroup(AbstractModel):
         ('ShopSchedule', 'Расписание магазина (schedule)'),
         ('VacancyBlackList', 'Черный список для вакансий (vacancy_black_list)'),
         ('Task', 'Задача (task)'),
+        ('ShiftSchedule_batch_update_or_create', 'Массовое создание/обновление графиков работ (Создать/Обновить) (shift_schedule/batch_update_or_create/)'),
     )
 
     METHODS_TUPLE = (
@@ -1787,5 +1788,91 @@ class ApiLog(AbstractModel):
     def clean_log(cls, network_id, delete_gap):
         cls.objects.filter(
             user__network_id=network_id,
-            request_datetime__gte=timezone.now() - datetime.timedelta(days=delete_gap),
+            request_datetime__lte=timezone.now() - datetime.timedelta(days=delete_gap),
         ).delete()
+
+
+class ShiftSchedule(AbstractActiveNetworkSpecificCodeNamedModel):
+    year = models.PositiveSmallIntegerField(default=current_year)
+
+    class Meta(AbstractActiveNetworkSpecificCodeNamedModel.Meta):
+        verbose_name = 'График смен'
+        verbose_name_plural = 'Графики смен'
+
+    @classmethod
+    def _get_rel_objs_mapping(cls):
+        return {
+            'days': (ShiftScheduleDay, 'shift_schedule_id'),
+        }
+
+
+class ShiftScheduleDay(AbstractModel):
+    code = models.CharField(max_length=256, null=True, blank=True, db_index=True)
+    shift_schedule = models.ForeignKey(
+        'base.ShiftSchedule', verbose_name='График смен', on_delete=models.CASCADE, related_name='days')
+    dt = models.DateField()
+
+    class Meta(AbstractModel.Meta):
+        verbose_name = 'День графика смен'
+        verbose_name_plural = 'Дни графика смен'
+        unique_together = (
+            ('dt', 'shift_schedule'),
+        )
+
+    @classmethod
+    def _get_rel_objs_mapping(cls):
+        return {
+            'items': (ShiftScheduleDayItem, 'shift_schedule_day_id'),
+        }
+
+
+class ShiftScheduleDayItem(AbstractModel):
+    HOURS_TYPE_DAY = 'D'
+    HOURS_TYPE_EVENING = 'E'
+    HOURS_TYPE_NIGHT = 'N'
+    HOURS_TYPE_WATCH = 'W'
+
+    HOURS_TYPE_CHOICES = (
+        (HOURS_TYPE_DAY, 'Дневное (явка)'),
+        (HOURS_TYPE_EVENING, 'Вечернее'),
+        (HOURS_TYPE_NIGHT, 'Ночное'),
+        (HOURS_TYPE_WATCH, 'Вахта'),
+    )
+
+    code = models.CharField(max_length=256, null=True, blank=True, db_index=True)
+    shift_schedule_day = models.ForeignKey('base.ShiftScheduleDay', on_delete=models.CASCADE, related_name='items')
+    hours_type = models.CharField(max_length=2, choices=HOURS_TYPE_CHOICES, default=HOURS_TYPE_DAY)
+    hours_amount = models.DecimalField(max_digits=4, decimal_places=2, default=Decimal("0.00"))
+
+    class Meta(AbstractModel.Meta):
+        verbose_name = 'Элемент дня графика смен'
+        verbose_name_plural = 'Элементы дня графика смен'
+        unique_together = (
+            ('hours_type', 'shift_schedule_day'),
+        )
+
+
+class ShiftScheduleInterval(AbstractModel):
+    code = models.CharField(max_length=256, null=True, blank=True)
+    shift_schedule = models.ForeignKey('base.ShiftSchedule', verbose_name='График смен', on_delete=models.PROTECT)
+    employee = models.ForeignKey(
+        'base.Employee', verbose_name='Сотрудник', on_delete=models.CASCADE, null=True, blank=True)
+    dt_from = models.DateField(verbose_name='Дата с (включительно)')
+    dt_to = models.DateField(verbose_name='Дата по (включительно)')
+
+    class Meta(AbstractModel.Meta):
+        verbose_name = 'Интервал графика смен сотрудника'
+        verbose_name_plural = 'Интервалы графика смен сотрудника'
+        # TODO: ограничение на невозможность создать для 1 сотрудника пересечения графика по датам ?
+
+
+# TODO: вьюха для отображения графика смен на фронте для сотрудников?
+# class EmployeeShiftSchedule(models.Model):
+#     employee = models.ForeignKey('base.Employee', verbose_name='Сотрудник', on_delete=models.PROTECT)
+#     dt = models.DateField()
+#     day_hours = models.DecimalField(max_digits=4, decimal_places=2, default=Decimal("0.00"))
+#     night_hours = models.DecimalField(max_digits=4, decimal_places=2, default=Decimal("0.00"))
+#     total_hours = models.DecimalField(max_digits=4, decimal_places=2, default=Decimal("0.00"))
+#
+#     class Meta:
+#         managed = False
