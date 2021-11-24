@@ -236,6 +236,10 @@ class Network(AbstractActiveModel):
                        'the Maximum shift length has passed since the opening of the previous shift'),
         default=False,
     )
+    trust_tick_request = models.BooleanField(
+        verbose_name=_('Create attendance record without check photo.'),
+        default=False,
+    )
     max_plan_diff_in_seconds = models.PositiveIntegerField(
         verbose_name=_('Max difference between the start or end time to "pull" to the planned work day'),
         default=3600 * 7,

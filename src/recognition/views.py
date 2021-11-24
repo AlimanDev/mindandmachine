@@ -290,7 +290,7 @@ class TickViewSet(BaseModelViewSet):
             is_front=is_front
         )
 
-        if settings.TRUST_TICK_REQUEST:
+        if request.user.network.trust_tick_request:
             AttendanceRecords.objects.create(
                 user_id=tick.user_id,
                 employee_id=employee_id,
@@ -316,7 +316,7 @@ class TickViewSet(BaseModelViewSet):
         if tick.type == Tick.TYPE_NO_TYPE:
             tick.type = type
             tick.save()
-            if settings.TRUST_TICK_REQUEST:
+            if request.user.network.trust_tick_request:
                 record, _created = AttendanceRecords.objects.get_or_create(
                     user_id=tick.user_id,
                     employee_id=tick.employee_id,

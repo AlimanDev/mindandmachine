@@ -460,6 +460,7 @@ class TestOutsource(TestsHelperMixin, APITestCase):
                     'unaccounted_overtime_threshold': 60,
                     'forbid_edit_employments_came_through_integration': True,
                     'get_position_from_work_type_name_in_calc_timesheet': False,
+                    'trust_tick_request': False,
                     'show_remaking_choice': False,
                     'shop_name_form': {
                         "singular": {
@@ -484,8 +485,9 @@ class TestOutsource(TestsHelperMixin, APITestCase):
         ]
         self.assertEqual(response.json(), data)
 
-    @override_settings(TRUST_TICK_REQUEST=True)
     def test_tick_vacancy(self):
+        self.network.trust_tick_request = True
+        self.network.save()
         vacancy = self._create_and_apply_vacancy()
         resp_coming = self.client.post(
             self.get_url('Tick-list'),
