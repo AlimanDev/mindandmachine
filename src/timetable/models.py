@@ -2086,7 +2086,7 @@ class AttendanceRecords(AbstractModel):
         )
 
     def _get_fact_approved_extra_q(self, closest_plan_approved):
-        fact_approved_extra_q = Q(closest_plan_approved=closest_plan_approved)
+        fact_approved_extra_q = Q(closest_plan_approved=closest_plan_approved) if closest_plan_approved else Q()
         if self.type == self.TYPE_LEAVING:
             fact_approved_extra_q |= Q(
                 dttm_work_start__isnull=False,
