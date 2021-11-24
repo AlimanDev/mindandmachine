@@ -127,6 +127,7 @@ class NetworkAdmin(admin.ModelAdmin):
             'get_position_from_work_type_name_in_calc_timesheet',
         )}),
         (_('Integration settings'), {'fields': (
+            'api_timesheet_lines_group_by',
             'descrease_employment_dt_fired_in_api',
             'ignore_parent_code_when_updating_department_via_api',
             'ignore_shop_code_when_updating_employment_via_api',
