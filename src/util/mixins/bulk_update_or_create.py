@@ -109,7 +109,7 @@ class BatchUpdateOrCreateModelMixin:
     @classmethod
     def batch_update_or_create(
             cls, data: list, update_key_field: str = 'id', delete_scope_fields_list: list = None,
-            delete_scope_values_list: list = None, stats=None, user=None):
+            delete_scope_values_list: list = None, delete_scope_filters: dict = None,  stats=None, user=None):
         """
         Функция для массового создания и/или обновления объектов
 
@@ -164,11 +164,13 @@ class BatchUpdateOrCreateModelMixin:
             delete_scope_values_set = set()
             if delete_scope_values_list:
                 for delete_scope_values in delete_scope_values_list:
-                    delete_scope_values_set.add(
-                        tuple(
-                            (delete_scope_field, delete_scope_values.get(delete_scope_field)) for delete_scope_field in
-                            delete_scope_fields_list)
-                    )
+                    delete_scope_values_list_of_tuples = []
+                    for delete_scope_field in delete_scope_fields_list:
+                        value = delete_scope_values.get(delete_scope_field)
+                        if isinstance(value, list):
+                            value = tuple(value)
+                        delete_scope_values_list_of_tuples.append((delete_scope_field, value))
+                    delete_scope_values_set.add(tuple(delete_scope_values_list_of_tuples))
             to_create = []
             to_update_dict = {}
             update_keys = []
@@ -199,6 +201,8 @@ class BatchUpdateOrCreateModelMixin:
             filter_kwargs = {
                 f"{update_key_field}__in": update_keys,
             }
+            if delete_scope_filters:
+                filter_kwargs.update(delete_scope_filters)
             update_qs = cls.objects.filter(**filter_kwargs).select_related(
                 *cls._get_batch_update_select_related_fields())
             existing_objs = {
@@ -251,8 +255,11 @@ class BatchUpdateOrCreateModelMixin:
                         q_for_delete |= Q(**dict(delete_scope_values_tuples))
 
                     delete_manager = cls._get_batch_delete_manager()
+                    delete_filter_kwargs = {}
+                    if delete_scope_filters:
+                        delete_filter_kwargs.update(delete_scope_filters)
                     delete_qs = delete_manager.filter(
-                        q_for_delete).exclude(id__in=list(obj.id for obj in objs if obj.id))
+                        q_for_delete, **delete_filter_kwargs).exclude(id__in=list(obj.id for obj in objs if obj.id))
                     if user:
                         cls._check_batch_delete_qs_perms(user, delete_qs, **check_perms_extra_kwargs)
                     _total_deleted_count, deleted_dict = delete_qs.delete()

@@ -68,13 +68,14 @@ class BatchUpdateOrCreateViewMixin:
             update_key_field='code' if options.get('by_code') else 'id',
             delete_scope_fields_list=options.get('delete_scope_fields_list'),
             delete_scope_values_list=options.get('delete_scope_values_list'),
+            delete_scope_filters={'code__isnull': False} if options.get('by_code') else None,
             user=self.request.user if self.request.user.is_authenticated else None,
         )
 
         res = {
             'stats': stats,
         }
-        if options.get('return_response', False):  # скорее всего нужно для перерендеринга на фронте
+        if options.get('return_response', False):  # для перерендеринга на фронте
             res['data'] = self.get_batch_update_or_create_serializer(
                 instance={
                     'data': objects,

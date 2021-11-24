@@ -1567,6 +1567,7 @@ class FunctionGroup(AbstractModel):
         ('VacancyBlackList', 'Черный список для вакансий (vacancy_black_list)'),
         ('Task', 'Задача (task)'),
         ('ShiftSchedule_batch_update_or_create', 'Массовое создание/обновление графиков работ (Создать/Обновить) (shift_schedule/batch_update_or_create/)'),
+        ('ShiftScheduleInterval_batch_update_or_create', 'Массовое создание/обновление интервалов графиков работ сотрудников (Создать/Обновить) (shift_schedule/batch_update_or_create/)'),
     )
 
     METHODS_TUPLE = (
@@ -1857,8 +1858,8 @@ class ShiftScheduleInterval(AbstractModel):
     shift_schedule = models.ForeignKey('base.ShiftSchedule', verbose_name='График смен', on_delete=models.PROTECT)
     employee = models.ForeignKey(
         'base.Employee', verbose_name='Сотрудник', on_delete=models.CASCADE, null=True, blank=True)
-    dt_from = models.DateField(verbose_name='Дата с (включительно)')
-    dt_to = models.DateField(verbose_name='Дата по (включительно)')
+    dt_start = models.DateField(verbose_name='Дата с (включительно)')
+    dt_end = models.DateField(verbose_name='Дата по (включительно)')
 
     class Meta(AbstractModel.Meta):
         verbose_name = 'Интервал графика смен сотрудника'
