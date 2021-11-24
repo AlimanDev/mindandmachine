@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 from rest_framework.response import Response
 from rest_framework.serializers import ValidationError
 from src.forecast.models import (
@@ -236,11 +237,12 @@ def download_demand_xlsx_util(request, workbook, form):
             )
         )
         if not demand_data:
-            demand_data = [(0, dttms[0])]
+            demand_data = [(np.nan, dttms[0])]
         demand_df = pd.DataFrame(data=demand_data, columns=[operation_type.operation_type_name.name, 'dttm']).set_index('dttm')
         df = df.merge(demand_df, how='left', left_index=True, right_index=True)
 
-    df = df.dropna(how='all')
+    if df.count().any():
+        df = df.dropna(how='all')
     df.fillna(0, inplace=True)
     
     df.to_excel(workbook, sheet_name=sheet_name)
