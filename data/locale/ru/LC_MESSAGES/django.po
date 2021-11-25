@@ -12,7 +12,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Django REST framework\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2021-11-24 13:52+0000\n"
+"POT-Creation-Date: 2021-11-25 05:47+0000\n"
 "PO-Revision-Date: 2017-08-03 14:58+0000\n"
 "Last-Translator: Grigory Mishchenko <grishkokot@gmail.com>\n"
 "Language-Team: Russian (http://www.transifex.com/django-rest-framework-1/"
@@ -59,27 +59,27 @@ msgstr "Настройки графика"
 msgid "Integration settings"
 msgstr "Настройки интеграции"
 
-#: src/base/admin.py:137
+#: src/base/admin.py:136
 msgid "Default settings"
 msgstr "Настройки по умолчанию"
 
-#: src/base/admin.py:138 src/base/admin.py:200
+#: src/base/admin.py:137 src/base/admin.py:199
 msgid "Other"
 msgstr "Прочее"
 
-#: src/base/admin.py:195
+#: src/base/admin.py:194
 msgid "Personal info"
 msgstr "Персональные данные"
 
-#: src/base/admin.py:196
+#: src/base/admin.py:195
 msgid "Permissions"
 msgstr "Доступы"
 
-#: src/base/admin.py:199
+#: src/base/admin.py:198
 msgid "Important dates"
 msgstr "Важные даты"
 
-#: src/base/admin.py:225
+#: src/base/admin.py:224
 #, python-format
 msgid "%(name)s object with primary key %(key)r does not exist."
 msgstr ""
@@ -674,19 +674,19 @@ msgid "End of previous year"
 msgstr "Конец предыдущего года"
 
 #: src/reports/utils/overtimes_undertimes.py:181
-#: src/timetable/worker_day/timetable.py:630
-#: src/timetable/worker_day/timetable.py:653
+#: src/timetable/worker_day/timetable.py:636
 #: src/timetable/worker_day/timetable.py:659
-#: src/timetable/worker_day/timetable.py:704 src/util/dg/timesheet.py:342
+#: src/timetable/worker_day/timetable.py:665
+#: src/timetable/worker_day/timetable.py:710 src/util/dg/timesheet.py:342
 msgid "Full name"
 msgstr "ФИО"
 
 #: src/reports/utils/overtimes_undertimes.py:182
 #: src/timetable/attendance_records/views.py:50
-#: src/timetable/worker_day/timetable.py:629
-#: src/timetable/worker_day/timetable.py:653
+#: src/timetable/worker_day/timetable.py:635
 #: src/timetable/worker_day/timetable.py:659
-#: src/timetable/worker_day/timetable.py:702 src/util/dg/timesheet.py:345
+#: src/timetable/worker_day/timetable.py:665
+#: src/timetable/worker_day/timetable.py:708 src/util/dg/timesheet.py:345
 msgid "Employee id"
 msgstr "Табельный номер"
 
@@ -1196,44 +1196,44 @@ msgstr ""
 "неправильное значение: {value}."
 
 #: src/timetable/worker_day/timetable.py:538
-#: src/timetable/worker_day/timetable.py:771
+#: src/timetable/worker_day/timetable.py:777
 msgid "Timetable for signature."
 msgstr "Расписание на подпись."
 
-#: src/timetable/worker_day/timetable.py:616
-#: src/timetable/worker_day/timetable.py:726
+#: src/timetable/worker_day/timetable.py:622
+#: src/timetable/worker_day/timetable.py:732
 msgid "Timetable_for_shop_{}_from_{}.xlsx"
 msgstr "Расписание_для_подразделения_{}_от_{}.xlsx"
 
-#: src/timetable/worker_day/timetable.py:631
-#: src/timetable/worker_day/timetable.py:653
+#: src/timetable/worker_day/timetable.py:637
 #: src/timetable/worker_day/timetable.py:659
-#: src/timetable/worker_day/timetable.py:706 src/util/dg/timesheet.py:352
+#: src/timetable/worker_day/timetable.py:665
+#: src/timetable/worker_day/timetable.py:712 src/util/dg/timesheet.py:352
 msgid "Position"
 msgstr "Должность"
 
-#: src/timetable/worker_day/timetable.py:656
-#: src/timetable/worker_day/timetable.py:916
+#: src/timetable/worker_day/timetable.py:662
+#: src/timetable/worker_day/timetable.py:922
 msgid "Timetable"
 msgstr "Расписание"
 
-#: src/timetable/worker_day/timetable.py:708 src/util/dg/timesheet.py:356
+#: src/timetable/worker_day/timetable.py:714 src/util/dg/timesheet.py:356
 msgid "Date"
 msgstr "Дата"
 
-#: src/timetable/worker_day/timetable.py:710
+#: src/timetable/worker_day/timetable.py:716
 msgid "Shift start"
 msgstr "Начало смены"
 
-#: src/timetable/worker_day/timetable.py:712
+#: src/timetable/worker_day/timetable.py:718
 msgid "Shift end"
 msgstr "Окончание смены"
 
-#: src/timetable/worker_day/timetable.py:818
+#: src/timetable/worker_day/timetable.py:824
 msgid "Can not parse date value {} on row {}."
 msgstr "Дата {} на строке {} указана в неверном формате."
 
-#: src/timetable/worker_day/timetable.py:839
+#: src/timetable/worker_day/timetable.py:845
 #, python-brace-format
 msgid ""
 "The employee {user.first_name} {user.last_name} in the row {i} has the wrong "
@@ -1374,8 +1374,8 @@ msgid "date"
 msgstr "дата"
 
 #: src/timetable/worker_day/xlsx_utils/timetable.py:185
-msgid "I have read the work schedule**."
-msgstr "С графиком работы ознакомлен**."
+msgid "I have read the work schedule."
+msgstr "С графиком работы ознакомлен."
 
 #: src/timetable/worker_day/xlsx_utils/timetable.py:190
 msgid "H"
@@ -1417,6 +1417,18 @@ msgstr "Пт"
 #: src/timetable/worker_day/xlsx_utils/timetable.py:348
 msgid "Sat"
 msgstr "Сб"
+
+#: src/timetable/worker_day/xlsx_utils/timetable.py:448
+msgid "Descriptions"
+msgstr "Обозначения"
+
+#: src/timetable/worker_day/xlsx_utils/timetable.py:463
+msgid "Abbreviation"
+msgstr "Сокращение"
+
+#: src/timetable/worker_day/xlsx_utils/timetable.py:464
+msgid "Description"
+msgstr "Обозначение"
 
 #: src/util/dg/helpers.py:18
 msgid "January"

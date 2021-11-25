@@ -842,7 +842,7 @@ class TestUploadDownload(TestsHelperMixin, APITestCase):
         self.assertEqual(tabel[tabel.columns[6]][10], 'ОТ 8.0')
         self.assertEqual(tabel[tabel.columns[26]][13], 'В')
         self.assertEqual(tabel[tabel.columns[3]][15], '10:00-14:00\n18:00-20:00')
-        self.assertEqual(tabel[tabel.columns[4]][15], 'К10:00-21:00')
+        self.assertEqual(tabel[tabel.columns[4]][15], 'К 10:00-21:00')
         self.network.set_settings_value('download_timetable_norm_field', 'sawh_hours')
         self.network.save()
         response = self.client.get(
@@ -912,7 +912,7 @@ class TestUploadDownload(TestsHelperMixin, APITestCase):
         self.assertEqual(tabel[tabel.columns[1]][10], 'Иванов Иван Иванович')
         self.assertEqual(tabel[tabel.columns[26]][13], 'В')
         self.assertEqual(tabel[tabel.columns[3]][15], '10:00-20:00')
-        self.assertEqual(tabel[tabel.columns[4]][15], 'К10:00-21:00')
+        self.assertEqual(tabel[tabel.columns[4]][15], 'К 10:00-21:00')
         self.assertEqual(tabel[tabel.columns[5]][15], 'ОТ 8.0')
         self.assertEqual(tabel[tabel.columns[33]][15], '2')
         self.assertEqual(tabel[tabel.columns[34]][15], '26')
