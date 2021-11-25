@@ -462,7 +462,6 @@ TEVIAN_FR_THRESHOLD = 0.8
 # после какого времени (в днях) удалять биометрию уволенных сотрудников
 URV_DELETE_BIOMETRICS_DAYS_AFTER_FIRED = 365 * 3
 
-TRUST_TICK_REQUEST = False
 USERS_WITH_SCHEDULE_ONLY = False
 # игнорировать отметку без активного трудоустройства или вакансии
 USERS_WITH_ACTIVE_EMPLOYEE_OR_VACANCY_ONLY = False
