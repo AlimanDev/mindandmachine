@@ -276,9 +276,13 @@ class TimesheetLinesDataGetter(AigulTimesheetDataGetter):
             day_data['value'] = ''
             return
 
+        curr_value = day_data.get('value', Decimal('0.0'))
         if not wday.day_type.is_dayoff or (wday.day_type.is_dayoff and wday.day_type.is_work_hours):
             # TODO: отображать более информативно, чем просто сумму часов?
-            day_data['value'] = day_data.get('value', Decimal('0.0')) + wday.day_hours + wday.night_hours
+            if isinstance(curr_value, str):
+                day_data['value'] = wday.day_hours + wday.night_hours
+            else:
+                day_data['value'] = curr_value + wday.day_hours + wday.night_hours
         else:
             day_data['value'] = self._get_tabel_type(wday.day_type)
 

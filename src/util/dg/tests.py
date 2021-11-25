@@ -1,6 +1,7 @@
 import uuid
 from calendar import monthrange
 from datetime import datetime, timedelta, time
+from decimal import Decimal
 
 from django.test import TestCase, override_settings
 
@@ -407,3 +408,38 @@ class TestGenerateTabel(TestsHelperMixin, TestCase):
         g = TimesheetLinesDataGetter(shop=self.shop, dt_from=self.dt_from, dt_to=self.dt_to)
         data = g.get_data()
         self.assertEqual(len(data['users']), 6)
+
+    def test_timesheet_lines_generator_get_data_with_holiday_and_workday_on_one_date(self):
+        WorkerDay.objects.all().delete()
+        TimesheetItem.objects.all().delete()
+        workday_type = WorkerDayType.objects.filter(
+            code=WorkerDay.TYPE_WORKDAY,
+        ).get()
+        holiday_type = WorkerDayType.objects.filter(
+            code=WorkerDay.TYPE_HOLIDAY,
+        ).get()
+        holiday_type.allowed_additional_types.add(workday_type)
+        WorkerDayFactory(
+            is_fact=True,
+            is_approved=True,
+            dt=self.dt_now,
+            employee=self.employee2,
+            shop=self.shop,
+            employment=self.employment2,
+            type_id=WorkerDay.TYPE_WORKDAY,
+            cashbox_details__work_type=self.work_type,
+        )
+        WorkerDayFactory(
+            is_fact=False,
+            is_approved=True,
+            dt=self.dt_now,
+            employee=self.employee2,
+            shop=self.shop,
+            employment=self.employment2,
+            type_id=WorkerDay.TYPE_HOLIDAY,
+        )
+        calc_timesheets()
+        g = TimesheetLinesDataGetter(shop=self.shop, dt_from=self.dt_from, dt_to=self.dt_to)
+        data = g.get_data()
+        d = list(filter(lambda i: i['fio'] == self.employee2.user.fio, data['users']))[0]["days"]
+        self.assertDictEqual(d[f'd{self.dt_now.day}'], {'value': Decimal('8.75')})
