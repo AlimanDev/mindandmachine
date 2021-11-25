@@ -201,13 +201,13 @@ class TimesheetCalculator:
                 if resp_wd['fact_timesheet_source'] == TimesheetItem.SOURCE_TYPE_FACT and resp_wd_type.allowed_as_additional_for.all():
                     allowed_as_additional_for_type_codes = list(
                         resp_wd_type.allowed_as_additional_for.values_list('code', flat=True))
-                    for plan_wd in plan_wdays_dict.get(dt):
+                    for plan_wd in plan_wdays_dict.get(dt, []):
                         if plan_wd.type_id in allowed_as_additional_for_type_codes:
                             self._add_plan(plan_wd, dt, fact_timesheet_dict, empl_dt_key)
                 elif resp_wd['fact_timesheet_source'] == TimesheetItem.SOURCE_TYPE_PLAN and resp_wd_type.allowed_additional_types.all():
                     allowed_additional_types_codes = list(
                         resp_wd_type.allowed_additional_types.values_list('code', flat=True))
-                    for plan_wd in plan_wdays_dict.get(dt):
+                    for plan_wd in plan_wdays_dict.get(dt, []):
                         if plan_wd.type_id in allowed_additional_types_codes:
                             self._add_plan(plan_wd, dt, fact_timesheet_dict, empl_dt_key)
                 continue
