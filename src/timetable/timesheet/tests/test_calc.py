@@ -267,3 +267,19 @@ class TestTimesheetCalc(TestTimesheetMixin, TestCase):
             day_type_id=WorkerDay.TYPE_ABSENSE,
             day_hours=0,
         ).count(), 1)
+
+    def test_calc_fact_without_plan_with_holiday_allowed_additional_types(self):
+        workday_type = WorkerDayType.objects.filter(
+            code=WorkerDay.TYPE_WORKDAY,
+        ).get()
+        holiday_type = WorkerDayType.objects.filter(
+            code=WorkerDay.TYPE_HOLIDAY,
+        ).get()
+        holiday_type.get_work_hours_method = WorkerDayType.GET_WORK_HOURS_METHOD_TYPE_MANUAL
+        holiday_type.is_work_hours = True
+        holiday_type.is_dayoff = True
+        holiday_type.save()
+        holiday_type.allowed_additional_types.add(workday_type)
+        dt = date(2021, 6, 7)
+        WorkerDay.objects.filter(dt=dt, is_fact=False).delete()
+        self._calc_timesheets()
