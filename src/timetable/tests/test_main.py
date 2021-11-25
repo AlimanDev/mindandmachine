@@ -1727,6 +1727,39 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
             21,
         )
 
+    def test_change_range_set_work_hours_from_average_sawh_hours(self):
+        self.employee2.tabel_code = 'empl_2'
+        self.employee2.save()
+        self.employee2.user.network.round_work_hours_alg = Network.ROUND_TO_HALF_AN_HOUR
+        self.employee2.user.network.save()
+        vacation_type = WorkerDayType.objects.filter(
+            code=WorkerDay.TYPE_VACATION,
+        ).get()
+        vacation_type.get_work_hours_method = WorkerDayType.GET_WORK_HOURS_METHOD_TYPE_MONTH_AVERAGE_SAWH_HOURS
+        vacation_type.is_work_hours = True
+        vacation_type.is_dayoff = True
+        vacation_type.save()
+
+        WorkerDay.objects.all().delete()
+        dt = date(2021, 6, 7)
+        data = {
+          "ranges": [
+            {
+              "worker": self.employee2.tabel_code,
+              "dt_from": dt,
+              "dt_to": dt,
+              "type": WorkerDay.TYPE_VACATION,
+              "is_fact": False,
+              "is_approved": True
+            }
+          ]
+        }
+        response = self.client.post(reverse('WorkerDay-change-range'), data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(WorkerDay.objects.filter(type=vacation_type).count(), 2)
+        approved_vac = WorkerDay.objects.get(is_approved=True)
+        self.assertEqual(approved_vac.work_hours, timedelta(seconds=19800))
+
     def test_cant_create_workday_if_user_has_no_active_employment(self):
         WorkerDay.objects_with_excluded.filter(employee=self.employee2).delete()
         Employment.objects.filter(employee__user=self.user2).delete()
