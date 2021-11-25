@@ -43,7 +43,7 @@ class TestsHelperMixin:
         return reverse(view_name, args=args, kwargs=kwargs)
 
     def pp_data(self, d):
-        print(json.dumps(d, indent=4, ensure_ascii=False))
+        print(json.dumps(d, indent=4, ensure_ascii=False, cls=DjangoJSONEncoder))
 
     def print_resp(self, resp):
         try:
