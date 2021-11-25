@@ -2913,7 +2913,6 @@ class TestWorkerDayCreateFact(TestsHelperMixin, APITestCase):
         self.assertEqual(fact.closest_plan_approved_id, None)
 
 
-@override_settings(TRUST_TICK_REQUEST=True)
 class TestAttendanceRecords(TestsHelperMixin, APITestCase):
     def setUp(self):
         self.url = '/rest_api/worker_day/'
@@ -2969,6 +2968,8 @@ class TestAttendanceRecords(TestsHelperMixin, APITestCase):
             dttm_work_end=datetime.combine(self.dt, time(19, 59, 1)),
             closest_plan_approved=self.worker_day_plan_approved,
         )
+        self.network.trust_tick_request = True
+        self.network.save()
 
     def test_attendancerecords_update(self):
         tm_start = datetime.combine(self.dt, time(6, 0, 0))

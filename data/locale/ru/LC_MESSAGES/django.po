@@ -33,29 +33,29 @@ msgstr "Базовые настройки"
 msgid "Time attendance settings"
 msgstr "Настройки УРВ"
 
-#: src/base/admin.py:106
+#: src/base/admin.py:107
 msgid "Time tracking settings"
 msgstr "Настройки суммированного учета рабочего времени"
 
-#: src/base/admin.py:116
+#: src/base/admin.py:117
 msgid "Vacancy settings"
 msgstr "Настройки биржи смен"
 
-#: src/base/admin.py:117
+#: src/base/admin.py:118
 msgid "Format settings"
 msgstr "Настройки форматов"
 
-#: src/base/admin.py:118
+#: src/base/admin.py:119
 msgid "Timetable settings"
 msgstr "Настройки графика"
 
-#: src/base/admin.py:124
+#: src/base/admin.py:125
 #, fuzzy
 #| msgid "Timetable settings"
 msgid "Timesheet settings"
 msgstr "Настройки графика"
 
-#: src/base/admin.py:129
+#: src/base/admin.py:130
 msgid "Integration settings"
 msgstr "Настройки интеграции"
 
@@ -312,6 +312,10 @@ msgstr ""
 "смены прошло больше, чем максимальная длительность смены."
 
 #: src/base/models.py:240
+msgid "Create attendance record without check photo."
+msgstr "Создавать отметки без проверки биометрии."
+
+#: src/base/models.py:244
 msgid ""
 "Max difference between the start or end time to \"pull\" to the planned work "
 "day"
@@ -319,7 +323,7 @@ msgstr ""
 "Максимальная разность между временем начала или окончания для \"притягивания"
 "\" к рабочему дню"
 
-#: src/base/models.py:374 src/base/models.py:380
+#: src/base/models.py:378 src/base/models.py:384
 #, python-brace-format
 msgid ""
 "Bad break triplet format {triplet}, should be [[int, int, [int, int,]],]."
@@ -327,42 +331,42 @@ msgstr ""
 "Некорректный формат перерыва {triplet}, должно быть [[int, int, [int, "
 "int,]],]."
 
-#: src/base/models.py:377
+#: src/base/models.py:381
 #, python-brace-format
 msgid "First value of period can not be greater then second value: {triplet}"
 msgstr ""
 "Первое значение периода не может быть больше второго значения: {triplet}"
 
-#: src/base/models.py:383
+#: src/base/models.py:387
 #, python-brace-format
 msgid "Value of break can not be greater than value of period: {triplet}"
 msgstr "Значение перерыва не может быть больше значения периода: {triplet}"
 
-#: src/base/models.py:567
+#: src/base/models.py:571
 #, python-brace-format
 msgid "Shop with parent_code={code} not found"
 msgstr "Подразделение с parent_code={code} не найдено"
 
-#: src/base/models.py:710
+#: src/base/models.py:714
 msgid "Keys of open times and close times are different."
 msgstr "Ключи в времени открытия и времени закрытия различаются."
 
-#: src/base/models.py:712
+#: src/base/models.py:716
 msgid "'All' and individual days cannot be specified."
 msgstr "Нельзя указывать all и отдельные дни."
 
-#: src/base/models.py:725
+#: src/base/models.py:729
 msgid ""
 "It is not possible to change the load template as it is in the calculation "
 "process."
 msgstr ""
 "Невозможно изменить шаблон нагрузки, так как он находится в процессе расчета."
 
-#: src/base/models.py:739
+#: src/base/models.py:743
 msgid "There is not load template with code {}."
 msgstr "Шаблон нагрузки с кодом {} не найден."
 
-#: src/base/models.py:1349
+#: src/base/models.py:1353
 msgid ""
 "Unable to define worker access group. Assign an access group to him or a "
 "position associated with an access group."
@@ -374,47 +378,47 @@ msgstr ""
 msgid "shop_id should be defined"
 msgstr "Произошла ошибка. Попробуйте перезагрузить страницу."
 
-#: src/base/serializers.py:251
+#: src/base/serializers.py:252
 msgid "Passwords are mismatched."
 msgstr "Пароли не совпадают."
 
-#: src/base/serializers.py:252
+#: src/base/serializers.py:253
 msgid "Password is wrong."
 msgstr "Неверный пароль."
 
-#: src/base/serializers.py:323
+#: src/base/serializers.py:324
 #, python-brace-format
 msgid "Employment from {dt_hired} to {dt_fired} already exists."
 msgstr ""
 "В этом магазине уже заведено трудоустройство с {dt_hired} по {dt_fired}."
 
-#: src/base/serializers.py:324 src/timetable/worker_day/serializers.py:130
+#: src/base/serializers.py:325 src/timetable/worker_day/serializers.py:130
 #, python-brace-format
 msgid "There is {amount} models of user with username: {username}."
 msgstr ""
 "Существует {amount} моделей пользователя с именем пользователя: {username}."
 
-#: src/base/serializers.py:325
+#: src/base/serializers.py:326
 #, python-brace-format
 msgid "There is {amount} models of user with user_id: {user_id}."
 msgstr "Существует {amount} моделей пользователя с user_id: {user_id}."
 
-#: src/base/serializers.py:326 src/tasks/serializers.py:19
+#: src/base/serializers.py:327 src/tasks/serializers.py:19
 #: src/tasks/serializers.py:20
 #, python-brace-format
 msgid "There is {amount} models of shop with code: {code}."
 msgstr "Есть {amount} магазинов с кодом: {code}."
 
-#: src/base/serializers.py:327
+#: src/base/serializers.py:328
 #, python-brace-format
 msgid "There is {amount} models of position with code: {code}."
 msgstr "Есть {amount} должностей с кодом: {code}."
 
-#: src/base/serializers.py:328
+#: src/base/serializers.py:329
 msgid "You are not allowed to choose shops from other network."
 msgstr "Вы не можете выбирать магазины из другой сети."
 
-#: src/base/serializers.py:329
+#: src/base/serializers.py:330
 msgid "Network of shop and position should be equal."
 msgstr "Сети магазина и должности должны совпадать."
 

@@ -101,6 +101,7 @@ class NetworkAdmin(admin.ModelAdmin):
                 'max_work_shift_seconds',
                 'skip_leaving_tick',
                 'max_plan_diff_in_seconds',
+                'trust_tick_request',
             )
         }),
         (_('Time tracking settings'), {
