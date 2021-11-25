@@ -193,14 +193,15 @@ class TestShiftScheduleIntervalViewSet(TestsHelperMixin, APITestCase):
             employee=cls.employee, shop=cls.shop, function_group=cls.group)
         cls.add_group_perm(cls.group, 'ShiftScheduleInterval_batch_update_or_create', 'POST')
         cls.add_group_perm(cls.group, 'ShiftSchedule_batch_update_or_create', 'POST')
+        cls.add_group_perm(cls.group, 'Employee_shift_schedule', 'GET')
 
     def setUp(self):
         self.client.force_authenticate(user=self.user)
         self.shop.refresh_from_db()
 
     def test_shift_schedule_interval_integration_for_employees(self):
-        EmployeeFactory(user=self.user, code='empl2', tabel_code='empl2')
-        EmployeeFactory(user=self.user, code='empl3', tabel_code='empl3')
+        empl2 = EmployeeFactory(user=self.user, code='empl2', tabel_code='empl2')
+        empl3 = EmployeeFactory(user=self.user, code='empl3', tabel_code='empl3')
 
         shift_schedules_data_2021 = [
             {
@@ -337,7 +338,7 @@ class TestShiftScheduleIntervalViewSet(TestsHelperMixin, APITestCase):
                 "code": "empl2_2_2021-01-01",
                 "shift_schedule__code": "2",
                 "employee__tabel_code": "empl2",
-                "dt_start": "2021-01-01",
+                "dt_start": "2021-01-06",
                 "dt_end": "2021-12-31",
             },
             {
@@ -402,6 +403,24 @@ class TestShiftScheduleIntervalViewSet(TestsHelperMixin, APITestCase):
             }
         })
 
+        resp = self.client.get(
+            self.get_url('Employee-shift-schedule'),
+            data={'employee_id': empl2.id, 'dt__gte': '2021-01-01', 'dt__lte': '2021-01-01'},
+        )
+        self.assertEqual(resp.status_code, 200)
+        resp_data = resp.json()
+        self.assertDictEqual(
+            resp_data, {
+                str(empl2.id): {
+                    "2021-01-01": {
+                        "day_hours": 8.0,
+                        "night_hours": 3.0,
+                        "total_hours": 11.0
+                    }
+                }
+            }
+        )
+
         shift_schedule_intervals_data2 = [
             {
                 "code": "empl2_3_2022-01-01",
@@ -454,3 +473,26 @@ class TestShiftScheduleIntervalViewSet(TestsHelperMixin, APITestCase):
                 }
             }
         })
+
+        resp = self.client.get(
+            self.get_url('Employee-shift-schedule'),
+            data={'employee_id': empl2.id, 'dt__gte': '2022-01-01', 'dt__lte': '2022-01-30'},
+        )
+        self.assertEqual(resp.status_code, 200)
+        resp_data = resp.json()
+        self.assertDictEqual(
+            resp_data, {
+                str(empl2.id): {
+                    "2022-01-01": {
+                        "day_hours": 12.0,
+                        "night_hours": 4.0,
+                        "total_hours": 16.0
+                    },
+                    "2022-01-07": {
+                        "day_hours": 11.0,
+                        "night_hours": None,
+                        "total_hours": 11.0
+                    }
+                }
+            }
+        )

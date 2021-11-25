@@ -1493,6 +1493,7 @@ class FunctionGroup(AbstractModel):
         ('Break', 'Перерыв (break)'),
         ('Employment', 'Трудоустройство (employment)'),
         ('Employee', 'Сотрудник (employee)'),
+        ('Employee_shift_schedule', 'Графики смен сотрудников (employee/shift_schedule/)'),
         ('Employment_auto_timetable', 'Выбрать сорудников для автосоставления (Создать) (employment/auto_timetable/)'),
         ('Employment_timetable', 'Редактирование полей трудоустройства, связанных с расписанием (employment/timetable/)'),
         ('EmploymentWorkType', 'Связь трудоустройства и типа работ (employment_work_type)'),
@@ -1813,6 +1814,12 @@ class ShiftSchedule(AbstractActiveNetworkSpecificCodeNamedModel):
         verbose_name = 'График смен'
         verbose_name_plural = 'Графики смен'
 
+    def __str__(self):
+        s = f'{self.name}'
+        if self.code:
+            s += f' ({self.code})'
+        return s
+
     @classmethod
     def _get_rel_objs_mapping(cls):
         return {
@@ -1832,6 +1839,12 @@ class ShiftScheduleDay(AbstractModel):
         unique_together = (
             ('dt', 'shift_schedule'),
         )
+
+    def __str__(self):
+        s = f'{self.dt}'
+        if self.code:
+            s += f' ({self.code})'
+        return s
 
     @classmethod
     def _get_rel_objs_mapping(cls):
@@ -1865,10 +1878,16 @@ class ShiftScheduleDayItem(AbstractModel):
             ('hours_type', 'shift_schedule_day'),
         )
 
+    def __str__(self):
+        s = f'{self.hours_type} {self.hours_amount}'
+        if self.code:
+            s += f' ({self.code})'
+        return s
+
 
 class ShiftScheduleInterval(AbstractModel):
-    code = models.CharField(max_length=256, null=True, blank=True)
-    shift_schedule = models.ForeignKey('base.ShiftSchedule', verbose_name='График смен', on_delete=models.PROTECT)
+    code = models.CharField(max_length=256, null=True, blank=True, db_index=True)
+    shift_schedule = models.ForeignKey('base.ShiftSchedule', verbose_name='График смен', on_delete=models.PROTECT, related_name='intervals')
     employee = models.ForeignKey(
         'base.Employee', verbose_name='Сотрудник', on_delete=models.CASCADE, null=True, blank=True)
     dt_start = models.DateField(verbose_name='Дата с (включительно)')
@@ -1879,14 +1898,8 @@ class ShiftScheduleInterval(AbstractModel):
         verbose_name_plural = 'Интервалы графика смен сотрудника'
         # TODO: ограничение на невозможность создать для 1 сотрудника пересечения графика по датам ?
 
-
-# TODO: вьюха для отображения графика смен на фронте для сотрудников?
-# class EmployeeShiftSchedule(models.Model):
-#     employee = models.ForeignKey('base.Employee', verbose_name='Сотрудник', on_delete=models.PROTECT)
-#     dt = models.DateField()
-#     day_hours = models.DecimalField(max_digits=4, decimal_places=2, default=Decimal("0.00"))
-#     night_hours = models.DecimalField(max_digits=4, decimal_places=2, default=Decimal("0.00"))
-#     total_hours = models.DecimalField(max_digits=4, decimal_places=2, default=Decimal("0.00"))
-#
-#     class Meta:
-#         managed = False
+    def __str__(self):
+        s = f'{self.shift_schedule} {self.employee} {self.dt_start}-{self.dt_end}'
+        if self.code:
+            s += f' ({self.code})'
+        return s

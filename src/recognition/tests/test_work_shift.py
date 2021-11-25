@@ -260,6 +260,7 @@ class TestWorkShiftViewSet(TestsHelperMixin, APITestCase):
                 'forbid_edit_employments_came_through_integration': True,
                 'get_position_from_work_type_name_in_calc_timesheet': False,
                 'show_remaking_choice': False,
+                'show_employee_shift_schedule_tab': False,
                 'url': None,
                 'shop_name_form': {
                     "singular": {
@@ -407,6 +408,7 @@ class TestWorkShiftViewSet(TestsHelperMixin, APITestCase):
                 'forbid_edit_employments_came_through_integration': True,
                 'get_position_from_work_type_name_in_calc_timesheet': False,
                 'show_remaking_choice': False,
+                'show_employee_shift_schedule_tab': False,
                 'url': None,
                 'shop_name_form': {
                     "singular": {
@@ -560,6 +562,7 @@ class TestWorkShiftViewSet(TestsHelperMixin, APITestCase):
                 'forbid_edit_employments_came_through_integration': True,
                 'get_position_from_work_type_name_in_calc_timesheet': False,
                 'show_remaking_choice': False,
+                'show_employee_shift_schedule_tab': False,
                 'url': None,
                 'shop_name_form': {
                     "singular": {

@@ -1,4 +1,4 @@
-from django.db.models import F, Q
+from django.db.models import Sum, Q, F
 from django.db.models.functions import Coalesce
 from django.db.models.query import Prefetch
 from django.middleware.csrf import rotate_token
@@ -10,12 +10,12 @@ from rest_auth.views import UserDetailsView
 from rest_framework import mixins
 from rest_framework import status
 from rest_framework.decorators import action
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.pagination import LimitOffsetPagination
 from rest_framework.parsers import MultiPartParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
-from rest_framework.exceptions import PermissionDenied
 
 from src.base.filters import (
     NotificationFilter,
@@ -39,6 +39,8 @@ from src.base.models import (
     Break,
     ShopSchedule,
     Employee,
+    ShiftScheduleInterval,
+    ShiftScheduleDayItem,
 )
 from src.base.permissions import Permission
 from src.base.serializers import (
@@ -59,6 +61,7 @@ from src.base.serializers import (
     BreakSerializer,
     ShopScheduleSerializer,
     EmployeeSerializer,
+    EmployeeShiftScheduleQueryParamsSerializer,
 )
 from src.base.views_abstract import (
     BaseActiveNamedModelViewSet,
@@ -263,6 +266,38 @@ class EmployeeViewSet(UpdateorCreateViewSet):
             qs = qs.prefetch_related(Prefetch('employments', queryset=queryset, to_attr='employments_list'))
 
         return qs.distinct()
+
+    @action(detail=False, methods=['get'])
+    def shift_schedule(self, *args, **kwargs):
+        s = EmployeeShiftScheduleQueryParamsSerializer(data=self.request.query_params)
+        s.is_valid(raise_exception=True)
+
+        qs = ShiftScheduleInterval.objects.filter(
+            Q(shift_schedule__days__dt__gte=s.validated_data.get('dt__gte')) & Q(
+                shift_schedule__days__dt__gte=F('dt_start')),
+            Q(shift_schedule__days__dt__lte=s.validated_data.get('dt__lte')) & Q(
+                shift_schedule__days__dt__lte=F('dt_end')),
+            employee_id=s.validated_data.get('employee_id'),
+            employee__user__network_id=self.request.user.network_id,
+            shift_schedule__network_id=self.request.user.network_id,
+        ).values(
+            'employee_id',
+            'shift_schedule__days__dt',
+        ).annotate(
+            day_hours=Sum('shift_schedule__days__items__hours_amount',
+                          filter=Q(shift_schedule__days__items__hours_type=ShiftScheduleDayItem.HOURS_TYPE_DAY)),
+            night_hours=Sum('shift_schedule__days__items__hours_amount',
+                            filter=Q(shift_schedule__days__items__hours_type=ShiftScheduleDayItem.HOURS_TYPE_NIGHT)),
+            total_hours=Sum('shift_schedule__days__items__hours_amount'),
+        )
+        data = {}
+        for i in qs:
+            data.setdefault(str(i['employee_id']), {}).setdefault(str(i['shift_schedule__days__dt']), {
+                'day_hours': i['day_hours'],
+                'night_hours': i['night_hours'],
+                'total_hours': i['total_hours'],
+            })
+        return Response(data)
 
 
 class AuthUserView(UserDetailsView):

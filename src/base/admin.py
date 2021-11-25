@@ -49,6 +49,10 @@ from src.base.models import (
     Employee,
     NetworkConnect,
     ApiLog,
+    ShiftSchedule,
+    ShiftScheduleDay,
+    ShiftScheduleDayItem,
+    ShiftScheduleInterval,
 )
 from src.timetable.models import GroupWorkerDayPermission
 
@@ -488,3 +492,42 @@ class ApiLogAdmin(admin.ModelAdmin):
     search_fields = ('url_kwargs',)
     raw_id_fields = ('user',)
     list_select_related = ('user',)
+
+
+@admin.register(ShiftSchedule)
+class ShiftScheduleAdmin(admin.ModelAdmin):
+    raw_id_fields = ('network',)
+    list_filter = ('year', 'network',)
+    list_display = ('id', 'name', 'year', 'code',)
+    save_as = True
+
+
+class ShiftScheduleDayItemStackedInline(admin.TabularInline):
+    raw_id_fields = ('shift_schedule_day',)
+    # list_filter = ('shift_schedule_day', 'hours_type',)
+    # list_display = ('id', 'code', 'shift_schedule_day', 'hours_type', 'hours_amount')
+    # save_as = True
+    extra = 0
+    model = ShiftScheduleDayItem
+
+
+@admin.register(ShiftScheduleDay)
+class ShiftScheduleDayAdmin(admin.ModelAdmin):
+    raw_id_fields = ('shift_schedule',)
+    list_filter = ('dt', 'shift_schedule',)
+    list_display = ('id', 'shift_schedule', 'dt', 'code',)
+    save_as = True
+    inlines = (
+        ShiftScheduleDayItemStackedInline,
+    )
+
+
+@admin.register(ShiftScheduleInterval)
+class ShiftScheduleIntervalAdmin(admin.ModelAdmin):
+    raw_id_fields = ('shift_schedule', 'employee')
+    list_filter = (
+        ('shift_schedule', RelatedOnlyDropdownNameOrderedFilter),
+        ('employee__user', RelatedOnlyDropdownLastNameOrderedFilter),
+    )
+    list_display = ('id', 'shift_schedule', 'employee', 'dt_start', 'dt_end', 'code',)
+    save_as = True
