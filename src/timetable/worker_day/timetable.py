@@ -603,6 +603,8 @@ class UploadDownloadTimetableCells(BaseUploadDownloadTimeTable):
         # fill page 2
         timetable.fill_table2(shop, timetable.prod_days[-1].dt, groupped_days)
 
+        timetable.fill_description_table(self.wd_types_dict)
+
         if timetable.on_print:
             timetable.worksheet.set_landscape()
             timetable.worksheet.set_paper(9)
@@ -612,6 +614,10 @@ class UploadDownloadTimetableCells(BaseUploadDownloadTimeTable):
             timetable.print_worksheet.set_paper(9)
             timetable.print_worksheet.fit_to_pages(1, 0)
             timetable.print_worksheet.set_margins(left=0.25, right=0.25)
+            timetable.description_sheet.set_landscape()
+            timetable.description_sheet.set_paper(9)
+            timetable.description_sheet.fit_to_pages(1, 0)
+            timetable.description_sheet.set_margins(left=0.25, right=0.25)
 
         return workbook, _('Timetable_for_shop_{}_from_{}.xlsx').format(shop.name, form['dt_from'])
 
