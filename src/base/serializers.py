@@ -124,6 +124,7 @@ class NetworkSerializer(serializers.ModelSerializer):
             'shop_name_form',
             'get_position_from_work_type_name_in_calc_timesheet',
             'trust_tick_request',
+            'show_cost_for_inner_vacancies',
         ]
 
 class NetworkListSerializer(serializers.Serializer):

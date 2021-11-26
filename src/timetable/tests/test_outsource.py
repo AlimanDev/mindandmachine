@@ -461,6 +461,7 @@ class TestOutsource(TestsHelperMixin, APITestCase):
                     'forbid_edit_employments_came_through_integration': True,
                     'get_position_from_work_type_name_in_calc_timesheet': False,
                     'trust_tick_request': False,
+                    'show_cost_for_inner_vacancies': False,
                     'show_remaking_choice': False,
                     'shop_name_form': {
                         "singular": {
