@@ -448,6 +448,8 @@ class Timetable_xlsx(Tabel_xlsx):
         self.description_sheet = self.workbook.add_worksheet(_('Descriptions'))
         self.description_sheet.set_column(0, 0, 16)
         self.description_sheet.set_column(1, 1, 20)
+        self.description_sheet.set_column(3, 3, 16)
+        self.description_sheet.set_column(4, 4, 20)
         day_type = {
             'font_size': self._font_size(14, 14),
             'font_name': 'Arial',
@@ -462,6 +464,9 @@ class Timetable_xlsx(Tabel_xlsx):
         default_format = self.workbook.add_format(day_type)
         self.description_sheet.write(0, 0, _("Abbreviation"), header_format)
         self.description_sheet.write(0, 1, _("Description"), header_format)
+        self.description_sheet.write(0, 2, "", header_format)
+        self.description_sheet.write(0, 3, _("Color of day of week"), header_format)
+        self.description_sheet.write(0, 4, _("Description"), header_format)
         empty_format = day_type.copy()
         empty_format.update(
             {
@@ -472,6 +477,17 @@ class Timetable_xlsx(Tabel_xlsx):
         empty_format = self.workbook.add_format(empty_format)
         self.description_sheet.write(1, 0, '', empty_format)
         self.description_sheet.write(1, 1, "Отсутствие данных", default_format)
+
+        colored_format = day_type.copy()
+        colored_format['bg_color'] = COLOR_WHITE
+        self.description_sheet.write(1, 3, "Белый", self.workbook.add_format(colored_format))
+        self.description_sheet.write(1, 4, "Рабочий день", default_format)
+        colored_format['bg_color'] = COLOR_ORANGE
+        self.description_sheet.write(2, 3, "Желтый", self.workbook.add_format(colored_format))
+        self.description_sheet.write(2, 4, "Сокращенный рабочий день", default_format)
+        colored_format['bg_color'] = COLOR_GREEN
+        self.description_sheet.write(3, 3, "Зеленый", self.workbook.add_format(colored_format))
+        self.description_sheet.write(3, 4, "Выходной", default_format)
         
         for i, type in enumerate(wd_types.values()):
             excel_code = type.excel_load_code
