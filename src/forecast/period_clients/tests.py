@@ -672,8 +672,8 @@ class TestDemand(APITestCase):
         self.assertEquals(response.status_code, 200)
         self.assertCountEqual(list(tabel.columns), ['dttm', 'Кассы'])
         self.assertEquals(tabel[tabel.columns[0]][0], datetime(2019, 5, 30))
-        self.assertEquals(len(tabel[tabel.columns[0]]), 73)
-        self.assertEquals(tabel[tabel.columns[0]][72], datetime(2019, 6, 2))
+        self.assertEquals(len(tabel[tabel.columns[0]]), 96)
+        self.assertEquals(tabel[tabel.columns[0]][95], datetime(2019, 6, 2, 23))
         self.assertEquals(tabel[tabel.columns[1]][0], 0)
         self.assertEquals(tabel[tabel.columns[1]][72], 0)
 
