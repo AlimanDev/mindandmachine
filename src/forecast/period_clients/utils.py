@@ -220,7 +220,7 @@ def download_demand_xlsx_util(request, workbook, form):
     if 'operation_type_ids' in form:
         operation_types = operation_types.filter(id__in=form['operation_type_ids'])
     
-    dttms = pd.date_range(from_dt, to_dt, freq=timestep)
+    dttms = pd.date_range(from_dt, datetime.combine(to_dt, time(23, 59)), freq=timestep)
 
     df = pd.DataFrame(data=dttms, columns=['dttm']).set_index('dttm')
     
