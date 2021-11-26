@@ -270,6 +270,8 @@ class Network(AbstractActiveModel):
     api_timesheet_lines_group_by = models.PositiveSmallIntegerField(
         verbose_name='Группировать данные табеля в api методе /rest_api/timesheet/lines/ по',
         choices=TIMESHEET_LINES_GROUP_BY_CHOICES, default=TIMESHEET_LINES_GROUP_BY_EMPLOYEE_POSITION_SHOP)
+    
+    show_cost_for_inner_vacancies = models.BooleanField('Отображать поле "стоимость работ" для внутренних вакансий', default=False)
 
     DEFAULT_NIGHT_EDGES = (
         '22:00:00',

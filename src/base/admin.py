@@ -114,7 +114,7 @@ class NetworkAdmin(admin.ModelAdmin):
                 'round_work_hours_alg',
             ),
         }),
-        (_('Vacancy settings'), {'fields': ('need_symbol_for_vacancy', 'allow_workers_confirm_outsource_vacancy')}),
+        (_('Vacancy settings'), {'fields': ('need_symbol_for_vacancy', 'allow_workers_confirm_outsource_vacancy', 'show_cost_for_inner_vacancies')}),
         (_('Format settings'), {'fields': ('download_tabel_template', 'convert_tabel_to', 'timetable_format', 'add_users_from_excel')}),
         (_('Timetable settings'), {'fields': (
             'show_worker_day_additional_info',

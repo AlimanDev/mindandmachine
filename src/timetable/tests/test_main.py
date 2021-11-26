@@ -1,3 +1,4 @@
+from decimal import Decimal
 import json
 import time as time_module
 import uuid
@@ -169,6 +170,8 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
             'unaccounted_overtime': 0.0,
             'crop_work_hours_by_shop_schedule': True,
             'closest_plan_approved_id': None,
+            'cost_per_hour': '0.00',
+            'total_cost': 0.0,
         }
 
         self.assertEqual(response.json(), data)
@@ -2664,6 +2667,77 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
         plan_not_approved_wday = plan_not_approved_qs.first()
         self.assertEqual(plan_not_approved_wday.work_hours, timedelta(seconds=60*60*10.5))
 
+    def test_set_cost_per_hour(self):
+        response = self.client.put(
+            f'{self.url}{self.worker_day_plan_not_approved.id}/',
+            data=self.dump_data(
+                {
+                    'cost_per_hour': 120.45,
+                    'shop_id': self.shop.id,
+                    'employee_id': self.employee2.id,
+                    'employment_id': self.employment2.id,
+                    'is_fact': False,
+                    'is_approved': False,
+                    'is_blocked': False,
+                    'type': WorkerDay.TYPE_WORKDAY,
+                    'parent_worker_day_id': self.worker_day_plan_approved.id,
+                    'comment': None,
+                    'dt': Converter.convert_date(self.dt),
+                    'dttm_work_start': Converter.convert_datetime(datetime.combine(self.dt, time(8, 0, 0))),
+                    'dttm_work_start_tabel': Converter.convert_datetime(datetime.combine(self.dt, time(8, 0, 0))),
+                    'dttm_work_end': Converter.convert_datetime(datetime.combine(self.dt, time(20, 0, 0))),
+                    'dttm_work_end_tabel': Converter.convert_datetime(datetime.combine(self.dt, time(20, 0, 0))),
+                    'worker_day_details': [
+                        {
+                            'work_type_id': self.work_type.id,
+                            'work_part': 1.0,
+                        }
+                    ],
+                }
+            ),
+            content_type='application/json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        data = {
+            'id': self.worker_day_plan_not_approved.id,
+            'shop_id': self.shop.id,
+            'employee_id': self.employee2.id,
+            'employment_id': self.employment2.id,
+            'is_fact': False,
+            'is_approved': False,
+            'is_blocked': False,
+            'type': WorkerDay.TYPE_WORKDAY,
+            'parent_worker_day_id': self.worker_day_plan_approved.id,
+            'comment': None,
+            'dt': Converter.convert_date(self.dt),
+            'dttm_work_start': Converter.convert_datetime(datetime.combine(self.dt, time(8, 0, 0))),
+            'dttm_work_start_tabel': Converter.convert_datetime(datetime.combine(self.dt, time(8, 0, 0))),
+            'dttm_work_end': Converter.convert_datetime(datetime.combine(self.dt, time(20, 0, 0))),
+            'dttm_work_end_tabel': Converter.convert_datetime(datetime.combine(self.dt, time(20, 0, 0))),
+            'work_hours': '10:45:00',
+            'is_outsource': False,
+            'outsources': [],
+            'is_vacancy': False,
+            'unaccounted_overtime': 0.0,
+            'crop_work_hours_by_shop_schedule': True,
+            'closest_plan_approved_id': None,
+            'cost_per_hour': '120.45',
+            'total_cost': 1294.8375,
+        }
+        response_data = response.json()
+        response_data.pop('worker_day_details', None)
+        self.assertEquals(response.json(), data)
+        self.worker_day_plan_not_approved.refresh_from_db()
+        self.assertEquals(self.worker_day_plan_not_approved.cost_per_hour, Decimal("120.45"))
+
+    def test_cost_per_hour_in_list(self):
+        self.worker_day_plan_not_approved.cost_per_hour = 120.45
+        self.worker_day_plan_not_approved.save()
+        response = self.client.get(self.url)
+        worker_day_plan_not_approved = list(filter(lambda x: x['id'] == self.worker_day_plan_not_approved.id, response.json()))[0]
+        self.assertEquals(worker_day_plan_not_approved['cost_per_hour'], '120.45')
+        self.assertEquals(worker_day_plan_not_approved['total_cost'], 1294.8375)
+
 
 class TestCropSchedule(TestsHelperMixin, APITestCase):
     @classmethod
@@ -4357,6 +4431,14 @@ class TestVacancy(TestsHelperMixin, APITestCase):
         self.assertEquals(response.status_code, 200)
         vacancy.refresh_from_db()
         self.assertTrue(vacancy.is_vacancy)
+    
+    def test_cost_per_hour_in_list(self):
+        self.vacancy.cost_per_hour = 120.45
+        self.vacancy.save()
+        response = self.client.get(f"{self.url}?limit=100")
+        vacancy = list(filter(lambda x: x['id'] == self.vacancy.id, response.json()['results']))[0]
+        self.assertEquals(vacancy['cost_per_hour'], '120.45')
+        self.assertEquals(vacancy['total_cost'], 1174.3875)
         
 
 class TestAditionalFunctions(TestsHelperMixin, APITestCase):
