@@ -5268,6 +5268,7 @@ class TestAditionalFunctions(TestsHelperMixin, APITestCase):
             'is_vacancy': True,
             'dt_from': dt_from,
             'dt_to': dt_from + timedelta(9),
+            'outsources': None,
         }
         url = f'{self.url}change_list/'
         response = self.client.post(url, data, format='json')

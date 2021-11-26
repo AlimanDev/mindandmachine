@@ -492,7 +492,7 @@ class ChangeListSerializer(serializers.Serializer):
         wd_types_dict = self.context.get('wd_types_dict') or WorkerDayType.get_wd_types_dict()
         if self.validated_data['is_vacancy']:
             self.validated_data['type_id'] = WorkerDay.TYPE_WORKDAY
-            self.validated_data['outsources'] = Network.objects.filter(id__in=self.validated_data.get('outsources', []))
+            self.validated_data['outsources'] = Network.objects.filter(id__in=(self.validated_data.get('outsources') or []))
         else:
             if wd_types_dict.get(self.validated_data['type_id']).is_dayoff:
                 self.validated_data['shop_id'] = None 
