@@ -12,7 +12,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Django REST framework\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2021-11-25 05:47+0000\n"
+"POT-Creation-Date: 2021-11-26 06:33+0000\n"
 "PO-Revision-Date: 2017-08-03 14:58+0000\n"
 "Last-Translator: Grigory Mishchenko <grishkokot@gmail.com>\n"
 "Language-Team: Russian (http://www.transifex.com/django-rest-framework-1/"
@@ -59,27 +59,27 @@ msgstr "Настройки графика"
 msgid "Integration settings"
 msgstr "Настройки интеграции"
 
-#: src/base/admin.py:136
+#: src/base/admin.py:137
 msgid "Default settings"
 msgstr "Настройки по умолчанию"
 
-#: src/base/admin.py:137 src/base/admin.py:199
+#: src/base/admin.py:138 src/base/admin.py:200
 msgid "Other"
 msgstr "Прочее"
 
-#: src/base/admin.py:194
+#: src/base/admin.py:195
 msgid "Personal info"
 msgstr "Персональные данные"
 
-#: src/base/admin.py:195
+#: src/base/admin.py:196
 msgid "Permissions"
 msgstr "Доступы"
 
-#: src/base/admin.py:198
+#: src/base/admin.py:199
 msgid "Important dates"
 msgstr "Важные даты"
 
-#: src/base/admin.py:224
+#: src/base/admin.py:225
 #, python-format
 msgid "%(name)s object with primary key %(key)r does not exist."
 msgstr ""
@@ -677,7 +677,7 @@ msgstr "Конец предыдущего года"
 #: src/timetable/worker_day/timetable.py:636
 #: src/timetable/worker_day/timetable.py:659
 #: src/timetable/worker_day/timetable.py:665
-#: src/timetable/worker_day/timetable.py:710 src/util/dg/timesheet.py:342
+#: src/timetable/worker_day/timetable.py:710 src/util/dg/timesheet.py:346
 msgid "Full name"
 msgstr "ФИО"
 
@@ -686,7 +686,7 @@ msgstr "ФИО"
 #: src/timetable/worker_day/timetable.py:635
 #: src/timetable/worker_day/timetable.py:659
 #: src/timetable/worker_day/timetable.py:665
-#: src/timetable/worker_day/timetable.py:708 src/util/dg/timesheet.py:345
+#: src/timetable/worker_day/timetable.py:708 src/util/dg/timesheet.py:349
 msgid "Employee id"
 msgstr "Табельный номер"
 
@@ -1208,7 +1208,7 @@ msgstr "Расписание_для_подразделения_{}_от_{}.xlsx"
 #: src/timetable/worker_day/timetable.py:637
 #: src/timetable/worker_day/timetable.py:659
 #: src/timetable/worker_day/timetable.py:665
-#: src/timetable/worker_day/timetable.py:712 src/util/dg/timesheet.py:352
+#: src/timetable/worker_day/timetable.py:712 src/util/dg/timesheet.py:356
 msgid "Position"
 msgstr "Должность"
 
@@ -1217,7 +1217,7 @@ msgstr "Должность"
 msgid "Timetable"
 msgstr "Расписание"
 
-#: src/timetable/worker_day/timetable.py:714 src/util/dg/timesheet.py:356
+#: src/timetable/worker_day/timetable.py:714 src/util/dg/timesheet.py:360
 msgid "Date"
 msgstr "Дата"
 
@@ -1352,12 +1352,12 @@ msgid "To"
 msgstr "По"
 
 #: src/timetable/worker_day/xlsx_utils/timetable.py:166
-#: src/util/dg/timesheet.py:350
+#: src/util/dg/timesheet.py:354
 msgid "Days"
 msgstr "Дни"
 
 #: src/timetable/worker_day/xlsx_utils/timetable.py:170
-#: src/util/dg/timesheet.py:351
+#: src/util/dg/timesheet.py:355
 msgid "Hours"
 msgstr "Часы"
 
@@ -1422,13 +1422,18 @@ msgstr "Сб"
 msgid "Descriptions"
 msgstr "Обозначения"
 
-#: src/timetable/worker_day/xlsx_utils/timetable.py:463
+#: src/timetable/worker_day/xlsx_utils/timetable.py:465
 msgid "Abbreviation"
 msgstr "Сокращение"
 
-#: src/timetable/worker_day/xlsx_utils/timetable.py:464
+#: src/timetable/worker_day/xlsx_utils/timetable.py:466
+#: src/timetable/worker_day/xlsx_utils/timetable.py:469
 msgid "Description"
 msgstr "Обозначение"
+
+#: src/timetable/worker_day/xlsx_utils/timetable.py:468
+msgid "Color of day of week"
+msgstr "Цвет дня недели"
 
 #: src/util/dg/helpers.py:18
 msgid "January"
@@ -1478,80 +1483,80 @@ msgstr "Ноябрь"
 msgid "December"
 msgstr "Декабрь"
 
-#: src/util/dg/timesheet.py:340
+#: src/util/dg/timesheet.py:344
 msgid "Tabel for {} {}y"
 msgstr "Табель учета рабочего времени за {} {}г"
 
-#: src/util/dg/timesheet.py:343
+#: src/util/dg/timesheet.py:347
 msgid "Number in order"
 msgstr "Номер по порядку"
 
-#: src/util/dg/timesheet.py:344
+#: src/util/dg/timesheet.py:348
 msgid "Last name, initials, position (specialty, profession)"
 msgstr "Фамилия, инициалы, должность (специальность, профессия)"
 
-#: src/util/dg/timesheet.py:346
+#: src/util/dg/timesheet.py:350
 msgid ""
 "Notes on attendance and non-attendance at work on the dates of the month"
 msgstr "Отметки о явках и неявках на работу по числам месяца"
 
-#: src/util/dg/timesheet.py:347
+#: src/util/dg/timesheet.py:351
 msgid "Worked out for"
 msgstr "Отработано за"
 
-#: src/util/dg/timesheet.py:348
+#: src/util/dg/timesheet.py:352
 msgid "half of the month (I, II)"
 msgstr "половину месяца (I, II)"
 
-#: src/util/dg/timesheet.py:349
+#: src/util/dg/timesheet.py:353
 msgid "month"
 msgstr "месяц"
 
-#: src/util/dg/timesheet.py:353
+#: src/util/dg/timesheet.py:357
 msgid "Shop"
 msgstr "Подразделение выхода"
 
-#: src/util/dg/timesheet.py:354
+#: src/util/dg/timesheet.py:358
 msgid "Total hours"
 msgstr "Итого часы"
 
-#: src/util/dg/timesheet.py:355
+#: src/util/dg/timesheet.py:359
 msgid "Total days"
 msgstr "Итого дни"
 
-#: src/util/dg/timesheet.py:357
+#: src/util/dg/timesheet.py:361
 msgid "Shop code"
 msgstr "Код ОП"
 
-#: src/util/dg/timesheet.py:358
+#: src/util/dg/timesheet.py:362
 msgid "Shop name"
 msgstr "Наименование ОП"
 
-#: src/util/dg/timesheet.py:359
+#: src/util/dg/timesheet.py:363
 msgid "Work type"
 msgstr "Тип работ"
 
-#: src/util/dg/timesheet.py:360
+#: src/util/dg/timesheet.py:364
 msgid "Fact, h"
 msgstr "Факт, ч"
 
-#: src/util/dg/timesheet.py:361
+#: src/util/dg/timesheet.py:365
 msgid "Plan, h"
 msgstr "План, ч"
 
-#: src/util/dg/timesheet.py:362
+#: src/util/dg/timesheet.py:366
 msgid "Shift start time, fact, h"
 msgstr "Время начала смены, факт, ч"
 
-#: src/util/dg/timesheet.py:363
+#: src/util/dg/timesheet.py:367
 msgid "Shift end time, fact, h"
 msgstr "Время окончания смены, факт, ч"
 
-#: src/util/dg/timesheet.py:364
+#: src/util/dg/timesheet.py:368
 msgid "Shift start time, plan, h"
 msgstr "Время начала смены, план, ч"
 
-#: src/util/dg/timesheet.py:365
+#: src/util/dg/timesheet.py:369
 msgid "Shift end time, plan, h"
 msgstr "Время окончания смены, план, ч"
 
