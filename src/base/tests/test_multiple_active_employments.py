@@ -954,6 +954,13 @@ class TestEmployeeAPI(MultipleActiveEmploymentsSupportMixin, APITestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(Employee.objects.get(id=self.employee1_1.id).tabel_code, new_tabel_code)
 
+        resp = self.client.put(
+            self.get_url('Employee-detail', pk=self.employee1_2.id),
+            data=self.dump_data({'tabel_code': new_tabel_code}),
+            content_type='application/json',
+        )
+        self.assertContains(response=resp, text='The employee\'s tabel code must be unique', status_code=400)
+
     def test_can_create_employee_without_tabel_code(self):
         self.client.force_authenticate(user=self.user1)
         resp = self.client.post(

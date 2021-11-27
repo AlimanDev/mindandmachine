@@ -5,11 +5,10 @@ from django.conf import settings
 from django.contrib.auth.forms import SetPasswordForm
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.core.validators import EmailValidator
-from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
-from rest_framework.exceptions import ValidationError, PermissionDenied
-from rest_framework.validators import UniqueValidator
+from rest_framework.exceptions import ValidationError
+from rest_framework.validators import UniqueValidator, UniqueTogetherValidator
 
 from src.base.fields import CurrentUserNetwork, UserworkShop
 from src.base.message import Message
@@ -216,6 +215,13 @@ class EmployeeSerializer(BaseNetworkSerializer):
     class Meta:
         model = Employee
         fields = ['id', 'user', 'user_id', 'tabel_code', 'has_shop_employment']
+        validators = [
+            UniqueTogetherValidator(
+                queryset=Employee.objects,
+                fields=['user', 'tabel_code'],
+                message=_('The employee\'s tabel code must be unique'),
+            )
+        ]
         extra_kwargs = {
             'tabel_code': {
                 'required': False,
