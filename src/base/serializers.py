@@ -218,15 +218,10 @@ class EmployeeSerializer(BaseNetworkSerializer):
         validators = [
             UniqueTogetherValidator(
                 queryset=Employee.objects,
-                fields=['user', 'tabel_code'],
+                fields=['user_id', 'tabel_code'],
                 message=_('The employee\'s tabel code must be unique'),
             )
         ]
-        extra_kwargs = {
-            'tabel_code': {
-                'required': False,
-            },
-        }
 
     def __init__(self, *args, **kwargs):
         super(EmployeeSerializer, self).__init__(*args, **kwargs)
