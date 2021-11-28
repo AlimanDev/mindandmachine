@@ -36,7 +36,12 @@ class ShiftScheduleDaySerializer(serializers.ModelSerializer):
 
 
 class ShiftScheduleSerializer(serializers.ModelSerializer):
+    default_error_messages = {
+        "no_employee_with_tabel_code": _("There are {amount} models of employee with tabel_code: {tabel_code}."),
+    }
+
     network_id = serializers.HiddenField(default=CurrentUserNetwork())
+    employee__tabel_code = serializers.CharField(required=False, source='employee.tabel_code')
     days = ShiftScheduleDaySerializer(many=True)
 
     class Meta:
@@ -47,18 +52,35 @@ class ShiftScheduleSerializer(serializers.ModelSerializer):
             'code',
             'name',
             'year',
+            'employee__tabel_code',
             'days',
         )
 
+    def validate(self, attrs):
+        # TODO: оптимизация получения связанных объектов ?
+        employee = attrs.pop('employee', {})
+        if not attrs.get('employee_id') and 'tabel_code' in employee:
+            tabel_code = employee.pop('tabel_code', None)
+            employees = list(Employee.objects.filter(
+                tabel_code=tabel_code,
+                user__network_id=self.context['request'].user.network_id,
+            ).only('id'))
+            if len(employees) == 1:
+                attrs['employee_id'] = employees[0].id
+            else:
+                self.fail('no_employee_with_tabel_code', amount=len(employees), tabel_code=tabel_code)
+
+        return attrs
+
 
 class ShiftScheduleIntervalSerializer(serializers.ModelSerializer):
-    employee__tabel_code = serializers.CharField(required=False, source='employee.tabel_code')
-    shift_schedule__code = serializers.CharField(required=False, source='shift_schedule.code')
-
     default_error_messages = {
         "no_employee_with_tabel_code": _("There are {amount} models of employee with tabel_code: {tabel_code}."),
         "no_shift_schedule_with_code": _("There are {amount} models of shift_schedule with code: {code}."),
     }
+
+    employee__tabel_code = serializers.CharField(required=False, source='employee.tabel_code')
+    shift_schedule__code = serializers.CharField(required=False, source='shift_schedule.code')
 
     class Meta:
         model = ShiftScheduleInterval
