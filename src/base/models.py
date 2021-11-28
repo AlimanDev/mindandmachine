@@ -34,6 +34,7 @@ from src.base.models_abstract import (
 )
 from src.conf.djconfig import QOS_TIME_FORMAT
 from src.util.mixins.qs import AnnotateValueEqualityQSMixin
+from src.base.fields import MultipleChoiceField
 
 
 class Network(AbstractActiveModel):
@@ -235,6 +236,10 @@ class Network(AbstractActiveModel):
                        'the Maximum shift length has passed since the opening of the previous shift'),
         default=False,
     )
+    trust_tick_request = models.BooleanField(
+        verbose_name=_('Create attendance record without check photo.'),
+        default=False,
+    )
     max_plan_diff_in_seconds = models.PositiveIntegerField(
         verbose_name=_('Max difference between the start or end time to "pull" to the planned work day'),
         default=3600 * 7,
@@ -265,6 +270,8 @@ class Network(AbstractActiveModel):
     api_timesheet_lines_group_by = models.PositiveSmallIntegerField(
         verbose_name='Группировать данные табеля в api методе /rest_api/timesheet/lines/ по',
         choices=TIMESHEET_LINES_GROUP_BY_CHOICES, default=TIMESHEET_LINES_GROUP_BY_EMPLOYEE_POSITION_SHOP)
+    
+    show_cost_for_inner_vacancies = models.BooleanField('Отображать поле "стоимость работ" для внутренних вакансий', default=False)
 
     DEFAULT_NIGHT_EDGES = (
         '22:00:00',
@@ -937,6 +944,16 @@ class Group(AbstractActiveNetworkSpecificCodeNamedModel):
     class Meta(AbstractActiveNetworkSpecificCodeNamedModel.Meta):
         verbose_name = 'Группа пользователей'
         verbose_name_plural = 'Группы пользователей'
+    
+
+    CHOICE_ALLOWED_TABS = [
+        ('load_forecast', 'Прогноз потребностей'),
+        ('schedule', 'Расписание'),
+        ('employees', 'Сотрудники'),
+        ('shift_exchange', 'Биржа смен'),
+        ('analytics', 'Аналитика'), 
+        ('settings', 'Настройки'),
+    ]
 
     dttm_modified = models.DateTimeField(blank=True, null=True)
     subordinates = models.ManyToManyField("self", blank=True)
@@ -944,6 +961,8 @@ class Group(AbstractActiveNetworkSpecificCodeNamedModel):
         default=False, verbose_name='Может изменять/подтверждать "защищенные" рабочие дни')
     has_perm_to_approve_other_shop_days = models.BooleanField(
         default=False, verbose_name='Может подтверждать дни из других подразделений')
+
+    allowed_tabs = MultipleChoiceField(choices=CHOICE_ALLOWED_TABS)
 
     def __str__(self):
         return '{}, {}, {}'.format(

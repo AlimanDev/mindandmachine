@@ -104,6 +104,7 @@ class WorkType(AbstractActiveModel):
     work_type_name = models.ForeignKey(WorkTypeName, on_delete=models.PROTECT, related_name='work_types')
     min_workers_amount = models.IntegerField(default=0, blank=True, null=True)
     max_workers_amount = models.IntegerField(default=20, blank=True, null=True)
+    preliminary_cost_per_hour = models.DecimalField('Предварительная стоимость работ за час', max_digits=6, decimal_places=2, default=Decimal("0.00"))
 
     probability = models.FloatField(default=1.0)
     prior_weight = models.FloatField(default=1.0)
@@ -965,11 +966,16 @@ class WorkerDay(AbstractModel):
         help_text='Используется в факте (и в черновике и подтв. версии) для связи с планом подтвержденным')
 
     source = PositiveSmallIntegerField('Источник создания', choices=SOURCES, default=SOURCE_FAST_EDITOR)
+    cost_per_hour = models.DecimalField('Стоимость работ за час', max_digits=6, decimal_places=2, default=Decimal("0.00"))
 
     objects = WorkerDayManager.from_queryset(WorkerDayQuerySet)()  # исключает раб. дни у которых employment_id is null
     objects_with_excluded = models.Manager.from_queryset(WorkerDayQuerySet)()
 
     tracker = FieldTracker(fields=('work_hours',))
+
+    @property
+    def total_cost(self):
+        return self.rounded_work_hours * float(self.cost_per_hour)
 
     @property
     def rounded_work_hours(self):

@@ -126,6 +126,8 @@ class NetworkSerializer(serializers.ModelSerializer):
             'allow_creation_several_wdays_for_one_employee_for_one_date',
             'shop_name_form',
             'get_position_from_work_type_name_in_calc_timesheet',
+            'trust_tick_request',
+            'show_cost_for_inner_vacancies',
             'show_employee_shift_schedule_tab',
         ]
 
@@ -240,9 +242,17 @@ class EmployeeSerializer(BaseNetworkSerializer):
 class AuthUserSerializer(UserSerializer):
     network = NetworkWithOutsourcingsAndClientsSerializer()
     shop_id = serializers.CharField(default=UserworkShop())
+    allowed_tabs = serializers.SerializerMethodField()
+
+    def get_allowed_tabs(self, obj: User):
+        allowed_tabs = []
+        for group in Group.objects.filter(id__in=obj.get_group_ids()):
+            allowed_tabs.extend(group.allowed_tabs)
+
+        return list(set(allowed_tabs))
 
     class Meta(UserSerializer.Meta):
-        fields = UserSerializer.Meta.fields + ['network', 'shop_id']
+        fields = UserSerializer.Meta.fields + ['network', 'shop_id', 'allowed_tabs']
 
 
 class PasswordSerializer(serializers.Serializer):

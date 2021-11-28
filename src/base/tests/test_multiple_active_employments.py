@@ -113,7 +113,7 @@ class MultipleActiveEmploymentsSupportMixin(TestsHelperMixin):
         fill_calendar.fill_days('2021.01.01', '2021.12.31', cls.shop1.region_id)
 
 
-@override_settings(CELERY_TASK_ALWAYS_EAGER=True, TRUST_TICK_REQUEST=True)
+@override_settings(CELERY_TASK_ALWAYS_EAGER=True)
 class TestURVTicks(MultipleActiveEmploymentsSupportMixin, APITestCase):
     """
     Проверка работы отметок когда у пользователя несколько активных трудоустройств одновременно
@@ -122,6 +122,8 @@ class TestURVTicks(MultipleActiveEmploymentsSupportMixin, APITestCase):
     def setUpTestData(cls):
         super(TestURVTicks, cls).setUpTestData()
         cls.add_group_perm(cls.group1, 'Tick', 'POST')
+        cls.network.trust_tick_request = True
+        cls.network.save()
 
     def _make_tick_requests(self, user, shop, dttm_coming=None, dttm_leaving=None):
         # TODO: разобраться с таймзонами
@@ -280,12 +282,14 @@ class TestURVTicks(MultipleActiveEmploymentsSupportMixin, APITestCase):
         self.assertEqual(fact_approved2.dttm_work_end, datetime.combine(self.dt, time(19, 57, 0)))
 
 
-@override_settings(CELERY_TASK_ALWAYS_EAGER=True, TRUST_TICK_REQUEST=True)
+@override_settings(CELERY_TASK_ALWAYS_EAGER=True)
 class TestConfirmVacancy(MultipleActiveEmploymentsSupportMixin, APITestCase):
     @classmethod
     def setUpTestData(cls):
         super(TestConfirmVacancy, cls).setUpTestData()
         cls.dt_now = date.today()
+        cls.network.trust_tick_request = True
+        cls.network.save()
         cls.add_group_perm(cls.group1, 'WorkerDay_confirm_vacancy', 'POST')
         for employee in [cls.employee1_1, cls.employee1_2, cls.employee2_1, cls.employee2_2]:
             WorkerDayFactory(
