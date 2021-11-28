@@ -13,7 +13,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('base', '0148_merge_0147_auto_20211122_0437_0147_auto_20211122_0544'),
-        ('timetable', '0107_auto_20211123_0543'),
+        ('timetable', '0105_auto_20211111_0002'),
     ]
 
     operations = [
