@@ -289,6 +289,7 @@ class BaseUploadDownloadTimeTable:
                         )
                         if employment.exists() and settings.UPLOAD_TT_CREATE_EMPLOYEE:
                             employee = employment.first().employee
+                            user = employee.user  # TODO: тест + рефакторинг
                             if number_cond and employee.tabel_code != tabel_code:
                                 user = employee.user
                                 employee = Employee.objects.create(user=user, tabel_code=tabel_code)
