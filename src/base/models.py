@@ -1680,6 +1680,7 @@ class SAWHSettings(AbstractActiveNetworkSpecificCodeNamedModel):
     work_hours_by_months = models.JSONField(
         verbose_name='Настройки по распределению часов в рамках уч. периода',
         blank=True,
+        default=dict,
     )  # Название ключей должно начинаться с m (например январь -- m1), чтобы можно было фильтровать через django orm
     type = models.PositiveSmallIntegerField(
         default=PART_OF_PROD_CAL_SUMM, choices=SAWH_SETTINGS_TYPES, verbose_name='Тип расчета')
@@ -1841,7 +1842,7 @@ class ShiftScheduleDay(AbstractModel):
         'base.ShiftSchedule', verbose_name='График смен', on_delete=models.CASCADE, related_name='days')
     dt = models.DateField()
     day_type = models.ForeignKey('timetable.WorkerDayType', on_delete=models.PROTECT, verbose_name='Тип дня')
-    work_hours = models.DecimalField(decimal_places=2, max_digits=4, verbose_name='Сумма рабочих часов')
+    work_hours = models.DecimalField(decimal_places=2, max_digits=4, verbose_name='Сумма рабочих часов', default=Decimal("0.00"))
 
     class Meta(AbstractModel.Meta):
         verbose_name = 'День графика смен'

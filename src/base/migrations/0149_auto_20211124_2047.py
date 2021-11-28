@@ -77,7 +77,7 @@ class Migration(migrations.Migration):
                 ('dttm_modified', models.DateTimeField(auto_now=True)),
                 ('code', models.CharField(blank=True, db_index=True, max_length=256, null=True)),
                 ('dt', models.DateField()),
-                ('work_hours', models.DecimalField(decimal_places=2, max_digits=4, verbose_name='Сумма рабочих часов')),
+                ('work_hours', models.DecimalField(decimal_places=2, max_digits=4, verbose_name='Сумма рабочих часов', default=Decimal('0.00'))),
                 ('day_type',
                  models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, to='timetable.workerdaytype',
                                    verbose_name='Тип дня')),

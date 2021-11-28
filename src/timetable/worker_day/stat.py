@@ -251,8 +251,8 @@ class WorkersStatsGetter:
         return get_shift_schedule(
             network_id=self.network.id,
             employment__in=self.employments_list,
-            dt__gte=self.acc_period_start,
-            dt__lte=self.acc_period_end,
+            dt__gte=self.dt_from,
+            dt__lte=self.dt_to,
         )
 
     @cached_property
