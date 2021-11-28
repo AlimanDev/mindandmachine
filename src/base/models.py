@@ -1669,14 +1669,17 @@ class SAWHSettings(AbstractActiveNetworkSpecificCodeNamedModel):
 
     PART_OF_PROD_CAL_SUMM = 1
     FIXED_HOURS = 2
+    SHIFT_SCHEDULE = 3
 
     SAWH_SETTINGS_TYPES = (
         (PART_OF_PROD_CAL_SUMM, 'Доля от суммы часов по произв. календарю в рамках уч. периода'),
         (FIXED_HOURS, 'Фикс. кол-во часов в месяц'),
+        (SHIFT_SCHEDULE, 'Часы по графику смен'),
     )
 
     work_hours_by_months = models.JSONField(
         verbose_name='Настройки по распределению часов в рамках уч. периода',
+        blank=True,
     )  # Название ключей должно начинаться с m (например январь -- m1), чтобы можно было фильтровать через django orm
     type = models.PositiveSmallIntegerField(
         default=PART_OF_PROD_CAL_SUMM, choices=SAWH_SETTINGS_TYPES, verbose_name='Тип расчета')
@@ -1809,8 +1812,13 @@ class ApiLog(AbstractModel):
 
 class ShiftSchedule(AbstractActiveNetworkSpecificCodeNamedModel):
     year = models.PositiveSmallIntegerField(default=current_year)
+    employee = models.ForeignKey('base.Employee', null=True, blank=True, on_delete=models.CASCADE)
 
     class Meta(AbstractActiveNetworkSpecificCodeNamedModel.Meta):
+        unique_together = (
+            ('code', 'year', 'network'),
+            ('employee', 'year', 'network'),
+        )
         verbose_name = 'График смен'
         verbose_name_plural = 'Графики смен'
 
@@ -1832,6 +1840,8 @@ class ShiftScheduleDay(AbstractModel):
     shift_schedule = models.ForeignKey(
         'base.ShiftSchedule', verbose_name='График смен', on_delete=models.CASCADE, related_name='days')
     dt = models.DateField()
+    day_type = models.ForeignKey('timetable.WorkerDayType', on_delete=models.PROTECT, verbose_name='Тип дня')
+    work_hours = models.DecimalField(decimal_places=2, max_digits=4, verbose_name='Сумма рабочих часов')
 
     class Meta(AbstractModel.Meta):
         verbose_name = 'День графика смен'
@@ -1842,44 +1852,6 @@ class ShiftScheduleDay(AbstractModel):
 
     def __str__(self):
         s = f'{self.dt}'
-        if self.code:
-            s += f' ({self.code})'
-        return s
-
-    @classmethod
-    def _get_rel_objs_mapping(cls):
-        return {
-            'items': (ShiftScheduleDayItem, 'shift_schedule_day_id'),
-        }
-
-
-class ShiftScheduleDayItem(AbstractModel):
-    HOURS_TYPE_DAY = 'D'
-    HOURS_TYPE_EVENING = 'E'
-    HOURS_TYPE_NIGHT = 'N'
-    HOURS_TYPE_WATCH = 'W'
-
-    HOURS_TYPE_CHOICES = (
-        (HOURS_TYPE_DAY, 'Дневное (явка)'),
-        (HOURS_TYPE_EVENING, 'Вечернее'),
-        (HOURS_TYPE_NIGHT, 'Ночное'),
-        (HOURS_TYPE_WATCH, 'Вахта'),
-    )
-
-    code = models.CharField(max_length=256, null=True, blank=True, db_index=True)
-    shift_schedule_day = models.ForeignKey('base.ShiftScheduleDay', on_delete=models.CASCADE, related_name='items')
-    hours_type = models.CharField(max_length=2, choices=HOURS_TYPE_CHOICES, default=HOURS_TYPE_DAY)
-    hours_amount = models.DecimalField(max_digits=4, decimal_places=2, default=Decimal("0.00"))
-
-    class Meta(AbstractModel.Meta):
-        verbose_name = 'Элемент дня графика смен'
-        verbose_name_plural = 'Элементы дня графика смен'
-        unique_together = (
-            ('hours_type', 'shift_schedule_day'),
-        )
-
-    def __str__(self):
-        s = f'{self.hours_type} {self.hours_amount}'
         if self.code:
             s += f' ({self.code})'
         return s

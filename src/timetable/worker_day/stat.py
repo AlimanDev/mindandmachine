@@ -19,6 +19,7 @@ from django.db.models.functions import Extract, Coalesce, Greatest, Least
 from django.utils.functional import cached_property
 
 from src.base.models import Employment, Shop, ProductionDay, SAWHSettings, Network, SAWHSettingsMapping
+from src.base.shift_schedule.utils import get_shift_schedule
 from src.forecast.models import PeriodClients
 from src.timetable.models import WorkerDay, ProdCal, TimesheetItem, WorkerDayType
 from src.util.models_converter import Converter
@@ -244,6 +245,17 @@ class WorkersStatsGetter:
             show_stat_in_hours=True,
         ).values_list('code', flat=True))
         self._network = network
+
+    @cached_property
+    def shift_schedule_data(self):
+        return get_shift_schedule(
+            network_id=self.network.id,
+            employment__in=self.employments_list,
+            dt__gte=self.acc_period_start,
+            dt__lte=self.acc_period_end,
+            group_by1_lookup='employee__employments__id',
+            group_by2_lookup='shift_schedule__days__dt__month',
+        )
 
     @cached_property
     def shop(self):
@@ -774,6 +786,12 @@ class WorkersStatsGetter:
                         empl_dict.setdefault('sawh_hours_by_months', {})[
                             month_num] = (empl_days_count / days_in_month) * (empl.norm_work_hours / 100) * empl.sawh_hours_by_months.get(
                             f'm{month_num}', prod_cal_norm_hours)
+                elif empl.sawh_settings_type == SAWHSettings.SHIFT_SCHEDULE:
+                    for month_num, prod_cal_norm_hours in norm_hours_by_months.items():
+                        _month_start, _month_end = get_month_range(
+                            self.year, month_num)
+                        empl_dict.setdefault('sawh_hours_by_months', {})[
+                            month_num] = float(self.shift_schedule_data.get(str(empl.id), {}).get(str(month_num), {}).get('work_hours', 0))
                 else:
                     empl_dict['sawh_hours_by_months'] = norm_hours_by_months
 

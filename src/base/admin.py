@@ -51,7 +51,6 @@ from src.base.models import (
     ApiLog,
     ShiftSchedule,
     ShiftScheduleDay,
-    ShiftScheduleDayItem,
     ShiftScheduleInterval,
 )
 from src.timetable.models import GroupWorkerDayPermission
@@ -502,24 +501,12 @@ class ShiftScheduleAdmin(admin.ModelAdmin):
     save_as = True
 
 
-class ShiftScheduleDayItemStackedInline(admin.TabularInline):
-    raw_id_fields = ('shift_schedule_day',)
-    # list_filter = ('shift_schedule_day', 'hours_type',)
-    # list_display = ('id', 'code', 'shift_schedule_day', 'hours_type', 'hours_amount')
-    # save_as = True
-    extra = 0
-    model = ShiftScheduleDayItem
-
-
 @admin.register(ShiftScheduleDay)
 class ShiftScheduleDayAdmin(admin.ModelAdmin):
     raw_id_fields = ('shift_schedule',)
-    list_filter = ('dt', 'shift_schedule',)
-    list_display = ('id', 'shift_schedule', 'dt', 'code',)
+    list_filter = ('dt', 'shift_schedule', 'day_type')
+    list_display = ('id', 'shift_schedule', 'dt', 'code', 'day_type', 'work_hours')
     save_as = True
-    inlines = (
-        ShiftScheduleDayItemStackedInline,
-    )
 
 
 @admin.register(ShiftScheduleInterval)

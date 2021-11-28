@@ -1,4 +1,4 @@
-from django.db.models import Sum, Q, F
+from django.db.models import Q, F
 from django.db.models.functions import Coalesce
 from django.db.models.query import Prefetch
 from django.middleware.csrf import rotate_token
@@ -39,8 +39,6 @@ from src.base.models import (
     Break,
     ShopSchedule,
     Employee,
-    ShiftScheduleInterval,
-    ShiftScheduleDayItem,
 )
 from src.base.permissions import Permission
 from src.base.serializers import (
@@ -63,6 +61,7 @@ from src.base.serializers import (
     EmployeeSerializer,
     EmployeeShiftScheduleQueryParamsSerializer,
 )
+from src.base.shift_schedule.utils import get_shift_schedule
 from src.base.views_abstract import (
     BaseActiveNamedModelViewSet,
     UpdateorCreateViewSet,
@@ -271,32 +270,12 @@ class EmployeeViewSet(UpdateorCreateViewSet):
     def shift_schedule(self, *args, **kwargs):
         s = EmployeeShiftScheduleQueryParamsSerializer(data=self.request.query_params)
         s.is_valid(raise_exception=True)
-
-        qs = ShiftScheduleInterval.objects.filter(
-            Q(shift_schedule__days__dt__gte=s.validated_data.get('dt__gte')) & Q(
-                shift_schedule__days__dt__gte=F('dt_start')),
-            Q(shift_schedule__days__dt__lte=s.validated_data.get('dt__lte')) & Q(
-                shift_schedule__days__dt__lte=F('dt_end')),
+        data = get_shift_schedule(
+            network_id=self.request.user.network_id,
             employee_id=s.validated_data.get('employee_id'),
-            employee__user__network_id=self.request.user.network_id,
-            shift_schedule__network_id=self.request.user.network_id,
-        ).values(
-            'employee_id',
-            'shift_schedule__days__dt',
-        ).annotate(
-            day_hours=Sum('shift_schedule__days__items__hours_amount',
-                          filter=Q(shift_schedule__days__items__hours_type=ShiftScheduleDayItem.HOURS_TYPE_DAY)),
-            night_hours=Sum('shift_schedule__days__items__hours_amount',
-                            filter=Q(shift_schedule__days__items__hours_type=ShiftScheduleDayItem.HOURS_TYPE_NIGHT)),
-            total_hours=Sum('shift_schedule__days__items__hours_amount'),
+            dt__gte=s.validated_data.get('dt__gte'),
+            dt__lte=s.validated_data.get('dt__lte'),
         )
-        data = {}
-        for i in qs:
-            data.setdefault(str(i['employee_id']), {}).setdefault(str(i['shift_schedule__days__dt']), {
-                'day_hours': i['day_hours'],
-                'night_hours': i['night_hours'],
-                'total_hours': i['total_hours'],
-            })
         return Response(data)
 
 

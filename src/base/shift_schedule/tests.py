@@ -1,9 +1,10 @@
+from decimal import Decimal
+
 from rest_framework.test import APITestCase
 
 from src.base.models import (
     ShiftSchedule,
     ShiftScheduleDay,
-    ShiftScheduleDayItem,
     ShiftScheduleInterval,
 )
 from src.base.tests.factories import (
@@ -47,29 +48,20 @@ class TestShiftScheduleViewSet(TestsHelperMixin, APITestCase):
                     {
                         "code": "1_2021-01-01",
                         "dt": "2021-01-01",
-                        "items": [
-                            {
-                                "code": "1_2021-01-01_D",
-                                "hours_type": "D",
-                                "hours_amount": 8
-                            },
-                            {
-                                "code": "1_2021-01-01_N",
-                                "hours_type": "N",
-                                "hours_amount": 3
-                            }
-                        ],
+                        "day_type": 'W',
+                        "work_hours": Decimal("13.00"),
+                    },
+                    {
+                        "code": "1_2021-01-02",
+                        "dt": "2021-01-02",
+                        "day_type": 'H',
+                        "work_hours": Decimal("0.00"),
                     },
                     {
                         "code": "1_2021-01-07",
                         "dt": "2021-01-07",
-                        "items": [
-                            {
-                                "code": "1_2021-01-07_D",
-                                "hours_type": "D",
-                                "hours_amount": 13
-                            }
-                        ],
+                        "day_type": 'W',
+                        "work_hours": Decimal("12.00"),
                     },
                 ]
             }
@@ -93,58 +85,52 @@ class TestShiftScheduleViewSet(TestsHelperMixin, APITestCase):
             self.get_url('ShiftSchedule-batch-update-or-create'), self.dump_data(data), content_type='application/json')
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(ShiftSchedule.objects.count(), 1)
-        self.assertEqual(ShiftScheduleDay.objects.count(), 2)
-        self.assertEqual(ShiftScheduleDayItem.objects.count(), 3)
+        self.assertEqual(ShiftScheduleDay.objects.count(), 3)
         resp_data = resp.json()
         self.assertDictEqual(resp_data['stats'], {
-            "ShiftScheduleDayItem": {
+            "ShiftScheduleDay": {
                 "created": 3
             },
-            "ShiftScheduleDay": {
-                "created": 2
-            },
             "ShiftSchedule": {
                 "created": 1
             }
         })
 
-        shift_schedules_data_2021[0]['days'][1]['items'].append({
-            "code": "1_2021-01-07_N",
-            "hours_type": "N",
-            "hours_amount": 3
-        })
+        shift_schedules_data_2021[0]['days'][0]['work_hours'] += Decimal('3.00')
         resp = self.client.post(
             self.get_url('ShiftSchedule-batch-update-or-create'), self.dump_data(data), content_type='application/json')
+        self.assertEqual(resp.status_code, 200)
         resp_data = resp.json()
         self.assertDictEqual(resp_data['stats'], {
-            "ShiftScheduleDayItem": {
-                "updated": 3,
-                "created": 1
-            },
             "ShiftScheduleDay": {
-                "updated": 2
+                "updated": 3  # TODO: добавить skipped?
             },
             "ShiftSchedule": {
                 "updated": 1
             }
         })
+        self.assertEqual(ShiftScheduleDay.objects.get(code='1_2021-01-01').work_hours, 16)
 
-        shift_schedules_data_2021[0]['days'][0]['items'][0]['hours_amount'] = 22
+        shift_schedules_data_2021[0]['days'].append(
+            {
+                "code": "1_2021-01-08",
+                "dt": "2021-01-08",
+                "day_type": 'W',
+                "work_hours": Decimal("12.00"),
+            },
+        )
         resp = self.client.post(
             self.get_url('ShiftSchedule-batch-update-or-create'), self.dump_data(data), content_type='application/json')
         resp_data = resp.json()
         self.assertDictEqual(resp_data['stats'], {
-            "ShiftScheduleDayItem": {
-                "updated": 4  # TODO: добавить skipped?
-            },
             "ShiftScheduleDay": {
-                "updated": 2
+                "created": 1,
+                "updated": 3
             },
             "ShiftSchedule": {
                 "updated": 1
             }
         })
-        self.assertEqual(ShiftScheduleDayItem.objects.get(code='1_2021-01-01_D').hours_amount, 22)
 
         shift_schedule = ShiftSchedule.objects.first()
         shift_schedule.code = None
@@ -165,11 +151,8 @@ class TestShiftScheduleViewSet(TestsHelperMixin, APITestCase):
             content_type='application/json')
         resp_data = resp.json()
         self.assertDictEqual(resp_data['stats'], {
-            "ShiftScheduleDayItem": {
-                "deleted": 4
-            },
             "ShiftScheduleDay": {
-                "deleted": 2
+                "deleted": 4
             },
             "ShiftSchedule": {
                 "deleted": 1
@@ -212,29 +195,14 @@ class TestShiftScheduleIntervalViewSet(TestsHelperMixin, APITestCase):
                     {
                         "code": "1_2021-01-01",
                         "dt": "2021-01-01",
-                        "items": [
-                            {
-                                "code": "1_2021-01-01_D",
-                                "hours_type": "D",
-                                "hours_amount": 8
-                            },
-                            {
-                                "code": "1_2021-01-01_N",
-                                "hours_type": "N",
-                                "hours_amount": 3
-                            }
-                        ],
+                        "day_type": "W",
+                        "work_hours": "11",
                     },
                     {
                         "code": "1_2021-01-07",
                         "dt": "2021-01-07",
-                        "items": [
-                            {
-                                "code": "1_2021-01-07_D",
-                                "hours_type": "D",
-                                "hours_amount": 13
-                            }
-                        ],
+                        "day_type": "W",
+                        "work_hours": "13",
                     },
                 ]
             },
@@ -246,29 +214,14 @@ class TestShiftScheduleIntervalViewSet(TestsHelperMixin, APITestCase):
                     {
                         "code": "2_2021-01-01",
                         "dt": "2021-01-01",
-                        "items": [
-                            {
-                                "code": "2_2021-01-01_D",
-                                "hours_type": "D",
-                                "hours_amount": 12
-                            },
-                            {
-                                "code": "2_2021-01-01_N",
-                                "hours_type": "N",
-                                "hours_amount": 1
-                            }
-                        ],
+                        "day_type": "W",
+                        "work_hours": "13",
                     },
                     {
                         "code": "2_2021-01-07",
                         "dt": "2021-01-07",
-                        "items": [
-                            {
-                                "code": "2_2021-01-07_D",
-                                "hours_type": "D",
-                                "hours_amount": 13
-                            }
-                        ],
+                        "day_type": "W",
+                        "work_hours": "13",
                     },
                 ]
             },
@@ -280,29 +233,14 @@ class TestShiftScheduleIntervalViewSet(TestsHelperMixin, APITestCase):
                     {
                         "code": "3_2022-01-01",
                         "dt": "2022-01-01",
-                        "items": [
-                            {
-                                "code": "3_2022-01-01_D",
-                                "hours_type": "D",
-                                "hours_amount": 12
-                            },
-                            {
-                                "code": "3_2022-01-01_N",
-                                "hours_type": "N",
-                                "hours_amount": 4
-                            }
-                        ],
+                        "day_type": "W",
+                        "work_hours": "16",
                     },
                     {
                         "code": "3_2022-01-07",
                         "dt": "2022-01-07",
-                        "items": [
-                            {
-                                "code": "3_2022-01-07_D",
-                                "hours_type": "D",
-                                "hours_amount": 11
-                            }
-                        ],
+                        "day_type": "W",
+                        "work_hours": "11",
                     },
                 ]
             }
@@ -413,9 +351,8 @@ class TestShiftScheduleIntervalViewSet(TestsHelperMixin, APITestCase):
             resp_data, {
                 str(empl2.id): {
                     "2021-01-01": {
-                        "day_hours": 8.0,
-                        "night_hours": 3.0,
-                        "total_hours": 11.0
+                        "day_type": "W",
+                        "work_hours": 11.0,
                     }
                 }
             }
@@ -484,14 +421,12 @@ class TestShiftScheduleIntervalViewSet(TestsHelperMixin, APITestCase):
             resp_data, {
                 str(empl2.id): {
                     "2022-01-01": {
-                        "day_hours": 12.0,
-                        "night_hours": 4.0,
-                        "total_hours": 16.0
+                        "day_type": "W",
+                        "work_hours": 16.0
                     },
                     "2022-01-07": {
-                        "day_hours": 11.0,
-                        "night_hours": None,
-                        "total_hours": 11.0
+                        "day_type": "W",
+                        "work_hours": 11.0
                     }
                 }
             }

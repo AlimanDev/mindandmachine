@@ -5,25 +5,24 @@ from src.base.fields import CurrentUserNetwork
 from src.base.models import (
     ShiftSchedule,
     ShiftScheduleDay,
-    ShiftScheduleDayItem,
     ShiftScheduleInterval,
     Employee,
 )
 
 
-class ShiftScheduleDayItemSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = ShiftScheduleDayItem
-        fields = (
-            'id',
-            'code',
-            'hours_type',
-            'hours_amount',
-        )
+# class ShiftScheduleDayItemSerializer(serializers.ModelSerializer):
+#     class Meta:
+#         model = ShiftScheduleDayItem
+#         fields = (
+#             'id',
+#             'code',
+#             'hours_type',
+#             'hours_amount',
+#         )
 
 
 class ShiftScheduleDaySerializer(serializers.ModelSerializer):
-    items = ShiftScheduleDayItemSerializer(many=True)
+    day_type = serializers.CharField(source='day_type_id')
 
     class Meta:
         model = ShiftScheduleDay
@@ -31,7 +30,8 @@ class ShiftScheduleDaySerializer(serializers.ModelSerializer):
             'id',
             'code',
             'dt',
-            'items',
+            'day_type',
+            'work_hours',
         )
 
 
