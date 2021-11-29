@@ -210,7 +210,8 @@ class BatchUpdateOrCreateModelMixin:
             }
             for update_key in update_keys:
                 if update_key not in existing_objs:
-                    to_create.append(to_update_dict.pop(update_key))
+                    obj_to_create = to_update_dict.pop(update_key)
+                    to_create.append(obj_to_create)
 
             if to_create:
                 create_rel_objs_data = cls._pop_rel_objs_data(
@@ -238,17 +239,18 @@ class BatchUpdateOrCreateModelMixin:
             deleted_dict = {}
             q_for_delete = Q()
             if delete_scope_fields_list:
-                for obj_to_update in objs_to_update:
-                    delete_scope_values_tuple = tuple(
-                        (k, getattr(obj_to_update, k)) for k in delete_scope_fields_list if hasattr(obj_to_update, k))
-                    if delete_scope_values_tuple:
-                        delete_scope_values_set.add(delete_scope_values_tuple)
+                if not delete_scope_values_list:
+                    for obj_to_update in objs_to_update:
+                        delete_scope_values_tuple = tuple(
+                            (k, getattr(obj_to_update, k)) for k in delete_scope_fields_list if hasattr(obj_to_update, k))
+                        if delete_scope_values_tuple:
+                            delete_scope_values_set.add(delete_scope_values_tuple)
 
-                for obj_to_create in objs_to_create:
-                    delete_scope_values_tuple = tuple(
-                        (k, getattr(obj_to_create, k)) for k in delete_scope_fields_list if hasattr(obj_to_create, k))
-                    if delete_scope_values_tuple:
-                        delete_scope_values_set.add(delete_scope_values_tuple)
+                    for obj_to_create in objs_to_create:
+                        delete_scope_values_tuple = tuple(
+                            (k, getattr(obj_to_create, k)) for k in delete_scope_fields_list if hasattr(obj_to_create, k))
+                        if delete_scope_values_tuple:
+                            delete_scope_values_set.add(delete_scope_values_tuple)
 
                 if delete_scope_values_set:
                     for delete_scope_values_tuples in delete_scope_values_set:
