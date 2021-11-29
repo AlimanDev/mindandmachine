@@ -42,7 +42,7 @@ SKIP_SYMBOLS = ['NAN', '']
 DIVIDERS = ['-', '.', ',', '\n', '\r', ' ']
 MULTIPLE_WDAYS_DIVIDER = '/'
 PARSE_CELL_STR_PATTERN = re.compile(
-    r'(?P<excel_code>[а-яА-ЯA-Za-z]+)?(?P<time_str>\d{1,2}:\d{1,2}\s*[' + r'\\'.join(DIVIDERS) + r']\s*\d{1,2}\:\d{1,2})')
+    r'(?P<excel_code>[а-яА-ЯA-Za-z]+)?(?P<time_str>\d{1,2}:\d{1,2}\s*[' + r'\\'.join(DIVIDERS) + r']\s*\d{1,2}:\d{1,2})')
 
 
 class BaseUploadDownloadTimeTable:
@@ -637,8 +637,8 @@ class UploadDownloadTimetableCells(BaseUploadDownloadTimeTable):
                     for wd in wdays_list:
                         excel_code = self.wd_type_mapping.get(wd.type_id, '')
                         if not wd.type.is_dayoff:
-                            tm_start = wd.dttm_work_start.strftime('%H:%M')
-                            tm_end = wd.dttm_work_end.strftime('%H:%M')
+                            tm_start = wd.dttm_work_start.strftime('%H:%M') if wd.dttm_work_start else '??:??'
+                            tm_end = wd.dttm_work_end.strftime('%H:%M') if wd.dttm_work_end else '??:??'
                             _cell_value = f'{tm_start}-{tm_end}'
                             if not wd.type_id == WorkerDay.TYPE_WORKDAY:
                                 _cell_value = excel_code + _cell_value
