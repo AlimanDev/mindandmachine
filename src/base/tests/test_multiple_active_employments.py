@@ -963,7 +963,7 @@ class TestEmployeeAPI(MultipleActiveEmploymentsSupportMixin, APITestCase):
             data=self.dump_data({'tabel_code': new_tabel_code}),
             content_type='application/json',
         )
-        self.assertContains(response=resp, text='Табельный номер сотрудника должнен быть уникальным.', status_code=400)
+        self.assertContains(response=resp, text='Табельный номер сотрудника должен быть уникален.', status_code=400)
 
     def test_can_create_employee_with_empty_tabel_code(self):
         self.client.force_authenticate(user=self.user1)
