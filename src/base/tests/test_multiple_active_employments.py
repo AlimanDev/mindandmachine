@@ -954,17 +954,24 @@ class TestEmployeeAPI(MultipleActiveEmploymentsSupportMixin, APITestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(Employee.objects.get(id=self.employee1_1.id).tabel_code, new_tabel_code)
 
-    def test_can_create_employee_without_tabel_code(self):
+        resp = self.client.put(
+            self.get_url('Employee-detail', pk=self.employee1_2.id),
+            data=self.dump_data({'tabel_code': new_tabel_code}),
+            content_type='application/json',
+        )
+        self.assertContains(response=resp, text='Табельный номер сотрудника должнен быть уникальным.', status_code=400)
+
+    def test_can_create_employee_with_empty_tabel_code(self):
         self.client.force_authenticate(user=self.user1)
         resp = self.client.post(
             self.get_url('Employee-list'),
-            data=self.dump_data({'user_id': self.user1.id}),
+            data=self.dump_data({'user_id': self.user1.id, 'tabel_code': ''}),
             content_type='application/json',
         )
         self.assertEqual(resp.status_code, 201)
         e = Employee.objects.get(id=resp.json()['id'])
         self.assertEqual(e.user_id, self.user1.id)
-        self.assertEqual(e.tabel_code, None)
+        self.assertEqual(e.tabel_code, '')
 
     def test_can_filter_by_group_id(self):
         self.client.force_authenticate(user=self.user1)
