@@ -47,7 +47,7 @@ class TimesheetItem:
         return TimesheetItem(**kwargs)
 
     def subtract_hours(self, hours_to_subtract, fields=None):
-        assert self.total_hours > hours_to_subtract
+        assert self.total_hours >= hours_to_subtract
         hours_left_to_subtract = hours_to_subtract
         fields = fields or ['night_hours', 'day_hours']
         subtracted_item = self.copy(overrides=dict(

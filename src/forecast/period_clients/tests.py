@@ -658,7 +658,7 @@ class TestDemand(APITestCase):
         tabel = pandas.read_excel(io.BytesIO(response.content))
         self.assertEquals(response.status_code, 200)
         self.assertCountEqual(list(tabel.columns), ['dttm', 'Кассы', 'O_TYPE4'])
-    
+
     def test_get_demand_xlsx_no_data(self):
         dt_from = Converter.convert_date(datetime(2019, 5, 30).date())
         dt_to = Converter.convert_date(datetime(2019, 6, 2).date())

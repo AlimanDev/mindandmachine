@@ -2088,7 +2088,7 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
         resp_data = resp.json()
         id1 = resp_data.get('data')[0]['id']
-        dttm_modified1 = resp_data.get('data')[0]['dttm_modified']
+        wd1 = WorkerDay.objects.get(id=id1)
 
         self.assertEqual(len(resp_data.get('data')), 2)
         wdays_qs = WorkerDay.objects.filter(
@@ -2111,12 +2111,12 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
         resp_data = resp.json()
         resp_data.get('data')[0]["dttm_work_start"] = datetime.combine(self.dt, time(9))
         id2 = resp_data.get('data')[0]['id']
-        dttm_modified2 = resp_data.get('data')[0]['dttm_modified']
         self.assertEqual(len(resp_data.get('data')), 1)
         self.assertEqual(wdays_qs.count(), 1)
         self.assertEqual(WorkerDayCashboxDetails.objects.filter(worker_day__in=wdays_qs).count(), 1)
         self.assertEqual(id1, id2)
-        self.assertNotEqual(dttm_modified1, dttm_modified2)  # проверка, что время обновляется
+        wd2 = WorkerDay.objects.get(id=id2)
+        self.assertNotEqual(wd1.dttm_modified, wd2.dttm_modified)  # проверка, что время обновляется
 
         wd_data = resp_data.get('data').pop(0)
         # при отправке пустого списка нам нужно передать "разрез" данных

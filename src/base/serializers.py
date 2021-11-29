@@ -5,11 +5,10 @@ from django.conf import settings
 from django.contrib.auth.forms import SetPasswordForm
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.core.validators import EmailValidator
-from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
-from rest_framework.exceptions import ValidationError, PermissionDenied
-from rest_framework.validators import UniqueValidator
+from rest_framework.exceptions import ValidationError
+from rest_framework.validators import UniqueValidator, UniqueTogetherValidator
 
 from src.base.fields import CurrentUserNetwork, UserworkShop
 from src.base.message import Message
@@ -51,6 +50,7 @@ class NetworkSerializer(serializers.ModelSerializer):
     unaccounted_overtime_threshold = serializers.SerializerMethodField()
     show_remaking_choice = serializers.SerializerMethodField()
     shop_name_form = serializers.SerializerMethodField()
+    show_employee_shift_schedule_tab = serializers.SerializerMethodField()
 
     def get_default_stats(self, obj: Network):
         default_stats = json.loads(obj.settings_values).get('default_stats', {})
@@ -98,6 +98,9 @@ class NetworkSerializer(serializers.ModelSerializer):
             return obj.logo.url
         return None
 
+    def get_show_employee_shift_schedule_tab(self, obj:Network):
+        return obj.settings_values_prop.get('show_employee_shift_schedule_tab', False)
+
     class Meta:
         model = Network
         fields = [
@@ -125,11 +128,13 @@ class NetworkSerializer(serializers.ModelSerializer):
             'get_position_from_work_type_name_in_calc_timesheet',
             'trust_tick_request',
             'show_cost_for_inner_vacancies',
+            'show_employee_shift_schedule_tab',
         ]
 
 class NetworkListSerializer(serializers.Serializer):
     id = serializers.IntegerField()
     name = serializers.CharField()
+
 
 class NetworkWithOutsourcingsAndClientsSerializer(NetworkSerializer):
     outsourcings = OutsourceClientNetworkSerializer(many=True)
@@ -218,11 +223,13 @@ class EmployeeSerializer(BaseNetworkSerializer):
     class Meta:
         model = Employee
         fields = ['id', 'user', 'user_id', 'tabel_code', 'has_shop_employment']
-        extra_kwargs = {
-            'tabel_code': {
-                'required': False,
-            },
-        }
+        validators = [
+            UniqueTogetherValidator(
+                queryset=Employee.objects,
+                fields=['user_id', 'tabel_code'],
+                message=_('The employee\'s tabel code must be unique'),
+            )
+        ]
 
     def __init__(self, *args, **kwargs):
         super(EmployeeSerializer, self).__init__(*args, **kwargs)
@@ -241,7 +248,7 @@ class AuthUserSerializer(UserSerializer):
         allowed_tabs = []
         for group in Group.objects.filter(id__in=obj.get_group_ids()):
             allowed_tabs.extend(group.allowed_tabs)
-        
+
         return list(set(allowed_tabs))
 
     class Meta(UserSerializer.Meta):
@@ -634,3 +641,9 @@ class ShopScheduleSerializer(serializers.ModelSerializer):
                 'read_only': True,
             },
         }
+
+
+class EmployeeShiftScheduleQueryParamsSerializer(serializers.Serializer):
+    employee_id = serializers.IntegerField()
+    dt__gte = serializers.DateField()
+    dt__lte = serializers.DateField()
