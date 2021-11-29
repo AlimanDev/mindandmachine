@@ -1812,13 +1812,12 @@ class ApiLog(AbstractModel):
 
 
 class ShiftSchedule(AbstractActiveNetworkSpecificCodeNamedModel):
-    year = models.PositiveSmallIntegerField(default=current_year)
     employee = models.ForeignKey('base.Employee', null=True, blank=True, on_delete=models.CASCADE)
 
     class Meta(AbstractActiveNetworkSpecificCodeNamedModel.Meta):
         unique_together = (
-            ('code', 'year', 'network'),
-            ('employee', 'year', 'network'),
+            ('code', 'network'),
+            ('employee', 'network'),
         )
         verbose_name = 'График смен'
         verbose_name_plural = 'Графики смен'
