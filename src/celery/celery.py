@@ -16,6 +16,8 @@ https://medium.com/@yehandjoe/celery-4-periodic-task-in-django-9f6b5a8c21c7
 import os
 
 from celery import Celery
+from celery.signals import beat_init
+from django.conf import settings
 
 # set the default Django settings module for the 'celery' program.
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'src.conf.djconfig')
@@ -31,3 +33,14 @@ app.config_from_object('django.conf:settings', namespace='CELERY')
 # Load task modules from all registered Django app configs.
 app.autodiscover_tasks()
 
+@beat_init.connect
+def sync_periodic_tasks(**kwags):
+    from django_celery_beat.models import PeriodicTask
+    enabled_tasks = settings.CELERY_BEAT_SCHEDULE
+    for task in PeriodicTask.objects.exclude(name='celery.backend_cleanup'):
+        if enabled_tasks.get(task.name) and not task.enabled:
+            task.enabled = True
+            task.save()
+        elif not enabled_tasks.get(task.name) and task.enabled:
+            task.enabled = False
+            task.save()

@@ -363,6 +363,17 @@ class TestSendUrvViolatorsEventNotifications(TestsHelperMixin, APITestCase):
     @classmethod
     def setUpTestData(cls):
         cls.network = NetworkFactory()
+        cls.network.set_settings_value(
+            'shop_name_form', 
+            {
+                'singular': {
+                    'I': 'объект',
+                    'R': 'объекта',
+                    'P': 'объекте',
+                }
+            }
+        )
+        cls.network.save()
         cls.period = Period.objects.create()
         cls.root_shop = ShopFactory(network=cls.network)
         cls.shop = ShopFactory(
@@ -551,6 +562,16 @@ class TestSendUrvStatV2EventNotifications(TestsHelperMixin, APITestCase):
     @classmethod
     def setUpTestData(cls):
         cls.network = NetworkFactory()
+        cls.network.set_settings_value(
+            'shop_name_form', 
+            {
+                'singular': {
+                    'I': 'магазин',
+                    'R': 'магазина',
+                    'P': 'магазине',
+                }
+            }
+        )
         cls.period = Period.objects.create()
         cls.root_shop = ShopFactory(network=cls.network)
         cls.shop = ShopFactory(
@@ -737,6 +758,17 @@ class TestEmployeeNotCheckedEventNotifications(TestsHelperMixin, APITestCase):
     @classmethod
     def setUpTestData(cls):
         cls.network = NetworkFactory()
+        cls.network.set_settings_value(
+            'shop_name_form', 
+            {
+                'singular': {
+                    'I': 'подразделение',
+                    'R': 'подразделения',
+                    'P': 'подразделении',
+                }
+            }
+        )
+        cls.network.save()
         cls.root_shop = ShopFactory(network=cls.network)
         cls.user_dir = UserFactory(email='dir@example.com', network=cls.network)
         cls.shop = ShopFactory(
@@ -879,6 +911,13 @@ class TestEmployeeNotCheckedEventNotifications(TestsHelperMixin, APITestCase):
             {
                 'delta_for_comming_in_secs': 125,
                 'delta_for_leaving_in_secs': 240,
+                'shop_name_form': {
+                    'singular': {
+                        'I': 'подразделение',
+                        'R': 'подразделения',
+                        'P': 'подразделении',
+                    }
+                }
             }
         )
         self.network.save()
@@ -920,6 +959,17 @@ class TestEmployeeWorkingNotAccordingToPlanEventNotifications(TestsHelperMixin, 
     @classmethod
     def setUpTestData(cls):
         cls.network = NetworkFactory()
+        cls.network.set_settings_value(
+            'shop_name_form', 
+            {
+                'singular': {
+                    'I': 'подразделение',
+                    'R': 'подразделения',
+                    'P': 'подразделении',
+                }
+            }
+        )
+        cls.network.save()
         cls.root_shop = ShopFactory(network=cls.network)
         cls.user_dir = UserFactory(email='dir@example.com', network=cls.network)
         cls.shop = ShopFactory(

@@ -2,6 +2,7 @@ import datetime
 import json
 import re
 from calendar import monthrange
+from decimal import Decimal
 
 import pandas as pd
 from celery import chain
@@ -10,12 +11,10 @@ from django.conf import settings
 from django.contrib.auth.models import (
     AbstractUser as DjangoAbstractUser,
 )
-
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models
 from django.db import transaction
-from django.db.models import Case, When, Sum, Value, IntegerField, Subquery, OuterRef, F, Q
-from django.db.models.functions import Coalesce
+from django.db.models import Case, When, Sum, Value, IntegerField, Subquery, OuterRef, Q
 from django.db.models.query import QuerySet
 from django.utils import timezone
 from django.utils.functional import cached_property
@@ -25,6 +24,7 @@ from mptt.models import MPTTModel, TreeForeignKey
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.serializers import ValidationError
 from timezone_field import TimeZoneField
+
 from src.base.models_abstract import (
     AbstractActiveModel,
     AbstractModel,
@@ -34,6 +34,7 @@ from src.base.models_abstract import (
 )
 from src.conf.djconfig import QOS_TIME_FORMAT
 from src.util.mixins.qs import AnnotateValueEqualityQSMixin
+from src.base.fields import MultipleChoiceField
 
 
 class Network(AbstractActiveModel):
@@ -57,6 +58,16 @@ class Network(AbstractActiveModel):
         (WD_FACT_APPROVED, 'Факт. подтв. график'),
         (FACT_TIMESHEET, 'Фактический табель'),
         (MAIN_TIMESHEET, 'Основной табель'),
+    )
+
+    TIMESHEET_LINES_GROUP_BY_EMPLOYEE = 1
+    TIMESHEET_LINES_GROUP_BY_EMPLOYEE_POSITION = 2
+    TIMESHEET_LINES_GROUP_BY_EMPLOYEE_POSITION_SHOP = 3
+
+    TIMESHEET_LINES_GROUP_BY_CHOICES = (
+        (TIMESHEET_LINES_GROUP_BY_EMPLOYEE, 'Сотруднику'),
+        (TIMESHEET_LINES_GROUP_BY_EMPLOYEE_POSITION, 'Сотруднику и должности'),
+        (TIMESHEET_LINES_GROUP_BY_EMPLOYEE_POSITION_SHOP, 'Сотруднику, должности и подразделению выхода'),
     )
 
     TABEL_FORMAT_CHOICES = (
@@ -225,6 +236,10 @@ class Network(AbstractActiveModel):
                        'the Maximum shift length has passed since the opening of the previous shift'),
         default=False,
     )
+    trust_tick_request = models.BooleanField(
+        verbose_name=_('Create attendance record without check photo.'),
+        default=False,
+    )
     max_plan_diff_in_seconds = models.PositiveIntegerField(
         verbose_name=_('Max difference between the start or end time to "pull" to the planned work day'),
         default=3600 * 7,
@@ -252,6 +267,11 @@ class Network(AbstractActiveModel):
         choices=ROUND_WORK_HOURS_ALG_CHOICES,
         verbose_name='Алгоритм округления рабочих часов',
     )
+    api_timesheet_lines_group_by = models.PositiveSmallIntegerField(
+        verbose_name='Группировать данные табеля в api методе /rest_api/timesheet/lines/ по',
+        choices=TIMESHEET_LINES_GROUP_BY_CHOICES, default=TIMESHEET_LINES_GROUP_BY_EMPLOYEE_POSITION_SHOP)
+    
+    show_cost_for_inner_vacancies = models.BooleanField('Отображать поле "стоимость работ" для внутренних вакансий', default=False)
 
     DEFAULT_NIGHT_EDGES = (
         '22:00:00',
@@ -657,9 +677,11 @@ class Shop(MPTTModel, AbstractActiveNetworkSpecificCodeNamedModel):
     def shop_default_values_dict(self):
         shop_default_values = json.loads(self.network.shop_default_values)
         if shop_default_values:
-            for re_pattern, shop_default_values_dict in shop_default_values.items():
-                if re.search(re_pattern, self.name, re.IGNORECASE):
-                    return shop_default_values_dict
+            for re_pattern, shop_default_values_by_name_dict in shop_default_values.items():
+                if re.search(re_pattern, str(self.level), re.IGNORECASE):
+                    for re_pattern, shop_default_values_dict in shop_default_values_by_name_dict.items():
+                        if re.search(re_pattern, self.name, re.IGNORECASE):
+                            return shop_default_values_dict
 
     def _set_shop_defaults(self):
         if self.shop_default_values_dict:
@@ -715,18 +737,28 @@ class Shop(MPTTModel, AbstractActiveNetworkSpecificCodeNamedModel):
             transaction.on_commit(self._handle_schedule_change)
         
         if is_new and self.load_template_id is None:
-            self.load_template_id = self.network.load_template_id
+            from src.forecast.models import LoadTemplate
+            lt = self.network.load_template_id
+            if self.shop_default_values_dict and self.shop_default_values_dict.get('load_template'):
+                lt = LoadTemplate.objects.filter(code=self.shop_default_values_dict.get('load_template')).first()
+                if not lt:
+                    raise ValidationError(_('There is not load template with code {}.').format(self.shop_default_values_dict.get('load_template')))
+                lt = lt.id
+            if lt:
+                self.load_template_id = lt
+                load_template_changed = True
 
         if load_template_changed and not (self.load_template_id is None):
             from src.forecast.load_template.utils import apply_load_template
             from src.forecast.load_template.tasks import calculate_shops_load
             apply_load_template(self.load_template_id, self.id)
-            calculate_shops_load.delay(
-                self.load_template_id,
-                datetime.date.today(),
-                datetime.date.today().replace(day=1) + relativedelta(months=1),
-                shop_id=self.id,
-            )
+            if not is_new:
+                calculate_shops_load.delay(
+                    self.load_template_id,
+                    datetime.date.today(),
+                    datetime.date.today().replace(day=1) + relativedelta(months=1),
+                    shop_id=self.id,
+                )
 
         if is_new or (self.tracker.has_changed('latitude') or self.tracker.has_changed('longitude')) and \
                 settings.FILL_SHOP_CITY_FROM_COORDS:
@@ -912,6 +944,16 @@ class Group(AbstractActiveNetworkSpecificCodeNamedModel):
     class Meta(AbstractActiveNetworkSpecificCodeNamedModel.Meta):
         verbose_name = 'Группа пользователей'
         verbose_name_plural = 'Группы пользователей'
+    
+
+    CHOICE_ALLOWED_TABS = [
+        ('load_forecast', 'Прогноз потребностей'),
+        ('schedule', 'Расписание'),
+        ('employees', 'Сотрудники'),
+        ('shift_exchange', 'Биржа смен'),
+        ('analytics', 'Аналитика'), 
+        ('settings', 'Настройки'),
+    ]
 
     dttm_modified = models.DateTimeField(blank=True, null=True)
     subordinates = models.ManyToManyField("self", blank=True)
@@ -919,6 +961,8 @@ class Group(AbstractActiveNetworkSpecificCodeNamedModel):
         default=False, verbose_name='Может изменять/подтверждать "защищенные" рабочие дни')
     has_perm_to_approve_other_shop_days = models.BooleanField(
         default=False, verbose_name='Может подтверждать дни из других подразделений')
+
+    allowed_tabs = MultipleChoiceField(choices=CHOICE_ALLOWED_TABS)
 
     def __str__(self):
         return '{}, {}, {}'.format(
@@ -1468,6 +1512,7 @@ class FunctionGroup(AbstractModel):
         ('Break', 'Перерыв (break)'),
         ('Employment', 'Трудоустройство (employment)'),
         ('Employee', 'Сотрудник (employee)'),
+        ('Employee_shift_schedule', 'Графики смен сотрудников (employee/shift_schedule/)'),
         ('Employment_auto_timetable', 'Выбрать сорудников для автосоставления (Создать) (employment/auto_timetable/)'),
         ('Employment_timetable', 'Редактирование полей трудоустройства, связанных с расписанием (employment/timetable/)'),
         ('EmploymentWorkType', 'Связь трудоустройства и типа работ (employment_work_type)'),
@@ -1554,6 +1599,8 @@ class FunctionGroup(AbstractModel):
         ('ShopSchedule', 'Расписание магазина (schedule)'),
         ('VacancyBlackList', 'Черный список для вакансий (vacancy_black_list)'),
         ('Task', 'Задача (task)'),
+        ('ShiftSchedule_batch_update_or_create', 'Массовое создание/обновление графиков работ (Создать/Обновить) (shift_schedule/batch_update_or_create/)'),
+        ('ShiftScheduleInterval_batch_update_or_create', 'Массовое создание/обновление интервалов графиков работ сотрудников (Создать/Обновить) (shift_schedule/batch_update_or_create/)'),
     )
 
     METHODS_TUPLE = (
@@ -1641,14 +1688,18 @@ class SAWHSettings(AbstractActiveNetworkSpecificCodeNamedModel):
 
     PART_OF_PROD_CAL_SUMM = 1
     FIXED_HOURS = 2
+    SHIFT_SCHEDULE = 3
 
     SAWH_SETTINGS_TYPES = (
         (PART_OF_PROD_CAL_SUMM, 'Доля от суммы часов по произв. календарю в рамках уч. периода'),
         (FIXED_HOURS, 'Фикс. кол-во часов в месяц'),
+        (SHIFT_SCHEDULE, 'Часы по графику смен'),
     )
 
     work_hours_by_months = models.JSONField(
         verbose_name='Настройки по распределению часов в рамках уч. периода',
+        blank=True,
+        default=dict,
     )  # Название ключей должно начинаться с m (например январь -- m1), чтобы можно было фильтровать через django orm
     type = models.PositiveSmallIntegerField(
         default=PART_OF_PROD_CAL_SUMM, choices=SAWH_SETTINGS_TYPES, verbose_name='Тип расчета')
@@ -1775,5 +1826,72 @@ class ApiLog(AbstractModel):
     def clean_log(cls, network_id, delete_gap):
         cls.objects.filter(
             user__network_id=network_id,
-            request_datetime__gte=timezone.now() - datetime.timedelta(days=delete_gap),
+            request_datetime__lte=timezone.now() - datetime.timedelta(days=delete_gap),
         ).delete()
+
+
+class ShiftSchedule(AbstractActiveNetworkSpecificCodeNamedModel):
+    year = models.PositiveSmallIntegerField(default=current_year)
+    employee = models.ForeignKey('base.Employee', null=True, blank=True, on_delete=models.CASCADE)
+
+    class Meta(AbstractActiveNetworkSpecificCodeNamedModel.Meta):
+        unique_together = (
+            ('code', 'year', 'network'),
+            ('employee', 'year', 'network'),
+        )
+        verbose_name = 'График смен'
+        verbose_name_plural = 'Графики смен'
+
+    def __str__(self):
+        s = f'{self.name}'
+        if self.code:
+            s += f' ({self.code})'
+        return s
+
+    @classmethod
+    def _get_rel_objs_mapping(cls):
+        return {
+            'days': (ShiftScheduleDay, 'shift_schedule_id'),
+        }
+
+
+class ShiftScheduleDay(AbstractModel):
+    code = models.CharField(max_length=256, null=True, blank=True, db_index=True)
+    shift_schedule = models.ForeignKey(
+        'base.ShiftSchedule', verbose_name='График смен', on_delete=models.CASCADE, related_name='days')
+    dt = models.DateField()
+    day_type = models.ForeignKey('timetable.WorkerDayType', on_delete=models.PROTECT, verbose_name='Тип дня')
+    work_hours = models.DecimalField(decimal_places=2, max_digits=4, verbose_name='Сумма рабочих часов', default=Decimal("0.00"))
+
+    class Meta(AbstractModel.Meta):
+        verbose_name = 'День графика смен'
+        verbose_name_plural = 'Дни графика смен'
+        unique_together = (
+            ('dt', 'shift_schedule'),
+        )
+
+    def __str__(self):
+        s = f'{self.dt}'
+        if self.code:
+            s += f' ({self.code})'
+        return s
+
+
+class ShiftScheduleInterval(AbstractModel):
+    code = models.CharField(max_length=256, null=True, blank=True, db_index=True)
+    shift_schedule = models.ForeignKey('base.ShiftSchedule', verbose_name='График смен', on_delete=models.PROTECT, related_name='intervals')
+    employee = models.ForeignKey(
+        'base.Employee', verbose_name='Сотрудник', on_delete=models.CASCADE, null=True, blank=True)
+    dt_start = models.DateField(verbose_name='Дата с (включительно)')
+    dt_end = models.DateField(verbose_name='Дата по (включительно)')
+
+    class Meta(AbstractModel.Meta):
+        verbose_name = 'Интервал графика смен сотрудника'
+        verbose_name_plural = 'Интервалы графика смен сотрудника'
+        # TODO: ограничение на невозможность создать для 1 сотрудника пересечения графика по датам ?
+
+    def __str__(self):
+        s = f'{self.shift_schedule} {self.employee} {self.dt_start}-{self.dt_end}'
+        if self.code:
+            s += f' ({self.code})'
+        return s

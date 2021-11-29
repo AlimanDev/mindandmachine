@@ -5,7 +5,8 @@ import pandas as pd
 from django.test import override_settings
 from rest_framework.test import APITestCase
 
-from src.base.tests.factories import EmployeeFactory
+from src.base.models import Network
+from src.base.tests.factories import EmployeeFactory, ShopFactory
 from src.timetable.models import TimesheetItem, WorkerDay
 from src.timetable.tests.factories import WorkerDayFactory
 from ._base import TestTimesheetMixin
@@ -155,3 +156,53 @@ class TestTimesheetApiView(TestTimesheetMixin, APITestCase):
 
         resp = self.client.get(self.get_url('Timesheet-lines'))
         self.assertEqual(resp.status_code, 200)
+        resp_data = resp.json()
+        self.assertEqual(len(resp_data), 2)
+
+    def test_timesheet_lines_group_by_employee_and_position(self):
+        self.network.api_timesheet_lines_group_by = Network.TIMESHEET_LINES_GROUP_BY_EMPLOYEE_POSITION
+        self.network.save()
+        shop2 = ShopFactory(
+            parent=self.root_shop,
+            name='SHOP_NAME2',
+            network=self.network,
+            email='shop2@example.com',
+            settings__breaks=self.breaks,
+        )
+
+        self.add_group_perm(self.group_worker, 'Timesheet_lines', 'GET')
+        TimesheetItem.objects.create(
+            timesheet_type=TimesheetItem.TIMESHEET_TYPE_FACT,
+            shop=self.shop,
+            position=self.position_worker,
+            employee=self.employee_worker,
+            dt='2021-01-01',
+            day_type_id=WorkerDay.TYPE_WORKDAY,
+            day_hours=8,
+        )
+        TimesheetItem.objects.create(
+            timesheet_type=TimesheetItem.TIMESHEET_TYPE_MAIN,
+            shop=self.shop,
+            position=self.position_worker,
+            employee=self.employee_worker,
+            dt='2021-01-01',
+            day_type_id=WorkerDay.TYPE_WORKDAY,
+            day_hours=8,
+        )
+        TimesheetItem.objects.create(
+            timesheet_type=TimesheetItem.TIMESHEET_TYPE_MAIN,
+            shop=shop2,
+            position=self.position_worker,
+            employee=self.employee_worker,
+            dt='2021-01-01',
+            day_type_id=WorkerDay.TYPE_WORKDAY,
+            day_hours=3,
+        )
+
+        resp = self.client.get(self.get_url('Timesheet-lines'))
+        self.assertEqual(resp.status_code, 200)
+        resp_data = resp.json()
+        self.assertEqual(len(resp_data), 2)
+        self.assertEqual(len(resp_data[0]['days']), 1)
+        self.assertNotIn('shop_id', resp_data[0])
+        self.assertNotIn('shop__code', resp_data[0])

@@ -198,6 +198,17 @@ class TestSendUnaccountedReport(TestsHelperMixin, APITestCase):
     @classmethod
     def setUpTestData(cls):
         cls.network = NetworkFactory(only_fact_hours_that_in_approved_plan=True)
+        cls.network.set_settings_value(
+            'shop_name_form', 
+            {
+                'singular': {
+                    'I': 'объект',
+                    'R': 'объекта',
+                    'P': 'объекте',
+                }
+            }
+        )
+        cls.network.save()
         cls.period = Period.objects.create()
         cls.root_shop = ShopFactory(network=cls.network)
         cls.shop = ShopFactory(
@@ -574,6 +585,17 @@ class TestVacancyCreatedNotification(TestsHelperMixin, APITestCase):
     @classmethod
     def setUpTestData(cls):
         cls.network = NetworkFactory(name='Client', code='client')
+        cls.network.set_settings_value(
+            'shop_name_form', 
+            {
+                'singular': {
+                    'I': 'подразделение',
+                    'R': 'подразделения',
+                    'P': 'подразделении',
+                }
+            }
+        )
+        cls.network.save()
         cls.outsource_network = NetworkFactory(name='Outsource', code='outsource')
         cls.outsource_network2 = NetworkFactory(name='Outsource2', code='outsource2')
         cls.root_shop = ShopFactory(network=cls.network)

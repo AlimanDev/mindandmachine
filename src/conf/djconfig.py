@@ -462,7 +462,6 @@ TEVIAN_FR_THRESHOLD = 0.8
 # после какого времени (в днях) удалять биометрию уволенных сотрудников
 URV_DELETE_BIOMETRICS_DAYS_AFTER_FIRED = 365 * 3
 
-TRUST_TICK_REQUEST = False
 USERS_WITH_SCHEDULE_ONLY = False
 # игнорировать отметку без активного трудоустройства или вакансии
 USERS_WITH_ACTIVE_EMPLOYEE_OR_VACANCY_ONLY = False
@@ -539,17 +538,6 @@ CELERY_ROUTES = {
 }
 
 CELERY_BEAT_SCHEDULE = {
-    'task-every-30-min-update-queue': {
-        'task': 'src.celery.tasks.update_queue',
-        'schedule': crontab(minute='0,30'),
-        'options': {'queue': BACKEND_QUEUE}
-    },
-    'task-free-all-workers-after-shop-closes': {
-        'task': 'src.celery.tasks.release_all_workers',
-        'schedule': crontab(hour=2, minute=0),
-        'options': {'queue': BACKEND_QUEUE}
-    },
-
     # 'task-update_worker_month_stat': {
     #     'task': 'src.celery.tasks.update_worker_month_stat',
     #     'schedule': crontab(day_of_month='1,15', hour=0, minute=0),
@@ -566,28 +554,9 @@ CELERY_BEAT_SCHEDULE = {
         'schedule': crontab(hour=1, minute=0),
         'options': {'queue': BACKEND_QUEUE}
     },
-    'task-allocation-of-time-for-work-on-cashbox': {
-        'task': 'src.celery.tasks.allocation_of_time_for_work_on_cashbox',
-        'schedule': crontab(day_of_month='1', hour=4, minute=0)
-    },
-    'task-clean-camera-stats': {
-        'task': 'src.celery.tasks.clean_camera_stats',
-        'schedule': crontab(day_of_week=6, hour=0, minute=15),
-        'options': {'queue': BACKEND_QUEUE}
-    },
-    'task-update-visitors-info': {
-        'task': 'src.celery.tasks.update_visitors_info',
-        'schedule': crontab(minute='0,30'),
-        'options': {'queue': BACKEND_QUEUE}
-    },
     'task-update-shop-stats': {
         'task': 'src.timetable.shop_month_stat.tasks.update_shop_stats_2_months',
         'schedule': crontab(hour=3, minute=0),
-        'options': {'queue': BACKEND_QUEUE}
-    },
-    'task-update-operation-templates': {
-        'task': 'src.celery.tasks.op_type_build_period_clients',
-        'schedule': crontab(hour=1, minute=0),
         'options': {'queue': BACKEND_QUEUE}
     },
     'task-aggregate-receipts': {

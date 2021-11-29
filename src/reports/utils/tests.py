@@ -27,6 +27,17 @@ class TestUrvFiles(APITestCase):
     def setUp(self):
         super().setUp()
         create_departments_and_users(self)
+        self.network.set_settings_value(
+            'shop_name_form', 
+            {
+                'singular': {
+                    'I': 'магазин',
+                    'R': 'магазина',
+                    'P': 'магазине',
+                }
+            }
+        )
+        self.network.save()
         self.dt = date.today()
         self._create_worker_day(
             self.employment2,
@@ -245,6 +256,15 @@ class TestUrvFiles(APITestCase):
 
 
     def test_urv_violators_report_xlsx(self):
+        self.network.set_settings_value(
+            'shop_name_form', 
+            {
+                'singular': {
+                    'R': 'объекта',
+                }
+            }
+        )
+        self.network.save()
         data = urv_violators_report_xlsx(self.network.id, dt_from=self.dt, dt_to=self.dt, in_memory=True)
         df = pd.read_excel(data['file']).fillna('')
         data1 = {
@@ -294,6 +314,16 @@ class TestUnaccountedOvertime(APITestCase):
         create_departments_and_users(self)
         self.dt = date.today()
         self.network.only_fact_hours_that_in_approved_plan = True
+        self.network.set_settings_value(
+            'shop_name_form', 
+            {
+                'singular': {
+                    'I': 'объект',
+                    'R': 'объекта',
+                    'P': 'объекте',
+                }
+            }
+        )
         self.network.save()
         pa1 = self._create_worker_day(
             self.employment1,

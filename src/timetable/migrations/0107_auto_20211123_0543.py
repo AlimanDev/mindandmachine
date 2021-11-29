@@ -29,10 +29,12 @@ def fix_attendance_records(apps, schema_editor):
     for record in records_to_fix:
         record.save()
 
+
 class Migration(migrations.Migration):
 
     dependencies = [
         ('timetable', '0106_auto_20211112_0838'),
+        ('base', '0150_merge_20211124_2147'),
     ]
 
     operations = [
