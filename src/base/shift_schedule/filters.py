@@ -10,7 +10,6 @@ class ShiftScheduleFilter(FilterSet):
     class Meta:
         model = ShiftSchedule
         fields = {
-            'year': ['exact', 'in'],
             'code': ['exact', 'in'],
         }
 

@@ -742,7 +742,7 @@ class TestShiftScheduleDivider(TestTimesheetMixin, TestCase):
                 dt=dt, shift_schedule=cls.individual_shift_schedule, day_type_id=WorkerDay.TYPE_HOLIDAY, work_hours=Decimal("0.00"))
 
     def test_plan_schedule_hours_gt_shift_schedule_hours(self):
-        for employee in [self.employee_worker, self.employee_worker2]:
+        for employee in [self.employee_worker]:
             self._calc_timesheets(employee_id=employee.id, reraise_exc=True)
             main_ts_item = TimesheetItem.objects.get(
                 employee=employee, dt=date(2021, 6, 7), timesheet_type=TimesheetItem.TIMESHEET_TYPE_MAIN)
@@ -752,7 +752,7 @@ class TestShiftScheduleDivider(TestTimesheetMixin, TestCase):
             self.assertEqual(additional_ts_item.day_hours, 1)
 
     def test_plan_schedule_hours_lt_shift_schedule_hours(self):
-        for employee in [self.employee_worker, self.employee_worker2]:
+        for employee in [self.employee_worker]:
             ShiftScheduleDay.objects.filter(work_hours__gt=0).update(work_hours=Decimal("14"))
 
             self._calc_timesheets(employee_id=employee.id, reraise_exc=True)
@@ -765,7 +765,7 @@ class TestShiftScheduleDivider(TestTimesheetMixin, TestCase):
             self.assertIsNone(additional_ts_item)
 
     def test_plan_schedule_is_workday_and_shift_schedule_is_holiday(self):
-        for employee in [self.employee_worker, self.employee_worker2]:
+        for employee in [self.employee_worker]:
             self._calc_timesheets(employee_id=employee.id, reraise_exc=True)
             main_ts_item = TimesheetItem.objects.get(
                 employee=employee, dt=date(2021, 6, 12), timesheet_type=TimesheetItem.TIMESHEET_TYPE_MAIN)
@@ -778,7 +778,7 @@ class TestShiftScheduleDivider(TestTimesheetMixin, TestCase):
 
     def test_absence_plan_schedule_is_workday_and_shift_schedule_is_holiday(self):
         WorkerDay.objects.filter(is_fact=True).delete()
-        for employee in [self.employee_worker, self.employee_worker2]:
+        for employee in [self.employee_worker]:
             self._calc_timesheets(employee_id=employee.id, reraise_exc=True, dttm_now=datetime(2021, 6, 25))
             main_ts_item = TimesheetItem.objects.get(
                 employee=employee, dt=date(2021, 6, 12), timesheet_type=TimesheetItem.TIMESHEET_TYPE_MAIN)
@@ -790,7 +790,7 @@ class TestShiftScheduleDivider(TestTimesheetMixin, TestCase):
 
     def test_absence_plan_schedule_is_workday_and_shift_schedule_is_workday(self):
         WorkerDay.objects.filter(is_fact=True).delete()
-        for employee in [self.employee_worker, self.employee_worker2]:
+        for employee in [self.employee_worker]:
             self._calc_timesheets(employee_id=employee.id, reraise_exc=True, dttm_now=datetime(2021, 6, 25))
             main_ts_item = TimesheetItem.objects.get(
                 employee=employee, dt=date(2021, 6, 7), timesheet_type=TimesheetItem.TIMESHEET_TYPE_MAIN)
@@ -809,7 +809,7 @@ class TestShiftScheduleDivider(TestTimesheetMixin, TestCase):
             work_hours=timedelta(0),
         )
         WorkerDay.objects.filter(is_fact=True, dt=dt).delete()
-        for employee in [self.employee_worker, self.employee_worker2]:
+        for employee in [self.employee_worker]:
             self._calc_timesheets(employee_id=employee.id, reraise_exc=True, dttm_now=datetime(2021, 6, 25))
             main_ts_item = TimesheetItem.objects.get(
                 employee=employee, dt=dt, timesheet_type=TimesheetItem.TIMESHEET_TYPE_MAIN)
@@ -828,7 +828,7 @@ class TestShiftScheduleDivider(TestTimesheetMixin, TestCase):
             work_hours=timedelta(0),
         )
         WorkerDay.objects.filter(is_fact=True, dt=dt).delete()
-        for employee in [self.employee_worker, self.employee_worker2]:
+        for employee in [self.employee_worker]:
             self._calc_timesheets(employee_id=employee.id, reraise_exc=True, dttm_now=datetime(2021, 6, 25))
             main_ts_item = TimesheetItem.objects.get(
                 employee=employee, dt=dt, timesheet_type=TimesheetItem.TIMESHEET_TYPE_MAIN)
@@ -865,7 +865,7 @@ class TestShiftScheduleDivider(TestTimesheetMixin, TestCase):
             dt=dt,
             type_id=WorkerDay.TYPE_VACATION,
         )
-        for employee in [self.employee_worker, self.employee_worker2]:
+        for employee in [self.employee_worker]:
             self._calc_timesheets(employee_id=employee.id, reraise_exc=True, dttm_now=datetime(2021, 6, 25))
             main_ts_item = TimesheetItem.objects.get(
                 employee=employee, dt=dt, timesheet_type=TimesheetItem.TIMESHEET_TYPE_MAIN)
@@ -904,7 +904,7 @@ class TestShiftScheduleDivider(TestTimesheetMixin, TestCase):
             type_id=WorkerDay.TYPE_VACATION,
         )
 
-        for employee in [self.employee_worker, self.employee_worker2]:
+        for employee in [self.employee_worker]:
             self._calc_timesheets(employee_id=employee.id, reraise_exc=True, dttm_now=datetime(2021, 6, 25))
             main_ts_item = TimesheetItem.objects.get(
                 employee=employee, dt=dt, timesheet_type=TimesheetItem.TIMESHEET_TYPE_MAIN)

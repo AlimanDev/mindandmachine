@@ -51,7 +51,6 @@ class ShiftScheduleSerializer(serializers.ModelSerializer):
             'id',
             'code',
             'name',
-            'year',
             'employee__tabel_code',
             'days',
         )

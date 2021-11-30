@@ -497,8 +497,8 @@ class ApiLogAdmin(admin.ModelAdmin):
 @admin.register(ShiftSchedule)
 class ShiftScheduleAdmin(admin.ModelAdmin):
     raw_id_fields = ('network', 'employee')
-    list_filter = ('year', 'employee', 'network',)
-    list_display = ('id', 'name', 'year', 'code', 'employee')
+    list_filter = ('employee', 'network',)
+    list_display = ('id', 'name', 'code', 'employee')
     save_as = True
 
 
