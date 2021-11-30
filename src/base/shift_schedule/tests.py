@@ -297,7 +297,6 @@ class TestShiftScheduleIntervalViewSet(TestsHelperMixin, APITestCase):
             {
                 "code": "3",
                 "name": "График 3",
-                "year": 2022,
                 "days": [
                     {
                         "code": "3_2022-01-01",
@@ -355,13 +354,8 @@ class TestShiftScheduleIntervalViewSet(TestsHelperMixin, APITestCase):
         shift_schedule_intervals_options = {
             "by_code": True,
             "delete_scope_fields_list": [
-                "shift_schedule__year__in",
+                "employee_id",
             ],
-            "delete_scope_values_list": [
-                {
-                    "shift_schedule__year__in": [2020, 2021, 2022],
-                }
-            ]
         }
 
         data = {
@@ -434,13 +428,8 @@ class TestShiftScheduleIntervalViewSet(TestsHelperMixin, APITestCase):
         shift_schedule_intervals_options2 = {
             "by_code": True,
             "delete_scope_fields_list": [
-                "shift_schedule__year__in",
+                "employee_id",
             ],
-            "delete_scope_values_list": [
-                {
-                    "shift_schedule__year__in": [2022],
-                }
-            ]
         }
         data2 = {
             'data': shift_schedule_intervals_data2,
@@ -455,22 +444,7 @@ class TestShiftScheduleIntervalViewSet(TestsHelperMixin, APITestCase):
             "stats": {
                 "ShiftScheduleInterval": {
                     "created": 1,
-                    "deleted": 1,
-                }
-            }
-        })
-
-        shift_schedule_intervals_options2['delete_scope_values_list'][0]['shift_schedule__year__in'] = [2021, 2022]
-        resp = self.client.post(
-            self.get_url('ShiftScheduleInterval-batch-update-or-create'), self.dump_data(data2),
-            content_type='application/json')
-        self.assertEqual(resp.status_code, 200)
-        resp_data = resp.json()
-        self.assertDictEqual(resp_data, {
-            "stats": {
-                "ShiftScheduleInterval": {
-                    "updated": 1,
-                    "deleted": 3,
+                    "deleted": 2,
                 }
             }
         })
