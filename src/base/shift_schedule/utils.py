@@ -10,20 +10,30 @@ def get_shift_schedule(
         network_id, dt__gte, dt__lte, employee_id=None, employee_id__in=None, employment__in=None):
     assert employee_id or employee_id__in or employment__in
 
-    filter_kwargs = {}
+    q = Q()
     if network_id:
-        filter_kwargs['employee__user__network_id'] = network_id
-        filter_kwargs['shift_schedule__network_id'] = network_id
+        q &= Q(
+            employee__user__network_id=network_id,
+            shift_schedule__network_id=network_id,
+        )
     if employee_id:
-        filter_kwargs['employee_id'] = employee_id
+        q &= Q(
+            employee_id=employee_id,
+        )
     if employee_id__in:
-        filter_kwargs['employee_id__in'] = employee_id__in
+        q &= Q(
+            employee_id__in=employee_id__in,
+        )
     if employment__in:
-        filter_kwargs['employee__employments__dt_fired__gte'] = dt__gte
-        filter_kwargs['employee__employments__dt_hired__lte'] = dt__lte
-        filter_kwargs['shift_schedule__days__dt__gte'] = F('employee__employments__dt_hired')
-        filter_kwargs['shift_schedule__days__dt__lte'] = F('employee__employments__dt_fired')
-        filter_kwargs['employee__employments__in'] = employment__in
+        q &= Q(
+            Q(employee__employments__dt_fired__gte=dt__gte) | Q(employee__employments__dt_fired__isnull=True),
+            Q(employee__employments__dt_hired__lte=dt__lte) | Q(employee__employments__dt_hired__isnull=True),
+            Q(shift_schedule__days__dt__gte=F('employee__employments__dt_hired')) | Q(
+                employee__employments__dt_hired__isnull=True),
+            Q(shift_schedule__days__dt__lte=F('employee__employments__dt_fired')) | Q(
+                employee__employments__dt_fired__isnull=True),
+            employee__employments__in=employment__in,
+        )
 
     values_list = [
         'group_by1_lookup',
@@ -37,7 +47,7 @@ def get_shift_schedule(
             shift_schedule__days__dt__gte=F('dt_start')),
         Q(shift_schedule__days__dt__lte=dt__lte) & Q(
             shift_schedule__days__dt__lte=F('dt_end')),
-        **filter_kwargs,
+        q,
     ).annotate(
         group_by1_lookup=F('employee__employments__id' if employment__in else 'employee_id'),
         group_by2_lookup=F('shift_schedule__days__dt'),
