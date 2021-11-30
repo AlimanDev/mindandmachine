@@ -46,17 +46,19 @@ def get_timesheet_stats(filtered_qs, dt_from, dt_to, user):
             ts_data['hours_by_type'] = hours_by_type_dict
         timesheet_stats[k] = ts_data
 
-    worker_stats = WorkersStatsGetter(
-        dt_from=dt_from,
-        dt_to=dt_to,
-        employee_id__in=timesheet_stats.keys(),
-        network=user.network,
-    ).run()
-    for employee_id, data in timesheet_stats.items():
-        data['norm_hours'] = worker_stats.get(
-            employee_id, {}).get('plan', {}).get('approved', {}).get('norm_hours', {}).get('curr_month', None)
-        data['sawh_hours'] = worker_stats.get(
-            employee_id, {}).get('plan', {}).get('approved', {}).get('sawh_hours', {}).get('curr_month', None)
+    employee_id__in = timesheet_stats.keys()
+    if employee_id__in:
+        worker_stats = WorkersStatsGetter(
+            dt_from=dt_from,
+            dt_to=dt_to,
+            employee_id__in=employee_id__in,
+            network=user.network,
+        ).run()
+        for employee_id, data in timesheet_stats.items():
+            data['norm_hours'] = worker_stats.get(
+                employee_id, {}).get('plan', {}).get('approved', {}).get('norm_hours', {}).get('curr_month', None)
+            data['sawh_hours'] = worker_stats.get(
+                employee_id, {}).get('plan', {}).get('approved', {}).get('sawh_hours', {}).get('curr_month', None)
 
     return timesheet_stats
 
