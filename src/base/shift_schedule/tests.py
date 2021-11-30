@@ -45,7 +45,6 @@ class TestShiftScheduleViewSet(TestsHelperMixin, APITestCase):
                 "code": "1",
                 "name": "График 1",
                 "employee__tabel_code": self.employee.tabel_code,
-                "year": 2021,
                 "days": [
                     {
                         "code": "1_2021-01-01",
@@ -71,12 +70,7 @@ class TestShiftScheduleViewSet(TestsHelperMixin, APITestCase):
         options = {
             "by_code": True,
             "return_response": True,
-            "delete_scope_fields_list": ["year"],
-            "delete_scope_values_list": [
-                {
-                    "year": 2021,
-                }
-            ],
+            "delete_scope_fields_list": ["code"],
         }
         data = {
             "data": shift_schedules_data_2021,
@@ -100,37 +94,37 @@ class TestShiftScheduleViewSet(TestsHelperMixin, APITestCase):
         shift_schedule = ShiftSchedule.objects.get(code="1")
         self.assertEqual(shift_schedule.employee_id, self.employee.id)
 
-        resp = self.client.get(
-            self.get_url('Employee-shift-schedule'),
-            data={'employee_id': self.employee.id, 'dt__gte': '2021-01-01', 'dt__lte': '2021-01-30'},
-        )
-        self.assertEqual(resp.status_code, 200)
-        resp_data = resp.json()
-        self.assertDictEqual(
-            resp_data, {
-                str(self.employee.id): {
-                    "2021-01-01": {
-                        "day_type": "W",
-                        "work_hours": 13.0
-                    },
-                    "2021-01-02": {
-                        "day_type": "H",
-                        "work_hours": 0.0
-                    },
-                    "2021-01-07": {
-                        "day_type": "W",
-                        "work_hours": 12.0
-                    }
-                }
-            }
-        )
+        # с индивид. графиками не до конца понятно, пока их не учитываем
+        # resp = self.client.get(
+        #     self.get_url('Employee-shift-schedule'),
+        #     data={'employee_id': self.employee.id, 'dt__gte': '2021-01-01', 'dt__lte': '2021-01-30'},
+        # )
+        # self.assertEqual(resp.status_code, 200)
+        # resp_data = resp.json()
+        # self.assertDictEqual(
+        #     resp_data, {
+        #         str(self.employee.id): {
+        #             "2021-01-01": {
+        #                 "day_type": "W",
+        #                 "work_hours": 13.0
+        #             },
+        #             "2021-01-02": {
+        #                 "day_type": "H",
+        #                 "work_hours": 0.0
+        #             },
+        #             "2021-01-07": {
+        #                 "day_type": "W",
+        #                 "work_hours": 12.0
+        #             }
+        #         }
+        #     }
+        # )
 
     def test_batch_update_or_create_shift_schedules_by_code(self):
         shift_schedules_data_2021 = [
             {
                 "code": "1",
                 "name": "График 1",
-                "year": 2021,
                 "days": [
                     {
                         "code": "1_2021-01-01",
@@ -156,12 +150,7 @@ class TestShiftScheduleViewSet(TestsHelperMixin, APITestCase):
         options = {
             "by_code": True,
             "return_response": True,
-            "delete_scope_fields_list": ["year"],
-            "delete_scope_values_list": [
-                {
-                    "year": 2021,
-                }
-            ],
+            "delete_scope_fields_list": ["code"],
         }
         data = {
             "data": shift_schedules_data_2021,
@@ -238,12 +227,7 @@ class TestShiftScheduleViewSet(TestsHelperMixin, APITestCase):
             content_type='application/json')
         resp_data = resp.json()
         self.assertDictEqual(resp_data['stats'], {
-            "ShiftScheduleDay": {
-                "deleted": 4
-            },
-            "ShiftSchedule": {
-                "deleted": 1
-            }
+            "ShiftSchedule": {}
         })
 
 
@@ -277,7 +261,6 @@ class TestShiftScheduleIntervalViewSet(TestsHelperMixin, APITestCase):
             {
                 "code": "1",
                 "name": "График 1",
-                "year": 2021,
                 "days": [
                     {
                         "code": "1_2021-01-01",
@@ -296,7 +279,6 @@ class TestShiftScheduleIntervalViewSet(TestsHelperMixin, APITestCase):
             {
                 "code": "2",
                 "name": "График 2",
-                "year": 2021,
                 "days": [
                     {
                         "code": "2_2021-01-01",
@@ -335,12 +317,7 @@ class TestShiftScheduleIntervalViewSet(TestsHelperMixin, APITestCase):
         shift_schedules_options = {
             "by_code": True,
             "return_response": True,
-            "delete_scope_fields_list": ["year"],
-            "delete_scope_values_list": [
-                {
-                    "year": 2021,
-                }
-            ],
+            "delete_scope_fields_list": ["code"],
         }
         data = {
             "data": shift_schedules_data_2021,
