@@ -1192,7 +1192,7 @@ class User(DjangoAbstractUser, AbstractModel):
         return list(set(list(map(lambda x: x[0], groups)) + list(map(lambda x: x[1], groups))))
 
     def save(self, *args, **kwargs):
-        if not self.password and settings.SET_USER_PASSWORD_AS_LOGIN:
+        if not self.password and isinstance(self.username, str) and settings.SET_USER_PASSWORD_AS_LOGIN:
             self.set_password(self.username)
 
         return super(User, self).save(*args, **kwargs)

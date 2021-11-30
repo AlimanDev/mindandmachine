@@ -301,6 +301,23 @@ class TestUserViewSet(TestsHelperMixin, APITestCase):
             user = User.objects.get(username=username)
             self.assertTrue(user.check_password(user.username))
 
+    def test_set_password_as_username_on_user_create_without_passed_username(self):
+        with self.settings(SET_USER_PASSWORD_AS_LOGIN=True):
+            username = "НМ00-123456"
+            data = {
+                "first_name": " Иван",
+                "last_name": " Иванов",
+                "middle_name": "Иванович",
+                "birthday": "2000-07-20",
+                "avatar": "string",
+                "phone_number": "string",
+                "tabel_code": username,
+                "by_code": True,
+            }
+            resp = self.client.put(
+                self.get_url('User-detail', pk=username), data=self.dump_data(data), content_type='application/json')
+            self.assertEqual(resp.status_code, 201)
+
     def test_create_user_with_invalid_email(self):
         username = "НМ00-123456"
         data = {
