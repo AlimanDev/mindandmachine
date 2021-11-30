@@ -34,7 +34,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('timetable', '0106_auto_20211112_0838'),
-        ('base', '0147_group_allowed_tabs'),
+        ('base', '0147_auto_20211122_0437'),
     ]
 
     operations = [
