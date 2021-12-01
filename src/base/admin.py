@@ -49,6 +49,9 @@ from src.base.models import (
     Employee,
     NetworkConnect,
     ApiLog,
+    ShiftSchedule,
+    ShiftScheduleDay,
+    ShiftScheduleInterval,
 )
 from src.timetable.models import GroupWorkerDayPermission
 
@@ -489,3 +492,30 @@ class ApiLogAdmin(admin.ModelAdmin):
     search_fields = ('url_kwargs',)
     raw_id_fields = ('user',)
     list_select_related = ('user',)
+
+
+@admin.register(ShiftSchedule)
+class ShiftScheduleAdmin(admin.ModelAdmin):
+    raw_id_fields = ('network', 'employee')
+    list_filter = ('employee', 'network',)
+    list_display = ('id', 'name', 'code', 'employee')
+    save_as = True
+
+
+@admin.register(ShiftScheduleDay)
+class ShiftScheduleDayAdmin(admin.ModelAdmin):
+    raw_id_fields = ('shift_schedule',)
+    list_filter = ('dt', 'shift_schedule', 'day_type')
+    list_display = ('id', 'shift_schedule', 'dt', 'code', 'day_type', 'work_hours')
+    save_as = True
+
+
+@admin.register(ShiftScheduleInterval)
+class ShiftScheduleIntervalAdmin(admin.ModelAdmin):
+    raw_id_fields = ('shift_schedule', 'employee')
+    list_filter = (
+        ('shift_schedule', RelatedOnlyDropdownNameOrderedFilter),
+        ('employee__user', RelatedOnlyDropdownLastNameOrderedFilter),
+    )
+    list_display = ('id', 'shift_schedule', 'employee', 'dt_start', 'dt_end', 'code',)
+    save_as = True

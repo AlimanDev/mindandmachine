@@ -332,8 +332,14 @@ class WorkerDayQuerySet(AnnotateValueEqualityQSMixin, QuerySet):
                 type_id=WorkerDay.TYPE_EMPTY,
             ))
         ).filter(
-            Q(is_fact=True, has_fact_approved_on_dt=True) |
-            Q(type__is_dayoff=True, is_fact=False, has_fact_approved_on_dt=False),
+            Q(
+                is_fact=True, has_fact_approved_on_dt=True,
+                dttm_work_start__isnull=False, dttm_work_end__isnull=False,
+                work_hours__gte=datetime.timedelta(0),
+            ) |
+            Q(
+                type__is_dayoff=True, is_fact=False, has_fact_approved_on_dt=False,
+            ),
             is_approved=True,
             *args,
             **kwargs,

@@ -463,6 +463,7 @@ class TestOutsource(TestsHelperMixin, APITestCase):
                     'trust_tick_request': False,
                     'show_cost_for_inner_vacancies': False,
                     'show_remaking_choice': False,
+                    'show_employee_shift_schedule_tab': False,
                     'shop_name_form': {
                         "singular": {
                             "I": "магазин",

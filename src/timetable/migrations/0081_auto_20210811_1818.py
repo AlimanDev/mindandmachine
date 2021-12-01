@@ -7,6 +7,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('timetable', '0080_remove_workerday_outsources'),
+        ('integration', '0005_auto_20210609_1900'),
     ]
 
     operations = [

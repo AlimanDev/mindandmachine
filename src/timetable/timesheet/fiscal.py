@@ -47,7 +47,7 @@ class TimesheetItem:
         return TimesheetItem(**kwargs)
 
     def subtract_hours(self, hours_to_subtract, fields=None):
-        assert self.total_hours > hours_to_subtract
+        assert self.total_hours >= hours_to_subtract
         hours_left_to_subtract = hours_to_subtract
         fields = fields or ['night_hours', 'day_hours']
         subtracted_item = self.copy(overrides=dict(
@@ -178,7 +178,6 @@ class FiscalTimesheet:
         self.wd_types_dict = wd_types_dict
         self.employee = employee
         self.active_employments = list(EmploymentModel.objects.get_active(
-            network_id=employee.user.network_id,
             dt_from=dt_from,
             dt_to=dt_to,
             employee=employee,

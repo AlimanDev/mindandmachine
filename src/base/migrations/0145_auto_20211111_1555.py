@@ -18,6 +18,6 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='sawhsettings',
             name='work_hours_by_months',
-            field=models.JSONField(verbose_name='Настройки по распределению часов в рамках уч. периода'),
+            field=models.JSONField(verbose_name='Настройки по распределению часов в рамках уч. периода', blank=True, default=dict),
         ),
     ]
