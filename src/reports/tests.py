@@ -316,8 +316,7 @@ class TestPivotTabelReportNotifications(TestsHelperMixin, APITestCase):
                 ]
             )
             self.assertEqual(emails, [self.user_dir.email, self.shop.email, self.user_urs.email])
-            data = open_workbook(file_contents=mail.outbox[0].attachments[0][1])
-            df = pd.read_excel(data, engine='xlrd')
+            df = pd.read_excel(mail.outbox[0].attachments[0][1])
             self.assertEquals(len(df.columns), 6 + monthrange(self.dt.year, self.dt.month)[1])
             self.assertEquals(len(df.values), 3)
             first_date = datetime.combine(self.dt - timedelta(1), time())
@@ -407,8 +406,7 @@ class TestReportsViewSet(TestsHelperMixin, APITestCase):
     def test_report_pivot_tabel_get(self):
         response = self.client.get(f'/rest_api/report/pivot_tabel/?dt_from={self.dt - timedelta(1)}&dt_to={self.dt}')
         self.assertEquals(response.status_code, 200)
-        data = open_workbook(file_contents=response.content)
-        df = pd.read_excel(data, engine='xlrd')
+        df = pd.read_excel(response.content)
         self.assertEquals(len(df.columns), 8)
         self.assertEquals(len(df.values), 3)
         self.assertEquals(list(df.iloc[0, 5:].values), [0.00, 10.75, 10.75])
@@ -641,15 +639,14 @@ class TestScheduleDeviation(APITestCase):
             dt=dt,
         )
         report = self.client.get(f'/rest_api/report/schedule_deviation/?dt_from={dt}&dt_to={dt+timedelta(1)}')
-        BytesIO = pd.io.common.BytesIO
-        data = pd.read_excel(BytesIO(report.content), engine='xlrd').fillna('')
+        data = pd.read_excel(report.content).fillna('')
         self.assertEquals(
-            list(data.iloc[9, :].values), 
+            list(data.iloc[10, :].values), 
             [1, 'Shop1', datetime.combine(dt, time(0, 0)), 'Васнецов Иван ', '-', '-', 'штат', 'Работа', 10,
             10.5, 4.5, 0.5, 1, 0.5, 1, 0, 0, 1, 2, 0, 0, 0, 0]
         )
         self.assertEquals(
-            list(data.iloc[10, :].values), 
+            list(data.iloc[11, :].values), 
             [2, 'Shop1', datetime.combine(dt, time(0, 0)), '-', '-', '-', '-', 'Грузчик', 8.75,
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8.75, 1]
         )

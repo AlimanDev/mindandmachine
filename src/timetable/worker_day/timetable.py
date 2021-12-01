@@ -208,7 +208,7 @@ class BaseUploadDownloadTimeTable:
                     if number_cond:
                         raise ValidationError(_('The employee with number {} does not exist in the current shop.').format(tabel_code))
                     else:
-                        raise ValidationError(_('The employee with the full name {} does not exist in the current shop.').format(data[name_cond]))
+                        raise ValidationError(_('The employee with the full name {} does not exist in the current shop.').format(data[name_column]))
                 
                 users.append([
                     employment.employee,

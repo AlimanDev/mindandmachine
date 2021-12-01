@@ -1,4 +1,4 @@
-ARG PYTHON_VERSION=3.6.13-slim-buster
+ARG PYTHON_VERSION=3.9.9-slim-buster
 
 FROM python:${PYTHON_VERSION} as python
 
@@ -22,6 +22,8 @@ RUN apt-get update && apt-get install --no-install-recommends -y \
   unixodbc-dev
 
 COPY ./requirements.txt .
+
+RUN pip install --upgrade pip
 
 # Create Python Dependency and Sub-Dependency Wheels.
 RUN --mount=type=cache,target=/root/.cache \
@@ -47,6 +49,7 @@ RUN apt-get update && apt-get install --no-install-recommends -y \
   libpq-dev \
   # Translations dependencies
   gettext \
+  libgeos-dev \
   # cleaning up unused files
   && apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false \
   && rm -rf /var/lib/apt/lists/*

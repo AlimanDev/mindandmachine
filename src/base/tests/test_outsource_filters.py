@@ -276,6 +276,8 @@ class TestOutsource(TestsHelperMixin, APITestCase):
             employee=self.employee1,
         )
         dt = date.today()
+        if dt.day >= 28:
+            dt = (dt + timedelta(5)).replace(day=1)
         WorkerDay.objects.create(
             employment=empl,
             employee=self.employee1,

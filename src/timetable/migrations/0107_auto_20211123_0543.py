@@ -32,7 +32,7 @@ def fix_attendance_records(apps, schema_editor):
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('timetable', '0106_auto_20211112_0838'),
+        ('timetable', '0108_auto_20211126_0857'),
     ]
 
     operations = [
