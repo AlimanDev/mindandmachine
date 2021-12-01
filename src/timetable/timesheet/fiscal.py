@@ -178,7 +178,6 @@ class FiscalTimesheet:
         self.wd_types_dict = wd_types_dict
         self.employee = employee
         self.active_employments = list(EmploymentModel.objects.get_active(
-            network_id=employee.user.network_id,
             dt_from=dt_from,
             dt_to=dt_to,
             employee=employee,
