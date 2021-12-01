@@ -8,13 +8,13 @@ from django_celery_beat.models import CrontabSchedule
 from rest_framework.test import APITestCase
 from xlrd import open_workbook
 
-from src.base.models import FunctionGroup
+from src.base.models import FunctionGroup, Network
 from src.base.tests.factories import EmployeeFactory, EmploymentFactory, GroupFactory, NetworkFactory, ShopFactory, \
     UserFactory
 from src.reports.models import ReportConfig, ReportType, Period
 from src.reports.reports import PIVOT_TABEL
 from src.reports.tasks import cron_report
-from src.timetable.models import PlanAndFactHours, WorkerDay
+from src.timetable.models import PlanAndFactHours, WorkerDay, WorkerDayOutsourceNetwork
 from src.timetable.tests.factories import WorkerDayFactory
 from src.util.mixins.tests import TestsHelperMixin
 from src.util.test import create_departments_and_users
@@ -640,6 +640,28 @@ class TestScheduleDeviation(APITestCase):
             dttm_work_end=datetime.combine(dt, time(18)),
             dt=dt,
         )
+        outsource_vacancy = WorkerDayFactory(
+            is_vacancy=True,
+            employee=None,
+            employment=None,
+            shop=self.shop,
+            is_approved=True,
+            type_id=WorkerDay.TYPE_WORKDAY,
+            is_fact=False,
+            cashbox_details__work_type__work_type_name__name='Грузчик',
+            dttm_work_start=datetime.combine(dt, time(8)),
+            dttm_work_end=datetime.combine(dt, time(18)),
+            dt=dt,
+        )
+        WorkerDayOutsourceNetwork.objects.bulk_create(
+            [
+                WorkerDayOutsourceNetwork(
+                    workerday=outsource_vacancy,
+                    network=Network.objects.create(name=name),
+                )
+                for name in ['Аутсорс сеть 1', 'Аутсорс сеть 2']
+            ]
+        )
         report = self.client.get(f'/rest_api/report/schedule_deviation/?dt_from={dt}&dt_to={dt+timedelta(1)}')
         BytesIO = pd.io.common.BytesIO
         data = pd.read_excel(BytesIO(report.content), engine='xlrd').fillna('')
@@ -650,6 +672,19 @@ class TestScheduleDeviation(APITestCase):
         )
         self.assertEquals(
             list(data.iloc[10, :].values), 
-            [2, 'Shop1', datetime.combine(dt, time(0, 0)), '-', '-', '-', '-', 'Грузчик', 8.75,
+            [2, 'Shop1', datetime.combine(dt, time(0, 0)), '-', '-', '-', 'штат', 'Грузчик', 8.75,
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8.75, 1]
         )
+        self.assertEquals(
+            list(data.iloc[11, :].values), 
+            [3, 'Shop1', datetime.combine(dt, time(0, 0)), '-', '-', 'Аутсорс сеть 1', 'не штат', 'Грузчик', 8.75,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8.75, 1]
+        )
+
+    def test_get_schedule_deviation_no_data(self):
+        dt = date.today()
+        report = self.client.get(f'/rest_api/report/schedule_deviation/?dt_from={dt}&dt_to={dt+timedelta(1)}')
+        self.assertEquals(report.status_code, 200)
+        BytesIO = pd.io.common.BytesIO
+        data = pd.read_excel(BytesIO(report.content), engine='xlrd').fillna('')
+        self.assertEquals(len(data), 9)

@@ -1,14 +1,25 @@
 from datetime import date
 import io
 import pandas as pd
-from django.db.models import Q, OuterRef, Subquery, CharField, F, FloatField, Value, IntegerField
+from django.db.models import (
+    Q, 
+    OuterRef, 
+    Subquery, 
+    CharField, 
+    F, 
+    FloatField, 
+    Value, 
+    IntegerField, 
+    ExpressionWrapper,
+    BooleanField,
+)
 from django.db.models.functions import Coalesce, Extract, Cast
 from django.http.response import HttpResponse
 from django.utils.encoding import escape_uri_path
 import xlsxwriter
 from src.base.models import Shop, User
 
-from src.timetable.models import PlanAndFactHours, WorkerDay, WorkerDayCashboxDetails
+from src.timetable.models import PlanAndFactHours, WorkerDay, WorkerDayCashboxDetails, WorkerDayOutsourceNetwork
 
 
 def schedule_deviation_report(dt_from, dt_to, *args, title=None, in_memory=False, created_by_id=None, shop_ids=None, **kwargs):
@@ -35,6 +46,13 @@ def schedule_deviation_report(dt_from, dt_to, *args, title=None, in_memory=False
         plan_work_hours=Coalesce(Cast(Extract(F('work_hours'), 'epoch') / 3600, FloatField()), 0, output_field=FloatField()),
         lost_work_hours=F('plan_work_hours'),
         lost_work_hours_count=Value(1, IntegerField()),
+        user_network=Subquery(
+            WorkerDayOutsourceNetwork.objects.filter(workerday_id=OuterRef('id')).values('network__name')[:1]
+        ),
+        is_outsource_allowed=ExpressionWrapper(
+            Q(user_network__isnull=False),
+            output_field=BooleanField(),
+        ),
     )
 
     if "work_type_name__in" in kwargs:
@@ -73,7 +91,31 @@ def schedule_deviation_report(dt_from, dt_to, *args, title=None, in_memory=False
                 'lost_work_hours',
                 'lost_work_hours_count',
             )
-        )
+        ),
+        columns=[
+            'dt',
+            'shop_name',
+            'worker_fio',
+            'tabel_code',
+            'user_network',
+            'is_outsource',
+            'work_type_name',
+            'plan_work_hours',
+            'fact_work_hours',
+            'fact_manual_work_hours',
+            'late_arrival_hours',
+            'late_arrival_count',
+            'early_arrival_hours',
+            'early_arrival_count',
+            'early_departure_hours',
+            'early_departure_count',
+            'late_departure_hours',
+            'late_departure_count',
+            'fact_without_plan_work_hours',
+            'fact_without_plan_count',
+            'lost_work_hours',
+            'lost_work_hours_count',
+        ],
     )
     unapplied_vacancies = list(
         unapplied_vacancies.values(
@@ -83,11 +125,13 @@ def schedule_deviation_report(dt_from, dt_to, *args, title=None, in_memory=False
             'plan_work_hours',
             'lost_work_hours',
             'lost_work_hours_count',
+            'user_network',
+            'is_outsource_allowed',
         )
     )
     if unapplied_vacancies:
         df = df.append(
-            unapplied_vacancies,
+            pd.DataFrame(unapplied_vacancies).rename({'is_outsource_allowed': 'is_outsource'}, axis=1),
             ignore_index=True,
         )
     
@@ -251,7 +295,7 @@ def schedule_deviation_report(dt_from, dt_to, *args, title=None, in_memory=False
         worksheet.write_string(11 + i, FIO, row.worker_fio, def_format)
         worksheet.write_string(11 + i, TABEL_CODE, row.tabel_code, def_format)
         worksheet.write_string(11 + i, NETWORK, row.user_network if row.is_outsource else '-', def_format)
-        worksheet.write_string(11 + i, IS_OUTSOURCE, '-' if pd.isna(row.is_outsource) else 'не штат' if row.is_outsource else 'штат', def_format)
+        worksheet.write_string(11 + i, IS_OUTSOURCE, 'не штат' if row.is_outsource else 'штат', def_format)
         worksheet.write_string(11 + i, WORK_TYPE, row.work_type_name, def_format)
         worksheet.write_number(11 + i, PLAN_HOURS, round(row.plan_work_hours, 2), def_format)
         worksheet.write_number(11 + i, FACT_HOURS, round(row.fact_work_hours, 2), def_format)
