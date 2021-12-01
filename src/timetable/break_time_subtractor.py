@@ -24,9 +24,9 @@ class HalfNightHalfDayBreakTimeSubtractor(BaseBreakTimeSubtractor):
             work_hours_day = round((self.day_seconds - break_time_half_seconds) / 3600, self.round_to)
             work_hours_night = round((self.night_seconds - break_time_half_seconds) / 3600, self.round_to)
         else:
-            substract_from_day_seconds = break_time_half_seconds - self.night_seconds
+            subtract_from_day_seconds = self.break_time_seconds - self.night_seconds
             work_hours_night = 0.0
-            work_hours_day = round((self.day_seconds - substract_from_day_seconds - break_time_half_seconds) / 3600,
+            work_hours_day = round((self.day_seconds - subtract_from_day_seconds) / 3600,
                                    self.round_to)
         return self._clean_work_hours(work_hours_day, work_hours_night)
 
@@ -37,9 +37,9 @@ class InPriorityFromNightBreakTimeSubtractor(BaseBreakTimeSubtractor):
             work_hours_day = round(self.day_seconds / 3600, self.round_to)
             work_hours_night = round((self.night_seconds - self.break_time_seconds) / 3600, self.round_to)
         else:
-            substract_from_day_seconds = self.break_time_seconds - self.night_seconds
+            subtract_from_day_seconds = self.break_time_seconds - self.night_seconds
             work_hours_night = 0.0
-            work_hours_day = round((self.day_seconds - substract_from_day_seconds) / 3600, self.round_to)
+            work_hours_day = round((self.day_seconds - subtract_from_day_seconds) / 3600, self.round_to)
         return self._clean_work_hours(work_hours_day, work_hours_night)
 
 
@@ -50,17 +50,17 @@ class InPriorityFromBiggerPartBreakTimeSubtractor(BaseBreakTimeSubtractor):
                 work_hours_day = round((self.day_seconds - self.break_time_seconds) / 3600, self.round_to)
                 work_hours_night = round(self.night_seconds / 3600, self.round_to)
             else:
-                substract_from_night_seconds = self.break_time_seconds - self.day_seconds
+                subtract_from_night_seconds = self.break_time_seconds - self.day_seconds
                 work_hours_day = 0.0
-                work_hours_night = round((self.night_seconds - substract_from_night_seconds) / 3600, self.round_to)
+                work_hours_night = round((self.night_seconds - subtract_from_night_seconds) / 3600, self.round_to)
         else:
             if self.night_seconds >= self.break_time_seconds:
                 work_hours_night = round((self.night_seconds - self.break_time_seconds) / 3600, self.round_to)
                 work_hours_day = round(self.day_seconds / 3600, self.round_to)
             else:
-                substract_from_day_seconds = self.break_time_seconds - self.night_seconds
+                subtract_from_day_seconds = self.break_time_seconds - self.night_seconds
                 work_hours_night = 0.0
-                work_hours_day = round((self.day_seconds - substract_from_day_seconds) / 3600, self.round_to)
+                work_hours_day = round((self.day_seconds - subtract_from_day_seconds) / 3600, self.round_to)
         return self._clean_work_hours(work_hours_day, work_hours_night)
 
 

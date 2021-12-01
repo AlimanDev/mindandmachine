@@ -29,6 +29,7 @@ class TestHalfNightHalfDayBreakTimeSubtractor(TestBreakTimeSubtractorMixin, Test
     def test_subtract(self):
         self._test_break_time_subtract(60*60, 60*60*12, 60*60*4, 7.5, 3.5)
         self._test_break_time_subtract(60*60, 60*60*12, 0, 11, 0)
+        self._test_break_time_subtract(60*60, 60*60*12, 60*5, 11, 0)
 
 
 class TestInPriorityFromBiggerPartBreakTimeSubtractor(TestBreakTimeSubtractorMixin, TestCase):
@@ -41,6 +42,7 @@ class TestInPriorityFromBiggerPartBreakTimeSubtractor(TestBreakTimeSubtractorMix
         self._test_break_time_subtract(60*60, 70*60, 30*60, 0, 10/60)
         self._test_break_time_subtract(60*60, 30*60, 0, 0, 0)
         self._test_break_time_subtract(60*60, 30*60, 30*60, 0, 0)
+        self._test_break_time_subtract(60*60, 60*60*12, 60*5, 10.92, 5/60)
 
 
 class TestInPriorityFromNightBreakTimeSubtractor(TestBreakTimeSubtractorMixin, TestCase):
@@ -51,3 +53,4 @@ class TestInPriorityFromNightBreakTimeSubtractor(TestBreakTimeSubtractorMixin, T
         self._test_break_time_subtract(60*60, 60*60*12, 60*60*8, 4, 7)
         self._test_break_time_subtract(60*60, 70*60, 10*60, 10/60, 0)
         self._test_break_time_subtract(60*60, 50*60, 0, 0, 0)
+        self._test_break_time_subtract(60*60, 60*60*12, 60*5, 11, 0)
