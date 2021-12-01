@@ -531,7 +531,8 @@ class TestSAWHSettingsQuarterAccPeriod(SawhSettingsHelperMixin, TestCase):
             expected_norm_hours=176,
         )
 
-        calc_timesheets(employee_id__in=[self.employee.id], dt_from=date(2021, 7, 1), dt_to=date(2021, 7, 31))
+        calc_timesheets(
+            employee_id__in=[self.employee.id], dt_from=date(2021, 7, 1), dt_to=date(2021, 7, 31), reraise_exc=True)
 
         timesheet_qs = TimesheetItem.objects.filter(
             employee=self.employee,
