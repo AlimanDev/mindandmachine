@@ -55,7 +55,7 @@ def create_view_sschedule_deviations(apps, schema_editor):
     shop_network.id <> user_network.id AS is_outsource
    FROM timetable_workerday wd
      LEFT JOIN base_shop s ON wd.shop_id = s.id
-     JOIN base_network shop_network ON shop_network.id = s.network_id
+     LEFT JOIN base_network shop_network ON shop_network.id = s.network_id
      JOIN base_employee employee ON wd.employee_id = employee.id
      JOIN base_user u ON employee.user_id = u.id
      JOIN base_network user_network ON user_network.id = u.network_id

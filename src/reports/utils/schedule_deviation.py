@@ -19,13 +19,20 @@ from django.utils.encoding import escape_uri_path
 import xlsxwriter
 from src.base.models import Employment, Shop, User
 
-from src.timetable.models import ScheduleDeviations, WorkerDay, WorkerDayCashboxDetails, WorkerDayOutsourceNetwork
+from src.timetable.models import (
+    ScheduleDeviations, 
+    WorkerDay, 
+    WorkerDayCashboxDetails, 
+    WorkerDayOutsourceNetwork,
+    WorkerDayType,
+)
 
 
 def schedule_deviation_report(dt_from, dt_to, *args, title=None, in_memory=False, created_by_id=None, shop_ids=None, **kwargs):
 
     shop_object = 'все'
     user_created = 'автоматически'
+    wd_types_dict = WorkerDayType.get_wd_types_dict()
 
     if created_by_id:
         user_created = User.objects.get(id=created_by_id).get_fio()
@@ -53,6 +60,7 @@ def schedule_deviation_report(dt_from, dt_to, *args, title=None, in_memory=False
             Q(user_network__isnull=False),
             output_field=BooleanField(),
         ),
+        wd_type_id=F('type_id'),
     )
 
     if "work_type_name__in" in kwargs:
@@ -61,7 +69,15 @@ def schedule_deviation_report(dt_from, dt_to, *args, title=None, in_memory=False
         unapplied_vacancies = unapplied_vacancies.filter(is_outsource=kwargs['is_outsource'])
 
     if shop_ids:
-        data = data.filter(Q(shop_id__in=shop_ids)|Q(employee_id__in=Employment.objects.get_active(dt_from, dt_to, shop_id__in=shop_ids).values_list('employee_id')))
+        data = data.filter(
+            Q(shop_id__in=shop_ids)|
+            (Q(employee_id__in=Employment.objects.get_active(
+                dt_from=dt_from,
+                dt_to=dt_to, 
+                shop_id__in=shop_ids,
+            ).values_list('employee_id'))&
+            Q(shop_id__isnull=True))
+        )
         unapplied_vacancies = unapplied_vacancies.filter(shop_id__in=shop_ids)
         shop_object = ', '.join(Shop.objects.filter(id__in=shop_ids).values_list('name', flat=True))
 
@@ -90,6 +106,7 @@ def schedule_deviation_report(dt_from, dt_to, *args, title=None, in_memory=False
                 'fact_without_plan_count',
                 'lost_work_hours',
                 'lost_work_hours_count',
+                'wd_type_id',
             )
         ),
         columns=[
@@ -115,6 +132,7 @@ def schedule_deviation_report(dt_from, dt_to, *args, title=None, in_memory=False
             'fact_without_plan_count',
             'lost_work_hours',
             'lost_work_hours_count',
+            'wd_type_id',
         ],
     )
     unapplied_vacancies = list(
@@ -127,6 +145,7 @@ def schedule_deviation_report(dt_from, dt_to, *args, title=None, in_memory=False
             'lost_work_hours_count',
             'user_network',
             'is_outsource_allowed',
+            'wd_type_id',
         )
     )
     if unapplied_vacancies:
@@ -164,6 +183,7 @@ def schedule_deviation_report(dt_from, dt_to, *args, title=None, in_memory=False
                 'worker_fio',
                 'tabel_code',
                 'user_network',
+                'shop_name',
             ],
             '-',
         ),
@@ -296,7 +316,7 @@ def schedule_deviation_report(dt_from, dt_to, *args, title=None, in_memory=False
         worksheet.write_string(11 + i, TABEL_CODE, row.tabel_code, def_format)
         worksheet.write_string(11 + i, NETWORK, row.user_network if row.is_outsource else '-', def_format)
         worksheet.write_string(11 + i, IS_OUTSOURCE, 'не штат' if row.is_outsource else 'штат', def_format)
-        worksheet.write_string(11 + i, WORK_TYPE, row.work_type_name, def_format)
+        worksheet.write_string(11 + i, WORK_TYPE, row.work_type_name or wd_types_dict[row.wd_type_id].name, def_format)
         worksheet.write_number(11 + i, PLAN_HOURS, round(row.plan_work_hours, 2), def_format)
         worksheet.write_number(11 + i, FACT_HOURS, round(row.fact_work_hours, 2), def_format)
         worksheet.write_number(11 + i, MANUAL_HOURS, round(row.fact_manual_work_hours, 2), def_format)
