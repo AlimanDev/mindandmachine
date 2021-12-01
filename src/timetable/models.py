@@ -2430,3 +2430,8 @@ class ProdCal(models.Model):
     class Meta:
         managed = False
         db_table = 'prod_cal'
+
+
+class ScheduleDeviations(PlanAndFactHours):
+    class Meta(PlanAndFactHours.Meta):
+        db_table = 'timetable_schedule_deviations'

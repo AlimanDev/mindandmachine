@@ -17,9 +17,9 @@ from django.db.models.functions import Coalesce, Extract, Cast
 from django.http.response import HttpResponse
 from django.utils.encoding import escape_uri_path
 import xlsxwriter
-from src.base.models import Shop, User
+from src.base.models import Employment, Shop, User
 
-from src.timetable.models import PlanAndFactHours, WorkerDay, WorkerDayCashboxDetails, WorkerDayOutsourceNetwork
+from src.timetable.models import ScheduleDeviations, WorkerDay, WorkerDayCashboxDetails, WorkerDayOutsourceNetwork
 
 
 def schedule_deviation_report(dt_from, dt_to, *args, title=None, in_memory=False, created_by_id=None, shop_ids=None, **kwargs):
@@ -33,7 +33,7 @@ def schedule_deviation_report(dt_from, dt_to, *args, title=None, in_memory=False
     if not title:
         title = f'Schedule_deviation_{dt_from}-{dt_to}.xlsx'
 
-    data = PlanAndFactHours.objects.filter(Q(fact_work_hours__gt=0) | Q(plan_work_hours__gt=0), dt__gte=dt_from, dt__lte=dt_to).filter(*args, **kwargs)
+    data = ScheduleDeviations.objects.filter(dt__gte=dt_from, dt__lte=dt_to).filter(*args, **kwargs)
     unapplied_vacancies = WorkerDay.objects.get_plan_approved(dt__gte=dt_from, dt__lte=dt_to, employee_id__isnull=True, type__is_dayoff=False).annotate(
         work_type_name=Coalesce(
             Subquery(
@@ -61,7 +61,7 @@ def schedule_deviation_report(dt_from, dt_to, *args, title=None, in_memory=False
         unapplied_vacancies = unapplied_vacancies.filter(is_outsource=kwargs['is_outsource'])
 
     if shop_ids:
-        data = data.filter(shop_id__in=shop_ids)
+        data = data.filter(Q(shop_id__in=shop_ids)|Q(employee_id__in=Employment.objects.get_active(dt_from, dt_to, shop_id__in=shop_ids).values_list('employee_id')))
         unapplied_vacancies = unapplied_vacancies.filter(shop_id__in=shop_ids)
         shop_object = ', '.join(Shop.objects.filter(id__in=shop_ids).values_list('name', flat=True))
 
