@@ -1,7 +1,8 @@
 from datetime import datetime, timedelta
 
 from django.db import transaction
-from django.db.models import Q, OuterRef, F, Exists, Prefetch
+from django.db.models import Q, OuterRef, F, Exists, Prefetch, DurationField
+from django.db.models.functions import Cast
 from django.db.utils import IntegrityError
 
 from src.timetable.models import WorkType, WorkerDay, AttendanceRecords, WorkerDayCashboxDetails
@@ -103,3 +104,27 @@ def fix_wrong_work_types(**kwargs):
         fields=['work_type'],
     )
     print(f'fixed {len(details_to_update)} work types')
+
+def fix_attendance_records():
+    WorkerDay.objects.annotate(
+        delta=Cast(
+            F('dttm_work_end') - F('dttm_work_start'), 
+            DurationField(),
+        )
+    ).filter(
+        type_id='W', 
+        delta__gte=timedelta(days=2),
+    ).update(
+        dttm_work_end=None,
+        dttm_work_end_tabel=None,
+        work_hours=timedelta(0),
+    )
+    records_to_fix = AttendanceRecords.objects.annotate(
+        delta=Cast(
+            F('dttm') - F('dt'), 
+            DurationField(),
+        ),
+    ).filter(delta__gte=timedelta(days=2))
+    for record in records_to_fix:
+        record.save()
+

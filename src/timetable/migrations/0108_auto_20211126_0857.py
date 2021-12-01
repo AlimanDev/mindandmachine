@@ -7,7 +7,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('timetable', '0106_auto_20211112_0838'),
+        ('timetable', '0107_auto_20211123_0543'),
     ]
 
     operations = [
