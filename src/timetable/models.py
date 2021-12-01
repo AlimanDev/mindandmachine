@@ -764,9 +764,10 @@ class WorkerDay(AbstractModel):
 
         break_time_seconds = total_seconds - work_seconds
 
-        break_time_subtractor_cls = break_time_subtractor_map.get(
-            self.shop.network.settings_values_prop.get(
-                'break_time_subtractor') if (self.shop_id and self.shop.network_id) else 'default')
+        break_time_subtractor_alias = None
+        if self.shop_id and self.shop.network_id:
+            break_time_subtractor_alias = self.shop.network.settings_values_prop.get('break_time_subtractor')
+        break_time_subtractor_cls = break_time_subtractor_map.get(break_time_subtractor_alias or 'default')
         break_time_subtractor = break_time_subtractor_cls(break_time_seconds, total_seconds, night_seconds)
         work_hours_day, work_hours_night = break_time_subtractor.calc()
         work_hours = work_hours_day + work_hours_night
