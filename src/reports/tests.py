@@ -114,7 +114,7 @@ class TestReportConfig(APITestCase):
         config.period.save()
         dates = config.get_dates()
         data = {
-            'dt_from': date.today() - relativedelta(months=3, days=1),
+            'dt_from': (date.today() - timedelta(1)) - relativedelta(months=3),
             'dt_to': date.today() - timedelta(1),
         }
         self.assertEquals(data, dates)
