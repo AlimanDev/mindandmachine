@@ -662,49 +662,6 @@ for schedule in CELERY_BEAT_SCHEDULE:
     CELERY_BEAT_SCHEDULE[schedule].pop('enabled', None)
 
 
-# if MDA_SYNC_DEPARTMENTS:
-#     CELERY_BEAT_SCHEDULE['task-sync-mda-data-all-time'] = {
-#         'task': 'src.integration.mda.tasks.sync_mda_data',
-#         'schedule': crontab(hour=1, minute=59),
-#         'options': {'queue': BACKEND_QUEUE},
-#         'kwargs': {'threshold_seconds': None},
-#     }
-#     CELERY_BEAT_SCHEDULE['task-sync-mda-data-last-changes'] = {
-#         'task': 'src.integration.mda.tasks.sync_mda_data',
-#         'schedule': crontab(minute=49),
-#         'options': {'queue': BACKEND_QUEUE},
-#         'kwargs': {'threshold_seconds': MDA_SYNC_DEPARTMENTS_THRESHOLD_SECONDS},
-#     }
-
-# if MDA_SYNC_USER_TO_SHOP_DAILY:
-#     CELERY_BEAT_SCHEDULE['task-sync-mda-user-to-shop-relation'] = {
-#         'task': 'src.integration.mda.tasks.sync_mda_user_to_shop_relation',
-#         'schedule': crontab(hour=1, minute=30),
-#         'options': {'queue': BACKEND_QUEUE}
-#     }
-
-# if ZKTECO_INTEGRATION:
-#     CELERY_BEAT_SCHEDULE['task-import-urv-zkteco'] = {
-#         'task': 'src.integration.tasks.import_urv_zkteco',
-#         'schedule': crontab(minute='*/5'),
-#         'options': {'queue': BACKEND_QUEUE}
-#     }
-#     CELERY_BEAT_SCHEDULE['task-export-workers-zkteco'] = {
-#         'task': 'src.integration.tasks.export_workers_zkteco',
-#         'schedule': crontab(minute=0),
-#         'options': {'queue': BACKEND_QUEUE}
-#     }
-#     CELERY_BEAT_SCHEDULE['task-delete-workers-zkteco'] = {
-#         'task': 'src.integration.tasks.delete_workers_zkteco',
-#         'schedule': crontab(minute=0),
-#         'options': {'queue': BACKEND_QUEUE}
-#     }
-#     CELERY_BEAT_SCHEDULE['task-sync-attendance-areas-zkteco'] = {
-#         'task': 'src.integration.tasks.sync_att_area_zkteco',
-#         'schedule': crontab(hour=0, minute=0),
-#         'options': {'queue': BACKEND_QUEUE}
-#     }
-
 if 'test' in sys.argv:
     # Disable migrations in test, fill the schema directly
     class MigrationDisabler(dict):
