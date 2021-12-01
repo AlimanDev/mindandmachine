@@ -619,10 +619,9 @@ BEAT_SCHEDULE = {
     },
     'task-sync-mda-data-last-changes': {
         'task': 'src.integration.mda.tasks.sync_mda_data',
-        'schedule': crontab(hour=1, minute=59),
+        'schedule': crontab(minute=49),
         'options': {'queue': BACKEND_QUEUE},
-        'kwargs': {'threshold_seconds': None},
-        'enabled': MDA_SYNC_DEPARTMENTS,
+        'kwargs': {'threshold_seconds': MDA_SYNC_DEPARTMENTS_THRESHOLD_SECONDS},
     },
     'task-sync-mda-user-to-shop-relation': {
         'task': 'src.integration.mda.tasks.sync_mda_user_to_shop_relation',
