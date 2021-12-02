@@ -3722,12 +3722,12 @@ class TestAttendanceRecords(TestsHelperMixin, APITestCase):
         self.assertEqual(attr.type, AttendanceRecords.TYPE_COMING)
 
     def test_calc_day_and_night_work_hours_when_night_hours_is_less_than_half_of_break_time(self):
-        self.worker_day_fact_approved.dttm_work_start = datetime.combine(self.dt, time(9, 32, 8))
-        self.worker_day_fact_approved.dttm_work_end = datetime.combine(self.dt, time(22, 5, 27))
+        self.worker_day_fact_approved.dttm_work_start = datetime.combine(self.dt, time(16))
+        self.worker_day_fact_approved.dttm_work_end = datetime.combine(self.dt, time(22, 15))
         self.worker_day_fact_approved.save()
         total, day, night = self.worker_day_fact_approved.calc_day_and_night_work_hours()
-        self.assertEqual(total, 11.4)
-        self.assertEqual(day, 11.4)
+        self.assertEqual(total, 5.25)
+        self.assertEqual(day, 5.25)
         self.assertEqual(night, 0.0)
 
     def test_two_facts_created_when_there_are_two_plans(self):

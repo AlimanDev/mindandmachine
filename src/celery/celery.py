@@ -36,11 +36,9 @@ app.autodiscover_tasks()
 @beat_init.connect
 def sync_periodic_tasks(**kwags):
     from django_celery_beat.models import PeriodicTask
-    enabled_tasks = settings.CELERY_BEAT_SCHEDULE
-    for task in PeriodicTask.objects.exclude(name='celery.backend_cleanup'):
-        if enabled_tasks.get(task.name) and not task.enabled:
-            task.enabled = True
-            task.save()
-        elif not enabled_tasks.get(task.name) and task.enabled:
-            task.enabled = False
+    tasks = settings.BEAT_SCHEDULE
+    for task in PeriodicTask.objects.all():
+        task_conf = tasks.get(task.name)
+        if task_conf and task_conf.get('enabled', True) != task.enabled:
+            task.enabled = task_conf.get('enabled', True)
             task.save()

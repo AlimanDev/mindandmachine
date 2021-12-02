@@ -458,12 +458,13 @@ class ShiftScheduleDivider(BaseTimesheetDivider):
                                 for item in items:
                                     self.fiscal_timesheet.additional_timesheet.add(dt=dt, timesheet_item=item)
                                 active_employment = self.fiscal_timesheet._get_active_employment(dt)
-                                self.fiscal_timesheet.main_timesheet.add(dt=dt, timesheet_item=TimesheetItem(
-                                    dt=dt,
-                                    shop=active_employment.shop,
-                                    position=active_employment.position,
-                                    day_type=shift_schedule_day_type_obj,
-                                ))
+                                if active_employment:
+                                    self.fiscal_timesheet.main_timesheet.add(dt=dt, timesheet_item=TimesheetItem(
+                                        dt=dt,
+                                        shop=active_employment.shop,
+                                        position=active_employment.position,
+                                        day_type=shift_schedule_day_type_obj,
+                                    ))
                             else:
                                 hours_to_subtract = main_ts_hours - shift_schedule_hours
                                 items = self.fiscal_timesheet.main_timesheet.subtract_hours(dt=dt, hours_to_subtract=hours_to_subtract)
@@ -471,12 +472,13 @@ class ShiftScheduleDivider(BaseTimesheetDivider):
                                     self.fiscal_timesheet.additional_timesheet.add(dt=dt, timesheet_item=item)
             else:
                 active_employment = self.fiscal_timesheet._get_active_employment(dt)
-                self.fiscal_timesheet.main_timesheet.add(dt=dt, timesheet_item=TimesheetItem(
-                    dt=dt,
-                    shop=active_employment.shop,
-                    position=active_employment.position,
-                    day_type=self.fiscal_timesheet.wd_types_dict.get(WorkerDay.TYPE_HOLIDAY),
-                ))
+                if active_employment:
+                    self.fiscal_timesheet.main_timesheet.add(dt=dt, timesheet_item=TimesheetItem(
+                        dt=dt,
+                        shop=active_employment.shop,
+                        position=active_employment.position,
+                        day_type=self.fiscal_timesheet.wd_types_dict.get(WorkerDay.TYPE_HOLIDAY),
+                    ))
 
     def divide(self):
         logger.info(f'start shift_schedule fiscal sheet divide')

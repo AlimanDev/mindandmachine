@@ -11,7 +11,6 @@ from django.db import transaction
 from django.db.models import (
     Subquery, OuterRef, Max, Q, Case, When, Value, FloatField, F, IntegerField, Exists, BooleanField, Min, Count
 )
-from django.db.models import UniqueConstraint
 from django.db.models.fields import PositiveSmallIntegerField
 from django.db.models.functions import Abs, Cast, Extract, Least
 from django.db.models.query import QuerySet
@@ -26,6 +25,7 @@ from src.base.models_abstract import AbstractModel, AbstractActiveModel, Abstrac
 from src.events.signals import event_signal
 from src.recognition.events import EMPLOYEE_WORKING_NOT_ACCORDING_TO_PLAN
 from src.tasks.models import Task
+from src.timetable.break_time_subtractor import break_time_subtractor_map
 from src.timetable.exceptions import (
     WorkTimeOverlap,
     WorkDayTaskViolation,
@@ -769,16 +769,12 @@ class WorkerDay(AbstractModel):
 
         break_time_seconds = total_seconds - work_seconds
 
-        break_time_half_seconds = break_time_seconds / 2
-        if night_seconds > break_time_half_seconds:
-            work_hours_day = round(
-                (total_seconds - night_seconds - break_time_half_seconds) / 3600, 2)
-            work_hours_night = round((night_seconds - break_time_half_seconds) / 3600, 2)
-        else:
-            substract_from_day_seconds = break_time_half_seconds - night_seconds
-            work_hours_night = 0.0
-            work_hours_day = round(
-                (total_seconds - substract_from_day_seconds - break_time_half_seconds) / 3600, 2)
+        break_time_subtractor_alias = None
+        if self.shop_id and self.shop.network_id:
+            break_time_subtractor_alias = self.shop.network.settings_values_prop.get('break_time_subtractor')
+        break_time_subtractor_cls = break_time_subtractor_map.get(break_time_subtractor_alias or 'default')
+        break_time_subtractor = break_time_subtractor_cls(break_time_seconds, total_seconds, night_seconds)
+        work_hours_day, work_hours_night = break_time_subtractor.calc()
         work_hours = work_hours_day + work_hours_night
         return work_hours, work_hours_day, work_hours_night
 
