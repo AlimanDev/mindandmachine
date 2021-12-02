@@ -33,10 +33,11 @@ def calc_timesheets(employee_id__in: list = None, dt_from=None, dt_to=None, rera
             )
         ).distinct()
 
-    qs = qs.annotate(
-        dt_hired=Min('employments__dt_hired'),
-        dt_fired=Max('employments__dt_fired'),
-    )
+    # TODO: переделать
+    # qs = qs.annotate(
+    #     dt_hired=Min('employments__dt_hired'),
+    #     dt_fired=Max('employments__dt_fired'),
+    # )
     wd_types_dict = WorkerDayType.get_wd_types_dict()
     for employee in qs:
         try:

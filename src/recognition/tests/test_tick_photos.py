@@ -16,6 +16,17 @@ class TestTickPhotos(TestsHelperMixin, APITestCase):
     @classmethod
     def setUpTestData(cls):
         cls.create_departments_and_users()
+        cls.network.set_settings_value(
+            'shop_name_form', 
+            {
+                'singular': {
+                    'I': 'подразделение',
+                    'R': 'подразделения',
+                    'P': 'подразделении',
+                }
+            }
+        )
+        cls.network.save()
         UserConnecter.objects.create(user=cls.user1, partner_id=1)
         cls.user1.avatar = 'photo/1'
         cls.user1.save()

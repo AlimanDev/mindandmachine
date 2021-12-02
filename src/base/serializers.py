@@ -50,6 +50,7 @@ class NetworkSerializer(serializers.ModelSerializer):
     unaccounted_overtime_threshold = serializers.SerializerMethodField()
     show_remaking_choice = serializers.SerializerMethodField()
     shop_name_form = serializers.SerializerMethodField()
+    show_employee_shift_schedule_tab = serializers.SerializerMethodField()
 
     def get_default_stats(self, obj: Network):
         default_stats = json.loads(obj.settings_values).get('default_stats', {})
@@ -97,6 +98,9 @@ class NetworkSerializer(serializers.ModelSerializer):
             return obj.logo.url
         return None
 
+    def get_show_employee_shift_schedule_tab(self, obj:Network):
+        return obj.settings_values_prop.get('show_employee_shift_schedule_tab', False)
+
     class Meta:
         model = Network
         fields = [
@@ -122,11 +126,15 @@ class NetworkSerializer(serializers.ModelSerializer):
             'allow_creation_several_wdays_for_one_employee_for_one_date',
             'shop_name_form',
             'get_position_from_work_type_name_in_calc_timesheet',
+            'trust_tick_request',
+            'show_cost_for_inner_vacancies',
+            'show_employee_shift_schedule_tab',
         ]
 
 class NetworkListSerializer(serializers.Serializer):
     id = serializers.IntegerField()
     name = serializers.CharField()
+
 
 class NetworkWithOutsourcingsAndClientsSerializer(NetworkSerializer):
     outsourcings = OutsourceClientNetworkSerializer(many=True)
@@ -234,9 +242,17 @@ class EmployeeSerializer(BaseNetworkSerializer):
 class AuthUserSerializer(UserSerializer):
     network = NetworkWithOutsourcingsAndClientsSerializer()
     shop_id = serializers.CharField(default=UserworkShop())
+    allowed_tabs = serializers.SerializerMethodField()
+
+    def get_allowed_tabs(self, obj: User):
+        allowed_tabs = []
+        for group in Group.objects.filter(id__in=obj.get_group_ids()):
+            allowed_tabs.extend(group.allowed_tabs)
+
+        return list(set(allowed_tabs))
 
     class Meta(UserSerializer.Meta):
-        fields = UserSerializer.Meta.fields + ['network', 'shop_id']
+        fields = UserSerializer.Meta.fields + ['network', 'shop_id', 'allowed_tabs']
 
 
 class PasswordSerializer(serializers.Serializer):
@@ -625,3 +641,9 @@ class ShopScheduleSerializer(serializers.ModelSerializer):
                 'read_only': True,
             },
         }
+
+
+class EmployeeShiftScheduleQueryParamsSerializer(serializers.Serializer):
+    employee_id = serializers.IntegerField()
+    dt__gte = serializers.DateField()
+    dt__lte = serializers.DateField()

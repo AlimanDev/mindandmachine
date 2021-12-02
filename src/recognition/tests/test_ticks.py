@@ -9,7 +9,6 @@ from src.timetable.models import WorkerDay, AttendanceRecords
 from datetime import date, timedelta, datetime, time
 
 
-@override_settings(TRUST_TICK_REQUEST=True)
 class TestTicksViewSet(TestsHelperMixin, APITestCase):
     @classmethod
     def setUpTestData(cls):
@@ -25,6 +24,8 @@ class TestTicksViewSet(TestsHelperMixin, APITestCase):
             dttm_work_start=datetime.combine(date.today(), time(10)),
             dttm_work_end=datetime.combine(date.today(), time(20)),
         )
+        cls.network.trust_tick_request = True
+        cls.network.save()
 
     def setUp(self):
         self._set_authorization_token(self.user2.username)

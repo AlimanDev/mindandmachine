@@ -11,7 +11,6 @@ from django.db import transaction
 from django.db.models import (
     Subquery, OuterRef, Max, Q, Case, When, Value, FloatField, F, IntegerField, Exists, BooleanField, Min, Count
 )
-from django.db.models import UniqueConstraint
 from django.db.models.fields import PositiveSmallIntegerField
 from django.db.models.functions import Abs, Cast, Extract, Least
 from django.db.models.query import QuerySet
@@ -26,6 +25,7 @@ from src.base.models_abstract import AbstractModel, AbstractActiveModel, Abstrac
 from src.events.signals import event_signal
 from src.recognition.events import EMPLOYEE_WORKING_NOT_ACCORDING_TO_PLAN
 from src.tasks.models import Task
+from src.timetable.break_time_subtractor import break_time_subtractor_map
 from src.timetable.exceptions import (
     WorkTimeOverlap,
     WorkDayTaskViolation,
@@ -104,6 +104,7 @@ class WorkType(AbstractActiveModel):
     work_type_name = models.ForeignKey(WorkTypeName, on_delete=models.PROTECT, related_name='work_types')
     min_workers_amount = models.IntegerField(default=0, blank=True, null=True)
     max_workers_amount = models.IntegerField(default=20, blank=True, null=True)
+    preliminary_cost_per_hour = models.DecimalField('Предварительная стоимость работ за час', max_digits=6, decimal_places=2, default=Decimal("0.00"))
 
     probability = models.FloatField(default=1.0)
     prior_weight = models.FloatField(default=1.0)
@@ -331,8 +332,14 @@ class WorkerDayQuerySet(AnnotateValueEqualityQSMixin, QuerySet):
                 type_id=WorkerDay.TYPE_EMPTY,
             ))
         ).filter(
-            Q(is_fact=True, has_fact_approved_on_dt=True) |
-            Q(type__is_dayoff=True, is_fact=False, has_fact_approved_on_dt=False),
+            Q(
+                is_fact=True, has_fact_approved_on_dt=True,
+                dttm_work_start__isnull=False, dttm_work_end__isnull=False,
+                work_hours__gte=datetime.timedelta(0),
+            ) |
+            Q(
+                type__is_dayoff=True, is_fact=False, has_fact_approved_on_dt=False,
+            ),
             is_approved=True,
             *args,
             **kwargs,
@@ -758,16 +765,12 @@ class WorkerDay(AbstractModel):
 
         break_time_seconds = total_seconds - work_seconds
 
-        break_time_half_seconds = break_time_seconds / 2
-        if night_seconds > break_time_half_seconds:
-            work_hours_day = round(
-                (total_seconds - night_seconds - break_time_half_seconds) / 3600, 2)
-            work_hours_night = round((night_seconds - break_time_half_seconds) / 3600, 2)
-        else:
-            substract_from_day_seconds = break_time_half_seconds - night_seconds
-            work_hours_night = 0.0
-            work_hours_day = round(
-                (total_seconds - substract_from_day_seconds - break_time_half_seconds) / 3600, 2)
+        break_time_subtractor_alias = None
+        if self.shop_id and self.shop.network_id:
+            break_time_subtractor_alias = self.shop.network.settings_values_prop.get('break_time_subtractor')
+        break_time_subtractor_cls = break_time_subtractor_map.get(break_time_subtractor_alias or 'default')
+        break_time_subtractor = break_time_subtractor_cls(break_time_seconds, total_seconds, night_seconds)
+        work_hours_day, work_hours_night = break_time_subtractor.calc()
         work_hours = work_hours_day + work_hours_night
         return work_hours, work_hours_day, work_hours_night
 
@@ -959,11 +962,16 @@ class WorkerDay(AbstractModel):
         help_text='Используется в факте (и в черновике и подтв. версии) для связи с планом подтвержденным')
 
     source = PositiveSmallIntegerField('Источник создания', choices=SOURCES, default=SOURCE_FAST_EDITOR)
+    cost_per_hour = models.DecimalField('Стоимость работ за час', max_digits=6, decimal_places=2, default=Decimal("0.00"))
 
     objects = WorkerDayManager.from_queryset(WorkerDayQuerySet)()  # исключает раб. дни у которых employment_id is null
     objects_with_excluded = models.Manager.from_queryset(WorkerDayQuerySet)()
 
     tracker = FieldTracker(fields=('work_hours',))
+
+    @property
+    def total_cost(self):
+        return self.rounded_work_hours * float(self.cost_per_hour)
 
     @property
     def rounded_work_hours(self):

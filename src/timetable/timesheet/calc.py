@@ -263,8 +263,8 @@ class TimesheetCalculator:
             f'start timesheet calc for employee with id={self.employee.id} tabel_code={self.employee.tabel_code}')
 
         periods = _get_calc_periods(
-            dt_hired=getattr(self.employee, 'dt_hired', None),
-            dt_fired=getattr(self.employee, 'dt_fired', None),
+            # dt_hired=getattr(self.employee, 'dt_hired', None),
+            # dt_fired=getattr(self.employee, 'dt_fired', None),
             dt_from=self.dt_from,
             dt_to=self.dt_to,
         )

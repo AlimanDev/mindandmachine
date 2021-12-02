@@ -220,6 +220,10 @@ def urv_violators_report_xlsx(network_id=None, dt_from=None, dt_to=None, title=N
     FIO = 4
     REASON = 5
     shop_filter = {}
+    shop_name_form = {}
+    if network_id:
+        network = Network.objects.get(id=network_id)
+        shop_name_form = network.settings_values_prop.get('shop_name_form', {})
     if shop_ids:
         shop_filter['id__in'] = shop_ids
     shops = { 
@@ -266,8 +270,8 @@ def urv_violators_report_xlsx(network_id=None, dt_from=None, dt_to=None, title=N
         'valign': 'vcenter',
         'align': 'center',
     })
-    worksheet.write_string(0, SHOP_CODE, 'Код объекта', header_format)
-    worksheet.write_string(0, SHOP, 'Название объекта', header_format)
+    worksheet.write_string(0, SHOP_CODE, f"Код {shop_name_form.get('singular', {}).get('R', 'магазина')}", header_format)
+    worksheet.write_string(0, SHOP, f"Название {shop_name_form.get('singular', {}).get('R', 'магазина')}", header_format)
     worksheet.write_string(0, TABEL_CODE, 'Табельный номер', header_format)
     worksheet.write_string(0, FIO, 'ФИО', header_format)
     worksheet.write_string(0, DATE, 'Дата', header_format)
@@ -320,6 +324,10 @@ def urv_violators_report_xlsx_v2(network_id, dt_from=None, dt_to=None, title=Non
             id__in=data.keys(),
         )
     }
+    shop_name_form = {}
+    if network_id:
+        network = Network.objects.get(id=network_id)
+        shop_name_form = network.settings_values_prop.get('shop_name_form', {})
 
     if in_memory:
         output = io.BytesIO()
@@ -364,7 +372,7 @@ def urv_violators_report_xlsx_v2(network_id, dt_from=None, dt_to=None, title=Non
         'valign': 'vcenter',
         'align': 'center',
     }
-    worksheet.write_string(0, SHOP_CODE, 'Код магазина', workbook.add_format(header_format))
+    worksheet.write_string(0, SHOP_CODE, f"Код {shop_name_form.get('singular', {}).get('R', 'магазина')}", workbook.add_format(header_format))
     worksheet.write_string(0, SHOP, 'Магазин', workbook.add_format(header_format))
     worksheet.write_string(0, TABEL_CODE, 'Табельный номер', workbook.add_format(header_format))
     worksheet.write_string(0, FIO, 'ФИО', workbook.add_format(header_format))
