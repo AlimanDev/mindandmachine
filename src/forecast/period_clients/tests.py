@@ -668,7 +668,8 @@ class TestDemand(APITestCase):
         )
         response = self.client.get(
             f'{self.url}download/?dt_from={dt_from}&dt_to={dt_to}&shop_id={self.shop2.id}')
-        tabel = pandas.read_excel(io.BytesIO(response.content))
+        tabel = pandas.read_excel(response.content)
+        tabel.dttm = tabel.dttm.dt.round('s')
         self.assertEquals(response.status_code, 200)
         self.assertCountEqual(list(tabel.columns), ['dttm', 'Кассы'])
         self.assertEquals(tabel[tabel.columns[0]][0], datetime(2019, 5, 30))

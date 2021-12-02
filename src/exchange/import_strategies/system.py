@@ -31,7 +31,7 @@ class ImportShopMappingStrategy(BaseSystemImportStrategy):
 
     def _read_file_to_df(self, f):
         if self.file_format == 'xlsx':
-            return pd.read_excel(f, engine='xlrd')
+            return pd.read_excel(f)
         elif self.file_format == 'csv':
             return pd.read_csv(f)
 

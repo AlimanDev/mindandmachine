@@ -316,8 +316,7 @@ class TestPivotTabelReportNotifications(TestsHelperMixin, APITestCase):
                 ]
             )
             self.assertEqual(emails, [self.user_dir.email, self.shop.email, self.user_urs.email])
-            data = open_workbook(file_contents=mail.outbox[0].attachments[0][1])
-            df = pd.read_excel(data, engine='xlrd')
+            df = pd.read_excel(mail.outbox[0].attachments[0][1])
             self.assertEquals(len(df.columns), 6 + monthrange(self.dt.year, self.dt.month)[1])
             self.assertEquals(len(df.values), 3)
             first_date = datetime.combine(self.dt - timedelta(1), time())
@@ -407,8 +406,7 @@ class TestReportsViewSet(TestsHelperMixin, APITestCase):
     def test_report_pivot_tabel_get(self):
         response = self.client.get(f'/rest_api/report/pivot_tabel/?dt_from={self.dt - timedelta(1)}&dt_to={self.dt}')
         self.assertEquals(response.status_code, 200)
-        data = open_workbook(file_contents=response.content)
-        df = pd.read_excel(data, engine='xlrd')
+        df = pd.read_excel(response.content)
         self.assertEquals(len(df.columns), 8)
         self.assertEquals(len(df.values), 3)
         self.assertEquals(list(df.iloc[0, 5:].values), [0.00, 10.75, 10.75])
@@ -663,20 +661,19 @@ class TestScheduleDeviation(APITestCase):
             ]
         )
         report = self.client.get(f'/rest_api/report/schedule_deviation/?dt_from={dt}&dt_to={dt+timedelta(1)}')
-        BytesIO = pd.io.common.BytesIO
-        data = pd.read_excel(BytesIO(report.content), engine='xlrd').fillna('')
+        data = pd.read_excel(report.content).fillna('')
         self.assertEquals(
-            list(data.iloc[9, :].values), 
+            list(data.iloc[10, :].values), 
             [1, 'Shop1', datetime.combine(dt, time(0, 0)), 'Васнецов Иван ', '-', '-', 'штат', 'Работа', 10,
             10.5, 4.5, 0.5, 1, 0.5, 1, 0, 0, 1, 2, 0, 0, 0, 0]
         )
         self.assertEquals(
-            list(data.iloc[10, :].values), 
+            list(data.iloc[11, :].values), 
             [2, 'Shop1', datetime.combine(dt, time(0, 0)), '-', '-', '-', 'штат', 'Грузчик', 8.75,
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8.75, 1]
         )
         self.assertEquals(
-            list(data.iloc[11, :].values), 
+            list(data.iloc[12, :].values), 
             [3, 'Shop1', datetime.combine(dt, time(0, 0)), '-', '-', 'Аутсорс сеть 1', 'не штат', 'Грузчик', 8.75,
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8.75, 1]
         )
@@ -685,9 +682,8 @@ class TestScheduleDeviation(APITestCase):
         dt = date.today()
         report = self.client.get(f'/rest_api/report/schedule_deviation/?dt_from={dt}&dt_to={dt+timedelta(1)}')
         self.assertEquals(report.status_code, 200)
-        BytesIO = pd.io.common.BytesIO
-        data = pd.read_excel(BytesIO(report.content), engine='xlrd').fillna('')
-        self.assertEquals(len(data), 9)
+        data = pd.read_excel(report.content).fillna('')
+        self.assertEquals(len(data), 10)
 
     def test_get_schedule_deviation_different_worker_day_types(self):
         dt_from = date.today()
@@ -716,11 +712,10 @@ class TestScheduleDeviation(APITestCase):
             )
         
         report = self.client.get(f'/rest_api/report/schedule_deviation/?dt_from={dt_from}&dt_to={dt_to}')
-        BytesIO = pd.io.common.BytesIO
-        data = pd.read_excel(BytesIO(report.content), engine='xlrd').fillna('')
+        data = pd.read_excel(report.content).fillna('')
         for i, wd_type in enumerate(WorkerDayType.objects.all()):
             self.assertEquals(
-                list(data.iloc[9 + i, [0, 1, 2, 3, 5, 6, 7]].values), 
+                list(data.iloc[10 + i, [0, 1, 2, 3, 5, 6, 7]].values), 
                 [i + 1, 'Shop1' if wd_type.is_work_hours else '-', datetime.combine(dt_from + timedelta(i), time(0, 0)), 
                 'Васнецов Иван ', '-', 'штат', 'Работа' if wd_type.code == WorkerDay.TYPE_WORKDAY else wd_type.name]
             )

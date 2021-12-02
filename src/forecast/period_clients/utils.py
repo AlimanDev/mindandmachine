@@ -45,7 +45,7 @@ def upload_demand_util_v1(df, shop_id, lang):
         if not operation_type:
             raise ValidationError(_('There is no such work type or it is not associated with the operation type {work_type}.').format(work_type=work_type))
         work_type_df = df[df['Тип работ'] == work_type]
-        dttms = list(work_type_df['Время'])
+        dttms = list(pd.to_datetime(work_type_df['Время']).dt.round('s'))
         period_clients_to_delete_ids += list(PeriodClients.objects.filter(
             operation_type__shop_id=shop_id,
             operation_type__operation_type_name__name=work_type,
@@ -69,6 +69,7 @@ def upload_demand_util_v1(df, shop_id, lang):
 
 
 def upload_demand_util_v2(new_workload, shop_id, type=PeriodClients.LONG_FORECASE_TYPE):
+    new_workload.dttm = new_workload.dttm.dt.round('s')
     dttm_min = new_workload.dttm.min()
     dttm_max = new_workload.dttm.max()
     op_types = {
@@ -115,7 +116,7 @@ def upload_demand(demand_file, shop_id=None, type=PeriodClients.LONG_FORECASE_TY
     with transaction.atomic():
         operation_types = list(set(df.columns) - {'dttm', 'shop_code'})
         df[operation_types] = df[operation_types].astype(float)
-        df.loc[:, 'dttm'] = pd.to_datetime(df.dttm)
+        df.loc[:, 'dttm'] = pd.to_datetime(df.dttm).dt.round('s')
         if 'shop_code' in df.columns:
             shops = Shop.objects.filter(code__in=df.shop_code.unique())
             for s in shops:
@@ -138,7 +139,7 @@ def upload_demand_util_v3(operation_type_name, demand_file, index_col=None, type
     DTTM_COL = df.columns[1]
     VALUE_COL = df.columns[2]
     df[VALUE_COL] = df[VALUE_COL].astype(float)
-    df[DTTM_COL] = pd.to_datetime(df[DTTM_COL])
+    df[DTTM_COL] = pd.to_datetime(df[DTTM_COL]).dt.round('s')
     with transaction.atomic():
         shops = df[SHOP_COL].unique()
         shops = Shop.objects.filter(code__in=shops)

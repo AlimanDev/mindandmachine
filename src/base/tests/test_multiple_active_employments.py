@@ -1020,20 +1020,17 @@ class TestEmployeeAPI(MultipleActiveEmploymentsSupportMixin, APITestCase):
         self.client.force_authenticate(user=self.user1)
         self.add_group_perm(self.group1, 'AttendanceRecords_report', 'GET')
         resp = self.client.get(self.get_url('AttendanceRecords-report'))
-        BytesIO = pd.io.common.BytesIO
-        df = pd.read_excel(BytesIO(resp.content), engine='xlrd')
+        df = pd.read_excel(resp.content)
         self.assertEqual(len(df.index), 4)
 
         resp = self.client.get(
             self.get_url('AttendanceRecords-report'), data={'employee_id__in': [self.employee1_1.id]})
-        BytesIO = pd.io.common.BytesIO
-        df = pd.read_excel(BytesIO(resp.content), engine='xlrd')
+        df = pd.read_excel(resp.content)
         self.assertEqual(len(df.index), 2)
 
         resp = self.client.get(
             self.get_url('AttendanceRecords-report'), data={'shop_id__in': [self.shop1.id]})
-        BytesIO = pd.io.common.BytesIO
-        df = pd.read_excel(BytesIO(resp.content), engine='xlrd')
+        df = pd.read_excel(resp.content)
         self.assertEqual(len(df.index), 2)
 
         resp = self.client.get(
@@ -1042,8 +1039,7 @@ class TestEmployeeAPI(MultipleActiveEmploymentsSupportMixin, APITestCase):
                 'shop_id__in': [self.shop1.id],
                 'employee_id__in': [self.employee2_1.id]
             })
-        BytesIO = pd.io.common.BytesIO
-        df = pd.read_excel(BytesIO(resp.content), engine='xlrd')
+        df = pd.read_excel(resp.content)
         self.assertEqual(len(df.index), 0)
 
     def test_other_deps_employees_with_wd_in_curr_shop_parameter(self):

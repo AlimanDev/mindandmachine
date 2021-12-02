@@ -99,7 +99,8 @@ class TestGenerateTabel(TestsHelperMixin, TestCase):
 
     def setUp(self) -> None:
         self.outsource_network.refresh_from_db()
-        self.second_empl.refresh_from_db()
+        self.second_empl.dt_fired = None
+        self.second_empl.save()
         self.outsource_employment.refresh_from_db()
 
     def test_generate_mts_tabel(self):

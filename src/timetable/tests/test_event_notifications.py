@@ -301,8 +301,7 @@ class TestSendUnaccountedReport(TestsHelperMixin, APITestCase):
                 ]
             )
             self.assertEqual(emails, [self.user_dir.email, self.shop.email, self.user_urs.email])
-            data = open_workbook(file_contents=mail.outbox[0].attachments[0][1])
-            df = pd.read_excel(data, engine='xlrd').fillna('')
+            df = pd.read_excel(mail.outbox[0].attachments[0][1]).fillna('')
             data = [
                 {
                     'Дата': self.dt.strftime('%d.%m.%Y'), 
@@ -364,8 +363,7 @@ class TestSendUnaccountedReport(TestsHelperMixin, APITestCase):
             self.assertEqual(len(mail.outbox), 1)
             self.assertEqual(mail.outbox[0].subject, subject)
             self.assertEqual(mail.outbox[0].to[0], self.user_dir.email)
-            data = open_workbook(file_contents=mail.outbox[0].attachments[0][1])
-            df = pd.read_excel(data, engine='xlrd').fillna('')
+            df = pd.read_excel(mail.outbox[0].attachments[0][1]).fillna('')
             data = [
                 {
                     'Дата': self.dt.strftime('%d.%m.%Y'), 
@@ -428,10 +426,8 @@ class TestSendUnaccountedReport(TestsHelperMixin, APITestCase):
                 for outbox in mail.outbox
             }
             self.assertCountEqual(list(mails_by_emails.keys()), [user_urs.email, self.user_urs.email])
-            data1 = open_workbook(file_contents=mails_by_emails[user_urs.email].attachments[0][1])
-            data2 = open_workbook(file_contents=mails_by_emails[self.user_urs.email].attachments[0][1])
-            df1 = pd.read_excel(data1, engine='xlrd').fillna('')
-            df2 = pd.read_excel(data2, engine='xlrd').fillna('')
+            df1 = pd.read_excel(mails_by_emails[user_urs.email].attachments[0][1]).fillna('')
+            df2 = pd.read_excel(mails_by_emails[self.user_urs.email].attachments[0][1]).fillna('')
             self.assertNotEquals(df1.to_dict('records'), df2.to_dict('records'))
             data1 = [
                 {
@@ -576,8 +572,7 @@ class TestOvertimesUndertimesReport(TestsHelperMixin, APITestCase):
                 ]
             )
             self.assertEqual(emails, [self.user_dir.email, self.shop.email, self.user_urs.email])
-            data = open_workbook(file_contents=mail.outbox[0].attachments[0][1])
-            df = pd.read_excel(data, engine='xlrd').fillna('')
+            df = pd.read_excel(mail.outbox[0].attachments[0][1]).fillna('')
             self.assertEqual(len(df.to_dict('records')), 11)
 
 
