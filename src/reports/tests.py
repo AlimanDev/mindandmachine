@@ -14,7 +14,7 @@ from src.base.tests.factories import EmployeeFactory, EmploymentFactory, GroupFa
 from src.reports.models import ReportConfig, ReportType, Period
 from src.reports.reports import PIVOT_TABEL
 from src.reports.tasks import cron_report
-from src.timetable.models import PlanAndFactHours, WorkerDay, WorkerDayOutsourceNetwork
+from src.timetable.models import PlanAndFactHours, WorkerDay, WorkerDayOutsourceNetwork, WorkerDayType
 from src.timetable.tests.factories import WorkerDayFactory
 from src.util.mixins.tests import TestsHelperMixin
 from src.util.test import create_departments_and_users
@@ -684,3 +684,38 @@ class TestScheduleDeviation(APITestCase):
         self.assertEquals(report.status_code, 200)
         data = pd.read_excel(report.content).fillna('')
         self.assertEquals(len(data), 10)
+
+    def test_get_schedule_deviation_different_worker_day_types(self):
+        dt_from = date.today()
+        dt_to = dt_from - timedelta(1)
+        for w_type in WorkerDayType.objects.all():
+            dt_to += timedelta(1)
+            kwargs = {
+                'shop': None,
+            }
+            if w_type.is_work_hours:
+                kwargs = {
+                    'dttm_work_start': datetime.combine(dt_to, time(8)),
+                    'dttm_work_end': datetime.combine(dt_to, time(20)),
+                    'cashbox_details__work_type__work_type_name__name': 'Работа',
+                    'shop': self.shop,
+                }
+
+            WorkerDayFactory(
+                employee=self.employee1,
+                employment=self.employment1,
+                is_approved=True,
+                type_id=w_type.code,
+                is_fact=False,
+                dt=dt_to,
+                **kwargs,
+            )
+        
+        report = self.client.get(f'/rest_api/report/schedule_deviation/?dt_from={dt_from}&dt_to={dt_to}')
+        data = pd.read_excel(report.content).fillna('')
+        for i, wd_type in enumerate(WorkerDayType.objects.all()):
+            self.assertEquals(
+                list(data.iloc[10 + i, [0, 1, 2, 3, 5, 6, 7]].values), 
+                [i + 1, 'Shop1' if wd_type.is_work_hours else '-', datetime.combine(dt_from + timedelta(i), time(0, 0)), 
+                'Васнецов Иван ', '-', 'штат', 'Работа' if wd_type.code == WorkerDay.TYPE_WORKDAY else wd_type.name]
+            )
