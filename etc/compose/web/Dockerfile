@@ -23,6 +23,7 @@ RUN apt-get update && apt-get install --no-install-recommends -y \
 
 COPY ./requirements.txt .
 
+RUN pip install --upgrade pip==21.3.1
 
 # Create Python Dependency and Sub-Dependency Wheels.
 RUN --mount=type=cache,target=/root/.cache \
