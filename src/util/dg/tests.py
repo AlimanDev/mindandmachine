@@ -91,7 +91,7 @@ class TestGenerateTabel(TestsHelperMixin, TestCase):
             dttm_work_end=datetime.combine(cls.dt_now, time(19, 59, 1)),
             cashbox_details__work_type=cls.work_type,
         )
-        calc_timesheets()
+        calc_timesheets(dt_from=cls.dt_from, dt_to=cls.dt_to)
         cls.types_mapping = dict(WorkerDayType.objects.values_list(
             'excel_load_code',
             'code',
@@ -209,7 +209,7 @@ class TestGenerateTabel(TestsHelperMixin, TestCase):
         g = T13TimesheetDataGetter(
             shop=self.shop, dt_from=self.dt_from, dt_to=self.dt_to, timesheet_type=TimesheetItem.TIMESHEET_TYPE_FACT)
         data = g.get_data()
-        # self.assertEqual(len(data['users']), 7)
+        self.assertEqual(len(data['users']), 7)
         for user in data['users']:
             dt_first = self.dt_from - timedelta(1)
             tabel_code = user['tabel_code']
