@@ -114,7 +114,7 @@ class TimesheetCalculator:
 
     def _add_plan(self, plan_wd, dt, fact_timesheet_dict, empl_dt_key):
         day_in_past = dt < self.dt_now
-        if not day_in_past:
+        if self.employee.user.network.settings_values_prop.get('timesheet_only_day_in_past', False) and not day_in_past:
             return
         work_type_name = plan_wd.work_types_list[0].work_type_name if \
             (plan_wd.type_id == WorkerDay.TYPE_WORKDAY and plan_wd.work_types_list) else None
@@ -148,7 +148,7 @@ class TimesheetCalculator:
         fact_timesheet_dict = {}
         for worker_day in wdays_qs:
             day_in_past = worker_day.dt < self.dt_now
-            if not day_in_past:
+            if self.employee.user.network.settings_values_prop.get('timesheet_only_day_in_past', False) and not day_in_past:
                 continue
             # TODO: нужна поддержка нескольких типов работ?
             work_type_name = worker_day.work_types_list[0].work_type_name if \
@@ -198,6 +198,10 @@ class TimesheetCalculator:
             plan_wdays_dict.setdefault(self._get_empl_key(wd.employee_id, wd.dt), []).append(wd)
 
         for dt in pd.date_range(dt_start, dt_end).date:
+            day_in_past = dt < self.dt_now
+            if self.employee.user.network.settings_values_prop.get(
+                    'timesheet_only_day_in_past', False) and not day_in_past:
+                continue
             empl_dt_key = self._get_empl_key(self.employee.id, dt)
             resp_wd_list = fact_timesheet_dict.get(empl_dt_key)
             if resp_wd_list:

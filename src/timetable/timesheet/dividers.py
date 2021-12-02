@@ -293,7 +293,8 @@ class BaseTimesheetDivider:
     def _init_main_and_additional_timesheets(self):
         for dt in pd.date_range(self.fiscal_timesheet.dt_from, self.fiscal_timesheet.dt_to).date:
             day_in_past = dt < self.dt_now
-            if not day_in_past:
+            if self.fiscal_timesheet.employee.user.network.settings_values_prop.get(
+                    'timesheet_only_day_in_past', False) and not day_in_past:
                 continue
             fact_timesheet_items = list(filter(
                 lambda i: i.day_type.is_dayoff or i.day_type.is_work_hours, self.fiscal_timesheet.fact_timesheet.get_items(dt)))
@@ -338,7 +339,8 @@ class PobedaTimesheetDivider(BaseTimesheetDivider):
     def _fill_empty_dates_as_holidays_in_main_timesheet(self):
         for dt in pd.date_range(self.fiscal_timesheet.dt_from, self.fiscal_timesheet.dt_to).date:
             day_in_past = dt < self.dt_now
-            if not day_in_past:
+            if self.fiscal_timesheet.employee.user.network.settings_values_prop.get(
+                    'timesheet_only_day_in_past', False) and not day_in_past:
                 continue
             active_employment = self.fiscal_timesheet._get_active_employment(dt)
             if active_employment:
@@ -427,6 +429,10 @@ class ShiftScheduleDivider(BaseTimesheetDivider):
 
     def _divide_by_shift_schedule(self):
         for dt in pd.date_range(self.fiscal_timesheet.dt_from, self.fiscal_timesheet.dt_to).date:
+            day_in_past = dt < self.dt_now
+            if self.fiscal_timesheet.employee.user.network.settings_values_prop.get(
+                    'timesheet_only_day_in_past', False) and not day_in_past:
+                continue
             fact_timesheet_items = list(filter(
                 lambda i: i.day_type.is_dayoff or i.day_type.is_work_hours, self.fiscal_timesheet.fact_timesheet.get_items(dt)))
             if fact_timesheet_items:
