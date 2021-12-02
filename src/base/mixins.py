@@ -20,7 +20,8 @@ class GetObjectByCodeMixin:
         if self.request.method == 'GET':
             by_code = self.request.query_params.get('by_code', False)
         else:
-            by_code = self.request.data.get('by_code', False)
+            by_code = self.request.data.get('by_code', False) \
+                      or self.request.data.get('by_code', {}).get('options', {}).get('by_code', False)
         self.request.by_code = by_code
         return super(GetObjectByCodeMixin, self).initial(request, *args, **kwargs)
 

@@ -132,8 +132,7 @@ class TestSendUrvStatEventNotifications(TestsHelperMixin, APITestCase):
                 ]
             )
             self.assertEqual(emails, [self.user_dir.email, self.shop.email, self.user_urs.email])
-            data = open_workbook(file_contents=mail.outbox[0].attachments[0][1])
-            df = pd.read_excel(data, engine='xlrd')
+            df = pd.read_excel(mail.outbox[0].attachments[0][1])
             data = [
                 {
                     'Магазин': 'SHOP_NAME',
@@ -189,8 +188,7 @@ class TestSendUrvStatEventNotifications(TestsHelperMixin, APITestCase):
             self.assertEqual(len(mail.outbox), 1)
             self.assertEqual(mail.outbox[0].subject, subject)
             self.assertEqual(mail.outbox[0].to[0], self.user_dir.email)
-            data = open_workbook(file_contents=mail.outbox[0].attachments[0][1])
-            df = pd.read_excel(data, engine='xlrd')
+            df = pd.read_excel(mail.outbox[0].attachments[0][1])
             data = [
                 {
                     'Магазин': 'SHOP_NAME2',
@@ -306,8 +304,7 @@ class TestSendUrvStatTodayEventNotifications(TestsHelperMixin, APITestCase):
                 ]
             )
             self.assertEqual(emails, [self.user_dir.email, self.shop.email, self.user_urs.email])
-            data = open_workbook(file_contents=mail.outbox[0].attachments[0][1])
-            df = pd.read_excel(data, engine='xlrd')
+            df = pd.read_excel(mail.outbox[0].attachments[0][1])
             data = [
                 {
                     'Магазин': 'SHOP_NAME',
@@ -345,8 +342,7 @@ class TestSendUrvStatTodayEventNotifications(TestsHelperMixin, APITestCase):
             self.assertEqual(len(mail.outbox), 1)
             self.assertEqual(mail.outbox[0].subject, subject)
             self.assertEqual(mail.outbox[0].to[0], self.user_dir.email)
-            data = open_workbook(file_contents=mail.outbox[0].attachments[0][1])
-            df = pd.read_excel(data, engine='xlrd')
+            df = pd.read_excel(mail.outbox[0].attachments[0][1])
             data = [
                 {
                     'Магазин': 'SHOP_NAME2',
@@ -480,8 +476,7 @@ class TestSendUrvViolatorsEventNotifications(TestsHelperMixin, APITestCase):
                 ]
             )
             self.assertEqual(emails, [self.user_dir.email, self.shop.email, self.user_urs.email])
-            data = open_workbook(file_contents=mail.outbox[0].attachments[0][1])
-            df = pd.read_excel(data, engine='xlrd').fillna('')
+            df = pd.read_excel(mail.outbox[0].attachments[0][1]).fillna('')
             data = [
                 {
                     'Дата': self.dt.strftime('%d.%m.%Y'),
@@ -543,8 +538,7 @@ class TestSendUrvViolatorsEventNotifications(TestsHelperMixin, APITestCase):
             self.assertEqual(len(mail.outbox), 1)
             self.assertEqual(mail.outbox[0].subject, subject)
             self.assertEqual(mail.outbox[0].to[0], self.user_dir.email)
-            data = open_workbook(file_contents=mail.outbox[0].attachments[0][1])
-            df = pd.read_excel(data, engine='xlrd').fillna('')
+            df = pd.read_excel(mail.outbox[0].attachments[0][1]).fillna('')
             data = [
                 {
                     'Дата': self.dt.strftime('%d.%m.%Y'),
@@ -668,8 +662,7 @@ class TestSendUrvStatV2EventNotifications(TestsHelperMixin, APITestCase):
                 ]
             )
             self.assertEqual(emails, [self.user_dir.email, self.shop.email, self.user_urs.email])
-            data = open_workbook(file_contents=mail.outbox[0].attachments[0][1])
-            df = pd.read_excel(data, engine='xlrd')
+            df = pd.read_excel(mail.outbox[0].attachments[0][1],)
             data = [
                 {
                     'Код магазина': self.shop.code, 
@@ -739,8 +732,7 @@ class TestSendUrvStatV2EventNotifications(TestsHelperMixin, APITestCase):
             self.assertEqual(len(mail.outbox), 1)
             self.assertEqual(mail.outbox[0].subject, subject)
             self.assertEqual(mail.outbox[0].to[0], self.user_dir.email)
-            data = open_workbook(file_contents=mail.outbox[0].attachments[0][1])
-            df = pd.read_excel(data, engine='xlrd')
+            df = pd.read_excel(mail.outbox[0].attachments[0][1])
             data = [
                 {
                     'Код магазина': self.shop2.code,

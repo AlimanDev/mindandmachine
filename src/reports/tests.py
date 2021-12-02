@@ -8,13 +8,13 @@ from django_celery_beat.models import CrontabSchedule
 from rest_framework.test import APITestCase
 from xlrd import open_workbook
 
-from src.base.models import FunctionGroup
+from src.base.models import FunctionGroup, Network
 from src.base.tests.factories import EmployeeFactory, EmploymentFactory, GroupFactory, NetworkFactory, ShopFactory, \
     UserFactory
 from src.reports.models import ReportConfig, ReportType, Period
 from src.reports.reports import PIVOT_TABEL
 from src.reports.tasks import cron_report
-from src.timetable.models import PlanAndFactHours, WorkerDay
+from src.timetable.models import PlanAndFactHours, WorkerDay, WorkerDayOutsourceNetwork, WorkerDayType
 from src.timetable.tests.factories import WorkerDayFactory
 from src.util.mixins.tests import TestsHelperMixin
 from src.util.test import create_departments_and_users
@@ -114,7 +114,7 @@ class TestReportConfig(APITestCase):
         config.period.save()
         dates = config.get_dates()
         data = {
-            'dt_from': date.today() - relativedelta(months=3, days=1),
+            'dt_from': (date.today() - timedelta(1)) - relativedelta(months=3),
             'dt_to': date.today() - timedelta(1),
         }
         self.assertEquals(data, dates)
@@ -316,8 +316,7 @@ class TestPivotTabelReportNotifications(TestsHelperMixin, APITestCase):
                 ]
             )
             self.assertEqual(emails, [self.user_dir.email, self.shop.email, self.user_urs.email])
-            data = open_workbook(file_contents=mail.outbox[0].attachments[0][1])
-            df = pd.read_excel(data, engine='xlrd')
+            df = pd.read_excel(mail.outbox[0].attachments[0][1])
             self.assertEquals(len(df.columns), 6 + monthrange(self.dt.year, self.dt.month)[1])
             self.assertEquals(len(df.values), 3)
             first_date = datetime.combine(self.dt - timedelta(1), time())
@@ -407,8 +406,7 @@ class TestReportsViewSet(TestsHelperMixin, APITestCase):
     def test_report_pivot_tabel_get(self):
         response = self.client.get(f'/rest_api/report/pivot_tabel/?dt_from={self.dt - timedelta(1)}&dt_to={self.dt}')
         self.assertEquals(response.status_code, 200)
-        data = open_workbook(file_contents=response.content)
-        df = pd.read_excel(data, engine='xlrd')
+        df = pd.read_excel(response.content)
         self.assertEquals(len(df.columns), 8)
         self.assertEquals(len(df.values), 3)
         self.assertEquals(list(df.iloc[0, 5:].values), [0.00, 10.75, 10.75])
@@ -640,16 +638,84 @@ class TestScheduleDeviation(APITestCase):
             dttm_work_end=datetime.combine(dt, time(18)),
             dt=dt,
         )
+        outsource_vacancy = WorkerDayFactory(
+            is_vacancy=True,
+            employee=None,
+            employment=None,
+            shop=self.shop,
+            is_approved=True,
+            type_id=WorkerDay.TYPE_WORKDAY,
+            is_fact=False,
+            cashbox_details__work_type__work_type_name__name='Грузчик',
+            dttm_work_start=datetime.combine(dt, time(8)),
+            dttm_work_end=datetime.combine(dt, time(18)),
+            dt=dt,
+        )
+        WorkerDayOutsourceNetwork.objects.bulk_create(
+            [
+                WorkerDayOutsourceNetwork(
+                    workerday=outsource_vacancy,
+                    network=Network.objects.create(name=name),
+                )
+                for name in ['Аутсорс сеть 1', 'Аутсорс сеть 2']
+            ]
+        )
         report = self.client.get(f'/rest_api/report/schedule_deviation/?dt_from={dt}&dt_to={dt+timedelta(1)}')
-        BytesIO = pd.io.common.BytesIO
-        data = pd.read_excel(BytesIO(report.content), engine='xlrd').fillna('')
+        data = pd.read_excel(report.content).fillna('')
         self.assertEquals(
-            list(data.iloc[9, :].values), 
+            list(data.iloc[10, :].values), 
             [1, 'Shop1', datetime.combine(dt, time(0, 0)), 'Васнецов Иван ', '-', '-', 'штат', 'Работа', 10,
             10.5, 4.5, 0.5, 1, 0.5, 1, 0, 0, 1, 2, 0, 0, 0, 0]
         )
         self.assertEquals(
-            list(data.iloc[10, :].values), 
-            [2, 'Shop1', datetime.combine(dt, time(0, 0)), '-', '-', '-', '-', 'Грузчик', 8.75,
+            list(data.iloc[11, :].values), 
+            [2, 'Shop1', datetime.combine(dt, time(0, 0)), '-', '-', '-', 'штат', 'Грузчик', 8.75,
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8.75, 1]
         )
+        self.assertEquals(
+            list(data.iloc[12, :].values), 
+            [3, 'Shop1', datetime.combine(dt, time(0, 0)), '-', '-', 'Аутсорс сеть 1', 'не штат', 'Грузчик', 8.75,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8.75, 1]
+        )
+
+    def test_get_schedule_deviation_no_data(self):
+        dt = date.today()
+        report = self.client.get(f'/rest_api/report/schedule_deviation/?dt_from={dt}&dt_to={dt+timedelta(1)}')
+        self.assertEquals(report.status_code, 200)
+        data = pd.read_excel(report.content).fillna('')
+        self.assertEquals(len(data), 10)
+
+    def test_get_schedule_deviation_different_worker_day_types(self):
+        dt_from = date.today()
+        dt_to = dt_from - timedelta(1)
+        for w_type in WorkerDayType.objects.all():
+            dt_to += timedelta(1)
+            kwargs = {
+                'shop': None,
+            }
+            if w_type.is_work_hours:
+                kwargs = {
+                    'dttm_work_start': datetime.combine(dt_to, time(8)),
+                    'dttm_work_end': datetime.combine(dt_to, time(20)),
+                    'cashbox_details__work_type__work_type_name__name': 'Работа',
+                    'shop': self.shop,
+                }
+
+            WorkerDayFactory(
+                employee=self.employee1,
+                employment=self.employment1,
+                is_approved=True,
+                type_id=w_type.code,
+                is_fact=False,
+                dt=dt_to,
+                **kwargs,
+            )
+        
+        report = self.client.get(f'/rest_api/report/schedule_deviation/?dt_from={dt_from}&dt_to={dt_to}')
+        data = pd.read_excel(report.content).fillna('')
+        for i, wd_type in enumerate(WorkerDayType.objects.all()):
+            self.assertEquals(
+                list(data.iloc[10 + i, [0, 1, 2, 3, 5, 6, 7]].values), 
+                [i + 1, 'Shop1' if wd_type.is_work_hours else '-', datetime.combine(dt_from + timedelta(i), time(0, 0)), 
+                'Васнецов Иван ', '-', 'штат', 'Работа' if wd_type.code == WorkerDay.TYPE_WORKDAY else wd_type.name]
+            )

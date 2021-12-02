@@ -406,7 +406,7 @@ class TestLoadTemplate(APITestCase):
         )
         response = self.client.get(f'/rest_api/load_template/{self.load_template.id}/download/')
         
-        df = pd.read_excel(BytesIO(response.content), engine='xlrd').fillna('')
+        df = pd.read_excel(response.content).fillna('')
         data = [
             {
                 'Тип операции': 'Кассы', 

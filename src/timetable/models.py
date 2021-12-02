@@ -11,7 +11,6 @@ from django.db import transaction
 from django.db.models import (
     Subquery, OuterRef, Max, Q, Case, When, Value, FloatField, F, IntegerField, Exists, BooleanField, Min, Count
 )
-from django.db.models import UniqueConstraint
 from django.db.models.fields import PositiveSmallIntegerField
 from django.db.models.functions import Abs, Cast, Extract, Least
 from django.db.models.query import QuerySet
@@ -26,6 +25,7 @@ from src.base.models_abstract import AbstractModel, AbstractActiveModel, Abstrac
 from src.events.signals import event_signal
 from src.recognition.events import EMPLOYEE_WORKING_NOT_ACCORDING_TO_PLAN
 from src.tasks.models import Task
+from src.timetable.break_time_subtractor import break_time_subtractor_map
 from src.timetable.exceptions import (
     WorkTimeOverlap,
     WorkDayTaskViolation,
@@ -104,6 +104,11 @@ class WorkType(AbstractActiveModel):
     work_type_name = models.ForeignKey(WorkTypeName, on_delete=models.PROTECT, related_name='work_types')
     min_workers_amount = models.IntegerField(default=0, blank=True, null=True)
     max_workers_amount = models.IntegerField(default=20, blank=True, null=True)
+    preliminary_cost_per_hour = models.DecimalField(
+        'Предварительная стоимость работ за час', max_digits=8, 
+        decimal_places=2,
+        null=True, blank=True,
+    )
 
     probability = models.FloatField(default=1.0)
     prior_weight = models.FloatField(default=1.0)
@@ -331,8 +336,14 @@ class WorkerDayQuerySet(AnnotateValueEqualityQSMixin, QuerySet):
                 type_id=WorkerDay.TYPE_EMPTY,
             ))
         ).filter(
-            Q(is_fact=True, has_fact_approved_on_dt=True) |
-            Q(type__is_dayoff=True, is_fact=False, has_fact_approved_on_dt=False),
+            Q(
+                is_fact=True, has_fact_approved_on_dt=True,
+                dttm_work_start__isnull=False, dttm_work_end__isnull=False,
+                work_hours__gte=datetime.timedelta(0),
+            ) |
+            Q(
+                type__is_dayoff=True, is_fact=False, has_fact_approved_on_dt=False,
+            ),
             is_approved=True,
             *args,
             **kwargs,
@@ -758,16 +769,12 @@ class WorkerDay(AbstractModel):
 
         break_time_seconds = total_seconds - work_seconds
 
-        break_time_half_seconds = break_time_seconds / 2
-        if night_seconds > break_time_half_seconds:
-            work_hours_day = round(
-                (total_seconds - night_seconds - break_time_half_seconds) / 3600, 2)
-            work_hours_night = round((night_seconds - break_time_half_seconds) / 3600, 2)
-        else:
-            substract_from_day_seconds = break_time_half_seconds - night_seconds
-            work_hours_night = 0.0
-            work_hours_day = round(
-                (total_seconds - substract_from_day_seconds - break_time_half_seconds) / 3600, 2)
+        break_time_subtractor_alias = None
+        if self.shop_id and self.shop.network_id:
+            break_time_subtractor_alias = self.shop.network.settings_values_prop.get('break_time_subtractor')
+        break_time_subtractor_cls = break_time_subtractor_map.get(break_time_subtractor_alias or 'default')
+        break_time_subtractor = break_time_subtractor_cls(break_time_seconds, total_seconds, night_seconds)
+        work_hours_day, work_hours_night = break_time_subtractor.calc()
         work_hours = work_hours_day + work_hours_night
         return work_hours, work_hours_day, work_hours_night
 
@@ -959,11 +966,23 @@ class WorkerDay(AbstractModel):
         help_text='Используется в факте (и в черновике и подтв. версии) для связи с планом подтвержденным')
 
     source = PositiveSmallIntegerField('Источник создания', choices=SOURCES, default=SOURCE_FAST_EDITOR)
+    cost_per_hour = models.DecimalField(
+        'Стоимость работ за час', max_digits=8, 
+        decimal_places=2,
+        null=True, blank=True,
+    )
 
     objects = WorkerDayManager.from_queryset(WorkerDayQuerySet)()  # исключает раб. дни у которых employment_id is null
     objects_with_excluded = models.Manager.from_queryset(WorkerDayQuerySet)()
 
     tracker = FieldTracker(fields=('work_hours',))
+
+    @property
+    def total_cost(self):
+        total_cost = None
+        if self.cost_per_hour:
+            total_cost = self.rounded_work_hours * float(self.cost_per_hour)
+        return total_cost
 
     @property
     def rounded_work_hours(self):
@@ -2086,7 +2105,7 @@ class AttendanceRecords(AbstractModel):
         )
 
     def _get_fact_approved_extra_q(self, closest_plan_approved):
-        fact_approved_extra_q = Q(closest_plan_approved=closest_plan_approved)
+        fact_approved_extra_q = Q(closest_plan_approved=closest_plan_approved) if closest_plan_approved else Q()
         if self.type == self.TYPE_LEAVING:
             fact_approved_extra_q |= Q(
                 dttm_work_start__isnull=False,
@@ -2342,8 +2361,7 @@ class GroupWorkerDayPermission(AbstractModel):
             worker_day_permission__wd_type=wd_type,
         ).exists()
 
-
-class PlanAndFactHours(models.Model):
+class PlanAndFactHoursAbstract(models.Model):
     id = models.CharField(max_length=256, primary_key=True)
     dt = models.DateField()
     shop = models.ForeignKey('base.Shop', on_delete=models.DO_NOTHING)
@@ -2384,8 +2402,7 @@ class PlanAndFactHours(models.Model):
     user_network = models.CharField(max_length=512)
 
     class Meta:
-        managed = False
-        db_table = 'timetable_plan_and_fact_hours'
+        abstract = True
 
     @property
     def dt_as_str(self):
@@ -2417,6 +2434,12 @@ class PlanAndFactHours(models.Model):
         return datetime.timedelta(seconds=int(self.fact_work_hours * 60 * 60))
 
 
+
+class PlanAndFactHours(PlanAndFactHoursAbstract):
+    class Meta:
+        managed = False
+        db_table = 'timetable_plan_and_fact_hours'
+
 class ProdCal(models.Model):
     id = models.CharField(max_length=256, primary_key=True)
     dt = models.DateField()
@@ -2430,3 +2453,9 @@ class ProdCal(models.Model):
     class Meta:
         managed = False
         db_table = 'prod_cal'
+
+
+class ScheduleDeviations(PlanAndFactHoursAbstract):
+    class Meta:
+        managed = False
+        db_table = 'timetable_schedule_deviations'

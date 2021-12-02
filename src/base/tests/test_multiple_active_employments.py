@@ -113,7 +113,7 @@ class MultipleActiveEmploymentsSupportMixin(TestsHelperMixin):
         fill_calendar.fill_days('2021.01.01', '2021.12.31', cls.shop1.region_id)
 
 
-@override_settings(CELERY_TASK_ALWAYS_EAGER=True, TRUST_TICK_REQUEST=True)
+@override_settings(CELERY_TASK_ALWAYS_EAGER=True)
 class TestURVTicks(MultipleActiveEmploymentsSupportMixin, APITestCase):
     """
     Проверка работы отметок когда у пользователя несколько активных трудоустройств одновременно
@@ -122,6 +122,8 @@ class TestURVTicks(MultipleActiveEmploymentsSupportMixin, APITestCase):
     def setUpTestData(cls):
         super(TestURVTicks, cls).setUpTestData()
         cls.add_group_perm(cls.group1, 'Tick', 'POST')
+        cls.network.trust_tick_request = True
+        cls.network.save()
 
     def _make_tick_requests(self, user, shop, dttm_coming=None, dttm_leaving=None):
         # TODO: разобраться с таймзонами
@@ -280,12 +282,14 @@ class TestURVTicks(MultipleActiveEmploymentsSupportMixin, APITestCase):
         self.assertEqual(fact_approved2.dttm_work_end, datetime.combine(self.dt, time(19, 57, 0)))
 
 
-@override_settings(CELERY_TASK_ALWAYS_EAGER=True, TRUST_TICK_REQUEST=True)
+@override_settings(CELERY_TASK_ALWAYS_EAGER=True)
 class TestConfirmVacancy(MultipleActiveEmploymentsSupportMixin, APITestCase):
     @classmethod
     def setUpTestData(cls):
         super(TestConfirmVacancy, cls).setUpTestData()
         cls.dt_now = date.today()
+        cls.network.trust_tick_request = True
+        cls.network.save()
         cls.add_group_perm(cls.group1, 'WorkerDay_confirm_vacancy', 'POST')
         for employee in [cls.employee1_1, cls.employee1_2, cls.employee2_1, cls.employee2_2]:
             WorkerDayFactory(
@@ -954,17 +958,24 @@ class TestEmployeeAPI(MultipleActiveEmploymentsSupportMixin, APITestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(Employee.objects.get(id=self.employee1_1.id).tabel_code, new_tabel_code)
 
-    def test_can_create_employee_without_tabel_code(self):
+        resp = self.client.put(
+            self.get_url('Employee-detail', pk=self.employee1_2.id),
+            data=self.dump_data({'tabel_code': new_tabel_code}),
+            content_type='application/json',
+        )
+        self.assertContains(response=resp, text='Табельный номер сотрудника должен быть уникален.', status_code=400)
+
+    def test_can_create_employee_with_empty_tabel_code(self):
         self.client.force_authenticate(user=self.user1)
         resp = self.client.post(
             self.get_url('Employee-list'),
-            data=self.dump_data({'user_id': self.user1.id}),
+            data=self.dump_data({'user_id': self.user1.id, 'tabel_code': ''}),
             content_type='application/json',
         )
         self.assertEqual(resp.status_code, 201)
         e = Employee.objects.get(id=resp.json()['id'])
         self.assertEqual(e.user_id, self.user1.id)
-        self.assertEqual(e.tabel_code, None)
+        self.assertEqual(e.tabel_code, '')
 
     def test_can_filter_by_group_id(self):
         self.client.force_authenticate(user=self.user1)
@@ -1009,20 +1020,17 @@ class TestEmployeeAPI(MultipleActiveEmploymentsSupportMixin, APITestCase):
         self.client.force_authenticate(user=self.user1)
         self.add_group_perm(self.group1, 'AttendanceRecords_report', 'GET')
         resp = self.client.get(self.get_url('AttendanceRecords-report'))
-        BytesIO = pd.io.common.BytesIO
-        df = pd.read_excel(BytesIO(resp.content), engine='xlrd')
+        df = pd.read_excel(resp.content)
         self.assertEqual(len(df.index), 4)
 
         resp = self.client.get(
             self.get_url('AttendanceRecords-report'), data={'employee_id__in': [self.employee1_1.id]})
-        BytesIO = pd.io.common.BytesIO
-        df = pd.read_excel(BytesIO(resp.content), engine='xlrd')
+        df = pd.read_excel(resp.content)
         self.assertEqual(len(df.index), 2)
 
         resp = self.client.get(
             self.get_url('AttendanceRecords-report'), data={'shop_id__in': [self.shop1.id]})
-        BytesIO = pd.io.common.BytesIO
-        df = pd.read_excel(BytesIO(resp.content), engine='xlrd')
+        df = pd.read_excel(resp.content)
         self.assertEqual(len(df.index), 2)
 
         resp = self.client.get(
@@ -1031,8 +1039,7 @@ class TestEmployeeAPI(MultipleActiveEmploymentsSupportMixin, APITestCase):
                 'shop_id__in': [self.shop1.id],
                 'employee_id__in': [self.employee2_1.id]
             })
-        BytesIO = pd.io.common.BytesIO
-        df = pd.read_excel(BytesIO(resp.content), engine='xlrd')
+        df = pd.read_excel(resp.content)
         self.assertEqual(len(df.index), 0)
 
     def test_other_deps_employees_with_wd_in_curr_shop_parameter(self):

@@ -2,16 +2,6 @@
 
 from django.db import migrations
 
-def compress_info(apps, schema_editor):
-    Receipt = apps.get_model('forecast', 'Receipt')
-    receipts = Receipt.objects.all().order_by('id')
-    step = 100000
-    receipts_portion = receipts[:step]
-    i = step
-    while receipts_portion:
-        Receipt.objects.bulk_update(receipts_portion, fields=['info'])
-        receipts_portion = receipts[i:i + step]
-        i = i + step
 
 class Migration(migrations.Migration):
 
@@ -20,6 +10,4 @@ class Migration(migrations.Migration):
     ]
     atomic = False
 
-    operations = [
-        migrations.RunPython(compress_info, migrations.RunPython.noop, atomic=False),
-    ]
+    operations = []

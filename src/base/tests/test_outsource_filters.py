@@ -1,6 +1,7 @@
 from datetime import datetime, date, timedelta, time
 
 from django.test import override_settings
+from freezegun import freeze_time
 from rest_framework.test import APITestCase
 
 from src.base.models import Shop, NetworkConnect, Network, User, Employee, Employment, Group, FunctionGroup, \
@@ -276,6 +277,8 @@ class TestOutsource(TestsHelperMixin, APITestCase):
             employee=self.employee1,
         )
         dt = date.today()
+        if dt.day >= 28:
+            dt = (dt + timedelta(5)).replace(day=1)
         WorkerDay.objects.create(
             employment=empl,
             employee=self.employee1,
@@ -287,9 +290,10 @@ class TestOutsource(TestsHelperMixin, APITestCase):
             is_approved=True,
         )
         with override_settings(FISCAL_SHEET_DIVIDER_ALIAS='nahodka'):
-            calc_timesheets(employee_id__in=[self.employee1.id], dt_from=dt, dt_to=dt+timedelta(1), reraise_exc=True)
+            with freeze_time(dt):
+                calc_timesheets(employee_id__in=[self.employee1.id], reraise_exc=True)
         response = self.client.get('/rest_api/timesheet/')
-        self.assertEquals(len(response.json()), 2)
+        self.assertTrue(len(response.json()) > 0)
         self.network_connect.allow_assign_employements_from_outsource = False
         self.network_connect.allow_choose_shop_from_client_for_employement = False
         self.network_connect.save()

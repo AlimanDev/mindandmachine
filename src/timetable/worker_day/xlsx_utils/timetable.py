@@ -182,7 +182,7 @@ class Timetable_xlsx(Tabel_xlsx):
         n += 1
         self.worksheet.set_column(count_of_days + n, count_of_days + n, self._column_width(150) / 6.23820623)
         self.worksheet.write_string(7, count_of_days + n,
-                                    _('I have read the work schedule**.'),
+                                    _('I have read the work schedule.'),
                                     format_header_text)
         n += 1
         if self.additional_fields_settings.get('timetable_add_holiday_count_field'):
@@ -223,7 +223,7 @@ class Timetable_xlsx(Tabel_xlsx):
                             text = '{}-{}'.format(wd.dttm_work_start.time().strftime(QOS_SHORT_TIME_FORMAT),
                                                     wd.dttm_work_end.time().strftime(QOS_SHORT_TIME_FORMAT))
                             if not getattr(wd, self.wd_type_field + '_id') == WorkerDay.TYPE_WORKDAY:
-                                text = mapping[getattr(wd, self.wd_type_field + '_id')] + text
+                                text = f"{mapping[getattr(wd, self.wd_type_field + '_id')]} {text}"
                         elif getattr(wd, self.wd_type_field).is_dayoff and getattr(wd, self.wd_type_field).is_work_hours:
                             text = mapping[getattr(wd, self.wd_type_field + '_id')] + ' ' + str(round(getattr(wd, self.work_hours_field), 1))
                         else:
@@ -443,3 +443,68 @@ class Timetable_xlsx(Tabel_xlsx):
 
     def add_sign(self, row, col=3):
         pass
+
+    def fill_description_table(self, wd_types):
+        self.description_sheet = self.workbook.add_worksheet(_('Descriptions'))
+        self.description_sheet.set_column(0, 0, 16)
+        self.description_sheet.set_column(1, 1, 20)
+        self.description_sheet.set_column(3, 3, 16)
+        self.description_sheet.set_column(4, 4, 20)
+        day_type = {
+            'font_size': self._font_size(14, 14),
+            'font_name': 'Arial',
+            'bold': True,
+            'align': 'center',
+            'valign': 'vcenter',
+            'border': 1,
+            'text_wrap': True,
+        }
+        header_format = self.workbook.add_format(day_type)
+        day_type['bold'] = False
+        default_format = self.workbook.add_format(day_type)
+        self.description_sheet.write(0, 0, _("Abbreviation"), header_format)
+        self.description_sheet.write(0, 1, _("Description"), header_format)
+        self.description_sheet.write(0, 2, "", header_format)
+        self.description_sheet.write(0, 3, _("Color of day of week"), header_format)
+        self.description_sheet.write(0, 4, _("Description"), header_format)
+        empty_format = day_type.copy()
+        empty_format.update(
+            {
+                'font_color': COLOR_BLACK,
+                'bg_color': COLOR_GREY,
+            }
+        )
+        empty_format = self.workbook.add_format(empty_format)
+        self.description_sheet.write(1, 0, '', empty_format)
+        self.description_sheet.write(1, 1, "Отсутствие данных", default_format)
+
+        colored_format = day_type.copy()
+        colored_format['bg_color'] = COLOR_WHITE
+        self.description_sheet.write(1, 3, "Белый", self.workbook.add_format(colored_format))
+        self.description_sheet.write(1, 4, "Рабочий день", default_format)
+        colored_format['bg_color'] = COLOR_ORANGE
+        self.description_sheet.write(2, 3, "Желтый", self.workbook.add_format(colored_format))
+        self.description_sheet.write(2, 4, "Сокращенный рабочий день", default_format)
+        colored_format['bg_color'] = COLOR_GREEN
+        self.description_sheet.write(3, 3, "Зеленый", self.workbook.add_format(colored_format))
+        self.description_sheet.write(3, 4, "Выходной", default_format)
+        
+        for i, type in enumerate(wd_types.values()):
+            excel_code = type.excel_load_code
+            if type.code == WorkerDay.TYPE_WORKDAY:
+                excel_code = '10:00-20:00'
+            font_color = self.WORKERDAY_TYPE_COLORS[type.code][0]
+            bg_color = self.WORKERDAY_TYPE_COLORS[type.code][1]
+            cell_format = day_type.copy()
+            cell_format.update(
+                {
+                    'font_color': font_color,
+                    'bg_color': bg_color,
+                }
+            )
+            cell_format = self.workbook.add_format(cell_format)
+
+            self.description_sheet.write(i + 2, 0, excel_code, cell_format)
+            self.description_sheet.write(i + 2, 1, type.name, default_format)
+        
+

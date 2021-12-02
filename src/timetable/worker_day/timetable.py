@@ -42,7 +42,7 @@ SKIP_SYMBOLS = ['NAN', '']
 DIVIDERS = ['-', '.', ',', '\n', '\r', ' ']
 MULTIPLE_WDAYS_DIVIDER = '/'
 PARSE_CELL_STR_PATTERN = re.compile(
-    r'(?P<excel_code>[а-яА-ЯA-Za-z]+)?(?P<time_str>\d{1,2}:\d{1,2}\s*[' + r'\\'.join(DIVIDERS) + r']\s*\d{1,2}\:\d{1,2})')
+    r'(?P<excel_code>[а-яА-ЯA-Za-z]+)?(?P<time_str>\d{1,2}:\d{1,2}\s*[' + r'\\'.join(DIVIDERS) + r']\s*\d{1,2}:\d{1,2})')
 
 
 class BaseUploadDownloadTimeTable:
@@ -208,7 +208,7 @@ class BaseUploadDownloadTimeTable:
                     if number_cond:
                         raise ValidationError(_('The employee with number {} does not exist in the current shop.').format(tabel_code))
                     else:
-                        raise ValidationError(_('The employee with the full name {} does not exist in the current shop.').format(data[name_cond]))
+                        raise ValidationError(_('The employee with the full name {} does not exist in the current shop.').format(data[name_column]))
                 
                 users.append([
                     employment.employee,
@@ -289,6 +289,7 @@ class BaseUploadDownloadTimeTable:
                         )
                         if employment.exists() and settings.UPLOAD_TT_CREATE_EMPLOYEE:
                             employee = employment.first().employee
+                            user = employee.user  # TODO: тест + рефакторинг
                             if number_cond and employee.tabel_code != tabel_code:
                                 user = employee.user
                                 employee = Employee.objects.create(user=user, tabel_code=tabel_code)
@@ -603,6 +604,8 @@ class UploadDownloadTimetableCells(BaseUploadDownloadTimeTable):
         # fill page 2
         timetable.fill_table2(shop, timetable.prod_days[-1].dt, groupped_days)
 
+        timetable.fill_description_table(self.wd_types_dict)
+
         if timetable.on_print:
             timetable.worksheet.set_landscape()
             timetable.worksheet.set_paper(9)
@@ -612,6 +615,10 @@ class UploadDownloadTimetableCells(BaseUploadDownloadTimeTable):
             timetable.print_worksheet.set_paper(9)
             timetable.print_worksheet.fit_to_pages(1, 0)
             timetable.print_worksheet.set_margins(left=0.25, right=0.25)
+            timetable.description_sheet.set_landscape()
+            timetable.description_sheet.set_paper(9)
+            timetable.description_sheet.fit_to_pages(1, 0)
+            timetable.description_sheet.set_margins(left=0.25, right=0.25)
 
         return workbook, _('Timetable_for_shop_{}_from_{}.xlsx').format(shop.name, form['dt_from'])
 
@@ -636,8 +643,8 @@ class UploadDownloadTimetableCells(BaseUploadDownloadTimeTable):
                     for wd in wdays_list:
                         excel_code = self.wd_type_mapping.get(wd.type_id, '')
                         if not wd.type.is_dayoff:
-                            tm_start = wd.dttm_work_start.strftime('%H:%M')
-                            tm_end = wd.dttm_work_end.strftime('%H:%M')
+                            tm_start = wd.dttm_work_start.strftime('%H:%M') if wd.dttm_work_start else '??:??'
+                            tm_end = wd.dttm_work_end.strftime('%H:%M') if wd.dttm_work_end else '??:??'
                             _cell_value = f'{tm_start}-{tm_end}'
                             if not wd.type_id == WorkerDay.TYPE_WORKDAY:
                                 _cell_value = excel_code + _cell_value

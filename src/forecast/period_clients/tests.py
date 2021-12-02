@@ -659,6 +659,25 @@ class TestDemand(APITestCase):
         self.assertEquals(response.status_code, 200)
         self.assertCountEqual(list(tabel.columns), ['dttm', 'Кассы', 'O_TYPE4'])
 
+    def test_get_demand_xlsx_no_data(self):
+        dt_from = Converter.convert_date(datetime(2019, 5, 30).date())
+        dt_to = Converter.convert_date(datetime(2019, 6, 2).date())
+        OperationType.objects.create(
+            operation_type_name=self.op_type_name,
+            shop=self.shop2,
+        )
+        response = self.client.get(
+            f'{self.url}download/?dt_from={dt_from}&dt_to={dt_to}&shop_id={self.shop2.id}')
+        tabel = pandas.read_excel(response.content)
+        tabel.dttm = tabel.dttm.dt.round('s')
+        self.assertEquals(response.status_code, 200)
+        self.assertCountEqual(list(tabel.columns), ['dttm', 'Кассы'])
+        self.assertEquals(tabel[tabel.columns[0]][0], datetime(2019, 5, 30))
+        self.assertEquals(len(tabel[tabel.columns[0]]), 96)
+        self.assertEquals(tabel[tabel.columns[0]][95], datetime(2019, 6, 2, 23))
+        self.assertEquals(tabel[tabel.columns[1]][0], 0)
+        self.assertEquals(tabel[tabel.columns[1]][72], 0)
+
     def test_duplicates_dont_created_for_the_same_dttm_forecast_and_operation_type(self):
         initial_pc_count = PeriodClients.objects.count()
         data = {"shop_code": self.shop.code, "type": "F", "dt_from": "2020-11-22", "dt_to": "2020-11-22",
