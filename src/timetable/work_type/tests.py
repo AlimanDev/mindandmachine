@@ -13,11 +13,12 @@ from src.timetable.models import (
     WorkerDay,
     WorkerDayCashboxDetails,
 )
+from src.util.mixins.tests import TestsHelperMixin
 from src.util.models_converter import Converter
 from src.util.test import create_departments_and_users
 
 
-class TestWorkType(APITestCase):
+class TestWorkType(APITestCase, TestsHelperMixin):
     USER_USERNAME = "user1"
     USER_EMAIL = "q@q.q"
     USER_PASSWORD = "4242"
@@ -516,9 +517,12 @@ class TestWorkType(APITestCase):
     def test_set_preliminary_cost_per_hour_empty(self):
         response = self.client.put(
             f'{self.url}{self.work_type1.id}/',
-            data={
-                'preliminary_cost_per_hour': None,
-            }
+            data=self.dump_data(
+                {
+                    'preliminary_cost_per_hour': None,
+                }
+            ),
+            content_type='application/json'
         )
         self.assertIsNone(response.json()['preliminary_cost_per_hour'])
         self.work_type1.refresh_from_db()
