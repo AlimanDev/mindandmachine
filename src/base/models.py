@@ -1902,5 +1902,7 @@ class ContentBlock(AbstractActiveNetworkSpecificCodeNamedModel):
     body = models.TextField(verbose_name='Тело блока (может передаваться контекст как в шаблонах django)')
 
     def get_body(self, request=None):
-        context = {}
+        context = {
+            'request': request,
+        }
         return Template(self.body).render(Context(context))
