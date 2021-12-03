@@ -273,6 +273,8 @@ class Network(AbstractActiveModel):
     
     show_cost_for_inner_vacancies = models.BooleanField('Отображать поле "стоимость работ" для внутренних вакансий', default=False)
 
+    rebuild_timetable_min_delta = models.IntegerField(default=2, verbose_name='Минимальное время для составления графика')
+
     DEFAULT_NIGHT_EDGES = (
         '22:00:00',
         '06:00:00',

@@ -147,6 +147,7 @@ class NetworkAdmin(admin.ModelAdmin):
             'edit_manual_fact_on_recalc_fact_from_att_records',
             'set_closest_plan_approved_delta_for_manual_fact',
             'clean_wdays_on_employment_dt_change',
+            'rebuild_timetable_min_delta',
         )}),
     )
 

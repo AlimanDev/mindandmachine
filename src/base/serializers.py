@@ -129,6 +129,7 @@ class NetworkSerializer(serializers.ModelSerializer):
             'trust_tick_request',
             'show_cost_for_inner_vacancies',
             'show_employee_shift_schedule_tab',
+            'rebuild_timetable_min_delta',
         ]
 
 class NetworkListSerializer(serializers.Serializer):
