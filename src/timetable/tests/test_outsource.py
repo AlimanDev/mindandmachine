@@ -462,6 +462,7 @@ class TestOutsource(TestsHelperMixin, APITestCase):
                     'get_position_from_work_type_name_in_calc_timesheet': False,
                     'trust_tick_request': False,
                     'show_cost_for_inner_vacancies': False,
+                    'rebuild_timetable_min_delta': 2,
                     'show_remaking_choice': False,
                     'show_employee_shift_schedule_tab': False,
                     'shop_name_form': {

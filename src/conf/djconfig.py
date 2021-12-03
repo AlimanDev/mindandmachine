@@ -421,7 +421,6 @@ BACKEND_QUEUE = env.str('BACKEND_QUEUE', default='backend_queue')
 # todo: do normal parameters changer
 
 APPEND_SLASH = False
-REBUILD_TIMETABLE_MIN_DELTA = 2
 
 # например, для Ортеки для отображения в отчете нужны показатели только по продавцам-кассирам
 UPDATE_SHOP_STATS_WORK_TYPES_CODES = None
