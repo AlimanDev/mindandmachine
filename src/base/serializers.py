@@ -13,6 +13,7 @@ from rest_framework.validators import UniqueValidator, UniqueTogetherValidator
 from src.base.fields import CurrentUserNetwork, UserworkShop
 from src.base.message import Message
 from src.base.models import (
+    ContentBlock,
     Employment,
     Network,
     NetworkConnect,
@@ -647,3 +648,14 @@ class EmployeeShiftScheduleQueryParamsSerializer(serializers.Serializer):
     employee_id = serializers.IntegerField()
     dt__gte = serializers.DateField()
     dt__lte = serializers.DateField()
+
+
+class ContentBlockSerializer(serializers.ModelSerializer):
+    body = serializers.SerializerMethodField()
+
+    def get_body(self, obj: ContentBlock):
+        return obj.get_body(self.context['request'])
+
+    class Meta:
+        model = ContentBlock
+        fields = ['name', 'code', 'body']

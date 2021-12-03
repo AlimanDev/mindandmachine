@@ -19,6 +19,7 @@ from django.db.models.query import QuerySet
 from django.utils import timezone
 from django.utils.functional import cached_property
 from django.utils.translation import gettext_lazy as _
+from django.template import Template, Context
 from model_utils import FieldTracker
 from mptt.models import MPTTModel, TreeForeignKey
 from rest_framework.exceptions import PermissionDenied
@@ -1510,6 +1511,7 @@ class FunctionGroup(AbstractModel):
         ('AutoSettings_delete_timetable', 'Удалить график (Создать) (auto_settings/delete_timetable/)'),
         ('AuthUserView', 'Получить авторизованного пользователя (auth/user/)'),
         ('Break', 'Перерыв (break)'),
+        ('ContentBlock', 'Блок контента (content_block)'),
         ('Employment', 'Трудоустройство (employment)'),
         ('Employee', 'Сотрудник (employee)'),
         ('Employee_shift_schedule', 'Графики смен сотрудников (employee/shift_schedule/)'),
@@ -1894,3 +1896,11 @@ class ShiftScheduleInterval(AbstractModel):
         if self.code:
             s += f' ({self.code})'
         return s
+
+class ContentBlock(AbstractActiveNetworkSpecificCodeNamedModel):
+    name = models.CharField(max_length=128, verbose_name='Имя текстового блока')
+    body = models.TextField(verbose_name='Тело блока (может передаваться контекст как в шаблонах django)')
+
+    def get_body(self, request=None):
+        context = {}
+        return Template(self.body).render(Context(context))

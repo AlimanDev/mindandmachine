@@ -12,6 +12,7 @@ from src.base.auth.views import (
 )
 from src.base.shop.views import ShopViewSet
 from src.base.views import (
+    ContentBlockViewSet,
     EmploymentViewSet,
     UserViewSet,
     FunctionGroupView,
@@ -59,6 +60,7 @@ router.register(r'group', GroupViewSet, basename='Group')
 router.register(r'break', BreakViewSet, basename='Break')
 router.register(r'shift_schedule', ShiftScheduleViewSet, basename='ShiftSchedule')
 router.register(r'shift_schedule_interval', ShiftScheduleIntervalViewSet, basename='ShiftScheduleInterval')
+router.register(r'content_block', ContentBlockViewSet, basename='ContentBlock')
 
 employment_nested_router = routers.NestedSimpleRouter(router, r'employment', lookup='employment')
 shop_nested_router = routers.NestedSimpleRouter(router, r'department', lookup='department')

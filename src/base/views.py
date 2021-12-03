@@ -15,7 +15,7 @@ from rest_framework.pagination import LimitOffsetPagination
 from rest_framework.parsers import MultiPartParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from rest_framework.viewsets import GenericViewSet
+from rest_framework.viewsets import GenericViewSet, ReadOnlyModelViewSet
 
 from src.base.filters import (
     NotificationFilter,
@@ -26,6 +26,7 @@ from src.base.filters import (
 )
 from src.base.filters import UserFilter, EmployeeFilter
 from src.base.models import (
+    ContentBlock,
     Employment,
     FunctionGroup,
     Network,
@@ -42,6 +43,7 @@ from src.base.models import (
 )
 from src.base.permissions import Permission
 from src.base.serializers import (
+    ContentBlockSerializer,
     EmploymentSerializer,
     UserSerializer,
     FunctionGroupSerializer,
@@ -451,3 +453,17 @@ class ShopScheduleViewSet(UpdateorCreateViewSet):
 
     def perform_update(self, serializer):
         self._perform_create_or_update(serializer)
+
+
+class ContentBlockViewSet(ReadOnlyModelViewSet):
+    serializer_class = ContentBlockSerializer
+    permission_classes = [Permission]
+
+    def get_queryset(self):
+        filters = {
+            'network_id': self.request.user.network_id
+        }
+        if self.request.query_params.get('code'):
+            filters['code'] = self.request.query_params.get('code')
+        
+        return ContentBlock.objects.filter(**filters)
