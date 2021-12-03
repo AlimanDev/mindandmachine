@@ -52,6 +52,7 @@ from src.base.models import (
     ShiftSchedule,
     ShiftScheduleDay,
     ShiftScheduleInterval,
+    ContentBlock,
 )
 from src.timetable.models import GroupWorkerDayPermission
 
@@ -520,3 +521,12 @@ class ShiftScheduleIntervalAdmin(admin.ModelAdmin):
     )
     list_display = ('id', 'shift_schedule', 'employee', 'dt_start', 'dt_end', 'code',)
     save_as = True
+
+@admin.register(ContentBlock)
+class ContentBlockAdmin(admin.ModelAdmin):
+    list_display = ('network', 'code', 'name',)
+    list_select_related = ('network',)
+    search_fields = ('code', 'name', 'network__name',)
+    list_filter = (
+        ('network', RelatedOnlyDropdownNameOrderedFilter),
+    )
