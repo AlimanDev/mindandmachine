@@ -4496,12 +4496,12 @@ class TestVacancy(TestsHelperMixin, APITestCase):
         self.assertTrue(vacancy.is_vacancy)
     
     def test_cost_per_hour_in_list(self):
-        self.vacancy.cost_per_hour = 120.45
+        self.vacancy.cost_per_hour = 120120.45
         self.vacancy.save()
         response = self.client.get(f"{self.url}?limit=100")
         vacancy = list(filter(lambda x: x['id'] == self.vacancy.id, response.json()['results']))[0]
-        self.assertEquals(vacancy['cost_per_hour'], '120.45')
-        self.assertEquals(vacancy['total_cost'], 1174.3875)
+        self.assertEquals(vacancy['cost_per_hour'], '120120.45')
+        self.assertEquals(vacancy['total_cost'], 1171174.3875)
         
 
 class TestAditionalFunctions(TestsHelperMixin, APITestCase):

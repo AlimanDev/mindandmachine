@@ -111,7 +111,7 @@ class WorkerDayListSerializer(serializers.Serializer, UnaccountedOvertimeMixin):
     is_blocked = serializers.BooleanField()
     unaccounted_overtime = serializers.SerializerMethodField()
     closest_plan_approved_id = serializers.IntegerField(read_only=True, required=False)
-    cost_per_hour = serializers.DecimalField(6, 2)
+    cost_per_hour = serializers.DecimalField(None, None)
     total_cost = serializers.FloatField(read_only=True)
 
     def get_unaccounted_overtime(self, obj):
@@ -458,7 +458,7 @@ class VacancySerializer(serializers.Serializer):
     outsources = NetworkListSerializer(many=True, read_only=True)
     shop = ShopListSerializer()
     comment = serializers.CharField(required=False)
-    cost_per_hour = serializers.DecimalField(6, 2)
+    cost_per_hour = serializers.DecimalField(None, None)
     total_cost = serializers.FloatField(read_only=True)
 
     def get_avatar_url(self, obj) -> str:
