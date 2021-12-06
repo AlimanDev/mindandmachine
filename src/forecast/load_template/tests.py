@@ -487,3 +487,88 @@ class TestLoadTemplate(APITestCase):
         self.assertEquals(change_workload_relation.depended.operation_type_name, self.operation_type_name3)
         self.assertEquals(change_workload_relation.max_value, 1.0)
         self.assertEquals(change_workload_relation.threshold, 0.4)
+
+    def _test_upload_errors(self, data, error_msg):
+        output = BytesIO()
+        writer = pd.ExcelWriter(output, engine='xlsxwriter')
+        pd.DataFrame(data).to_excel(excel_writer=writer, sheet_name='Load template', index=False)
+        writer.book.close()
+        output.seek(0)
+        response = self.client.post(
+            '/rest_api/load_template/upload/',
+            {
+                'name': 'Test2',
+                'file': SimpleUploadedFile('template.xlsx', output.read())
+            }
+        )
+        self.assertEquals(response.status_code, 400)
+        self.assertEquals(response.json(), error_msg)
+        self.assertIsNone(LoadTemplate.objects.filter(name='Test2').first())
+
+    def test_upload_errors(self):
+        data = [
+            {
+                'Тип операции': 'Кассы', 
+                'Зависимости': 'Строительные работы', 
+                'Формула': 'a * 2 + a', 
+                'Константа': '', 
+                'Максимальное значение': '', 
+                'Порог': '', 
+                'Дни недели (через запятую)': '0,1,2,3,4,5,6', 
+                'Шаг прогноза': '', 
+                'Время начала': '', 
+                'Время окончания': '', 
+                'Тип работ': 'Кассы'
+            }, 
+            {
+                'Тип операции': '', 
+                'Зависимости': 'ДМ', 
+                'Формула': '', 
+                'Константа': '', 
+                'Максимальное значение': 1.0, 
+                'Порог': 0.4, 
+                'Дни недели (через запятую)': '1,2,4', 
+                'Шаг прогноза': '', 
+                'Время начала': '', 
+                'Время окончания': '', 
+                'Тип работ': ''
+            }, 
+            {
+                'Тип операции': 'Строительные работы', 
+                'Зависимости': '', 
+                'Формула': '', 
+                'Константа': '', 
+                'Максимальное значение': '', 
+                'Порог': '', 
+                'Дни недели (через запятую)': '', 
+                'Шаг прогноза': '1h', 
+                'Время начала': '', 
+                'Время окончания': '', 
+                'Тип работ': ''
+            }, 
+            {
+                'Тип операции': 'ДМ', 
+                'Зависимости': '', 
+                'Формула': '', 
+                'Константа': '', 
+                'Максимальное значение': '', 
+                'Порог': '', 
+                'Дни недели (через запятую)': '', 
+                'Шаг прогноза': '1h', 
+                'Время начала': '', 
+                'Время окончания': '', 
+                'Тип работ': 'ДМ'
+            }
+        ]
+        self._test_upload_errors(data, ['Шаг прогноза обязателен. Строка 2.'])
+        data[0]['Шаг прогноза'] = '11h'
+        self._test_upload_errors(data, ['Шаг прогноза 11h не является валидным, следует выбрать из 1h, 30min, 1d.'])
+        data[0]['Шаг прогноза'] = '1h'
+        data[1]['Максимальное значение'] = ''
+        self._test_upload_errors(data, ["Для отношения 'перекидывание нагрузки между типами работ' максимальное значение обязательны."])
+        data[1]['Порог'] = ''
+        data[1]['Дни недели (через запятую)'] = ''
+        self._test_upload_errors(data, ["Некорректное значение дней недели '', должны быть целочисленные значения от 0 до 6, разделенные запятой."])
+        data[1]['Дни недели (через запятую)'] = '1,2'
+        self._test_upload_errors(data, ["Для отношения 'перекидывание нагрузки между типами работ' максимальное значение, порог обязательны."])
+        
