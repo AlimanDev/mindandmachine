@@ -100,12 +100,12 @@ imagesize==1.0.0
 importlib-metadata==0.23
 inflection==0.5.1
 iniconfig==1.1.1
-ipython==7.9.0
+ipython==7.30.1
 ipython-genutils==0.2.0
 isort==4.3.4
 itypes==1.2.0
 jdcal==1.4.1
-jedi==0.15.1
+jedi==0.18.1
 Jinja2==2.10
 joblib==0.11
 kombu==5.1.0
@@ -114,6 +114,7 @@ lxml==4.6.1
 Markdown==3.1.1
 MarkupPy==1.14
 MarkupSafe==1.1.0
+matplotlib-inline==0.1.3
 mccabe==0.6.1
 more-itertools==7.2.0
 msgpack==1.0.3
@@ -123,7 +124,7 @@ openpyxl==3.0.1
 packaging==17.1
 pandas==1.3.4
 paramiko==2.6.0
-parso==0.5.1
+parso==0.8.3
 pexpect==4.7.0
 pickleshare==0.7.5
 Pillow==8.4.0
