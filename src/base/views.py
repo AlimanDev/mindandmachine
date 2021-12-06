@@ -1,4 +1,4 @@
-from django.db.models import Q, F
+from django.db.models import Q, F, BooleanField, ExpressionWrapper
 from django.db.models.functions import Coalesce
 from django.db.models.query import Prefetch
 from django.middleware.csrf import rotate_token
@@ -340,9 +340,15 @@ class WorkerPositionViewSet(UpdateorCreateViewSet):
                     client_id=self.request.user.network_id, 
                 ).values_list('outsourcing_id', flat=True)
             )
-        return WorkerPosition.objects.filter(
+        now = timezone.now()
+        return WorkerPosition.objects.annotate(
+            is_active=ExpressionWrapper(
+                Q(dttm_deleted__isnull=True) | 
+                Q(dttm_deleted__gte=now),
+                output_field=BooleanField(),
+            )
+        ).filter(
             network_filter,
-            dttm_deleted__isnull=True,
         )
 
 

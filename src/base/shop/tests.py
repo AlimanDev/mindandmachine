@@ -126,13 +126,17 @@ class TestDepartment(TestsHelperMixin, APITestCase):
         # self.assertEqual(len(shops), 1)
         # self.assertEqual(shops[0]['id'], self.shop.id)
     
-    def test_get_list_exclude_deleted(self):
+    def test_get_list_is_active_field(self):
         response = self.client.get(self.url)
         self.assertEquals(len(response.json()), 6)
+        shop_info = list(filter(lambda x: x['id'] == self.shop.id,response.json()))[0]
+        self.assertTrue(shop_info['is_active'])
         self.shop.dttm_deleted = datetime.now() - timedelta(hours=2)
         self.shop.save()
         response = self.client.get(self.url)
-        self.assertEquals(len(response.json()), 5)
+        self.assertEquals(len(response.json()), 6)
+        shop_info = list(filter(lambda x: x['id'] == self.shop.id,response.json()))[0]
+        self.assertFalse(shop_info['is_active'])
         self.shop.dttm_deleted = None
         self.shop.save()
 
