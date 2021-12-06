@@ -63,14 +63,9 @@ class ShopViewSet(UpdateorCreateViewSet):
 
     @swagger_auto_schema(responses={200: ShopSerializer(many=True)}, operation_description='GET /rest_api/department/')
     def list(self, request):
-        now = datetime.datetime.now()
         data = list(
             self.filter_queryset(
-                self.get_queryset().filter(
-                    Q(dttm_deleted__isnull=True) | Q(dttm_deleted__gte=now),
-                    Q(dt_closed__isnull=True) |
-                    Q(dt_closed__gte=now.today() - datetime.timedelta(days=30)),
-                )
+                self.get_queryset()
             )
         )
         return Response([serialize_shop(s, request) for s in data])

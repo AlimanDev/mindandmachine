@@ -514,9 +514,10 @@ class EmploymentSerializer(serializers.ModelSerializer):
 
 class WorkerPositionSerializer(BaseNetworkSerializer):
     group_id = serializers.IntegerField(required=False, allow_null=True)
+    is_active = serializers.BooleanField(read_only=True)
     class Meta:
         model = WorkerPosition
-        fields = ['id', 'name', 'network_id', 'code', 'breaks_id', 'group_id']
+        fields = ['id', 'name', 'network_id', 'code', 'breaks_id', 'group_id', 'is_active']
 
     def __init__(self, *args, **kwargs):
         super(WorkerPositionSerializer, self).__init__(*args, **kwargs)
