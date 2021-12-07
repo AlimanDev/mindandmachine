@@ -650,6 +650,7 @@ class Shop(MPTTModel, AbstractActiveNetworkSpecificCodeNamedModel):
                         function_group=role,
                         dt_hired=timezone.now().date(),
                         dt_fired=datetime.date(3999, 1, 1),
+                        norm_work_hours=0,
                     )
                 )
 
