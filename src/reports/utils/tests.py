@@ -696,7 +696,12 @@ class TestOvertimesUndertimes(APITestCase):
                 'Плановое количество часов': '10.8'
             }
         ]
-        self.assertListEqual(data.to_dict('records')[:5], assert_data)
+        self.assertListEqual(
+            data[
+                data['ФИО'].isin(['', 'Васнецов Иван', 'Иванов Иван2', 'Сидоров Иван3', 'Петров Иван4'])
+            ].to_dict('records')[:5], 
+            assert_data,
+        )
         self._test_accounting_period_xlsx(3)
         self._test_accounting_period_xlsx(6)
         self._test_accounting_period_xlsx(12)
