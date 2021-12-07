@@ -2344,8 +2344,7 @@ class GroupWorkerDayPermission(AbstractModel):
             worker_day_permission__wd_type=wd_type,
         ).exists()
 
-
-class PlanAndFactHours(models.Model):
+class PlanAndFactHoursAbstract(models.Model):
     id = models.CharField(max_length=256, primary_key=True)
     dt = models.DateField()
     shop = models.ForeignKey('base.Shop', on_delete=models.DO_NOTHING)
@@ -2386,8 +2385,7 @@ class PlanAndFactHours(models.Model):
     user_network = models.CharField(max_length=512)
 
     class Meta:
-        managed = False
-        db_table = 'timetable_plan_and_fact_hours'
+        abstract = True
 
     @property
     def dt_as_str(self):
@@ -2419,6 +2417,12 @@ class PlanAndFactHours(models.Model):
         return datetime.timedelta(seconds=int(self.fact_work_hours * 60 * 60))
 
 
+
+class PlanAndFactHours(PlanAndFactHoursAbstract):
+    class Meta:
+        managed = False
+        db_table = 'timetable_plan_and_fact_hours'
+
 class ProdCal(models.Model):
     id = models.CharField(max_length=256, primary_key=True)
     dt = models.DateField()
@@ -2432,3 +2436,9 @@ class ProdCal(models.Model):
     class Meta:
         managed = False
         db_table = 'prod_cal'
+
+
+class ScheduleDeviations(PlanAndFactHoursAbstract):
+    class Meta:
+        managed = False
+        db_table = 'timetable_schedule_deviations'
