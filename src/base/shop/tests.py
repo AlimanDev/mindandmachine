@@ -926,3 +926,17 @@ class TestDepartment(TestsHelperMixin, APITestCase):
         )
         self.assertEquals(response.status_code, 400)
         self.assertEquals(response.json(), ['Шаблон нагрузки с кодом lt_code не найден.'])
+
+    def test_get_internal_tree(self):
+        self.employment1.shop = self.shop2
+        self.employment1.save()
+        response = self.client.get(self.url + 'internal_tree/')
+        self.assertEquals(response.status_code, 200)
+        response = response.json()
+        self.assertEquals(len(response), 1)
+        self.assertEquals(response[0]['label'], self.root_shop.name)
+        self.assertEquals(len(response[0]['children']), 2)
+        self.assertEquals(response[0]['children'][0]['label'], self.reg_shop1.name)
+        self.assertEquals(response[0]['children'][1]['label'], self.reg_shop2.name)
+        self.assertEquals(len(response[0]['children'][0]['children']), 2)
+        self.assertEquals(len(response[0]['children'][1]['children']), 1)

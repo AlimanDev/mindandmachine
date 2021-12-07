@@ -1549,6 +1549,7 @@ class FunctionGroup(AbstractModel):
         ('Shop', 'Отдел (department)'),
         ('Shop_stat', 'Статистика по отделам (Получить) (department/stat/)'),
         ('Shop_tree', 'Дерево отделов (Получить) (department/tree/)'),
+        ('Shop_internal_tree', 'Дерево отделов сети пользователя (Получить) (department/internal_tree/)'),
         ('Shop_load_template', 'Изменить шаблон нагрузки магазина (Обновить) (department/{pk}/load_template/)'),
         ('Shop_outsource_tree', 'Дерево отделов клиентов (для аутсорс компаний) (Получить) (department/outsource_tree/)'),
         ('Subscribe', 'Subscribe (subscribe)'),
