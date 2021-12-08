@@ -367,9 +367,6 @@ class TestWorkType(APITestCase, TestsHelperMixin):
         self.assertEqual(day_stats['work_days'][Converter.convert_date(dt_now)], 1.0)
         self.assertEqual(day_stats['income'][Converter.convert_date(dt_now)], 2400.0)
         self.assertEqual(day_stats['perfomance'][Converter.convert_date(dt_now)], 300.0)
-        self.assertEqual(day_stats['graph_hours_only_open_vacancies'][Converter.convert_date(dt_now)], 12.0)
-        self.assertEqual(day_stats['work_hours_other_departments'][Converter.convert_date(dt_now)], 0.0)
-        self.assertEqual(day_stats['work_hours_selected_department'][Converter.convert_date(dt_now)], 8.0)
 
         wd = WorkerDay.objects.create(
             dttm_work_start=datetime.combine(dt_now, time(hour=8)),

@@ -62,7 +62,7 @@ class Migration(migrations.Migration):
                 ('dttm_deleted', models.DateTimeField(blank=True, null=True)),
                 ('code', models.CharField(blank=True, max_length=64, null=True, verbose_name='Код')),
                 ('name', models.CharField(max_length=128, verbose_name='Имя текстового блока')),
-                ('body', models.TextField()),
+                ('body', models.TextField(verbose_name='Тело блока (может передаваться контекст как в шаблонах django)')),
                 ('network', models.ForeignKey(null=True, on_delete=django.db.models.deletion.PROTECT, to='base.network')),
             ],
             options={
