@@ -441,7 +441,6 @@ class TestOutsource(TestsHelperMixin, APITestCase):
                     'secondary_color': '', 
                     'allowed_geo_distance_km': None,
                     'allow_creation_several_wdays_for_one_employee_for_one_date': False,
-                    'display_employee_tabs_in_the_schedule': True,
                     'enable_camera_ticks': False,
                     'show_worker_day_additional_info': False,
                     'allowed_interval_for_late_arrival': '00:00:00',

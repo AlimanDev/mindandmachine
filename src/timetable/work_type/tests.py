@@ -350,7 +350,6 @@ class TestWorkType(APITestCase, TestsHelperMixin):
             'to_dt': Converter.convert_date(dt_now + timedelta(days=2)),
         }
         self.shop.network.set_settings_value('income_code', 'income')
-        self.shop.network.display_employee_tabs_in_the_schedule = True
         self.shop.network.save()
 
         response = self.client.get(url, data=get_params)

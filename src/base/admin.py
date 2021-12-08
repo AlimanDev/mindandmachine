@@ -124,7 +124,6 @@ class NetworkAdmin(admin.ModelAdmin):
             'show_worker_day_additional_info',
             'show_worker_day_tasks',
             'copy_plan_to_fact_crossing',
-            'display_employee_tabs_in_the_schedule',
         )}),
         (_('Timesheet settings'), {'fields': (
             'consider_remaining_hours_in_prev_months_when_calc_norm_hours',
