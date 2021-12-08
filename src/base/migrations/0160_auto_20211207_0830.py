@@ -12,7 +12,8 @@ def set_group_codes_and_subordinates(apps, schema_editor):
         (r'сотрудник', 'worker'),
         (r'(?!.*супервайзер.*)(^.*директор.*$)', 'director'),
         (r'(?!.*((руководитель)|(открывающий)).*)(^.*((урс)|(супервайзер)).*$)', 'urs'),
-        (r'.*руководитель урс.*', 'urs_managers'),
+        (r'.*руководители урс.*', 'urs_managers'),
+        (r'.*контроллер.*', 'controller'),
     ]
     codes_subordinates = [
         ('admin', ['admin', 'admin_outsource', 'admin_client', 'worker', 'director', 'urs', 'urs_managers']),
