@@ -228,8 +228,6 @@ class Network(AbstractActiveModel):
         default=False, verbose_name='Не учитывать shop_code при изменении трудоустройства через api',
         help_text='Необходимо включить для случаев, когда привязка трудоустройств к отделам поддерживается вручную',
     )
-    display_employee_tabs_in_the_schedule = models.BooleanField(
-        default=True, verbose_name='Отображать вкладки сотрудников в расписании')
     max_work_shift_seconds = models.PositiveIntegerField(
         verbose_name=_('Maximum shift length (in seconds)'), default=3600 * 16)
     skip_leaving_tick = models.BooleanField(

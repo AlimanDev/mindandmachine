@@ -123,7 +123,6 @@ class NetworkSerializer(serializers.ModelSerializer):
             'unaccounted_overtime_threshold',
             'forbid_edit_employments_came_through_integration',
             'show_remaking_choice',
-            'display_employee_tabs_in_the_schedule',
             'allow_creation_several_wdays_for_one_employee_for_one_date',
             'shop_name_form',
             'get_position_from_work_type_name_in_calc_timesheet',
