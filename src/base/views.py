@@ -1,4 +1,4 @@
-from django.db.models import F, Q
+from django.db.models import Q, F, BooleanField, ExpressionWrapper
 from django.db.models.functions import Coalesce
 from django.db.models.query import Prefetch
 from django.middleware.csrf import rotate_token
@@ -10,12 +10,12 @@ from rest_auth.views import UserDetailsView
 from rest_framework import mixins
 from rest_framework import status
 from rest_framework.decorators import action
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.pagination import LimitOffsetPagination
 from rest_framework.parsers import MultiPartParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from rest_framework.viewsets import GenericViewSet
-from rest_framework.exceptions import PermissionDenied
+from rest_framework.viewsets import GenericViewSet, ReadOnlyModelViewSet
 
 from src.base.filters import (
     NotificationFilter,
@@ -26,6 +26,7 @@ from src.base.filters import (
 )
 from src.base.filters import UserFilter, EmployeeFilter
 from src.base.models import (
+    ContentBlock,
     Employment,
     FunctionGroup,
     Network,
@@ -42,6 +43,7 @@ from src.base.models import (
 )
 from src.base.permissions import Permission
 from src.base.serializers import (
+    ContentBlockSerializer,
     EmploymentSerializer,
     UserSerializer,
     FunctionGroupSerializer,
@@ -59,7 +61,9 @@ from src.base.serializers import (
     BreakSerializer,
     ShopScheduleSerializer,
     EmployeeSerializer,
+    EmployeeShiftScheduleQueryParamsSerializer,
 )
+from src.base.shift_schedule.utils import get_shift_schedule
 from src.base.views_abstract import (
     BaseActiveNamedModelViewSet,
     UpdateorCreateViewSet,
@@ -264,6 +268,18 @@ class EmployeeViewSet(UpdateorCreateViewSet):
 
         return qs.distinct()
 
+    @action(detail=False, methods=['get'])
+    def shift_schedule(self, *args, **kwargs):
+        s = EmployeeShiftScheduleQueryParamsSerializer(data=self.request.query_params)
+        s.is_valid(raise_exception=True)
+        data = get_shift_schedule(
+            network_id=self.request.user.network_id,
+            employee_id=s.validated_data.get('employee_id'),
+            dt__gte=s.validated_data.get('dt__gte'),
+            dt__lte=s.validated_data.get('dt__lte'),
+        )
+        return Response(data)
+
 
 class AuthUserView(UserDetailsView):
     serializer_class = AuthUserSerializer
@@ -324,9 +340,15 @@ class WorkerPositionViewSet(UpdateorCreateViewSet):
                     client_id=self.request.user.network_id, 
                 ).values_list('outsourcing_id', flat=True)
             )
-        return WorkerPosition.objects.filter(
+        now = timezone.now()
+        return WorkerPosition.objects.annotate(
+            is_active=ExpressionWrapper(
+                Q(dttm_deleted__isnull=True) | 
+                Q(dttm_deleted__gte=now),
+                output_field=BooleanField(),
+            )
+        ).filter(
             network_filter,
-            dttm_deleted__isnull=True,
         )
 
 
@@ -437,3 +459,17 @@ class ShopScheduleViewSet(UpdateorCreateViewSet):
 
     def perform_update(self, serializer):
         self._perform_create_or_update(serializer)
+
+
+class ContentBlockViewSet(ReadOnlyModelViewSet):
+    serializer_class = ContentBlockSerializer
+    permission_classes = [Permission]
+
+    def get_queryset(self):
+        filters = {
+            'network_id': self.request.user.network_id
+        }
+        if self.request.query_params.get('code'):
+            filters['code'] = self.request.query_params.get('code')
+        
+        return ContentBlock.objects.filter(**filters)

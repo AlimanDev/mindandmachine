@@ -8,7 +8,7 @@ export COMPOSE_FILE=docker-compose-tests.yml
 export COMPOSE_DOCKER_CLI_BUILD=1
 export DOCKER_BUILDKIT=1
 
-docker-compose down --remove-orphans
+docker-compose down --remove-orphans -v
 #docker-compose build postgres
 docker-compose build web
 
@@ -30,4 +30,4 @@ else
       --exitfirst
 fi
 
-docker-compose down --remove-orphans
+docker-compose stop

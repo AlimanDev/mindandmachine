@@ -5,7 +5,7 @@ from django.db.models import F, IntegerField
 from datetime import date, timedelta
 
 import xlsxwriter
-from src.base.models import Employment
+from src.base.models import Employment, Network
 from src.timetable.models import WorkerDay
 
 
@@ -68,6 +68,10 @@ def unaccounted_overtimes_xlsx(network_id=None, dt_from=None, dt_to=None, title=
     TABEL_CODE = 3
     FIO = 4
     OVERTIME = 5
+    shop_name_form = {}
+    if network_id:
+        network = Network.objects.get(id=network_id)
+        shop_name_form = network.settings_values_prop.get('shop_name_form', {})
     data = data if not (data is None) else get_unaccounted_overtimes(network_id, dt_from=dt_from, dt_to=dt_to, shop_ids=shop_ids)
 
     if in_memory:
@@ -90,8 +94,8 @@ def unaccounted_overtimes_xlsx(network_id=None, dt_from=None, dt_to=None, title=
         'valign': 'vcenter',
         'align': 'center',
     })
-    worksheet.write_string(0, SHOP_CODE, 'Код объекта', header_format)
-    worksheet.write_string(0, SHOP, 'Название объекта', header_format)
+    worksheet.write_string(0, SHOP_CODE, f"Код {shop_name_form.get('singular', {}).get('R', 'магазина')}", header_format)
+    worksheet.write_string(0, SHOP, f"Название {shop_name_form.get('singular', {}).get('R', 'магазина')}", header_format)
     worksheet.write_string(0, TABEL_CODE, 'Табельный номер', header_format)
     worksheet.write_string(0, FIO, 'ФИО', header_format)
     worksheet.write_string(0, DATE, 'Дата', header_format)

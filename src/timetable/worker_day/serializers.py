@@ -111,6 +111,8 @@ class WorkerDayListSerializer(serializers.Serializer, UnaccountedOvertimeMixin):
     is_blocked = serializers.BooleanField()
     unaccounted_overtime = serializers.SerializerMethodField()
     closest_plan_approved_id = serializers.IntegerField(read_only=True, required=False)
+    cost_per_hour = serializers.DecimalField(None, None)
+    total_cost = serializers.FloatField(read_only=True)
 
     def get_unaccounted_overtime(self, obj):
         return self.unaccounted_overtime_getter(obj)
@@ -155,6 +157,7 @@ class WorkerDaySerializer(serializers.ModelSerializer, UnaccountedOvertimeMixin)
     outsources_ids = serializers.ListField(required=False, child=serializers.IntegerField(), allow_null=True, allow_empty=True, write_only=True)
     unaccounted_overtime = serializers.SerializerMethodField()
     closest_plan_approved_id = serializers.IntegerField(required=False, read_only=True)
+    total_cost = serializers.FloatField(read_only=True)
 
     _employee_active_empl = None
 
@@ -165,7 +168,7 @@ class WorkerDaySerializer(serializers.ModelSerializer, UnaccountedOvertimeMixin)
                   'is_outsource', 'is_vacancy', 'shop_code', 'user_login', 'username', 'created_by', 'last_edited_by',
                   'crop_work_hours_by_shop_schedule', 'dttm_work_start_tabel', 'dttm_work_end_tabel', 'is_blocked',
                   'employment_tabel_code', 'outsources', 'outsources_ids', 'unaccounted_overtime',
-                  'closest_plan_approved_id']
+                  'closest_plan_approved_id', 'cost_per_hour', 'total_cost'] 
         read_only_fields = ['parent_worker_day_id', 'is_blocked', 'closest_plan_approved_id']
         create_only_fields = ['is_fact']
         ref_name = 'WorkerDaySerializer'
@@ -455,6 +458,8 @@ class VacancySerializer(serializers.Serializer):
     outsources = NetworkListSerializer(many=True, read_only=True)
     shop = ShopListSerializer()
     comment = serializers.CharField(required=False)
+    cost_per_hour = serializers.DecimalField(None, None)
+    total_cost = serializers.FloatField(read_only=True)
 
     def get_avatar_url(self, obj) -> str:
         if obj.employee_id and obj.employee.user_id and obj.employee.user.avatar:
@@ -492,7 +497,7 @@ class ChangeListSerializer(serializers.Serializer):
         wd_types_dict = self.context.get('wd_types_dict') or WorkerDayType.get_wd_types_dict()
         if self.validated_data['is_vacancy']:
             self.validated_data['type_id'] = WorkerDay.TYPE_WORKDAY
-            self.validated_data['outsources'] = Network.objects.filter(id__in=self.validated_data.get('outsources', []))
+            self.validated_data['outsources'] = Network.objects.filter(id__in=(self.validated_data.get('outsources') or []))
         else:
             if wd_types_dict.get(self.validated_data['type_id']).is_dayoff:
                 self.validated_data['shop_id'] = None 

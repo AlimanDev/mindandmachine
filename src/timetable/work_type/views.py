@@ -26,7 +26,7 @@ class WorkTypeSerializer(serializers.ModelSerializer):
     class Meta:
         model = WorkType
         fields = ['id', 'priority', 'dttm_last_update_queue', 'min_workers_amount', 'max_workers_amount',\
-             'probability', 'prior_weight', 'shop_id', 'code', 'work_type_name_id', 'work_type_name']
+             'probability', 'prior_weight', 'shop_id', 'code', 'work_type_name_id', 'work_type_name', 'preliminary_cost_per_hour']
         validators = [
             UniqueTogetherValidator(
                 queryset=WorkType.objects.filter(dttm_deleted__isnull=True),
@@ -204,6 +204,5 @@ class WorkTypeViewSet(BaseModelViewSet):
         data.is_valid(raise_exception=True)
 
         return Response(ShopEfficiencyGetter(
-            add_schedule_tabs_day_stats=self.request.user.network.display_employee_tabs_in_the_schedule,
             **data.validated_data,
         ).get(), status=200)

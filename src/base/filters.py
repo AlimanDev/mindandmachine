@@ -1,7 +1,7 @@
 from django.db.models import Q
 from django_filters.rest_framework import FilterSet, DateFilter, NumberFilter, CharFilter, BooleanFilter, OrderingFilter
 
-from src.base.models import Employment, User, Notification, Subscribe, Shop, ShopSchedule, Employee
+from src.base.models import Employment, User, Notification, Subscribe, Shop, ShopSchedule, Employee, ShiftScheduleDay
 from src.util.drf.filters import (
     ListFilter,
     QCharFilter,
@@ -11,6 +11,7 @@ from src.util.drf.filters import (
     QEmploymentGroupListFilter,
 )
 from src.util.drf.filterset import QFilterSet
+
 
 
 class BaseActiveNamedModelFilter(FilterSet):
@@ -156,4 +157,15 @@ class ShopScheduleFilter(FilterSet):
         fields = {
             'dt': ['exact', 'lte', 'gte'],
             'type': ['exact', 'in'],
+        }
+
+
+class EmployeeShiftScheduleFilter(FilterSet):
+    employee_id = NumberFilter(field_name='shift_schedule__intervals__employee_id', lookup_expr='exact')
+
+    class Meta:
+        model = ShiftScheduleDay
+        fields = {
+            'shift_schedule_id': ['exact', 'in'],
+            'dt': ['exact', 'in', 'gte', 'lte'],
         }
