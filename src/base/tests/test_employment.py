@@ -2,9 +2,14 @@ import uuid
 from datetime import timedelta, date, datetime, time
 from unittest import mock
 
+import pandas as pd
+from dateutil.relativedelta import relativedelta
+from django.core import mail
 from django.db import transaction
 from django.utils import timezone
+from freezegun import freeze_time
 from rest_framework.test import APITestCase
+from xlrd import open_workbook
 
 from src.base.models import WorkerPosition, Employment, Break, ApiLog
 from src.celery.tasks import delete_inactive_employment_groups
@@ -806,3 +811,290 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
         self.admin_group.subordinates.add(self.employee_group)
         self._test_update_group_permissions(None, 200, None)
         self.admin_group.subordinates.clear()
+
+    def test_batch_update_or_create(self):
+        now = timezone.now()
+        dt_now = now.date()
+
+        options = {
+            'by_code': True,
+            'delete_scope_fields_list': [
+                'employee_id',
+            ],
+            'delete_scope_filters': {
+                'dt_hired__lte': (dt_now + relativedelta(months=1)).replace(day=1) - timedelta(days=1),
+                'dt_fired__gte_or_isnull': dt_now.replace(day=1),
+            }
+        }
+        data = {
+            'data': [
+                {
+                    'code': 'e_new',
+                    'position_code': self.worker_position.code,
+                    'dt_hired': (dt_now - timedelta(days=300)).strftime('%Y-%m-%d'),
+                    'dt_fired': (dt_now + timedelta(days=300)).strftime('%Y-%m-%d'),
+                    'shop_code': self.shop2.code,
+                    'username': self.user2.username,
+                    'tabel_code': self.employee2.tabel_code,
+                },
+            ],
+            'options': options,
+        }
+
+        resp = self.client.post(
+            self.get_url('Employment-batch-update-or-create'), self.dump_data(data), content_type='application/json')
+        self.assertEqual(resp.status_code, 200)
+        self.assertDictEqual(
+            resp.json(),
+            {
+                "stats": {
+                    "Employment": {
+                        "created": 1,
+                        "deleted": 1
+                    }
+                }
+            }
+        )
+
+        # old employment
+        o_e = Employment.objects.create(
+            code='o_e',
+            shop=self.shop2,
+            employee=self.employee2,
+            position=self.worker_position,
+            dt_hired=now - timedelta(days=300),
+            dt_fired=now - timedelta(days=100),
+        )
+
+        # future employments
+        f_e = Employment.objects.create(
+            code='f_e',
+            shop=self.shop2,
+            employee=self.employee2,
+            position=self.worker_position,
+            dt_hired=now + timedelta(days=100),
+            dt_fired=now + timedelta(days=300),
+        )
+        f_e2 = Employment.objects.create(
+            code='f_e2',
+            shop=self.shop2,
+            employee=self.employee2,
+            position=self.worker_position,
+            dt_hired=now + timedelta(days=100),
+            dt_fired=None,
+        )
+
+        # curr empl to delete
+        d_e = Employment.objects.create(
+            code='d_e',
+            shop=self.shop2,
+            employee=self.employee2,
+            position=self.worker_position,
+            dt_hired=now,
+            dt_fired=None,
+        )
+
+        # curr empl without code to skip
+        s_e = Employment.objects.create(
+            shop=self.shop2,
+            employee=self.employee2,
+            position=self.worker_position,
+            dt_hired=now,
+            dt_fired=None,
+        )
+        d_e.refresh_from_db()
+        self.assertTrue(Employment.objects.filter(id=d_e.id).exists())
+        resp = self.client.post(
+            self.get_url('Employment-batch-update-or-create'), self.dump_data(data), content_type='application/json')
+        self.assertEqual(resp.status_code, 200)
+        self.assertDictEqual(
+            resp.json(),
+            {
+                "stats": {
+                    "Employment": {
+                        "deleted": 1,
+                        "skipped": 1
+                    }
+                }
+            }
+        )
+        self.assertTrue(Employment.objects.filter(id=o_e.id).exists())
+        self.assertTrue(Employment.objects.filter(id=f_e.id).exists())
+        self.assertTrue(Employment.objects.filter(id=f_e2.id).exists())
+        self.assertTrue(Employment.objects.filter(id=s_e.id).exists())
+        self.assertFalse(Employment.objects.filter(id=d_e.id).exists())
+
+    def test_batch_update_or_create_diff_report(self):
+        dt_now = date(2021, 12, 6)
+
+        options = {
+            'by_code': True,
+            'delete_scope_fields_list': [
+                'employee_id',
+            ],
+            'delete_scope_filters': {
+                'dt_hired__lte': (dt_now + relativedelta(months=1)).replace(day=1) - timedelta(days=1),
+                'dt_fired__gte_or_isnull': dt_now.replace(day=1),
+            },
+            'diff_report_email_to': ['dummy@example.com']
+        }
+        data = {
+            'data': [
+                {
+                    'code': 'e_new',
+                    'position_code': self.worker_position.code,
+                    'dt_hired': (dt_now - timedelta(days=300)).strftime('%Y-%m-%d'),
+                    'dt_fired': (dt_now + timedelta(days=300)).strftime('%Y-%m-%d'),
+                    'shop_code': self.shop2.code,
+                    'username': self.user2.username,
+                    'tabel_code': self.employee2.tabel_code,
+                },
+            ],
+            'options': options,
+        }
+
+        dttm1 = datetime(2021, 12, 9, 10, 1, 3)
+        with freeze_time(dttm1):
+            resp = self.client.post(
+                self.get_url('Employment-batch-update-or-create'), self.dump_data(data), content_type='application/json')
+        self.assertEqual(resp.status_code, 200)
+        self.assertDictEqual(
+            resp.json(),
+            {
+                "stats": {
+                    "Employment": {
+                        "created": 1,
+                        "deleted": 1
+                    }
+                }
+            }
+        )
+
+        dttm2 = datetime(2021, 12, 9, 12, 3, 3)
+        with freeze_time(dttm2):
+            resp = self.client.post(
+                self.get_url('Employment-batch-update-or-create'), self.dump_data(data), content_type='application/json')
+        self.assertEqual(resp.status_code, 200)
+        self.assertDictEqual(
+            resp.json(),
+            {
+                "stats": {
+                    "Employment": {
+                        "skipped": 1,
+                    }
+                }
+            }
+        )
+
+        dttm3 = datetime(2021, 12, 9, 13, 3, 3)
+        data['data'][0]['dt_fired'] = (dt_now + timedelta(days=900)).strftime('%Y-%m-%d')
+        with freeze_time(dttm3):
+            resp = self.client.post(
+                self.get_url('Employment-batch-update-or-create'), self.dump_data(data),
+                content_type='application/json')
+        self.assertEqual(resp.status_code, 200)
+        self.assertDictEqual(
+            resp.json(),
+            {
+                "stats": {
+                    "Employment": {
+                        "updated": 1,
+                    }
+                }
+            }
+        )
+
+        self.assertEqual(len(mail.outbox), 3)
+        self.assertEqual(mail.outbox[0].subject, 'Сверка трудоустройств от 2021-12-09T10:01:03')
+        self.assertEqual(mail.outbox[0].body, 'Создано: 1, Удалено: 1, Изменено: 0, Пропущено: 0')
+        self.assertEqual(mail.outbox[1].subject, 'Сверка трудоустройств от 2021-12-09T12:03:03')
+        self.assertEqual(mail.outbox[1].body, 'Создано: 0, Удалено: 0, Изменено: 0, Пропущено: 1')
+        self.assertEqual(mail.outbox[2].subject, 'Сверка трудоустройств от 2021-12-09T13:03:03')
+        self.assertEqual(mail.outbox[2].body, 'Создано: 0, Удалено: 0, Изменено: 1, Пропущено: 0')
+        attachment1 = open_workbook(file_contents=mail.outbox[0].attachments[0][1])
+        df_created = pd.read_excel(attachment1, dtype=str, sheet_name='Создано', engine='xlrd')
+        df_deleted = pd.read_excel(attachment1, dtype=str, sheet_name='Удалено', engine='xlrd')
+        df_before_update = pd.read_excel(attachment1, dtype=str, sheet_name='До изменений', engine='xlrd')
+        df_after_update = pd.read_excel(attachment1, dtype=str, sheet_name='После изменений', engine='xlrd')
+        df_skipped = pd.read_excel(attachment1, dtype=str, sheet_name='Пропущено', engine='xlrd')
+        self.assertEqual(len(df_created.index), 1)
+        self.assertEqual(len(df_deleted.index), 1)
+        self.assertEqual(len(df_before_update.index), 0)
+        self.assertEqual(len(df_after_update.index), 0)
+        self.assertEqual(len(df_skipped.index), 0)
+
+        attachment2 = open_workbook(file_contents=mail.outbox[1].attachments[0][1])
+        df_created = pd.read_excel(attachment2, dtype=str, sheet_name='Создано', engine='xlrd')
+        df_deleted = pd.read_excel(attachment2, dtype=str, sheet_name='Удалено', engine='xlrd')
+        df_before_update = pd.read_excel(attachment2, dtype=str, sheet_name='До изменений', engine='xlrd')
+        df_after_update = pd.read_excel(attachment2, dtype=str, sheet_name='После изменений', engine='xlrd')
+        df_skipped = pd.read_excel(attachment2, dtype=str, sheet_name='Пропущено', engine='xlrd')
+        self.assertEqual(len(df_created.index), 0)
+        self.assertEqual(len(df_deleted.index), 0)
+        self.assertEqual(len(df_before_update.index), 0)
+        self.assertEqual(len(df_after_update.index), 0)
+        self.assertEqual(len(df_skipped.index), 1)
+
+        attachment3 = open_workbook(file_contents=mail.outbox[2].attachments[0][1])
+        df_created = pd.read_excel(attachment3, dtype=str, sheet_name='Создано', engine='xlrd')
+        df_deleted = pd.read_excel(attachment3, dtype=str, sheet_name='Удалено', engine='xlrd')
+        df_before_update = pd.read_excel(attachment3, dtype=str, sheet_name='До изменений', engine='xlrd')
+        df_after_update = pd.read_excel(attachment3, dtype=str, sheet_name='После изменений', engine='xlrd')
+        df_skipped = pd.read_excel(attachment3, dtype=str, sheet_name='Пропущено', engine='xlrd')
+        self.assertEqual(len(df_created.index), 0)
+        self.assertEqual(len(df_deleted.index), 0)
+        self.assertEqual(len(df_before_update.index), 1)
+        self.assertEqual(len(df_after_update.index), 1)
+        self.assertEqual(len(df_skipped.index), 0)
+        self.assertTrue(df_before_update['ДатаОкончанияРаботы'][0].startswith('2022-10-02'))
+        self.assertTrue(df_after_update['ДатаОкончанияРаботы'][0].startswith('2024-05-24'))
+
+    def test_batch_update_or_create_dry_run(self):
+        employments_count_before = Employment.objects.filter(code__isnull=False).count()
+        dt_now = date(2021, 12, 6)
+
+        options = {
+            'by_code': True,
+            'delete_scope_fields_list': [
+                'employee_id',
+            ],
+            'delete_scope_filters': {
+                'dt_hired__lte': (dt_now + relativedelta(months=1)).replace(day=1) - timedelta(days=1),
+                'dt_fired__gte_or_isnull': dt_now.replace(day=1),
+            },
+            'dry_run': True,
+        }
+        data = {
+            'data': [
+                {
+                    'code': 'e_new',
+                    'position_code': self.worker_position.code,
+                    'dt_hired': (dt_now - timedelta(days=300)).strftime('%Y-%m-%d'),
+                    'dt_fired': (dt_now + timedelta(days=300)).strftime('%Y-%m-%d'),
+                    'shop_code': self.shop2.code,
+                    'username': self.user2.username,
+                    'tabel_code': self.employee2.tabel_code,
+                },
+            ],
+            'options': options,
+        }
+
+        resp = self.client.post(
+            self.get_url('Employment-batch-update-or-create'), self.dump_data(data),
+            content_type='application/json')
+        self.assertEqual(resp.status_code, 200)
+        self.assertDictEqual(
+            resp.json(),
+            {
+                "stats": {
+                    "Employment": {
+                        "created": 1,
+                        "deleted": 1
+                    }
+                }
+            }
+        )
+
+        employments_count_after = Employment.objects.filter(code__isnull=False).count()
+        self.assertEqual(employments_count_before, employments_count_after)
+        self.assertFalse(Employment.objects.filter(code='e_new').exists())
