@@ -12,7 +12,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Django REST framework\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2021-12-06 07:49+0000\n"
+"POT-Creation-Date: 2021-12-09 13:04+0000\n"
 "PO-Revision-Date: 2017-08-03 14:58+0000\n"
 "Last-Translator: Grigory Mishchenko <grishkokot@gmail.com>\n"
 "Language-Team: Russian (http://www.transifex.com/django-rest-framework-1/"
@@ -49,37 +49,37 @@ msgstr "Настройки форматов"
 msgid "Timetable settings"
 msgstr "Настройки графика"
 
-#: src/base/admin.py:129
+#: src/base/admin.py:128
 #, fuzzy
 #| msgid "Timetable settings"
 msgid "Timesheet settings"
 msgstr "Настройки графика"
 
-#: src/base/admin.py:134
+#: src/base/admin.py:133
 msgid "Integration settings"
 msgstr "Настройки интеграции"
 
-#: src/base/admin.py:141
+#: src/base/admin.py:140
 msgid "Default settings"
 msgstr "Настройки по умолчанию"
 
-#: src/base/admin.py:142 src/base/admin.py:205
+#: src/base/admin.py:141 src/base/admin.py:204
 msgid "Other"
 msgstr "Прочее"
 
-#: src/base/admin.py:200
+#: src/base/admin.py:199
 msgid "Personal info"
 msgstr "Персональные данные"
 
-#: src/base/admin.py:201
+#: src/base/admin.py:200
 msgid "Permissions"
 msgstr "Доступы"
 
-#: src/base/admin.py:204
+#: src/base/admin.py:203
 msgid "Important dates"
 msgstr "Важные даты"
 
-#: src/base/admin.py:230
+#: src/base/admin.py:229
 #, python-format
 msgid "%(name)s object with primary key %(key)r does not exist."
 msgstr ""
@@ -299,11 +299,11 @@ msgstr "Отображать блок биометрии в деталях со�
 msgid "Fines settings"
 msgstr "Настройки штрафов"
 
-#: src/base/models.py:234
+#: src/base/models.py:232
 msgid "Maximum shift length (in seconds)"
 msgstr "Максимальная длительность смены (в секундах)"
 
-#: src/base/models.py:236
+#: src/base/models.py:234
 msgid ""
 "Skip the creation of a departure mark if more than the Maximum shift length "
 "has passed since the opening of the previous shift"
@@ -311,11 +311,11 @@ msgstr ""
 "Пропускать создание отметки об уходе, если с момента открытия предыдущей "
 "смены прошло больше, чем максимальная длительность смены."
 
-#: src/base/models.py:241
+#: src/base/models.py:239
 msgid "Create attendance record without check photo."
 msgstr "Создавать отметки без проверки биометрии."
 
-#: src/base/models.py:245
+#: src/base/models.py:243
 msgid ""
 "Max difference between the start or end time to \"pull\" to the planned work "
 "day"
@@ -323,7 +323,7 @@ msgstr ""
 "Максимальная разность между временем начала или окончания для \"притягивания"
 "\" к рабочему дню"
 
-#: src/base/models.py:383 src/base/models.py:389
+#: src/base/models.py:381 src/base/models.py:387
 #, python-brace-format
 msgid ""
 "Bad break triplet format {triplet}, should be [[int, int, [int, int,]],]."
@@ -331,42 +331,42 @@ msgstr ""
 "Некорректный формат перерыва {triplet}, должно быть [[int, int, [int, "
 "int,]],]."
 
-#: src/base/models.py:386
+#: src/base/models.py:384
 #, python-brace-format
 msgid "First value of period can not be greater then second value: {triplet}"
 msgstr ""
 "Первое значение периода не может быть больше второго значения: {triplet}"
 
-#: src/base/models.py:392
+#: src/base/models.py:390
 #, python-brace-format
 msgid "Value of break can not be greater than value of period: {triplet}"
 msgstr "Значение перерыва не может быть больше значения периода: {triplet}"
 
-#: src/base/models.py:576
+#: src/base/models.py:574
 #, python-brace-format
 msgid "Shop with parent_code={code} not found"
 msgstr "Подразделение с parent_code={code} не найдено"
 
-#: src/base/models.py:719
+#: src/base/models.py:718
 msgid "Keys of open times and close times are different."
 msgstr "Ключи в времени открытия и времени закрытия различаются."
 
-#: src/base/models.py:721
+#: src/base/models.py:720
 msgid "'All' and individual days cannot be specified."
 msgstr "Нельзя указывать all и отдельные дни."
 
-#: src/base/models.py:734
+#: src/base/models.py:733
 msgid ""
 "It is not possible to change the load template as it is in the calculation "
 "process."
 msgstr ""
 "Невозможно изменить шаблон нагрузки, так как он находится в процессе расчета."
 
-#: src/base/models.py:748
+#: src/base/models.py:747
 msgid "There is not load template with code {}."
 msgstr "Шаблон нагрузки с кодом {} не найден."
 
-#: src/base/models.py:1358
+#: src/base/models.py:1357
 msgid ""
 "Unable to define worker access group. Assign an access group to him or a "
 "position associated with an access group."
@@ -378,51 +378,51 @@ msgstr ""
 msgid "shop_id should be defined"
 msgstr "Произошла ошибка. Попробуйте перезагрузить страницу."
 
-#: src/base/serializers.py:232
+#: src/base/serializers.py:231
 msgid "The employee's tabel code must be unique"
 msgstr "Табельный номер сотрудника должен быть уникален."
 
-#: src/base/serializers.py:262
+#: src/base/serializers.py:261
 msgid "Passwords are mismatched."
 msgstr "Пароли не совпадают."
 
-#: src/base/serializers.py:263
+#: src/base/serializers.py:262
 msgid "Password is wrong."
 msgstr "Неверный пароль."
 
-#: src/base/serializers.py:334
+#: src/base/serializers.py:333
 #, python-brace-format
 msgid "Employment from {dt_hired} to {dt_fired} already exists."
 msgstr ""
 "В этом магазине уже заведено трудоустройство с {dt_hired} по {dt_fired}."
 
-#: src/base/serializers.py:335 src/timetable/worker_day/serializers.py:132
+#: src/base/serializers.py:334 src/timetable/worker_day/serializers.py:132
 #, python-brace-format
 msgid "There is {amount} models of user with username: {username}."
 msgstr ""
 "Существует {amount} моделей пользователя с именем пользователя: {username}."
 
-#: src/base/serializers.py:336
+#: src/base/serializers.py:335
 #, python-brace-format
 msgid "There is {amount} models of user with user_id: {user_id}."
 msgstr "Существует {amount} моделей пользователя с user_id: {user_id}."
 
-#: src/base/serializers.py:337 src/tasks/serializers.py:19
+#: src/base/serializers.py:336 src/tasks/serializers.py:19
 #: src/tasks/serializers.py:20
 #, python-brace-format
 msgid "There is {amount} models of shop with code: {code}."
 msgstr "Есть {amount} магазинов с кодом: {code}."
 
-#: src/base/serializers.py:338
+#: src/base/serializers.py:337
 #, python-brace-format
 msgid "There is {amount} models of position with code: {code}."
 msgstr "Есть {amount} должностей с кодом: {code}."
 
-#: src/base/serializers.py:339
+#: src/base/serializers.py:338
 msgid "You are not allowed to choose shops from other network."
 msgstr "Вы не можете выбирать магазины из другой сети."
 
-#: src/base/serializers.py:340
+#: src/base/serializers.py:339
 msgid "Network of shop and position should be equal."
 msgstr "Сети магазина и должности должны совпадать."
 
@@ -442,13 +442,13 @@ msgstr "Есть {amount} графиков работы с кодом: {code}."
 msgid "Invalid time format. Format should be {format}"
 msgstr "Неверный формат времени. Должен быть {format}"
 
-#: src/base/shop/serializers.py:153
+#: src/base/shop/serializers.py:154
 #, python-brace-format
 msgid "Invalid key value {key}. Allowed values: {possible_keys}."
 msgstr ""
 "Недопустимое значение ключа {key}. Допустимые значения: {possible_keys}."
 
-#: src/base/shop/serializers.py:157
+#: src/base/shop/serializers.py:158
 #, python-brace-format
 msgid ""
 "Invalid time format {time} for value {key}. The format must be {format}."
@@ -934,111 +934,111 @@ msgid ""
 "одного сотрудника запрещено. ({error_str})"
 msgstr ""
 
-#: src/timetable/models.py:1578
+#: src/timetable/models.py:1601
 msgid "Fact"
 msgstr "Факт"
 
-#: src/timetable/models.py:1579
+#: src/timetable/models.py:1602
 msgid "Main"
 msgstr "Осн"
 
-#: src/timetable/models.py:1580
+#: src/timetable/models.py:1603
 msgid "Additional"
 msgstr "Доп"
 
-#: src/timetable/models.py:1589
+#: src/timetable/models.py:1612
 #, fuzzy
 #| msgid "Timetable"
 msgid "Planned timetable"
 msgstr "Расписание"
 
-#: src/timetable/models.py:1590
+#: src/timetable/models.py:1613
 msgid "Actual timetable"
 msgstr "Фактический график"
 
-#: src/timetable/models.py:1591
+#: src/timetable/models.py:1614
 msgid "Manual changes"
 msgstr "Ручные изменения"
 
-#: src/timetable/models.py:1592
+#: src/timetable/models.py:1615
 msgid "Determined by the system"
 msgstr "Определено системой"
 
-#: src/timetable/models.py:1970 src/timetable/models.py:1998
+#: src/timetable/models.py:1993 src/timetable/models.py:2021
 msgid "You have no active employment"
 msgstr "У вас нет активного трудоустройства"
 
-#: src/timetable/models.py:2243
+#: src/timetable/models.py:2266
 msgid "Automatic create vacancies"
 msgstr "Автоматически создавать вакансии"
 
-#: src/timetable/models.py:2245
+#: src/timetable/models.py:2268
 msgid "Automatic delete vacancies"
 msgstr "Автоматически удалять вакансии"
 
-#: src/timetable/models.py:2247
+#: src/timetable/models.py:2270
 msgid "Automatic check lack timegap"
 msgstr "Период, за который проверяем"
 
-#: src/timetable/models.py:2249
+#: src/timetable/models.py:2272
 msgid "Automatic holiday worker select timegap"
 msgstr "С какого дня выводить с выходного"
 
-#: src/timetable/models.py:2251
+#: src/timetable/models.py:2274
 msgid "Automatic exchange"
 msgstr "Включить автоматическую биржу смен"
 
-#: src/timetable/models.py:2253
+#: src/timetable/models.py:2276
 msgid "Max working hours"
 msgstr "Максимальное количество рабочих часов в месяц для вывода с выходного"
 
-#: src/timetable/models.py:2255
+#: src/timetable/models.py:2278
 msgid "Constraints"
 msgstr "Ограничения"
 
-#: src/timetable/models.py:2256
+#: src/timetable/models.py:2279
 msgid "Exclude positions"
 msgstr "Должности которые не участвуют в обмене сменами"
 
-#: src/timetable/models.py:2258
+#: src/timetable/models.py:2281
 msgid "Automatic create vacancy lack min"
 msgstr "Минимальная потребность в сотруднике при создании вакансии"
 
-#: src/timetable/models.py:2260
+#: src/timetable/models.py:2283
 msgid "Automatic delete vacancy lack max"
 msgstr "Максимальная потребность в сотруднике для удалении вакансии"
 
-#: src/timetable/models.py:2263
+#: src/timetable/models.py:2286
 msgid "Automatic worker select timegap"
 msgstr "Только автоназначение сотрудников"
 
-#: src/timetable/models.py:2265
+#: src/timetable/models.py:2288
 msgid "Automatic worker select timegap to"
 msgstr "Период за который делаем обмен сменами"
 
-#: src/timetable/models.py:2267
+#: src/timetable/models.py:2290
 msgid "Automatic worker select overflow min"
 msgstr "Дробное число, на какую долю сотрудник не занят, чтобы совершить обмен"
 
-#: src/timetable/models.py:2270
+#: src/timetable/models.py:2293
 msgid "Working shift min hours"
 msgstr "Минимальная длина смены"
 
-#: src/timetable/models.py:2271
+#: src/timetable/models.py:2294
 msgid "Working shift max hours"
 msgstr "Максимальная длина смены"
 
-#: src/timetable/models.py:2274
+#: src/timetable/models.py:2297
 msgid "Automatic worker select tree level"
 msgstr ""
 "Расстояние до родителя, в поддереве которого ищем сотрудников для "
 "автоназначения"
 
-#: src/timetable/models.py:2277
+#: src/timetable/models.py:2300
 msgid "Outsourcing companies"
 msgstr "Аутсорс компании"
 
-#: src/timetable/models.py:2278
+#: src/timetable/models.py:2301
 msgid ""
 "Outsourcing companies that will be able to respond to an automatically "
 "created vacancy"
@@ -1046,15 +1046,15 @@ msgstr ""
 "Аутсорс компании, которым можно будет откликаться на автоматически созданную "
 "вакансию"
 
-#: src/timetable/models.py:2307
+#: src/timetable/models.py:2330
 msgid "Create/update"
 msgstr "Создание/изменение"
 
-#: src/timetable/models.py:2309
+#: src/timetable/models.py:2332
 msgid "Remove"
 msgstr "Удаление"
 
-#: src/timetable/models.py:2310
+#: src/timetable/models.py:2333
 msgid "Approve"
 msgstr "Подтверждение"
 
@@ -1070,7 +1070,7 @@ msgstr "Дата окончания должна быть равна после�
 msgid "Recalculation can only be run for 1 month."
 msgstr "Пересчет можно запускать только для 1 месяца."
 
-#: src/timetable/timesheet/views.py:173 src/timetable/worker_day/views.py:1554
+#: src/timetable/timesheet/views.py:173 src/timetable/worker_day/views.py:1555
 msgid "No employees satisfying the conditions."
 msgstr "Не найдено сотрудников удовлетворяющих условиям запроса."
 
@@ -1293,7 +1293,7 @@ msgstr ""
 "У сотрудника {user.first_name} {user.last_name} в строке {i} неправильное "
 "значение: {value}."
 
-#: src/timetable/worker_day/utils.py:260 src/timetable/worker_day/utils.py:410
+#: src/timetable/worker_day/utils.py:261 src/timetable/worker_day/utils.py:411
 msgid ""
 "It is not possible to create days on the selected dates. Please check "
 "whether the employee has active employment."
@@ -1346,27 +1346,32 @@ msgstr ""
 msgid "There is no such user in your network."
 msgstr "В вашей сети нет такого пользователя."
 
-#: src/timetable/worker_day/views.py:920
+#: src/timetable/worker_day/views.py:101
+#, python-brace-format
+msgid "Employee {employee} is not your subordinate."
+msgstr "Сотрудник {employee} не является Вашим подчиненным."
+
+#: src/timetable/worker_day/views.py:921
 msgid "This vacancy does not exist or has already been approved."
 msgstr "Такой вакансии не существует или она уже подтверждена."
 
-#: src/timetable/worker_day/views.py:923
+#: src/timetable/worker_day/views.py:924
 msgid "You can not approve vacancy from other network."
 msgstr "Вы не можете подтвердить вакансию из другой сети."
 
-#: src/timetable/worker_day/views.py:970
+#: src/timetable/worker_day/views.py:971
 msgid "There is no such vacancy."
 msgstr "Такой вакансии не существует"
 
-#: src/timetable/worker_day/views.py:974
+#: src/timetable/worker_day/views.py:975
 msgid "The vacancy cannot be edited because it has already been responded."
 msgstr "Невозможно отредактировать вакансию, так как на неё уже откликнулись."
 
-#: src/timetable/worker_day/views.py:1479
+#: src/timetable/worker_day/views.py:1480
 msgid "{}_timesheet_for_shop_{}_from_{}.{}"
 msgstr "{}_табель_для_подразделения_{}_от_{}.{}"
 
-#: src/timetable/worker_day/views.py:1560
+#: src/timetable/worker_day/views.py:1561
 msgid "Hours recalculation started successfully."
 msgstr "Пересчет часов успешно запущен."
 

@@ -17,9 +17,9 @@ from django.db.models.query import QuerySet
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from model_utils import FieldTracker
-from rest_framework.exceptions import ValidationError
+from rest_framework.exceptions import PermissionDenied, ValidationError
 
-from src.base.models import Shop, Employment, User, Event, Network, Break, ProductionDay, Employee
+from src.base.models import Shop, Employment, User, Event, Network, Break, ProductionDay, Employee, Group
 from src.base.models_abstract import AbstractModel, AbstractActiveModel, AbstractActiveNetworkSpecificCodeNamedModel, \
     AbstractActiveModelManager
 from src.events.signals import event_signal
@@ -639,7 +639,8 @@ class WorkerDay(AbstractModel):
         wd_type_id = obj_dict.get('type_id') or obj_dict.get('type').code
         dt = obj_dict.get('dt')
         shop_id = obj_dict.get('shop_id')
-        k = f'{graph_type}_{action}_{wd_type_id}_{shop_id}'
+        employee_id = obj_dict.get('employee_id')
+        k = f'{graph_type}_{action}_{wd_type_id}_{shop_id}_{employee_id}'
         create_or_update_perms_data.setdefault(k, set()).add(dt)
 
     @classmethod
@@ -653,7 +654,17 @@ class WorkerDay(AbstractModel):
         from src.timetable.worker_day.utils import check_worker_day_permissions
         from src.timetable.worker_day.views import WorkerDayViewSet
         action = WorkerDayPermission.DELETE
-        grouped_qs =  delete_qs.values(
+        employees_and_shops = delete_qs.values_list(
+            'employee_id',
+            'shop_id',
+        ).distinct()
+        for employee_id, shop_id in employees_and_shops:
+            if not cls._has_group_permissions(user, employee_id, shop_id):
+                raise PermissionDenied(
+                    WorkerDayViewSet.error_messages['employee_not_in_subordinates'].format(
+                    employee=User.objects.filter(employees__id=employee_id).first().fio),
+                )
+        grouped_qs = delete_qs.values(
             'is_fact',
             'type_id',
             'shop_id',
@@ -685,9 +696,11 @@ class WorkerDay(AbstractModel):
         from src.timetable.worker_day.utils import check_worker_day_permissions
         from src.timetable.worker_day.views import WorkerDayViewSet
         for k, dates_set in create_or_update_perms_data.items():
-            graph_type, action, wd_type_id, shop_id = k.split('_')
+            graph_type, action, wd_type_id, shop_id, employee_id = k.split('_')
             if shop_id == 'None':
                 shop_id = None
+            if employee_id == 'None':
+                employee_id = None
             check_worker_day_permissions(
                 user=user,
                 shop_id=shop_id,
@@ -724,6 +737,16 @@ class WorkerDay(AbstractModel):
             'dttm_work_end_tabel',
             'work_hours',
         }
+
+    @classmethod
+    def _has_group_permissions(cls, user, employee_id, shop_id=None):
+        if not employee_id:
+            return True
+        employee = Employee.objects.select_related('user').get(id=employee_id)
+        shop = None
+        if shop_id:
+            shop = Shop.objects.get(id=shop_id)
+        return Group.check_has_perm_to_group(user, groups=employee.user.get_group_ids(shop))
 
     def calc_day_and_night_work_hours(self):
         from src.util.models_converter import Converter
