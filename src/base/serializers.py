@@ -366,12 +366,9 @@ class EmploymentSerializer(serializers.ModelSerializer):
         create_only_fields = ['employee_id']
         read_only_fields = []
         extra_kwargs = {
-            'auto_timetable': {
-                'default': True,
-            },
-            'is_visible': {
-                'default': True,
-            },
+            'code': {
+                'validators': []
+            }
         }
         timetable_fields = [
             'function_group_id', 'is_fixed_hours', 'salary', 'week_availability', 'norm_work_hours', 'shift_hours_length_min', 
