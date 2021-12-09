@@ -1,4 +1,5 @@
 import os
+import requests
 from django.db.models.expressions import Exists, OuterRef
 from django.utils.timezone import now
 from datetime import datetime, timedelta, date
@@ -160,6 +161,8 @@ def export_workers_zkteco():
                 code=pin
             )
             print(f'Added user {user} to zkteco with ext code {user_code.code}')
+            if user.avatar:
+                zkteco.export_biophoto(user_code.code, user.avatar)
 
             for shop_code in shop_codes:
                 res_area = zkteco.add_personarea(user_code, shop_code.attendance_area)
@@ -269,6 +272,9 @@ def export_or_delete_employment_zkteco(employment_id):
                 res = zkteco.add_user(user_code.user, user_code.code)
                 if 'code' in res and res['code'] == 0:
                     print(f'Added user {user_code.user} to zkteco with ext code {user_code.code}')
+                    user = employment.employee.user
+                    if user.avatar:
+                        zkteco.export_biophoto(user_code.code, user.avatar)
                 else:
                     raise ValueError(f'Error in {res} while saving user {user_code.user} to zkteco')
             res_area = zkteco.add_personarea(user_code, shop_code.attendance_area)
@@ -287,3 +293,22 @@ def export_or_delete_employment_zkteco(employment_id):
                     print(f"Delete userexternalcode for fired user {user_code.user}")
             else:
                 print(f"Failed delete area and userexternalcode for fired user {employment}: {res}")
+
+@app.task
+def export_user_biophoto(pin, encoded_photo):
+    raw_body = f'BIOPHOTO PIN={pin}\tFileName={pin}.jpg\tType=9\tSize={len(encoded_photo)}\tContent={encoded_photo}'
+    headers = {
+        'Content-Length': len(raw_body),
+        'Host': settings.ZKTECO_BIOHOST,
+    }
+    params = {
+        'SN': settings.ZKTECO_SNTERMINAL,
+        'table': 'OPERLOG',
+    }
+    response = requests.post(
+        f'http://{settings.ZKTECO_BIOHOST}/iclock/cdata', 
+        data=raw_body, 
+        headers=headers, 
+        params=params,
+    )
+    print(f"Recieved from bio host: status {response.status_code}, body {response.content}")
