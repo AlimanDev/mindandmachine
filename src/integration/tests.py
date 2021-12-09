@@ -163,6 +163,28 @@ class TestIntegration(APITestCase):
             self.employment2.save()
             delete_workers_zkteco()
         self.assertEqual(UserExternalCode.objects.count(), 4)
+
+    def test_delete_workers_many_shops_to_one_zone(self):
+        ShopExternalCode.objects.create(
+            attendance_area=self.att_area,
+            shop=self.shop,
+        )
+        ShopExternalCode.objects.create(
+            attendance_area=self.att_area,
+            shop=self.shop2,
+        )
+        with patch('src.integration.zkteco.requests', new_callable=TestRequestMock) as mock_request:
+            export_workers_zkteco()
+            self.assertEqual(UserExternalCode.objects.count(), 5)
+            self.employment2.dt_fired = date.today() - timedelta(days=2)
+            self.employment2.save()
+            Employment.objects.create(
+                employee_id=self.employment2.employee_id,
+                shop_id=self.shop2.id,
+                position=self.position,
+            )
+            delete_workers_zkteco()
+        self.assertEqual(UserExternalCode.objects.count(), 5)
     
     def test_import_urv(self):
         TestRequestMock.responses["/transaction/listAttTransaction"] = default_transaction_response
