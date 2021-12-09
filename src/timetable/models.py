@@ -2028,13 +2028,26 @@ class AttendanceRecords(AbstractModel):
                     ]
                 )
         elif active_user_empl:
-            employment_work_type = EmploymentWorkType.objects.filter(
-                employment=active_user_empl).order_by('-priority').first()
-            if employment_work_type:
+            work_type_id = getattr(
+                EmploymentWorkType.objects.filter(
+                    employment=active_user_empl,
+                ).order_by('-priority').first(), 
+                'work_type_id', 
+                None,
+            ) or\
+            getattr(
+                WorkType.objects.filter(
+                    Q(dttm_deleted__isnull=True)|Q(dttm_deleted__gte=timezone.now()),
+                    shop_id=active_user_empl.shop_id,
+                ).first(),
+                'id',
+                None,
+            )
+            if work_type_id:
                 WorkerDayCashboxDetails.objects.create(
                     work_part=1,
                     worker_day=fact_approved,
-                    work_type_id=employment_work_type.work_type_id,
+                    work_type_id=work_type_id,
                 )
 
     def _create_or_update_not_approved_fact(self, fact_approved):
