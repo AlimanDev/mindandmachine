@@ -77,7 +77,7 @@ class WdPermission(Permission):
                 wd_dt=request.data.get('dt'),
             ) and WorkerDay._has_group_permissions(request.user, request.data.get('employee_id'), request.data.get('shop_id'))
         elif view_action == 'destroy':
-            wd_dict = WorkerDay.objects.filter(id=view.kwargs['pk']).values('type', 'dt', 'is_fact').first()
+            wd_dict = WorkerDay.objects.filter(id=view.kwargs['pk']).values('type', 'dt', 'is_fact', 'employee_id', 'shop_id').first()
             if not wd_dict:
                 return False
             return GroupWorkerDayPermission.has_permission(
@@ -86,7 +86,7 @@ class WdPermission(Permission):
                 graph_type=WorkerDayPermission.FACT if wd_dict.get('is_fact') else WorkerDayPermission.PLAN,
                 wd_type=wd_dict.get('type'),
                 wd_dt=wd_dict.get('dt'),
-            ) and WorkerDay._has_group_permissions(request.user, request.data.get('employee_id'), request.data.get('shop_id'))
+            ) and WorkerDay._has_group_permissions(request.user, wd_dict.get('employee_id'), wd_dict.get('shop_id'))
 
         return has_permission
 

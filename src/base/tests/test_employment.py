@@ -414,6 +414,7 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
         self.assertIsNone(resp.json()['function_group_id'])
 
     def test_change_function_group_tmp_no_perm(self):
+        self.admin_group.subordinates.clear()
         self.admin_group.subordinates.add(self.employee_group)
         put_data = {
             'function_group_id': self.chief_group.id,
@@ -734,6 +735,7 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
         self.assertEquals(self.employment3.position_id, assert_position_id)
 
     def test_update_worker_position_permissions(self):
+        self.admin_group.subordinates.clear()
         self.employment3.worker_position = None
         self.employment3.save()
         worker_position_with_chief_group = WorkerPosition.objects.create(
@@ -782,6 +784,7 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
         self.assertEquals(self.employment3.function_group_id, assert_group_id)
 
     def test_update_group_permissions(self):
+        self.admin_group.subordinates.clear()
         self.employment3.function_group_id = None
         self.employment3.worker_position = None
         self.employment3.save()

@@ -104,6 +104,7 @@ class TestAutoWorkerExchange(APITestCase):
                 worker_day_permission=wdp,
             ) for wdp in WorkerDayPermission.objects.all()
         )
+        cls.admin_group.subordinates.add(*Group.objects.all())
         
         cls.root_shop = Shop.objects.create(
             name='SuperShop1',

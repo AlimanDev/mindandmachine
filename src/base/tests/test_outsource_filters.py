@@ -53,6 +53,7 @@ class TestOutsource(TestsHelperMixin, APITestCase):
                 level_down=99,
             ) for func, _ in FunctionGroup.FUNCS_TUPLE for method, _ in FunctionGroup.METHODS_TUPLE
         ])
+        cls.cleint_admin_group.subordinates.add(*Group.objects.all())
         GroupWorkerDayPermission.objects.bulk_create(
             GroupWorkerDayPermission(
                 group=cls.cleint_admin_group,

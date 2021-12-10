@@ -1609,6 +1609,7 @@ class WorkerDayViewSet(BaseModelViewSet):
             data['dt_to'],
             self.error_messages,
             wd_types_dict=wd_types_dict,
+            employee_id=data.get('employee_id'),
         )
         response = WorkerDaySerializer(
             create_worker_days_range(

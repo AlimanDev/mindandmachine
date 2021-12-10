@@ -711,6 +711,7 @@ class WorkerDay(AbstractModel):
                 dt_to=max(dates_set),
                 error_messages=WorkerDayViewSet.error_messages,
                 wd_types_dict=kwargs.get('wd_types_dict'),
+                employee_id=employee_id,
             )
 
     @classmethod

@@ -56,6 +56,7 @@ class MultipleActiveEmploymentsSupportMixin(TestsHelperMixin):
 
         cls.group1 = GroupFactory(network=cls.network)
         cls.group2 = GroupFactory(network=cls.network)
+        cls.group1.subordinates.add(cls.group1, cls.group2)
 
         cls.work_type3_other = WorkTypeFactory(
             shop=cls.shop3,
