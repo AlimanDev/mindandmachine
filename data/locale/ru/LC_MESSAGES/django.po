@@ -12,7 +12,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Django REST framework\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2021-12-09 13:04+0000\n"
+"POT-Creation-Date: 2021-12-10 08:59+0000\n"
 "PO-Revision-Date: 2017-08-03 14:58+0000\n"
 "Last-Translator: Grigory Mishchenko <grishkokot@gmail.com>\n"
 "Language-Team: Russian (http://www.transifex.com/django-rest-framework-1/"
@@ -968,77 +968,77 @@ msgstr "Определено системой"
 msgid "You have no active employment"
 msgstr "У вас нет активного трудоустройства"
 
-#: src/timetable/models.py:2266
+#: src/timetable/models.py:2256
 msgid "Automatic create vacancies"
 msgstr "Автоматически создавать вакансии"
 
-#: src/timetable/models.py:2268
+#: src/timetable/models.py:2258
 msgid "Automatic delete vacancies"
 msgstr "Автоматически удалять вакансии"
 
-#: src/timetable/models.py:2270
+#: src/timetable/models.py:2260
 msgid "Automatic check lack timegap"
 msgstr "Период, за который проверяем"
 
-#: src/timetable/models.py:2272
+#: src/timetable/models.py:2262
 msgid "Automatic holiday worker select timegap"
 msgstr "С какого дня выводить с выходного"
 
-#: src/timetable/models.py:2274
+#: src/timetable/models.py:2264
 msgid "Automatic exchange"
 msgstr "Включить автоматическую биржу смен"
 
-#: src/timetable/models.py:2276
+#: src/timetable/models.py:2266
 msgid "Max working hours"
 msgstr "Максимальное количество рабочих часов в месяц для вывода с выходного"
 
-#: src/timetable/models.py:2278
+#: src/timetable/models.py:2268
 msgid "Constraints"
 msgstr "Ограничения"
 
-#: src/timetable/models.py:2279
+#: src/timetable/models.py:2269
 msgid "Exclude positions"
 msgstr "Должности которые не участвуют в обмене сменами"
 
-#: src/timetable/models.py:2281
+#: src/timetable/models.py:2271
 msgid "Automatic create vacancy lack min"
 msgstr "Минимальная потребность в сотруднике при создании вакансии"
 
-#: src/timetable/models.py:2283
+#: src/timetable/models.py:2273
 msgid "Automatic delete vacancy lack max"
 msgstr "Максимальная потребность в сотруднике для удалении вакансии"
 
-#: src/timetable/models.py:2286
+#: src/timetable/models.py:2276
 msgid "Automatic worker select timegap"
 msgstr "Только автоназначение сотрудников"
 
-#: src/timetable/models.py:2288
+#: src/timetable/models.py:2278
 msgid "Automatic worker select timegap to"
 msgstr "Период за который делаем обмен сменами"
 
-#: src/timetable/models.py:2290
+#: src/timetable/models.py:2280
 msgid "Automatic worker select overflow min"
 msgstr "Дробное число, на какую долю сотрудник не занят, чтобы совершить обмен"
 
-#: src/timetable/models.py:2293
+#: src/timetable/models.py:2283
 msgid "Working shift min hours"
 msgstr "Минимальная длина смены"
 
-#: src/timetable/models.py:2294
+#: src/timetable/models.py:2284
 msgid "Working shift max hours"
 msgstr "Максимальная длина смены"
 
-#: src/timetable/models.py:2297
+#: src/timetable/models.py:2287
 msgid "Automatic worker select tree level"
 msgstr ""
 "Расстояние до родителя, в поддереве которого ищем сотрудников для "
 "автоназначения"
 
-#: src/timetable/models.py:2300
+#: src/timetable/models.py:2290
 msgid "Outsourcing companies"
 msgstr "Аутсорс компании"
 
-#: src/timetable/models.py:2301
+#: src/timetable/models.py:2291
 msgid ""
 "Outsourcing companies that will be able to respond to an automatically "
 "created vacancy"
@@ -1046,15 +1046,15 @@ msgstr ""
 "Аутсорс компании, которым можно будет откликаться на автоматически созданную "
 "вакансию"
 
-#: src/timetable/models.py:2330
+#: src/timetable/models.py:2320
 msgid "Create/update"
 msgstr "Создание/изменение"
 
-#: src/timetable/models.py:2332
+#: src/timetable/models.py:2322
 msgid "Remove"
 msgstr "Удаление"
 
-#: src/timetable/models.py:2333
+#: src/timetable/models.py:2323
 msgid "Approve"
 msgstr "Подтверждение"
 
@@ -1070,7 +1070,7 @@ msgstr "Дата окончания должна быть равна после�
 msgid "Recalculation can only be run for 1 month."
 msgstr "Пересчет можно запускать только для 1 месяца."
 
-#: src/timetable/timesheet/views.py:173 src/timetable/worker_day/views.py:1555
+#: src/timetable/timesheet/views.py:173 src/timetable/worker_day/views.py:1568
 msgid "No employees satisfying the conditions."
 msgstr "Не найдено сотрудников удовлетворяющих условиям запроса."
 
@@ -1137,6 +1137,18 @@ msgid ""
 "already entered this vacancy."
 msgstr ""
 "Вы не можете переназначить сотрудника на данную вакансию, так как сотрудник "
+"уже вышел на данную вакансию."
+
+#: src/timetable/vacancy/utils.py:603
+msgid "Vacancy successfully refused."
+msgstr "Вакансия успешно отозвана."
+
+#: src/timetable/vacancy/utils.py:604
+msgid ""
+"You can't refuse vacancy, because the employee has already entered this "
+"vacancy."
+msgstr ""
+"Вы не можете отозвать вакансию, так как сотрудник "
 "уже вышел на данную вакансию."
 
 #: src/timetable/worker_day/serializers.py:130

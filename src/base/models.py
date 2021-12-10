@@ -1577,6 +1577,7 @@ class FunctionGroup(AbstractModel):
         ('WorkerDay_exchange_approved', 'Обмен подтвержденными сменами (Создать) (worker_day/exchange_approved/)'),
         ('WorkerDay_confirm_vacancy', 'Откликнуться вакансию (Создать) (worker_day/confirm_vacancy/)'),
         ('WorkerDay_confirm_vacancy_to_worker', 'Назначить работника на вакансию (Создать) (worker_day/confirm_vacancy_to_worker/)'),
+        ('WorkerDay_refuse_vacancy', 'Отказаться от вакансии (Создать) (worker_day/refuse_vacancy/)'),
         ('WorkerDay_reconfirm_vacancy_to_worker', 'Переназначить работника на вакансию (Создать) (worker_day/reconfirm_vacancy_to_worker/)'),
         ('WorkerDay_upload', 'Загрузить плановый график (Создать) (worker_day/upload/)'),
         ('WorkerDay_upload_fact', 'Загрузить фактический график (Создать) (worker_day/upload_fact/)'),

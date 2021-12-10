@@ -907,6 +907,20 @@ class WorkerDayViewSet(BaseModelViewSet):
         result = result['text']
 
         return Response({'result': result}, status=status_code)
+    
+    @swagger_auto_schema(
+        operation_description='''
+        Метод для отказа от вакансии
+        ''',
+    )
+    @action(detail=True, methods=['post'], serializer_class=None)
+    def refuse_vacancy(self, request, pk=None):
+        result = confirm_vacancy(pk, refuse=True)
+        status_code = result['status_code']
+        result = result['text']
+
+        return Response({'result': result}, status=status_code)
+
 
     @swagger_auto_schema(
         operation_description='''
