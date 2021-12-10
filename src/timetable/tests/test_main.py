@@ -4538,7 +4538,109 @@ class TestVacancy(TestsHelperMixin, APITestCase):
         vacancy = list(filter(lambda x: x['id'] == self.vacancy.id, response.json()['results']))[0]
         self.assertEquals(vacancy['cost_per_hour'], '120120.45')
         self.assertEquals(vacancy['total_cost'], 1171174.3875)
-        
+
+    def test_refuse_vacancy(self):
+        WorkerDay.objects.all().delete()
+        ShopMonthStat.objects.create(
+            shop=self.shop,
+            dt=self.dt_now.replace(day=1),
+            dttm_status_change=now(),
+            status=ShopMonthStat.READY,
+        )
+        pawd = WorkerDay.objects.create(
+            shop=self.shop,
+            employee=self.employee2,
+            employment=self.employment2,
+            type_id=WorkerDay.TYPE_HOLIDAY,
+            dt=self.dt_now,
+            is_approved=True,
+        )
+        vacancy = WorkerDay.objects.create(
+            is_vacancy=True,
+            dt=self.dt_now,
+            dttm_work_start=datetime.combine(self.dt_now, time(8)),
+            dttm_work_end=datetime.combine(self.dt_now, time(19)),
+            is_approved=True,
+            shop=self.shop,
+            type_id=WorkerDay.TYPE_WORKDAY,
+        )
+        # refuse empty vacancy, no errors
+        resp = self.client.post(self.get_url('WorkerDay-refuse-vacancy', pk=vacancy.id))
+        self.assertEquals(resp.status_code, 200)
+        self.assertEquals(resp.json(), {'result': 'Вакансия успешно отозвана.'})
+
+        # apply vacancy
+        response = self.client.post(
+            f'/rest_api/worker_day/{vacancy.id}/confirm_vacancy_to_worker/',
+            data={
+                'user_id': self.user2.id,
+            }
+        )
+        self.assertEqual(response.json(), {'result': 'Вакансия успешно принята.'})
+        vacancy.refresh_from_db()
+        self.assertEqual(vacancy.employee_id, self.employee2.id)
+        self.assertEqual(vacancy.employment_id, self.employment2.id)
+        self.assertIsNotNone(
+            WorkerDay.objects.filter(is_approved=False, type=WorkerDay.TYPE_WORKDAY, employee_id=self.employee2.id).first(),
+        )
+        # refuse vacancy, no errors
+        resp = self.client.post(self.get_url('WorkerDay-refuse-vacancy', pk=vacancy.id))
+        self.assertEquals(resp.status_code, 200)
+        self.assertEquals(resp.json(), {'result': 'Вакансия успешно отозвана.'})
+        vacancy.refresh_from_db()
+        self.assertIsNone(vacancy.employee_id)
+        self.assertIsNone(vacancy.employment_id)
+        self.assertIsNone(
+            WorkerDay.objects.filter(is_approved=False, type=WorkerDay.TYPE_WORKDAY, employee_id=self.employee2.id).first(),
+        )
+
+    def test_cant_refuse_vacancy_when_fact_exist(self):
+        WorkerDay.objects.all().delete()
+        ShopMonthStat.objects.create(
+            shop=self.shop,
+            dt=self.dt_now.replace(day=1),
+            dttm_status_change=now(),
+            status=ShopMonthStat.READY,
+        )
+        pawd = WorkerDay.objects.create(
+            employee=self.employee2,
+            employment=self.employment2,
+            type_id=WorkerDay.TYPE_HOLIDAY,
+            dt=self.dt_now,
+            is_approved=True,
+        )
+        vacancy = WorkerDay.objects.create(
+            is_vacancy=True,
+            dt=self.dt_now,
+            dttm_work_start=datetime.combine(self.dt_now, time(8)),
+            dttm_work_end=datetime.combine(self.dt_now, time(19)),
+            is_approved=True,
+            shop=self.shop,
+            type_id=WorkerDay.TYPE_WORKDAY,
+        )
+        response = self.client.post(
+            f'/rest_api/worker_day/{vacancy.id}/confirm_vacancy_to_worker/',
+            data={
+                'user_id': self.user2.id,
+            }
+        )
+        self.assertEqual(response.json(), {'result': 'Вакансия успешно принята.'})
+        vacancy.refresh_from_db()
+        self.assertEqual(vacancy.employee_id, self.employee2.id)
+        self.assertEqual(vacancy.employment_id, self.employment2.id)
+        self.assertIsNotNone(
+            WorkerDay.objects.filter(is_approved=False, type=WorkerDay.TYPE_WORKDAY, employee_id=self.employee2.id).first(),
+        )
+        AttendanceRecords.objects.create(
+            user=self.user2,
+            shop=self.shop,
+            dttm=datetime.combine(self.dt_now, time(7, 50)),
+            dt=self.dt_now,
+            type=AttendanceRecords.TYPE_COMING
+        )
+        resp = self.client.post(self.get_url('WorkerDay-refuse-vacancy', pk=vacancy.id))
+        self.assertEquals(resp.status_code, 400)
+        self.assertEquals(resp.json(), {'result': "Вы не можете отозвать вакансию, так как сотрудник уже вышел на данную вакансию."})
 
 class TestAditionalFunctions(TestsHelperMixin, APITestCase):
     USER_USERNAME = "user1"
