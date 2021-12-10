@@ -41,7 +41,7 @@ from src.timetable.models import (
     EmploymentWorkType,
     WorkerDayType,
 )
-from src.timetable.tests.factories import WorkerDayFactory, WorkerDayTypeFactory
+from src.timetable.tests.factories import WorkTypeFactory, WorkerDayFactory, WorkerDayTypeFactory
 from src.util.mixins.tests import TestsHelperMixin
 from src.util.models_converter import Converter
 from src.util.test import create_departments_and_users
@@ -4070,6 +4070,42 @@ class TestAttendanceRecords(TestsHelperMixin, APITestCase):
         self.assertIsNotNone(wd_created)
         self.assertIsNone(wd_created.dttm_work_start)
         self.assertEquals(wd_created.dttm_work_end, datetime(2021, 11, 12, 21, 23))
+
+    def test_work_type_created_without_employment_work_type_and_plan(self):
+        employment = self.employment5
+        dt = date.today()
+        work_type = WorkTypeFactory(
+            shop_id=employment.shop_id,
+            work_type_name__name="Работа",
+        )
+        WorkerDay.objects.filter(employee_id=employment.employee_id).delete()
+        AttendanceRecords.objects.create(
+            employee_id=employment.employee_id,
+            user_id=self.user5.id,
+            type=AttendanceRecords.TYPE_COMING,
+            dt=dt,
+            dttm=datetime.combine(dt, time(8, 10)),
+            shop_id=employment.shop_id,
+        )
+        wd_fact = WorkerDay.objects.filter(dt=dt, employee_id=employment.employee_id, is_fact=True, is_approved=True).first()
+        self.assertIsNotNone(wd_fact)
+        details = WorkerDayCashboxDetails.objects.filter(worker_day=wd_fact).first()
+        self.assertIsNotNone(details)
+        self.assertEquals(details.work_type_id, work_type.id)
+        WorkerDay.objects.filter(employee_id=employment.employee_id).delete()
+        AttendanceRecords.objects.create(
+            employee_id=employment.employee_id,
+            user_id=self.user5.id,
+            type=AttendanceRecords.TYPE_LEAVING,
+            dt=dt,
+            dttm=datetime.combine(dt, time(19, 10)),
+            shop_id=employment.shop_id,
+        )
+        wd_fact = WorkerDay.objects.filter(dt=dt, employee_id=employment.employee_id, is_fact=True, is_approved=True).first()
+        self.assertIsNotNone(wd_fact)
+        details = WorkerDayCashboxDetails.objects.filter(worker_day=wd_fact).first()
+        self.assertIsNotNone(details)
+        self.assertEquals(details.work_type_id, work_type.id)
 
 
 class TestVacancy(TestsHelperMixin, APITestCase):
