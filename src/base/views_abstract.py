@@ -14,7 +14,10 @@ class BatchUpdateOrCreateOptionsSerializer(serializers.Serializer):
         child=serializers.CharField(), required=False, allow_empty=False, allow_null=False)
     delete_scope_values_list = serializers.ListField(
         child=serializers.DictField(), required=False, allow_empty=False, allow_null=False)
+    delete_scope_filters = serializers.DictField(required=False)
     return_response = serializers.BooleanField(required=False, allow_null=False)
+    dry_run = serializers.BooleanField(required=False)
+    diff_report_email_to = serializers.ListField(child=serializers.CharField(), required=False)
 
 
 def _patch_obj_serializer(obj_serializer, update_key_field='id'):
@@ -63,13 +66,18 @@ class BatchUpdateOrCreateViewMixin:
         serializer.is_valid(raise_exception=True)
 
         options = serializer.validated_data.get('options', {})
+        delete_scope_filters = options.get('delete_scope_filters', {})
+        if options.get('by_code'):
+            delete_scope_filters.update({'code__isnull': False})
         objects, stats = self._get_model_from_serializer(serializer).batch_update_or_create(
             data=serializer.validated_data.get('data'),
             update_key_field='code' if options.get('by_code') else 'id',
             delete_scope_fields_list=options.get('delete_scope_fields_list'),
             delete_scope_values_list=options.get('delete_scope_values_list'),
-            delete_scope_filters={'code__isnull': False} if options.get('by_code') else None,
+            delete_scope_filters=delete_scope_filters,
             user=self.request.user if self.request.user.is_authenticated else None,
+            dry_run=options.get('dry_run', False),
+            diff_report_email_to=options.get('diff_report_email_to'),
         )
 
         res = {

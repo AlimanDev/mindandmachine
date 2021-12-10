@@ -1285,8 +1285,9 @@ class EmploymentQuerySet(AnnotateValueEqualityQSMixin, QuerySet):
         with transaction.atomic():
             wdays_ids = list(WorkerDay.objects.filter(employment__in=self).values_list('id', flat=True))
             WorkerDay.objects.filter(employment__in=self).update(employment_id=None)
-            self.update(dttm_deleted=timezone.now())
+            deleted_count = self.update(dttm_deleted=timezone.now())
             transaction.on_commit(lambda: clean_wdays.delay(id__in=wdays_ids))
+        return deleted_count, {'base.Employment': deleted_count}
 
 
 class Employee(AbstractModel):
@@ -1486,6 +1487,42 @@ class Employment(AbstractActiveModel):
         dt = dt or timezone.now().date()
         return (self.dt_hired is None or self.dt_hired <= dt) and (self.dt_fired is None or self.dt_fired >= dt)
 
+    @classmethod
+    def _get_batch_delete_manager(cls):
+        return cls.objects
+
+    @classmethod
+    def _get_batch_update_select_related_fields(cls):
+        return ['employee__user__network', 'shop__network', 'position']
+
+    @classmethod
+    def _get_diff_lookup_fields(cls):
+        return (
+            'code',
+            'shop__code',
+            'employee__tabel_code',
+            'position__code',
+            'norm_work_hours',
+            'dt_hired',
+            'dt_fired',
+        )
+
+    @classmethod
+    def _get_diff_headers(cls):
+        return (
+            'UIDзаписи',
+            'КодПодразделения',
+            'ТабельныйНомер',
+            'КодДолжности',
+            'Ставка',
+            'ДатаНачалаРаботы',
+            'ДатаОкончанияРаботы',
+        )
+
+    @classmethod
+    def _get_diff_report_subject_fmt(cls):
+        return 'Сверка трудоустройств от {dttm_now}'
+
 
 class FunctionGroup(AbstractModel):
     class Meta:
@@ -1519,6 +1556,8 @@ class FunctionGroup(AbstractModel):
         ('Employment_auto_timetable', 'Выбрать сорудников для автосоставления (Создать) (employment/auto_timetable/)'),
         ('Employment_timetable', 'Редактирование полей трудоустройства, связанных с расписанием (employment/timetable/)'),
         ('EmploymentWorkType', 'Связь трудоустройства и типа работ (employment_work_type)'),
+        ('Employment_batch_update_or_create',
+         'Массовое создание/обновление трудоустройств (Создать/Обновить) (employment/batch_update_or_create/)'),
         ('ExchangeSettings', 'Настройки обмена сменами (exchange_settings)'),
         ('FunctionGroupView', 'Доступ к функциям (function_group)'),
         ('FunctionGroupView_functions', 'Получить список доступных функций (Получить) (function_group/functions/)'),
