@@ -2157,6 +2157,7 @@ class AttendanceRecords(AbstractModel):
         employee_id, active_user_empl, dt, record_type, closest_plan_approved = self.get_day_data(
             self.dttm, self.user, self.shop, self.type)
         self.dt = dt
+        self.fact_wd = None
         self.type = self.type or record_type
         self.employee_id = self.employee_id or employee_id
         res = super(AttendanceRecords, self).save(*args, **kwargs)
@@ -2176,6 +2177,7 @@ class AttendanceRecords(AbstractModel):
             ).order_by('-is_equal_shops', '-is_closest_plan_approved_equal').first()
 
             if fact_approved:
+                self.fact_wd = fact_approved
                 if fact_approved.last_edited_by_id and (
                         recalc_fact_from_att_records and not self.user.network.edit_manual_fact_on_recalc_fact_from_att_records):
                     return
@@ -2239,6 +2241,7 @@ class AttendanceRecords(AbstractModel):
                         #'is_outsource': active_user_empl.shop.network_id != self.shop.network_id,
                     }
                 )
+                self.fact_wd = fact_approved
                 if _wd_created or not fact_approved.worker_day_details.exists():
                     self._create_wd_details(self.dt, fact_approved, active_user_empl, closest_plan_approved)
                 if _wd_created:
