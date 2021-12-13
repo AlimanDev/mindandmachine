@@ -294,7 +294,7 @@ class TickViewSet(BaseModelViewSet):
         )
 
         if request.user.network.trust_tick_request:
-            record = AttendanceRecords.objects.create(
+            AttendanceRecords.objects.create(
                 user_id=tick.user_id,
                 employee_id=employee_id,
                 dttm=check_time,
@@ -302,9 +302,6 @@ class TickViewSet(BaseModelViewSet):
                 shop_id=tick.tick_point.shop_id,
                 type=tick.type,
             )
-            if record.fact_wd and record.fact_wd.closest_plan_approved:
-                tick.lateness = LATENESS_LAMBDA.get(tick.type, lambda x, y: None)(tick.dttm, record.fact_wd.closest_plan_approved)
-                tick.save()
 
         return Response(TickSerializer(tick).data)
 

@@ -73,19 +73,19 @@ class TestTickPhotos(TestsHelperMixin, APITestCase):
             with mock.patch.object(Recognition, 'detect_and_match', lambda x, y, z: {'score': 1, 'liveness': 1}):
                 if not tick_id:
                     response = self.client.post(self.get_url('Tick-list'), {'employee_id': self.employee2.id, 'type': type, 'shop_code': self.shop2.code })
-                    self.assertEquals(response.status_code, 200)
+                    self.assertEqual(response.status_code, 200)
                     self.assertIsNone(response.json()['lateness'])
                     tick_id = response.json()['id']
                 
                 with open('src/recognition/test_data/1.jpg', 'rb') as image:
                     response = self.client.post(self.get_url('TickPhoto-list'), {'type': photo_type, 'tick_id': tick_id, 'image': image})
                 
-                self.assertEquals(response.status_code, 200)
-                self.assertEquals(assert_lateness, response.json()['lateness'])
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(assert_lateness, response.json()['lateness'])
                 if assert_tick_lateness:
                     tick = Tick.objects.get(id=tick_id)
                     if assert_lateness:
-                        self.assertEquals(tick.lateness, timedelta(seconds=assert_lateness))
+                        self.assertEqual(tick.lateness, timedelta(seconds=assert_lateness))
                     else:
                         self.assertIsNone(tick.lateness)
                 return tick_id
