@@ -934,37 +934,37 @@ msgid ""
 "одного сотрудника запрещено. ({error_str})"
 msgstr ""
 
-#: src/timetable/models.py:1578
+#: src/timetable/models.py:1601
 msgid "Fact"
 msgstr "Факт"
 
-#: src/timetable/models.py:1579
+#: src/timetable/models.py:1602
 msgid "Main"
 msgstr "Осн"
 
-#: src/timetable/models.py:1580
+#: src/timetable/models.py:1603
 msgid "Additional"
 msgstr "Доп"
 
-#: src/timetable/models.py:1589
+#: src/timetable/models.py:1612
 #, fuzzy
 #| msgid "Timetable"
 msgid "Planned timetable"
 msgstr "Расписание"
 
-#: src/timetable/models.py:1590
+#: src/timetable/models.py:1613
 msgid "Actual timetable"
 msgstr "Фактический график"
 
-#: src/timetable/models.py:1591
+#: src/timetable/models.py:1614
 msgid "Manual changes"
 msgstr "Ручные изменения"
 
-#: src/timetable/models.py:1592
+#: src/timetable/models.py:1615
 msgid "Determined by the system"
 msgstr "Определено системой"
 
-#: src/timetable/models.py:1970 src/timetable/models.py:1998
+#: src/timetable/models.py:1993 src/timetable/models.py:2021
 msgid "You have no active employment"
 msgstr "У вас нет активного трудоустройства"
 
@@ -1305,7 +1305,7 @@ msgstr ""
 "У сотрудника {user.first_name} {user.last_name} в строке {i} неправильное "
 "значение: {value}."
 
-#: src/timetable/worker_day/utils.py:260 src/timetable/worker_day/utils.py:410
+#: src/timetable/worker_day/utils.py:261 src/timetable/worker_day/utils.py:411
 msgid ""
 "It is not possible to create days on the selected dates. Please check "
 "whether the employee has active employment."
@@ -1358,27 +1358,32 @@ msgstr ""
 msgid "There is no such user in your network."
 msgstr "В вашей сети нет такого пользователя."
 
-#: src/timetable/worker_day/views.py:934
+#: src/timetable/worker_day/views.py:101
+#, python-brace-format
+msgid "Employee {employee} is not your subordinate."
+msgstr "Сотрудник {employee} не является Вашим подчиненным."
+
+#: src/timetable/worker_day/views.py:921
 msgid "This vacancy does not exist or has already been approved."
 msgstr "Такой вакансии не существует или она уже подтверждена."
 
-#: src/timetable/worker_day/views.py:937
+#: src/timetable/worker_day/views.py:924
 msgid "You can not approve vacancy from other network."
 msgstr "Вы не можете подтвердить вакансию из другой сети."
 
-#: src/timetable/worker_day/views.py:984
+#: src/timetable/worker_day/views.py:971
 msgid "There is no such vacancy."
 msgstr "Такой вакансии не существует"
 
-#: src/timetable/worker_day/views.py:988
+#: src/timetable/worker_day/views.py:975
 msgid "The vacancy cannot be edited because it has already been responded."
 msgstr "Невозможно отредактировать вакансию, так как на неё уже откликнулись."
 
-#: src/timetable/worker_day/views.py:1493
+#: src/timetable/worker_day/views.py:1480
 msgid "{}_timesheet_for_shop_{}_from_{}.{}"
 msgstr "{}_табель_для_подразделения_{}_от_{}.{}"
 
-#: src/timetable/worker_day/views.py:1574
+#: src/timetable/worker_day/views.py:1561
 msgid "Hours recalculation started successfully."
 msgstr "Пересчет часов успешно запущен."
 

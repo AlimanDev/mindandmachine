@@ -397,6 +397,7 @@ class TestUserViewSet(TestsHelperMixin, APITestCase):
             self.assertFalse(self.user4.check_password('test_password_1234'))
 
     def test_change_password_subordinates(self):
+        self.admin_group.subordinates.clear()
         self._test_change_password_subordinates(403, False)
         self.employment4.function_group = self.chief_group
         self.employment4.save()

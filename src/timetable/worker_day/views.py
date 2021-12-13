@@ -98,6 +98,7 @@ class WorkerDayViewSet(BaseModelViewSet):
         'has_no_perm_to_approve_protected_wdays': _('You do not have rights to approve protected worker days ({protected_wdays}). '
                                                    'Please contact your system administrator.'),
         "no_such_user_in_network": _("There is no such user in your network."),
+        "employee_not_in_subordinates": _("Employee {employee} is not your subordinate."),
     }
 
     permission_classes = [WdPermission]  # временно из-за биржи смен vacancy  [FilteredListPermission]
@@ -1622,6 +1623,7 @@ class WorkerDayViewSet(BaseModelViewSet):
             data['dt_to'],
             self.error_messages,
             wd_types_dict=wd_types_dict,
+            employee_id=data.get('employee_id'),
         )
         response = WorkerDaySerializer(
             create_worker_days_range(

@@ -156,6 +156,7 @@ class TestWorkerPositionAPI(TestsHelperMixin, APITestCase):
         self.assertEquals(self.worker_position.group_id, assert_group_id)
 
     def test_update_group_id(self):
+        self.admin_group.subordinates.clear()
         # нет subordunates
         self._test_update_group(self.chief_group.id, 403, None)
         self.admin_group.subordinates.add(self.chief_group)
