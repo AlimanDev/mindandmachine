@@ -138,7 +138,7 @@ class TickPointAuthTickViewStrategy(TickViewStrategy):
     def filter_qs(self, queryset):
         tick_point = self.view.request.user
         queryset = queryset.filter(
-            tick_point_id=tick_point.id,
+            tick_point__shop_id=tick_point.shop_id,
         )
         return queryset
 
