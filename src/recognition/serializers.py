@@ -1,3 +1,4 @@
+from datetime import timedelta
 import geopy.distance
 from django.conf import settings
 from django.utils.translation import gettext_lazy as _
@@ -85,7 +86,7 @@ class TickSerializer(serializers.ModelSerializer):
     #     return []
 
     def get_lateness(self, obj) -> int:
-        return int(obj.lateness.total_seconds())
+        return int(obj.lateness.total_seconds()) if isinstance(obj.lateness, timedelta) else None
 
 
 class PostTickSerializer_point(serializers.ModelSerializer):

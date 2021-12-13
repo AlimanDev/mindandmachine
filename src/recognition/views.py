@@ -61,6 +61,10 @@ recognition = Recognition()
 
 USERS_WITH_SCHEDULE_ONLY = getattr(settings, 'USERS_WITH_SCHEDULE_ONLY', True)
 
+LATENESS_LAMBDA = {
+    Tick.TYPE_COMING: lambda check_dttm, wd: check_dttm - wd.dttm_work_start,
+    Tick.TYPE_LEAVING: lambda  check_dttm, wd: wd.dttm_work_end - check_dttm,
+}
 
 class HashSigninAuthToken(ObtainAuthToken):
     authentication_classes = ()
@@ -284,7 +288,6 @@ class TickViewSet(BaseModelViewSet):
             user_id=user_id,
             employee_id=employee_id,
             tick_point_id=tick_point.id,
-            lateness=check_time - wd.dttm_work_start if wd else timedelta(seconds=0),  # TODO: при 2 днях на 1 дату может некорректно рассчитываться? Нужно ли вообще это поле?
             dttm=check_time,
             type=data['type'],
             is_front=is_front
@@ -315,7 +318,6 @@ class TickViewSet(BaseModelViewSet):
 
         if tick.type == Tick.TYPE_NO_TYPE:
             tick.type = type
-            tick.save()
             if request.user.network.trust_tick_request:
                 record, _created = AttendanceRecords.objects.get_or_create(
                     user_id=tick.user_id,
@@ -327,6 +329,9 @@ class TickViewSet(BaseModelViewSet):
                 )
                 record.type = type
                 record.save()
+                if record.fact_wd and record.fact_wd.closest_plan_approved:
+                    tick.lateness = LATENESS_LAMBDA.get(tick.type, lambda x, y: None)(tick.dttm, record.fact_wd.closest_plan_approved)     
+            tick.save()
         
         return Response(TickSerializer(tick).data)
 
@@ -431,8 +436,10 @@ class TickPhotoViewSet(BaseModelViewSet):
                 tick.verified_score = tick_photo.verified_score
                 tick.save()
 
+        data = TickPhotoSerializer(tick_photo).data
+        data['lateness'] = None
         if (type == TickPhoto.TYPE_SELF) and (tick_photo.verified_score > 0):
-            AttendanceRecords.objects.create(
+            record = AttendanceRecords.objects.create(
                 user_id=tick.user_id,
                 employee_id=tick.employee_id,
                 dttm=tick.dttm,
@@ -440,7 +447,11 @@ class TickPhotoViewSet(BaseModelViewSet):
                 shop_id=tick.tick_point.shop_id,
                 type=tick.type,
             )
-        return Response(TickPhotoSerializer(tick_photo).data)
+            if record.fact_wd and record.fact_wd.closest_plan_approved:
+                tick.lateness = LATENESS_LAMBDA.get(tick.type, lambda x, y: None)(tick.dttm, record.fact_wd.closest_plan_approved)
+                tick.save()
+                data['lateness'] = tick.lateness.total_seconds() if tick.lateness else None
+        return Response(data)
 
     @swagger_auto_schema(
         responses={200:'Файл с отметками'},

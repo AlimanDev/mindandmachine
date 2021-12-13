@@ -1,12 +1,13 @@
 from rest_framework.test import APITestCase
 from unittest import mock
-from datetime import date, timedelta
+from datetime import date, datetime, time, timedelta
 from django.test import override_settings
 from django.core import mail
 from django.conf import settings
 from src.recognition.utils import check_duplicate_biometrics
 from src.recognition.events import DUPLICATE_BIOMETRICS
-from src.recognition.models import UserConnecter
+from src.recognition.models import Tick, TickPhoto, UserConnecter
+from src.timetable.models import WorkerDay
 from src.util.mixins.tests import TestsHelperMixin
 from src.recognition.api.recognition import Recognition
 from src.events.models import EventType
@@ -66,3 +67,65 @@ class TestTickPhotos(TestsHelperMixin, APITestCase):
             f'Табельный номер\n\n\n{self.employee3.tabel_code}\n\n\n{self.employee1.tabel_code}\n\n\n\n\nПодразделение\n\n\n{self.shop.name}\n\n\n{self.root_shop.name}\n\n\n\n\n'
             f'Ссылка на биошаблон\n\n\nбиошаблон\n\n\nбиошаблон\n\n\n\n\n\n\n\n\n\n\n\nПисьмо отправлено роботом. Подробности можно узнать по ссылке'
         )
+
+    def _test_lateness(self, type, photo_type, dttm, assert_lateness, tick_id=None, assert_tick_lateness=True):
+        with mock.patch('src.recognition.views.now', lambda: dttm - timedelta(hours=3)):
+            with mock.patch.object(Recognition, 'detect_and_match', lambda x, y, z: {'score': 1, 'liveness': 1}):
+                if not tick_id:
+                    response = self.client.post(self.get_url('Tick-list'), {'employee_id': self.employee2.id, 'type': type, 'shop_code': self.shop2.code })
+                    self.assertEqual(response.status_code, 200)
+                    self.assertIsNone(response.json()['lateness'])
+                    tick_id = response.json()['id']
+                
+                with open('src/recognition/test_data/1.jpg', 'rb') as image:
+                    response = self.client.post(self.get_url('TickPhoto-list'), {'type': photo_type, 'tick_id': tick_id, 'image': image})
+                
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(assert_lateness, response.json()['lateness'])
+                if assert_tick_lateness:
+                    tick = Tick.objects.get(id=tick_id)
+                    if assert_lateness:
+                        self.assertEqual(tick.lateness, timedelta(seconds=assert_lateness))
+                    else:
+                        self.assertIsNone(tick.lateness)
+                return tick_id
+
+    def test_lateness(self):
+        WorkerDay.objects.create(
+            dt=date.today(),
+            type_id=WorkerDay.TYPE_WORKDAY,
+            employee=self.employee2,
+            employment=self.employment2,
+            shop=self.shop2,
+            is_approved=True,
+            is_vacancy=True,
+            dttm_work_start=datetime.combine(date.today(), time(10)),
+            dttm_work_end=datetime.combine(date.today(), time(20)),
+        )
+        comming_time = datetime.combine(date.today(), time(9))
+        leaving_time = datetime.combine(date.today(), time(21))
+        tick_id = self._test_lateness(Tick.TYPE_COMING, TickPhoto.TYPE_FIRST, comming_time, None)
+        self._test_lateness(Tick.TYPE_COMING, TickPhoto.TYPE_SELF, comming_time, -3600, tick_id=tick_id)
+        self._test_lateness(Tick.TYPE_COMING, TickPhoto.TYPE_LAST, comming_time, None, tick_id=tick_id, assert_tick_lateness=False)
+        tick_id = self._test_lateness(Tick.TYPE_LEAVING, TickPhoto.TYPE_FIRST, leaving_time, None)
+        self._test_lateness(Tick.TYPE_LEAVING, TickPhoto.TYPE_SELF, leaving_time, -3600, tick_id=tick_id)
+        self._test_lateness(Tick.TYPE_LEAVING, TickPhoto.TYPE_LAST, leaving_time, None, tick_id=tick_id, assert_tick_lateness=False)
+        TickPhoto.objects.all().delete()
+        Tick.objects.all().delete()
+        WorkerDay.objects.filter(is_fact=True).delete()
+        comming_time = datetime.combine(date.today(), time(11))
+        leaving_time = datetime.combine(date.today(), time(19))
+        tick_id = self._test_lateness(Tick.TYPE_COMING, TickPhoto.TYPE_FIRST, comming_time, None)
+        self._test_lateness(Tick.TYPE_COMING, TickPhoto.TYPE_SELF, comming_time, 3600, tick_id=tick_id)
+        self._test_lateness(Tick.TYPE_COMING, TickPhoto.TYPE_LAST, comming_time, None, tick_id=tick_id, assert_tick_lateness=False)
+        tick_id = self._test_lateness(Tick.TYPE_LEAVING, TickPhoto.TYPE_FIRST, leaving_time, None)
+        self._test_lateness(Tick.TYPE_LEAVING, TickPhoto.TYPE_SELF, leaving_time, 3600, tick_id=tick_id)
+        self._test_lateness(Tick.TYPE_LEAVING, TickPhoto.TYPE_LAST, leaving_time, None, tick_id=tick_id, assert_tick_lateness=False)
+        comming_time = datetime.combine(date.today() + timedelta(1), time(11))
+        leaving_time = datetime.combine(date.today() + timedelta(1), time(19))
+        tick_id = self._test_lateness(Tick.TYPE_COMING, TickPhoto.TYPE_FIRST, comming_time, None)
+        self._test_lateness(Tick.TYPE_COMING, TickPhoto.TYPE_SELF, comming_time, None, tick_id=tick_id)
+        self._test_lateness(Tick.TYPE_COMING, TickPhoto.TYPE_LAST, comming_time, None, tick_id=tick_id)
+        tick_id = self._test_lateness(Tick.TYPE_LEAVING, TickPhoto.TYPE_FIRST, leaving_time, None)
+        self._test_lateness(Tick.TYPE_LEAVING, TickPhoto.TYPE_SELF, leaving_time, None, tick_id=tick_id)
+        self._test_lateness(Tick.TYPE_LEAVING, TickPhoto.TYPE_LAST, leaving_time, None, tick_id=tick_id)
