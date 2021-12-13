@@ -707,3 +707,23 @@ class TestOutsource(TestsHelperMixin, APITestCase):
         self.assertIsNotNone(employee1_wd)
         self.assertIsNotNone(employee2_wd)
         self.assertEquals(list(employee2_wd.outsources.all()), [self.outsource_network,])
+
+    def test_outsourcing_network_id__in_filter(self):
+        dt_now = self.dt_now
+        vacancy = self._create_vacancy(dt_now, datetime.combine(dt_now, time(8)), datetime.combine(dt_now, time(20)), outsources=[self.outsource_network.id]).json()
+        vacancy2 = self._create_vacancy(dt_now, datetime.combine(dt_now, time(8)), datetime.combine(dt_now, time(20)), outsources=[self.outsource_network.id]).json()
+        vacancy3 = self._create_vacancy(dt_now, datetime.combine(dt_now, time(8)), datetime.combine(dt_now, time(20)), outsources=[self.outsource_network.id, self.outsource_network2.id]).json()
+        vacancy4 = self._create_vacancy(dt_now, datetime.combine(dt_now, time(8)), datetime.combine(dt_now, time(20)), outsources=[self.outsource_network2.id]).json()
+        WorkerDay.objects.all().update(is_approved=True)
+        response = self.client.get('/rest_api/worker_day/vacancy/?limit=10&offset=0')
+        self.assertEquals(len(response.json()['results']), 4)
+        response = self.client.get(f'/rest_api/worker_day/vacancy/?limit=10&offset=0&outsourcing_network_id__in={self.outsource_network.id}')
+        self.assertEquals(len(response.json()['results']), 3)
+        vac_ids = list(map(lambda x: x['id'], response.json()['results']))
+        self.assertCountEqual(vac_ids, [vacancy['id'], vacancy2['id'], vacancy3['id']])
+        response = self.client.get(f'/rest_api/worker_day/vacancy/?limit=10&offset=0&outsourcing_network_id__in={self.outsource_network2.id}')
+        self.assertEquals(len(response.json()['results']), 2)
+        vac_ids = list(map(lambda x: x['id'], response.json()['results']))
+        self.assertCountEqual(vac_ids, [vacancy3['id'], vacancy4['id']])
+        response = self.client.get(f'/rest_api/worker_day/vacancy/?limit=10&offset=0&outsourcing_network_id__in={self.outsource_network.id},{self.outsource_network2.id}')
+        self.assertEquals(len(response.json()['results']), 4)
