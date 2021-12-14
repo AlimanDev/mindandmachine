@@ -262,6 +262,7 @@ class TestWorkShiftViewSet(TestsHelperMixin, APITestCase):
                 'show_cost_for_inner_vacancies': False,
                 'rebuild_timetable_min_delta': 2,
                 'show_remaking_choice': False,
+                'analytics_iframe': '',
                 'show_employee_shift_schedule_tab': False,
                 'url': None,
                 'shop_name_form': {
@@ -412,6 +413,7 @@ class TestWorkShiftViewSet(TestsHelperMixin, APITestCase):
                 'show_cost_for_inner_vacancies': False,
                 'rebuild_timetable_min_delta': 2,
                 'show_remaking_choice': False,
+                'analytics_iframe': '',
                 'show_employee_shift_schedule_tab': False,
                 'url': None,
                 'shop_name_form': {
@@ -568,6 +570,7 @@ class TestWorkShiftViewSet(TestsHelperMixin, APITestCase):
                 'show_cost_for_inner_vacancies': False,
                 'rebuild_timetable_min_delta': 2,
                 'show_remaking_choice': False,
+                'analytics_iframe': '',
                 'show_employee_shift_schedule_tab': False,
                 'url': None,
                 'shop_name_form': {

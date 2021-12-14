@@ -51,6 +51,7 @@ class NetworkSerializer(serializers.ModelSerializer):
     unaccounted_overtime_threshold = serializers.SerializerMethodField()
     show_remaking_choice = serializers.SerializerMethodField()
     shop_name_form = serializers.SerializerMethodField()
+    analytics_iframe = serializers.SerializerMethodField()
     show_employee_shift_schedule_tab = serializers.SerializerMethodField()
 
     def get_default_stats(self, obj: Network):
@@ -94,6 +95,9 @@ class NetworkSerializer(serializers.ModelSerializer):
     def get_show_remaking_choice(self, obj: Network):
         return obj.settings_values_prop.get('show_remaking_choice', False)
 
+    def get_analytics_iframe(self, obj: Network):
+        return obj.settings_values_prop.get('analytics_iframe', '')
+
     def get_logo_url(self, obj) -> str:
         if obj.logo:
             return obj.logo.url
@@ -130,6 +134,7 @@ class NetworkSerializer(serializers.ModelSerializer):
             'show_cost_for_inner_vacancies',
             'show_employee_shift_schedule_tab',
             'rebuild_timetable_min_delta',
+            'analytics_iframe',
         ]
 
 class NetworkListSerializer(serializers.Serializer):
