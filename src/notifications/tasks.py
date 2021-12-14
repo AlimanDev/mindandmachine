@@ -1,3 +1,4 @@
+import json
 from django.conf import settings
 from django.template import Template, Context
 
@@ -21,9 +22,11 @@ def enrich_context(context):
 def send_event_email_notifications(event_email_notification_id: int, user_author_id: int, context: dict):
     event_email_notification = EventEmailNotification.objects.select_related(
         'event_type',
+        'event_type__network',
     ).get(
         id=event_email_notification_id,
     )
+    context['shop_name_form'] = event_email_notification.event_type.network.settings_values_prop.get('shop_name_form', {})
     template = event_email_notification.get_email_template()
     enrich_context(context)
     subject = Template(event_email_notification.get_subject_template()).render(Context(context))

@@ -13,6 +13,7 @@ from rest_framework.validators import UniqueValidator, UniqueTogetherValidator
 from src.base.fields import CurrentUserNetwork, UserworkShop
 from src.base.message import Message
 from src.base.models import (
+    ContentBlock,
     Employment,
     Network,
     NetworkConnect,
@@ -51,6 +52,7 @@ class NetworkSerializer(serializers.ModelSerializer):
     show_remaking_choice = serializers.SerializerMethodField()
     shop_name_form = serializers.SerializerMethodField()
     analytics_iframe = serializers.SerializerMethodField()
+    show_employee_shift_schedule_tab = serializers.SerializerMethodField()
 
     def get_default_stats(self, obj: Network):
         default_stats = json.loads(obj.settings_values).get('default_stats', {})
@@ -101,6 +103,9 @@ class NetworkSerializer(serializers.ModelSerializer):
             return obj.logo.url
         return None
 
+    def get_show_employee_shift_schedule_tab(self, obj:Network):
+        return obj.settings_values_prop.get('show_employee_shift_schedule_tab', False)
+
     class Meta:
         model = Network
         fields = [
@@ -122,15 +127,19 @@ class NetworkSerializer(serializers.ModelSerializer):
             'unaccounted_overtime_threshold',
             'forbid_edit_employments_came_through_integration',
             'show_remaking_choice',
-            'display_employee_tabs_in_the_schedule',
             'allow_creation_several_wdays_for_one_employee_for_one_date',
             'shop_name_form',
             'get_position_from_work_type_name_in_calc_timesheet',
+            'trust_tick_request',
+            'show_cost_for_inner_vacancies',
+            'show_employee_shift_schedule_tab',
+            'rebuild_timetable_min_delta',
         ]
 
 class NetworkListSerializer(serializers.Serializer):
     id = serializers.IntegerField()
     name = serializers.CharField()
+
 
 class NetworkWithOutsourcingsAndClientsSerializer(NetworkSerializer):
     outsourcings = OutsourceClientNetworkSerializer(many=True)
@@ -238,9 +247,17 @@ class EmployeeSerializer(BaseNetworkSerializer):
 class AuthUserSerializer(UserSerializer):
     network = NetworkWithOutsourcingsAndClientsSerializer()
     shop_id = serializers.CharField(default=UserworkShop())
+    allowed_tabs = serializers.SerializerMethodField()
+
+    def get_allowed_tabs(self, obj: User):
+        allowed_tabs = []
+        for group in Group.objects.filter(id__in=obj.get_group_ids()):
+            allowed_tabs.extend(group.allowed_tabs)
+
+        return list(set(allowed_tabs))
 
     class Meta(UserSerializer.Meta):
-        fields = UserSerializer.Meta.fields + ['network', 'shop_id']
+        fields = UserSerializer.Meta.fields + ['network', 'shop_id', 'allowed_tabs']
 
 
 class PasswordSerializer(serializers.Serializer):
@@ -353,12 +370,9 @@ class EmploymentSerializer(serializers.ModelSerializer):
         create_only_fields = ['employee_id']
         read_only_fields = []
         extra_kwargs = {
-            'auto_timetable': {
-                'default': True,
-            },
-            'is_visible': {
-                'default': True,
-            },
+            'code': {
+                'validators': []
+            }
         }
         timetable_fields = [
             'function_group_id', 'is_fixed_hours', 'salary', 'week_availability', 'norm_work_hours', 'shift_hours_length_min', 
@@ -500,9 +514,10 @@ class EmploymentSerializer(serializers.ModelSerializer):
 
 class WorkerPositionSerializer(BaseNetworkSerializer):
     group_id = serializers.IntegerField(required=False, allow_null=True)
+    is_active = serializers.BooleanField(read_only=True)
     class Meta:
         model = WorkerPosition
-        fields = ['id', 'name', 'network_id', 'code', 'breaks_id', 'group_id']
+        fields = ['id', 'name', 'network_id', 'code', 'breaks_id', 'group_id', 'is_active']
 
     def __init__(self, *args, **kwargs):
         super(WorkerPositionSerializer, self).__init__(*args, **kwargs)
@@ -629,3 +644,20 @@ class ShopScheduleSerializer(serializers.ModelSerializer):
                 'read_only': True,
             },
         }
+
+
+class EmployeeShiftScheduleQueryParamsSerializer(serializers.Serializer):
+    employee_id = serializers.IntegerField()
+    dt__gte = serializers.DateField()
+    dt__lte = serializers.DateField()
+
+
+class ContentBlockSerializer(serializers.ModelSerializer):
+    body = serializers.SerializerMethodField()
+
+    def get_body(self, obj: ContentBlock):
+        return obj.get_body(self.context['request'])
+
+    class Meta:
+        model = ContentBlock
+        fields = ['name', 'code', 'body']

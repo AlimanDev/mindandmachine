@@ -397,6 +397,7 @@ class TestUserViewSet(TestsHelperMixin, APITestCase):
             self.assertFalse(self.user4.check_password('test_password_1234'))
 
     def test_change_password_subordinates(self):
+        self.admin_group.subordinates.clear()
         self._test_change_password_subordinates(403, False)
         self.employment4.function_group = self.chief_group
         self.employment4.save()
@@ -434,3 +435,18 @@ class TestUserViewSet(TestsHelperMixin, APITestCase):
         self.client.defaults['HTTP_REFERER'] = 'https://local.mindandmachine.ru/'
         resp = self.client.get('/rest_api/auth/user/')
         self.assertEqual(resp.get('X-Frame-Options'), 'ALLOWALL')
+
+    def test_get_user_with_allowed_tabs(self):
+        self.admin_group.allowed_tabs = [
+            'settings',
+            'schedule',
+            'load_forecast',
+        ]
+        self.admin_group.save()
+        resp = self.client.get('/rest_api/auth/user/')
+        data = [
+            'settings',
+            'schedule',
+            'load_forecast',
+        ]
+        self.assertCountEqual(resp.json()['allowed_tabs'], data)

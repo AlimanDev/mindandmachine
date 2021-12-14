@@ -63,14 +63,9 @@ class ShopViewSet(UpdateorCreateViewSet):
 
     @swagger_auto_schema(responses={200: ShopSerializer(many=True)}, operation_description='GET /rest_api/department/')
     def list(self, request):
-        now = datetime.datetime.now()
         data = list(
             self.filter_queryset(
-                self.get_queryset().filter(
-                    Q(dttm_deleted__isnull=True) | Q(dttm_deleted__gte=now),
-                    Q(dt_closed__isnull=True) |
-                    Q(dt_closed__gte=now.today() - datetime.timedelta(days=30)),
-                )
+                self.get_queryset()
             )
         )
         return Response([serialize_shop(s, request) for s in data])
@@ -209,3 +204,24 @@ class ShopViewSet(UpdateorCreateViewSet):
         shop.load_template_id = data.validated_data['load_template_id']
         shop.save()
         return Response(ShopSerializer(shop).data)
+
+    @swagger_auto_schema(responses=tree_response_schema_dict)
+    @action(detail=False, methods=['get'])
+    def internal_tree(self, request):
+        """
+        Дерево магазинов сети юзера в формате для Quasar
+        :param request:
+        :return:
+        """
+        only_top = self.request.query_params.get('only_top')
+
+        shops = self.filter_queryset(self.get_queryset())
+        if not only_top:
+            now = datetime.datetime.now()
+            shops = Shop.objects.get_queryset_descendants(shops, include_self=True).filter(
+                Q(dttm_deleted__isnull=True) | Q(dttm_deleted__gte=now),
+                Q(dt_closed__isnull=True) |
+                Q(dt_closed__gte=now.today() - datetime.timedelta(days=30)),
+            ).order_by('level', 'name')
+
+        return Response(get_tree(shops))

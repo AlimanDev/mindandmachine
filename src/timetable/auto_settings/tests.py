@@ -420,25 +420,26 @@ class TestAutoSettings(APITestCase):
     def _test_create_tt(self, dt_from, dt_to, use_not_approved=True, shop_id=None):
         ShopMonthStat.objects.filter(shop_id=shop_id or self.employment2.shop_id).update(status=ShopMonthStat.NOT_DONE)
         # так переопределяем, чтобы можно было константные значения дат из прошлого использовать
-        with self.settings(REBUILD_TIMETABLE_MIN_DELTA=-9999):
-            class res:
-                def json(self):
-                    return {'task_id': 1}
+        self.network.rebuild_timetable_min_delta = -9999
+        self.network.save()
+        class res:
+            def json(self):
+                return {'task_id': 1}
 
-            with patch.object(requests, 'post', return_value=res()) as mock_post:
-                response = self.client.post(
-                    '/rest_api/auto_settings/create_timetable/',
-                    {
-                        'shop_id': shop_id or self.shop.id,
-                        'dt_from': dt_from,
-                        'dt_to': dt_to,
-                        'use_not_approved': use_not_approved,
-                    }
-                )
-                data = json.loads(mock_post.call_args[1]['data'])
-                self.assertEqual(response.status_code, 200)
+        with patch.object(requests, 'post', return_value=res()) as mock_post:
+            response = self.client.post(
+                '/rest_api/auto_settings/create_timetable/',
+                {
+                    'shop_id': shop_id or self.shop.id,
+                    'dt_from': dt_from,
+                    'dt_to': dt_to,
+                    'use_not_approved': use_not_approved,
+                }
+            )
+            data = json.loads(mock_post.call_args[1]['data'])
+            self.assertEqual(response.status_code, 200)
 
-            return data
+        return data
 
     def test_create_tt(self):
         dt_from = date(2021, 2, 1)

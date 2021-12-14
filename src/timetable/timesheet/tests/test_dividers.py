@@ -6,10 +6,29 @@ import pandas as pd
 from django.db.models import Sum, Q
 from django.test import TestCase, override_settings
 
-from src.base.models import SAWHSettings, SAWHSettingsMapping, Network, WorkerPosition
-from src.base.tests.factories import ShopFactory
-from src.timetable.models import TimesheetItem, WorkerDay
-from src.timetable.models import WorkTypeName, WorkType, WorkerDayType
+from src.base.models import (
+    SAWHSettings,
+    SAWHSettingsMapping,
+    Network,
+    WorkerPosition,
+    ShiftSchedule,
+    ShiftScheduleDay,
+    ShiftScheduleInterval,
+)
+from src.base.tests.factories import (
+    ShopFactory,
+    UserFactory,
+    EmploymentFactory,
+    EmployeeFactory,
+    WorkerPositionFactory,
+)
+from src.timetable.models import (
+    WorkerDay,
+    WorkType,
+    WorkTypeName,
+    TimesheetItem,
+    WorkerDayType,
+)
 from src.timetable.tests.factories import WorkerDayFactory
 from ._base import TestTimesheetMixin
 
@@ -627,3 +646,271 @@ class TestPobedaDivider(TestTimesheetMixin, TestCase):
             self.assertEqual(TimesheetItem.objects.get(
                 timesheet_type=TimesheetItem.TIMESHEET_TYPE_MAIN, dt=date(2021, 6, day_num)).day_type_id,
                              WorkerDay.TYPE_WORKDAY)
+
+
+@override_settings(FISCAL_SHEET_DIVIDER_ALIAS='shift_schedule')
+class TestShiftScheduleDivider(TestTimesheetMixin, TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        sawh_settings = SAWHSettings.objects.create(
+            network=cls.network,
+            work_hours_by_months={},
+            type=SAWHSettings.SHIFT_SCHEDULE,
+        )
+        sawh_settings_mapping = SAWHSettingsMapping.objects.create(
+            sawh_settings=sawh_settings,
+            year=2021,
+        )
+        sawh_settings_mapping.positions.add(cls.position_worker)
+        # 7-13 июня рабочие дни по плановому графику
+        # 12,13 выходные
+        cls.shift_schedule = ShiftSchedule.objects.create(
+            network=cls.network,
+            name='График смен',
+        )
+        cls.shift_schedule_interval = ShiftScheduleInterval.objects.create(
+            shift_schedule=cls.shift_schedule,
+            employee=cls.employee_worker,
+            dt_start=date(2021, 6, 1),
+            dt_end=date(2021, 6, 30),
+        )
+        for dt in pd.date_range(date(2021, 6, 7), date(2021, 6, 11)).date:
+            ShiftScheduleDay.objects.create(
+                dt=dt, shift_schedule=cls.shift_schedule, day_type_id=WorkerDay.TYPE_WORKDAY,
+                work_hours=Decimal("8.00"))
+        for dt in pd.date_range(date(2021, 6, 12), date(2021, 6, 13)).date:
+            ShiftScheduleDay.objects.create(
+                dt=dt, shift_schedule=cls.shift_schedule, day_type_id=WorkerDay.TYPE_HOLIDAY, work_hours=Decimal("0.00"))
+
+        cls.user_worker2 = UserFactory(email='worker2@example.com', network=cls.network)
+        cls.employee_worker2 = EmployeeFactory(user=cls.user_worker2)
+        cls.position_worker2 = WorkerPositionFactory(
+            name='Работник', group=cls.group_worker,
+            breaks=cls.breaks,
+        )
+        cls.employment_worker2 = EmploymentFactory(
+            employee=cls.employee_worker2, shop=cls.shop, position=cls.position_worker2,
+        )
+        cls.work_type_name_worker2 = WorkTypeName.objects.create(
+            position=cls.position_worker2,
+            network=cls.network,
+            name='worker2',
+            code='worker2',
+        )
+        cls.work_type_worker2 = WorkType.objects.create(
+            work_type_name=cls.work_type_name_worker2,
+            shop=cls.shop,
+        )
+
+        for dt in pd.date_range(date(2021, 6, 7), date(2021, 6, 13)).date:
+            WorkerDayFactory(
+                is_approved=True,
+                is_fact=True,
+                shop=cls.shop,
+                employment=cls.employment_worker2,
+                employee=cls.employee_worker2,
+                dt=dt,
+                type_id=WorkerDay.TYPE_WORKDAY,
+                dttm_work_start=datetime.combine(dt, time(10)),
+                dttm_work_end=datetime.combine(dt, time(20)),
+                cashbox_details__work_type=cls.work_type_worker2,
+            )
+            WorkerDayFactory(
+                is_approved=True,
+                is_fact=False,
+                shop=cls.shop,
+                employment=cls.employment_worker2,
+                employee=cls.employee_worker2,
+                dt=dt,
+                type_id=WorkerDay.TYPE_WORKDAY,
+                dttm_work_start=datetime.combine(dt, time(10)),
+                dttm_work_end=datetime.combine(dt, time(20)),
+                cashbox_details__work_type=cls.work_type_worker2,
+            )
+        cls.individual_shift_schedule = ShiftSchedule.objects.create(
+            network=cls.network,
+            name='Индивидуальный график смен',
+            employee=cls.employee_worker2,
+        )
+        for dt in pd.date_range(date(2021, 6, 7), date(2021, 6, 11)).date:
+            ShiftScheduleDay.objects.create(
+                dt=dt, shift_schedule=cls.individual_shift_schedule, day_type_id=WorkerDay.TYPE_WORKDAY,
+                work_hours=Decimal("8.00"))
+        for dt in pd.date_range(date(2021, 6, 12), date(2021, 6, 13)).date:
+            ShiftScheduleDay.objects.create(
+                dt=dt, shift_schedule=cls.individual_shift_schedule, day_type_id=WorkerDay.TYPE_HOLIDAY, work_hours=Decimal("0.00"))
+
+    def test_plan_schedule_hours_gt_shift_schedule_hours(self):
+        for employee in [self.employee_worker]:
+            self._calc_timesheets(employee_id=employee.id, reraise_exc=True)
+            main_ts_item = TimesheetItem.objects.get(
+                employee=employee, dt=date(2021, 6, 7), timesheet_type=TimesheetItem.TIMESHEET_TYPE_MAIN)
+            additional_ts_item = TimesheetItem.objects.get(
+                employee=employee, dt=date(2021, 6, 7), timesheet_type=TimesheetItem.TIMESHEET_TYPE_ADDITIONAL)
+            self.assertEqual(main_ts_item.day_hours, 8)
+            self.assertEqual(additional_ts_item.day_hours, 1)
+
+    def test_plan_schedule_hours_lt_shift_schedule_hours(self):
+        for employee in [self.employee_worker]:
+            ShiftScheduleDay.objects.filter(work_hours__gt=0).update(work_hours=Decimal("14"))
+
+            self._calc_timesheets(employee_id=employee.id, reraise_exc=True)
+            main_ts_item = TimesheetItem.objects.get(
+                employee=employee, dt=date(2021, 6, 7), timesheet_type=TimesheetItem.TIMESHEET_TYPE_MAIN)
+            additional_ts_item = TimesheetItem.objects.filter(
+                employee=employee,
+                dt=date(2021, 6, 7), timesheet_type=TimesheetItem.TIMESHEET_TYPE_ADDITIONAL).first()
+            self.assertEqual(main_ts_item.day_hours, 9)
+            self.assertIsNone(additional_ts_item)
+
+    def test_plan_schedule_is_workday_and_shift_schedule_is_holiday(self):
+        for employee in [self.employee_worker]:
+            self._calc_timesheets(employee_id=employee.id, reraise_exc=True)
+            main_ts_item = TimesheetItem.objects.get(
+                employee=employee, dt=date(2021, 6, 12), timesheet_type=TimesheetItem.TIMESHEET_TYPE_MAIN)
+            additional_ts_item = TimesheetItem.objects.filter(
+                employee=employee, dt=date(2021, 6, 12), timesheet_type=TimesheetItem.TIMESHEET_TYPE_ADDITIONAL).first()
+            self.assertEqual(main_ts_item.day_hours, 0)
+            self.assertEqual(main_ts_item.day_type_id, WorkerDay.TYPE_HOLIDAY)
+            self.assertEqual(additional_ts_item.day_hours, 9)
+            self.assertEqual(additional_ts_item.day_type_id, WorkerDay.TYPE_WORKDAY)
+
+    def test_absence_plan_schedule_is_workday_and_shift_schedule_is_holiday(self):
+        WorkerDay.objects.filter(is_fact=True).delete()
+        for employee in [self.employee_worker]:
+            self._calc_timesheets(employee_id=employee.id, reraise_exc=True, dttm_now=datetime(2021, 6, 25))
+            main_ts_item = TimesheetItem.objects.get(
+                employee=employee, dt=date(2021, 6, 12), timesheet_type=TimesheetItem.TIMESHEET_TYPE_MAIN)
+            additional_ts_item = TimesheetItem.objects.filter(
+                employee=employee, dt=date(2021, 6, 12), timesheet_type=TimesheetItem.TIMESHEET_TYPE_ADDITIONAL).first()
+            self.assertEqual(main_ts_item.day_hours, 0)
+            self.assertEqual(main_ts_item.day_type_id, WorkerDay.TYPE_HOLIDAY)
+            self.assertIsNone(additional_ts_item)
+
+    def test_absence_plan_schedule_is_workday_and_shift_schedule_is_workday(self):
+        WorkerDay.objects.filter(is_fact=True).delete()
+        for employee in [self.employee_worker]:
+            self._calc_timesheets(employee_id=employee.id, reraise_exc=True, dttm_now=datetime(2021, 6, 25))
+            main_ts_item = TimesheetItem.objects.get(
+                employee=employee, dt=date(2021, 6, 7), timesheet_type=TimesheetItem.TIMESHEET_TYPE_MAIN)
+            additional_ts_item = TimesheetItem.objects.filter(
+                employee=employee, dt=date(2021, 6, 7), timesheet_type=TimesheetItem.TIMESHEET_TYPE_ADDITIONAL).first()
+            self.assertEqual(main_ts_item.day_hours, 0)
+            self.assertEqual(main_ts_item.day_type_id, WorkerDay.TYPE_ABSENSE)
+            self.assertIsNone(additional_ts_item)
+
+    def test_plan_schedule_is_vacation_and_shift_schedule_is_workday(self):
+        dt = date(2021, 6, 7)
+        WorkerDay.objects.filter(is_fact=False, dt=dt).update(
+            type_id=WorkerDay.TYPE_VACATION,
+            dttm_work_start=None,
+            dttm_work_end=None,
+            work_hours=timedelta(0),
+        )
+        WorkerDay.objects.filter(is_fact=True, dt=dt).delete()
+        for employee in [self.employee_worker]:
+            self._calc_timesheets(employee_id=employee.id, reraise_exc=True, dttm_now=datetime(2021, 6, 25))
+            main_ts_item = TimesheetItem.objects.get(
+                employee=employee, dt=dt, timesheet_type=TimesheetItem.TIMESHEET_TYPE_MAIN)
+            additional_ts_item = TimesheetItem.objects.filter(
+                employee=employee, dt=dt, timesheet_type=TimesheetItem.TIMESHEET_TYPE_ADDITIONAL).first()
+            self.assertEqual(main_ts_item.day_hours, 0)
+            self.assertEqual(main_ts_item.day_type_id, WorkerDay.TYPE_VACATION)
+            self.assertIsNone(additional_ts_item)
+
+    def test_plan_schedule_is_vacation_and_shift_schedule_is_holiday(self):
+        dt = date(2021, 6, 12)
+        WorkerDay.objects.filter(is_fact=False, dt=dt).update(
+            type_id=WorkerDay.TYPE_VACATION,
+            dttm_work_start=None,
+            dttm_work_end=None,
+            work_hours=timedelta(0),
+        )
+        WorkerDay.objects.filter(is_fact=True, dt=dt).delete()
+        for employee in [self.employee_worker]:
+            self._calc_timesheets(employee_id=employee.id, reraise_exc=True, dttm_now=datetime(2021, 6, 25))
+            main_ts_item = TimesheetItem.objects.get(
+                employee=employee, dt=dt, timesheet_type=TimesheetItem.TIMESHEET_TYPE_MAIN)
+            additional_ts_item = TimesheetItem.objects.filter(
+                employee=employee, dt=dt, timesheet_type=TimesheetItem.TIMESHEET_TYPE_ADDITIONAL).first()
+            self.assertEqual(main_ts_item.day_hours, 0)
+            self.assertEqual(main_ts_item.day_type_id, WorkerDay.TYPE_VACATION)  # или должен быть выходной?
+            self.assertIsNone(additional_ts_item)
+
+    def test_workday_and_vacation_plan_schedule_and_shift_schedule_is_holiday(self):
+        dt = date(2021, 6, 12)
+        workday_type = WorkerDayType.objects.filter(
+            code=WorkerDay.TYPE_WORKDAY,
+        ).get()
+        vacation_type = WorkerDayType.objects.filter(
+            code=WorkerDay.TYPE_VACATION,
+        ).get()
+        vacation_type.allowed_additional_types.add(workday_type)
+        WorkerDayFactory(
+            is_approved=True,
+            is_fact=False,
+            shop=self.shop,
+            employment=self.employment_worker,
+            employee=self.employee_worker,
+            dt=dt,
+            type_id=WorkerDay.TYPE_VACATION,
+        )
+        WorkerDayFactory(
+            is_approved=True,
+            is_fact=False,
+            shop=self.shop,
+            employment=self.employment_worker2,
+            employee=self.employee_worker2,
+            dt=dt,
+            type_id=WorkerDay.TYPE_VACATION,
+        )
+        for employee in [self.employee_worker]:
+            self._calc_timesheets(employee_id=employee.id, reraise_exc=True, dttm_now=datetime(2021, 6, 25))
+            main_ts_item = TimesheetItem.objects.get(
+                employee=employee, dt=dt, timesheet_type=TimesheetItem.TIMESHEET_TYPE_MAIN)
+            additional_ts_item = TimesheetItem.objects.filter(
+                employee=employee, dt=dt, timesheet_type=TimesheetItem.TIMESHEET_TYPE_ADDITIONAL).first()
+            self.assertEqual(main_ts_item.day_hours, 0)
+            self.assertEqual(main_ts_item.day_type_id, WorkerDay.TYPE_VACATION)
+            self.assertIsNotNone(additional_ts_item)
+            self.assertEqual(additional_ts_item.day_hours, 9)
+
+    def test_workday_and_vacation_plan_schedule_and_shift_schedule_is_workday(self):
+        dt = date(2021, 6, 7)
+        workday_type = WorkerDayType.objects.filter(
+            code=WorkerDay.TYPE_WORKDAY,
+        ).get()
+        vacation_type = WorkerDayType.objects.filter(
+            code=WorkerDay.TYPE_VACATION,
+        ).get()
+        vacation_type.allowed_additional_types.add(workday_type)
+        WorkerDayFactory(
+            is_approved=True,
+            is_fact=False,
+            shop=self.shop,
+            employment=self.employment_worker,
+            employee=self.employee_worker,
+            dt=dt,
+            type_id=WorkerDay.TYPE_VACATION,
+        )
+        WorkerDayFactory(
+            is_approved=True,
+            is_fact=False,
+            shop=self.shop,
+            employment=self.employment_worker2,
+            employee=self.employee_worker2,
+            dt=dt,
+            type_id=WorkerDay.TYPE_VACATION,
+        )
+
+        for employee in [self.employee_worker]:
+            self._calc_timesheets(employee_id=employee.id, reraise_exc=True, dttm_now=datetime(2021, 6, 25))
+            main_ts_item = TimesheetItem.objects.get(
+                employee=employee, dt=dt, timesheet_type=TimesheetItem.TIMESHEET_TYPE_MAIN)
+            additional_ts_item = TimesheetItem.objects.filter(
+                employee=employee, dt=dt, timesheet_type=TimesheetItem.TIMESHEET_TYPE_ADDITIONAL).first()
+            self.assertEqual(main_ts_item.day_hours, 0)
+            self.assertEqual(main_ts_item.day_type_id, WorkerDay.TYPE_VACATION)
+            self.assertIsNotNone(additional_ts_item)
+            self.assertEqual(additional_ts_item.day_hours, 9)

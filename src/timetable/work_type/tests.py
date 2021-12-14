@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta, time, date
+from decimal import Decimal
 
 from dateutil.relativedelta import relativedelta
 from rest_framework import status
@@ -12,11 +13,12 @@ from src.timetable.models import (
     WorkerDay,
     WorkerDayCashboxDetails,
 )
+from src.util.mixins.tests import TestsHelperMixin
 from src.util.models_converter import Converter
 from src.util.test import create_departments_and_users
 
 
-class TestWorkType(APITestCase):
+class TestWorkType(APITestCase, TestsHelperMixin):
     USER_USERNAME = "user1"
     USER_EMAIL = "q@q.q"
     USER_PASSWORD = "4242"
@@ -65,6 +67,7 @@ class TestWorkType(APITestCase):
             'min_workers_amount': 0, 
             'max_workers_amount': 20, 
             'probability': 1.0, 
+            'preliminary_cost_per_hour': None,
             'prior_weight': 1.0, 
             'shop_id': self.shop.id, 
             'work_type_name': {
@@ -83,6 +86,7 @@ class TestWorkType(APITestCase):
             'min_workers_amount': 0, 
             'max_workers_amount': 20, 
             'probability': 1.0, 
+            'preliminary_cost_per_hour': None,
             'prior_weight': 1.0, 
             'shop_id': self.shop.id,
         }
@@ -107,6 +111,7 @@ class TestWorkType(APITestCase):
             'max_workers_amount': 20, 
             'probability': 1.0, 
             'prior_weight': 1.0, 
+            'preliminary_cost_per_hour': None,
             'shop_id': self.shop.id,
         }
         response = self.client.post(self.url, data, format='json')
@@ -134,6 +139,7 @@ class TestWorkType(APITestCase):
             'dttm_last_update_queue': None, 
             'min_workers_amount': 30, 
             'max_workers_amount': 20, 
+            'preliminary_cost_per_hour': None,
             'probability': 1.0, 
             'prior_weight': 1.0, 
             'shop_id': self.shop.id, 
@@ -158,6 +164,7 @@ class TestWorkType(APITestCase):
             'dttm_last_update_queue': None, 
             'min_workers_amount': 0, 
             'max_workers_amount': 30, 
+            'preliminary_cost_per_hour': None,
             'probability': 1.0, 
             'prior_weight': 1.0, 
             'shop_id': self.shop.id, 
@@ -343,7 +350,6 @@ class TestWorkType(APITestCase):
             'to_dt': Converter.convert_date(dt_now + timedelta(days=2)),
         }
         self.shop.network.set_settings_value('income_code', 'income')
-        self.shop.network.display_employee_tabs_in_the_schedule = True
         self.shop.network.save()
 
         response = self.client.get(url, data=get_params)
@@ -361,9 +367,6 @@ class TestWorkType(APITestCase):
         self.assertEqual(day_stats['work_days'][Converter.convert_date(dt_now)], 1.0)
         self.assertEqual(day_stats['income'][Converter.convert_date(dt_now)], 2400.0)
         self.assertEqual(day_stats['perfomance'][Converter.convert_date(dt_now)], 300.0)
-        self.assertEqual(day_stats['graph_hours_only_open_vacancies'][Converter.convert_date(dt_now)], 12.0)
-        self.assertEqual(day_stats['work_hours_other_departments'][Converter.convert_date(dt_now)], 0.0)
-        self.assertEqual(day_stats['work_hours_selected_department'][Converter.convert_date(dt_now)], 8.0)
 
         wd = WorkerDay.objects.create(
             dttm_work_start=datetime.combine(dt_now, time(hour=8)),
@@ -495,3 +498,28 @@ class TestWorkType(APITestCase):
         self.assertIsInstance(resp_data['indicators']['fot'], float)
         self.assertEqual(resp_data['indicators']['covering'], 9.8)
         self.assertEqual(resp_data['indicators']['deadtime'], 15.4)
+
+    def test_set_preliminary_cost_per_hour(self):
+        response = self.client.put(
+            f'{self.url}{self.work_type1.id}/',
+            data={
+                'preliminary_cost_per_hour': 200.12,
+            }
+        )
+        self.assertEquals(response.json()['preliminary_cost_per_hour'], '200.12')
+        self.work_type1.refresh_from_db()
+        self.assertEquals(self.work_type1.preliminary_cost_per_hour, Decimal('200.12'))
+
+    def test_set_preliminary_cost_per_hour_empty(self):
+        response = self.client.put(
+            f'{self.url}{self.work_type1.id}/',
+            data=self.dump_data(
+                {
+                    'preliminary_cost_per_hour': None,
+                }
+            ),
+            content_type='application/json'
+        )
+        self.assertIsNone(response.json()['preliminary_cost_per_hour'])
+        self.work_type1.refresh_from_db()
+        self.assertIsNone(self.work_type1.preliminary_cost_per_hour)

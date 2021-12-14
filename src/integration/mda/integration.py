@@ -15,6 +15,7 @@ from src.base.models import (
     Employment,
 )
 from src.integration.models import VMdaUsers
+from ._tmp_backport import ArraySubquery
 from .serializers import (
     ShopDTOSerializer,
     RegionDTOSerializer,
@@ -105,14 +106,17 @@ class MdaIntegrationHelper:
                 When(level=Value(3), then=Value('SHOP', output_field=CharField())),
                 default=Value('SHOP', output_field=CharField()), output_field=CharField(),
             ),
+            # allOrgUnits=Case(
+            #     When(level=Value(0), then=None),
+            #     default=ArraySubquery(
+            #         active_employments_subq.values_list('shop_id', flat=True)
+            #     ),
+            # ),
             orgUnits=Case(
                 When(level=Value(0), then=None),
-                default=ArrayAgg(
-                    'employees__employments__shop', distinct=True,
-                    filter=Q(
-                        employees__employments__id__in=active_employments_qs.values_list('id', flat=True),
-                        employees__employments__shop__level=F('level'),
-                    ),
+                default=ArraySubquery(
+                    active_employments_subq.filter(
+                        shop__level=OuterRef('level')).values_list('shop_id', flat=True).distinct()
                 ),
             ),
             admin=Exists(active_employments_subq.filter(
@@ -211,10 +215,12 @@ class MdaIntegrationHelper:
             divisions_dict = {d['id']: d for d in data['divisions']}
             regions_dict = {d['id']: d for d in data['regions']}
             for shop_data in data['shops']:
-                region_data = regions_dict[shop_data['regionId']]
-                division_data = divisions_dict[region_data['divisionId']]
-                shop_data['regionName'] = region_data['name']
-                shop_data['divisionName'] = division_data['name']
+                region_data = regions_dict.get(shop_data['regionId'], {})
+                if region_data:
+                    shop_data['regionName'] = region_data.get('name', '-')
+                    division_data = divisions_dict.get(region_data['divisionId'], {})
+                    if division_data:
+                        shop_data['divisionName'] = division_data.get('name', '-')
         shops_df = pd.DataFrame(data['shops'])
         users_df = pd.DataFrame(self._get_users_data(threshold_seconds=threshold_seconds))
 

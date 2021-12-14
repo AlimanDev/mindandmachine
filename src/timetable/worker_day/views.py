@@ -98,6 +98,7 @@ class WorkerDayViewSet(BaseModelViewSet):
         'has_no_perm_to_approve_protected_wdays': _('You do not have rights to approve protected worker days ({protected_wdays}). '
                                                    'Please contact your system administrator.'),
         "no_such_user_in_network": _("There is no such user in your network."),
+        "employee_not_in_subordinates": _("Employee {employee} is not your subordinate."),
     }
 
     permission_classes = [WdPermission]  # временно из-за биржи смен vacancy  [FilteredListPermission]
@@ -906,6 +907,20 @@ class WorkerDayViewSet(BaseModelViewSet):
         result = result['text']
 
         return Response({'result': result}, status=status_code)
+    
+    @swagger_auto_schema(
+        operation_description='''
+        Метод для отказа от вакансии
+        ''',
+    )
+    @action(detail=True, methods=['post'], serializer_class=None)
+    def refuse_vacancy(self, request, pk=None):
+        result = confirm_vacancy(pk, refuse=True)
+        status_code = result['status_code']
+        result = result['text']
+
+        return Response({'result': result}, status=status_code)
+
 
     @swagger_auto_schema(
         operation_description='''
@@ -1608,6 +1623,7 @@ class WorkerDayViewSet(BaseModelViewSet):
             data['dt_to'],
             self.error_messages,
             wd_types_dict=wd_types_dict,
+            employee_id=data.get('employee_id'),
         )
         response = WorkerDaySerializer(
             create_worker_days_range(

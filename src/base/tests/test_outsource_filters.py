@@ -53,6 +53,7 @@ class TestOutsource(TestsHelperMixin, APITestCase):
                 level_down=99,
             ) for func, _ in FunctionGroup.FUNCS_TUPLE for method, _ in FunctionGroup.METHODS_TUPLE
         ])
+        cls.cleint_admin_group.subordinates.add(*Group.objects.all())
         GroupWorkerDayPermission.objects.bulk_create(
             GroupWorkerDayPermission(
                 group=cls.cleint_admin_group,
@@ -277,6 +278,8 @@ class TestOutsource(TestsHelperMixin, APITestCase):
             employee=self.employee1,
         )
         dt = date.today()
+        if dt.day >= 28:
+            dt = (dt + timedelta(5)).replace(day=1)
         WorkerDay.objects.create(
             employment=empl,
             employee=self.employee1,

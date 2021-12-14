@@ -16,6 +16,7 @@ from src.base.models import (
     Employment,
     Group,
     Shop,
+    User,
 )
 from src.timetable.models import (
     AttendanceRecords,
@@ -443,7 +444,12 @@ def create_worker_days_range(dates, type_id=WorkerDay.TYPE_WORKDAY, shop_id=None
 
 
 def check_worker_day_permissions(
-        user, shop_id, action, graph_type, wd_types, dt_from, dt_to, error_messages, wd_types_dict):
+        user, shop_id, action, graph_type, wd_types, dt_from, dt_to, error_messages, wd_types_dict, employee_id=None):
+    if not WorkerDay._has_group_permissions(user, employee_id, shop_id):
+        raise PermissionDenied(
+            error_messages['employee_not_in_subordinates'].format(
+            employee=User.objects.filter(employees__id=employee_id).first().fio),
+        )
     wd_perms = GroupWorkerDayPermission.objects.filter(
         group__in=user.get_group_ids(Shop.objects.get(id=shop_id) if shop_id else None),
         worker_day_permission__action=action,

@@ -132,8 +132,7 @@ class TestSendUrvStatEventNotifications(TestsHelperMixin, APITestCase):
                 ]
             )
             self.assertEqual(emails, [self.user_dir.email, self.shop.email, self.user_urs.email])
-            data = open_workbook(file_contents=mail.outbox[0].attachments[0][1])
-            df = pd.read_excel(data, engine='xlrd')
+            df = pd.read_excel(mail.outbox[0].attachments[0][1])
             data = [
                 {
                     'Магазин': 'SHOP_NAME',
@@ -189,8 +188,7 @@ class TestSendUrvStatEventNotifications(TestsHelperMixin, APITestCase):
             self.assertEqual(len(mail.outbox), 1)
             self.assertEqual(mail.outbox[0].subject, subject)
             self.assertEqual(mail.outbox[0].to[0], self.user_dir.email)
-            data = open_workbook(file_contents=mail.outbox[0].attachments[0][1])
-            df = pd.read_excel(data, engine='xlrd')
+            df = pd.read_excel(mail.outbox[0].attachments[0][1])
             data = [
                 {
                     'Магазин': 'SHOP_NAME2',
@@ -306,8 +304,7 @@ class TestSendUrvStatTodayEventNotifications(TestsHelperMixin, APITestCase):
                 ]
             )
             self.assertEqual(emails, [self.user_dir.email, self.shop.email, self.user_urs.email])
-            data = open_workbook(file_contents=mail.outbox[0].attachments[0][1])
-            df = pd.read_excel(data, engine='xlrd')
+            df = pd.read_excel(mail.outbox[0].attachments[0][1])
             data = [
                 {
                     'Магазин': 'SHOP_NAME',
@@ -345,8 +342,7 @@ class TestSendUrvStatTodayEventNotifications(TestsHelperMixin, APITestCase):
             self.assertEqual(len(mail.outbox), 1)
             self.assertEqual(mail.outbox[0].subject, subject)
             self.assertEqual(mail.outbox[0].to[0], self.user_dir.email)
-            data = open_workbook(file_contents=mail.outbox[0].attachments[0][1])
-            df = pd.read_excel(data, engine='xlrd')
+            df = pd.read_excel(mail.outbox[0].attachments[0][1])
             data = [
                 {
                     'Магазин': 'SHOP_NAME2',
@@ -363,6 +359,17 @@ class TestSendUrvViolatorsEventNotifications(TestsHelperMixin, APITestCase):
     @classmethod
     def setUpTestData(cls):
         cls.network = NetworkFactory()
+        cls.network.set_settings_value(
+            'shop_name_form', 
+            {
+                'singular': {
+                    'I': 'объект',
+                    'R': 'объекта',
+                    'P': 'объекте',
+                }
+            }
+        )
+        cls.network.save()
         cls.period = Period.objects.create()
         cls.root_shop = ShopFactory(network=cls.network)
         cls.shop = ShopFactory(
@@ -469,8 +476,7 @@ class TestSendUrvViolatorsEventNotifications(TestsHelperMixin, APITestCase):
                 ]
             )
             self.assertEqual(emails, [self.user_dir.email, self.shop.email, self.user_urs.email])
-            data = open_workbook(file_contents=mail.outbox[0].attachments[0][1])
-            df = pd.read_excel(data, engine='xlrd').fillna('')
+            df = pd.read_excel(mail.outbox[0].attachments[0][1]).fillna('')
             data = [
                 {
                     'Дата': self.dt.strftime('%d.%m.%Y'),
@@ -532,8 +538,7 @@ class TestSendUrvViolatorsEventNotifications(TestsHelperMixin, APITestCase):
             self.assertEqual(len(mail.outbox), 1)
             self.assertEqual(mail.outbox[0].subject, subject)
             self.assertEqual(mail.outbox[0].to[0], self.user_dir.email)
-            data = open_workbook(file_contents=mail.outbox[0].attachments[0][1])
-            df = pd.read_excel(data, engine='xlrd').fillna('')
+            df = pd.read_excel(mail.outbox[0].attachments[0][1]).fillna('')
             data = [
                 {
                     'Дата': self.dt.strftime('%d.%m.%Y'),
@@ -551,6 +556,16 @@ class TestSendUrvStatV2EventNotifications(TestsHelperMixin, APITestCase):
     @classmethod
     def setUpTestData(cls):
         cls.network = NetworkFactory()
+        cls.network.set_settings_value(
+            'shop_name_form', 
+            {
+                'singular': {
+                    'I': 'магазин',
+                    'R': 'магазина',
+                    'P': 'магазине',
+                }
+            }
+        )
         cls.period = Period.objects.create()
         cls.root_shop = ShopFactory(network=cls.network)
         cls.shop = ShopFactory(
@@ -647,8 +662,7 @@ class TestSendUrvStatV2EventNotifications(TestsHelperMixin, APITestCase):
                 ]
             )
             self.assertEqual(emails, [self.user_dir.email, self.shop.email, self.user_urs.email])
-            data = open_workbook(file_contents=mail.outbox[0].attachments[0][1])
-            df = pd.read_excel(data, engine='xlrd')
+            df = pd.read_excel(mail.outbox[0].attachments[0][1],)
             data = [
                 {
                     'Код магазина': self.shop.code, 
@@ -718,8 +732,7 @@ class TestSendUrvStatV2EventNotifications(TestsHelperMixin, APITestCase):
             self.assertEqual(len(mail.outbox), 1)
             self.assertEqual(mail.outbox[0].subject, subject)
             self.assertEqual(mail.outbox[0].to[0], self.user_dir.email)
-            data = open_workbook(file_contents=mail.outbox[0].attachments[0][1])
-            df = pd.read_excel(data, engine='xlrd')
+            df = pd.read_excel(mail.outbox[0].attachments[0][1])
             data = [
                 {
                     'Код магазина': self.shop2.code,
@@ -737,6 +750,17 @@ class TestEmployeeNotCheckedEventNotifications(TestsHelperMixin, APITestCase):
     @classmethod
     def setUpTestData(cls):
         cls.network = NetworkFactory()
+        cls.network.set_settings_value(
+            'shop_name_form', 
+            {
+                'singular': {
+                    'I': 'подразделение',
+                    'R': 'подразделения',
+                    'P': 'подразделении',
+                }
+            }
+        )
+        cls.network.save()
         cls.root_shop = ShopFactory(network=cls.network)
         cls.user_dir = UserFactory(email='dir@example.com', network=cls.network)
         cls.shop = ShopFactory(
@@ -879,6 +903,13 @@ class TestEmployeeNotCheckedEventNotifications(TestsHelperMixin, APITestCase):
             {
                 'delta_for_comming_in_secs': 125,
                 'delta_for_leaving_in_secs': 240,
+                'shop_name_form': {
+                    'singular': {
+                        'I': 'подразделение',
+                        'R': 'подразделения',
+                        'P': 'подразделении',
+                    }
+                }
             }
         )
         self.network.save()
@@ -920,6 +951,17 @@ class TestEmployeeWorkingNotAccordingToPlanEventNotifications(TestsHelperMixin, 
     @classmethod
     def setUpTestData(cls):
         cls.network = NetworkFactory()
+        cls.network.set_settings_value(
+            'shop_name_form', 
+            {
+                'singular': {
+                    'I': 'подразделение',
+                    'R': 'подразделения',
+                    'P': 'подразделении',
+                }
+            }
+        )
+        cls.network.save()
         cls.root_shop = ShopFactory(network=cls.network)
         cls.user_dir = UserFactory(email='dir@example.com', network=cls.network)
         cls.shop = ShopFactory(

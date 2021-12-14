@@ -265,10 +265,10 @@ class AutoSettingsViewSet(viewsets.ViewSet):
         if not (self.request.user.network.get_acc_period_range(dt_to) == self.request.user.network.get_acc_period_range(dt_from)):
             raise ValidationError(self.error_messages["tt_different_acc_periods"])
 
-        dt_min = datetime.now().date() + timedelta(days=settings.REBUILD_TIMETABLE_MIN_DELTA)
+        dt_min = datetime.now().date() + timedelta(days=self.request.user.network.rebuild_timetable_min_delta)
 
         if dt_from < dt_min:
-            raise ValidationError(self.error_messages["tt_create_past"].format(num=settings.REBUILD_TIMETABLE_MIN_DELTA))
+            raise ValidationError(self.error_messages["tt_create_past"].format(num=self.request.user.network.rebuild_timetable_min_delta))
 
         dt_first = dt_from.replace(day=1)
 
@@ -961,7 +961,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
         dt_from = form['dt_from']
         dt_to = form['dt_to']
 
-        dt_min = datetime.now().date() + timedelta(days=settings.REBUILD_TIMETABLE_MIN_DELTA)
+        dt_min = datetime.now().date() + timedelta(days=self.request.user.network.rebuild_timetable_min_delta)
 
         if dt_from < dt_min:
             raise ValidationError(self.error_messages["tt_delete_past"])

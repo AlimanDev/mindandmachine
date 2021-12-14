@@ -33,6 +33,17 @@ class TestOutsource(TestsHelperMixin, APITestCase):
             name='Клиент',
             breaks=cls.breaks,
         )
+        cls.client_network.set_settings_value(
+            'shop_name_form', 
+            {
+                'singular': {
+                    'I': 'подразделение',
+                    'R': 'подразделения',
+                    'P': 'подразделении',
+                }
+            }
+        )
+        cls.client_network.save()
         cls.outsource_network = cls.network
         cls.outsource_network2 = Network.objects.create(
             name='Аутсорс'
@@ -430,7 +441,6 @@ class TestOutsource(TestsHelperMixin, APITestCase):
                     'secondary_color': '', 
                     'allowed_geo_distance_km': None,
                     'allow_creation_several_wdays_for_one_employee_for_one_date': False,
-                    'display_employee_tabs_in_the_schedule': True,
                     'enable_camera_ticks': False,
                     'show_worker_day_additional_info': False,
                     'allowed_interval_for_late_arrival': '00:00:00',
@@ -449,8 +459,12 @@ class TestOutsource(TestsHelperMixin, APITestCase):
                     'unaccounted_overtime_threshold': 60,
                     'forbid_edit_employments_came_through_integration': True,
                     'get_position_from_work_type_name_in_calc_timesheet': False,
+                    'trust_tick_request': False,
+                    'show_cost_for_inner_vacancies': False,
+                    'rebuild_timetable_min_delta': 2,
                     'show_remaking_choice': False,
                     'analytics_iframe': '',
+                    'show_employee_shift_schedule_tab': False,
                     'shop_name_form': {
                         "singular": {
                             "I": "магазин",
@@ -474,8 +488,9 @@ class TestOutsource(TestsHelperMixin, APITestCase):
         ]
         self.assertEqual(response.json(), data)
 
-    @override_settings(TRUST_TICK_REQUEST=True)
     def test_tick_vacancy(self):
+        self.network.trust_tick_request = True
+        self.network.save()
         vacancy = self._create_and_apply_vacancy()
         resp_coming = self.client.post(
             self.get_url('Tick-list'),
@@ -693,3 +708,23 @@ class TestOutsource(TestsHelperMixin, APITestCase):
         self.assertIsNotNone(employee1_wd)
         self.assertIsNotNone(employee2_wd)
         self.assertEquals(list(employee2_wd.outsources.all()), [self.outsource_network,])
+
+    def test_outsourcing_network_id__in_filter(self):
+        dt_now = self.dt_now
+        vacancy = self._create_vacancy(dt_now, datetime.combine(dt_now, time(8)), datetime.combine(dt_now, time(20)), outsources=[self.outsource_network.id]).json()
+        vacancy2 = self._create_vacancy(dt_now, datetime.combine(dt_now, time(8)), datetime.combine(dt_now, time(20)), outsources=[self.outsource_network.id]).json()
+        vacancy3 = self._create_vacancy(dt_now, datetime.combine(dt_now, time(8)), datetime.combine(dt_now, time(20)), outsources=[self.outsource_network.id, self.outsource_network2.id]).json()
+        vacancy4 = self._create_vacancy(dt_now, datetime.combine(dt_now, time(8)), datetime.combine(dt_now, time(20)), outsources=[self.outsource_network2.id]).json()
+        WorkerDay.objects.all().update(is_approved=True)
+        response = self.client.get('/rest_api/worker_day/vacancy/?limit=10&offset=0')
+        self.assertEquals(len(response.json()['results']), 4)
+        response = self.client.get(f'/rest_api/worker_day/vacancy/?limit=10&offset=0&outsourcing_network_id__in={self.outsource_network.id}')
+        self.assertEquals(len(response.json()['results']), 3)
+        vac_ids = list(map(lambda x: x['id'], response.json()['results']))
+        self.assertCountEqual(vac_ids, [vacancy['id'], vacancy2['id'], vacancy3['id']])
+        response = self.client.get(f'/rest_api/worker_day/vacancy/?limit=10&offset=0&outsourcing_network_id__in={self.outsource_network2.id}')
+        self.assertEquals(len(response.json()['results']), 2)
+        vac_ids = list(map(lambda x: x['id'], response.json()['results']))
+        self.assertCountEqual(vac_ids, [vacancy3['id'], vacancy4['id']])
+        response = self.client.get(f'/rest_api/worker_day/vacancy/?limit=10&offset=0&outsourcing_network_id__in={self.outsource_network.id},{self.outsource_network2.id}')
+        self.assertEquals(len(response.json()['results']), 4)

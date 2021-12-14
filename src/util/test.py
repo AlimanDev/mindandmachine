@@ -454,6 +454,7 @@ def create_departments_and_users(self, dt=None):
             # access_type=FunctionGroup.TYPE_SELF
         ) for func, _ in FunctionGroup.FUNCS_TUPLE
     ])
+    self.admin_group.subordinates.add(self.admin_group, self.chief_group, self.employee_group)
 
     Shop._tree_manager.rebuild()
     # supershop

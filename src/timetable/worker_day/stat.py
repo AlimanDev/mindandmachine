@@ -19,6 +19,7 @@ from django.db.models.functions import Extract, Coalesce, Greatest, Least
 from django.utils.functional import cached_property
 
 from src.base.models import Employment, Shop, ProductionDay, SAWHSettings, Network, SAWHSettingsMapping
+from src.base.shift_schedule.utils import get_shift_schedule
 from src.forecast.models import PeriodClients
 from src.timetable.models import WorkerDay, ProdCal, TimesheetItem, WorkerDayType
 from src.util.models_converter import Converter
@@ -244,6 +245,38 @@ class WorkersStatsGetter:
             show_stat_in_hours=True,
         ).values_list('code', flat=True))
         self._network = network
+
+    @cached_property
+    def shift_schedule_data(self):
+        return get_shift_schedule(
+            network_id=self.network.id,
+            employment__in=self.employments_list,
+            dt__gte=self.dt_from,
+            dt__lte=self.dt_to,
+        )
+
+    @cached_property
+    def workdays_by_dates(self):
+        qs = WorkerDay.objects.filter(
+            is_fact=False,
+            employment__in=self.employments_list,
+            dt__gte=self.dt_from,
+            dt__lte=self.dt_to,
+        ).values(
+            'employment_id',
+            'dt',
+            'type_id',
+            'type__is_dayoff',
+            'type__is_reduce_norm',
+            'type__is_work_hours',
+            'work_hours',
+            'is_approved',
+        )
+        data = {}
+        for wd in qs:
+            data.setdefault(str(wd['employment_id']), {}).setdefault(wd['is_approved'], {}).setdefault(str(wd['dt']),
+                                                                                                       []).append(wd)
+        return data
 
     @cached_property
     def shop(self):
@@ -774,6 +807,14 @@ class WorkersStatsGetter:
                         empl_dict.setdefault('sawh_hours_by_months', {})[
                             month_num] = (empl_days_count / days_in_month) * (empl.norm_work_hours / 100) * empl.sawh_hours_by_months.get(
                             f'm{month_num}', prod_cal_norm_hours)
+                elif empl.sawh_settings_type == SAWHSettings.SHIFT_SCHEDULE:  # TODO: тесты
+                    for month_num, prod_cal_norm_hours in norm_hours_by_months.items():
+                        _month_start, _month_end = get_month_range(
+                            self.year, month_num)
+                        empl_dict.setdefault('sawh_hours_by_months', {})[month_num] = 0
+                        for dt in pd.date_range(_month_start, _month_end).date:
+                            empl_dict.setdefault('sawh_hours_by_months', {})[month_num] += float(
+                                self.shift_schedule_data.get(str(empl.id), {}).get(str(dt), {}).get('work_hours', 0))
                 else:
                     empl_dict['sawh_hours_by_months'] = norm_hours_by_months
 
@@ -800,13 +841,27 @@ class WorkersStatsGetter:
                         empl_dict.setdefault('one_day_value', {})[month_num] = \
                             sawh_hours_by_months / empl_dict.get('empl_days_count').get(month_num)
                         empl_dict.setdefault('sawh_hours_by_months_plan_approved', {})[month_num] = \
-                        empl_dict['sawh_hours_by_months'][month_num] - (
-                                empl_dict['one_day_value'][month_num] *
-                                empl_dict.get('vacation_or_sick_plan_approved_count', {}).get(month_num, 0))
+                        empl_dict['sawh_hours_by_months'][month_num]
                         empl_dict.setdefault('sawh_hours_by_months_plan_not_approved', {})[month_num] = \
-                        empl_dict['sawh_hours_by_months'][
-                            month_num] - (empl_dict['one_day_value'][month_num] * empl_dict.get(
-                            'vacation_or_sick_plan_not_approved_count', {}).get(month_num, 0))
+                            empl_dict['sawh_hours_by_months'][
+                                month_num]
+                        if empl.sawh_settings_type == SAWHSettings.SHIFT_SCHEDULE:  # TODO: тесты
+                            empl_shift_schedule_data = self.shift_schedule_data.get(str(empl.id), {})
+                            for dt, ss_data in empl_shift_schedule_data.items():
+                                wd_by_dates = self.workdays_by_dates.get(str(empl.id), {})
+                                if any(i['type__is_reduce_norm'] for i in wd_by_dates.get(False, {}).get(dt, [])):
+                                    empl_dict.setdefault('sawh_hours_by_months_plan_not_approved', {})[month_num] -= \
+                                    float(ss_data['work_hours'])
+                                if any(i['type__is_reduce_norm'] for i in wd_by_dates.get(True, {}).get(dt, [])):
+                                    empl_dict.setdefault('sawh_hours_by_months_plan_approved', {})[month_num] -= \
+                                    float(ss_data['work_hours'])
+                        else:
+                            empl_dict.setdefault('sawh_hours_by_months_plan_approved', {})[month_num] -= (
+                                    empl_dict['one_day_value'][month_num] *
+                                    empl_dict.get('vacation_or_sick_plan_approved_count', {}).get(month_num, 0))
+                            empl_dict.setdefault('sawh_hours_by_months_plan_not_approved', {})[month_num] -= (
+                                        empl_dict['one_day_value'][month_num] * empl_dict.get(
+                                    'vacation_or_sick_plan_not_approved_count', {}).get(month_num, 0))
 
                     if month_num in selected_period_months:
                         days_count_in_month = empl_dict['empl_days_count'][month_num]
