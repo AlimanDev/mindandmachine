@@ -126,6 +126,7 @@ class NetworkSerializer(serializers.ModelSerializer):
             'allow_creation_several_wdays_for_one_employee_for_one_date',
             'shop_name_form',
             'get_position_from_work_type_name_in_calc_timesheet',
+            'analytics_iframe',
         ]
 
 class NetworkListSerializer(serializers.Serializer):
