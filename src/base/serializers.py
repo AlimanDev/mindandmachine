@@ -134,6 +134,7 @@ class NetworkSerializer(serializers.ModelSerializer):
             'show_cost_for_inner_vacancies',
             'show_employee_shift_schedule_tab',
             'rebuild_timetable_min_delta',
+            'analytics_iframe',
         ]
 
 class NetworkListSerializer(serializers.Serializer):
