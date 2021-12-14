@@ -68,6 +68,7 @@ class WorkerDayApproveSerializer(serializers.Serializer):
         child=serializers.IntegerField(),
         required=False,
     )
+    approve_open_vacs = serializers.BooleanField(required=False)
 
 
 class WorkerDayCashboxDetailsSerializer(serializers.ModelSerializer):

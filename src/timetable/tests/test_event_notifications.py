@@ -692,6 +692,7 @@ class TestVacancyCreatedNotification(TestsHelperMixin, APITestCase):
                 'wd_types': [
                     WorkerDay.TYPE_WORKDAY,
                 ],
+                'approve_open_vacs': True,
             }
             with mock.patch.object(transaction, 'on_commit', lambda t: t()):
                 resp = self.client.post(self.get_url('WorkerDay-approve'), data=approve_data)

@@ -448,6 +448,10 @@ class WorkerDayViewSet(BaseModelViewSet):
                     is_fact=serializer.validated_data['is_fact'],
                 )
 
+                # не подтверждаем открытые вакансии
+                if not serializer.validated_data.get('approve_open_vacs'):
+                    wdays_to_approve = wdays_to_approve.filter(employee_id__isnull=False)
+
                 # если у пользователя нет группы с наличием прав на изменение защищенных дней, то проверяем,
                 # что в списке подтверждаемых дней нету защищенных дней, если есть, то выдаем ошибку
                 has_permission_to_change_protected_wdays = Group.objects.filter(

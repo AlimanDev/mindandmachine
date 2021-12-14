@@ -218,6 +218,38 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
         self.assertFalse(WorkerDay.objects.filter(id=self.worker_day_fact_approved.id).exists())
         self.assertTrue(WorkerDay.objects.filter(id=self.worker_day_plan_not_approved.id).exists())
 
+    def test_approve_open_vacs(self):
+        open_vacancy = WorkerDay.objects.create(
+            shop=self.shop,
+            is_vacancy=True,
+            type_id=WorkerDay.TYPE_WORKDAY,
+            dt=self.dt,
+            dttm_work_start=datetime.combine(self.dt, time(10)),
+            dttm_work_end=datetime.combine(self.dt, time(19)),
+        )
+        data = {
+            'shop_id': self.shop.id,
+            'dt_from': self.dt,
+            'dt_to': self.dt + timedelta(days=2),
+            'is_fact': False,
+        }
+        response = self.client.post(self.url_approve, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        open_vacancy.refresh_from_db()
+        self.assertFalse(open_vacancy.is_approved)
+        data = {
+            'shop_id': self.shop.id,
+            'dt_from': self.dt,
+            'dt_to': self.dt + timedelta(days=2),
+            'is_fact': False,
+            'approve_open_vacs': True,
+        }
+        response = self.client.post(self.url_approve, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        open_vacancy.refresh_from_db()
+        self.assertTrue(open_vacancy.is_approved)
+
+
     # Последовательное создание и подтверждение P1 -> A1 -> P2 -> F1 -> A2 -> F2
     def test_create_and_approve(self):
         GroupWorkerDayPermission.objects.filter(
