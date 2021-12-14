@@ -450,6 +450,7 @@ class TestOutsource(TestsHelperMixin, APITestCase):
                     'forbid_edit_employments_came_through_integration': True,
                     'get_position_from_work_type_name_in_calc_timesheet': False,
                     'show_remaking_choice': False,
+                    'analytics_iframe': '',
                     'shop_name_form': {
                         "singular": {
                             "I": "магазин",
