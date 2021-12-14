@@ -45,6 +45,7 @@ from src.timetable.timesheet.tasks import calc_timesheets
 from src.timetable.vacancy.tasks import vacancies_create_and_cancel_for_shop
 from src.timetable.vacancy.utils import cancel_vacancies, cancel_vacancy, confirm_vacancy, notify_vacancy_created
 from src.timetable.worker_day.serializers import (
+    ConfirmVacancyToWorkerSerializer,
     OvertimesUndertimesReportSerializer,
     ChangeListSerializer,
     WorkerDaySerializer,
@@ -882,10 +883,10 @@ class WorkerDayViewSet(BaseModelViewSet):
     )
     @action(detail=True, methods=['post'], serializer_class=None)
     def confirm_vacancy_to_worker(self, request, pk=None):
-        user = User.objects.filter(id=request.data.get('user_id'), network_id=request.user.network_id).first()
-        if not user:
-            raise ValidationError(self.error_messages["no_such_user_in_network"])
-        result = confirm_vacancy(pk, user, employee_id=request.data.get('employee_id', None))
+        data = ConfirmVacancyToWorkerSerializer(data=request.data, context=self.get_serializer_context())
+        data.is_valid(raise_exception=True)
+        data = data.validated_data
+        result = confirm_vacancy(pk, data['user'], employee_id=data['employee_id'])
         status_code = result['status_code']
         result = result['text']
 
@@ -899,10 +900,10 @@ class WorkerDayViewSet(BaseModelViewSet):
     )
     @action(detail=True, methods=['post'], serializer_class=None)
     def reconfirm_vacancy_to_worker(self, request, pk=None):
-        user = User.objects.filter(id=request.data.get('user_id'), network_id=request.user.network_id).first()
-        if not user:
-            raise ValidationError(self.error_messages["no_such_user_in_network"])
-        result = confirm_vacancy(pk, user, employee_id=request.data.get('employee_id', None), reconfirm=True)
+        data = ConfirmVacancyToWorkerSerializer(data=request.data, context=self.get_serializer_context())
+        data.is_valid(raise_exception=True)
+        data = data.validated_data
+        result = confirm_vacancy(pk, data['user'], employee_id=data['employee_id'], reconfirm=True)
         status_code = result['status_code']
         result = result['text']
 

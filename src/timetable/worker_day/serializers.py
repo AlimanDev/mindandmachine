@@ -6,7 +6,7 @@ from django.db.models import Q
 from django.utils.functional import cached_property
 from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
-from rest_framework.exceptions import ValidationError, NotFound
+from rest_framework.exceptions import PermissionDenied, ValidationError, NotFound
 
 from src.base.exceptions import FieldError
 from src.base.models import Employment, User, Shop, Employee, Network
@@ -744,3 +744,26 @@ class OvertimesUndertimesReportSerializer(serializers.Serializer):
             raise ValidationError(_('Shop or employees should be defined.'))
         if self.validated_data.get('employee_id__in'):
             self.validated_data['employee_id__in'] = self.validated_data['employee_id__in'].split(',')
+
+class ConfirmVacancyToWorkerSerializer(serializers.Serializer):
+    default_error_messages = {
+        "employee_not_in_subordinates": _("Employee {employee} is not your subordinate."),
+        "no_such_user_in_network": _("There is no such user in your network."),
+    }
+
+    employee_id = serializers.IntegerField()
+    user_id = serializers.IntegerField()
+
+    def validate(self, attrs):
+        user = self.context['request'].user
+        attrs['user'] = User.objects.filter(id=attrs['user_id'], network_id=user.network_id).first()
+        if not attrs['user']:
+            raise ValidationError(self.error_messages["no_such_user_in_network"])
+        employee_id = attrs['employee_id']
+        
+        if not WorkerDay._has_group_permissions(user, employee_id):
+            raise PermissionDenied(
+                self.error_messages['employee_not_in_subordinates'].format(
+                employee=attrs['user'].fio),
+            )
+        return attrs

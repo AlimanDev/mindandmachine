@@ -743,10 +743,23 @@ class WorkerDay(AbstractModel):
     def _has_group_permissions(cls, user, employee_id, shop_id=None):
         if not employee_id:
             return True
-        employee = Employee.objects.select_related('user').get(id=employee_id)
         shop = None
         if shop_id:
             shop = Shop.objects.get(id=shop_id)
+        user_shops = Shop.objects.filter(id__in=user.get_active_employments().values_list('shop_id', flat=True))
+        user_shops = Shop.objects.get_queryset_descendants(user_shops, include_self=True)
+        employee = Employee.objects.select_related('user').filter(id=employee_id).annotate(
+            has_employment_in_shops=Exists(
+                Employment.objects.get_active(
+                    employee_id=OuterRef('id'),
+                    shop__in=user_shops,
+                )
+            )
+        ).filter(
+            has_employment_in_shops=True,
+        ).first()
+        if not employee:
+            return False
         return Group.check_has_perm_to_group(user, groups=employee.user.get_group_ids(shop))
 
     def calc_day_and_night_work_hours(self):

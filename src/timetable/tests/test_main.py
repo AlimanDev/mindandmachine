@@ -1782,11 +1782,7 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
             ]
         }
         resp = self.client.post(self.url, data, format='json')
-        self.assertEqual(resp.status_code, 400)
-        self.assertEqual(
-            resp.json()["non_field_errors"][0],
-            'Невозможно создать рабочий день, так как пользователь в этот период не трудоустроен',
-        )
+        self.assertEqual(resp.status_code, 403)
 
     def test_can_create_workday_for_user_from_outsourcing_network(self):
         outsource_network = Network.objects.create(
@@ -1820,6 +1816,9 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
                 "work_type_id": self.work_type.id}
             ]
         }
+        resp = self.client.post(self.url, data, format='json')
+        self.assertEqual(resp.status_code, 403)
+        Employment.objects.filter(employee__user=self.user2).update(shop=self.shop)
         resp = self.client.post(self.url, data, format='json')
         self.assertEqual(resp.status_code, 201)
 
@@ -2088,6 +2087,14 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
         resp = self.client.delete(self.get_url('WorkerDay-detail', pk=wd_not_approved_to_delete.id))
         self.assertEquals(resp.status_code, 403)
         self.admin_group.subordinates.add(self.employment2.function_group)
+        Employment.objects.filter(employee=self.employee1).update(shop=self.shop2)
+        resp = self.client.post(self.url, self.dump_data(wd_not_approved_to_create), content_type='application/json')
+        self.assertEquals(resp.status_code, 403)
+        resp = self.client.put(self.get_url('WorkerDay-detail', pk=wd_not_approved_to_update.id), self.dump_data(wd_update_data), content_type='application/json')
+        self.assertEquals(resp.status_code, 403)
+        resp = self.client.delete(self.get_url('WorkerDay-detail', pk=wd_not_approved_to_delete.id))
+        self.assertEquals(resp.status_code, 403)
+        Employment.objects.filter(employee=self.employee1).update(shop=self.shop)
         resp = self.client.post(self.url, self.dump_data(wd_not_approved_to_create), content_type='application/json')
         self.assertEquals(resp.status_code, 201)
         self.assertIsNotNone(WorkerDay.objects.filter(id=resp.json()['id']).first())
@@ -2297,6 +2304,17 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
             resp, f'Сотрудник {self.user2.fio} не является Вашим подчиненным.', status_code=403)
         WorkerDay.objects.all().delete()
         self.admin_group.subordinates.add(self.employment2.function_group)
+        Employment.objects.filter(employee=self.employee1).update(shop=self.shop2)
+        resp = self.client.post(
+            self.get_url('WorkerDay-batch-update-or-create'), self.dump_data(delete_data),
+            content_type='application/json')
+        self.assertContains(
+            resp, f'Сотрудник {self.user2.fio} не является Вашим подчиненным.', status_code=403)
+        resp = self.client.post(
+            self.get_url('WorkerDay-batch-update-or-create'), self.dump_data(data), content_type='application/json')
+        self.assertContains(
+            resp, f'Сотрудник {self.user2.fio} не является Вашим подчиненным.', status_code=403)
+        Employment.objects.filter(employee=self.employee1).update(shop=self.shop)
         resp = self.client.post(
             self.get_url('WorkerDay-batch-update-or-create'), self.dump_data(data), content_type='application/json')
         self.assertEquals(resp.status_code, status.HTTP_200_OK)
@@ -4741,6 +4759,7 @@ class TestVacancy(TestsHelperMixin, APITestCase):
             f'/rest_api/worker_day/{vacancy.id}/confirm_vacancy_to_worker/',
             data={
                 'user_id': self.user2.id,
+                'employee_id': self.employee2.id,
             }
         )
         self.assertEqual(response.json(), {'result': 'Вакансия успешно принята.'})
@@ -4789,6 +4808,7 @@ class TestVacancy(TestsHelperMixin, APITestCase):
             f'/rest_api/worker_day/{vacancy.id}/confirm_vacancy_to_worker/',
             data={
                 'user_id': self.user2.id,
+                'employee_id': self.employee2.id,
             }
         )
         self.assertEqual(response.json(), {'result': 'Вакансия успешно принята.'})
