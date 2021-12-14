@@ -98,10 +98,17 @@ class Timesheet:
             items = list(filter(filter_func, items))
         return items
 
-    def is_holiday(self, dt):
+    def is_holiday(self, dt, consider_dayoff_work_hours=True):
+        """
+        :param dt:
+        :param consider_dayoff_work_hours: считать нерабочий день с рабочими часами как выходной
+        :return:
+        """
         items = self.get_items(dt=dt)
         return not items or \
-               any((item.day_type.is_dayoff and not item.day_type.is_work_hours) for item in items) or \
+               any(((item.day_type.is_dayoff and not item.day_type.is_work_hours) or (
+                           consider_dayoff_work_hours and item.day_type.is_dayoff and item.day_type.is_work_hours)) for
+                   item in items) or \
                self.get_total_hours_sum(dt=dt) == 0
 
     def get_day_hours_sum(self, dt=None, filter_func=None):

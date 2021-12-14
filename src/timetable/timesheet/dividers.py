@@ -20,7 +20,7 @@ class BaseTimesheetDivider:
         self.fiscal_timesheet = fiscal_timesheet
         self.dt_now = timezone.now().date()
 
-    def _is_holiday(self, item_data):
+    def _is_holiday(self, item_data, consider_dayoff_work_hours=True):
         if not item_data:
             return True
 
@@ -32,7 +32,8 @@ class BaseTimesheetDivider:
             timesheet_total_hours = item_data.get('fact_timesheet_total_hours')
 
         wd_type_obj = self.fiscal_timesheet.wd_types_dict.get(timesheet_type)
-        if (wd_type_obj.is_dayoff and not wd_type_obj.is_work_hours) or timesheet_total_hours == 0:
+        if (wd_type_obj.is_dayoff and not wd_type_obj.is_work_hours) or (
+                consider_dayoff_work_hours and wd_type_obj.is_dayoff and wd_type_obj.is_work_hours) or timesheet_total_hours == 0:
             return True
 
     def _get_outside_period_data(self, start_of_week, first_dt_weekday_num):
@@ -122,9 +123,11 @@ class BaseTimesheetDivider:
 
             for dt in week_dates:
                 if self.fiscal_timesheet.dt_from <= dt <= self.fiscal_timesheet.dt_to:
-                    current_day_is_holiday = self.fiscal_timesheet.main_timesheet.is_holiday(dt=dt)
+                    current_day_is_holiday = self.fiscal_timesheet.main_timesheet.is_holiday(
+                        dt=dt, consider_dayoff_work_hours=False)
                 else:
-                    current_day_is_holiday = self._is_holiday(outside_period_data.get(dt))
+                    current_day_is_holiday = self._is_holiday(
+                        outside_period_data.get(dt), consider_dayoff_work_hours=False)
 
                 if prev_day_is_holiday and current_day_is_holiday:
                     continuous_holidays_count = 2
