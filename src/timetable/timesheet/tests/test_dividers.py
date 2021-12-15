@@ -647,6 +647,85 @@ class TestPobedaDivider(TestTimesheetMixin, TestCase):
                 timesheet_type=TimesheetItem.TIMESHEET_TYPE_MAIN, dt=date(2021, 6, day_num)).day_type_id,
                              WorkerDay.TYPE_WORKDAY)
 
+    def test_vacation_dont_moved_to_additional_timesheet(self):
+        vacation_type = WorkerDayType.objects.filter(
+            code=WorkerDay.TYPE_VACATION,
+        ).get()
+        vacation_type.get_work_hours_method = WorkerDayType.GET_WORK_HOURS_METHOD_TYPE_MONTH_AVERAGE_SAWH_HOURS
+        vacation_type.is_work_hours = True
+        vacation_type.is_dayoff = True
+        vacation_type.save()
+
+        WorkerDay.objects.all().delete()
+        wdays = (
+            ((WorkerDay.TYPE_VACATION, None, None, None), (
+                date(2021, 6, 3),
+                date(2021, 6, 4),
+                date(2021, 6, 5),
+            )),
+            ((WorkerDay.TYPE_WORKDAY, time(8), time(21), None), (
+                date(2021, 6, 1),
+                date(2021, 6, 2),
+                date(2021, 6, 6),
+                date(2021, 6, 7),
+                date(2021, 6, 8),
+                date(2021, 6, 9),
+                date(2021, 6, 10),
+                date(2021, 6, 11),
+                date(2021, 6, 12),
+                date(2021, 6, 13),
+                date(2021, 6, 14),
+                date(2021, 6, 15),
+                date(2021, 6, 16),
+                date(2021, 6, 17),
+                date(2021, 6, 20),
+                date(2021, 6, 21),
+                date(2021, 6, 22),
+                date(2021, 6, 23),
+                date(2021, 6, 25),
+                date(2021, 6, 26),
+                date(2021, 6, 27),
+                date(2021, 6, 28),
+            )),
+        )
+        for (wd_type_id, tm_start, tm_end, work_hours), dates in wdays:
+            for dt in dates:
+                is_night_work = False
+                if tm_start and tm_end and tm_end < tm_start:
+                    is_night_work = True
+
+                is_work_day = wd_type_id == WorkerDay.TYPE_WORKDAY
+                WorkerDayFactory(
+                    type_id=wd_type_id,
+                    dt=dt,
+                    shop=self.shop,
+                    employee=self.employee_worker,
+                    employment=self.employment_worker,
+                    dttm_work_start=datetime.combine(dt, tm_start) if is_work_day else None,
+                    dttm_work_end=datetime.combine(dt + timedelta(days=1) if is_night_work else dt,
+                                                   tm_end) if is_work_day else None,
+                    is_fact=is_work_day,
+                    is_approved=True,
+                    work_hours=work_hours,
+                )
+
+        data = WorkerDay.objects.filter(type__is_work_hours=True).aggregate(work_hours_sum=Sum('work_hours'))
+        self.assertEqual(data['work_hours_sum'].total_seconds() / 3600, 282.0)
+        self._calc_timesheets(reraise_exc=True)
+        self.assertEqual(TimesheetItem.objects.get(
+            timesheet_type=TimesheetItem.TIMESHEET_TYPE_MAIN, dt='2021-06-03').day_type_id, WorkerDay.TYPE_VACATION)
+        self.assertEqual(TimesheetItem.objects.get(
+            timesheet_type=TimesheetItem.TIMESHEET_TYPE_MAIN, dt='2021-06-04').day_type_id, WorkerDay.TYPE_VACATION)
+        self.assertEqual(TimesheetItem.objects.get(
+            timesheet_type=TimesheetItem.TIMESHEET_TYPE_MAIN, dt='2021-06-05').day_type_id, WorkerDay.TYPE_VACATION)
+
+        self.assertIsNone(TimesheetItem.objects.filter(
+            timesheet_type=TimesheetItem.TIMESHEET_TYPE_ADDITIONAL, dt='2021-06-03').first())
+        self.assertIsNone(TimesheetItem.objects.filter(
+            timesheet_type=TimesheetItem.TIMESHEET_TYPE_ADDITIONAL, dt='2021-06-04').first())
+        self.assertIsNone(TimesheetItem.objects.filter(
+            timesheet_type=TimesheetItem.TIMESHEET_TYPE_ADDITIONAL, dt='2021-06-05').first())
+
 
 @override_settings(FISCAL_SHEET_DIVIDER_ALIAS='shift_schedule')
 class TestShiftScheduleDivider(TestTimesheetMixin, TestCase):
