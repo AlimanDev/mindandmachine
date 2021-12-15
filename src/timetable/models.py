@@ -657,9 +657,11 @@ class WorkerDay(AbstractModel):
         employees_and_shops = delete_qs.values_list(
             'employee_id',
             'shop_id',
+            'dt',
         ).distinct()
-        for employee_id, shop_id in employees_and_shops:
-            if not cls._has_group_permissions(user, employee_id, shop_id):
+        user_shops = list(user.get_shops(include_descendants=True).values_list('id', flat=True))
+        for employee_id, shop_id, dt in employees_and_shops:
+            if not cls._has_group_permissions(user, employee_id, dt, shop_id=shop_id, user_shops=user_shops):
                 raise PermissionDenied(
                     WorkerDayViewSet.error_messages['employee_not_in_subordinates'].format(
                     employee=User.objects.filter(employees__id=employee_id).first().fio),
@@ -740,26 +742,28 @@ class WorkerDay(AbstractModel):
         }
 
     @classmethod
-    def _has_group_permissions(cls, user, employee_id, shop_id=None):
+    def _has_group_permissions(cls, user, employee_id, dt, shop_id=None, user_shops=None):
         if not employee_id:
             return True
         shop = None
         if shop_id:
             shop = Shop.objects.get(id=shop_id)
-        user_shops = Shop.objects.filter(id__in=user.get_active_employments().values_list('shop_id', flat=True))
-        user_shops = Shop.objects.get_queryset_descendants(user_shops, include_self=True)
-        employee = Employee.objects.select_related('user').filter(id=employee_id).annotate(
-            has_employment_in_shops=Exists(
-                Employment.objects.get_active(
-                    employee_id=OuterRef('id'),
-                    shop__in=user_shops,
-                )
-            )
-        ).filter(
-            has_employment_in_shops=True,
-        ).first()
+        employee = Employee.get_subordinates(
+            user, 
+            dt=dt, 
+            user_shops=user_shops,
+        ).select_related('user').filter(id=employee_id).first()
         if not employee:
-            return False
+            active_empls = Employment.objects.get_active(
+                dt_from=dt,
+                dt_to=dt,
+                employee_id=employee_id,
+            )
+            if active_empls.exists():
+                return False
+            else:
+                raise ValidationError(
+                    _("Can't create a working day in the schedule, since the user is not employed during this period"))
         return Group.check_has_perm_to_group(user, groups=employee.user.get_group_ids(shop))
 
     def calc_day_and_night_work_hours(self):

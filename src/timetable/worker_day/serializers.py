@@ -760,8 +760,8 @@ class ConfirmVacancyToWorkerSerializer(serializers.Serializer):
         if not attrs['user']:
             raise ValidationError(self.error_messages["no_such_user_in_network"])
         employee_id = attrs['employee_id']
-        
-        if not WorkerDay._has_group_permissions(user, employee_id):
+        vacancy = self.context['view'].get_object()
+        if not WorkerDay._has_group_permissions(user, employee_id, vacancy.dt):
             raise PermissionDenied(
                 self.error_messages['employee_not_in_subordinates'].format(
                 employee=attrs['user'].fio),
