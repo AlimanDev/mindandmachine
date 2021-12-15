@@ -656,12 +656,12 @@ class WorkerDay(AbstractModel):
         action = WorkerDayPermission.DELETE
         employees_and_shops = delete_qs.values_list(
             'employee_id',
-            'shop_id',
             'dt',
         ).distinct()
         user_shops = list(user.get_shops(include_descendants=True).values_list('id', flat=True))
-        for employee_id, shop_id, dt in employees_and_shops:
-            if not cls._has_group_permissions(user, employee_id, dt, shop_id=shop_id, user_shops=user_shops):
+        user_subordinates = Group.get_subordinate_ids(user)
+        for employee_id, dt in employees_and_shops:
+            if not cls._has_group_permissions(user, employee_id, dt, user_shops=user_shops, user_subordinates=user_subordinates):
                 raise PermissionDenied(
                     WorkerDayViewSet.error_messages['employee_not_in_subordinates'].format(
                     employee=User.objects.filter(employees__id=employee_id).first().fio),
@@ -742,17 +742,15 @@ class WorkerDay(AbstractModel):
         }
 
     @classmethod
-    def _has_group_permissions(cls, user, employee_id, dt, shop_id=None, user_shops=None):
+    def _has_group_permissions(cls, user, employee_id, dt, user_shops=None, user_subordinates=None):
         if not employee_id:
             return True
-        shop = None
-        if shop_id:
-            shop = Shop.objects.get(id=shop_id)
         employee = Employee.get_subordinates(
             user, 
             dt=dt, 
             user_shops=user_shops,
-        ).select_related('user').filter(id=employee_id).first()
+            user_subordinates=user_subordinates,
+        ).filter(id=employee_id).first()
         if not employee:
             active_empls = Employment.objects.get_active(
                 dt_from=dt,
@@ -764,7 +762,7 @@ class WorkerDay(AbstractModel):
             else:
                 raise ValidationError(
                     _("Can't create a working day in the schedule, since the user is not employed during this period"))
-        return Group.check_has_perm_to_group(user, groups=employee.user.get_group_ids(shop))
+        return True
 
     def calc_day_and_night_work_hours(self, work_hours=None, work_start=None, work_end=None):
         from src.util.models_converter import Converter
