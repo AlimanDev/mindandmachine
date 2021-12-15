@@ -311,7 +311,7 @@ def export_or_delete_employment_zkteco(employment_id):
 def export_user_biophoto(pin, encoded_photo):
     raw_body = f'BIOPHOTO PIN={pin}\tFileName={pin}.jpg\tType=9\tSize={len(encoded_photo)}\tContent={encoded_photo}'
     headers = {
-        'Content-Length': len(raw_body),
+        'Content-Length': str(len(raw_body)),
         'Host': settings.ZKTECO_BIOHOST,
     }
     params = {

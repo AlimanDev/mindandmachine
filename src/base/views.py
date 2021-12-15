@@ -189,7 +189,7 @@ class UserViewSet(UpdateorCreateViewSet):
             biometrics_image = self.request.data['file']
             user_external_code = UserExternalCode.objects.filter(user=user).first()
             if settings.ZKTECO_INTEGRATION and user_external_code:
-                ZKTeco().export_biophoto(user_external_code.pin, biometrics_image)
+                ZKTeco().export_biophoto(user_external_code.code, biometrics_image)
             recognition = Recognition()
             try:
                 partner_id = recognition.create_person({"id": user.id})
