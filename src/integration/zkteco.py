@@ -1,3 +1,4 @@
+from base64 import b64encode
 import requests
 from requests.exceptions import HTTPError
 from django.conf import settings
@@ -110,6 +111,13 @@ class ZKTeco:
             "pageSize": page_size,
         }
         return self.call('GET', url, params=params)
+
+    def export_biophoto(self, pin, photo):
+        from src.integration.tasks import export_user_biophoto
+        photo.seek(0)
+        encoded_photo = b64encode(photo.read()).decode("utf-8")
+        export_user_biophoto.delay(pin, encoded_photo)
+        photo.seek(0)
 
     def call(self, method, url, data=None, params={}, json=None):
         params.update({'access_token': settings.ZKTECO_KEY})

@@ -442,6 +442,8 @@ GOTENBERG_URL = env.str('GOTENBERG_URL', default='http://localhost:3001')
 ZKTECO_HOST = ''
 ZKTECO_KEY = ''
 ZKTECO_DEPARTMENT_CODE = 1  # код отдела из zkteco к которому привязываются новые юзеры
+ZKTECO_BIOHOST = "89.208.197.220:8088" # хост, на который отправляется биометрия
+ZKTECO_SNTERMINAL = "CNWY212760023" # серийный номер терминала для идентификации запроса
 
 # Используем ли интеграцию в проекте
 ZKTECO_INTEGRATION = False
