@@ -985,6 +985,10 @@ class Group(AbstractActiveNetworkSpecificCodeNamedModel):
             ).exists()
 
         return group_perm
+    
+    @classmethod
+    def get_subordinate_ids(cls, user):
+        return list(cls.objects.filter(id__in=user.get_group_ids()).values_list('subordinates__id', flat=True).distinct())
 
     @classmethod
     def check_has_perm_to_edit_group_objects(cls, group_from, group_to, user):
@@ -1315,13 +1319,18 @@ class Employee(AbstractModel):
         return s
     
     @classmethod
-    def get_subordinates(cls, user, dt=None, user_shops=None):
+    def get_subordinates(cls, user, dt=None, user_shops=None, user_subordinates=None):
         if not user_shops:
             user_shops = user.get_shops(include_descendants=True).values_list('id', flat=True)
+        if not user_subordinates:
+            user_subordinates = Group.get_subordinate_ids(user)
             
         return Employee.objects.annotate(
-            has_employment_in_shops=models.Exists(
+            is_subordinate=models.Exists(
                 Employment.objects.get_active(
+                    extra_q=models.Q(position__group_id__in=user_subordinates) | 
+                    models.Q(function_group_id__in=user_subordinates) |
+                    (models.Q(function_group_id__isnull=True) & models.Q(position__group__isnull=True)),
                     dt_from=dt,
                     dt_to=dt,
                     employee_id=OuterRef('id'),
@@ -1329,7 +1338,7 @@ class Employee(AbstractModel):
                 )
             )
         ).filter(
-            has_employment_in_shops=True,
+            is_subordinate=True,
         )
 
 

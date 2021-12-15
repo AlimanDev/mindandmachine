@@ -6,7 +6,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.utils import timezone
 from rest_framework.test import APITestCase
 
-from src.base.models import WorkerPosition, Employment, User, Network, NetworkConnect
+from src.base.models import Employee, WorkerPosition, Employment, User, Network, NetworkConnect
 from src.recognition.api import recognition
 from src.recognition.models import UserConnecter
 from src.timetable.models import WorkTypeName
@@ -450,3 +450,13 @@ class TestUserViewSet(TestsHelperMixin, APITestCase):
             'load_forecast',
         ]
         self.assertCountEqual(resp.json()['allowed_tabs'], data)
+    
+    def test_get_user_with_subordinates(self):
+        resp = self.client.get('/rest_api/auth/user/')
+        self.assertCountEqual(resp.json()['subordinate_employee_ids'], list(Employee.objects.all().values_list('id', flat=True)))
+        self.admin_group.subordinates.clear()
+        resp = self.client.get('/rest_api/auth/user/')
+        self.assertEqual(resp.json()['subordinate_employee_ids'], [])
+        self.admin_group.subordinates.add(self.chief_group)
+        resp = self.client.get('/rest_api/auth/user/')
+        self.assertEqual(resp.json()['subordinate_employee_ids'], [self.employee5.id, self.employee6.id])

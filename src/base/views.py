@@ -33,6 +33,7 @@ from src.base.models import (
     Network,
     NetworkConnect,
     Notification,
+    Shop,
     Subscribe,
     ShopSettings,
     WorkerPosition,
@@ -258,6 +259,16 @@ class EmployeeViewSet(UpdateorCreateViewSet):
         ).select_related(
             'user',
         )
+
+        if self.request.query_params.get('other_deps_employees_with_wd_in_curr_shop'):
+            shop = Shop.objects.get(pk=self.request.query_params.get('shop_id')) if self.request.query_params.get('shop_id') else\
+            self.request.user.get_shops().first()
+            qs = qs.annotate(
+                from_another_network=ExpressionWrapper(
+                    ~Q(user__network_id=shop.network_id),
+                    output_field=BooleanField(),
+                )
+            )
 
         if self.request.query_params.get('include_employments'):
             queryset = Employment.objects.all().prefetch_related(Prefetch('work_types', to_attr='work_types_list')).select_related(

@@ -309,3 +309,28 @@ class TestOutsource(TestsHelperMixin, APITestCase):
         self.network_connect.save()
         response = self.client.get(f'/rest_api/user/?id={self.user1.id}')
         self.assertEquals(len(response.json()), 0)
+
+    def test_get_employee_from_another_network_field(self):
+        def _get_employee(data, id):
+            return list(filter(lambda x: x['id'] == id, data))[0]
+        # field not set
+        employees = self.client.get('/rest_api/employee/')
+        self.assertEqual(len(employees.json()), 9)
+        self.assertIsNone(_get_employee(employees.json(), self.employee2.id).get('from_another_network'))
+
+        # with outsource shop
+        employees = self.client.get(f'/rest_api/employee/?shop_id={self.shop.id}&other_deps_employees_with_wd_in_curr_shop=true')
+        self.assertEqual(len(employees.json()), 5)
+        self.assertFalse(_get_employee(employees.json(), self.employee2.id).get('from_another_network'))
+
+        # with client shop
+        Employment.objects.filter(employee=self.employee2).update(shop=self.client_shop)
+        employees = self.client.get(f'/rest_api/employee/?shop_id={self.client_shop.id}&other_deps_employees_with_wd_in_curr_shop=true')
+        self.assertEqual(len(employees.json()), 1)
+        self.assertTrue(_get_employee(employees.json(), self.employee2.id).get('from_another_network'))
+
+        # wuthout shop
+        Employment.objects.filter(employee=self.employee2).update(shop=self.shop)
+        employees = self.client.get(f'/rest_api/employee/?other_deps_employees_with_wd_in_curr_shop=true')
+        self.assertEqual(len(employees.json()), 9)
+        self.assertTrue(_get_employee(employees.json(), self.employee2.id).get('from_another_network'))
