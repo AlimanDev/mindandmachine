@@ -179,10 +179,11 @@ class TestShiftScheduleViewSet(TestsHelperMixin, APITestCase):
         resp_data = resp.json()
         self.assertDictEqual(resp_data['stats'], {
             "ShiftScheduleDay": {
-                "updated": 3  # TODO: добавить skipped?
+                "skipped": 2,
+                "updated": 1
             },
             "ShiftSchedule": {
-                "updated": 1
+                "skipped": 1
             }
         })
         self.assertEqual(ShiftScheduleDay.objects.get(code='1_2021-01-01').work_hours, 16)
@@ -201,10 +202,10 @@ class TestShiftScheduleViewSet(TestsHelperMixin, APITestCase):
         self.assertDictEqual(resp_data['stats'], {
             "ShiftScheduleDay": {
                 "created": 1,
-                "updated": 3
+                "skipped": 3
             },
             "ShiftSchedule": {
-                "updated": 1
+                "skipped": 1
             }
         })
 
@@ -393,7 +394,7 @@ class TestShiftScheduleIntervalViewSet(TestsHelperMixin, APITestCase):
         self.assertDictEqual(resp_data, {
             "stats": {
                 "ShiftScheduleInterval": {
-                    "updated": 3,
+                    "skipped": 3,
                     "created": 1,
                 }
             }

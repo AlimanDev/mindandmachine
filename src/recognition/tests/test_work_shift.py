@@ -245,7 +245,6 @@ class TestWorkShiftViewSet(TestsHelperMixin, APITestCase):
                     'timesheet_employee_bottom': 'sawh_hours',
                     'timesheet_employee_top': 'fact_total_all_hours_sum',
                 },
-                'display_employee_tabs_in_the_schedule': True,
                 'enable_camera_ticks': False,
                 'id': self.user2.network_id,
                 'logo': None,
@@ -263,6 +262,7 @@ class TestWorkShiftViewSet(TestsHelperMixin, APITestCase):
                 'show_cost_for_inner_vacancies': False,
                 'rebuild_timetable_min_delta': 2,
                 'show_remaking_choice': False,
+                'analytics_iframe': '',
                 'show_employee_shift_schedule_tab': False,
                 'url': None,
                 'shop_name_form': {
@@ -396,7 +396,6 @@ class TestWorkShiftViewSet(TestsHelperMixin, APITestCase):
                     'timesheet_employee_bottom': 'sawh_hours',
                     'timesheet_employee_top': 'fact_total_all_hours_sum',
                 },
-                'display_employee_tabs_in_the_schedule': True,
                 'enable_camera_ticks': False,
                 'id': self.user2.network_id,
                 'logo': None,
@@ -414,6 +413,7 @@ class TestWorkShiftViewSet(TestsHelperMixin, APITestCase):
                 'show_cost_for_inner_vacancies': False,
                 'rebuild_timetable_min_delta': 2,
                 'show_remaking_choice': False,
+                'analytics_iframe': '',
                 'show_employee_shift_schedule_tab': False,
                 'url': None,
                 'shop_name_form': {
@@ -553,7 +553,6 @@ class TestWorkShiftViewSet(TestsHelperMixin, APITestCase):
                     'timesheet_employee_bottom': 'sawh_hours',
                     'timesheet_employee_top': 'fact_total_all_hours_sum',
                 },
-                'display_employee_tabs_in_the_schedule': True,
                 'enable_camera_ticks': False,
                 'id': self.user2.network_id,
                 'logo': None,
@@ -571,6 +570,7 @@ class TestWorkShiftViewSet(TestsHelperMixin, APITestCase):
                 'show_cost_for_inner_vacancies': False,
                 'rebuild_timetable_min_delta': 2,
                 'show_remaking_choice': False,
+                'analytics_iframe': '',
                 'show_employee_shift_schedule_tab': False,
                 'url': None,
                 'shop_name_form': {

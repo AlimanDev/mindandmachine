@@ -583,7 +583,7 @@ def notify_vacancy_created(worker_day, work_type_id=None, is_auto=True):
     )
 
 
-def confirm_vacancy(vacancy_id, user, employee_id=None, exchange=False, reconfirm=False):
+def confirm_vacancy(vacancy_id, user=None, employee_id=None, exchange=False, reconfirm=False, refuse=False):
     """
     :param vacancy_id:
     :param user: пользователь, откликнувшийся на вакансию
@@ -599,16 +599,24 @@ def confirm_vacancy(vacancy_id, user, employee_id=None, exchange=False, reconfir
         'cant_apply_vacancy_outsource_not_allowed': _('You cannot apply for this vacancy because your network does not allow you to apply for an outsourced vacancy in your network.'),
         'no_timetable': _('The timetable for this period has not yet been created.'),
         'vacancy_success': _('The vacancy was successfully accepted.'),
-        'cant_reconfrm_fact_exists': _("You can't reassign an employee to this vacancy, because the employee has already entered this vacancy.")
+        'cant_reconfrm_fact_exists': _("You can't reassign an employee to this vacancy, because the employee has already entered this vacancy."),
+        'vacancy_refused': _('Vacancy successfully refused.'),
+        'cant_refuse_fact_exists': _("You can't refuse vacancy, because the employee has already entered this vacancy."),
     }
     res = {
         'status_code': 200,
     }
+    if not refuse and not user:
+        res['text'] = 'User is required'
+        res['status_code'] = 400
+        return res 
     try:
         with transaction.atomic():
             filt = Q()
             worker_day_qs = WorkerDay.objects.all()
-            if not reconfirm:
+            if refuse:
+                pass
+            elif not reconfirm:
                 filt = Q(employee__isnull=True)
             else:
                 worker_day_qs = worker_day_qs.annotate(
@@ -630,8 +638,8 @@ def confirm_vacancy(vacancy_id, user, employee_id=None, exchange=False, reconfir
                 res['text'] = messages['no_vacancy']
                 res['status_code'] = 404
                 return res
-
-            if reconfirm:
+            
+            if reconfirm or refuse:
                 fact = WorkerDay.objects.filter(
                     employee_id=vacancy.employee_id,
                     is_fact=True,
@@ -639,9 +647,15 @@ def confirm_vacancy(vacancy_id, user, employee_id=None, exchange=False, reconfir
                     dt=vacancy.dt,
                 )
                 if fact.exists():
-                    res['text'] = messages['cant_reconfrm_fact_exists']
+                    res['text'] = messages['cant_reconfrm_fact_exists'] if reconfirm else messages['cant_refuse_fact_exists']
                     res['status_code'] = 400
                     return res
+            
+            if refuse:
+                cancel_vacancy(vacancy.id, delete=False)
+                res['text'] = messages['vacancy_refused']
+                return res
+
 
             vacancy_shop = vacancy.shop
 

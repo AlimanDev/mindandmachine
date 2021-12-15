@@ -2,6 +2,9 @@ from django.test import override_settings
 from rest_framework import status
 from rest_framework.exceptions import ValidationError
 from rest_framework.test import APITestCase
+from unittest import mock
+
+from rest_framework.utils.serializer_helpers import NestedBoundField
 
 from src.recognition.models import Tick, TickPoint
 from src.util.mixins.tests import TestsHelperMixin
@@ -30,10 +33,10 @@ class TestTicksViewSet(TestsHelperMixin, APITestCase):
     def setUp(self):
         self._set_authorization_token(self.user2.username)
 
-    def _authorize_tick_point(self):
+    def _authorize_tick_point(self, name='test'):
         t = TickPoint.objects.create(
             network=self.network,
-            name='test',
+            name=name,
             shop=self.shop,
         )
 
@@ -227,6 +230,10 @@ class TestTicksViewSet(TestsHelperMixin, APITestCase):
         )
         response = self.client.get(self.get_url('Tick-list'))
         self.assertEqual(len(response.json()), 2)
+        tick_point_id2 = self._authorize_tick_point().json()['tick_point']['id']
+        response = self.client.get(self.get_url('Tick-list'))
+        self.assertEqual(len(response.json()), 2)
+        self.assertNotEquals(response.json()[0]['tick_point_id'], tick_point_id2)
 
     def test_get_ticks_with_yesterday_leving_for_tick_point(self):
         tick_point_id = self._authorize_tick_point().json()['tick_point']['id']
@@ -251,3 +258,73 @@ class TestTicksViewSet(TestsHelperMixin, APITestCase):
         )
         response = self.client.get(self.get_url('Tick-list'))
         self.assertEqual(len(response.json()), 0)
+
+    def _test_lateness(self, type, dttm, assert_lateness, tick_id=None):
+        with mock.patch('src.recognition.views.now', lambda: dttm - timedelta(hours=3)):
+            data = {'employee_id': self.employee2.id, 'type': type, 'shop_code': self.shop2.code }
+            if not tick_id:
+                response = self.client.post(self.get_url('Tick-list'), data)
+            else:
+                response = self.client.put(self.get_url('Tick-detail', pk=tick_id), data)
+
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(assert_lateness, response.json()['lateness'])
+            return response.json()['id']
+
+    def test_lateness(self):
+        comming_time = datetime.combine(date.today(), time(9))
+        leaving_time = datetime.combine(date.today(), time(21))
+        tick_id = self._test_lateness(Tick.TYPE_NO_TYPE, comming_time, None) # пришел раньше, но пока нет типа
+        self._test_lateness(Tick.TYPE_COMING, comming_time, -3600, tick_id=tick_id) # есть тип, обновляем
+        tick_id = self._test_lateness(Tick.TYPE_NO_TYPE, leaving_time, None) # ушел позже, но пока нет типа
+        self._test_lateness(Tick.TYPE_LEAVING, leaving_time, -3600, tick_id=tick_id) # есть тип, обновляем
+        Tick.objects.all().delete()
+        WorkerDay.objects.filter(is_fact=True).delete()
+        comming_time = datetime.combine(date.today(), time(11))
+        leaving_time = datetime.combine(date.today(), time(19))
+        self._test_lateness(
+            Tick.TYPE_COMING, 
+            comming_time, 
+            3600, 
+            tick_id=self._test_lateness(Tick.TYPE_NO_TYPE, comming_time, None),
+        ) # опоздал
+        self._test_lateness(
+            Tick.TYPE_LEAVING, 
+            leaving_time, 
+            3600, 
+            tick_id=self._test_lateness(Tick.TYPE_NO_TYPE, leaving_time, None),
+        ) # ушел раньше
+        Tick.objects.all().delete()
+        WorkerDay.objects.filter(is_fact=True).delete()
+        comming_time = datetime.combine(date.today() + timedelta(1), time(9))
+        leaving_time = datetime.combine(date.today() + timedelta(1), time(21))
+        self._test_lateness(
+            Tick.TYPE_COMING, 
+            comming_time, 
+            None,
+            tick_id=self._test_lateness(Tick.TYPE_NO_TYPE, comming_time, None),
+        ) # нет плана
+        self._test_lateness(
+            Tick.TYPE_LEAVING, 
+            leaving_time, 
+            None,
+            tick_id=self._test_lateness(Tick.TYPE_NO_TYPE, leaving_time, None),
+        ) # нет плана
+        Tick.objects.all().delete()
+        WorkerDay.objects.filter(is_fact=True).delete()
+        self.network.trust_tick_request = False
+        self.network.save()
+        comming_time = datetime.combine(date.today(), time(9))
+        leaving_time = datetime.combine(date.today(), time(21))
+        self._test_lateness(
+            Tick.TYPE_COMING, 
+            comming_time, 
+            None, 
+            tick_id=self._test_lateness(Tick.TYPE_NO_TYPE, comming_time, None),
+        ) # нельзя отметиться без фото
+        self._test_lateness(
+            Tick.TYPE_LEAVING, 
+            leaving_time, 
+            None, 
+            tick_id=self._test_lateness(Tick.TYPE_NO_TYPE, leaving_time, None),
+        ) # нельзя отметиться без фото

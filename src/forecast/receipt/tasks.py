@@ -95,7 +95,10 @@ def aggregate_timeserie_value():
 
                             value = 0
                             if 'timeserie_value' in aggregate:
-                                value = float(item.info.get(aggregate['timeserie_value'], 0))  # fixme: то ли ошибку лучше кидать, то ли пропускать (0 ставить)
+                                value = item.info.get(aggregate['timeserie_value'], 0)  # fixme: то ли ошибку лучше кидать, то ли пропускать (0 ставить)
+                                if isinstance(value, str):
+                                    value = value.replace(',', '.')
+                                value = float(value)
                             elif 'timeserie_value_complex' in aggregate:
                                 value = '_'.join(item.info.get(field_name) for field_name in aggregate['timeserie_value_complex'])
                             items_list.append({

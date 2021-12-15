@@ -17,9 +17,9 @@ from django.db.models.query import QuerySet
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from model_utils import FieldTracker
-from rest_framework.exceptions import ValidationError
+from rest_framework.exceptions import PermissionDenied, ValidationError
 
-from src.base.models import Shop, Employment, User, Event, Network, Break, ProductionDay, Employee
+from src.base.models import Shop, Employment, User, Event, Network, Break, ProductionDay, Employee, Group
 from src.base.models_abstract import AbstractModel, AbstractActiveModel, AbstractActiveNetworkSpecificCodeNamedModel, \
     AbstractActiveModelManager
 from src.events.signals import event_signal
@@ -639,7 +639,8 @@ class WorkerDay(AbstractModel):
         wd_type_id = obj_dict.get('type_id') or obj_dict.get('type').code
         dt = obj_dict.get('dt')
         shop_id = obj_dict.get('shop_id')
-        k = f'{graph_type}_{action}_{wd_type_id}_{shop_id}'
+        employee_id = obj_dict.get('employee_id')
+        k = f'{graph_type}_{action}_{wd_type_id}_{shop_id}_{employee_id}'
         create_or_update_perms_data.setdefault(k, set()).add(dt)
 
     @classmethod
@@ -653,7 +654,17 @@ class WorkerDay(AbstractModel):
         from src.timetable.worker_day.utils import check_worker_day_permissions
         from src.timetable.worker_day.views import WorkerDayViewSet
         action = WorkerDayPermission.DELETE
-        grouped_qs =  delete_qs.values(
+        employees_and_shops = delete_qs.values_list(
+            'employee_id',
+            'shop_id',
+        ).distinct()
+        for employee_id, shop_id in employees_and_shops:
+            if not cls._has_group_permissions(user, employee_id, shop_id):
+                raise PermissionDenied(
+                    WorkerDayViewSet.error_messages['employee_not_in_subordinates'].format(
+                    employee=User.objects.filter(employees__id=employee_id).first().fio),
+                )
+        grouped_qs = delete_qs.values(
             'is_fact',
             'type_id',
             'shop_id',
@@ -685,9 +696,11 @@ class WorkerDay(AbstractModel):
         from src.timetable.worker_day.utils import check_worker_day_permissions
         from src.timetable.worker_day.views import WorkerDayViewSet
         for k, dates_set in create_or_update_perms_data.items():
-            graph_type, action, wd_type_id, shop_id = k.split('_')
+            graph_type, action, wd_type_id, shop_id, employee_id = k.split('_')
             if shop_id == 'None':
                 shop_id = None
+            if employee_id == 'None':
+                employee_id = None
             check_worker_day_permissions(
                 user=user,
                 shop_id=shop_id,
@@ -698,6 +711,7 @@ class WorkerDay(AbstractModel):
                 dt_to=max(dates_set),
                 error_messages=WorkerDayViewSet.error_messages,
                 wd_types_dict=kwargs.get('wd_types_dict'),
+                employee_id=employee_id,
             )
 
     @classmethod
@@ -725,20 +739,31 @@ class WorkerDay(AbstractModel):
             'work_hours',
         }
 
-    def calc_day_and_night_work_hours(self):
+    @classmethod
+    def _has_group_permissions(cls, user, employee_id, shop_id=None):
+        if not employee_id:
+            return True
+        employee = Employee.objects.select_related('user').get(id=employee_id)
+        shop = None
+        if shop_id:
+            shop = Shop.objects.get(id=shop_id)
+        return Group.check_has_perm_to_group(user, groups=employee.user.get_group_ids(shop))
+
+    def calc_day_and_night_work_hours(self, work_hours=None, work_start=None, work_end=None):
         from src.util.models_converter import Converter
         # TODO: нужно учитывать работу в праздничные дни? -- сейчас is_celebration в ProductionDay всегда False
 
         if self.type.is_dayoff:
             return 0.0, 0.0, 0.0
 
-        if self.work_hours > datetime.timedelta(0):
-            work_seconds = self.work_hours.seconds
+        work_hours = (work_hours or self.work_hours)
+        if work_hours > datetime.timedelta(0):
+            work_seconds = work_hours.seconds
         else:
             return 0.0, 0.0, 0.0
 
-        work_start = self.dttm_work_start_tabel or self.dttm_work_start
-        work_end = self.dttm_work_end_tabel or self.dttm_work_end
+        work_start = work_start or self.dttm_work_start_tabel or self.dttm_work_start
+        work_end = work_end or self.dttm_work_end_tabel or self.dttm_work_end
         if not (work_start and work_end):
             return 0.0, 0.0, 0.0
 
@@ -2028,13 +2053,26 @@ class AttendanceRecords(AbstractModel):
                     ]
                 )
         elif active_user_empl:
-            employment_work_type = EmploymentWorkType.objects.filter(
-                employment=active_user_empl).order_by('-priority').first()
-            if employment_work_type:
+            work_type_id = getattr(
+                EmploymentWorkType.objects.filter(
+                    employment=active_user_empl,
+                ).order_by('-priority').first(), 
+                'work_type_id', 
+                None,
+            ) or\
+            getattr(
+                WorkType.objects.filter(
+                    Q(dttm_deleted__isnull=True)|Q(dttm_deleted__gte=timezone.now()),
+                    shop_id=active_user_empl.shop_id,
+                ).first(),
+                'id',
+                None,
+            )
+            if work_type_id:
                 WorkerDayCashboxDetails.objects.create(
                     work_part=1,
                     worker_day=fact_approved,
-                    work_type_id=employment_work_type.work_type_id,
+                    work_type_id=work_type_id,
                 )
 
     def _create_or_update_not_approved_fact(self, fact_approved):
@@ -2120,6 +2158,7 @@ class AttendanceRecords(AbstractModel):
         employee_id, active_user_empl, dt, record_type, closest_plan_approved = self.get_day_data(
             self.dttm, self.user, self.shop, self.type)
         self.dt = dt
+        self.fact_wd = None
         self.type = self.type or record_type
         self.employee_id = self.employee_id or employee_id
         res = super(AttendanceRecords, self).save(*args, **kwargs)
@@ -2139,6 +2178,7 @@ class AttendanceRecords(AbstractModel):
             ).order_by('-is_equal_shops', '-is_closest_plan_approved_equal').first()
 
             if fact_approved:
+                self.fact_wd = fact_approved
                 if fact_approved.last_edited_by_id and (
                         recalc_fact_from_att_records and not self.user.network.edit_manual_fact_on_recalc_fact_from_att_records):
                     return
@@ -2202,6 +2242,7 @@ class AttendanceRecords(AbstractModel):
                         #'is_outsource': active_user_empl.shop.network_id != self.shop.network_id,
                     }
                 )
+                self.fact_wd = fact_approved
                 if _wd_created or not fact_approved.worker_day_details.exists():
                     self._create_wd_details(self.dt, fact_approved, active_user_empl, closest_plan_approved)
                 if _wd_created:

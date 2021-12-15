@@ -51,6 +51,7 @@ class NetworkSerializer(serializers.ModelSerializer):
     unaccounted_overtime_threshold = serializers.SerializerMethodField()
     show_remaking_choice = serializers.SerializerMethodField()
     shop_name_form = serializers.SerializerMethodField()
+    analytics_iframe = serializers.SerializerMethodField()
     show_employee_shift_schedule_tab = serializers.SerializerMethodField()
 
     def get_default_stats(self, obj: Network):
@@ -94,6 +95,9 @@ class NetworkSerializer(serializers.ModelSerializer):
     def get_show_remaking_choice(self, obj: Network):
         return obj.settings_values_prop.get('show_remaking_choice', False)
 
+    def get_analytics_iframe(self, obj: Network):
+        return obj.settings_values_prop.get('analytics_iframe', '')
+
     def get_logo_url(self, obj) -> str:
         if obj.logo:
             return obj.logo.url
@@ -123,7 +127,6 @@ class NetworkSerializer(serializers.ModelSerializer):
             'unaccounted_overtime_threshold',
             'forbid_edit_employments_came_through_integration',
             'show_remaking_choice',
-            'display_employee_tabs_in_the_schedule',
             'allow_creation_several_wdays_for_one_employee_for_one_date',
             'shop_name_form',
             'get_position_from_work_type_name_in_calc_timesheet',
@@ -131,6 +134,7 @@ class NetworkSerializer(serializers.ModelSerializer):
             'show_cost_for_inner_vacancies',
             'show_employee_shift_schedule_tab',
             'rebuild_timetable_min_delta',
+            'analytics_iframe',
         ]
 
 class NetworkListSerializer(serializers.Serializer):
@@ -367,12 +371,9 @@ class EmploymentSerializer(serializers.ModelSerializer):
         create_only_fields = ['employee_id']
         read_only_fields = []
         extra_kwargs = {
-            'auto_timetable': {
-                'default': True,
-            },
-            'is_visible': {
-                'default': True,
-            },
+            'code': {
+                'validators': []
+            }
         }
         timetable_fields = [
             'function_group_id', 'is_fixed_hours', 'salary', 'week_availability', 'norm_work_hours', 'shift_hours_length_min', 

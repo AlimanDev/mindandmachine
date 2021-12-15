@@ -204,8 +204,21 @@ def delete_workers_zkteco():
             external_system=ext_system,
         )
 
+        # получаем активные зоны, так как несколько магазинов могут быть привязаны к одной зоне
+        # исключаем активные зоны, чтобы не удалять уволенного сотрудника в другом магазине
+        active_external_codes = list(
+            ShopExternalCode.objects.filter(
+                shop_id__in=Employment.objects.get_active(
+                    employee__user=user,
+                ).values_list('shop_id', flat=True),
+                attendance_area__external_system=ext_system,
+            ).values_list('attendance_area_id', flat=True)
+        )
+
         for e in employments:
-            shop_codes = ShopExternalCode.objects.filter(
+            shop_codes = ShopExternalCode.objects.exclude(
+                attendance_area_id__in=active_external_codes,
+            ).filter(
                 shop_id=e.shop_id,
                 attendance_area__external_system=ext_system,
             ).select_related('attendance_area')
@@ -278,7 +291,7 @@ def export_or_delete_employment_zkteco(employment_id):
                 else:
                     raise ValueError(f'Error in {res} while saving user {user_code.user} to zkteco')
             res_area = zkteco.add_personarea(user_code, shop_code.attendance_area)
-            if not('code' in res and res['code'] == 0):
+            if not('code' in res_area and res_area['code'] == 0):
                 raise ValueError(f'Error in {res_area} while set area for user {user_code.user} to zkteco')
         elif not active_employments and shop_code and user_code:            
             res = zkteco.delete_personarea(user_code, shop_code.attendance_area)

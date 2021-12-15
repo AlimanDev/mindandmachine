@@ -57,6 +57,7 @@ class EmploymentFilter(FilterSet):
         model = Employment
         fields = {
             'id': ['in'],
+            'code': ['isnull', 'exact', 'in'],
             'shop_id': ['exact', 'in'],
             'employee_id': ['exact', 'in'],
             'employee__tabel_code': ['exact', 'in'],

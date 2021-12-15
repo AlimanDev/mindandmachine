@@ -445,6 +445,7 @@ class TestWorkerDayApprove(TestsHelperMixin, APITestCase):
             dt_from=self.today,
             dt_to=self.today,
             wd_types=[WorkerDay.TYPE_WORKDAY],
+            approve_open_vacs=True,
         )
         self.assertEqual(resp.status_code, 200)
         vac_not_approved.refresh_from_db()

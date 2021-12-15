@@ -914,3 +914,25 @@ class TestShiftScheduleDivider(TestTimesheetMixin, TestCase):
             self.assertEqual(main_ts_item.day_type_id, WorkerDay.TYPE_VACATION)
             self.assertIsNotNone(additional_ts_item)
             self.assertEqual(additional_ts_item.day_hours, 9)
+
+    def test_work_hours_moved_from_additional_tabel_to_main_if_main_less_than_norm(self):
+        dt = date(2021, 6, 11)
+        dt_donors = [date(2021, 6, 7), date(2021, 6, 8), date(2021, 6, 9)]
+        for wd in WorkerDay.objects.filter(dt=dt, is_fact=True):
+            wd.dttm_work_start = datetime.combine(dt, time(10))
+            wd.dttm_work_end = datetime.combine(dt, time(16))
+            wd.save()
+        for employee in [self.employee_worker]:
+            self._calc_timesheets(employee_id=employee.id, reraise_exc=True, dttm_now=datetime(2021, 6, 25))
+            main_ts_item = TimesheetItem.objects.get(
+                employee=employee, dt=dt, timesheet_type=TimesheetItem.TIMESHEET_TYPE_MAIN)
+            additional_ts_item = TimesheetItem.objects.filter(
+                employee=employee, dt=dt, timesheet_type=TimesheetItem.TIMESHEET_TYPE_ADDITIONAL).first()
+            self.assertEqual(main_ts_item.day_hours, 8)
+            self.assertEqual(main_ts_item.day_type_id, WorkerDay.TYPE_WORKDAY)
+            self.assertIsNone(additional_ts_item)
+
+            for dt_donor in dt_donors:
+                donor_additional_ts_item = TimesheetItem.objects.filter(
+                    employee=employee, dt=dt_donor, timesheet_type=TimesheetItem.TIMESHEET_TYPE_ADDITIONAL).first()
+                self.assertIsNone(donor_additional_ts_item)
