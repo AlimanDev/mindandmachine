@@ -749,20 +749,21 @@ class WorkerDay(AbstractModel):
             shop = Shop.objects.get(id=shop_id)
         return Group.check_has_perm_to_group(user, groups=employee.user.get_group_ids(shop))
 
-    def calc_day_and_night_work_hours(self):
+    def calc_day_and_night_work_hours(self, work_hours=None, work_start=None, work_end=None):
         from src.util.models_converter import Converter
         # TODO: нужно учитывать работу в праздничные дни? -- сейчас is_celebration в ProductionDay всегда False
 
         if self.type.is_dayoff:
             return 0.0, 0.0, 0.0
 
-        if self.work_hours > datetime.timedelta(0):
-            work_seconds = self.work_hours.seconds
+        work_hours = (work_hours or self.work_hours)
+        if work_hours > datetime.timedelta(0):
+            work_seconds = work_hours.seconds
         else:
             return 0.0, 0.0, 0.0
 
-        work_start = self.dttm_work_start_tabel or self.dttm_work_start
-        work_end = self.dttm_work_end_tabel or self.dttm_work_end
+        work_start = work_start or self.dttm_work_start_tabel or self.dttm_work_start
+        work_end = work_end or self.dttm_work_end_tabel or self.dttm_work_end
         if not (work_start and work_end):
             return 0.0, 0.0, 0.0
 
