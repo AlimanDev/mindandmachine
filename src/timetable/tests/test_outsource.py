@@ -290,20 +290,59 @@ class TestOutsource(TestsHelperMixin, APITestCase):
             f'/rest_api/worker_day/{vacancy["id"]}/confirm_vacancy_to_worker/',
             data={
                 'user_id': self.user1.id,
+                'employee_id': self.employee1.id,
             }
         )
-        self.assertEqual(response.json(), ['В вашей сети нет такого пользователя.'])
+        self.assertEqual(response.json(), {'non_field_errors': ['В вашей сети нет такого пользователя.']})
         self.client.force_authenticate(user=self.user1)
         response = self.client.post(
             f'/rest_api/worker_day/{vacancy["id"]}/confirm_vacancy_to_worker/',
             data={
                 'user_id': self.user2.id,
+                'employee_id': self.employee2.id,
             }
         )
         self.assertEqual(response.json(), {'result': 'Вакансия успешно принята.'})
         vacancy = WorkerDay.objects.get(id=vacancy['id'])
         self.assertEqual(vacancy.employee_id, self.employee2.id)
         self.assertEqual(vacancy.employment_id, self.employment2.id)
+    
+    def test_confirm_vacancy_to_worker_group_perms(self):
+        dt_now = self.dt_now
+        self.admin_group.subordinates.clear()
+        vacancy = self._create_vacancy(dt_now, datetime.combine(dt_now, time(8)), datetime.combine(dt_now, time(20)), outsources=[self.outsource_network.id,]).json()
+        WorkerDay.objects.all().update(is_approved=True)
+        self.client.force_authenticate(user=self.user1)
+        response = self.client.post(
+            f'/rest_api/worker_day/{vacancy["id"]}/confirm_vacancy_to_worker/',
+            data={
+                'user_id': self.user2.id,
+                'employee_id': self.employee2.id,
+            }
+        )
+        self.assertContains(
+            response, f'Сотрудник {self.user2.fio} не является Вашим подчиненным.', status_code=403)
+        self.admin_group.subordinates.add(self.employment2.function_group)
+        Employment.objects.filter(employee=self.employee1).update(shop=self.shop2)
+        response = self.client.post(
+            f'/rest_api/worker_day/{vacancy["id"]}/confirm_vacancy_to_worker/',
+            data={
+                'user_id': self.user2.id,
+                'employee_id': self.employee2.id,
+            }
+        )
+        self.assertContains(
+            response, f'Сотрудник {self.user2.fio} не является Вашим подчиненным.', status_code=403)
+        Employment.objects.filter(employee=self.employee1).update(shop=self.shop)
+        response = self.client.post(
+            f'/rest_api/worker_day/{vacancy["id"]}/confirm_vacancy_to_worker/',
+            data={
+                'user_id': self.user2.id,
+                'employee_id': self.employee2.id,
+            }
+        )
+        self.assertEqual(response.json(), {'result': 'Вакансия успешно принята.'})
+
 
     def test_reconfirm_vacancy_to_worker(self):
         dt_now = self.dt_now
@@ -314,6 +353,7 @@ class TestOutsource(TestsHelperMixin, APITestCase):
             f'/rest_api/worker_day/{vacancy["id"]}/confirm_vacancy_to_worker/',
             data={
                 'user_id': self.user2.id,
+                'employee_id': self.employee2.id,
             }
         )
         self.assertEqual(response.json(), {'result': 'Вакансия успешно принята.'})
@@ -324,6 +364,7 @@ class TestOutsource(TestsHelperMixin, APITestCase):
             f'/rest_api/worker_day/{vacancy.id}/reconfirm_vacancy_to_worker/',
             data={
                 'user_id': self.user3.id,
+                'employee_id': self.employee3.id,
             }
         )
         self.assertEqual(response.json(), {'result': 'Вакансия успешно принята.'})
@@ -342,12 +383,58 @@ class TestOutsource(TestsHelperMixin, APITestCase):
             f'/rest_api/worker_day/{vacancy.id}/reconfirm_vacancy_to_worker/',
             data={
                 'user_id': self.user2.id,
+                'employee_id': self.employee2.id,
             }
         )
         self.assertEqual(response.json(), {'result': 'Вы не можете переназначить сотрудника на данную вакансию, так как сотрудник уже вышел на данную вакансию.'})
         vacancy.refresh_from_db()
         self.assertEqual(vacancy.employee_id, self.employee3.id)
         self.assertEqual(vacancy.employment_id, self.employment3.id)
+    
+    def test_reconfirm_vacancy_to_worker_group_perms(self):
+        dt_now = self.dt_now
+        vacancy = self._create_vacancy(dt_now, datetime.combine(dt_now, time(8)), datetime.combine(dt_now, time(20)), outsources=[self.outsource_network.id,]).json()
+        WorkerDay.objects.all().update(is_approved=True)
+        self.client.force_authenticate(user=self.user1)
+        response = self.client.post(
+            f'/rest_api/worker_day/{vacancy["id"]}/confirm_vacancy_to_worker/',
+            data={
+                'user_id': self.user3.id,
+                'employee_id': self.employee3.id,
+            }
+        )
+        self.assertEqual(response.json(), {'result': 'Вакансия успешно принята.'})
+        self.admin_group.subordinates.clear()
+        response = self.client.post(
+            f'/rest_api/worker_day/{vacancy["id"]}/reconfirm_vacancy_to_worker/',
+            data={
+                'user_id': self.user2.id,
+                'employee_id': self.employee2.id,
+            }
+        )
+        self.assertContains(
+            response, f'Сотрудник {self.user2.fio} не является Вашим подчиненным.', status_code=403)
+        self.admin_group.subordinates.add(self.employment2.function_group)
+        Employment.objects.filter(employee=self.employee1).update(shop=self.shop2)
+        response = self.client.post(
+            f'/rest_api/worker_day/{vacancy["id"]}/reconfirm_vacancy_to_worker/',
+            data={
+                'user_id': self.user2.id,
+                'employee_id': self.employee2.id,
+            }
+        )
+        self.assertContains(
+            response, f'Сотрудник {self.user2.fio} не является Вашим подчиненным.', status_code=403)
+        Employment.objects.filter(employee=self.employee1).update(shop=self.shop)
+        response = self.client.post(
+            f'/rest_api/worker_day/{vacancy["id"]}/reconfirm_vacancy_to_worker/',
+            data={
+                'user_id': self.user2.id,
+                'employee_id': self.employee2.id,
+            }
+        )
+        self.assertEqual(response.json(), {'result': 'Вакансия успешно принята.'})
+
 
     def test_confirm_outsource_vacancy_from_client_network(self):
         dt_now = self.dt_now
@@ -602,7 +689,7 @@ class TestOutsource(TestsHelperMixin, APITestCase):
         response = self.client.post(f'/rest_api/worker_day/{vacancy["id"]}/confirm_vacancy/')
         self.assertEqual(response.status_code, 200)
         self.client.force_authenticate(user=self.user1)
-        response = self.client.post(f'/rest_api/worker_day/{vacancy["id"]}/reconfirm_vacancy_to_worker/', {'user_id': self.user1.id})
+        response = self.client.post(f'/rest_api/worker_day/{vacancy["id"]}/reconfirm_vacancy_to_worker/', {'user_id': self.user1.id, 'employee_id': self.employee1.id,})
         self.assertEqual(response.status_code, 404)
         self.assertEquals(response.json(), {'result': 'Такой вакансии не существует'})
 

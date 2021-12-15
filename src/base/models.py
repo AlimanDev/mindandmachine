@@ -977,7 +977,7 @@ class Group(AbstractActiveNetworkSpecificCodeNamedModel):
     @classmethod
     def check_has_perm_to_group(cls, user, group=None, groups=[]):
         group_perm = True
-        if groups or group:
+        if any(groups) or group:
             groups = groups or [group,]
             group_perm = cls.objects.filter(
                 Q(employments__employee__user=user) | Q(workerposition__employment__employee__user=user),
@@ -1188,6 +1188,12 @@ class User(DjangoAbstractUser, AbstractModel):
             employee__user=self,
             **kwargs,
         )
+    
+    def get_shops(self, include_descendants=False):
+        shops = Shop.objects.filter(id__in=self.get_active_employments().values_list('shop_id', flat=True))
+        if include_descendants:
+            shops = Shop.objects.get_queryset_descendants(shops, include_self=True)
+        return shops
 
     def get_group_ids(self, shop=None):
         groups = self.get_active_employments(shop=shop).values_list('position__group_id', 'function_group_id')
@@ -1307,6 +1313,24 @@ class Employee(AbstractModel):
         if self.tabel_code:
             s += f' ({self.tabel_code})'
         return s
+    
+    @classmethod
+    def get_subordinates(cls, user, dt=None, user_shops=None):
+        if not user_shops:
+            user_shops = user.get_shops(include_descendants=True).values_list('id', flat=True)
+            
+        return Employee.objects.annotate(
+            has_employment_in_shops=models.Exists(
+                Employment.objects.get_active(
+                    dt_from=dt,
+                    dt_to=dt,
+                    employee_id=OuterRef('id'),
+                    shop_id__in=user_shops,
+                )
+            )
+        ).filter(
+            has_employment_in_shops=True,
+        )
 
 
 class Employment(AbstractActiveModel):
