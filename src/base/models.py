@@ -902,7 +902,7 @@ class EmploymentManager(models.Manager):
         )
         if network_id:
             q &= models.Q(
-                models.Q(shop__network_id=network_id)|
+                models.Q(shop__network_id=network_id) |
                 models.Q(employee__user__network_id=network_id)
             )
         if extra_q:

@@ -1,9 +1,10 @@
 import datetime
 
+from django.db.models import Q
 from django_filters import utils
 from django_filters.rest_framework import DjangoFilterBackend
 
-from src.base.models import Employment, Shop
+from src.base.models import Employment, Shop, NetworkConnect
 
 
 class MultiShopsFilterBackend(DjangoFilterBackend):
@@ -46,8 +47,25 @@ class MultiShopsFilterBackend(DjangoFilterBackend):
         shop_filter = {}
         if shop_id:
             shop_filter['shop_id'] = shop_id
+
+        # рефакторинг
+        outsourcing_network_qs = list(
+            NetworkConnect.objects.filter(
+                client=request.user.network_id,
+            ).values_list('outsourcing_id', flat=True)
+        )
+        extra_q = Q(
+            Q(
+                Q(employee__user__network_id=request.user.network_id) |
+                Q(shop__network_id=request.user.network_id)
+            ) |
+            Q(
+                employee__user__network_id__in=outsourcing_network_qs,
+                shop__network_id__in=outsourcing_network_qs + [request.user.network_id],
+            )
+        )
         ids = Employment.objects.get_active(
-            network_id=request.user.network_id,
+            extra_q=extra_q,
             dt_from=dt_from, dt_to=dt_to,
             **shop_filter,
         ).values('employee__user_id')
@@ -61,11 +79,8 @@ class MultiShopsFilterBackend(DjangoFilterBackend):
                 employee__user__username__in=worker__username__in.split(',')  # TODO: покрыть тестами работу фильтра
             )
 
-        # all_employments_for_users = Employment.objects.get_active(dt_from, dt_to).filter(user_id__in=ids)
-
         return super().filter_queryset(
             request, queryset, view
         ).filter(
             employee__user__id__in=ids,
-            # employment__in=all_employments_for_users\
         ).order_by('employee__user_id', 'dt', 'dttm_work_start')

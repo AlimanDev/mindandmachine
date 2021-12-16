@@ -261,33 +261,23 @@ class EmployeeViewSet(UpdateorCreateViewSet):
         ).select_related(
             'user',
         )
+        return qs.distinct()
 
-        other_deps_employees_with_wd_in_curr_shop = self.request.query_params.get('other_deps_employees_with_wd_in_curr_shop')
-        if other_deps_employees_with_wd_in_curr_shop and bool(
-                distutils.util.strtobool(other_deps_employees_with_wd_in_curr_shop)):
-            shop = Shop.objects.get(pk=self.request.query_params.get('shop_id')) if self.request.query_params.get('shop_id') else\
-            self.request.user.get_shops().first()
-            qs = qs.annotate(
-                from_another_network=ExpressionWrapper(
-                    ~Q(user__network_id=shop.network_id),
-                    output_field=BooleanField(),
-                )
-            )
-
+    def filter_queryset(self, queryset):
+        filtered_qs = super(EmployeeViewSet, self).filter_queryset(queryset=queryset)
         if self.request.query_params.get('include_employments'):
-            queryset = Employment.objects.all().prefetch_related(Prefetch('work_types', to_attr='work_types_list')).select_related(
+            employments_qs = Employment.objects.all().prefetch_related(Prefetch('work_types', to_attr='work_types_list')).select_related(
                 'position',
                 'shop',
                 'employee',
                 'employee__user',
             )
             if self.request.query_params.get('shop_network__in'):
-                queryset = queryset.filter(shop__network_id__in=self.request.query_params.get('shop_network__in').split(','))
+                employments_qs = employments_qs.filter(shop__network_id__in=self.request.query_params.get('shop_network__in').split(','))
             if self.request.query_params.get('show_constraints'):
-                queryset = queryset.prefetch_related(Prefetch('worker_constraints', to_attr='worker_constraints_list'))
-            qs = qs.prefetch_related(Prefetch('employments', queryset=queryset, to_attr='employments_list'))
-
-        return qs.distinct()
+                employments_qs = employments_qs.prefetch_related(Prefetch('worker_constraints', to_attr='worker_constraints_list'))
+            filtered_qs = filtered_qs.prefetch_related(Prefetch('employments', queryset=employments_qs, to_attr='employments_list'))
+        return filtered_qs
 
     @action(detail=False, methods=['get'])
     def shift_schedule(self, *args, **kwargs):
