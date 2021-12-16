@@ -1,5 +1,6 @@
 import distutils.util
 
+from django.conf import settings
 from django.db.models import Q, F, BooleanField, ExpressionWrapper
 from django.db.models.functions import Coalesce
 from django.db.models.query import Prefetch
@@ -72,6 +73,8 @@ from src.base.views_abstract import (
     UpdateorCreateViewSet,
     BaseModelViewSet,
 )
+from src.integration.models import UserExternalCode
+from src.integration.zkteco import ZKTeco
 from src.recognition.api.recognition import Recognition
 from src.recognition.models import UserConnecter
 from src.timetable.worker_day.tasks import recalc_wdays
@@ -187,6 +190,9 @@ class UserViewSet(UpdateorCreateViewSet):
             if 'file' not in self.request.data:
                 return Response({"detail": _('It is necessary to transfer a biometrics template (file field).')}, 400)
             biometrics_image = self.request.data['file']
+            user_external_code = UserExternalCode.objects.filter(user=user).first()
+            if settings.ZKTECO_INTEGRATION and user_external_code:
+                ZKTeco().export_biophoto(user_external_code.code, biometrics_image)
             recognition = Recognition()
             try:
                 partner_id = recognition.create_person({"id": user.id})
