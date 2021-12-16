@@ -7,6 +7,7 @@ from rest_framework.test import APITestCase
 from src.base.models import Shop, NetworkConnect, Network, User, Employee, Employment, Group, FunctionGroup, \
     WorkerPosition
 from src.timetable.models import (
+    WorkerConstraint,
     WorkerDay,
     WorkType,
     WorkTypeName,
@@ -300,6 +301,56 @@ class TestOutsource(TestsHelperMixin, APITestCase):
         self.network_connect.save()
         response = self.client.get('/rest_api/timesheet/')
         self.assertEquals(len(response.json()), 0)
+
+    def test_client_can_set_worker_constraint_to_outsource_user(self):
+        empl = Employment.objects.create(
+            shop=self.client_shop,
+            employee=self.employee1,
+        )
+        response = self.client.post(
+            self.get_url('Employment-detail', pk=empl.id) + 'worker_constraint/', 
+            self.dump_data(
+                {
+                    'id': empl.id,
+                    'data': [
+                        {
+                            'weekday': 1,
+                            'tm': '10:00:00'
+                        }
+                    ]
+                }
+            ),
+            content_type='application/json',
+        )
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(WorkerConstraint.objects.filter(employment_id=empl.id).count(), 1)
+        response = self.client.post(
+            self.get_url('Employment-detail', pk=empl.id) + 'worker_constraint/', 
+            self.dump_data(
+                {
+                    'id': empl.id,
+                    'data': []
+                }
+            ),
+            content_type='application/json',
+        )
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(WorkerConstraint.objects.filter(employment_id=empl.id).count(), 0)
+        response = self.client.post(
+            self.get_url('Employment-detail', pk=self.employment1.id) + 'worker_constraint/', 
+            self.dump_data(
+                {
+                    'id': self.employment1.id,
+                    'data': {
+                        'weekday': 1,
+                        'tm': '10:00:00'
+                    }
+                }
+            ),
+            content_type='application/json',
+        )
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(WorkerConstraint.objects.filter(employment_id=self.employment1.id).count(), 0)
 
     def test_client_can_get_outsource_user(self):
         response = self.client.get(f'/rest_api/user/?id={self.user1.id}')

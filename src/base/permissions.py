@@ -1,4 +1,4 @@
-from django.db.models import ObjectDoesNotExist
+from django.db.models import ObjectDoesNotExist, Q
 from django.utils.translation import gettext_lazy as _
 from rest_framework import permissions
 from rest_framework.exceptions import ValidationError, NotFound
@@ -137,16 +137,21 @@ class EmploymentFilteredListPermission(Permission):
         employment_id = view.kwargs.get('employment_pk')
 
         try:
-            employment = Employment.objects.get(id=employment_id)
+            employment = Employment.objects.select_related('shop', 'employee__user').get(id=employment_id)
         except ObjectDoesNotExist:
             raise NotFound("Employment does not exist")
 
         department = employment.shop
 
         employments = Employment.objects.get_active(
-            employment.employee.user.network_id,
             shop__in=department.get_ancestors(include_self=True, ascending=True),
             employee__user=request.user,
+            extra_q=Q(
+                Q(shop__network_id=employment.shop.network_id)|
+                Q(employee__user__network_id=employment.shop.network_id) |
+                Q(shop__network_id=employment.employee.user.network_id)|
+                Q(employee__user__network_id=employment.employee.user.network_id)
+            )
         )
 
         return self.check_employment_permission(employments, request, view)
