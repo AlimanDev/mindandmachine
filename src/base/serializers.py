@@ -1,7 +1,9 @@
 import json
 from datetime import timedelta
+from dateutil.relativedelta import relativedelta
 
 from django.conf import settings
+from django.utils.timezone import now
 from django.contrib.auth.forms import SetPasswordForm
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.core.validators import EmailValidator
@@ -251,6 +253,7 @@ class AuthUserSerializer(UserSerializer):
     shop_id = serializers.CharField(default=UserworkShop())
     allowed_tabs = serializers.SerializerMethodField()
     subordinate_employee_ids = serializers.SerializerMethodField()
+    self_employee_ids = serializers.SerializerMethodField()
 
     def get_allowed_tabs(self, obj: User):
         allowed_tabs = []
@@ -260,10 +263,14 @@ class AuthUserSerializer(UserSerializer):
         return list(set(allowed_tabs))
     
     def get_subordinate_employee_ids(self, obj: User):
-        return list(Employee.get_subordinates(obj).values_list('id', flat=True))
+        return list(Employee.get_subordinates(obj, dt=now().date(), dt_to_shift=relativedelta(months=6)).values_list('id', flat=True))
+    
+    def get_self_employee_ids(self, obj: User):
+        dt = now().date()
+        return list(obj.get_active_employments(dt_from=dt, dt_to=dt + relativedelta(months=6)).values_list('employee_id', flat=True))
 
     class Meta(UserSerializer.Meta):
-        fields = UserSerializer.Meta.fields + ['network', 'shop_id', 'allowed_tabs', 'subordinate_employee_ids']
+        fields = UserSerializer.Meta.fields + ['network', 'shop_id', 'allowed_tabs', 'subordinate_employee_ids', 'self_employee_ids']
 
 
 class PasswordSerializer(serializers.Serializer):
