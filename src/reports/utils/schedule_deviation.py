@@ -107,6 +107,8 @@ def schedule_deviation_report(dt_from, dt_to, *args, title=None, in_memory=False
                 'lost_work_hours',
                 'lost_work_hours_count',
                 'wd_type_id',
+                'employment_shop_name',
+                'position_name',
             )
         ),
         columns=[
@@ -133,6 +135,8 @@ def schedule_deviation_report(dt_from, dt_to, *args, title=None, in_memory=False
             'lost_work_hours',
             'lost_work_hours_count',
             'wd_type_id',
+            'employment_shop_name',
+            'position_name',
         ],
     )
     unapplied_vacancies = list(
@@ -184,6 +188,8 @@ def schedule_deviation_report(dt_from, dt_to, *args, title=None, in_memory=False
                 'tabel_code',
                 'user_network',
                 'shop_name',
+                'employment_shop_name',
+                'position_name',
             ],
             '-',
         ),
@@ -196,24 +202,25 @@ def schedule_deviation_report(dt_from, dt_to, *args, title=None, in_memory=False
     DATE = 2
     FIO = 3
     TABEL_CODE = 4
-    NETWORK = 5
+    NETWORK_SHOP = 5
     IS_OUTSOURCE = 6
     WORK_TYPE = 7
-    PLAN_HOURS = 8
-    FACT_HOURS = 9
-    MANUAL_HOURS = 10
-    LATE_ARRIVAL_HOURS = 11
-    LATE_ARRIVAL_COUNT = 12
-    EARLY_ARRIVAL_HOURS = 13
-    EARLY_ARRIVAL_COUNT = 14
-    EARLY_DEPARTURE_HOURS = 15
-    EARLY_DEPARTURE_COUNT = 16
-    LATE_DEPARTURE_HOURS = 17
-    LATE_DEPARTURE_COUNT = 18
-    FACT_WITHOUT_PLAN_HOURS = 19
-    FACT_WITHOUT_PLAN_COUNT = 20
-    LOST_HOURS = 21
-    LOST_COUNT = 22
+    WORKERDAY_TYPE = 8
+    PLAN_HOURS = 9
+    FACT_HOURS = 10
+    MANUAL_HOURS = 11
+    LATE_ARRIVAL_HOURS = 12
+    LATE_ARRIVAL_COUNT = 13
+    EARLY_ARRIVAL_HOURS = 14
+    EARLY_ARRIVAL_COUNT = 15
+    EARLY_DEPARTURE_HOURS = 16
+    EARLY_DEPARTURE_COUNT = 17
+    LATE_DEPARTURE_HOURS = 18
+    LATE_DEPARTURE_COUNT = 19
+    FACT_WITHOUT_PLAN_HOURS = 20
+    FACT_WITHOUT_PLAN_COUNT = 21
+    LOST_HOURS = 22
+    LOST_COUNT = 23
 
     if in_memory:
         output = io.BytesIO()
@@ -264,9 +271,10 @@ def schedule_deviation_report(dt_from, dt_to, *args, title=None, in_memory=False
     worksheet.write_string(10, DATE, 'Дата', header_format)
     worksheet.write_string(10, FIO, 'Сотрудник', header_format)
     worksheet.write_string(10, TABEL_CODE, 'Табельный Номер', header_format)
-    worksheet.write_string(10, NETWORK, 'Сеть Сотрудника, компания', header_format)
+    worksheet.write_string(10, NETWORK_SHOP, 'Закрепленная компания/магазиня', header_format)
     worksheet.write_string(10, IS_OUTSOURCE, 'Штат или нет', header_format)
-    worksheet.write_string(10, WORK_TYPE, 'Тип Работ/должность', header_format)
+    worksheet.write_string(10, WORK_TYPE, 'Должность/вид работ', header_format)
+    worksheet.write_string(10, WORKERDAY_TYPE, 'Тип дня', header_format)
     worksheet.write_string(10, PLAN_HOURS, 'План', header_format)
     worksheet.write_string(10, FACT_HOURS, 'Факт', header_format)
     worksheet.write_string(10, MANUAL_HOURS, 'Скорректировано вручную', header_format)
@@ -289,9 +297,10 @@ def schedule_deviation_report(dt_from, dt_to, *args, title=None, in_memory=False
     worksheet.set_column(DATE, DATE, 20)
     worksheet.set_column(FIO, FIO, 33)
     worksheet.set_column(TABEL_CODE, TABEL_CODE, 22)
-    worksheet.set_column(NETWORK, NETWORK, 36)
+    worksheet.set_column(NETWORK_SHOP, NETWORK_SHOP, 36)
     worksheet.set_column(IS_OUTSOURCE, IS_OUTSOURCE, 14)
     worksheet.set_column(WORK_TYPE, WORK_TYPE, 18)
+    worksheet.set_column(WORKERDAY_TYPE, WORKERDAY_TYPE, 18)
     worksheet.set_column(PLAN_HOURS, PLAN_HOURS, 9)
     worksheet.set_column(FACT_HOURS, FACT_HOURS, 9)
     worksheet.set_column(MANUAL_HOURS, MANUAL_HOURS, 18)
@@ -309,14 +318,18 @@ def schedule_deviation_report(dt_from, dt_to, *args, title=None, in_memory=False
     worksheet.set_column(LOST_COUNT, LOST_COUNT, 17)
 
     for i, row in df.iterrows():
+        worker_day_type = wd_types_dict[row.wd_type_id].name
+        if (row.is_outsource or row.shop_name != row.employment_shop_name) and row.wd_type_id == WorkerDay.TYPE_WORKDAY:
+            worker_day_type = "Биржа смен"
         worksheet.write_number(11 + i, NUMBER, i+1, def_format)
         worksheet.write_string(11 + i, SHOP, row.shop_name, def_format)
         worksheet.write_datetime(11 + i, DATE, row['dt'], date_format)
         worksheet.write_string(11 + i, FIO, row.worker_fio, def_format)
         worksheet.write_string(11 + i, TABEL_CODE, row.tabel_code, def_format)
-        worksheet.write_string(11 + i, NETWORK, row.user_network if row.is_outsource else '-', def_format)
+        worksheet.write_string(11 + i, NETWORK_SHOP, row.user_network if row.is_outsource else row.employment_shop_name, def_format)
         worksheet.write_string(11 + i, IS_OUTSOURCE, 'не штат' if row.is_outsource else 'штат', def_format)
-        worksheet.write_string(11 + i, WORK_TYPE, row.work_type_name or wd_types_dict[row.wd_type_id].name, def_format)
+        worksheet.write_string(11 + i, WORK_TYPE, row.work_type_name if (row.is_outsource or row.worker_fio == '-') else row.position_name, def_format)
+        worksheet.write_string(11 + i, WORKERDAY_TYPE, worker_day_type, def_format)
         worksheet.write_number(11 + i, PLAN_HOURS, round(row.plan_work_hours, 2), def_format)
         worksheet.write_number(11 + i, FACT_HOURS, round(row.fact_work_hours, 2), def_format)
         worksheet.write_number(11 + i, MANUAL_HOURS, round(row.fact_manual_work_hours, 2), def_format)
