@@ -1,5 +1,5 @@
 import json
-from datetime import timedelta
+from datetime import timedelta, date
 from unittest import mock
 
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -458,5 +458,30 @@ class TestUserViewSet(TestsHelperMixin, APITestCase):
         resp = self.client.get('/rest_api/auth/user/')
         self.assertEqual(resp.json()['subordinate_employee_ids'], [])
         self.admin_group.subordinates.add(self.chief_group)
+        self.employment5.dt_hired = date.today() + timedelta(30)
+        self.employment5.save()
         resp = self.client.get('/rest_api/auth/user/')
-        self.assertEqual(resp.json()['subordinate_employee_ids'], [self.employee5.id, self.employee6.id])
+        self.assertCountEqual(resp.json()['subordinate_employee_ids'], [self.employee5.id, self.employee6.id])
+
+    def test_get_user_self_employee_ids(self):
+        dt = date.today()
+        inactive_employee = Employee.objects.create(
+            user=self.user1,
+            tabel_code='inactive',
+        )
+        Employment.objects.create(
+            employee=inactive_employee,
+            shop=self.shop,
+            dt_fired=dt - timedelta(1),
+        )
+        active_employee_from_future = Employee.objects.create(
+            user=self.user1,
+            tabel_code='active_employee',
+        )
+        Employment.objects.create(
+            employee=active_employee_from_future,
+            shop=self.shop2,
+            dt_hired=dt + timedelta(30),
+        )
+        resp = self.client.get('/rest_api/auth/user/')
+        self.assertCountEqual(resp.json()['self_employee_ids'], [self.employee1.id, active_employee_from_future.id])

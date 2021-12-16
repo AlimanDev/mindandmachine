@@ -1181,14 +1181,18 @@ class User(DjangoAbstractUser, AbstractModel):
     def fio(self):
         return self.get_fio()
 
-    def get_active_employments(self, shop=None):
+    def get_active_employments(self, shop=None, dt_from=None, dt_to=None):
         kwargs = {
             'employee__user__network_id': self.network_id,
             'shop__network_id': self.network_id,
         }
         if shop:
             kwargs['shop__in'] = shop.get_ancestors(include_self=True)
-        return Employment.objects.filter(
+        if dt_from:
+            kwargs['dt_from'] = dt_from
+        if dt_to:
+            kwargs['dt_to'] = dt_to
+        return Employment.objects.get_active(
             employee__user=self,
             **kwargs,
         )
@@ -1319,11 +1323,14 @@ class Employee(AbstractModel):
         return s
     
     @classmethod
-    def get_subordinates(cls, user, dt=None, user_shops=None, user_subordinates=None):
+    def get_subordinates(cls, user, dt=None, user_shops=None, user_subordinates=None, dt_to_shift=None):
         if not user_shops:
             user_shops = user.get_shops(include_descendants=True).values_list('id', flat=True)
         if not user_subordinates:
             user_subordinates = Group.get_subordinate_ids(user)
+        dt_to = dt
+        if dt_to_shift and dt_to:
+            dt_to += dt_to_shift
             
         return Employee.objects.annotate(
             is_subordinate=models.Exists(
@@ -1332,7 +1339,7 @@ class Employee(AbstractModel):
                     models.Q(function_group_id__in=user_subordinates) |
                     (models.Q(function_group_id__isnull=True) & models.Q(position__group__isnull=True)),
                     dt_from=dt,
-                    dt_to=dt,
+                    dt_to=dt_to,
                     employee_id=OuterRef('id'),
                     shop_id__in=user_shops,
                 )
