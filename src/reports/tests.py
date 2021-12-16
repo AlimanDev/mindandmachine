@@ -6,15 +6,14 @@ from django.core import mail
 from calendar import monthrange
 from django_celery_beat.models import CrontabSchedule
 from rest_framework.test import APITestCase
-from xlrd import open_workbook
 
-from src.base.models import FunctionGroup, Network
+from src.base.models import FunctionGroup, Network, WorkerPosition
 from src.base.tests.factories import EmployeeFactory, EmploymentFactory, GroupFactory, NetworkFactory, ShopFactory, \
     UserFactory
 from src.reports.models import ReportConfig, ReportType, Period
 from src.reports.reports import PIVOT_TABEL
 from src.reports.tasks import cron_report
-from src.timetable.models import PlanAndFactHours, WorkerDay, WorkerDayOutsourceNetwork, WorkerDayType
+from src.timetable.models import ScheduleDeviations, WorkerDay, WorkerDayOutsourceNetwork, WorkerDayType
 from src.timetable.tests.factories import WorkerDayFactory
 from src.util.mixins.tests import TestsHelperMixin
 from src.util.test import create_departments_and_users
@@ -422,6 +421,12 @@ class TestScheduleDeviation(APITestCase):
     def setUp(self):
         super().setUp()
         create_departments_and_users(self)
+        self.position = WorkerPosition.objects.create(
+            name='Должность сотрудника',
+            network=self.network,
+        )
+        self.employment1.position = self.position
+        self.employment1.save()
         self.client.force_authenticate(self.user1)
 
     def assertHours(self, 
@@ -458,7 +463,7 @@ class TestScheduleDeviation(APITestCase):
             'fact_without_plan_count': fact_without_plan_count, 
             'lost_work_hours_count': lost_work_hours_count,
         }
-        self.assertEquals(PlanAndFactHours.objects.values(*data.keys())[0], data)
+        self.assertEquals(ScheduleDeviations.objects.values(*data.keys())[0], data)
 
     def test_plan_and_fact_hours_values(self):
         dt = date.today()
@@ -664,17 +669,17 @@ class TestScheduleDeviation(APITestCase):
         data = pd.read_excel(report.content).fillna('')
         self.assertEquals(
             list(data.iloc[10, :].values), 
-            [1, 'Shop1', datetime.combine(dt, time(0, 0)), 'Васнецов Иван ', '-', '-', 'штат', 'Работа', 10,
+            [1, self.shop.name, datetime.combine(dt, time(0, 0)), f'{self.user1.fio} ', '-', self.root_shop.name, 'штат', self.position.name, 'Биржа смен', 10,
             10.5, 4.5, 0.5, 1, 0.5, 1, 0, 0, 1, 2, 0, 0, 0, 0]
         )
         self.assertEquals(
             list(data.iloc[11, :].values), 
-            [2, 'Shop1', datetime.combine(dt, time(0, 0)), '-', '-', '-', 'штат', 'Грузчик', 8.75,
+            [2, self.shop.name, datetime.combine(dt, time(0, 0)), '-', '-', '-', 'штат', 'Грузчик', 'Биржа смен', 8.75,
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8.75, 1]
         )
         self.assertEquals(
             list(data.iloc[12, :].values), 
-            [3, 'Shop1', datetime.combine(dt, time(0, 0)), '-', '-', 'Аутсорс сеть 1', 'не штат', 'Грузчик', 8.75,
+            [3, self.shop.name, datetime.combine(dt, time(0, 0)), '-', '-', 'Аутсорс сеть 1', 'не штат', 'Грузчик', 'Биржа смен', 8.75,
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8.75, 1]
         )
 
@@ -715,7 +720,7 @@ class TestScheduleDeviation(APITestCase):
         data = pd.read_excel(report.content).fillna('')
         for i, wd_type in enumerate(WorkerDayType.objects.all()):
             self.assertEquals(
-                list(data.iloc[10 + i, [0, 1, 2, 3, 5, 6, 7]].values), 
-                [i + 1, 'Shop1' if wd_type.is_work_hours else '-', datetime.combine(dt_from + timedelta(i), time(0, 0)), 
-                'Васнецов Иван ', '-', 'штат', 'Работа' if wd_type.code == WorkerDay.TYPE_WORKDAY else wd_type.name]
+                list(data.iloc[10 + i, [0, 1, 2, 3, 5, 6, 7, 8]].values), 
+                [i + 1, self.shop.name if wd_type.is_work_hours else '-', datetime.combine(dt_from + timedelta(i), time(0, 0)), 
+                f'{self.user1.fio} ', self.root_shop.name, 'штат', self.position.name, 'Биржа смен' if wd_type.code == WorkerDay.TYPE_WORKDAY else wd_type.name]
             )

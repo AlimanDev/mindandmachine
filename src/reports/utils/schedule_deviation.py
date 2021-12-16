@@ -319,14 +319,17 @@ def schedule_deviation_report(dt_from, dt_to, *args, title=None, in_memory=False
 
     for i, row in df.iterrows():
         worker_day_type = wd_types_dict[row.wd_type_id].name
+        if (row.is_outsource or row.shop_name != row.employment_shop_name) and row.wd_type_id == WorkerDay.TYPE_WORKDAY:
+            worker_day_type = "Биржа смен"
         worksheet.write_number(11 + i, NUMBER, i+1, def_format)
         worksheet.write_string(11 + i, SHOP, row.shop_name, def_format)
         worksheet.write_datetime(11 + i, DATE, row['dt'], date_format)
         worksheet.write_string(11 + i, FIO, row.worker_fio, def_format)
         worksheet.write_string(11 + i, TABEL_CODE, row.tabel_code, def_format)
-        worksheet.write_string(11 + i, NETWORK_SHOP, row.user_network if row.is_outsource else row.employement_shop_name, def_format)
+        worksheet.write_string(11 + i, NETWORK_SHOP, row.user_network if row.is_outsource else row.employment_shop_name, def_format)
         worksheet.write_string(11 + i, IS_OUTSOURCE, 'не штат' if row.is_outsource else 'штат', def_format)
-        worksheet.write_string(11 + i, WORK_TYPE, row.work_type_name or wd_types_dict[row.wd_type_id].name, def_format)
+        worksheet.write_string(11 + i, WORK_TYPE, row.work_type_name if (row.is_outsource or row.worker_fio == '-') else row.position_name, def_format)
+        worksheet.write_string(11 + i, WORKERDAY_TYPE, worker_day_type, def_format)
         worksheet.write_number(11 + i, PLAN_HOURS, round(row.plan_work_hours, 2), def_format)
         worksheet.write_number(11 + i, FACT_HOURS, round(row.fact_work_hours, 2), def_format)
         worksheet.write_number(11 + i, MANUAL_HOURS, round(row.fact_manual_work_hours, 2), def_format)
