@@ -1,3 +1,5 @@
+import distutils.util
+
 from django.conf import settings
 from django.db.models import Q, F, BooleanField, ExpressionWrapper
 from django.db.models.functions import Coalesce
@@ -260,7 +262,9 @@ class EmployeeViewSet(UpdateorCreateViewSet):
             'user',
         )
 
-        if self.request.query_params.get('other_deps_employees_with_wd_in_curr_shop'):
+        other_deps_employees_with_wd_in_curr_shop = self.request.query_params.get('other_deps_employees_with_wd_in_curr_shop')
+        if other_deps_employees_with_wd_in_curr_shop and bool(
+                distutils.util.strtobool(other_deps_employees_with_wd_in_curr_shop)):
             shop = Shop.objects.get(pk=self.request.query_params.get('shop_id')) if self.request.query_params.get('shop_id') else\
             self.request.user.get_shops().first()
             qs = qs.annotate(
