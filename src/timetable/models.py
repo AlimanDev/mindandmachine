@@ -2515,3 +2515,8 @@ class ScheduleDeviations(PlanAndFactHoursAbstract):
     class Meta:
         managed = False
         db_table = 'timetable_schedule_deviations'
+    
+    employment_shop = models.ForeignKey('base.Shop', on_delete=models.DO_NOTHING)
+    position = models.ForeignKey('base.WorkerPosition', on_delete=models.DO_NOTHING)
+    employment_shop_name = models.CharField(max_length=512)
+    position_name = models.CharField(max_length=512)
