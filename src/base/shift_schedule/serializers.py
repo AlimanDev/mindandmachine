@@ -32,6 +32,8 @@ class ShiftScheduleDaySerializer(serializers.ModelSerializer):
             'dt',
             'day_type',
             'work_hours',
+            'day_hours',
+            'night_hours',
         )
 
 

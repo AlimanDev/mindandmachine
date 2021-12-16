@@ -424,6 +424,8 @@ class TestShiftScheduleIntervalViewSet(TestsHelperMixin, APITestCase):
                     "2021-01-01": {
                         "day_type": "W",
                         "work_hours": 11.0,
+                        "day_hours": 11.0,
+                        "night_hours": 0.0,
                     }
                 }
             }
@@ -473,11 +475,15 @@ class TestShiftScheduleIntervalViewSet(TestsHelperMixin, APITestCase):
                 str(empl2.id): {
                     "2022-01-01": {
                         "day_type": "W",
-                        "work_hours": 16.0
+                        "work_hours": 16.0,
+                        "day_hours": 16.0,
+                        "night_hours": 0.0,
                     },
                     "2022-01-07": {
                         "day_type": "W",
-                        "work_hours": 11.0
+                        "work_hours": 11.0,
+                        "day_hours": 11.0,
+                        "night_hours": 0.0,
                     }
                 }
             }
