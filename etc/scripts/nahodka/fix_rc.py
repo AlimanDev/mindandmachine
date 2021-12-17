@@ -86,6 +86,8 @@ from etc.scripts.shift_schedule import load_shift_schedule, load_shift_schedule_
 from datetime import date
 load_shift_schedule('/home/wonder/Downloads/Telegram Desktop/РЦ_графики 20211101-2.xlsx', from_dt=date(2021, 11, 1))
 load_shift_schedule_intervals('/home/wonder/Downloads/Telegram Desktop/РЦ_графики_сотрудников_интервальный_2.xlsx')
+load_shift_schedule('/home/wonder/Downloads/Telegram Desktop/АТЛ_графики 20211101-2.xlsx', from_dt=date(2021, 11, 1))
+load_shift_schedule_intervals('/home/wonder/Downloads/Telegram Desktop/АТЛ_графики_сотрудников_интервальный_2.xlsx')
 recalc_wdays(dt__gte='2021-11-01', dt__lte='2021-12-31', type__is_dayoff=False)
 calc_timesheets(dt_from='2021-11-01', dt_to='2021-11-30')
 calc_timesheets(dt_from='2021-12-01', dt_to='2021-12-31')

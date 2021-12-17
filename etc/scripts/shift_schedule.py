@@ -32,7 +32,6 @@ def load_shift_schedule(filepath, from_dt=None, load_employee_shift_schedules=Fa
     with open(filepath, 'rb') as f:
         df = pd.read_excel(f)
         df.drop(df[df['ВидУчетаВремени'] == 'Рабочее время'].index, inplace=True)
-        df.replace(DAY_TYPE_MAPPING, inplace=True)
         df['Дата'] = pd.to_datetime(df['Дата'], format='%d.%m.%Y %H:%M:%S').dt.date
         df.drop(df[df['Дата'] < (from_dt or date.today().replace(day=1))].index, inplace=True)
         existing_employee_tabel_codes = list(
@@ -56,7 +55,7 @@ def load_shift_schedule(filepath, from_dt=None, load_employee_shift_schedules=Fa
                 day_data['day_hours'] = day_data.get('day_hours', 0) + row['ДополнительноеЗначение']
             if row['ВидУчетаВремени'] == 'Ночные часы':
                 day_data['night_hours'] = day_data.get('work_hours', 0) + row['ДополнительноеЗначение']
-            day_data.setdefault('day_type', row['ВидУчетаВремени'])
+            day_data.setdefault('day_type', DAY_TYPE_MAPPING[row['ВидУчетаВремени']])
             day_data.setdefault('code', row['ГУИДГрафика'] + '_' + str(row['Дата']))
 
         shift_schedules_data_list = []
