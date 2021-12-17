@@ -50,6 +50,7 @@ class NetworkSerializer(serializers.ModelSerializer):
     unaccounted_overtime_threshold = serializers.SerializerMethodField()
     show_remaking_choice = serializers.SerializerMethodField()
     shop_name_form = serializers.SerializerMethodField()
+    analytics_iframe = serializers.SerializerMethodField()
 
     def get_default_stats(self, obj: Network):
         default_stats = json.loads(obj.settings_values).get('default_stats', {})
@@ -92,6 +93,9 @@ class NetworkSerializer(serializers.ModelSerializer):
     def get_show_remaking_choice(self, obj: Network):
         return obj.settings_values_prop.get('show_remaking_choice', False)
 
+    def get_analytics_iframe(self, obj: Network):
+        return obj.settings_values_prop.get('analytics_iframe', '')
+
     def get_logo_url(self, obj) -> str:
         if obj.logo:
             return obj.logo.url
@@ -122,6 +126,7 @@ class NetworkSerializer(serializers.ModelSerializer):
             'allow_creation_several_wdays_for_one_employee_for_one_date',
             'shop_name_form',
             'get_position_from_work_type_name_in_calc_timesheet',
+            'analytics_iframe',
         ]
 
 class NetworkListSerializer(serializers.Serializer):
