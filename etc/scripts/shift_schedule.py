@@ -39,8 +39,10 @@ def load_shift_schedule(filepath, from_dt=None, load_employee_shift_schedules=Fa
             Employee.objects.filter(employments__isnull=False).values_list('tabel_code', flat=True))
         shift_schedules_data = {}
         for idx, row in df.iterrows():
-            if row['ЭтоСотрудник'] == 'Истина' and load_employee_shift_schedules and row[
-                'ГрафикРаботы'] not in existing_employee_tabel_codes:
+            if row['ЭтоСотрудник'] == 'Истина' and not load_employee_shift_schedules:
+                continue
+
+            if row['ЭтоСотрудник'] == 'Истина' and row['ГрафикРаботы'] not in existing_employee_tabel_codes:
                 continue
             shift_schedule_data = shift_schedules_data.setdefault(row['ГУИДГрафика'], {})
             shift_schedule_data.setdefault('name', row['ГрафикРаботы'])
@@ -50,6 +52,10 @@ def load_shift_schedule(filepath, from_dt=None, load_employee_shift_schedules=Fa
             days_data = shift_schedule_data.setdefault('days', {})
             day_data = days_data.setdefault(str(row['Дата']), {})
             day_data['work_hours'] = day_data.get('work_hours', 0) + row['ДополнительноеЗначение']
+            if row['ВидУчетаВремени'] == 'Явка':
+                day_data['day_hours'] = day_data.get('day_hours', 0) + row['ДополнительноеЗначение']
+            if row['ВидУчетаВремени'] == 'Ночные часы':
+                day_data['night_hours'] = day_data.get('work_hours', 0) + row['ДополнительноеЗначение']
             day_data.setdefault('day_type', row['ВидУчетаВремени'])
             day_data.setdefault('code', row['ГУИДГрафика'] + '_' + str(row['Дата']))
 
