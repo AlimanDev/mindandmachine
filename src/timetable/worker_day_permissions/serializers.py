@@ -50,6 +50,8 @@ class WsPermissionDataSerializer(serializers.ModelSerializer):
             'type',
             'is_fact',
             'employee_id',
+            'is_vacancy',
+            'shop_id',
         )
         extra_kwargs = {
             "dt": {

@@ -4612,10 +4612,103 @@ class TestVacancy(TestsHelperMixin, APITestCase):
         self.assertEqual(resp.json()['results'][0]['id'], self.vacancy2.id)
 
     def test_get_list(self):
+        WorkerDay.objects.all().delete()
+        self.admin_group.subordinates.clear()
+        self.admin_group.subordinates.add(self.employee_group)
+        self.employment1.shop = self.shop
+        self.employment1.save()
+        outsource_network = Network.objects.create(name='outsource')
+        outsource_user = User.objects.create(
+            username='outsource',
+            network=outsource_network,
+        )
+        outsource_shop = Shop.objects.create(
+            name='outsource',
+            network=outsource_network,
+            region=self.region,
+        )
+        outsource_employee = Employee.objects.create(
+            user=outsource_user,
+            tabel_code='outsource',
+        )
+        outsource_employment = Employment.objects.create(
+            employee=outsource_employee,
+            shop=outsource_shop,
+        )
+        vacanct_vacancy = WorkerDay.objects.create(
+            is_vacancy=True,
+            shop=self.shop,
+            type_id=WorkerDay.TYPE_WORKDAY,
+            dt=self.dt_now,
+            dttm_work_start=datetime.combine(self.dt_now, time(8)),
+            dttm_work_end=datetime.combine(self.dt_now, time(20)),
+            is_approved=True,
+            comment='Test',
+        )
+        own_vacancy = WorkerDay.objects.create(
+            is_vacancy=True,
+            shop=self.shop,
+            type_id=WorkerDay.TYPE_WORKDAY,
+            dt=self.dt_now,
+            dttm_work_start=datetime.combine(self.dt_now, time(8)),
+            dttm_work_end=datetime.combine(self.dt_now, time(20)),
+            employee=self.employee1,
+            employment=self.employment1,
+            is_approved=True,
+        )
+        outsource_vacancy = WorkerDay.objects.create(
+            is_vacancy=True,
+            shop=self.shop,
+            type_id=WorkerDay.TYPE_WORKDAY,
+            dt=self.dt_now,
+            dttm_work_start=datetime.combine(self.dt_now, time(8)),
+            dttm_work_end=datetime.combine(self.dt_now, time(20)),
+            employee=outsource_employee,
+            employment=outsource_employment,
+            is_approved=True,
+            is_outsource=True,
+        )
+        subordinate_vacancy = WorkerDay.objects.create(
+            is_vacancy=True,
+            shop=self.shop,
+            type_id=WorkerDay.TYPE_WORKDAY,
+            dt=self.dt_now,
+            dttm_work_start=datetime.combine(self.dt_now, time(8)),
+            dttm_work_end=datetime.combine(self.dt_now, time(20)),
+            employee=self.employee2,
+            employment=self.employment2,
+            is_approved=True,
+        )
+        not_subordinate_vacancy = WorkerDay.objects.create(
+            is_vacancy=True,
+            shop=self.shop,
+            type_id=WorkerDay.TYPE_WORKDAY,
+            dt=self.dt_now,
+            dttm_work_start=datetime.combine(self.dt_now, time(8)),
+            dttm_work_end=datetime.combine(self.dt_now, time(20)),
+            employee=self.employee5,
+            employment=self.employment5,
+            is_approved=True,
+        )
+        not_own_shop_vacancy = WorkerDay.objects.create(
+            is_vacancy=True,
+            shop=self.shop,
+            type_id=WorkerDay.TYPE_WORKDAY,
+            dt=self.dt_now,
+            dttm_work_start=datetime.combine(self.dt_now, time(8)),
+            dttm_work_end=datetime.combine(self.dt_now, time(20)),
+            employee=self.employee8,
+            employment=self.employment8,
+            is_approved=True,
+        )
         response = self.client.get(f'{self.url}?shop_id={self.shop.id}&limit=100')
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(len(response.json()['results']), 2)
+        self.assertEqual(len(response.json()['results']), 4)
         self.assertEqual(response.json()['results'][0]['comment'], 'Test')
+        self.assertCountEqual(
+            list(map(lambda x: x['id'], response.json()['results'])), 
+            [vacanct_vacancy.id, own_vacancy.id, outsource_vacancy.id, subordinate_vacancy.id],
+        )
 
     def test_get_list_shift_length(self):
         response = self.client.get(
@@ -5003,6 +5096,116 @@ class TestVacancy(TestsHelperMixin, APITestCase):
         resp = self.client.post(self.get_url('WorkerDay-refuse-vacancy', pk=vacancy.id))
         self.assertEquals(resp.status_code, 400)
         self.assertEquals(resp.json(), {'result': "Вы не можете отозвать вакансию, так как сотрудник уже вышел на данную вакансию."})
+    
+    def test_can_change_applied_vacancy_with_non_subordinate_user(self):
+        self.work_type_name = WorkTypeName.objects.create(name='Магазин', network=self.network)
+        self.work_type = WorkType.objects.create(
+            work_type_name=self.work_type_name,
+            shop=self.shop,
+        )
+        self.employment1.shop = self.shop
+        self.employment1.save()
+        vacancy = WorkerDay.objects.create(
+            is_vacancy=True,
+            shop=self.shop,
+            type_id=WorkerDay.TYPE_WORKDAY,
+            dt=self.dt_now,
+            dttm_work_start=datetime.combine(self.dt_now, time(8)),
+            dttm_work_end=datetime.combine(self.dt_now, time(20)),
+            employee=self.employee8,
+            employment=self.employment8,
+            is_approved=False,
+            created_by=self.user1,
+        )
+        wd_update_data = {
+            "type": WorkerDay.TYPE_WORKDAY,
+            "employee_id": self.employee8.id,
+            "dt": self.dt_now,
+            "is_vacancy": True,
+            "shop_id": self.shop.id,
+            "dttm_work_start": datetime.combine(self.dt_now, time(10)),
+            "dttm_work_end": datetime.combine(self.dt_now, time(20)),
+            "worker_day_details": [
+                {
+                    "work_part": 1.0,
+                    "work_type_id": self.work_type.id
+                },
+            ]
+        }
+        response = self.client.put(
+            self.get_url('WorkerDay-detail', pk=vacancy.id), 
+            data=self.dump_data(wd_update_data),
+            content_type='application/json',
+        )
+        self.assertEqual(response.status_code, 200)
+        vacancy.refresh_from_db()
+        self.assertEqual(vacancy.dttm_work_start, datetime.combine(self.dt_now, time(10)))
+        response = self.client.delete(
+            self.get_url('WorkerDay-detail', pk=vacancy.id),
+        )
+        self.assertEqual(response.status_code, 204)
+        self.assertFalse(WorkerDay.objects.filter(id=vacancy.id).exists())
+        WorkerDay.objects.all().delete()
+        vacancy = WorkerDay.objects.create(
+            is_vacancy=True,
+            shop=self.shop,
+            type_id=WorkerDay.TYPE_WORKDAY,
+            dt=self.dt_now,
+            dttm_work_start=datetime.combine(self.dt_now, time(8)),
+            dttm_work_end=datetime.combine(self.dt_now, time(20)),
+            employee=self.employee8,
+            employment=self.employment8,
+            is_approved=False,
+            created_by=self.user1,
+        )
+        options = {
+            'return_response': True,
+        }
+        data = {
+           'data':  [
+                {
+                    "id": vacancy.id,
+                    "shop_id": self.shop.id,
+                    "employee_id": self.employee8.id,
+                    "dt": self.dt_now,
+                    "is_fact": False,
+                    "is_vacancy": True,
+                    "is_approved": False,
+                    "type": WorkerDay.TYPE_WORKDAY,
+                    "dttm_work_start": datetime.combine(self.dt_now, time(10)),
+                    "dttm_work_end": datetime.combine(self.dt_now, time(21)),
+                    "worker_day_details": [{
+                        "work_part": 1.0,
+                        "work_type_id": self.work_type.id}
+                    ]
+                },
+            ],
+            'options': options,
+        }
+        resp = self.client.post(
+            self.get_url('WorkerDay-batch-update-or-create'), self.dump_data(data), content_type='application/json')
+        self.assertEqual(resp.status_code, 200)
+        vacancy.refresh_from_db()
+        self.assertEqual(vacancy.dttm_work_start, datetime.combine(self.dt_now, time(10)))
+        
+        delete_data = {
+            'data': [],
+            'options': {
+                'delete_scope_values_list': [
+                    {
+                        'employee_id': self.employee8.id,
+                        'dt': self.dt_now,
+                        'is_fact': False,
+                        'is_approved': False,
+                    },
+                ]
+            }
+        }
+        resp = self.client.post(
+            self.get_url('WorkerDay-batch-update-or-create'), self.dump_data(delete_data), content_type='application/json')
+        self.assertEqual(resp.status_code, 200)
+        self.assertFalse(WorkerDay.objects.filter(id=vacancy.id).exists())
+
 
 class TestAditionalFunctions(TestsHelperMixin, APITestCase):
     USER_USERNAME = "user1"

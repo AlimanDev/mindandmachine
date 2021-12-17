@@ -1,6 +1,7 @@
 import datetime
 import json
 from itertools import groupby
+from dateutil.relativedelta import relativedelta
 
 import numpy as np
 import pandas as pd
@@ -811,6 +812,19 @@ class WorkerDayViewSet(BaseModelViewSet):
             pk=OuterRef('pk'),
             outsources__id=self.request.user.network_id,
         )
+        dt = datetime.date.today()
+        available_employee = list(
+            Employee.get_subordinates(
+                request.user, 
+                dt=dt,
+                dt_to_shift=relativedelta(months=6),
+            ).values_list('id', flat=True)
+        ) + list(
+            request.user.get_active_employments(
+                dt_from=dt,
+                dt_to=dt + relativedelta(months=6),
+            ).values_list('employee_id', flat=True)
+        )
         queryset = filterset_class.filter_queryset(
             self.get_queryset().filter(
                 is_vacancy=True,
@@ -818,7 +832,13 @@ class WorkerDayViewSet(BaseModelViewSet):
             ).annotate(
                 worker_day_outsource_network_exitst=Exists(worker_day_outsource_network_subq),
             ).filter(
-                Q(shop__network_id=request.user.network_id) | 
+                (
+                    Q(shop__network_id=request.user.network_id)&
+                    (
+                        Q(is_outsource=True) | Q(employee__isnull=True) |
+                        Q(employee_id__in=available_employee)
+                    )
+                ) | 
                 (
                     Q(is_outsource=True, worker_day_outsource_network_exitst=True, is_approved=True)&
                     (Q(employee__isnull=True) | Q(employee__user__network_id=request.user.network_id)) # чтобы не попадали вакансии с сотрудниками другой аутсорс сети

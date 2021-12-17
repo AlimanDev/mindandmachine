@@ -690,8 +690,7 @@ class TestOutsource(TestsHelperMixin, APITestCase):
         self.assertEqual(response.status_code, 200)
         self.client.force_authenticate(user=self.user1)
         response = self.client.post(f'/rest_api/worker_day/{vacancy["id"]}/reconfirm_vacancy_to_worker/', {'user_id': self.user1.id, 'employee_id': self.employee1.id,})
-        self.assertEqual(response.status_code, 404)
-        self.assertEquals(response.json(), {'result': 'Такой вакансии не существует'})
+        self.assertEqual(response.status_code, 403)
 
     def test_approve_with_worker_copy_outsources(self):
         dt_now = self.dt_now
