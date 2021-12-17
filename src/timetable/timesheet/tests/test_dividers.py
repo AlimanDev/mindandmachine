@@ -757,7 +757,9 @@ class TestShiftScheduleDivider(TestTimesheetMixin, TestCase):
         for dt in pd.date_range(date(2021, 6, 7), date(2021, 6, 11)).date:
             ShiftScheduleDay.objects.create(
                 dt=dt, shift_schedule=cls.shift_schedule, day_type_id=WorkerDay.TYPE_WORKDAY,
-                work_hours=Decimal("8.00"))
+                work_hours=Decimal("8.00"),
+                day_hours=Decimal("8.00"),
+                night_hours=Decimal("0.00"))
         for dt in pd.date_range(date(2021, 6, 12), date(2021, 6, 13)).date:
             ShiftScheduleDay.objects.create(
                 dt=dt, shift_schedule=cls.shift_schedule, day_type_id=WorkerDay.TYPE_HOLIDAY, work_hours=Decimal("0.00"))
@@ -1015,3 +1017,50 @@ class TestShiftScheduleDivider(TestTimesheetMixin, TestCase):
                 donor_additional_ts_item = TimesheetItem.objects.filter(
                     employee=employee, dt=dt_donor, timesheet_type=TimesheetItem.TIMESHEET_TYPE_ADDITIONAL).first()
                 self.assertIsNone(donor_additional_ts_item)
+
+    def test_work_hours_moved_from_additional_tabel_to_main_if_is_absent_in_main_but_workday_in_shift_schedule(self):
+        dt = date(2021, 6, 11)
+        dt_donor = date(2021, 6, 12)
+        WorkerDay.objects.filter(dt=dt, is_fact=True).delete()
+        WorkerDay.objects.filter(~Q(dt__in=[dt, dt_donor])).delete()
+        for employee in [self.employee_worker]:
+            self._calc_timesheets(employee_id=employee.id, reraise_exc=True, dttm_now=datetime(2021, 6, 25))
+            main_ts_item = TimesheetItem.objects.get(
+                employee=employee, dt=dt, timesheet_type=TimesheetItem.TIMESHEET_TYPE_MAIN)
+            additional_ts_item = TimesheetItem.objects.filter(
+                employee=employee, dt=dt, timesheet_type=TimesheetItem.TIMESHEET_TYPE_ADDITIONAL).first()
+            self.assertEqual(main_ts_item.day_type_id, WorkerDay.TYPE_WORKDAY)
+            self.assertEqual(main_ts_item.day_hours, 8)
+            self.assertIsNone(additional_ts_item)
+
+            donor_additional_ts_item = TimesheetItem.objects.filter(
+                employee=employee, dt=dt_donor, timesheet_type=TimesheetItem.TIMESHEET_TYPE_ADDITIONAL).first()
+            self.assertIsNotNone(donor_additional_ts_item)
+            self.assertEqual(donor_additional_ts_item.day_type_id, WorkerDay.TYPE_WORKDAY)
+            self.assertEqual(donor_additional_ts_item.day_hours, 1)
+
+    def test_plan_holiday_in_main_timesheet_filled_as_in_shift_schedule(self):
+        dt = date(2021, 6, 11)
+        WorkerDay.objects.filter(dt=dt, is_fact=True).delete()
+        for wd in WorkerDay.objects.filter(dt=dt, is_fact=False):
+            wd.type_id = WorkerDay.TYPE_HOLIDAY
+            wd.dttm_work_start = None
+            wd.dttm_work_end = None
+            wd.save()
+        dt_donor = date(2021, 6, 12)
+        WorkerDay.objects.filter(~Q(dt__in=[dt, dt_donor])).delete()
+        for employee in [self.employee_worker]:
+            self._calc_timesheets(employee_id=employee.id, reraise_exc=True, dttm_now=datetime(2021, 6, 25))
+            main_ts_item = TimesheetItem.objects.get(
+                employee=employee, dt=dt, timesheet_type=TimesheetItem.TIMESHEET_TYPE_MAIN)
+            additional_ts_item = TimesheetItem.objects.filter(
+                employee=employee, dt=dt, timesheet_type=TimesheetItem.TIMESHEET_TYPE_ADDITIONAL).first()
+            self.assertEqual(main_ts_item.day_type_id, WorkerDay.TYPE_WORKDAY)
+            self.assertEqual(main_ts_item.day_hours, 8)
+            self.assertIsNone(additional_ts_item)
+
+            donor_additional_ts_item = TimesheetItem.objects.filter(
+                employee=employee, dt=dt_donor, timesheet_type=TimesheetItem.TIMESHEET_TYPE_ADDITIONAL).first()
+            self.assertIsNotNone(donor_additional_ts_item)
+            self.assertEqual(donor_additional_ts_item.day_type_id, WorkerDay.TYPE_WORKDAY)
+            self.assertEqual(donor_additional_ts_item.day_hours, 1)

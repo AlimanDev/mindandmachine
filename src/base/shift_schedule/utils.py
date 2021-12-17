@@ -56,6 +56,8 @@ def get_shift_schedule(
         *values_list,
     ).annotate(
         work_hours_sum=Sum('shift_schedule__days__work_hours'),
+        day_hours_sum=Sum('shift_schedule__days__day_hours'),
+        night_hours_sum=Sum('shift_schedule__days__night_hours'),
     )
 
     # ss_filter_kwargs = {}
@@ -88,10 +90,14 @@ def get_shift_schedule(
         if employment__in:
             data.setdefault(str(i['group_by1_lookup']), {}).setdefault(str(i['group_by2_lookup']), {
                 'work_hours': i['work_hours_sum'],
+                'day_hours': i['day_hours_sum'],
+                'night_hours': i['night_hours_sum'],
             })
         else:
             data.setdefault(str(i['group_by1_lookup']), {}).setdefault(str(i['group_by2_lookup']), {
                 'day_type': i['day_type_id'],
                 'work_hours': i['work_hours_sum'],
+                'day_hours': i['day_hours_sum'],
+                'night_hours': i['night_hours_sum'],
             })
     return data

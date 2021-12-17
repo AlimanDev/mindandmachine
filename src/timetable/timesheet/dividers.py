@@ -442,35 +442,66 @@ class ShiftScheduleDivider(BaseTimesheetDivider):
 
     def _move_from_additional_to_main_if_main_less_than_norm(self):
         for dt in pd.date_range(self.fiscal_timesheet.dt_from, self.fiscal_timesheet.dt_to).date:
+            additional_timesheet_total_hours = self.fiscal_timesheet.additional_timesheet.get_total_hours_sum()
+            if additional_timesheet_total_hours <= 0:
+                return
             shift_schedule_hours = self.shift_schedule_data.get(str(dt), {}).get('work_hours', Decimal('0.00'))
             main_timesheet_total_hours = self.fiscal_timesheet.main_timesheet.get_total_hours_sum(dt=dt)
-            if main_timesheet_total_hours and shift_schedule_hours and main_timesheet_total_hours < shift_schedule_hours:
-                additional_tabel_total_hours = self.fiscal_timesheet.additional_timesheet.get_total_hours_sum()
-                if additional_tabel_total_hours > 0:
-                    plan_approved_wd = self.plan_approved_data.get(dt)
-                    work_end = plan_approved_wd.dttm_work_end
-                    delta_hours = datetime.timedelta(0)
-                    if (plan_approved_wd.work_hours.total_seconds() / 3600) > shift_schedule_hours:
-                        delta_hours = datetime.timedelta(hours=(plan_approved_wd.work_hours.total_seconds() / 3600) - float(shift_schedule_hours))
-                        work_end = plan_approved_wd.dttm_work_end - delta_hours
-                    plan_work_hours_total, plan_work_hours_day, plan_work_hours_night = plan_approved_wd.calc_day_and_night_work_hours(
-                        work_hours=plan_approved_wd.work_hours - delta_hours, work_end=work_end)
-                    main_timesheet_day_hours = self.fiscal_timesheet.main_timesheet.get_day_hours_sum(dt=dt)
-                    main_timesheet_night_hours = self.fiscal_timesheet.main_timesheet.get_night_hours_sum(dt=dt)
-                    if main_timesheet_day_hours < plan_work_hours_day:
-                        day_hours_to_subtract = Decimal(plan_work_hours_day) - main_timesheet_day_hours
-                        items = self.fiscal_timesheet.additional_timesheet.subtract_hours(hours_to_subtract=day_hours_to_subtract, field='day_hours')
-                        self.fiscal_timesheet.main_timesheet.add(dt, items, inplace=True)
-                    if main_timesheet_night_hours < plan_work_hours_night:
-                        night_hours_to_subtract = Decimal(plan_work_hours_night) - main_timesheet_night_hours
-                        items = self.fiscal_timesheet.additional_timesheet.subtract_hours(hours_to_subtract=night_hours_to_subtract, field='night_hours')
-                        self.fiscal_timesheet.main_timesheet.add(dt, items, inplace=True)
-                    items = self.fiscal_timesheet.main_timesheet.get_items(dt=dt)
-                    item = items[0]
-                    item.dttm_work_start = plan_approved_wd.dttm_work_start
-                    item.dttm_work_end = work_end - datetime.timedelta(hours=float(Decimal(plan_work_hours_total) - item.total_hours))
-                else:
-                    return
+            if shift_schedule_hours and main_timesheet_total_hours < shift_schedule_hours:
+                plan_approved_wd = self.plan_approved_data.get(dt)
+                if plan_approved_wd and \
+                        (main_timesheet_total_hours + additional_timesheet_total_hours) > settings.TIMESHEET_MIN_HOURS_THRESHOLD:
+
+                    # если в плане рабочий день
+                    if not plan_approved_wd.type.is_dayoff and plan_approved_wd.type.is_work_hours:
+                        work_end = plan_approved_wd.dttm_work_end_tabel
+                        delta_hours = datetime.timedelta(0)
+                        if (plan_approved_wd.work_hours.total_seconds() / 3600) > shift_schedule_hours:
+                            delta_hours = datetime.timedelta(
+                                hours=(plan_approved_wd.work_hours.total_seconds() / 3600) - float(
+                                    shift_schedule_hours))
+                            work_end = plan_approved_wd.dttm_work_end_tabel - delta_hours
+                        plan_work_hours_total, plan_work_hours_day, plan_work_hours_night = plan_approved_wd.calc_day_and_night_work_hours(
+                            work_hours=plan_approved_wd.work_hours - delta_hours, work_end=work_end)
+                        main_timesheet_day_hours = self.fiscal_timesheet.main_timesheet.get_day_hours_sum(dt=dt)
+                        main_timesheet_night_hours = self.fiscal_timesheet.main_timesheet.get_night_hours_sum(dt=dt)
+                        if main_timesheet_night_hours < plan_work_hours_night:
+                            night_hours_to_subtract = Decimal(plan_work_hours_night) - main_timesheet_night_hours
+                            items = self.fiscal_timesheet.additional_timesheet.subtract_hours(
+                                hours_to_subtract=night_hours_to_subtract, field='night_hours')
+                            self.fiscal_timesheet.main_timesheet.add(dt, items, inplace=True)
+                        if main_timesheet_day_hours < plan_work_hours_day:
+                            day_hours_to_subtract = Decimal(plan_work_hours_day) - main_timesheet_day_hours
+                            items = self.fiscal_timesheet.additional_timesheet.subtract_hours(
+                                hours_to_subtract=day_hours_to_subtract, field='day_hours')
+                            self.fiscal_timesheet.main_timesheet.add(dt, items, inplace=True)
+
+                        items = self.fiscal_timesheet.main_timesheet.get_items(dt=dt)
+                        item = items[0]
+                        item.dttm_work_start = plan_approved_wd.dttm_work_start_tabel
+                        item.dttm_work_end = work_end - datetime.timedelta(
+                            hours=float(Decimal(plan_work_hours_total) - item.total_hours))
+
+                    # если в плане выходной
+                    elif plan_approved_wd.type_id == WorkerDay.TYPE_HOLIDAY:
+                        shift_schedule_day_hours = self.shift_schedule_data.get(str(dt), {}).get('day_hours', Decimal('0.00'))
+                        shift_schedule_night_hours = self.shift_schedule_data.get(str(dt), {}).get('night_hours', Decimal('0.00'))
+
+                        # костылик на случай если дневные и ночные часы не будут приходить
+                        if not shift_schedule_day_hours and not shift_schedule_night_hours:
+                            shift_schedule_day_hours = shift_schedule_hours
+                        main_timesheet_day_hours = self.fiscal_timesheet.main_timesheet.get_day_hours_sum(dt=dt)
+                        main_timesheet_night_hours = self.fiscal_timesheet.main_timesheet.get_night_hours_sum(dt=dt)
+                        if main_timesheet_night_hours < shift_schedule_night_hours:
+                            night_hours_to_subtract = Decimal(shift_schedule_night_hours) - main_timesheet_night_hours
+                            items = self.fiscal_timesheet.additional_timesheet.subtract_hours(
+                                hours_to_subtract=night_hours_to_subtract, field='night_hours')
+                            self.fiscal_timesheet.main_timesheet.add(dt, items, inplace=True)
+                        if main_timesheet_day_hours < shift_schedule_day_hours:
+                            day_hours_to_subtract = Decimal(shift_schedule_day_hours) - main_timesheet_day_hours
+                            items = self.fiscal_timesheet.additional_timesheet.subtract_hours(
+                                hours_to_subtract=day_hours_to_subtract, field='day_hours')
+                            self.fiscal_timesheet.main_timesheet.add(dt, items, inplace=True)
 
     def _divide_by_shift_schedule(self):
         for dt in pd.date_range(self.fiscal_timesheet.dt_from, self.fiscal_timesheet.dt_to).date:

@@ -1108,7 +1108,7 @@ class WorkerDay(AbstractModel):
         return self.get_type_display()
 
     @tracker
-    def save(self, *args, **kwargs): # todo: aa: частая модель для сохранения, отправлять запросы при сохранении накладно
+    def save(self, *args, recalc_fact=True, **kwargs): # todo: aa: частая модель для сохранения, отправлять запросы при сохранении накладно
         self.dttm_work_start_tabel, self.dttm_work_end_tabel, self.work_hours = self._calc_wh()
         self.work_hours = self._round_wh()
 
@@ -1121,7 +1121,7 @@ class WorkerDay(AbstractModel):
         fines = self.employment.position.wp_fines if self.employment and self.employment.position else None
 
         # запускаем пересчет часов для факта, если изменились часы в подтвержденном плане
-        if self.shop \
+        if recalc_fact and self.shop \
                 and (self.shop.network.only_fact_hours_that_in_approved_plan or fines) \
                 and self.tracker.has_changed('work_hours') \
                 and not self.type.is_dayoff \

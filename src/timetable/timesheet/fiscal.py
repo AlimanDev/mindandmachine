@@ -48,7 +48,7 @@ class TimesheetItem:
         return TimesheetItem(**kwargs)
 
     def subtract_hours(self, hours_to_subtract, fields=None):
-        assert self.total_hours >= hours_to_subtract
+        assert round(self.total_hours, 2) >= round(hours_to_subtract, 2)
         hours_left_to_subtract = hours_to_subtract
         fields = fields or ['night_hours', 'day_hours']
         subtracted_item = self.copy(overrides=dict(
@@ -125,9 +125,16 @@ class Timesheet:
         items = self.get_items(dt=dt)
         if items:
             existing_item = items[-1]
-            existing_item.day_hours += item.day_hours
-            existing_item.night_hours += item.night_hours
-            existing_item.dttm_work_end += timedelta(hours=float(item.total_hours))
+            if existing_item.day_type.is_dayoff:
+                existing_item.day_type = item.day_type
+                existing_item.day_hours = item.day_hours
+                existing_item.night_hours = item.night_hours
+                existing_item.dttm_work_start = item.dttm_work_start
+                existing_item.dttm_work_end = item.dttm_work_end
+            else:
+                existing_item.day_hours += item.day_hours
+                existing_item.night_hours += item.night_hours
+                existing_item.dttm_work_end += timedelta(hours=float(item.total_hours))
         else:
             item.dt = dt
             item.dttm_work_start = item.dttm_work_start.replace(day=item.dt.day, month=item.dt.month, year=item.dt.year)

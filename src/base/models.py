@@ -25,7 +25,7 @@ from mptt.models import MPTTModel, TreeForeignKey
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.serializers import ValidationError
 from timezone_field import TimeZoneField
-
+from django.core.exceptions import ValidationError as DjangoValidationError
 from src.base.models_abstract import (
     AbstractActiveModel,
     AbstractModel,
@@ -1944,7 +1944,12 @@ class ShiftScheduleDay(AbstractModel):
         'base.ShiftSchedule', verbose_name='График смен', on_delete=models.CASCADE, related_name='days')
     dt = models.DateField()
     day_type = models.ForeignKey('timetable.WorkerDayType', on_delete=models.PROTECT, verbose_name='Тип дня')
-    work_hours = models.DecimalField(decimal_places=2, max_digits=4, verbose_name='Сумма рабочих часов', default=Decimal("0.00"))
+    work_hours = models.DecimalField(
+        decimal_places=2, max_digits=4, verbose_name='Сумма всех рабочих часов', default=Decimal("0.00"))
+    day_hours = models.DecimalField(
+        decimal_places=2, max_digits=4, verbose_name='Сумма дневных часов', default=Decimal("0.00"))
+    night_hours = models.DecimalField(
+        decimal_places=2, max_digits=4, verbose_name='Сумма ночных часов', default=Decimal("0.00"))
 
     class Meta(AbstractModel.Meta):
         verbose_name = 'День графика смен'
@@ -1958,6 +1963,10 @@ class ShiftScheduleDay(AbstractModel):
         if self.code:
             s += f' ({self.code})'
         return s
+
+    def clean(self):
+        if (self.day_hours + self.night_hours) != self.work_hours:
+            raise DjangoValidationError('work_hours should be sum of day_hours and night_hours')
 
 
 class ShiftScheduleInterval(AbstractModel):
