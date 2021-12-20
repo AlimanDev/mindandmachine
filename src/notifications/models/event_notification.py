@@ -99,6 +99,18 @@ class AbstractEventNotificationWithRecipients(AbstractEventNotification):
                     email__isnull=False,
                 ))
             )
+        
+        employment_shop_id = context.get('employment_shop_id')
+        if employment_shop_id:
+            recipients.extend(
+                list(User.objects.filter(
+                    id__in=Employment.objects.get_active().filter(
+                        Q(function_group__in=self.shop_groups.all()) | Q(position__group__in=self.shop_groups.all()),
+                        shop_id=employment_shop_id,
+                    ).values_list('employee__user_id', flat=True),
+                    email__isnull=False,
+                ))
+            )
 
         shops = list(self.shops.filter(network_filter))
         if shops:

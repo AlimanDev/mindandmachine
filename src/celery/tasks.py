@@ -311,13 +311,10 @@ def employee_not_checked():
                     'last_name': no_comming_record.worker.last_name,
                     'first_name': no_comming_record.worker.first_name,
                 },
-                'director': {
-                    'email': no_comming_record.shop.director.email if no_comming_record.shop.director else no_comming_record.shop.email,
-                    'name': no_comming_record.shop.director.first_name if no_comming_record.shop.director else no_comming_record.shop.name,
-                },
                 'dttm': no_comming_record.dttm_work_start_plan.strftime('%Y-%m-%d %H:%M:%S'),
                 'type': 'приход',
                 'shop_id': no_comming_record.shop_id,
+                'employment_shop_id': no_comming_record.employment_shop_id,
             },
         )
 
@@ -333,13 +330,10 @@ def employee_not_checked():
                     'last_name': no_leaving_record.worker.last_name,
                     'first_name': no_leaving_record.worker.first_name,
                 },
-                'director': {
-                    'email': no_leaving_record.shop.director.email if no_leaving_record.shop.director else no_leaving_record.shop.email,
-                    'name': no_leaving_record.shop.director.first_name if no_leaving_record.shop.director else no_leaving_record.shop.name,
-                },
                 'dttm': no_leaving_record.dttm_work_end_plan.strftime('%Y-%m-%d %H:%M:%S'),
                 'type': 'уход',
                 'shop_id': no_leaving_record.shop_id,
+                'employment_shop_id': no_comming_record.employment_shop_id,
             },
         )
 

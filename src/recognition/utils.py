@@ -1,4 +1,6 @@
 import json
+
+from django.db.models import Subquery, Q, OuterRef, F
 from src.timetable.models import PlanAndFactHours, WorkerDay
 from datetime import timedelta, datetime, date
 from src.base.models import Shop, User, Employment
@@ -17,6 +19,19 @@ def get_worker_days_with_no_ticks(dttm: datetime):
 
     no_comming = []
     no_leaving = []
+    pfh_qs = PlanAndFactHours.objects.annotate(
+        employment_shop_id=Subquery(
+            Employment.objects.filter(
+                Q(dt_fired__isnull=True) | Q(dt_fired__gte=OuterRef('dt')),
+                Q(dt_hired__isnull=True) | Q(dt_hired__lte=OuterRef('dt')),
+                employee_id=OuterRef('employee_id'),
+            ).values('shop_id')[:1]
+        ),
+    ).select_related(
+        'shop',
+        'shop__director',
+        'worker',
+    )
 
     for shop in Shop.objects.select_related('network').all():
         dttm_to = dttm + timedelta(hours=shop.get_tz_offset())
@@ -24,31 +39,23 @@ def get_worker_days_with_no_ticks(dttm: datetime):
         dttm_from_leaving = dttm_to - timedelta(seconds=json.loads(shop.network.settings_values).get('delta_for_leaving_in_secs', 300))
         no_comming.extend(
             list(
-                PlanAndFactHours.objects.filter(
+                pfh_qs.filter(
                     dttm_work_start_plan__gte=dttm_from_comming, 
                     dttm_work_start_plan__lt=dttm_from_comming + timedelta(minutes=1), 
                     ticks_comming_fact_count=0,
                     wd_type_id=WorkerDay.TYPE_WORKDAY,
                     shop=shop,
-                ).select_related(
-                    'shop',
-                    'shop__director',
-                    'worker',
                 )
             )
         )
         no_leaving.extend(
             list(
-                PlanAndFactHours.objects.filter(
+                pfh_qs.filter(
                     dttm_work_end_plan__gte=dttm_from_leaving, 
                     dttm_work_end_plan__lt=dttm_from_leaving + timedelta(minutes=1), 
                     ticks_leaving_fact_count=0,
                     wd_type_id=WorkerDay.TYPE_WORKDAY,
                     shop=shop,
-                ).select_related(
-                    'shop',
-                    'shop__director',
-                    'worker',
                 )
             )
         )

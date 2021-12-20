@@ -87,6 +87,7 @@ class TestAutoWorkerExchange(APITestCase):
         cls.shop_settings = ShopSettings.objects.create(breaks=cls.breaks)
         Shop.objects.all().update(network=cls.network)
 
+        cls.director_group = Group.objects.create(name='Director')
         cls.admin_group = Group.objects.create(name='ADMIN')
         FunctionGroup.objects.bulk_create([
             FunctionGroup(
@@ -187,6 +188,21 @@ class TestAutoWorkerExchange(APITestCase):
             network=cls.network,
         )
 
+        cls.user_admin = User.objects.create_user(
+            network=cls.network,
+            username='admin',
+            email='admin@test.ru',
+            last_name='Admin',
+            first_name='Admin',
+        )
+        cls.employee_admin = EmployeeFactory(user=cls.user_admin)
+        cls.employment_admin = Employment.objects.create(
+            shop=cls.root_shop,
+            employee=cls.employee_admin,
+            dt_hired=cls.dt_now - datetime.timedelta(days=2),
+            function_group=cls.admin_group,
+        )
+
         cls.user_dir = User.objects.create_user(
             network=cls.network,
             username='dir',
@@ -196,14 +212,11 @@ class TestAutoWorkerExchange(APITestCase):
         )
         cls.employee_dir = EmployeeFactory(user=cls.user_dir)
         cls.employment_dir = Employment.objects.create(
-            shop=cls.root_shop,
+            shop=cls.shop,
             employee=cls.employee_dir,
             dt_hired=cls.dt_now - datetime.timedelta(days=2),
-            function_group=cls.admin_group,
+            function_group=cls.director_group,
         )
-
-        cls.shop.director = cls.user_dir
-        cls.shop.save()
 
         cls.created_event, _ = EventType.objects.get_or_create(
             code=VACANCY_CREATED, network=cls.network,
@@ -218,14 +231,15 @@ class TestAutoWorkerExchange(APITestCase):
             event_type=cls.created_event,
             system_email_template='notifications/email/vacancy_created.html',
             subject='Автоматически создана вакансия',
-            get_recipients_from_event_type=True,
+            shop_ancestors=True,
         )
+        cls.event_email_notification_vacancy_created.shop_groups.add(cls.director_group)
         cls.event_email_notification_vacancy_deleted = EventEmailNotification.objects.create(
             event_type=cls.deleted_event,
             system_email_template='notifications/email/vacancy_deleted.html',
             subject='Автоматически удалена вакансия',
-            get_recipients_from_event_type=True,
         )
+        cls.event_email_notification_vacancy_deleted.shop_groups.add(cls.director_group)
         cls.event_email_notification_employee_vacancy_deleted = EventEmailNotification.objects.create(
             event_type=cls.employee_deleted_event,
             system_email_template='notifications/email/employee_vacancy_deleted.html',
@@ -279,6 +293,7 @@ class TestAutoWorkerExchange(APITestCase):
 
         cls.network.exchange_settings = cls.exchange_settings
         cls.network.save()
+        cls.employment_qs = Employment.objects.exclude(id__in=[cls.employment_dir.id, cls.employment_admin.id])
 
     def create_vacancy(self, tm_from, tm_to, work_type):
         wd = WorkerDay.objects.create(
@@ -336,7 +351,7 @@ class TestAutoWorkerExchange(APITestCase):
         return resp
 
     def create_worker_day(self):
-        for employment in Employment.objects.exclude(id=self.employment_dir.id):
+        for employment in self.employment_qs:
             wd = WorkerDay.objects.create(
                 employment=employment,
                 employee_id=employment.employee_id,
@@ -554,7 +569,7 @@ class TestAutoWorkerExchange(APITestCase):
         self.create_users(1)
         self.dt_now = self.dt_now + datetime.timedelta(days=9)
         vacancy = self.create_vacancy(9, 21, self.work_type2)
-        employment = Employment.objects.exclude(pk=self.employment_dir.id).first()
+        employment = self.employment_qs.first()
         dt = self.dt_now
         self.update_or_create_holidays(employment, dt, 3)
 
@@ -592,7 +607,7 @@ class TestAutoWorkerExchange(APITestCase):
         self.create_users(3)
         self.dt_now = self.dt_now + datetime.timedelta(days=9)
         vacancy = self.create_vacancy(9, 21, self.work_type2)
-        employments = list(Employment.objects.all())
+        employments = list(self.employment_qs)
         employment1 = employments[0]
         employment2 = employments[1]
         employment3 = employments[2]
@@ -624,7 +639,7 @@ class TestAutoWorkerExchange(APITestCase):
         self.create_users(3)
         self.dt_now = self.dt_now + datetime.timedelta(days=9)
         vacancy = self.create_vacancy(9, 21, self.work_type2)
-        employments = list(Employment.objects.all())
+        employments = list(self.employment_qs)
         employment1 = employments[0]
         employment2 = employments[1]
         employment3 = employments[2]
@@ -662,7 +677,7 @@ class TestAutoWorkerExchange(APITestCase):
 
     def test_worker_exchange_change_vacancy_to_own_shop_vacancy(self):
         self.create_users(1)
-        user = User.objects.exclude(username='dir').first()
+        user = User.objects.exclude(username__in=['dir', 'admin']).first()
         vacancy = self.create_vacancy(9, 21, self.work_type1)
         self.update_or_create_holidays(Employment.objects.get(employee__user=user), self.dt_now, 1)
 
@@ -728,7 +743,7 @@ class TestAutoWorkerExchange(APITestCase):
         self.dt_now = self.dt_now + datetime.timedelta(days=1)
         vac1 = self.create_vacancy(9, 20, self.work_type1)
         vac2 = self.create_vacancy(9, 20, self.work_type1)
-        employments = list(Employment.objects.exclude(id=self.employment_dir.id))
+        employments = list(self.employment_qs)
         vac1.employee_id = employments[0].employee_id
         vac1.employment = employments[0]
         vac1.save()
@@ -802,7 +817,7 @@ class TestAutoWorkerExchange(APITestCase):
         )
         len_vacancies = len(WorkerDay.objects.filter(is_vacancy=True))
         self.assertEqual(len_vacancies, 0)
-        self.client.force_authenticate(user=self.user_dir)
+        self.client.force_authenticate(user=self.user_admin)
         with mock.patch.object(transaction, 'on_commit', lambda t: t()):
             data = {
                 'shop_id': self.shop.id,
@@ -826,7 +841,7 @@ class TestAutoWorkerExchange(APITestCase):
         create_vacancies_and_notify(self.shop.id, self.work_type1.id)
         self.assertEquals(WorkerDay.objects.filter(is_vacancy=True).count(), 2)
         vacancy = WorkerDay.objects.filter(is_vacancy=True).first()
-        self.client.force_authenticate(user=self.user_dir)
+        self.client.force_authenticate(user=self.user_admin)
         response = self.client.delete(f"/rest_api/worker_day/{vacancy.id}/")
         self.assertEquals(response.status_code, 204)
         self.assertEquals(WorkerDay.objects.filter(is_vacancy=True).count(), 2)
@@ -842,12 +857,12 @@ class TestAutoWorkerExchange(APITestCase):
         self.assertEqual(len_vacancies, 0)
         create_vacancies_and_notify(self.shop.id, self.work_type1.id)
         self.assertEquals(WorkerDay.objects.filter(is_vacancy=True).count(), 2)
-        employment = Employment.objects.exclude(id=self.employment_dir.id).first()
+        employment = self.employment_qs.first()
         vacancy = WorkerDay.objects.filter(is_vacancy=True).first()
         vacancy.employee_id = employment.employee_id
         vacancy.employment = employment
         vacancy.save()
-        self.client.force_authenticate(user=self.user_dir)
+        self.client.force_authenticate(user=self.user_admin)
         response = self.client.delete(f"/rest_api/worker_day/{vacancy.id}/")
         self.assertEquals(response.status_code, 204)
         self.assertEquals(WorkerDay.objects.filter(is_vacancy=True).count(), 2)
@@ -881,7 +896,7 @@ class TestAutoWorkerExchange(APITestCase):
         create_vacancies_and_notify(self.shop.id, self.work_type1.id)
         self.assertEquals(WorkerDay.objects.filter(is_vacancy=True).count(), 2)
         vacancy = WorkerDay.objects.filter(is_vacancy=True).first()
-        self.client.force_authenticate(user=self.user_dir)
+        self.client.force_authenticate(user=self.user_admin)
         response = self.client.delete(f"/rest_api/worker_day/{vacancy.id}/")
         self.assertEquals(response.status_code, 204)
         self.assertEquals(WorkerDay.objects.filter(is_vacancy=True).count(), 2)
@@ -919,7 +934,7 @@ class TestAutoWorkerExchange(APITestCase):
         create_vacancies_and_notify(self.shop.id, self.work_type1.id)
         self.assertEquals(WorkerDay.objects.filter(is_vacancy=True).count(), 2)
         vacancy = WorkerDay.objects.filter(is_vacancy=True).first()
-        self.client.force_authenticate(user=self.user_dir)
+        self.client.force_authenticate(user=self.user_admin)
         response = self.client.delete(f"/rest_api/worker_day/{vacancy.id}/")
         self.assertEquals(response.status_code, 204)
         self.assertEquals(WorkerDay.objects.filter(is_vacancy=True).count(), 2)
@@ -954,7 +969,7 @@ class TestAutoWorkerExchange(APITestCase):
         create_vacancies_and_notify(self.shop.id, self.work_type1.id)
         self.assertEquals(WorkerDay.objects.filter(is_vacancy=True).count(), 2)
         vacancy = WorkerDay.objects.filter(is_vacancy=True).first()
-        self.client.force_authenticate(user=self.user_dir)
+        self.client.force_authenticate(user=self.user_admin)
         response = self.client.delete(f"/rest_api/worker_day/{vacancy.id}/")
         self.assertEquals(response.status_code, 204)
         self.assertEquals(WorkerDay.objects.filter(is_vacancy=True).count(), 2)
@@ -989,7 +1004,7 @@ class TestAutoWorkerExchange(APITestCase):
             shop=self.shop,
             type_id=WorkerDay.TYPE_WORKDAY,
         )
-        self.client.force_authenticate(user=self.user_dir)
+        self.client.force_authenticate(user=self.user_admin)
         response = self.client.delete(f"/rest_api/worker_day/{vacancy.id}/")
         self.assertEquals(response.status_code, 204)
         self.assertIsNone(WorkerDay.objects.filter(id=vacancy.id).first())

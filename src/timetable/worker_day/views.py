@@ -857,25 +857,6 @@ class WorkerDayViewSet(BaseModelViewSet):
         result = confirm_vacancy(pk, request.user, employee_id=self.request.data.get('employee_id', None))
         status_code = result['status_code']
         result = result['text']
-        if status_code == 200:
-            vacancy = WorkerDay.objects.get(pk=pk)
-            work_types = list(vacancy.work_types.all().values_list('work_type_name__name', flat=True))
-            event_signal.send(
-                sender=None,
-                network_id=vacancy.shop.network_id,
-                event_code=VACANCY_CONFIRMED_TYPE,
-                user_author_id=None,
-                shop_id=vacancy.shop_id,
-                context={
-                    'user': {
-                        'last_name': request.user.last_name,
-                        'first_name': request.user.first_name,
-                    },
-                    'dt': str(vacancy.dt),
-                    'work_types': work_types,
-                    'shop_id': vacancy.shop_id,
-                },
-            )
 
         return Response({'result': result}, status=status_code)
 
