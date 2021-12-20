@@ -76,7 +76,7 @@ class EmployeeFilterBackend(DjangoFilterBackend):
 
         employee_id = filterset.form.cleaned_data.get('id')
         if employee_id:
-            qs = qs.annotate(
+            qs = qs.filter(
                 id=employee_id,
             )
 
