@@ -11,7 +11,7 @@ from freezegun import freeze_time
 from rest_framework.test import APITestCase
 from xlrd import open_workbook
 
-from src.base.models import WorkerPosition, Employment, Break, ApiLog
+from src.base.models import Group, WorkerPosition, Employment, Break, ApiLog
 from src.celery.tasks import delete_inactive_employment_groups
 from src.timetable.models import WorkTypeName, EmploymentWorkType, WorkerDay
 from src.timetable.tests.factories import WorkerDayFactory
@@ -1101,3 +1101,22 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
         employments_count_after = Employment.objects.filter(code__isnull=False).count()
         self.assertEqual(employments_count_before, employments_count_after)
         self.assertFalse(Employment.objects.filter(code='e_new').exists())
+
+    def test_has_permission_through_position_when_group_set(self):
+        position = WorkerPosition.objects.create(
+            name='Test position',
+            group=self.admin_group,
+            network=self.network,
+        )
+        group_without_perms = Group.objects.create(
+            name='group_without_perms',
+        )
+        self.employment1.function_group = group_without_perms
+        self.employment1.position = None
+        self.employment1.save()
+        response = self.client.get('/rest_api/department/')
+        self.assertEqual(response.status_code, 403)
+        self.employment1.position = position
+        self.employment1.save()
+        response = self.client.get('/rest_api/department/')
+        self.assertEqual(response.status_code, 200)

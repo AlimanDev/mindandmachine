@@ -38,14 +38,14 @@ class Permission(permissions.BasePermission):
         employments = Employment.objects.get_active(
             network_id=request.user.network_id,
             employee__user=request.user,
-        ).select_related('position')
+        ).select_related('position__group')
         return self.check_employment_permission(employments, request, view)
 
     def has_object_permission(self, request, view, obj):
         employments = Employment.objects.get_active(
             network_id=request.user.network_id,
             employee__user=request.user,
-        ).select_related('position')
+        ).select_related('position__group')
 
         return self.check_employment_permission(employments, request, view)
 
