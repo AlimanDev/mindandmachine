@@ -1396,15 +1396,11 @@ class Employment(AbstractActiveModel):
         groups = [self.function_group, self.position.group if self.position else None]
         if not any(groups):
             raise ValidationError(_('Unable to define worker access group. Assign an access group to him or a position associated with an access group.'))
-        return any(
-            map(lambda group:
-                group.allowed_functions.filter(
-                    func=permission,
-                    method=method
-                ).first() if group else None,
-                groups,
-            ),
-        )
+        return FunctionGroup.objects.filter(
+            func=permission,
+            method=method,
+            group__in=filter(None, groups),
+        ).first()
 
     def get_department(self):
         return self.shop
