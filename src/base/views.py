@@ -258,8 +258,14 @@ class EmployeeViewSet(UpdateorCreateViewSet):
 
         qs = Employee.objects.filter(
             network_filter,
-        ).select_related(
-            'user',
+        ).prefetch_related(
+            Prefetch(
+                'user',
+                queryset=User.objects.all().annotate(
+                    userconnecter_id=F('userconnecter'),
+                ),
+                to_attr='employee_user',
+            )
         )
         return qs.distinct()
 

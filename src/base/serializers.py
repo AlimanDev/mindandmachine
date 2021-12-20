@@ -193,14 +193,16 @@ class UserShorSerializer(serializers.Serializer):
 
 class UserSerializer(BaseNetworkSerializer):
     username = serializers.CharField(required=False, validators=[UniqueValidator(queryset=User.objects.all())])
-    network_id = serializers.HiddenField(default=CurrentUserNetwork())
+    network_id = serializers.IntegerField(default=CurrentUserNetwork())
     avatar = serializers.SerializerMethodField('get_avatar_url')
     email = serializers.CharField(required=False, allow_blank=True)
+    has_biometrics = serializers.SerializerMethodField()
 
     class Meta:
         model = User
         fields = ['id', 'first_name', 'last_name', 'middle_name', 'network_id',
-                  'birthday', 'sex', 'avatar', 'email', 'phone_number', 'username', 'auth_type', 'ldap_login']
+                  'birthday', 'sex', 'avatar', 'email', 'phone_number', 'username', 'auth_type', 'ldap_login',
+                  'has_biometrics']
 
     def validate(self, attrs):
         email = attrs.get('email')
@@ -222,9 +224,15 @@ class UserSerializer(BaseNetworkSerializer):
             return obj.avatar.url
         return None
 
+    def get_has_biometrics(self, obj) -> bool:
+        if getattr(obj, 'userconnecter_id', None):
+            return True
+        else:
+            return False
+
 
 class EmployeeSerializer(BaseNetworkSerializer):
-    user = UserSerializer(read_only=True)
+    user = UserSerializer(read_only=True, source='employee_user')
     user_id = serializers.IntegerField(required=False, write_only=True)
     has_shop_employment = serializers.BooleanField(required=False, read_only=True)
     from_another_network = serializers.BooleanField(required=False, read_only=True)
