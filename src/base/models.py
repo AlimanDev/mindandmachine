@@ -1393,13 +1393,18 @@ class Employment(AbstractActiveModel):
     objects_with_excluded = models.Manager.from_queryset(EmploymentQuerySet)()
 
     def has_permission(self, permission, method='GET'):
-        group = self.function_group or (self.position.group if self.position else None)
-        if not group:
+        groups = [self.function_group, self.position.group if self.position else None]
+        if not any(groups):
             raise ValidationError(_('Unable to define worker access group. Assign an access group to him or a position associated with an access group.'))
-        return group.allowed_functions.filter(
-            func=permission,
-            method=method
-        ).first()
+        return any(
+            map(lambda group:
+                group.allowed_functions.filter(
+                    func=permission,
+                    method=method
+                ).first() if group else None,
+                groups,
+            ),
+        )
 
     def get_department(self):
         return self.shop
