@@ -4681,7 +4681,7 @@ class TestVacancy(TestsHelperMixin, APITestCase):
         )
         not_subordinate_vacancy = WorkerDay.objects.create(
             is_vacancy=True,
-            shop=self.shop,
+            shop=self.shop2,
             type_id=WorkerDay.TYPE_WORKDAY,
             dt=self.dt_now,
             dttm_work_start=datetime.combine(self.dt_now, time(8)),
@@ -4692,7 +4692,7 @@ class TestVacancy(TestsHelperMixin, APITestCase):
         )
         not_own_shop_vacancy = WorkerDay.objects.create(
             is_vacancy=True,
-            shop=self.shop,
+            shop=self.shop2,
             type_id=WorkerDay.TYPE_WORKDAY,
             dt=self.dt_now,
             dttm_work_start=datetime.combine(self.dt_now, time(8)),
@@ -4701,13 +4701,24 @@ class TestVacancy(TestsHelperMixin, APITestCase):
             employment=self.employment8,
             is_approved=True,
         )
+        not_subordinate__in_own_shop_vacancy = WorkerDay.objects.create(
+            is_vacancy=True,
+            shop=self.shop,
+            type_id=WorkerDay.TYPE_WORKDAY,
+            dt=self.dt_now,
+            dttm_work_start=datetime.combine(self.dt_now, time(8)),
+            dttm_work_end=datetime.combine(self.dt_now, time(20)),
+            employee=self.employee6,
+            employment=self.employment6,
+            is_approved=True,
+        )
         response = self.client.get(f'{self.url}?shop_id={self.shop.id}&limit=100')
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(len(response.json()['results']), 4)
+        self.assertEqual(len(response.json()['results']), 5)
         self.assertEqual(response.json()['results'][0]['comment'], 'Test')
         self.assertCountEqual(
             list(map(lambda x: x['id'], response.json()['results'])), 
-            [vacanct_vacancy.id, own_vacancy.id, outsource_vacancy.id, subordinate_vacancy.id],
+            [vacanct_vacancy.id, own_vacancy.id, outsource_vacancy.id, subordinate_vacancy.id, not_subordinate__in_own_shop_vacancy.id],
         )
 
     def test_get_list_shift_length(self):

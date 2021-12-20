@@ -813,11 +813,13 @@ class WorkerDayViewSet(BaseModelViewSet):
             outsources__id=self.request.user.network_id,
         )
         dt = datetime.date.today()
+        user_shops = list(request.user.get_shops(include_descendants=True).values_list('id', flat=True))
         available_employee = list(
             Employee.get_subordinates(
                 request.user, 
                 dt=dt,
                 dt_to_shift=relativedelta(months=6),
+                user_shops=user_shops,
             ).values_list('id', flat=True)
         ) + list(
             request.user.get_active_employments(
@@ -836,7 +838,8 @@ class WorkerDayViewSet(BaseModelViewSet):
                     Q(shop__network_id=request.user.network_id)&
                     (
                         Q(is_outsource=True) | Q(employee__isnull=True) |
-                        Q(employee_id__in=available_employee)
+                        Q(employee_id__in=available_employee) |
+                        Q(shop_id__in=user_shops)
                     )
                 ) | 
                 (
