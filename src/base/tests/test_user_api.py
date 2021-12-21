@@ -1,12 +1,12 @@
 import json
-from datetime import timedelta
+from datetime import timedelta, date
 from unittest import mock
 
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.utils import timezone
 from rest_framework.test import APITestCase
 
-from src.base.models import WorkerPosition, Employment, User, Network, NetworkConnect
+from src.base.models import Employee, WorkerPosition, Employment, User, Network, NetworkConnect
 from src.recognition.api import recognition
 from src.recognition.models import UserConnecter
 from src.timetable.models import WorkTypeName
@@ -397,6 +397,7 @@ class TestUserViewSet(TestsHelperMixin, APITestCase):
             self.assertFalse(self.user4.check_password('test_password_1234'))
 
     def test_change_password_subordinates(self):
+        self.admin_group.subordinates.clear()
         self._test_change_password_subordinates(403, False)
         self.employment4.function_group = self.chief_group
         self.employment4.save()
@@ -434,3 +435,53 @@ class TestUserViewSet(TestsHelperMixin, APITestCase):
         self.client.defaults['HTTP_REFERER'] = 'https://local.mindandmachine.ru/'
         resp = self.client.get('/rest_api/auth/user/')
         self.assertEqual(resp.get('X-Frame-Options'), 'ALLOWALL')
+
+    def test_get_user_with_allowed_tabs(self):
+        self.admin_group.allowed_tabs = [
+            'settings',
+            'schedule',
+            'load_forecast',
+        ]
+        self.admin_group.save()
+        resp = self.client.get('/rest_api/auth/user/')
+        data = [
+            'settings',
+            'schedule',
+            'load_forecast',
+        ]
+        self.assertCountEqual(resp.json()['allowed_tabs'], data)
+    
+    def test_get_user_with_subordinates(self):
+        resp = self.client.get('/rest_api/auth/user/')
+        self.assertCountEqual(resp.json()['subordinate_employee_ids'], list(Employee.objects.all().values_list('id', flat=True)))
+        self.admin_group.subordinates.clear()
+        resp = self.client.get('/rest_api/auth/user/')
+        self.assertEqual(resp.json()['subordinate_employee_ids'], [])
+        self.admin_group.subordinates.add(self.chief_group)
+        self.employment5.dt_hired = date.today() + timedelta(30)
+        self.employment5.save()
+        resp = self.client.get('/rest_api/auth/user/')
+        self.assertCountEqual(resp.json()['subordinate_employee_ids'], [self.employee5.id, self.employee6.id])
+
+    def test_get_user_self_employee_ids(self):
+        dt = date.today()
+        inactive_employee = Employee.objects.create(
+            user=self.user1,
+            tabel_code='inactive',
+        )
+        Employment.objects.create(
+            employee=inactive_employee,
+            shop=self.shop,
+            dt_fired=dt - timedelta(1),
+        )
+        active_employee_from_future = Employee.objects.create(
+            user=self.user1,
+            tabel_code='active_employee',
+        )
+        Employment.objects.create(
+            employee=active_employee_from_future,
+            shop=self.shop2,
+            dt_hired=dt + timedelta(30),
+        )
+        resp = self.client.get('/rest_api/auth/user/')
+        self.assertCountEqual(resp.json()['self_employee_ids'], [self.employee1.id, active_employee_from_future.id])

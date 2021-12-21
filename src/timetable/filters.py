@@ -133,6 +133,7 @@ class VacancyFilter(FilterSetWithInitial):
     shift_length_min = TimeFilter(field_name='work_hours', lookup_expr='gte')
     shift_length_max = TimeFilter(field_name='work_hours', lookup_expr='lte')
     shop_id = CharFilter(field_name='shop_id', method='filter_shops')
+    outsourcing_network_id__in = CharFilter(field_name='outsources', method='filter_outsources')
     is_outsource = BooleanFilter(field_name='is_outsource')
     work_type_name = CharFilter(field_name='work_types', method='filter_by_name')
     ordering = OrderingFilter(fields=('dt', 'id', 'dttm_work_start', 'dttm_work_end'), initial='dt,dttm_work_start')
@@ -142,6 +143,11 @@ class VacancyFilter(FilterSetWithInitial):
     def filter_shops(self, queryset, name, value):
         if value:
             return queryset.filter(shop_id__in=value.split(','))
+        return queryset
+
+    def filter_outsources(self, queryset, name, value):
+        if value:
+            return queryset.filter(outsources__id__in=value.split(',')).distinct()
         return queryset
 
     def filter_by_name(self, queryset, name, value):

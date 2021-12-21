@@ -6,7 +6,7 @@ from django.db.models import Q
 from django.utils.functional import cached_property
 from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
-from rest_framework.exceptions import ValidationError, NotFound
+from rest_framework.exceptions import PermissionDenied, ValidationError, NotFound
 
 from src.base.exceptions import FieldError
 from src.base.models import Employment, User, Shop, Employee, Network
@@ -68,6 +68,7 @@ class WorkerDayApproveSerializer(serializers.Serializer):
         child=serializers.IntegerField(),
         required=False,
     )
+    approve_open_vacs = serializers.BooleanField(required=False)
 
 
 class WorkerDayCashboxDetailsSerializer(serializers.ModelSerializer):
@@ -111,6 +112,8 @@ class WorkerDayListSerializer(serializers.Serializer, UnaccountedOvertimeMixin):
     is_blocked = serializers.BooleanField()
     unaccounted_overtime = serializers.SerializerMethodField()
     closest_plan_approved_id = serializers.IntegerField(read_only=True, required=False)
+    cost_per_hour = serializers.DecimalField(None, None)
+    total_cost = serializers.FloatField(read_only=True)
 
     def get_unaccounted_overtime(self, obj):
         return self.unaccounted_overtime_getter(obj)
@@ -155,6 +158,7 @@ class WorkerDaySerializer(serializers.ModelSerializer, UnaccountedOvertimeMixin)
     outsources_ids = serializers.ListField(required=False, child=serializers.IntegerField(), allow_null=True, allow_empty=True, write_only=True)
     unaccounted_overtime = serializers.SerializerMethodField()
     closest_plan_approved_id = serializers.IntegerField(required=False, read_only=True)
+    total_cost = serializers.FloatField(read_only=True)
 
     _employee_active_empl = None
 
@@ -165,7 +169,7 @@ class WorkerDaySerializer(serializers.ModelSerializer, UnaccountedOvertimeMixin)
                   'is_outsource', 'is_vacancy', 'shop_code', 'user_login', 'username', 'created_by', 'last_edited_by',
                   'crop_work_hours_by_shop_schedule', 'dttm_work_start_tabel', 'dttm_work_end_tabel', 'is_blocked',
                   'employment_tabel_code', 'outsources', 'outsources_ids', 'unaccounted_overtime',
-                  'closest_plan_approved_id']
+                  'closest_plan_approved_id', 'cost_per_hour', 'total_cost'] 
         read_only_fields = ['parent_worker_day_id', 'is_blocked', 'closest_plan_approved_id']
         create_only_fields = ['is_fact']
         ref_name = 'WorkerDaySerializer'
@@ -333,6 +337,7 @@ class WorkerDaySerializer(serializers.ModelSerializer, UnaccountedOvertimeMixin)
         else:
             attrs['outsources'] = []
 
+        self._create_update_clean(attrs, instance=self.instance)
         return attrs
 
     def _create_update_clean(self, validated_data, instance=None):
@@ -349,8 +354,6 @@ class WorkerDaySerializer(serializers.ModelSerializer, UnaccountedOvertimeMixin)
 
     def create(self, validated_data):
         with transaction.atomic():
-            self._create_update_clean(validated_data)
-
             details = validated_data.pop('worker_day_details', None)
             outsources = validated_data.pop('outsources', None)
             canceled_vacancies = WorkerDay.objects.filter(
@@ -403,8 +406,6 @@ class WorkerDaySerializer(serializers.ModelSerializer, UnaccountedOvertimeMixin)
             for wd_detail in details:
                 WorkerDayCashboxDetails.objects.create(worker_day=instance, **wd_detail)
 
-            self._create_update_clean(validated_data, instance=instance)
-
             res = super().update(instance, validated_data)
 
             self._run_transaction_checks(
@@ -455,6 +456,8 @@ class VacancySerializer(serializers.Serializer):
     outsources = NetworkListSerializer(many=True, read_only=True)
     shop = ShopListSerializer()
     comment = serializers.CharField(required=False)
+    cost_per_hour = serializers.DecimalField(None, None)
+    total_cost = serializers.FloatField(read_only=True)
 
     def get_avatar_url(self, obj) -> str:
         if obj.employee_id and obj.employee.user_id and obj.employee.user.avatar:
@@ -492,7 +495,7 @@ class ChangeListSerializer(serializers.Serializer):
         wd_types_dict = self.context.get('wd_types_dict') or WorkerDayType.get_wd_types_dict()
         if self.validated_data['is_vacancy']:
             self.validated_data['type_id'] = WorkerDay.TYPE_WORKDAY
-            self.validated_data['outsources'] = Network.objects.filter(id__in=self.validated_data.get('outsources', []))
+            self.validated_data['outsources'] = Network.objects.filter(id__in=(self.validated_data.get('outsources') or []))
         else:
             if wd_types_dict.get(self.validated_data['type_id']).is_dayoff:
                 self.validated_data['shop_id'] = None 
@@ -739,3 +742,35 @@ class OvertimesUndertimesReportSerializer(serializers.Serializer):
             raise ValidationError(_('Shop or employees should be defined.'))
         if self.validated_data.get('employee_id__in'):
             self.validated_data['employee_id__in'] = self.validated_data['employee_id__in'].split(',')
+
+class ConfirmVacancyToWorkerSerializer(serializers.Serializer):
+    default_error_messages = {
+        "employee_not_in_subordinates": _("Employee {employee} is not your subordinate."),
+        "no_such_user_in_network": _("There is no such user in your network."),
+    }
+
+    employee_id = serializers.IntegerField()
+    user_id = serializers.IntegerField()
+
+    def validate(self, attrs):
+        user = self.context['request'].user
+        attrs['user'] = User.objects.filter(id=attrs['user_id'], network_id=user.network_id).first()
+        if not attrs['user']:
+            raise ValidationError(self.error_messages["no_such_user_in_network"])
+        employee_id = attrs['employee_id']
+        vacancy = self.context['view'].get_object()
+        if not WorkerDay._has_group_permissions(user, employee_id, vacancy.dt):
+            raise PermissionDenied(
+                self.error_messages['employee_not_in_subordinates'].format(
+                employee=attrs['user'].fio),
+            )
+        no_perm_to_reconfirm = self.context['view'].action == 'reconfirm_vacancy_to_worker' and\
+            not (vacancy.employee.user_id == user.id) and\
+            not WorkerDay._has_group_permissions(user, vacancy.employee_id, vacancy.dt)
+        if no_perm_to_reconfirm:
+            raise PermissionDenied(
+                self.error_messages['employee_not_in_subordinates'].format(
+                employee=vacancy.employee.user.fio),
+            )
+
+        return attrs

@@ -17,6 +17,7 @@ from src.forecast.operation_type_template.views import OperationTypeTemplateSeri
 from src.base.shop.serializers import ShopSerializer
 from django.db.models import F, Case, When, TimeField, Q, Max, Min
 from django.db.models.functions import Least, Greatest
+from django.db import transaction
 from django.utils.translation import gettext as _
 from src.util.models_converter import Converter
 from src.conf.djconfig import HOST
@@ -538,55 +539,85 @@ def upload_load_template(template_file, form, lang='ru'):
     undefined_o_types = set(df[O_TYPE_COL].dropna()).difference(o_types_db_set)
     if len(undefined_o_types):
         raise serializers.ValidationError(_('These operation types do not exist: {types}.').format(types=undefined_o_types))
-    lt = LoadTemplate.objects.create(name=form['name'], network_id=network_id)
-    df = df.fillna('')
-    df[DAYS_OF_WEEK_COL] = df[DAYS_OF_WEEK_COL].astype(str).str.replace('.', ',')
-    forecast_steps = {
-        '1h': datetime.timedelta(hours=1),
-        '30min': datetime.timedelta(minutes=30),
-        '1d': datetime.timedelta(days=1),
-    }
-    templates = OperationTypeTemplate.objects.bulk_create(
-        [
-            OperationTypeTemplate(
-                operation_type_name=o_types[row[O_TYPE_COL]],
-                load_template=lt,
-                tm_from=row[TM_START_COL] or None,
-                tm_to=row[TM_END_COL] or None,
-                forecast_step=forecast_steps.get(row[TIMESTEP_COL]),
-                const_value=row[CONSTANT_COL] or None,
-            )
-            for i, row in df.iterrows()
-            if not row[O_TYPE_COL] == ''
-        ]
-    )
-    created_templates = {t.operation_type_name.name: t for t in templates}
-    prev_name = None
-    for i, row in df.iterrows():
-        if row[O_TYPE_COL] == '':
-            name = prev_name
-        else:
-            name = row[O_TYPE_COL]
-            prev_name = name
-        if not row[DEPENDENCY_COL] == '':
-            max_value = None
-            threshold = None
-            days_of_week = []
-            type = OperationTypeRelation.TYPE_FORMULA
-            if row[FORMULA_COL] == '':
-                type = OperationTypeRelation.TYPE_CHANGE_WORKLOAD_BETWEEN
-                max_value = row[MAX_VALUE_COL]
-                threshold = row[THRESHOLD_COL]
-                days_of_week = list(map(int, row[DAYS_OF_WEEK_COL].split(',')))
-            OperationTypeRelation.objects.create(
-                base=created_templates[name],
-                depended=created_templates[row[DEPENDENCY_COL]],
-                formula=row[FORMULA_COL],
-                max_value=max_value,
-                threshold=threshold,
-                type=type,
-                days_of_week=days_of_week,
-            )
+    with transaction.atomic():
+        lt = LoadTemplate.objects.create(name=form['name'], network_id=network_id)
+        df = df.fillna('')
+        df[DAYS_OF_WEEK_COL] = df[DAYS_OF_WEEK_COL].astype(str).str.replace('.', ',')
+        forecast_steps = {
+            '1h': datetime.timedelta(hours=1),
+            '30min': datetime.timedelta(minutes=30),
+            '1d': datetime.timedelta(days=1),
+        }
+        templates = []
+        available_days_of_week = {0, 1, 2, 3, 4, 5, 6}
+        for i, row in df.iterrows():
+            if not row[O_TYPE_COL] == '':
+                if not forecast_steps.get(row[TIMESTEP_COL]):
+                    error_msg = _('Timestep is required. Row {row}.').format(row=i + 2)
+                    if row[TIMESTEP_COL]:
+                        error_msg = _('Timestep {timestep} is not valid choice, choices are {timesteps}.').format(
+                            timestep=row[TIMESTEP_COL],
+                            timesteps=', '.join(forecast_steps.keys()),
+                        )
+                    raise serializers.ValidationError(error_msg)
+                templates.append(
+                    OperationTypeTemplate(
+                        operation_type_name=o_types[row[O_TYPE_COL]],
+                        load_template=lt,
+                        tm_from=row[TM_START_COL] or None,
+                        tm_to=row[TM_END_COL] or None,
+                        forecast_step=forecast_steps.get(row[TIMESTEP_COL]),
+                        const_value=row[CONSTANT_COL] or None,
+                    )
+                )
+        templates = OperationTypeTemplate.objects.bulk_create(templates)
+        created_templates = {t.operation_type_name.name: t for t in templates}
+        prev_name = None
+        for i, row in df.iterrows():
+            if row[O_TYPE_COL] == '':
+                name = prev_name
+            else:
+                name = row[O_TYPE_COL]
+                prev_name = name
+            if not row[DEPENDENCY_COL] == '':
+                max_value = None
+                threshold = None
+                days_of_week = []
+                type = OperationTypeRelation.TYPE_FORMULA
+                if row[FORMULA_COL] == '':
+                    type = OperationTypeRelation.TYPE_CHANGE_WORKLOAD_BETWEEN
+                    max_value = row[MAX_VALUE_COL]
+                    threshold = row[THRESHOLD_COL]
+                    try:
+                        days_of_week = list(set(map(int, row[DAYS_OF_WEEK_COL].split(','))).intersection(available_days_of_week))
+                    except:
+                        raise serializers.ValidationError(
+                            _("Invalid days of week '{}', should be comma separated int in interfval from 0 to 6.").format(
+                                row[DAYS_OF_WEEK_COL],
+                            )
+                        )
+                    if not all([max_value, threshold, days_of_week]):
+                        error_msgs = []
+                        if not max_value:
+                            error_msgs.append(_('max value'))
+                        if not threshold:
+                            error_msgs.append(_('threshold'))
+                        if not days_of_week:
+                            error_msgs.append(_('days of week'))
+                        raise serializers.ValidationError(
+                            _("For relation 'change workload between' {} are required.").format(
+                                ', '.join(error_msgs)
+                            )
+                        )
+                OperationTypeRelation.objects.create(
+                    base=created_templates[name],
+                    depended=created_templates[row[DEPENDENCY_COL]],
+                    formula=row[FORMULA_COL],
+                    max_value=max_value,
+                    threshold=threshold,
+                    type=type,
+                    days_of_week=days_of_week,
+                )
     return Response()
             
 
@@ -620,7 +651,7 @@ def download_load_template(request, workbook, load_template_id):
         }
         for o in OperationTypeTemplate.objects.select_related('operation_type_name', 'operation_type_name__work_type_name').filter(load_template_id=load_template_id)
     ]
-    worksheet = workbook.add_worksheet('Шаблон нагрузки')
+    worksheet = workbook.book.add_worksheet('Шаблон нагрузки')
     worksheet.set_column(0, 3, 30)
     worksheet.write(0, 0, 'Тип операции')
     worksheet.write(0, 1, 'Зависимости')

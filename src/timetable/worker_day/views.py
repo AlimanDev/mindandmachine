@@ -1,6 +1,7 @@
 import datetime
 import json
 from itertools import groupby
+from dateutil.relativedelta import relativedelta
 
 import numpy as np
 import pandas as pd
@@ -45,6 +46,7 @@ from src.timetable.timesheet.tasks import calc_timesheets
 from src.timetable.vacancy.tasks import vacancies_create_and_cancel_for_shop
 from src.timetable.vacancy.utils import cancel_vacancies, cancel_vacancy, confirm_vacancy, notify_vacancy_created
 from src.timetable.worker_day.serializers import (
+    ConfirmVacancyToWorkerSerializer,
     OvertimesUndertimesReportSerializer,
     ChangeListSerializer,
     WorkerDaySerializer,
@@ -98,6 +100,7 @@ class WorkerDayViewSet(BaseModelViewSet):
         'has_no_perm_to_approve_protected_wdays': _('You do not have rights to approve protected worker days ({protected_wdays}). '
                                                    'Please contact your system administrator.'),
         "no_such_user_in_network": _("There is no such user in your network."),
+        "employee_not_in_subordinates": _("Employee {employee} is not your subordinate."),
     }
 
     permission_classes = [WdPermission]  # временно из-за биржи смен vacancy  [FilteredListPermission]
@@ -446,6 +449,10 @@ class WorkerDayViewSet(BaseModelViewSet):
                     is_approved=False,
                     is_fact=serializer.validated_data['is_fact'],
                 )
+
+                # не подтверждаем открытые вакансии
+                if not serializer.validated_data.get('approve_open_vacs'):
+                    wdays_to_approve = wdays_to_approve.filter(employee_id__isnull=False)
 
                 # если у пользователя нет группы с наличием прав на изменение защищенных дней, то проверяем,
                 # что в списке подтверждаемых дней нету защищенных дней, если есть, то выдаем ошибку
@@ -805,6 +812,21 @@ class WorkerDayViewSet(BaseModelViewSet):
             pk=OuterRef('pk'),
             outsources__id=self.request.user.network_id,
         )
+        dt = datetime.date.today()
+        user_shops = list(request.user.get_shops(include_descendants=True).values_list('id', flat=True))
+        available_employee = list(
+            Employee.get_subordinates(
+                request.user, 
+                dt=dt,
+                dt_to_shift=relativedelta(months=6),
+                user_shops=user_shops,
+            ).values_list('id', flat=True)
+        ) + list(
+            request.user.get_active_employments(
+                dt_from=dt,
+                dt_to=dt + relativedelta(months=6),
+            ).values_list('employee_id', flat=True)
+        )
         queryset = filterset_class.filter_queryset(
             self.get_queryset().filter(
                 is_vacancy=True,
@@ -812,7 +834,14 @@ class WorkerDayViewSet(BaseModelViewSet):
             ).annotate(
                 worker_day_outsource_network_exitst=Exists(worker_day_outsource_network_subq),
             ).filter(
-                Q(shop__network_id=request.user.network_id) | 
+                (
+                    Q(shop__network_id=request.user.network_id)&
+                    (
+                        Q(is_outsource=True) | Q(employee__isnull=True) |
+                        Q(employee_id__in=available_employee) |
+                        Q(shop_id__in=user_shops)
+                    )
+                ) | 
                 (
                     Q(is_outsource=True, worker_day_outsource_network_exitst=True, is_approved=True)&
                     (Q(employee__isnull=True) | Q(employee__user__network_id=request.user.network_id)) # чтобы не попадали вакансии с сотрудниками другой аутсорс сети
@@ -881,10 +910,10 @@ class WorkerDayViewSet(BaseModelViewSet):
     )
     @action(detail=True, methods=['post'], serializer_class=None)
     def confirm_vacancy_to_worker(self, request, pk=None):
-        user = User.objects.filter(id=request.data.get('user_id'), network_id=request.user.network_id).first()
-        if not user:
-            raise ValidationError(self.error_messages["no_such_user_in_network"])
-        result = confirm_vacancy(pk, user, employee_id=request.data.get('employee_id', None))
+        data = ConfirmVacancyToWorkerSerializer(data=request.data, context=self.get_serializer_context())
+        data.is_valid(raise_exception=True)
+        data = data.validated_data
+        result = confirm_vacancy(pk, data['user'], employee_id=data['employee_id'])
         status_code = result['status_code']
         result = result['text']
 
@@ -898,14 +927,28 @@ class WorkerDayViewSet(BaseModelViewSet):
     )
     @action(detail=True, methods=['post'], serializer_class=None)
     def reconfirm_vacancy_to_worker(self, request, pk=None):
-        user = User.objects.filter(id=request.data.get('user_id'), network_id=request.user.network_id).first()
-        if not user:
-            raise ValidationError(self.error_messages["no_such_user_in_network"])
-        result = confirm_vacancy(pk, user, employee_id=request.data.get('employee_id', None), reconfirm=True)
+        data = ConfirmVacancyToWorkerSerializer(data=request.data, context=self.get_serializer_context())
+        data.is_valid(raise_exception=True)
+        data = data.validated_data
+        result = confirm_vacancy(pk, data['user'], employee_id=data['employee_id'], reconfirm=True)
         status_code = result['status_code']
         result = result['text']
 
         return Response({'result': result}, status=status_code)
+    
+    @swagger_auto_schema(
+        operation_description='''
+        Метод для отказа от вакансии
+        ''',
+    )
+    @action(detail=True, methods=['post'], serializer_class=None)
+    def refuse_vacancy(self, request, pk=None):
+        result = confirm_vacancy(pk, refuse=True)
+        status_code = result['status_code']
+        result = result['text']
+
+        return Response({'result': result}, status=status_code)
+
 
     @swagger_auto_schema(
         operation_description='''
@@ -1608,6 +1651,7 @@ class WorkerDayViewSet(BaseModelViewSet):
             data['dt_to'],
             self.error_messages,
             wd_types_dict=wd_types_dict,
+            employee_id=data.get('employee_id'),
         )
         response = WorkerDaySerializer(
             create_worker_days_range(

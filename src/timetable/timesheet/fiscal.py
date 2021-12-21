@@ -2,6 +2,7 @@ from collections import OrderedDict
 from datetime import timedelta
 from decimal import Decimal
 
+import pandas as pd
 from django.db import transaction
 
 from src.timetable.models import (
@@ -47,7 +48,7 @@ class TimesheetItem:
         return TimesheetItem(**kwargs)
 
     def subtract_hours(self, hours_to_subtract, fields=None):
-        assert self.total_hours > hours_to_subtract
+        assert round(self.total_hours, 2) >= round(hours_to_subtract, 2)
         hours_left_to_subtract = hours_to_subtract
         fields = fields or ['night_hours', 'day_hours']
         subtracted_item = self.copy(overrides=dict(
@@ -98,10 +99,17 @@ class Timesheet:
             items = list(filter(filter_func, items))
         return items
 
-    def is_holiday(self, dt):
+    def is_holiday(self, dt, consider_dayoff_work_hours=True):
+        """
+        :param dt:
+        :param consider_dayoff_work_hours: считать нерабочий день с рабочими часами как выходной
+        :return:
+        """
         items = self.get_items(dt=dt)
         return not items or \
-               any((item.day_type.is_dayoff and not item.day_type.is_work_hours) for item in items) or \
+               any(((item.day_type.is_dayoff and not item.day_type.is_work_hours) or (
+                           consider_dayoff_work_hours and item.day_type.is_dayoff and item.day_type.is_work_hours)) for
+                   item in items) or \
                self.get_total_hours_sum(dt=dt) == 0
 
     def get_day_hours_sum(self, dt=None, filter_func=None):
@@ -113,41 +121,89 @@ class Timesheet:
     def get_total_hours_sum(self, dt=None, filter_func=None):
         return self._get_hours_sum(dt=dt, filter_func=filter_func, fields=['day_hours', 'night_hours'])
 
-    def add(self, dt, timesheet_item):
+    def _add_inplace(self, dt, item):
+        items = self.get_items(dt=dt)
+        if items:
+            existing_item = items[-1]
+            if existing_item.day_type.is_dayoff:
+                existing_item.day_type = item.day_type
+                existing_item.day_hours = item.day_hours
+                existing_item.night_hours = item.night_hours
+                existing_item.dttm_work_start = item.dttm_work_start
+                existing_item.dttm_work_end = item.dttm_work_end
+            else:
+                existing_item.day_hours += item.day_hours
+                existing_item.night_hours += item.night_hours
+                existing_item.dttm_work_end += timedelta(hours=float(item.total_hours))
+        else:
+            item.dt = dt
+            item.dttm_work_start = item.dttm_work_start.replace(day=item.dt.day, month=item.dt.month, year=item.dt.year)
+            item.dttm_work_end = item.dttm_work_end.replace(day=item.dt.day, month=item.dt.month, year=item.dt.year)
+            self._timesheet_items.setdefault(dt, []).append(item)
+
+    def add(self, dt, timesheet_item, inplace=False):
         if isinstance(timesheet_item, list):
             for item in timesheet_item:
-                self._timesheet_items.setdefault(dt, []).append(item)
+                if inplace:
+                    self._add_inplace(dt, item)
+                else:
+                    self._timesheet_items.setdefault(dt, []).append(item)
         elif isinstance(timesheet_item, TimesheetItem):
-            self._timesheet_items.setdefault(dt, []).append(timesheet_item)
+            if inplace:
+                self._add_inplace(dt, timesheet_item)
+            else:
+                self._timesheet_items.setdefault(dt, []).append(timesheet_item)
         else:
             raise ValueError('timesheet_item should be TimesheetItem object or list of TimesheetItem objects')
 
     def pop(self, dt):
-        return self._timesheet_items.pop(dt)
+        return self._timesheet_items.pop(dt, [])
 
     def remove(self, dt, item):
         return self._timesheet_items[dt].remove(item)
 
-    def subtract_hours(self, dt, hours_to_subtract, filters=None):
+    def subtract_hours(self, hours_to_subtract, dt=None, filters=None, field=None):
         if not hours_to_subtract:
             return []
 
-        items = self.pop(dt)
         subtracted_items = []
+        dates = [dt] if dt else pd.date_range(self.fiscal_timesheet.dt_from, self.fiscal_timesheet.dt_to).date
+
         hours_left_to_subtract = hours_to_subtract
-        for item in items:
-            if filters:
-                if not all(getattr(item, k) == v for k, v in filters.items()):
-                    continue
-            if hours_left_to_subtract > item.total_hours:
-                items.remove(item)
-                subtracted_items.append(item)
-                hours_left_to_subtract = hours_left_to_subtract - item.total_hours
-            else:
-                subtracted_item = item.subtract_hours(hours_to_subtract=hours_left_to_subtract)
-                subtracted_items.append(subtracted_item)
-        if items:
-            self.add(dt, items)
+        for dt in dates:
+            if hours_left_to_subtract <= 0:
+                break
+
+            items = self.pop(dt)
+            for item in items:
+                if filters:
+                    if not all(getattr(item, k) == v for k, v in filters.items()):
+                        continue
+
+                if field:
+                    item_hours = getattr(item, field)
+                    if hours_left_to_subtract >= item_hours:
+                        subtracted_item = item.subtract_hours(hours_to_subtract=item_hours, fields=[field])
+                        subtracted_items.append(subtracted_item)
+                        hours_left_to_subtract = hours_left_to_subtract - item_hours
+                    else:
+                        subtracted_item = item.subtract_hours(hours_to_subtract=hours_left_to_subtract, fields=[field])
+                        subtracted_items.append(subtracted_item)
+                        hours_left_to_subtract = 0
+
+                    if item.total_hours <= 0:
+                        items.remove(item)
+                else:
+                    if hours_left_to_subtract >= item.total_hours:
+                        items.remove(item)
+                        subtracted_items.append(item)
+                        hours_left_to_subtract = hours_left_to_subtract - item.total_hours
+                    else:
+                        subtracted_item = item.subtract_hours(hours_to_subtract=hours_left_to_subtract)
+                        subtracted_items.append(subtracted_item)
+                        hours_left_to_subtract = 0
+            if items:
+                self.add(dt, items)
         return subtracted_items
 
     def save(self):

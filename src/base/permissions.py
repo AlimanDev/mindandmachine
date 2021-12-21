@@ -38,14 +38,14 @@ class Permission(permissions.BasePermission):
         employments = Employment.objects.get_active(
             network_id=request.user.network_id,
             employee__user=request.user,
-        ).select_related('position')
+        ).select_related('position__group')
         return self.check_employment_permission(employments, request, view)
 
     def has_object_permission(self, request, view, obj):
         employments = Employment.objects.get_active(
             network_id=request.user.network_id,
             employee__user=request.user,
-        ).select_related('position')
+        ).select_related('position__group')
 
         return self.check_employment_permission(employments, request, view)
 
@@ -65,28 +65,33 @@ class WdPermission(Permission):
             return has_permission
 
         view_action = view.action.lower()
-        if view_action in ['create', 'update']:
-            # проверка пермишнов происходит раньше, чем валидация данных,
-            # поэтому предварительно провалидируем данные, используемые для проверки доступа
-            WsPermissionDataSerializer(data=request.data).is_valid(raise_exception=True)
-            return GroupWorkerDayPermission.has_permission(
-                user=request.user,
-                action=WorkerDayPermission.CREATE_OR_UPDATE,
-                graph_type=WorkerDayPermission.FACT if request.data.get('is_fact') else WorkerDayPermission.PLAN,
-                wd_type=request.data.get('type'),
-                wd_dt=request.data.get('dt'),
-            )
-        elif view_action == 'destroy':
-            wd_dict = WorkerDay.objects.filter(id=view.kwargs['pk']).values('type', 'dt', 'is_fact').first()
+        if view_action in ['create', 'update', 'destroy']:
+            action = WorkerDayPermission.DELETE if view_action == 'destroy' else WorkerDayPermission.CREATE_OR_UPDATE
+            if view_action == 'create':
+                # проверка пермишнов происходит раньше, чем валидация данных,
+                # поэтому предварительно провалидируем данные, используемые для проверки доступа
+                WsPermissionDataSerializer(data=request.data).is_valid(raise_exception=True)
+                wd_dict = request.data
+            else:
+                wd_dict = WorkerDay.objects.filter(id=view.kwargs['pk']).values(
+                    'type', 
+                    'dt', 
+                    'is_fact', 
+                    'employee_id', 
+                    'shop_id',
+                    'is_vacancy',
+                ).first()
             if not wd_dict:
                 return False
+            if view_action == 'update':
+                wd_dict['type'] = request.data.get('type', wd_dict.get('type'))
             return GroupWorkerDayPermission.has_permission(
                 user=request.user,
-                action=WorkerDayPermission.DELETE,
+                action=action,
                 graph_type=WorkerDayPermission.FACT if wd_dict.get('is_fact') else WorkerDayPermission.PLAN,
                 wd_type=wd_dict.get('type'),
                 wd_dt=wd_dict.get('dt'),
-            )
+            ) and WorkerDay._has_group_permissions(request.user, wd_dict.get('employee_id'), wd_dict.get('dt'), is_vacancy=wd_dict.get('is_vacancy', False), shop_id=wd_dict.get('shop_id'))
 
         return has_permission
 

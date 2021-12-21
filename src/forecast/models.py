@@ -51,6 +51,7 @@ class LoadTemplate(AbstractModel):
         verbose_name_plural = 'Шаблоны нагрузки'
 
     name = models.CharField(max_length=64, unique=True)
+    code = models.CharField(max_length=128, unique=True, null=True, blank=True)
     network = models.ForeignKey(Network, on_delete=models.PROTECT, null=True)
     forecast_params = models.TextField(default='{}')
     round_delta = models.FloatField(default=0)

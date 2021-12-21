@@ -1,4 +1,7 @@
-from django.db.models import F, Q
+import distutils.util
+
+from django.conf import settings
+from django.db.models import Q, F, BooleanField, ExpressionWrapper
 from django.db.models.functions import Coalesce
 from django.db.models.query import Prefetch
 from django.middleware.csrf import rotate_token
@@ -10,12 +13,12 @@ from rest_auth.views import UserDetailsView
 from rest_framework import mixins
 from rest_framework import status
 from rest_framework.decorators import action
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.pagination import LimitOffsetPagination
 from rest_framework.parsers import MultiPartParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from rest_framework.viewsets import GenericViewSet
-from rest_framework.exceptions import PermissionDenied
+from rest_framework.viewsets import GenericViewSet, ReadOnlyModelViewSet
 
 from src.base.filters import (
     NotificationFilter,
@@ -26,11 +29,13 @@ from src.base.filters import (
 )
 from src.base.filters import UserFilter, EmployeeFilter
 from src.base.models import (
+    ContentBlock,
     Employment,
     FunctionGroup,
     Network,
     NetworkConnect,
     Notification,
+    Shop,
     Subscribe,
     ShopSettings,
     WorkerPosition,
@@ -42,6 +47,7 @@ from src.base.models import (
 )
 from src.base.permissions import Permission
 from src.base.serializers import (
+    ContentBlockSerializer,
     EmploymentSerializer,
     UserSerializer,
     FunctionGroupSerializer,
@@ -59,12 +65,16 @@ from src.base.serializers import (
     BreakSerializer,
     ShopScheduleSerializer,
     EmployeeSerializer,
+    EmployeeShiftScheduleQueryParamsSerializer,
 )
+from src.base.shift_schedule.utils import get_shift_schedule
 from src.base.views_abstract import (
     BaseActiveNamedModelViewSet,
     UpdateorCreateViewSet,
     BaseModelViewSet,
 )
+from src.integration.models import UserExternalCode
+from src.integration.zkteco import ZKTeco
 from src.recognition.api.recognition import Recognition
 from src.recognition.models import UserConnecter
 from src.timetable.worker_day.tasks import recalc_wdays
@@ -180,6 +190,9 @@ class UserViewSet(UpdateorCreateViewSet):
             if 'file' not in self.request.data:
                 return Response({"detail": _('It is necessary to transfer a biometrics template (file field).')}, 400)
             biometrics_image = self.request.data['file']
+            user_external_code = UserExternalCode.objects.filter(user=user).first()
+            if settings.ZKTECO_INTEGRATION and user_external_code:
+                ZKTeco().export_biophoto(user_external_code.code, biometrics_image)
             recognition = Recognition()
             try:
                 partner_id = recognition.create_person({"id": user.id})
@@ -232,6 +245,11 @@ class EmployeeViewSet(UpdateorCreateViewSet):
     filter_backends = [EmployeeFilterBackend]
     openapi_tags = ['Employee', ]
 
+    def get_serializer(self, *args, **kwargs):
+        if self.action == 'list':
+            kwargs['user_source'] = 'employee_user'
+        return super(EmployeeViewSet, self).get_serializer(*args, **kwargs)
+
     def get_queryset(self):
         network_filter = Q(user__network_id=self.request.user.network_id)
         # сотрудники из аутсорс сети только для чтения
@@ -245,24 +263,44 @@ class EmployeeViewSet(UpdateorCreateViewSet):
 
         qs = Employee.objects.filter(
             network_filter,
-        ).select_related(
-            'user',
+        ).prefetch_related(
+            Prefetch(
+                'user',
+                queryset=User.objects.all().annotate(
+                    userconnecter_id=F('userconnecter'),
+                ),
+                to_attr='employee_user',
+            )
         )
+        return qs.distinct()
 
+    def filter_queryset(self, queryset):
+        filtered_qs = super(EmployeeViewSet, self).filter_queryset(queryset=queryset)
         if self.request.query_params.get('include_employments'):
-            queryset = Employment.objects.all().prefetch_related(Prefetch('work_types', to_attr='work_types_list')).select_related(
+            employments_qs = Employment.objects.all().prefetch_related(Prefetch('work_types', to_attr='work_types_list')).select_related(
                 'position',
                 'shop',
                 'employee',
                 'employee__user',
             )
             if self.request.query_params.get('shop_network__in'):
-                queryset = queryset.filter(shop__network_id__in=self.request.query_params.get('shop_network__in').split(','))
+                employments_qs = employments_qs.filter(shop__network_id__in=self.request.query_params.get('shop_network__in').split(','))
             if self.request.query_params.get('show_constraints'):
-                queryset = queryset.prefetch_related(Prefetch('worker_constraints', to_attr='worker_constraints_list'))
-            qs = qs.prefetch_related(Prefetch('employments', queryset=queryset, to_attr='employments_list'))
+                employments_qs = employments_qs.prefetch_related(Prefetch('worker_constraints', to_attr='worker_constraints_list'))
+            filtered_qs = filtered_qs.prefetch_related(Prefetch('employments', queryset=employments_qs, to_attr='employments_list'))
+        return filtered_qs
 
-        return qs.distinct()
+    @action(detail=False, methods=['get'])
+    def shift_schedule(self, *args, **kwargs):
+        s = EmployeeShiftScheduleQueryParamsSerializer(data=self.request.query_params)
+        s.is_valid(raise_exception=True)
+        data = get_shift_schedule(
+            network_id=self.request.user.network_id,
+            employee_id=s.validated_data.get('employee_id'),
+            dt__gte=s.validated_data.get('dt__gte'),
+            dt__lte=s.validated_data.get('dt__lte'),
+        )
+        return Response(data)
 
 
 class AuthUserView(UserDetailsView):
@@ -324,9 +362,15 @@ class WorkerPositionViewSet(UpdateorCreateViewSet):
                     client_id=self.request.user.network_id, 
                 ).values_list('outsourcing_id', flat=True)
             )
-        return WorkerPosition.objects.filter(
+        now = timezone.now()
+        return WorkerPosition.objects.annotate(
+            is_active=ExpressionWrapper(
+                Q(dttm_deleted__isnull=True) | 
+                Q(dttm_deleted__gte=now),
+                output_field=BooleanField(),
+            )
+        ).filter(
             network_filter,
-            dttm_deleted__isnull=True,
         )
 
 
@@ -437,3 +481,17 @@ class ShopScheduleViewSet(UpdateorCreateViewSet):
 
     def perform_update(self, serializer):
         self._perform_create_or_update(serializer)
+
+
+class ContentBlockViewSet(ReadOnlyModelViewSet):
+    serializer_class = ContentBlockSerializer
+    permission_classes = [Permission]
+
+    def get_queryset(self):
+        filters = {
+            'network_id': self.request.user.network_id
+        }
+        if self.request.query_params.get('code'):
+            filters['code'] = self.request.query_params.get('code')
+        
+        return ContentBlock.objects.filter(**filters)

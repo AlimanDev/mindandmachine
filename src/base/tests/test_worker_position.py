@@ -1,5 +1,7 @@
+from django.utils import timezone
 from django.test import TestCase
 from rest_framework.test import APITestCase
+from datetime import timedelta
 
 from src.base.models import WorkerPosition
 from src.base.tests.factories import GroupFactory, NetworkFactory, BreakFactory
@@ -52,6 +54,22 @@ class TestWorkerPositionAPI(TestsHelperMixin, APITestCase):
         self.assertEqual(len(resp.json()), self.worker_positions_count)
         self.assertEqual(resp.json()[0]['name'], 'Директор магазина')
         self.assertEqual(resp.json()[1]['name'], 'ЗДМ')
+
+    def test_list_is_active(self):
+        resp = self.client.get(self.get_url('WorkerPosition-list'))
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(len(resp.json()), self.worker_positions_count)
+        worker_position = list(filter(lambda x: x['id'] == self.worker_position.id, resp.json()))[0]
+        self.assertTrue(worker_position['is_active'])
+        self.worker_position.dttm_deleted = timezone.now() - timedelta(hours=2)
+        self.worker_position.save()
+        resp = self.client.get(self.get_url('WorkerPosition-list'))
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(len(resp.json()), self.worker_positions_count)
+        worker_position = list(filter(lambda x: x['id'] == self.worker_position.id, resp.json()))[0]
+        self.assertFalse(worker_position['is_active'])
+        self.worker_position.dttm_deleted = None
+        self.worker_position.save()
 
     def test_create(self):
         data = {
@@ -138,6 +156,7 @@ class TestWorkerPositionAPI(TestsHelperMixin, APITestCase):
         self.assertEquals(self.worker_position.group_id, assert_group_id)
 
     def test_update_group_id(self):
+        self.admin_group.subordinates.clear()
         # нет subordunates
         self._test_update_group(self.chief_group.id, 403, None)
         self.admin_group.subordinates.add(self.chief_group)

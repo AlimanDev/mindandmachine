@@ -64,6 +64,7 @@ class UserDTOSerializer(serializers.ModelSerializer):
     active = serializers.BooleanField()
     orgLevel = serializers.CharField()
     orgUnits = serializers.ListField(child=serializers.CharField())
+    # orgUnits = serializers.SerializerMethodField()
     position = serializers.CharField()
     admin = serializers.BooleanField()
     supervisor = serializers.BooleanField()
@@ -82,6 +83,16 @@ class UserDTOSerializer(serializers.ModelSerializer):
 
     def get_reports(self, _user):
         return ['REPORT_ALL']
+
+    # заготовка для передачи всех подразделений нижнего уровня
+    # def get_orgUnits(self, user):
+    #     # что будет если сотрудник в каком-то магазине как директор, в каких-то как урс?
+    #     # Флаг директор снимет директорство со всех других юзеров?
+    #     # Можно решить очередностью передаваемых сотрудников?
+    #     if user.allOrgUnits:
+    #         return list(Shop.objects.get_queryset_descendants(
+    #             Shop.objects.filter(id__in=user.allOrgUnits)
+    #         ).filter(level=user.level).values_list('id', flat=True).distinct())
 
     class Meta:
         model = User

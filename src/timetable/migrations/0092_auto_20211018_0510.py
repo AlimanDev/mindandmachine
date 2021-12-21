@@ -169,6 +169,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('timetable', '0091_auto_20210930_1556'),
+        ('base', '0140_auto_20211015_0911'),
     ]
 
     operations = [

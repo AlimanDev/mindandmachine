@@ -1,7 +1,18 @@
+import io
+
+import pandas as pd
 from django.core.exceptions import FieldDoesNotExist
 from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
+
+from src.notifications.helpers import send_mass_html_mail
+from src.reports.helpers import get_datatuple
+from src.util.commons import obj_deep_get
+
+
+class DryRunRevertException(Exception):
+    pass
 
 
 class BatchUpdateOrCreateException(Exception):
@@ -27,7 +38,7 @@ class BatchUpdateOrCreateModelMixin:
 
     @classmethod
     def _get_allowed_update_key_fields(cls):
-        return ['id']
+        return ['id', 'code']
 
     @classmethod
     def _get_batch_update_or_create_transaction_checks_kwargs(cls, **kwargs):
@@ -70,7 +81,7 @@ class BatchUpdateOrCreateModelMixin:
         return rel_objs_to_create_or_update
 
     @classmethod
-    def _batch_update_or_create_rel_objs(cls, rel_objs_data, objs, rel_objs_mapping, stats):
+    def _batch_update_or_create_rel_objs(cls, rel_objs_data, objs, rel_objs_mapping, stats, update_key_field):
         all_rel_objs_mapped_by_type = {}
         for idx, rel_objs_to_create_or_update in rel_objs_data.items():
             obj = objs[idx]
@@ -78,13 +89,14 @@ class BatchUpdateOrCreateModelMixin:
                 _rel_obj_cls, rel_obj_reverse_fk_field = rel_objs_mapping.get(rel_obj_key)
                 for rel_obj_dict in rel_obj_data_list:
                     rel_obj_dict[
-                        rel_obj_reverse_fk_field] = obj.id  # нужна возможность указать другой ключ? (для всех вложенных, либо задавать в виде маппинга?)
+                        rel_obj_reverse_fk_field] = obj.pk
                 all_rel_objs_mapped_by_type.setdefault(rel_obj_key, []).extend(rel_obj_data_list)
 
         for rel_obj_key, rel_obj_data_list in all_rel_objs_mapped_by_type.items():
             rel_obj_cls, rel_obj_reverse_fk_field = rel_objs_mapping.get(rel_obj_key)
             rel_obj_cls.batch_update_or_create(
-                data=rel_obj_data_list, delete_scope_fields_list=[rel_obj_reverse_fk_field], stats=stats)
+                data=rel_obj_data_list, update_key_field=update_key_field,
+                delete_scope_fields_list=[rel_obj_reverse_fk_field], stats=stats)
 
     @classmethod
     def _is_field_exist(cls, field_name):
@@ -100,15 +112,65 @@ class BatchUpdateOrCreateModelMixin:
         pass
 
     @classmethod
-    def _get_batch_delete_manager(cls,):
+    def _get_batch_delete_manager(cls, ):
         if hasattr(cls, 'objects_with_excluded'):
             return cls.objects_with_excluded
         return cls.objects
 
     @classmethod
+    def _get_diff_lookup_fields(cls):
+        pass
+
+    @classmethod
+    def _get_diff_headers(cls):
+        pass
+
+    @classmethod
+    def _get_diff_report_subject_fmt(self):
+        pass
+
+    @classmethod
+    def _create_and_send_diff_report(cls, diff_report_email_to, diff_data, diff_headers, now):
+        from src.util.models_converter import Converter
+        created_df = pd.DataFrame(diff_data.get('created', []), dtype=str, columns=diff_headers)
+        before_update_df = pd.DataFrame(diff_data.get('before_update', []), dtype=str, columns=diff_headers)
+        after_update_df = pd.DataFrame(diff_data.get('after_update', []), dtype=str, columns=diff_headers)
+        deleted_df = pd.DataFrame(diff_data.get('deleted', []), dtype=str, columns=diff_headers)
+        skipped_df = pd.DataFrame(diff_data.get('skipped', []), dtype=str, columns=diff_headers)
+        output = io.BytesIO()
+        writer = pd.ExcelWriter(output, engine='xlsxwriter')
+        created_df.to_excel(writer, index=False, sheet_name='Создано')
+        before_update_df.to_excel(writer, index=False, sheet_name='До изменений')
+        after_update_df.to_excel(writer, index=False, sheet_name='После изменений')
+        deleted_df.to_excel(writer, index=False, sheet_name='Удалено')
+        skipped_df.to_excel(writer, index=False, sheet_name='Пропущено')
+        for sheet_name, df in [('Создано', created_df),
+                               ('До изменений', before_update_df),
+                               ('После изменений', after_update_df),
+                               ('Удалено', deleted_df),
+                               ('Пропущено', skipped_df)]:
+            worksheet = writer.sheets[sheet_name]
+            for idx, col in enumerate(df):  # loop through all columns
+                worksheet.set_column(idx, idx, len(col) + 2)
+        writer.save()
+        subject = cls._get_diff_report_subject_fmt()
+        datatuple = get_datatuple(
+            diff_report_email_to,
+            (subject or 'Отчет для сверки данных от {dttm_now}').format(dttm_now=Converter.convert_datetime(now)),
+            f'Создано: {len(created_df.index)}, Удалено: {len(deleted_df.index)}, '
+            f'Изменено: {len(after_update_df.index)}, Пропущено: {len(skipped_df.index)}',
+            {
+                'name': 'diff_report.xlsx',
+                'file': output,
+            },
+        )
+        send_mass_html_mail(datatuple)
+
+    @classmethod
     def batch_update_or_create(
             cls, data: list, update_key_field: str = 'id', delete_scope_fields_list: list = None,
-            delete_scope_values_list: list = None, stats=None, user=None):
+            delete_scope_values_list: list = None, delete_scope_filters: dict = None, stats=None, user=None,
+            dry_run=False, diff_report_email_to: list = None):
         """
         Функция для массового создания и/или обновления объектов
 
@@ -153,131 +215,208 @@ class BatchUpdateOrCreateModelMixin:
             raise BatchUpdateOrCreateException(
                 f'Not allowed update key field: "{update_key_field}", allowed fields: {allowed_update_key_fields}')
 
-        with transaction.atomic():
-            create_or_update_perms_data = {}
-            check_perms_extra_kwargs = {}
-            if user:
-                check_perms_extra_kwargs = cls._get_check_batch_perms_extra_kwargs()
-            stats = stats or {}
-            delete_scope_fields_list = delete_scope_fields_list or cls._get_batch_delete_scope_fields_list()
-            delete_scope_values_set = set()
-            if delete_scope_values_list:
-                for delete_scope_values in delete_scope_values_list:
-                    delete_scope_values_set.add(
-                        tuple(
-                            (delete_scope_field, delete_scope_values.get(delete_scope_field)) for delete_scope_field in
-                            delete_scope_fields_list)
-                    )
-            to_create = []
-            to_update_dict = {}
-            update_keys = []
-            objs_to_create = []
-            objs_to_update = []
-            rel_objs_mapping = cls._get_rel_objs_mapping()
-            now = timezone.now()
-            for obj_dict in data:
-                obj_dict['dttm_modified'] = now
+        try:
+            with transaction.atomic():
+                if diff_report_email_to:
+                    diff_data = {}
+                    diff_lookup_fields = cls._get_diff_lookup_fields()
+                    diff_obj_keys = tuple(lookup_field.split('__') for lookup_field in diff_lookup_fields)
+                    diff_headers = cls._get_diff_headers()
+                create_or_update_perms_data = {}
+                check_perms_extra_kwargs = {}
+                if user:
+                    check_perms_extra_kwargs = cls._get_check_batch_perms_extra_kwargs()
+                stats = stats if stats is not None else {}
+                delete_scope_fields_list = delete_scope_fields_list or cls._get_batch_delete_scope_fields_list()
+                delete_scope_values_set = set()
+                if delete_scope_values_list:
+                    for delete_scope_values in delete_scope_values_list:
+                        delete_scope_values_list_of_tuples = []
+                        for delete_scope_field in delete_scope_fields_list:
+                            value = delete_scope_values.get(delete_scope_field)
+                            if isinstance(value, list):
+                                value = tuple(value)
+                            delete_scope_values_list_of_tuples.append((delete_scope_field, value))
+                        delete_scope_values_set.add(tuple(delete_scope_values_list_of_tuples))
+                to_skip = []
+                to_create = []
+                to_update_dict = {}
+                update_keys = []
+                objs_to_create = []
+                objs_to_skip = []
+                objs_to_update = []
+                rel_objs_mapping = cls._get_rel_objs_mapping()
+                now = timezone.now()
+                for obj_dict in data:
+                    keys_to_delete = [k for k in (obj_dict.keys()) if not cls._is_field_exist(k)]
+                    for k in keys_to_delete:
+                        del obj_dict[k]
 
-                keys_to_delete = [k for k in (obj_dict.keys()) if not cls._is_field_exist(k)]
-                for k in keys_to_delete:
-                    del obj_dict[k]
+                    update_key = obj_dict.get(update_key_field)
+                    if update_key is None:
+                        to_create.append(obj_dict)
+                    else:
+                        update_keys.append(update_key)
+                        to_update_dict[update_key] = obj_dict
 
-                update_key = obj_dict.get(update_key_field)
-                if update_key is None:
-                    to_create.append(obj_dict)
-                else:
-                    update_keys.append(update_key)
-                    to_update_dict[update_key] = obj_dict
+                    if user:
+                        cls._enrich_create_or_update_perms_data(create_or_update_perms_data, obj_dict)
 
                 if user:
-                    cls._enrich_create_or_update_perms_data(create_or_update_perms_data, obj_dict)
+                    cls._check_create_or_update_perms(user, create_or_update_perms_data, **check_perms_extra_kwargs)
 
-            if user:
-                cls._check_create_or_update_perms(user, create_or_update_perms_data, **check_perms_extra_kwargs)
+                filter_kwargs = {
+                    f"{update_key_field}__in": update_keys,
+                }
+                if delete_scope_filters:
+                    filter_kwargs.update(delete_scope_filters)
+                update_qs = cls.objects.filter(**filter_kwargs).select_related(
+                    *cls._get_batch_update_select_related_fields())
+                existing_objs = {
+                    getattr(obj, update_key_field): obj for obj in update_qs
+                }
+                for update_key in update_keys:
+                    if update_key not in existing_objs:
+                        to_update_dict[update_key]['dttm_modified'] = now
+                        obj_to_create = to_update_dict.pop(update_key)
+                        to_create.append(obj_to_create)
+                    else:
+                        existing_obj = existing_objs.get(update_key)
+                        if all(getattr(existing_obj, k) == v for k, v in to_update_dict[update_key].items() if
+                               k not in rel_objs_mapping):
+                            to_skip.append(to_update_dict.pop(update_key))
+                            obj_to_skip = existing_objs.pop(update_key)
+                            objs_to_skip.append(obj_to_skip)
+                            if diff_report_email_to:
+                                diff_data.setdefault('skipped', []).append(
+                                    tuple(obj_deep_get(obj_to_skip, *keys) for keys in diff_obj_keys))
+                        else:
+                            to_update_dict[update_key]['dttm_modified'] = now
 
-            filter_kwargs = {
-                f"{update_key_field}__in": update_keys,
-            }
-            update_qs = cls.objects.filter(**filter_kwargs).select_related(
-                *cls._get_batch_update_select_related_fields())
-            existing_objs = {
-                getattr(obj, update_key_field): obj for obj in update_qs
-            }
-            for update_key in update_keys:
-                if update_key not in existing_objs:
-                    to_create.append(to_update_dict.pop(update_key))
+                if to_skip:
+                    skip_rel_objs_data = cls._pop_rel_objs_data(
+                        objs_data=to_skip, rel_objs_mapping=rel_objs_mapping)
 
-            if to_create:
-                create_rel_objs_data = cls._pop_rel_objs_data(
-                    objs_data=to_create, rel_objs_mapping=rel_objs_mapping)
-                objs_to_create = [cls(**obj_dict, **cls._get_batch_create_extra_kwargs()) for obj_dict in to_create]
+                if to_create:
+                    create_rel_objs_data = cls._pop_rel_objs_data(
+                        objs_data=to_create, rel_objs_mapping=rel_objs_mapping)
+                    objs_to_create = []
+                    for obj_dict in to_create:
+                        obj_to_create = cls(**obj_dict, **cls._get_batch_create_extra_kwargs())
+                        objs_to_create.append(obj_to_create)
+                        if diff_report_email_to:
+                            diff_data.setdefault('created', []).append(
+                                tuple(obj_deep_get(obj_to_create, *keys) for keys in diff_obj_keys))
 
-            update_fields_set = {"dttm_modified"}
-            if to_update_dict:
-                to_update = list(to_update_dict.values())
-                update_rel_objs_data = cls._pop_rel_objs_data(
-                    objs_data=to_update, rel_objs_mapping=rel_objs_mapping)
-                for update_dict in to_update:
-                    update_key = update_dict.get(update_key_field)
-                    obj = existing_objs.get(update_key)
-                    for k, v in update_dict.items():
-                        setattr(obj, k, v)
-                        update_fields_set.add(k)
-                    extra_update_fields = cls._batch_update_extra_handler(obj)
-                    if extra_update_fields:
-                        update_fields_set.update(extra_update_fields)
-                    objs_to_update.append(obj)
+                update_fields_set = {"dttm_modified"}
+                if to_update_dict:
+                    to_update = list(to_update_dict.values())
+                    update_rel_objs_data = cls._pop_rel_objs_data(
+                        objs_data=to_update, rel_objs_mapping=rel_objs_mapping)
+                    for update_dict in to_update:
+                        update_key = update_dict.get(update_key_field)
+                        obj = existing_objs.get(update_key)
+                        if diff_report_email_to:
+                            diff_data.setdefault('before_update', []).append(
+                                tuple(obj_deep_get(obj, *keys) for keys in diff_obj_keys))
+                        for k, v in update_dict.items():
+                            setattr(obj, k, v)
+                            update_fields_set.add(k)
+                        extra_update_fields = cls._batch_update_extra_handler(obj)
+                        if extra_update_fields:
+                            update_fields_set.update(extra_update_fields)
+                        objs_to_update.append(obj)
 
-            objs = objs_to_create + objs_to_update
+                objs = objs_to_create + objs_to_update + objs_to_skip
 
-            deleted_dict = {}
-            q_for_delete = Q()
-            if delete_scope_fields_list:
-                for obj_to_update in objs_to_update:
-                    delete_scope_values_tuple = tuple((k, getattr(obj_to_update, k)) for k in delete_scope_fields_list)
-                    delete_scope_values_set.add(delete_scope_values_tuple)
+                deleted_dict = {}
+                q_for_delete = Q()
+                if delete_scope_fields_list:
+                    if not delete_scope_values_list:
+                        for obj_to_update in objs_to_update:
+                            delete_scope_values_tuple = tuple(
+                                (k, getattr(obj_to_update, k)) for k in delete_scope_fields_list if
+                                hasattr(obj_to_update, k))
+                            if delete_scope_values_tuple:
+                                delete_scope_values_set.add(delete_scope_values_tuple)
 
-                for obj_to_create in objs_to_create:
-                    delete_scope_values_tuple = tuple((k, getattr(obj_to_create, k)) for k in delete_scope_fields_list)
-                    delete_scope_values_set.add(delete_scope_values_tuple)
+                        for obj_to_create in objs_to_create:
+                            delete_scope_values_tuple = tuple(
+                                (k, getattr(obj_to_create, k)) for k in delete_scope_fields_list if
+                                hasattr(obj_to_create, k))
+                            if delete_scope_values_tuple:
+                                delete_scope_values_set.add(delete_scope_values_tuple)
 
-                if delete_scope_values_set:
-                    for delete_scope_values_tuples in delete_scope_values_set:
-                        q_for_delete |= Q(**dict(delete_scope_values_tuples))
+                        for obj_to_skip in objs_to_skip:
+                            delete_scope_values_tuple = tuple(
+                                (k, getattr(obj_to_skip, k)) for k in delete_scope_fields_list if
+                                hasattr(obj_to_skip, k))
+                            if delete_scope_values_tuple:
+                                delete_scope_values_set.add(delete_scope_values_tuple)
 
-                    delete_manager = cls._get_batch_delete_manager()
-                    delete_qs = delete_manager.filter(
-                        q_for_delete).exclude(id__in=list(obj.id for obj in objs if obj.id))
-                    if user:
-                        cls._check_batch_delete_qs_perms(user, delete_qs, **check_perms_extra_kwargs)
-                    _total_deleted_count, deleted_dict = delete_qs.delete()
+                    if delete_scope_values_set:
+                        for delete_scope_values_tuples in delete_scope_values_set:
+                            q_for_delete |= Q(**dict(delete_scope_values_tuples))
 
-            if objs_to_create:
-                cls.objects.bulk_create(objs_to_create)  # в объектах будут проставлены id (только в postgres)
-                cls._batch_update_or_create_rel_objs(
-                    rel_objs_data=create_rel_objs_data, objs=objs_to_create, rel_objs_mapping=rel_objs_mapping, stats=stats)
+                        delete_manager = cls._get_batch_delete_manager()
+                        delete_filter_kwargs = {}
+                        if delete_scope_filters:
+                            delete_filter_kwargs.update(delete_scope_filters)
+                        delete_qs = delete_manager.filter(
+                            q_for_delete, **delete_filter_kwargs).exclude(id__in=list(obj.id for obj in objs if obj.id))
+                        if user:
+                            cls._check_batch_delete_qs_perms(user, delete_qs, **check_perms_extra_kwargs)
+                        if diff_report_email_to:
+                            diff_data['deleted'] = list(delete_qs.values_list(*diff_lookup_fields))
+                        _total_deleted_count, deleted_dict = delete_qs.delete()
 
-            if objs_to_update:
-                update_fields_set.discard(cls._meta.pk.name)
-                cls.objects.bulk_update(objs_to_update, fields=update_fields_set)
-                cls._batch_update_or_create_rel_objs(
-                    rel_objs_data=update_rel_objs_data, objs=objs_to_update, rel_objs_mapping=rel_objs_mapping, stats=stats)
+                if objs_to_skip:
+                    cls._batch_update_or_create_rel_objs(
+                        rel_objs_data=skip_rel_objs_data, objs=objs_to_skip, rel_objs_mapping=rel_objs_mapping,
+                        stats=stats, update_key_field=update_key_field)
 
-            cls_name = cls.__name__
-            cls_stats = stats.setdefault(cls_name, {})
-            if objs_to_create:
-                cls_stats['created'] = cls_stats.get('created', 0) + len(objs_to_create)
-            if objs_to_update:
-                cls_stats['updated'] = cls_stats.get('updated', 0) + len(objs_to_update)
-            for original_deleted_cls_name, deleted_count in deleted_dict.items():
-                if deleted_count:
-                    deleted_cls_name = original_deleted_cls_name.split('.')[1]
-                    deleted_cls_stats = stats.setdefault(deleted_cls_name, {})
-                    deleted_cls_stats['deleted'] = deleted_cls_stats.get('deleted', 0) + deleted_dict.get(
-                        original_deleted_cls_name)
+                if objs_to_create:
+                    cls.objects.bulk_create(objs_to_create)  # в объектах будут проставлены id (только в postgres)
+                    cls._batch_update_or_create_rel_objs(
+                        rel_objs_data=create_rel_objs_data, objs=objs_to_create, rel_objs_mapping=rel_objs_mapping,
+                        stats=stats, update_key_field=update_key_field)
 
-            transaction_checks_kwargs = cls._get_batch_update_or_create_transaction_checks_kwargs(
-                data=data, q_for_delete=q_for_delete, user=user)
-            cls._run_batch_update_or_create_transaction_checks(**transaction_checks_kwargs)
+                if objs_to_update:
+                    update_fields_set.discard(cls._meta.pk.name)
+                    cls.objects.bulk_update(objs_to_update, fields=update_fields_set)
+                    if diff_report_email_to:
+                        for obj_to_update in objs_to_update:
+                            diff_data.setdefault('after_update', []).append(
+                                tuple(obj_deep_get(obj_to_update, *keys) for keys in diff_obj_keys))
+                    cls._batch_update_or_create_rel_objs(
+                        rel_objs_data=update_rel_objs_data, objs=objs_to_update, rel_objs_mapping=rel_objs_mapping,
+                        stats=stats, update_key_field=update_key_field)
+
+                cls_name = cls.__name__
+                cls_stats = stats.setdefault(cls_name, {})
+                if objs_to_create:
+                    cls_stats['created'] = cls_stats.get('created', 0) + len(objs_to_create)
+                if objs_to_update:
+                    cls_stats['updated'] = cls_stats.get('updated', 0) + len(objs_to_update)
+                if objs_to_skip:
+                    cls_stats['skipped'] = cls_stats.get('skipped', 0) + len(objs_to_skip)
+                for original_deleted_cls_name, deleted_count in deleted_dict.items():
+                    if deleted_count:
+                        deleted_cls_name = original_deleted_cls_name.split('.')[1]
+                        deleted_cls_stats = stats.setdefault(deleted_cls_name, {})
+                        deleted_cls_stats['deleted'] = deleted_cls_stats.get('deleted', 0) + deleted_dict.get(
+                            original_deleted_cls_name)
+
+                transaction_checks_kwargs = cls._get_batch_update_or_create_transaction_checks_kwargs(
+                    data=data, q_for_delete=q_for_delete, user=user)
+                cls._run_batch_update_or_create_transaction_checks(**transaction_checks_kwargs)
+
+                if diff_report_email_to:
+                    cls._create_and_send_diff_report(diff_report_email_to, diff_data, diff_headers, now)
+
+                if dry_run:
+                    raise DryRunRevertException()
+        except DryRunRevertException:
+            pass
 
         return objs, stats

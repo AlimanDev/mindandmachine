@@ -1,7 +1,7 @@
 {% extends 'notifications/email/base.html' %}
 
 {% block content %}
-<p style="font-size:15px">Это автоматическое уведомление для подразделения <b>{{ shop.name }}</b> об изменениях в графике.</p>
+<p style="font-size:15px">Это автоматическое уведомление для {{ shop_name_form.singular.R | default:'магазина' }} <b>{{ shop.name }}</b> об изменениях в графике.</p>
 <p style="font-size:15px">Сотрудник <b>{{ user.last_name }} {{ user.first_name }}</b>
     отмененил вакансию на типах работ <b>{{ work_types }}</b>.</p>
 <p style="font-size:15px">Дата <b>{{ dt }}</b></p>

@@ -175,12 +175,13 @@ class TestsHelperMixin:
             )
         return resp
 
-    def _approve(self, shop_id, is_fact, dt_from, dt_to, wd_types=None, employee_ids=None):
+    def _approve(self, shop_id, is_fact, dt_from, dt_to, wd_types=None, employee_ids=None, approve_open_vacs=False):
         approve_data = {
             'shop_id': shop_id,
             'is_fact': is_fact,
             'dt_from': dt_from,
             'dt_to': dt_to,
+            'approve_open_vacs': approve_open_vacs,
         }
         if wd_types:
             approve_data['wd_types'] = wd_types

@@ -59,7 +59,7 @@ class UrvViolatorsReport(BaseRegisteredReport, DatesReportMixin):
         from src.reports.utils.urv_violators import urv_violators_report_xlsx
         dt_from, dt_to = self.get_dates(self.context)
 
-        return urv_violators_report_xlsx(dt_from=dt_from, dt_to=dt_to, in_memory=True, data=self.report_data)
+        return urv_violators_report_xlsx(network_id=self.network_id, dt_from=dt_from, dt_to=dt_to, in_memory=True, data=self.report_data)
 
     @cached_property
     def report_data(self):
@@ -107,7 +107,7 @@ class UnaccountedOvertivmeReport(BaseRegisteredReport, DatesReportMixin):
     def get_file(self):
         from src.reports.utils.unaccounted_overtime import unaccounted_overtimes_xlsx
         dt_from, dt_to = self.get_dates(self.context)
-        return unaccounted_overtimes_xlsx(dt_from=dt_from, dt_to=dt_to, in_memory=True, data=self.report_data)
+        return unaccounted_overtimes_xlsx(network_id=self.network_id, dt_from=dt_from, dt_to=dt_to, in_memory=True, data=self.report_data)
 
     @cached_property
     def report_data(self):

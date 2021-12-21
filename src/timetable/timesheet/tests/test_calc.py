@@ -283,3 +283,12 @@ class TestTimesheetCalc(TestTimesheetMixin, TestCase):
         dt = date(2021, 6, 7)
         WorkerDay.objects.filter(dt=dt, is_fact=False).delete()
         self._calc_timesheets()
+
+    def test_calc_for_only_days_in_past(self):
+        WorkerDay.objects.filter(is_fact=True).delete()
+        dttm_now = datetime(2021, 6, 10, 10)
+        self.user_worker.network.set_settings_value('timesheet_only_day_in_past', True)
+        self.user_worker.network.save()
+        self._calc_timesheets(dttm_now=dttm_now, dt_from=date(2021, 6, 1), dt_to=date(2021, 6, 30))
+        self.assertEqual(TimesheetItem.objects.filter(
+            employee=self.employee_worker, timesheet_type=TimesheetItem.TIMESHEET_TYPE_FACT).count(), 9)
