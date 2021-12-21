@@ -232,7 +232,6 @@ class UserSerializer(BaseNetworkSerializer):
 
 
 class EmployeeSerializer(BaseNetworkSerializer):
-    user = UserSerializer(read_only=True, source='employee_user')
     user_id = serializers.IntegerField(required=False, write_only=True)
     has_shop_employment = serializers.BooleanField(required=False, read_only=True)
     from_another_network = serializers.BooleanField(required=False, read_only=True)
@@ -248,9 +247,10 @@ class EmployeeSerializer(BaseNetworkSerializer):
             )
         ]
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, user_source=None, **kwargs):
         super(EmployeeSerializer, self).__init__(*args, **kwargs)
         request = self.context.get('request')
+        self.fields['user'] = UserSerializer(read_only=True, source=user_source)
         if request and request.query_params.get('include_employments'):
             self.fields['employments'] = EmploymentSerializer(
                 required=False, many=True, read_only=True, context=self.context, source='employments_list')
