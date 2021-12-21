@@ -246,7 +246,8 @@ class EmployeeViewSet(UpdateorCreateViewSet):
     openapi_tags = ['Employee', ]
 
     def get_serializer(self, *args, **kwargs):
-        kwargs['user_source'] = 'employee_user'
+        if self.action == 'list':
+            kwargs['user_source'] = 'employee_user'
         return super(EmployeeViewSet, self).get_serializer(*args, **kwargs)
 
     def get_queryset(self):
