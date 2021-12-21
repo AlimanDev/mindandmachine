@@ -54,7 +54,7 @@ def load_shift_schedule(filepath, from_dt=None, load_employee_shift_schedules=Fa
             if row['ВидУчетаВремени'] == 'Явка':
                 day_data['day_hours'] = day_data.get('day_hours', 0) + row['ДополнительноеЗначение']
             if row['ВидУчетаВремени'] == 'Ночные часы':
-                day_data['night_hours'] = day_data.get('work_hours', 0) + row['ДополнительноеЗначение']
+                day_data['night_hours'] = day_data.get('night_hours', 0) + row['ДополнительноеЗначение']
             day_data.setdefault('day_type', DAY_TYPE_MAPPING[row['ВидУчетаВремени']])
             day_data.setdefault('code', row['ГУИДГрафика'] + '_' + str(row['Дата']))
 
