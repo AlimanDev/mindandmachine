@@ -18,7 +18,7 @@ from django.db.models.functions import Cast, TruncDate
 from django.db.models.functions import Extract, Coalesce, Greatest, Least
 from django.utils.functional import cached_property
 
-from src.base.models import Employment, Shop, ProductionDay, SAWHSettings, Network, SAWHSettingsMapping
+from src.base.models import Employment, Shop, ProductionDay, SAWHSettings, Network, SAWHSettingsMapping, NetworkConnect
 from src.base.shift_schedule.utils import get_shift_schedule
 from src.forecast.models import PeriodClients
 from src.timetable.models import WorkerDay, ProdCal, TimesheetItem, WorkerDayType
@@ -338,8 +338,25 @@ class WorkersStatsGetter:
             ~Q(exclude_positions__id=OuterRef('position_id')),
             year=self.year,
         ).order_by('-priority')
+
+        # рефакторинг
+        outsourcing_network_qs = list(
+            NetworkConnect.objects.filter(
+                client=self.network.id,
+            ).values_list('outsourcing_id', flat=True)
+        )
+        extra_q = Q(
+            Q(
+                Q(employee__user__network_id=self.network.id) |
+                Q(shop__network_id=self.network.id)
+            ) |
+            Q(
+                employee__user__network_id__in=outsourcing_network_qs,
+                shop__network_id__in=outsourcing_network_qs + [self.network.id],
+            )
+        )
         employments = Employment.objects.get_active(
-            network_id=self.network.id,
+            extra_q=extra_q,
             dt_from=dt_from,
             dt_to=dt_to,
         ).select_related(
