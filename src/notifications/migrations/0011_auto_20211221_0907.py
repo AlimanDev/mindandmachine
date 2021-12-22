@@ -2,6 +2,24 @@
 
 from django.db import migrations, models
 
+def update_recipients(apps, schema_editor):
+    EventEmailNotification = apps.get_model('notifications', 'EventEmailNotification')
+    Group = apps.get_model('base', 'Group')
+    director_group = Group.objects.filter(code='director').first()
+    for notification in EventEmailNotification.objects.filter(
+        event_type__code__in=[
+            'employee_not_checked_in', 
+            'employee_not_checked_out', 
+            'employee_working_not_according_to_plan',
+            'vacancy_created',
+            'vacancy_deleted',
+        ],
+        get_recipients_from_event_type=True,
+    ):
+        notification.get_recipients_from_event_type = False
+        if director_group:
+            notification.shop_groups.add(director_group)
+        notification.save()
 
 class Migration(migrations.Migration):
 
@@ -20,4 +38,5 @@ class Migration(migrations.Migration):
             name='employee_shop_groups',
             field=models.ManyToManyField(blank=True, related_name='_notifications_eventonlinenotification_employee_shop_groups_+', to='base.Group', verbose_name='Оповещать пользователей магазина сотрудника, имеющих выбранные группы'),
         ),
+        migrations.RunPython(update_recipients, migrations.RunPython.noop),
     ]
