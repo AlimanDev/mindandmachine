@@ -30,7 +30,7 @@ from src.base.views_abstract import BaseModelViewSet
 from src.events.signals import event_signal
 from src.reports.utils.overtimes_undertimes import overtimes_undertimes_xlsx
 from src.timetable.backends import MultiShopsFilterBackend
-from src.timetable.events import REQUEST_APPROVE_EVENT_TYPE, APPROVE_EVENT_TYPE, VACANCY_CONFIRMED_TYPE
+from src.timetable.events import REQUEST_APPROVE_EVENT_TYPE, APPROVE_EVENT_TYPE
 from src.timetable.filters import WorkerDayFilter, WorkerDayStatFilter, VacancyFilter
 from src.timetable.models import (
     WorkerDay,

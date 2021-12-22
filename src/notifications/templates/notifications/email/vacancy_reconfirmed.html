@@ -1,7 +1,7 @@
 {% extends 'notifications/email/base.html' %}
 
 {% block content %}
-<p style="font-size:15px">Сотрудник <b>{{user.last_name}} {{user.first_name}}</b> был назначен на вакансию с тип{% if work_types|length == 1 %}ом{% else %}ами{% endif %} работ <b>{{ work_types|join:", " }}, вместо <b>{{from_user.last_name}} {{from_user.first_name}}</b></b></p>
+<p style="font-size:15px">{% if user.is_outsource %}Аутсорс сотрудник{% else %}Сотрудник{%endif%} <b>{{user.last_name}} {{user.first_name}}</b> был назначен на вакансию с тип{% if work_types|length == 1 %}ом{% else %}ами{% endif %} работ <b>{{ work_types|join:", " }}, вместо{% if from_user.is_outsource %} аутсорс{%endif%} сотрудника <b>{{from_user.last_name}} {{from_user.first_name}}</b></b></p>
 <p style="font-size:15px">Дата: <b>{{dt}}</b></p>
 <p style="font-size:15px">{{ shop_name_form.singular.I | default:'магазин'|capfirst }}: <b>{{shop.name}}</b></p>
 {% endblock %}

@@ -29,7 +29,6 @@ def get_worker_days_with_no_ticks(dttm: datetime):
         ),
     ).select_related(
         'shop',
-        'shop__director',
         'worker',
     )
 

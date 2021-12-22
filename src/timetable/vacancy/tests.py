@@ -6,17 +6,21 @@ from django.db import transaction
 
 from django.test.utils import override_settings
 from rest_framework.test import APITestCase
+from src.recognition.events import EMPLOYEE_NOT_CHECKED_IN, EMPLOYEE_NOT_CHECKED_OUT
+from src.timetable.tests.factories import WorkerDayFactory
 from src.util.mixins.tests import TestsHelperMixin
 from src.notifications.models.event_notification import EventEmailNotification
-from src.timetable.events import EMPLOYEE_VACANCY_DELETED, VACANCY_CREATED, VACANCY_DELETED
+from src.timetable.events import EMPLOYEE_VACANCY_DELETED, VACANCY_CONFIRMED_TYPE, VACANCY_CREATED, VACANCY_DELETED, VACANCY_RECONFIRMED_TYPE, VACANCY_REFUSED
 
 from dateutil.relativedelta import relativedelta
 from django.utils.timezone import now
 
 from etc.scripts import fill_calendar
 from src.base.models import (
+    Employee,
     FunctionGroup,
     Group,
+    NetworkConnect,
     Shop,
     Employment,
     User,
@@ -171,6 +175,7 @@ class TestAutoWorkerExchange(APITestCase):
                     shop=shop,
                     dt=dt.replace(day=1),
                     dttm_status_change=datetime.datetime.now(),
+                    is_approved=True,
                 )
                 for shop in shops
             ]
@@ -1413,4 +1418,360 @@ class TestVacancyActions(APITestCase, TestsHelperMixin):
                 is_approved=False, 
                 source=WorkerDay.SOURCE_ON_CONFIRM_VACANCY
             ).exists()
+        )
+
+@override_settings(CELERY_TASK_ALWAYS_EAGER=True)
+class TestVacancyNotification(APITestCase, TestsHelperMixin):
+    @classmethod
+    def setUpTestData(cls):
+        cls.create_departments_and_users()
+        cls.outsource_network1 = Network.objects.create(
+            name='Outsource network 1',
+        )
+        cls.outsource_network2 = Network.objects.create(
+            name='Outsource network 2',
+        )
+        NetworkConnect.objects.create(
+            client=cls.network,
+            outsourcing=cls.outsource_network1,
+        )
+        NetworkConnect.objects.create(
+            client=cls.network,
+            outsourcing=cls.outsource_network2,
+        )
+        cls.outsource_shop1 = Shop.objects.create(
+            region=cls.region,
+            network=cls.outsource_network1,
+            name='Outsource shop 1',
+        )
+        cls.outsource_shop2 = Shop.objects.create(
+            region=cls.region,
+            network=cls.outsource_network2,
+            name='Outsource shop 2',
+        )
+        create_users = [
+            ('urs1', 'Urs', '1', cls.outsource_shop1, cls.admin_group),
+            ('urs2', 'Urs', '2', cls.outsource_shop2, cls.admin_group),
+            ('dir1', 'Dir', '1', cls.outsource_shop1, cls.chief_group),
+            ('dir2', 'Dir', '2', cls.outsource_shop2, cls.chief_group),
+            ('empl1', 'Empl', '1', cls.outsource_shop1, cls.employee_group),
+            ('empl1_2', 'Empl', '1', cls.outsource_shop1, cls.employee_group),
+            ('empl2', 'Empl', '2', cls.outsource_shop2, cls.employee_group),
+        ]
+        for user_data in create_users:
+            user, employee, employment = cls._create_user(*user_data)
+            setattr(cls, f'outsource_user_{user_data[0]}', user)
+            setattr(cls, f'outsource_employee_{user_data[0]}', employee)
+            setattr(cls, f'outsource_employment_{user_data[0]}', employment)
+        
+        cls.work_type_name = WorkTypeName.objects.create(
+            name='Работа',
+            network=cls.network,
+        )
+        cls.work_type = WorkType.objects.create(
+            work_type_name=cls.work_type_name,
+            shop=cls.shop,
+        )
+        dt = datetime.date.today()
+        ShopMonthStat.objects.bulk_create(
+            [
+                ShopMonthStat(
+                    shop=shop,
+                    dt=dt.replace(day=1),
+                    dttm_status_change=datetime.datetime.now(),
+                    is_approved=True,
+                )
+                for shop in Shop.objects.all()
+            ]
+        )
+
+        cls.created_event, _ = EventType.objects.get_or_create(
+            code=VACANCY_CREATED, network=cls.network,
+        )
+        cls.confirmed_event, _ = EventType.objects.get_or_create(
+            code=VACANCY_CONFIRMED_TYPE, network=cls.network,
+        )
+        cls.reconfirmed_event, _ = EventType.objects.get_or_create(
+            code=VACANCY_RECONFIRMED_TYPE, network=cls.network,
+        )
+        cls.refused_event, _ = EventType.objects.get_or_create(
+            code=VACANCY_REFUSED, network=cls.network,
+        )
+        cls.delete_event, _ = EventType.objects.get_or_create(
+            code=VACANCY_DELETED, network=cls.network,
+        )
+        cls.not_checked_in_event, _ = EventType.objects.get_or_create(
+            code=EMPLOYEE_NOT_CHECKED_IN, network=cls.network,
+        )
+        cls.not_checked_out_event, _ = EventType.objects.get_or_create(
+            code=EMPLOYEE_NOT_CHECKED_OUT, network=cls.network,
+        )
+        cls.employee_vacancy_deleted_event, _ = EventType.objects.get_or_create(
+            code=EMPLOYEE_VACANCY_DELETED, network=cls.network,
+        )
+        cls.created_event_email_notification = cls._create_event_email_notification(
+            cls.created_event, 'notifications/email/vacancy_created.html', 'Создана вакансия', users=[cls.outsource_user_urs1, cls.outsource_user_urs2], shop_groups=[cls.chief_group])
+        cls.confirmed_event_email_notification = cls._create_event_email_notification(
+            cls.confirmed_event, 'notifications/email/vacancy_confirmed.html', 'Сотрудник откликнулся на вакансию', shop_groups=[cls.chief_group])
+        cls.reconfirmed_event_email_notification = cls._create_event_email_notification(
+            cls.reconfirmed_event, 'notifications/email/vacancy_reconfirmed.html', 'Сотрудник переназначен на вакансию', shop_groups=[cls.chief_group])
+        cls.refused_event_email_notification = cls._create_event_email_notification(
+            cls.refused_event, 'notifications/email/vacancy_deleted.html', 'Отмена назначения сотрудника', 
+            users=[cls.outsource_user_urs1, cls.outsource_user_urs2], employee_shop_groups=[cls.chief_group])
+        cls.delete_event_email_notification = cls._create_event_email_notification(
+            cls.delete_event, 'notifications/email/vacancy_deleted.html', 'Удалена вакансия', 
+            users=[cls.outsource_user_urs1, cls.outsource_user_urs2], 
+            employee_shop_groups=[cls.chief_group], shop_groups=[cls.chief_group])
+        cls.not_checked_in_event_email_notification = cls._create_event_email_notification(
+            cls.not_checked_in_event, 'notifications/email/employee_not_checked.html', 'Сотрудник не отметился на приход', users=[cls.outsource_user_urs1, cls.outsource_user_urs2],
+            employee_shop_groups=[cls.chief_group], shop_groups=[cls.chief_group])
+        cls.not_checked_out_event_email_notification = cls._create_event_email_notification(
+            cls.not_checked_out_event, 'notifications/email/employee_not_checked.html', 'Сотрудник не отметился на уход', users=[cls.outsource_user_urs1, cls.outsource_user_urs2],
+            employee_shop_groups=[cls.chief_group], shop_groups=[cls.chief_group])
+        cls.employee_vacancy_deleted_event_email_notification = cls._create_event_email_notification(
+            cls.employee_vacancy_deleted_event, 'notifications/email/employee_vacancy_deleted.html', 'Отменена вакансия', get_recipients_from_event_type=True)
+        cls.dttm_format = '%Y-%m-%d %H:%M:%S'
+
+    @classmethod
+    def _create_event_email_notification(cls, event, system_email_template, subject, shop_groups=[], employee_shop_groups=[], users=[], get_recipients_from_event_type=False):
+        notification = EventEmailNotification.objects.create(
+            event_type=event,
+            system_email_template=system_email_template,
+            subject=subject,
+            get_recipients_from_event_type=get_recipients_from_event_type,
+        )
+        notification.shop_groups.add(*shop_groups)
+        notification.users.add(*users)
+        notification.employee_shop_groups.add(*employee_shop_groups)
+        return notification
+    
+    def setUp(self) -> None:
+        self.client.force_authenticate(user=self.user1)
+    
+    @classmethod
+    def _create_user(cls, username, first_name, last_name, shop, function_group):
+        user = User.objects.create(
+            username=username,
+            first_name=first_name,
+            last_name=last_name,
+            network_id=shop.network_id,
+            email=f'{username}@test.com',
+        )
+        employee = Employee.objects.create(
+            user=user,
+            tabel_code=username,
+        )
+        employment = Employment.objects.create(
+            employee=employee,
+            shop=shop,
+            function_group=function_group,
+        )
+        return user, employee, employment
+
+    def test_vacancy_create_notification_sent(self):
+        dt = datetime.date.today()
+        dttm_work_start = datetime.datetime.combine(dt, datetime.time(10))
+        dttm_work_end = datetime.datetime.combine(dt, datetime.time(20))
+        response = self.client.post(
+            '/rest_api/worker_day/',
+            self.dump_data(
+                {
+                    'is_vacancy': True,
+                    'is_outsource': True,
+                    'shop_id': self.shop.id,
+                    'dttm_work_start': dttm_work_start,
+                    'dttm_work_end': dttm_work_end,
+                    'type': WorkerDay.TYPE_WORKDAY,
+                    'dt': dt,
+                    'is_fact': False,
+                    'worker_day_details': [
+                        {
+                            'work_type_id': self.work_type.id,
+                            'work_part': 1.0,
+                        }
+                    ],
+                    'outsources_ids': [
+                        self.outsource_network1.id,
+                    ]
+                }
+            ),
+            content_type='application/json',
+        )
+        self.assertEqual(response.status_code, 201)
+        with mock.patch.object(transaction, 'on_commit', lambda t: t()):
+            response = self.client.post(
+                '/rest_api/worker_day/approve/',
+                self.dump_data(
+                    {
+                        'shop_id': self.shop.id,
+                        'dt_from': dt,
+                        'dt_to': dt,
+                        'approve_open_vacs': True,
+                        'is_fact': False,
+                    }
+                ),
+                content_type='application/json',
+            )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(mail.outbox), 2)
+        self.assertCountEqual([mail.outbox[0].to[0], mail.outbox[1].to[0]], [self.outsource_user_urs1.email, self.user6.email])
+        body = ('Здравствуйте, {first_name}!\n\n\n\n\n\n\nВ магазине ' f'{self.shop.name} создана вакансия для типа работ Работа\n'
+            f'Дата: {dt}\nВремя с {dttm_work_start.strftime(self.dttm_format)} по {dttm_work_end.strftime(self.dttm_format)}\n\n\n\n\n\nПисьмо отправлено роботом. Подробности можно узнать по ссылке')
+        self.assertCountEqual(
+            [mail.outbox[0].body, mail.outbox[1].body],
+            [body.format(first_name=self.outsource_user_urs1.first_name), body.format(first_name=self.user6.first_name)],
+        )
+
+    def test_vacancy_confirmed_and_reconfirmed_notification_sent(self):
+        dt = datetime.date.today()
+        dttm_work_start = datetime.datetime.combine(dt, datetime.time(10))
+        dttm_work_end = datetime.datetime.combine(dt, datetime.time(20))
+        vacancy = WorkerDayFactory(
+            cashbox_details__work_type=self.work_type,
+            shop=self.shop,
+            is_vacancy=True, 
+            is_outsource=True,
+            type_id=WorkerDay.TYPE_WORKDAY,
+            dt=dt,
+            dttm_work_start=dttm_work_start,
+            dttm_work_end=dttm_work_end,
+            is_approved=True,
+            employee=None,
+            employment=None,
+        )
+        WorkerDayFactory(
+            employee=self.outsource_employee_empl1,
+            employment=self.outsource_employment_empl1,
+            type_id=WorkerDay.TYPE_HOLIDAY,
+            dt=dt,
+            is_approved=True,
+        )
+        WorkerDayFactory(
+            employee=self.outsource_employee_empl1_2,
+            employment=self.outsource_employment_empl1_2,
+            type_id=WorkerDay.TYPE_HOLIDAY,
+            dt=dt,
+            is_approved=True,
+        )
+        vacancy.outsources.add(self.outsource_network1)
+        self.client.force_authenticate(user=self.outsource_user_urs1)
+        response = self.client.post(
+            f'/rest_api/worker_day/{vacancy.id}/confirm_vacancy_to_worker/',
+            {
+                'user_id': self.outsource_user_empl1.id,
+                'employee_id': self.outsource_employee_empl1.id,
+            }
+        )
+        self.assertEqual(response.status_code, 200)
+        vacancy.refresh_from_db()
+        self.assertEqual(vacancy.employee_id, self.outsource_employee_empl1.id)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to[0], self.user6.email)
+        self.assertEqual(
+            mail.outbox[0].body, 
+            f'Здравствуйте, {self.user6.first_name}!\n\n\n\n\n\n\nАутсорс сотрудник {self.outsource_user_empl1.last_name} {self.outsource_user_empl1.first_name} откликнулся на вакансию с типом работ {self.work_type_name.name}\n'
+            f'Дата: {vacancy.dt}\nМагазин: {self.shop.name}\n\n\n\n\n\nПисьмо отправлено роботом. Подробности можно узнать по ссылке'
+        )
+        mail.outbox.clear()
+        response = self.client.post(
+            f'/rest_api/worker_day/{vacancy.id}/reconfirm_vacancy_to_worker/',
+            {
+                'user_id': self.outsource_user_empl1_2.id,
+                'employee_id': self.outsource_employee_empl1_2.id,
+            }
+        )
+        self.assertEqual(response.status_code, 200)
+        vacancy.refresh_from_db()
+        self.assertEqual(vacancy.employee_id, self.outsource_employee_empl1_2.id)
+        self.assertEqual(len(mail.outbox), 4)
+        self.assertCountEqual(
+            list(map(lambda x: x.to[0], mail.outbox)), 
+            [self.user6.email, self.outsource_user_dir1.email, self.outsource_user_empl1.email, self.outsource_user_urs1.email],
+        )
+        self.assertCountEqual(
+            list(map(lambda x: x.body, mail.outbox)), 
+            [
+                f'Здравствуйте, {self.user6.first_name}!\n\n\n\n\n\n\nАутсорс сотрудник {self.outsource_user_empl1_2.last_name} {self.outsource_user_empl1_2.first_name} был назначен на вакансию с типом работ {self.work_type_name.name}'
+                f', вместо аутсорс сотрудника {self.outsource_user_empl1.last_name} {self.outsource_user_empl1.first_name}\n'
+                f'Дата: {vacancy.dt}\nМагазин: {self.shop.name}\n\n\n\n\n\nПисьмо отправлено роботом. Подробности можно узнать по ссылке',
+                f'Здравствуйте, {self.outsource_user_empl1.first_name}!\n\n\n\n\n\n\nУ вас была отменена вакансия в магазине {self.shop.name}.\n'
+                f'Дата: {dt}\nВремя работы с {dttm_work_start.strftime(self.dttm_format)} по {dttm_work_end.strftime(self.dttm_format)}\n\n\n\n\n\nПисьмо отправлено роботом. Подробности можно узнать по ссылке',
+                f'Здравствуйте, {self.outsource_user_dir1.first_name}!\n\n\n\n\n\n\nВ магазине {self.shop.name} отменена вакансия у сотрудника'
+                f' {self.outsource_user_empl1.last_name} {self.outsource_user_empl1.first_name} с табельным номером {self.outsource_employee_empl1.tabel_code} \n'
+                f'Дата: {dt}\nВремя с {dttm_work_start.strftime(self.dttm_format)} по {dttm_work_end.strftime(self.dttm_format)}\n\n\n\n\n\nПисьмо отправлено роботом. Подробности можно узнать по ссылке',
+                f'Здравствуйте, {self.outsource_user_urs1.first_name}!\n\n\n\n\n\n\nВ магазине {self.shop.name} отменена вакансия у сотрудника'
+                f' {self.outsource_user_empl1.last_name} {self.outsource_user_empl1.first_name} с табельным номером {self.outsource_employee_empl1.tabel_code} \n'
+                f'Дата: {dt}\nВремя с {dttm_work_start.strftime(self.dttm_format)} по {dttm_work_end.strftime(self.dttm_format)}\n\n\n\n\n\nПисьмо отправлено роботом. Подробности можно узнать по ссылке'
+            ]
+        )
+
+    def test_vacancy_refused_deleted_notification_sent(self):
+        dt = datetime.date.today()
+        dttm_work_start = datetime.datetime.combine(dt, datetime.time(10))
+        dttm_work_end = datetime.datetime.combine(dt, datetime.time(20))
+        vacancy = WorkerDayFactory(
+            cashbox_details__work_type=self.work_type,
+            shop=self.shop,
+            is_vacancy=True, 
+            is_outsource=True,
+            type_id=WorkerDay.TYPE_WORKDAY,
+            dt=dt,
+            dttm_work_start=dttm_work_start,
+            dttm_work_end=dttm_work_end,
+            is_approved=True,
+            employee=self.outsource_employee_empl1,
+            employment=self.outsource_employment_empl1,
+            created_by=self.user1,
+        )
+        vacancy.outsources.add(self.outsource_network1)
+        response = self.client.post(
+            f'/rest_api/worker_day/{vacancy.id}/refuse_vacancy/',
+        )
+        self.assertEqual(response.status_code, 200)
+        vacancy.refresh_from_db()
+        self.assertIsNone(vacancy.employee_id)
+        self.assertEqual(len(mail.outbox), 3)
+        self.assertCountEqual(
+            list(map(lambda x: x.to[0], mail.outbox)), 
+            [self.outsource_user_dir1.email, self.outsource_user_empl1.email, self.outsource_user_urs1.email],
+        )
+        self.assertCountEqual(
+            list(map(lambda x: x.body, mail.outbox)), 
+            [
+                f'Здравствуйте, {self.outsource_user_empl1.first_name}!\n\n\n\n\n\n\nУ вас была отменена вакансия в магазине {self.shop.name}.\n'
+                f'Дата: {dt}\nВремя работы с {dttm_work_start.strftime(self.dttm_format)} по {dttm_work_end.strftime(self.dttm_format)}\n\n\n\n\n\nПисьмо отправлено роботом. Подробности можно узнать по ссылке',
+                f'Здравствуйте, {self.outsource_user_dir1.first_name}!\n\n\n\n\n\n\nВ магазине {self.shop.name} отменена вакансия у сотрудника'
+                f' {self.outsource_user_empl1.last_name} {self.outsource_user_empl1.first_name} с табельным номером {self.outsource_employee_empl1.tabel_code} \n'
+                f'Дата: {dt}\nВремя с {dttm_work_start.strftime(self.dttm_format)} по {dttm_work_end.strftime(self.dttm_format)}\n\n\n\n\n\nПисьмо отправлено роботом. Подробности можно узнать по ссылке',
+                f'Здравствуйте, {self.outsource_user_urs1.first_name}!\n\n\n\n\n\n\nВ магазине {self.shop.name} отменена вакансия у сотрудника'
+                f' {self.outsource_user_empl1.last_name} {self.outsource_user_empl1.first_name} с табельным номером {self.outsource_employee_empl1.tabel_code} \n'
+                f'Дата: {dt}\nВремя с {dttm_work_start.strftime(self.dttm_format)} по {dttm_work_end.strftime(self.dttm_format)}\n\n\n\n\n\nПисьмо отправлено роботом. Подробности можно узнать по ссылке'
+            ]
+        )
+        mail.outbox.clear()
+        vacancy.employee = self.outsource_employee_empl1
+        vacancy.employment = self.outsource_employment_empl1
+        vacancy.save()
+        response = self.client.delete(
+            f'/rest_api/worker_day/{vacancy.id}/',
+        )
+        self.assertEqual(response.status_code, 204)
+        self.assertFalse(WorkerDay.objects.filter(pk=vacancy.id).exists())
+        self.assertEqual(len(mail.outbox), 3)
+        self.assertCountEqual(
+            list(map(lambda x: x.to[0], mail.outbox)), 
+            [self.outsource_user_dir1.email, self.outsource_user_empl1.email, self.outsource_user_urs1.email],
+        )
+        self.assertCountEqual(
+            list(map(lambda x: x.body, mail.outbox)), 
+            [
+                f'Здравствуйте, {self.outsource_user_empl1.first_name}!\n\n\n\n\n\n\nУ вас была отменена вакансия в магазине {self.shop.name}.\n'
+                f'Дата: {dt}\nВремя работы с {dttm_work_start.strftime(self.dttm_format)} по {dttm_work_end.strftime(self.dttm_format)}\n\n\n\n\n\nПисьмо отправлено роботом. Подробности можно узнать по ссылке',
+                f'Здравствуйте, {self.outsource_user_dir1.first_name}!\n\n\n\n\n\n\nВ магазине {self.shop.name} отменена вакансия у сотрудника'
+                f' {self.outsource_user_empl1.last_name} {self.outsource_user_empl1.first_name} с табельным номером {self.outsource_employee_empl1.tabel_code} \n'
+                f'Дата: {dt}\nВремя с {dttm_work_start.strftime(self.dttm_format)} по {dttm_work_end.strftime(self.dttm_format)}\n\n\n\n\n\nПисьмо отправлено роботом. Подробности можно узнать по ссылке',
+                f'Здравствуйте, {self.outsource_user_urs1.first_name}!\n\n\n\n\n\n\nВ магазине {self.shop.name} отменена вакансия у сотрудника'
+                f' {self.outsource_user_empl1.last_name} {self.outsource_user_empl1.first_name} с табельным номером {self.outsource_employee_empl1.tabel_code} \n'
+                f'Дата: {dt}\nВремя с {dttm_work_start.strftime(self.dttm_format)} по {dttm_work_end.strftime(self.dttm_format)}\n\n\n\n\n\nПисьмо отправлено роботом. Подробности можно узнать по ссылке'
+            ]
         )

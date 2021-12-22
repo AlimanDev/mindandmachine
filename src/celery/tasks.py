@@ -315,6 +315,7 @@ def employee_not_checked():
                 'type': 'приход',
                 'shop_id': no_comming_record.shop_id,
                 'employment_shop_id': no_comming_record.employment_shop_id,
+                'networks': [no_comming_record.shop.network_id, no_comming_record.worker.network_id],
             },
         )
 
@@ -334,6 +335,7 @@ def employee_not_checked():
                 'type': 'уход',
                 'shop_id': no_leaving_record.shop_id,
                 'employment_shop_id': no_comming_record.employment_shop_id,
+                'networks': [no_leaving_record.shop.network_id, no_leaving_record.worker.network_id],
             },
         )
 

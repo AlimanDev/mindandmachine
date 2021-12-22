@@ -416,6 +416,7 @@ def cancel_vacancy(vacancy_id, auto=True, delete=True, refuse=False):
     ).first()
     if vacancy:
         shop = vacancy.shop
+        networks = [shop.network_id,]
         employee = vacancy.employee
         vac_employment_id = vacancy.employment_id
         child = vacancy.child.first()
@@ -441,6 +442,7 @@ def cancel_vacancy(vacancy_id, auto=True, delete=True, refuse=False):
                 'last_name': employee.user.last_name,
                 'tabel_code': employee.tabel_code or '',
             }
+            networks.append(employee_obj.user.network_id)
             wd_exists = WorkerDay.objects.filter(
                 dt=vacancy.dt,
                 employee=employee_obj,
@@ -515,6 +517,7 @@ def cancel_vacancy(vacancy_id, auto=True, delete=True, refuse=False):
             'employment_shop_id': employment_shop_id,
             'shop_name': shop.name,
             'employee': employee,
+            'networks': networks,
         }
         if auto:
             event_context['shop_id'] = shop.id
@@ -809,6 +812,7 @@ def confirm_vacancy(vacancy_id, user=None, employee_id=None, exchange=False, rec
                     'user': {
                         'last_name': user.last_name,
                         'first_name': user.first_name,
+                        'is_outsource': user.network_id != vacancy_shop.network_id,
                     },
                     'from_user': {
                         'last_name': '',
@@ -823,6 +827,7 @@ def confirm_vacancy(vacancy_id, user=None, employee_id=None, exchange=False, rec
                     event_context['from_user'] = {
                         'last_name': from_user.last_name,
                         'first_name': from_user.first_name,
+                        'is_outsource': from_user.network_id != vacancy_shop.network_id,
                     }
 
                 event_signal.send(

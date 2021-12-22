@@ -42,6 +42,10 @@ class AbstractEventNotificationWithRecipients(AbstractEventNotification):
         'base.Group', blank=True, verbose_name='Оповещать пользователей магазина, имеющих выбранные группы',
         related_name='+',
     )
+    employee_shop_groups = models.ManyToManyField(
+        'base.Group', blank=True, verbose_name='Оповещать пользователей магазина сотрудника, имеющих выбранные группы',
+        related_name='+',
+    )
     shops = models.ManyToManyField(
         'base.Shop', blank=True, verbose_name='Оповещать по почте магазина',
     )
@@ -102,11 +106,17 @@ class AbstractEventNotificationWithRecipients(AbstractEventNotification):
         
         employment_shop_id = context.get('employment_shop_id')
         if employment_shop_id:
+            shop = Shop.objects.get(id=employment_shop_id)
+            shop_q = Q(shop=shop)
+            if self.shop_descendants:
+                shop_q |= Q(shop__in=shop.get_descendants())
+            if self.shop_ancestors:
+                shop_q |= Q(shop__in=shop.get_ancestors())
             recipients.extend(
                 list(User.objects.filter(
                     id__in=Employment.objects.get_active().filter(
-                        Q(function_group__in=self.shop_groups.all()) | Q(position__group__in=self.shop_groups.all()),
-                        shop_id=employment_shop_id,
+                        Q(function_group__in=self.employee_shop_groups.all()) | Q(position__group__in=self.employee_shop_groups.all()),
+                        shop_q,
                     ).values_list('employee__user_id', flat=True),
                     email__isnull=False,
                 ))
