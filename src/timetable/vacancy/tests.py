@@ -6,6 +6,7 @@ from django.db import transaction
 
 from django.test.utils import override_settings
 from rest_framework.test import APITestCase
+from src.celery.tasks import employee_not_checked
 from src.recognition.events import EMPLOYEE_NOT_CHECKED_IN, EMPLOYEE_NOT_CHECKED_OUT
 from src.timetable.tests.factories import WorkerDayFactory
 from src.util.mixins.tests import TestsHelperMixin
@@ -39,6 +40,7 @@ from src.forecast.models import (
     OperationTypeName,
 )
 from src.timetable.models import (
+    AttendanceRecords,
     GroupWorkerDayPermission,
     WorkType,
     WorkTypeName,
@@ -175,7 +177,6 @@ class TestAutoWorkerExchange(APITestCase):
                     shop=shop,
                     dt=dt.replace(day=1),
                     dttm_status_change=datetime.datetime.now(),
-                    is_approved=True,
                 )
                 for shop in shops
             ]
@@ -670,7 +671,7 @@ class TestAutoWorkerExchange(APITestCase):
 
     def test_worker_exchange_cant_apply_vacancy(self):
         self.create_users(1)
-        user = User.objects.exclude(username='dir').first()
+        user = User.objects.exclude(username__in=['dir', 'admin']).first()
         vacancy = self.create_vacancy(9, 21, self.work_type1)
         self.update_or_create_holidays(Employment.objects.get(employee__user=user), self.dt_now, 1)
         tt = ShopMonthStat.objects.get(shop_id=self.shop.id)
@@ -1450,13 +1451,13 @@ class TestVacancyNotification(APITestCase, TestsHelperMixin):
             name='Outsource shop 2',
         )
         create_users = [
-            ('urs1', 'Urs', '1', cls.outsource_shop1, cls.admin_group),
-            ('urs2', 'Urs', '2', cls.outsource_shop2, cls.admin_group),
-            ('dir1', 'Dir', '1', cls.outsource_shop1, cls.chief_group),
-            ('dir2', 'Dir', '2', cls.outsource_shop2, cls.chief_group),
-            ('empl1', 'Empl', '1', cls.outsource_shop1, cls.employee_group),
-            ('empl1_2', 'Empl', '1', cls.outsource_shop1, cls.employee_group),
-            ('empl2', 'Empl', '2', cls.outsource_shop2, cls.employee_group),
+            ('urs1', 'Urs', 'Urs1', cls.outsource_shop1, cls.admin_group),
+            ('urs2', 'Urs', 'Urs2', cls.outsource_shop2, cls.admin_group),
+            ('dir1', 'Dir', 'Dir1', cls.outsource_shop1, cls.chief_group),
+            ('dir2', 'Dir', 'Dir2', cls.outsource_shop2, cls.chief_group),
+            ('empl1', 'Empl', 'Empl1', cls.outsource_shop1, cls.employee_group),
+            ('empl1_2', 'Empl', 'Empl1_2', cls.outsource_shop1, cls.employee_group),
+            ('empl2', 'Empl', 'Empl2', cls.outsource_shop2, cls.employee_group),
         ]
         for user_data in create_users:
             user, employee, employment = cls._create_user(*user_data)
@@ -1773,5 +1774,65 @@ class TestVacancyNotification(APITestCase, TestsHelperMixin):
                 f'Здравствуйте, {self.outsource_user_urs1.first_name}!\n\n\n\n\n\n\nВ магазине {self.shop.name} отменена вакансия у сотрудника'
                 f' {self.outsource_user_empl1.last_name} {self.outsource_user_empl1.first_name} с табельным номером {self.outsource_employee_empl1.tabel_code} \n'
                 f'Дата: {dt}\nВремя с {dttm_work_start.strftime(self.dttm_format)} по {dttm_work_end.strftime(self.dttm_format)}\n\n\n\n\n\nПисьмо отправлено роботом. Подробности можно узнать по ссылке'
+            ]
+        )
+
+    def test_employee_not_checked_notification_sent(self):
+        self.maxDiff = None
+        dt = datetime.date.today()
+        dttm_now = datetime.datetime.now().replace(second=0) + datetime.timedelta(hours=self.shop.get_tz_offset())
+        dttm_check = dttm_now - datetime.timedelta(minutes=5)
+        WorkerDayFactory(
+            is_approved=True,
+            is_fact=False,
+            shop=self.shop,
+            is_vacancy=True,
+            is_outsource=True,
+            employee=self.outsource_employee_empl1,
+            employment=self.outsource_employment_empl1,
+            dt=dt,
+            type_id=WorkerDay.TYPE_WORKDAY,
+            dttm_work_start=dttm_check,
+            dttm_work_end=dttm_now + datetime.timedelta(hours=6),
+        )
+        WorkerDayFactory(
+            is_approved=True,
+            is_fact=False,
+            shop=self.shop,
+            is_vacancy=True,
+            is_outsource=True,
+            employee=self.outsource_employee_empl1_2,
+            employment=self.outsource_employment_empl1_2,
+            dt=dt,
+            type_id=WorkerDay.TYPE_WORKDAY,
+            dttm_work_start=dttm_now - datetime.timedelta(hours=6),
+            dttm_work_end=dttm_check,
+        )
+        AttendanceRecords.objects.create(
+            shop=self.shop,
+            type=AttendanceRecords.TYPE_COMING,
+            user=self.outsource_user_empl1_2,
+            dttm=dttm_now - datetime.timedelta(hours=6, minutes=23)
+        )
+        employee_not_checked()
+
+        self.assertEqual(len(mail.outbox), 6)
+        self.assertCountEqual(
+            list(map(lambda x: x.to[0], mail.outbox)), 
+            [self.outsource_user_dir1.email, self.user6.email, self.outsource_user_urs1.email] * 2,
+        )
+        worker1 = f'{self.outsource_user_empl1.last_name} {self.outsource_user_empl1.first_name}'
+        worker2 = f'{self.outsource_user_empl1_2.last_name} {self.outsource_user_empl1_2.first_name}'
+        body = ('Здравствуйте, {first_name}!\n\n\n\n\n\n\nСотрудник {worker} не отметился на {type}.\n\n'
+                'Время {shift_type} смены: {dttm}.\n\n' f'Магазин: {self.shop.name}.\n\n\n\n\n\n\nПисьмо отправлено роботом. Подробности можно узнать по ссылке')
+        self.assertCountEqual(
+            list(map(lambda x: x.body, mail.outbox)), 
+            [
+                body.format(first_name=self.outsource_user_dir1.first_name, worker=worker1, type='приход', shift_type='начала', dttm=dttm_check.strftime(self.dttm_format)),
+                body.format(first_name=self.outsource_user_urs1.first_name, worker=worker1, type='приход', shift_type='начала', dttm=dttm_check.strftime(self.dttm_format)),
+                body.format(first_name=self.user6.first_name, worker=worker1, type='приход', shift_type='начала', dttm=dttm_check.strftime(self.dttm_format)),
+                body.format(first_name=self.outsource_user_dir1.first_name, worker=worker2, type='уход', shift_type='окончания', dttm=dttm_check.strftime(self.dttm_format)),
+                body.format(first_name=self.outsource_user_urs1.first_name, worker=worker2, type='уход', shift_type='окончания', dttm=dttm_check.strftime(self.dttm_format)),
+                body.format(first_name=self.user6.first_name, worker=worker2, type='уход', shift_type='окончания', dttm=dttm_check.strftime(self.dttm_format)),
             ]
         )

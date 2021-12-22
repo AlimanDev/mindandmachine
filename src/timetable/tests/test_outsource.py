@@ -271,7 +271,7 @@ class TestOutsource(TestsHelperMixin, APITestCase):
         self.assertEqual(mail.outbox[0].to[0], self.client_user.email)
         self.assertEqual(
             mail.outbox[0].body, 
-            f'Здравствуйте, {self.client_user.first_name}!\n\n\n\n\n\n\nСотрудник {self.user1.last_name} {self.user1.first_name} откликнулся на вакансию с типом работ {self.client_work_type_name.name}\n'
+            f'Здравствуйте, {self.client_user.first_name}!\n\n\n\n\n\n\nАутсорс сотрудник {self.user1.last_name} {self.user1.first_name} откликнулся на вакансию с типом работ {self.client_work_type_name.name}\n'
             f'Дата: {vacancy["dt"]}\nПодразделение: {self.client_shop.name}\n\n\n\n\n\nПисьмо отправлено роботом. Подробности можно узнать по ссылке'
         )
         vacancy = WorkerDay.objects.get(id=vacancy['id'])
