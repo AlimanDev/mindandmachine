@@ -337,6 +337,7 @@ class WorkerDaySerializer(serializers.ModelSerializer, UnaccountedOvertimeMixin)
         else:
             attrs['outsources'] = []
 
+        self._create_update_clean(attrs, instance=self.instance)
         return attrs
 
     def _create_update_clean(self, validated_data, instance=None):
@@ -353,8 +354,6 @@ class WorkerDaySerializer(serializers.ModelSerializer, UnaccountedOvertimeMixin)
 
     def create(self, validated_data):
         with transaction.atomic():
-            self._create_update_clean(validated_data)
-
             details = validated_data.pop('worker_day_details', None)
             outsources = validated_data.pop('outsources', None)
             canceled_vacancies = WorkerDay.objects.filter(
@@ -406,8 +405,6 @@ class WorkerDaySerializer(serializers.ModelSerializer, UnaccountedOvertimeMixin)
             instance.outsources.set(outsources)
             for wd_detail in details:
                 WorkerDayCashboxDetails.objects.create(worker_day=instance, **wd_detail)
-
-            self._create_update_clean(validated_data, instance=instance)
 
             res = super().update(instance, validated_data)
 
@@ -767,4 +764,13 @@ class ConfirmVacancyToWorkerSerializer(serializers.Serializer):
                 self.error_messages['employee_not_in_subordinates'].format(
                 employee=attrs['user'].fio),
             )
+        no_perm_to_reconfirm = self.context['view'].action == 'reconfirm_vacancy_to_worker' and\
+            not (vacancy.employee.user_id == user.id) and\
+            not WorkerDay._has_group_permissions(user, vacancy.employee_id, vacancy.dt)
+        if no_perm_to_reconfirm:
+            raise PermissionDenied(
+                self.error_messages['employee_not_in_subordinates'].format(
+                employee=vacancy.employee.user.fio),
+            )
+
         return attrs

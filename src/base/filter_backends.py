@@ -1,10 +1,12 @@
 import distutils.util
 
-from django.db.models import Exists, OuterRef, Q, BooleanField, ExpressionWrapper
+from django.db.models import Exists, OuterRef, Q, BooleanField, ExpressionWrapper, F
+from django.db.models.query import Prefetch
+from django.utils import timezone
 from django_filters import utils
 from django_filters.rest_framework import DjangoFilterBackend
-from django.utils import timezone
-from src.base.models import Employee, Employment, Shop
+
+from src.base.models import Employee, Employment, Shop, User
 from src.timetable.models import WorkerDay
 
 
@@ -54,6 +56,14 @@ class EmployeeFilterBackend(DjangoFilterBackend):
                 qs = Employee.objects.filter(
                     Q(id__in=filterset.qs.values_list('id', flat=True)) |
                     Q(id__in=other_deps_employees_with_wd_in_curr_shop_qs.values_list('id', flat=True)),
+                ).prefetch_related(
+                    Prefetch(
+                        'user',
+                        queryset=User.objects.all().annotate(
+                            userconnecter_id=F('userconnecter'),
+                        ),
+                        to_attr='employee_user',
+                    )
                 )
 
             shop = Shop.objects.get(pk=shop_id) if shop_id else request.user.get_shops().first()
@@ -62,6 +72,12 @@ class EmployeeFilterBackend(DjangoFilterBackend):
                     ~Q(user__network_id=shop.network_id),
                     output_field=BooleanField(),
                 )
+            )
+
+        employee_id = filterset.form.cleaned_data.get('id')
+        if employee_id:
+            qs = qs.filter(
+                id=employee_id,
             )
 
         if shop_id:

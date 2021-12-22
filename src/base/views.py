@@ -245,6 +245,11 @@ class EmployeeViewSet(UpdateorCreateViewSet):
     filter_backends = [EmployeeFilterBackend]
     openapi_tags = ['Employee', ]
 
+    def get_serializer(self, *args, **kwargs):
+        if self.action == 'list':
+            kwargs['user_source'] = 'employee_user'
+        return super(EmployeeViewSet, self).get_serializer(*args, **kwargs)
+
     def get_queryset(self):
         network_filter = Q(user__network_id=self.request.user.network_id)
         # сотрудники из аутсорс сети только для чтения
@@ -258,8 +263,14 @@ class EmployeeViewSet(UpdateorCreateViewSet):
 
         qs = Employee.objects.filter(
             network_filter,
-        ).select_related(
-            'user',
+        ).prefetch_related(
+            Prefetch(
+                'user',
+                queryset=User.objects.all().annotate(
+                    userconnecter_id=F('userconnecter'),
+                ),
+                to_attr='employee_user',
+            )
         )
         return qs.distinct()
 

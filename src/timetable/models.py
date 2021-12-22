@@ -1,6 +1,7 @@
 import datetime
 import json
 from decimal import Decimal
+import distutils.util
 
 from django.conf import settings
 from django.contrib.auth.models import (
@@ -640,7 +641,8 @@ class WorkerDay(AbstractModel):
         dt = obj_dict.get('dt')
         shop_id = obj_dict.get('shop_id')
         employee_id = obj_dict.get('employee_id')
-        k = f'{graph_type}_{action}_{wd_type_id}_{shop_id}_{employee_id}'
+        is_vacancy = obj_dict.get('is_vacancy', False)
+        k = f'{graph_type}_{action}_{wd_type_id}_{shop_id}_{employee_id}_{is_vacancy}'
         create_or_update_perms_data.setdefault(k, set()).add(dt)
 
     @classmethod
@@ -657,11 +659,15 @@ class WorkerDay(AbstractModel):
         employees_and_shops = delete_qs.values_list(
             'employee_id',
             'dt',
+            'shop_id',
+            'is_vacancy',
         ).distinct()
         user_shops = list(user.get_shops(include_descendants=True).values_list('id', flat=True))
         user_subordinates = Group.get_subordinate_ids(user)
-        for employee_id, dt in employees_and_shops:
-            if not cls._has_group_permissions(user, employee_id, dt, user_shops=user_shops, user_subordinates=user_subordinates):
+        for employee_id, dt, shop_id, is_vacancy in employees_and_shops:
+            if not cls._has_group_permissions(
+                user, employee_id, dt, user_shops=user_shops, 
+                user_subordinates=user_subordinates, shop_id=shop_id, is_vacancy=is_vacancy):
                 raise PermissionDenied(
                     WorkerDayViewSet.error_messages['employee_not_in_subordinates'].format(
                     employee=User.objects.filter(employees__id=employee_id).first().fio),
@@ -698,11 +704,12 @@ class WorkerDay(AbstractModel):
         from src.timetable.worker_day.utils import check_worker_day_permissions
         from src.timetable.worker_day.views import WorkerDayViewSet
         for k, dates_set in create_or_update_perms_data.items():
-            graph_type, action, wd_type_id, shop_id, employee_id = k.split('_')
+            graph_type, action, wd_type_id, shop_id, employee_id, is_vacancy = k.split('_')
             if shop_id == 'None':
                 shop_id = None
             if employee_id == 'None':
                 employee_id = None
+            is_vacancy = bool(distutils.util.strtobool(is_vacancy))
             check_worker_day_permissions(
                 user=user,
                 shop_id=shop_id,
@@ -714,6 +721,7 @@ class WorkerDay(AbstractModel):
                 error_messages=WorkerDayViewSet.error_messages,
                 wd_types_dict=kwargs.get('wd_types_dict'),
                 employee_id=employee_id,
+                is_vacancy=is_vacancy,
             )
 
     @classmethod
@@ -742,9 +750,16 @@ class WorkerDay(AbstractModel):
         }
 
     @classmethod
-    def _has_group_permissions(cls, user, employee_id, dt, user_shops=None, user_subordinates=None):
+    def _has_group_permissions(cls, user, employee_id, dt, user_shops=None, user_subordinates=None, is_vacancy=False, shop_id=None):
         if not employee_id:
             return True
+        if is_vacancy:
+            if not user_shops:
+                user_shops = user.get_shops(include_descendants=True).values_list('id', flat=True)
+            if isinstance(shop_id, str):
+                shop_id = int(shop_id)
+            if shop_id in user_shops:
+                return True
         employee = Employee.get_subordinates(
             user, 
             dt=dt, 

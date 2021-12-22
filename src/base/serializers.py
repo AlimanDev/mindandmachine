@@ -193,14 +193,16 @@ class UserShorSerializer(serializers.Serializer):
 
 class UserSerializer(BaseNetworkSerializer):
     username = serializers.CharField(required=False, validators=[UniqueValidator(queryset=User.objects.all())])
-    network_id = serializers.HiddenField(default=CurrentUserNetwork())
+    network_id = serializers.IntegerField(default=CurrentUserNetwork())
     avatar = serializers.SerializerMethodField('get_avatar_url')
     email = serializers.CharField(required=False, allow_blank=True)
+    has_biometrics = serializers.SerializerMethodField()
 
     class Meta:
         model = User
         fields = ['id', 'first_name', 'last_name', 'middle_name', 'network_id',
-                  'birthday', 'sex', 'avatar', 'email', 'phone_number', 'username', 'auth_type', 'ldap_login']
+                  'birthday', 'sex', 'avatar', 'email', 'phone_number', 'username', 'auth_type', 'ldap_login',
+                  'has_biometrics']
 
     def validate(self, attrs):
         email = attrs.get('email')
@@ -222,9 +224,14 @@ class UserSerializer(BaseNetworkSerializer):
             return obj.avatar.url
         return None
 
+    def get_has_biometrics(self, obj) -> bool:
+        if getattr(obj, 'userconnecter_id', None):
+            return True
+        else:
+            return False
+
 
 class EmployeeSerializer(BaseNetworkSerializer):
-    user = UserSerializer(read_only=True)
     user_id = serializers.IntegerField(required=False, write_only=True)
     has_shop_employment = serializers.BooleanField(required=False, read_only=True)
     from_another_network = serializers.BooleanField(required=False, read_only=True)
@@ -240,9 +247,10 @@ class EmployeeSerializer(BaseNetworkSerializer):
             )
         ]
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, user_source=None, **kwargs):
         super(EmployeeSerializer, self).__init__(*args, **kwargs)
         request = self.context.get('request')
+        self.fields['user'] = UserSerializer(read_only=True, source=user_source)
         if request and request.query_params.get('include_employments'):
             self.fields['employments'] = EmploymentSerializer(
                 required=False, many=True, read_only=True, context=self.context, source='employments_list')

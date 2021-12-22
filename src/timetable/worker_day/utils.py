@@ -444,11 +444,11 @@ def create_worker_days_range(dates, type_id=WorkerDay.TYPE_WORKDAY, shop_id=None
 
 
 def check_worker_day_permissions(
-        user, shop_id, action, graph_type, wd_types, dt_from, dt_to, error_messages, wd_types_dict, employee_id=None):
+        user, shop_id, action, graph_type, wd_types, dt_from, dt_to, error_messages, wd_types_dict, employee_id=None, is_vacancy=False):
     user_shops = list(user.get_shops(include_descendants=True).values_list('id', flat=True))
     user_subordinates = Group.get_subordinate_ids(user)
     for dt in [dt_from + datetime.timedelta(i) for i in range((dt_to - dt_from).days + 1)]:
-        if not WorkerDay._has_group_permissions(user, employee_id, dt, user_shops=user_shops, user_subordinates=user_subordinates):
+        if not WorkerDay._has_group_permissions(user, employee_id, dt, user_shops=user_shops, user_subordinates=user_subordinates, shop_id=shop_id, is_vacancy=is_vacancy):
             raise PermissionDenied(
                 error_messages['employee_not_in_subordinates'].format(
                 employee=User.objects.filter(employees__id=employee_id).first().fio),
