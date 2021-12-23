@@ -97,6 +97,7 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
             'dt_hired': (timezone.now() - timedelta(days=300)).strftime('%Y-%m-%d'),
             'shop_id': self.shop2.id,
             'employee_id': self.employee2.id,
+            'dt_fired': None,
         }
 
         resp = self.client.put(
