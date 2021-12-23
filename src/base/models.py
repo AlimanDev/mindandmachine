@@ -946,7 +946,6 @@ class Group(AbstractActiveNetworkSpecificCodeNamedModel):
     class Meta(AbstractActiveNetworkSpecificCodeNamedModel.Meta):
         verbose_name = 'Группа пользователей'
         verbose_name_plural = 'Группы пользователей'
-    
 
     CHOICE_ALLOWED_TABS = [
         ('load_forecast', 'Прогноз потребностей'),
