@@ -957,7 +957,7 @@ class Group(AbstractActiveNetworkSpecificCodeNamedModel):
     ]
 
     dttm_modified = models.DateTimeField(blank=True, null=True)
-    subordinates = models.ManyToManyField("self", blank=True)
+    subordinates = models.ManyToManyField("self", blank=True, symmetrical=False)
     has_perm_to_change_protected_wdays = models.BooleanField(
         default=False, verbose_name='Может изменять/подтверждать "защищенные" рабочие дни')
     has_perm_to_approve_other_shop_days = models.BooleanField(
