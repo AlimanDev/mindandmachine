@@ -4,6 +4,9 @@ import time as time_module
 import uuid
 from datetime import timedelta, time, datetime, date
 from unittest import mock
+from src.timetable.vacancy.utils import (
+    confirm_vacancy,
+)
 
 from dateutil.relativedelta import relativedelta
 from django.core import mail
@@ -4466,6 +4469,97 @@ class TestAttendanceRecords(TestsHelperMixin, APITestCase):
         details = WorkerDayCashboxDetails.objects.filter(worker_day=wd_fact).first()
         self.assertIsNotNone(details)
         self.assertEquals(details.work_type_id, work_type.id)
+
+    def test_set_closest_plan_approved_on_confirm_vacancy_to_worker(self):
+        ShopMonthStat.objects.create(
+            shop=self.shop,
+            dt=date(2021, 9, 1),
+            dttm_status_change=now(),
+            status=ShopMonthStat.READY,
+            is_approved=True,
+        )
+        WorkerDay.objects.filter(employee=self.employee3).delete()
+        WorkerDay.objects.create(
+            employee=self.employee3,
+            employment=self.employment3,
+            shop=self.shop,
+            dt=date(2021, 9, 21),
+            is_approved=True,
+            is_fact=False,
+            type_id=WorkerDay.TYPE_HOLIDAY,
+        )
+        wd_approved_fact = WorkerDay.objects.create(
+            employee=self.employee3,
+            employment=self.employment3,
+            shop=self.shop,
+            dt=date(2021, 9, 21),
+            is_approved=True,
+            is_fact=True,
+            dttm_work_start=datetime(2021, 9, 21, 8, 34),
+            dttm_work_end=datetime(2021, 9, 21, 20, 15),
+            type_id=WorkerDay.TYPE_WORKDAY,
+            closest_plan_approved=None,
+        )
+        vacancy = WorkerDay.objects.create(
+            shop=self.shop,
+            is_vacancy=True,
+            dt=date(2021, 9, 21),
+            is_approved=True,
+            is_fact=False,
+            dttm_work_start=datetime(2021, 9, 21, 9),
+            dttm_work_end=datetime(2021, 9, 21, 20),
+            type_id=WorkerDay.TYPE_WORKDAY,
+            closest_plan_approved=None,
+        )
+        confirm_vacancy(vacancy_id=vacancy.id, user=self.employee3.user, employee_id=self.employee3.id)
+        wd_approved_fact.refresh_from_db()
+        self.assertIsNotNone(wd_approved_fact.closest_plan_approved_id)
+        self.assertEqual(wd_approved_fact.closest_plan_approved_id, vacancy.id)
+
+    def test_set_closest_plan_approved_on_leaving_att_record(self):
+        ShopMonthStat.objects.create(
+            shop=self.shop,
+            dt=date(2021, 9, 1),
+            dttm_status_change=now(),
+            status=ShopMonthStat.READY,
+            is_approved=True,
+        )
+        WorkerDay.objects.filter(employee=self.employee3).delete()
+        plan_approved = WorkerDay.objects.create(
+            employee=self.employee3,
+            employment=self.employment3,
+            shop=self.shop,
+            dt=date(2021, 9, 21),
+            is_approved=True,
+            is_fact=False,
+            dttm_work_start=datetime(2021, 9, 21, 8, 34),
+            dttm_work_end=datetime(2021, 9, 21, 20, 15),
+            type_id=WorkerDay.TYPE_WORKDAY,
+        )
+        wd_approved_fact = WorkerDay.objects.create(
+            employee=self.employee3,
+            employment=self.employment3,
+            shop=self.shop,
+            dt=date(2021, 9, 21),
+            is_approved=True,
+            is_fact=True,
+            dttm_work_start=datetime(2021, 9, 21, 8, 34),
+            type_id=WorkerDay.TYPE_WORKDAY,
+            closest_plan_approved=None,
+        )
+        AttendanceRecords.objects.create(
+            employee_id=self.employee3.id,
+            user_id=self.user3.id,
+            type=AttendanceRecords.TYPE_LEAVING,
+            dt=date(2021, 9, 21),
+            dttm=datetime.combine(date(2021, 9, 21), time(20)),
+            shop_id=self.shop.id,
+        )
+
+        wd_approved_fact.refresh_from_db()
+        self.assertEqual(wd_approved_fact.dttm_work_end, datetime.combine(date(2021, 9, 21), time(20)))
+        self.assertIsNotNone(wd_approved_fact.closest_plan_approved_id)
+        self.assertEqual(wd_approved_fact.closest_plan_approved_id, plan_approved.id)
 
 
 class TestVacancy(TestsHelperMixin, APITestCase):

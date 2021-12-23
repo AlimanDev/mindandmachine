@@ -2224,6 +2224,8 @@ class AttendanceRecords(AbstractModel):
                 # TODO: проставление такого же типа как в плане? (тест + проверить)
                 setattr(fact_approved, 'type_id',
                         closest_plan_approved.type_id if closest_plan_approved else WorkerDay.TYPE_WORKDAY)
+                if closest_plan_approved and not fact_approved.closest_plan_approved_id:
+                    fact_approved.closest_plan_approved = closest_plan_approved
                 if not fact_approved.worker_day_details.exists():
                     self._create_wd_details(self.dt, fact_approved, active_user_empl, closest_plan_approved)
                 fact_approved.save()
@@ -2244,6 +2246,8 @@ class AttendanceRecords(AbstractModel):
                         setattr(prev_fa_wd, self.TYPE_2_DTTM_FIELD[self.type], self.dttm)
                         setattr(prev_fa_wd, 'type_id',
                                 closest_plan_approved.type_id if closest_plan_approved else WorkerDay.TYPE_WORKDAY)
+                        if closest_plan_approved and not prev_fa_wd.closest_plan_approved_id:
+                            prev_fa_wd.closest_plan_approved = closest_plan_approved
                         prev_fa_wd.save()
                         # логично дату предыдущую ставить, так как это значение в отчетах используется
                         self.dt = prev_fa_wd.dt

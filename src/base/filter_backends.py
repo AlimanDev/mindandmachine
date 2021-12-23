@@ -56,6 +56,7 @@ class EmployeeFilterBackend(DjangoFilterBackend):
                 qs = Employee.objects.filter(
                     Q(id__in=filterset.qs.values_list('id', flat=True)) |
                     Q(id__in=other_deps_employees_with_wd_in_curr_shop_qs.values_list('id', flat=True)),
+                    employments__dttm_deleted__isnull=True,
                 ).prefetch_related(
                     Prefetch(
                         'user',
@@ -84,4 +85,4 @@ class EmployeeFilterBackend(DjangoFilterBackend):
             qs = qs.annotate(
                 has_shop_employment=has_shop_employment_sq,
             )
-        return qs
+        return qs.distinct()
