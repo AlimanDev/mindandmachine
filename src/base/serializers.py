@@ -375,8 +375,8 @@ class EmploymentSerializer(serializers.ModelSerializer):
     worker_constraints = WorkerConstraintSerializer(many=True, source='worker_constraints_list')
     username = serializers.CharField(required=False, source='employee.user.username')
     dt_hired = serializers.DateField(required=True)
-    dt_fired = serializers.DateField(required=False, default=None)
-    tabel_code = serializers.CharField(required=False, source='employee.tabel_code')
+    dt_fired = serializers.DateField(required=False, default=None, allow_null=True)
+    tabel_code = serializers.CharField(required=False, source='employee.tabel_code', allow_blank=True)
     is_active = serializers.BooleanField(read_only=True)
 
     class Meta:
