@@ -4,8 +4,9 @@ from django_filters.constants import EMPTY_VALUES
 
 
 class QFilterAndOrIsNullMixin(Filter):
-    def __init__(self, *args, or_isnull=False, **kwargs):
+    def __init__(self, *args, or_isnull=False, extra_lookups=None, **kwargs):
         self.or_isnull = or_isnull
+        self.extra_lookups = extra_lookups
         super(QFilterAndOrIsNullMixin, self).__init__(*args, **kwargs)
 
     def get_q(self, value):
@@ -17,6 +18,9 @@ class QFilterAndOrIsNullMixin(Filter):
         if self.or_isnull:
             isnull_lookup = '%s__%s' % (self.field_name, 'isnull')
             q |= Q(**{isnull_lookup: True})
+        if self.extra_lookups:
+            for extra_lookup_name, extra_lookup_value in self.extra_lookups.items():
+                q &= Q(**{extra_lookup_name: extra_lookup_value})
         return q
 
 
