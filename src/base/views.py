@@ -254,11 +254,17 @@ class EmployeeViewSet(UpdateorCreateViewSet):
         network_filter = Q(user__network_id=self.request.user.network_id)
         # сотрудники из аутсорс сети только для чтения
         if self.action in ['list', 'retrieve']:
+            outsource_networks_qs = NetworkConnect.objects.filter(
+                client_id=self.request.user.network_id,
+            ).values_list('outsourcing_id', flat=True)
+            # рефакторинг
+            other_deps_employees_with_wd_in_curr_shop = self.request.query_params.get(
+                'other_deps_employees_with_wd_in_curr_shop')
+            if not (other_deps_employees_with_wd_in_curr_shop and bool(
+                distutils.util.strtobool(other_deps_employees_with_wd_in_curr_shop))):
+                outsource_networks_qs = outsource_networks_qs.filter(allow_assign_employements_from_outsource=True)
             network_filter |= Q(
-                user__network_id__in=NetworkConnect.objects.filter(
-                    client_id=self.request.user.network_id, 
-                    allow_assign_employements_from_outsource=True,
-                ).values_list('outsourcing_id', flat=True)
+                user__network_id__in=outsource_networks_qs
             )
 
         qs = Employee.objects.filter(
