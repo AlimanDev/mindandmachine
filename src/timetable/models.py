@@ -2286,10 +2286,6 @@ class AttendanceRecords(AbstractModel):
                             network_id=self.user.network_id,
                             event_code=EMPLOYEE_WORKING_NOT_ACCORDING_TO_PLAN,
                             context={
-                                'director':{
-                                    'email': self.shop.director.email if self.shop.director else self.shop.email,
-                                    'name': self.shop.director.first_name if self.shop.director else self.shop.name, 
-                                },
                                 'user':{
                                     'last_name': self.user.last_name,
                                     'first_name': self.user.first_name,
