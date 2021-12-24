@@ -44,6 +44,7 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
             'dt_hired': (timezone.now() - timedelta(days=500)).strftime('%Y-%m-%d'),
             'shop_id': self.shop.id,
             'employee_id': self.employee2.id,
+            'tabel_code': '',
         }
 
         resp = self.client.post(
@@ -96,6 +97,7 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
             'dt_hired': (timezone.now() - timedelta(days=300)).strftime('%Y-%m-%d'),
             'shop_id': self.shop2.id,
             'employee_id': self.employee2.id,
+            'dt_fired': None,
         }
 
         resp = self.client.put(
@@ -518,7 +520,7 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
                     'dt_hired': date(2021, 1, 1).strftime('%Y-%m-%d'),
                     'dt_fired': date(2021, 5, 25).strftime('%Y-%m-%d'),
                     'shop_id': self.shop2.id,
-            'employee_id': self.employee2.id,
+                    'employee_id': self.employee2.id,
                     'code': 'code1',
                     'by_code': True,
                 }
@@ -535,7 +537,7 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
                     'dt_hired': date(2021, 1, 1).strftime('%Y-%m-%d'),
                     'dt_fired': date(2021, 5, 25).strftime('%Y-%m-%d'),
                     'shop_id': self.shop2.id,
-            'employee_id': self.employee2.id,
+                    'employee_id': self.employee2.id,
                     'code': 'code2',
                     'by_code': True,
                 }

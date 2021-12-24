@@ -838,6 +838,12 @@ def confirm_vacancy(vacancy_id, user=None, employee_id=None, exchange=False, rec
                     shop_id=vacancy.shop_id,
                     context=event_context,
                 )
+                
+                WorkerDay.set_closest_plan_approved(
+                    q_obj=Q(employee_id=vacancy.employee_id, dt=vacancy.dt),
+                    delta_in_secs=vacancy_shop.network.set_closest_plan_approved_delta_for_manual_fact if (
+                                vacancy_shop and vacancy_shop.network_id) else 60 * 60 * 5,
+                )
             else:
                 res['text'] = messages['cant_apply_vacancy']
                 res['status_code'] = 400

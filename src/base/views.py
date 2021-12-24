@@ -263,6 +263,7 @@ class EmployeeViewSet(UpdateorCreateViewSet):
 
         qs = Employee.objects.filter(
             network_filter,
+            employments__dttm_deleted__isnull=True,
         ).prefetch_related(
             Prefetch(
                 'user',

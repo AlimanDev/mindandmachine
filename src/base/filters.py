@@ -121,8 +121,10 @@ class EmployeeFilter(QFilterSet):
     worker_day_type__in = QListFilter(field_name='worker_days__type', lookup_expr='in')
     worker_day_dt__in = QListFilter(field_name='worker_days__dt', lookup_expr='in')
 
-    employments__dt_from = QDateFilter(field_name='employments__dt_fired', lookup_expr='gte', or_isnull=True)
-    employments__dt_to = QDateFilter(field_name='employments__dt_hired', lookup_expr='lte', or_isnull=True)
+    employments__dt_from = QDateFilter(
+        field_name='employments__dt_fired', lookup_expr='gte_or_isnull', extra_lookups={'employments__dttm_deleted__isnull': True})
+    employments__dt_to = QDateFilter(
+        field_name='employments__dt_hired', lookup_expr='lte_or_isnull', extra_lookups={'employments__dttm_deleted__isnull': True})
 
     id = QNumberFilter(field_name='id')
     id__in = QListFilter(field_name='id', lookup_expr='in')
