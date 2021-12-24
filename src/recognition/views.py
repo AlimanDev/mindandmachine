@@ -95,11 +95,11 @@ class TickPointAuthToken(ObtainAuthToken):
             raise exceptions.AuthenticationFailed('Invalid key')
 
         token = TickPointToken.objects.filter(user=tick_point).first()
-        check_urv_token = tick_point and \
+        skip_check_urv_token = tick_point and \
                           tick_point.shop_id and \
                           tick_point.shop.network_id and \
-                          tick_point.shop.network.settings_values_prop.get('check_urv_token', True)
-        if check_urv_token and token:  # Only one auth token
+                          tick_point.shop.network.settings_values_prop.get('skip_check_urv_token', False)
+        if not skip_check_urv_token and token:  # Only one auth token
             raise exceptions.AuthenticationFailed('Для этой точки уже открыта сессия')
 
         token = TickPointToken.objects.create(user=tick_point)
