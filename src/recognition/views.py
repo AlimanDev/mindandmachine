@@ -102,7 +102,7 @@ class TickPointAuthToken(ObtainAuthToken):
         if not skip_check_urv_token and token:  # Only one auth token
             raise exceptions.AuthenticationFailed('Для этой точки уже открыта сессия')
 
-        token = TickPointToken.objects.create(user=tick_point)
+        token, _tpt_created = TickPointToken.objects.get_or_create(user=tick_point)
 
         return Response({
             'token': token.key,
