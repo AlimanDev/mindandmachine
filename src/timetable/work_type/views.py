@@ -9,6 +9,7 @@ from rest_framework.response import Response
 from rest_framework.validators import UniqueTogetherValidator
 
 from src.base.permissions import Permission
+from src.base.serializers import ModelSerializerWithCreateOnlyFields
 from src.base.views_abstract import BaseModelViewSet
 from src.conf.djconfig import QOS_DATE_FORMAT
 from src.timetable.models import WorkType, WorkTypeName
@@ -18,8 +19,8 @@ from src.util.openapi.responses import efficieny_response_schema_dict as respons
 
 
 # Serializers define the API representation.
-class WorkTypeSerializer(serializers.ModelSerializer):
-    work_type_name = WorkTypeNameSerializer(required=False)
+class WorkTypeSerializer(ModelSerializerWithCreateOnlyFields):
+    work_type_name = WorkTypeNameSerializer(read_only=True)
     code = serializers.CharField(required=False, write_only=True)
     shop_id = serializers.IntegerField(required=False)
     work_type_name_id = serializers.IntegerField(required=False, write_only=True)
@@ -27,16 +28,19 @@ class WorkTypeSerializer(serializers.ModelSerializer):
         model = WorkType
         fields = ['id', 'priority', 'dttm_last_update_queue', 'min_workers_amount', 'max_workers_amount',\
              'probability', 'prior_weight', 'shop_id', 'code', 'work_type_name_id', 'work_type_name', 'preliminary_cost_per_hour']
+        create_only_fields = ['work_type_name_id']
         validators = [
             UniqueTogetherValidator(
                 queryset=WorkType.objects.filter(dttm_deleted__isnull=True),
                 fields=['shop_id', 'work_type_name_id'],
             ),
         ]
-    def is_valid(self, *args, **kwargs):
-        if self.initial_data.get('code', False):
-            self.initial_data['work_type_name_id'] = WorkTypeName.objects.get(code=self.initial_data.get('code')).id
-        super().is_valid(*args, **kwargs)
+    
+    def to_internal_value(self, data):
+        if data.get('code', False) and not self.instance:
+            data['work_type_name_id'] = WorkTypeName.objects.get(code=data.get('code')).id   
+        return super().to_internal_value(data)
+
 
 
 class EfficiencySerializer(serializers.Serializer):

@@ -76,8 +76,12 @@ class WorkTypeName(AbstractActiveNetworkSpecificCodeNamedModel):
         verbose_name_plural = 'Названия типов работ'
 
     def delete(self):
+        from src.forecast.models import OperationTypeName
         super(WorkTypeName, self).delete()
         WorkType.objects.qos_delete(work_type_name__id=self.pk)
+        otn = OperationTypeName.objects.filter(work_type_name_id=self.pk).first()
+        if otn:
+            otn.delete()
         return self
 
     def __str__(self):
@@ -85,6 +89,34 @@ class WorkTypeName(AbstractActiveNetworkSpecificCodeNamedModel):
             self.id,
             self.name,
             self.code,
+        )
+
+    def save(self, *args, **kwargs):
+        from src.forecast.models import OperationTypeName
+        is_new = self.id is None
+        super().save(*args, **kwargs)
+        update_or_create_kwargs = {}
+        defaults = {
+            'do_forecast': OperationTypeName.FORECAST_FORMULA,
+            'code': self.code,
+            'work_type_name_id': self.id,
+            'name': self.name,
+            'network_id': self.network_id,
+            'dttm_deleted': None,
+        }
+        if is_new or not OperationTypeName.objects.filter(work_type_name_id=self.id).exists():
+            update_or_create_kwargs['network_id'] = defaults.pop('network_id')
+            if self.code:
+                update_or_create_kwargs['code'] = defaults.pop('code')
+            else:
+                update_or_create_kwargs['name'] = defaults.pop('name')
+        else:
+            update_or_create_kwargs['work_type_name_id'] = defaults.pop('work_type_name_id')
+
+        
+        OperationTypeName.objects.update_or_create(
+            **update_or_create_kwargs,
+            defaults=defaults,
         )
 
 
@@ -127,18 +159,42 @@ class WorkType(AbstractActiveModel):
             self.work_type_name = WorkTypeName.objects.get(code=code)
 
     def save(self, *args, **kwargs):
+        from src.forecast.models import OperationType
         if hasattr(self, 'code'):
             self.work_type_name = WorkTypeName.objects.get(code=self.code)
+        is_new = self.id is None
         super(WorkType, self).save(*args, **kwargs)
+        update_or_create_kwargs = {}
+        defaults = {
+            'status': OperationType.UPDATED,
+            'work_type_id': self.id,
+            'dttm_deleted': None,
+            'operation_type_name': self.work_type_name.operation_type_name,
+            'shop_id': self.shop_id,
+        }
+        if is_new or not OperationType.objects.filter(work_type_id=self.id).exists():
+            update_or_create_kwargs['shop_id'] = defaults.pop('shop_id')
+            update_or_create_kwargs['operation_type_name'] = defaults.pop('operation_type_name')
+        else:
+            update_or_create_kwargs['work_type_id'] = defaults.pop('work_type_id')
+        
+        OperationType.objects.update_or_create(
+            **update_or_create_kwargs,
+            defaults=defaults,
+        )
 
     def get_department(self):
         return self.shop
 
     def delete(self):
+        from src.forecast.models import OperationType
         if Cashbox.objects.filter(type_id=self.id, dttm_deleted__isnull=True).exists():
             raise models.ProtectedError('There is cashboxes with such work_type', Cashbox.objects.filter(type_id=self.id, dttm_deleted__isnull=True))
 
         super(WorkType, self).delete()
+        operation_type = OperationType.objects.filter(work_type_id=self.pk).first()
+        if operation_type:
+            operation_type.delete()
         # self.dttm_deleted = datetime.datetime.now()
         # self.save()
 

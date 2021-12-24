@@ -23,16 +23,12 @@ class TestOperationTypeName(APITestCase):
         self.url = '/rest_api/operation_type_name/'
 
         create_departments_and_users(self)
-        self.operation_type_name1 = OperationTypeName.objects.create(
-            name='Кассы',
-            network=self.network,
-        )
         self.work_type_name1 = WorkTypeName.objects.create(
             name='Кассы',
             network=self.network,
         )
+        self.operation_type_name1 = self.work_type_name1.operation_type_name
         self.work_type = WorkType.objects.create(shop=self.shop, work_type_name=self.work_type_name1)
-        OperationType.objects.create(work_type=self.work_type, operation_type_name=self.operation_type_name1)
         self.operation_type_name2 = OperationTypeName.objects.create(
             name='Тип_кассы_2',
             network=self.network,
@@ -58,8 +54,8 @@ class TestOperationTypeName(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         data = {'name': 'Кассы', 'code': None}
         data['id'] = response.json()['id']
-        data['do_forecast'] = OperationTypeName.FORECAST
-        data['work_type_name_id'] = None
+        data['do_forecast'] = OperationTypeName.FORECAST_FORMULA
+        data['work_type_name_id'] = self.work_type_name1.id
         self.assertEqual(response.json(), data)
 
     def test_create(self):
@@ -80,9 +76,9 @@ class TestOperationTypeName(APITestCase):
             'name': 'Склад',
             'code': '21',
         }
-        response = self.client.put(f'{self.url}{self.operation_type_name1.id}/', data, format='json')
+        response = self.client.put(f'{self.url}{self.operation_type_name2.id}/', data, format='json')
         operation_type_name = response.json()
-        data['id'] = self.operation_type_name1.id
+        data['id'] = self.operation_type_name2.id
         data['do_forecast'] = OperationTypeName.FORECAST
         data['work_type_name_id'] = None
         self.assertEqual(operation_type_name, data)
@@ -91,10 +87,10 @@ class TestOperationTypeName(APITestCase):
         data = {
             'name': 'Склад',
         }
-        response = self.client.put(f'{self.url}{self.operation_type_name1.id}/', data, format='json')
+        response = self.client.put(f'{self.url}{self.operation_type_name2.id}/', data, format='json')
         operation_type_name = response.json()
-        data['id'] = self.operation_type_name1.id
-        data['code'] = self.operation_type_name1.code
+        data['id'] = self.operation_type_name2.id
+        data['code'] = self.operation_type_name2.code
         data['do_forecast'] = OperationTypeName.FORECAST
         data['work_type_name_id'] = None
         self.assertEqual(operation_type_name, data)
@@ -103,10 +99,10 @@ class TestOperationTypeName(APITestCase):
         data = {
             'code': '21',
         }
-        response = self.client.put(f'{self.url}{self.operation_type_name1.id}/', data, format='json')
+        response = self.client.put(f'{self.url}{self.operation_type_name2.id}/', data, format='json')
         operation_type_name = response.json()
-        data['id'] = self.operation_type_name1.id
-        data['name'] = self.operation_type_name1.name
+        data['id'] = self.operation_type_name2.id
+        data['name'] = self.operation_type_name2.name
         data['do_forecast'] = OperationTypeName.FORECAST
         data['work_type_name_id'] = None
         self.assertEqual(operation_type_name, data)
