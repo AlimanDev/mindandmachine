@@ -74,7 +74,8 @@ class TestTickPhotos(TestsHelperMixin, APITestCase):
             with override_settings(CELERY_TASK_ALWAYS_EAGER=True):
                 ret_data = check_duplicate_biometrics(None, self.user3, shop_id=self.shop2.id)
         self.assertEqual(ret_data, "An error occurred while checking duplicate biometrics: The 'avatar' attribute has no file associated with it.")
-        self.assertEqual(len(mail.outbox), 0)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].subject, "[Django] ERROR: An error occurred while checking duplicate biometrics: The 'avatar' attribute has no file associated with it.")
 
     def _test_lateness(self, type, photo_type, dttm, assert_lateness, tick_id=None, assert_tick_lateness=True):
         with mock.patch('src.recognition.views.now', lambda: dttm - timedelta(hours=3)):
