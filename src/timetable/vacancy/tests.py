@@ -268,22 +268,9 @@ class TestAutoWorkerExchange(APITestCase):
             work_type_name=cls.work_type_name2,
         )
 
-        cls.operation_type_name = OperationTypeName.objects.create(
-            name='',
-            code='',
-            network=cls.network,
-            do_forecast=OperationTypeName.FORECAST,
-        )
+        cls.operation_type = cls.work_type1.operation_type
 
-        cls.operation_type = OperationType.objects.create(
-            operation_type_name=cls.operation_type_name,
-            work_type=cls.work_type1,
-        )
-
-        cls.operation_type2 = OperationType.objects.create(
-            operation_type_name=cls.operation_type_name,
-            work_type=cls.work_type2,
-        )
+        cls.operation_type2 = cls.work_type2.operation_type
 
         cls.exchange_settings = ExchangeSettings.objects.create(
             automatic_check_lack_timegap=datetime.timedelta(days=1),

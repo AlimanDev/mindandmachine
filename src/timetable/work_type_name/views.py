@@ -29,29 +29,6 @@ class WorkTypeNameSerializer(BaseNetworkSerializer):
 
         return True
     
-    def create(self, validated_data, *args, **kwargs):
-        instance = super().create(validated_data, *args, **kwargs)
-        validated_data['work_type_name'] = instance
-        validated_data['do_forecast'] = 'F'
-        OperationTypeName.objects.update_or_create(
-            network_id=validated_data.pop('network_id'),
-            name=validated_data.pop('name'),
-            defaults=validated_data,
-        )
-        return instance
-    
-    def update(self, instance, validated_data, *args, **kwargs):
-        instance = super().update(instance, validated_data, *args, **kwargs)
-        validated_data.pop('network_id', None)
-        validated_data.pop('id', None)
-        validated_data['do_forecast'] = 'F'
-        OperationTypeName.objects.update_or_create(
-            network_id=instance.network_id, 
-            work_type_name=instance, 
-            defaults=validated_data
-        )
-        return instance
-
 
 class WorkTypeNameViewSet(BaseActiveNamedModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
