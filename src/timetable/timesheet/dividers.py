@@ -460,28 +460,35 @@ class ShiftScheduleDivider(BaseTimesheetDivider):
                         # костылик на случай если дневные и ночные часы не будут приходить
                         if not shift_schedule_day_hours and not shift_schedule_night_hours:
                             shift_schedule_day_hours = shift_schedule_hours
-                        main_timesheet_day_hours = self.fiscal_timesheet.main_timesheet.get_day_hours_sum(dt=dt)
-                        main_timesheet_night_hours = self.fiscal_timesheet.main_timesheet.get_night_hours_sum(dt=dt)
-                        if main_timesheet_night_hours < shift_schedule_night_hours:
-                            night_hours_to_subtract = Decimal(shift_schedule_night_hours) - main_timesheet_night_hours
-                            items = self.fiscal_timesheet.additional_timesheet.subtract_hours(
-                                hours_to_subtract=night_hours_to_subtract, field='night_hours')
-                            self.fiscal_timesheet.main_timesheet.add(dt, items, inplace=True)
-                        if main_timesheet_day_hours < shift_schedule_day_hours:
-                            day_hours_to_subtract = Decimal(shift_schedule_day_hours) - main_timesheet_day_hours
-                            items = self.fiscal_timesheet.additional_timesheet.subtract_hours(
-                                hours_to_subtract=day_hours_to_subtract, field='day_hours')
-                            self.fiscal_timesheet.main_timesheet.add(dt, items, inplace=True)
 
-                        main_timesheet_total_hours = self.fiscal_timesheet.main_timesheet.get_total_hours_sum(dt=dt)
                         if main_timesheet_total_hours < shift_schedule_hours:
-                            hours_to_subtract = Decimal(shift_schedule_hours) - main_timesheet_total_hours
-                            items = self.fiscal_timesheet.additional_timesheet.subtract_hours(
-                                hours_to_subtract=hours_to_subtract)
-                            for item in items:
-                                item.day_hours = item.day_hours + item.night_hours
-                                item.night_hours = Decimal('0.00')
-                            self.fiscal_timesheet.main_timesheet.add(dt, items, inplace=True)
+                            main_timesheet_night_hours = self.fiscal_timesheet.main_timesheet.get_night_hours_sum(dt=dt)
+                            if main_timesheet_night_hours < shift_schedule_night_hours:
+                                total_hours_to_subtract = Decimal(
+                                    shift_schedule_hours) - self.fiscal_timesheet.main_timesheet.get_total_hours_sum(dt=dt)
+                                night_hours_to_subtract = min(Decimal(shift_schedule_night_hours) - main_timesheet_night_hours, total_hours_to_subtract)
+                                items = self.fiscal_timesheet.additional_timesheet.subtract_hours(
+                                    hours_to_subtract=night_hours_to_subtract, field='night_hours')
+                                self.fiscal_timesheet.main_timesheet.add(dt, items, inplace=True)
+
+                            main_timesheet_day_hours = self.fiscal_timesheet.main_timesheet.get_day_hours_sum(dt=dt)
+                            if main_timesheet_day_hours < shift_schedule_day_hours:
+                                total_hours_to_subtract = Decimal(
+                                    shift_schedule_hours) - self.fiscal_timesheet.main_timesheet.get_total_hours_sum(dt=dt)
+                                day_hours_to_subtract = min(Decimal(shift_schedule_day_hours) - main_timesheet_day_hours, total_hours_to_subtract)
+                                items = self.fiscal_timesheet.additional_timesheet.subtract_hours(
+                                    hours_to_subtract=day_hours_to_subtract, field='day_hours')
+                                self.fiscal_timesheet.main_timesheet.add(dt, items, inplace=True)
+
+                            total_hours_to_subtract = Decimal(
+                                shift_schedule_hours) - self.fiscal_timesheet.main_timesheet.get_total_hours_sum(dt=dt)
+                            if total_hours_to_subtract < shift_schedule_hours:
+                                items = self.fiscal_timesheet.additional_timesheet.subtract_hours(
+                                    hours_to_subtract=total_hours_to_subtract)
+                                for item in items:
+                                    item.day_hours = item.day_hours + item.night_hours
+                                    item.night_hours = Decimal('0.00')
+                                self.fiscal_timesheet.main_timesheet.add(dt, items, inplace=True)
 
     def _divide_by_shift_schedule(self):
         for dt in pd.date_range(self.fiscal_timesheet.dt_from, self.fiscal_timesheet.dt_to).date:
