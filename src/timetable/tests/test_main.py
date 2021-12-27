@@ -1,16 +1,14 @@
-from decimal import Decimal
 import json
 import time as time_module
 import uuid
 from datetime import timedelta, time, datetime, date
+from decimal import Decimal
 from unittest import mock
-from src.timetable.vacancy.utils import (
-    confirm_vacancy,
-)
 
 from dateutil.relativedelta import relativedelta
 from django.core import mail
 from django.db import transaction, IntegrityError
+from django.db.models import Q
 from django.test import override_settings
 from django.urls import reverse
 from django.utils.timezone import now
@@ -45,6 +43,9 @@ from src.timetable.models import (
     WorkerDayType,
 )
 from src.timetable.tests.factories import WorkTypeFactory, WorkerDayFactory, WorkerDayTypeFactory
+from src.timetable.vacancy.utils import (
+    confirm_vacancy,
+)
 from src.util.mixins.tests import TestsHelperMixin
 from src.util.models_converter import Converter
 from src.util.test import create_departments_and_users
@@ -1797,6 +1798,93 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
         self.assertEqual(WorkerDay.objects.filter(type=vacation_type).count(), 2)
         approved_vac = WorkerDay.objects.get(is_approved=True)
         self.assertEqual(approved_vac.work_hours, timedelta(seconds=19800))
+
+    def test_change_range_fact_recalculated_on_plan_approved_delete(self):
+        with self.settings(CELERY_TASK_ALWAYS_EAGER=True):
+            self.employee2.tabel_code = 'empl_2'
+            self.employee2.save()
+            self.shop.network.only_fact_hours_that_in_approved_plan = True
+            self.shop.network.save()
+            WorkerDay.objects.all().delete()
+            dt = date(2021, 6, 7)
+            for is_approved in [True, False]:
+                for is_fact in [True, False]:
+                    WorkerDayFactory(
+                        is_approved=is_approved,
+                        is_fact=is_fact,
+                        shop=self.shop,
+                        employment=self.employment2,
+                        employee=self.employee2,
+                        dt=dt,
+                        type_id=WorkerDay.TYPE_WORKDAY,
+                        dttm_work_start=datetime.combine(dt, time(8)),
+                        dttm_work_end=datetime.combine(dt, time(22)),
+                    )
+            WorkerDay.set_closest_plan_approved(
+                q_obj=Q(employee_id=self.employee2.id, dt=dt),
+                delta_in_secs=60*60*5,
+            )
+            for fact_wd in WorkerDay.objects.filter(dt=dt, employee=self.employee2, is_fact=True):
+                fact_wd.save()
+                self.assertIsNotNone(fact_wd.closest_plan_approved_id)
+                self.assertEqual(fact_wd.work_hours, timedelta(seconds=45900))
+
+            data = {
+                "ranges": [
+                    {
+                        "worker": self.employee2.tabel_code,
+                        "dt_from": dt,
+                        "dt_to": dt,
+                        "type": WorkerDay.TYPE_VACATION,
+                        "is_fact": False,
+                        "is_approved": True
+                    }
+                ]
+            }
+            with self.captureOnCommitCallbacks(execute=True) as callbacks:
+                response = self.client.post(reverse('WorkerDay-change-range'), data, format='json')
+            self.assertEqual(response.status_code, status.HTTP_200_OK)
+            self.assertDictEqual(
+                response.json(),
+                {self.employee2.tabel_code: {'created_count': 1, 'deleted_count': 1, 'existing_count': 0}}
+            )
+            self.assertEqual(
+                WorkerDay.objects.filter(
+                    employee__tabel_code=self.employee2.tabel_code,
+                    type_id=WorkerDay.TYPE_WORKDAY,
+                    is_fact=False,
+                ).count(),
+                0,
+            )
+            self.assertEqual(
+                WorkerDay.objects.filter(
+                    employee__tabel_code=self.employee2.tabel_code,
+                    type_id=WorkerDay.TYPE_VACATION,
+                    is_approved=True,
+                    is_fact=False,
+                ).count(),
+                1,
+            )
+            self.assertEqual(
+                WorkerDay.objects.filter(
+                    employee__tabel_code=self.employee2.tabel_code,
+                    type_id=WorkerDay.TYPE_VACATION,
+                    is_approved=False,
+                    is_fact=False,
+                ).count(),
+                1,
+            )
+            self.assertEqual(
+                WorkerDay.objects.filter(
+                    employee__tabel_code=self.employee2.tabel_code,
+                    type_id=WorkerDay.TYPE_WORKDAY,
+                    is_fact=True,
+                ).count(),
+                2,
+            )
+            for fact_wd in WorkerDay.objects.filter(dt=dt, employee=self.employee2, is_fact=True):
+                self.assertIsNone(fact_wd.closest_plan_approved_id)
+                self.assertEqual(fact_wd.work_hours, timedelta(seconds=0))
 
     def test_cant_create_workday_if_user_has_no_active_employment(self):
         WorkerDay.objects_with_excluded.filter(employee=self.employee2).delete()
