@@ -1,4 +1,5 @@
 import json
+import logging
 
 from django.db.models import Subquery, Q, OuterRef, F
 from src.timetable.models import PlanAndFactHours, WorkerDay
@@ -9,6 +10,8 @@ from src.recognition.models import UserConnecter
 from src.recognition.events import DUPLICATE_BIOMETRICS
 from src.events.signals import event_signal
 from django.conf import settings
+
+logger = logging.getLogger('django')
 
 
 def get_worker_days_with_no_ticks(dttm: datetime):
@@ -80,6 +83,12 @@ def check_duplicate_biometrics(image, user: User, shop_id):
         or Employment.objects.filter(employee__user=user).select_related('employee').order_by('-dt_fired').first()
         employment2 = active_employments.filter(employee__user=user2).first()\
         or Employment.objects.filter(employee__user=user2).select_related('employee').order_by('-dt_fired').first()
+        try:
+            url1 = settings.EXTERNAL_HOST + user.avatar.url
+            url2 = settings.EXTERNAL_HOST + user2.avatar.url
+        except ValueError as e:
+            logger.error(f"An error occurred while checking duplicate biometrics: {e}")
+            return f"An error occurred while checking duplicate biometrics: {e}"
         event_signal.send(
             sender=None,
             network_id=user.network_id,
@@ -89,8 +98,8 @@ def check_duplicate_biometrics(image, user: User, shop_id):
             context={
                 'fio1': f"{user.last_name} {user.first_name}",
                 'fio2': f"{user2.last_name} {user2.first_name}",
-                'url1': settings.EXTERNAL_HOST + user.avatar.url,
-                'url2': settings.EXTERNAL_HOST + user2.avatar.url,
+                'url1': url1,
+                'url2': url2,
                 'tabel_code1': employment1.employee.tabel_code if employment1 else user.username,
                 'tabel_code2': employment2.employee.tabel_code if employment2 else user2.username,
                 'shop1': employment1.shop.name if employment1 else 'Без отдела',
