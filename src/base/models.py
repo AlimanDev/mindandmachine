@@ -74,7 +74,7 @@ class Network(AbstractActiveModel):
     TABEL_FORMAT_CHOICES = (
         ('mts', 'MTSTimesheetGenerator'),
         ('t13_custom', 'CustomT13TimesheetGenerator'),
-        ('aigul', 'AigulTimesheetGenerator'),
+        ('default', 'DefaultTimesheetGenerator'),
         ('lines', 'TimesheetLinesGenerator'),
     )
 
@@ -148,7 +148,7 @@ class Network(AbstractActiveModel):
         verbose_name=_("Copy plan to fact crossing"), default=False)
     download_tabel_template = models.CharField(
         max_length=64, verbose_name=_('Download tabel template'),
-        choices=TABEL_FORMAT_CHOICES, default='mts',
+        choices=TABEL_FORMAT_CHOICES, default='default',
     )
     timetable_format = models.CharField(
         max_length=64, verbose_name=_('Timetable format'),
