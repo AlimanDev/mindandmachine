@@ -1016,7 +1016,7 @@ class WorkerDayViewSet(BaseModelViewSet):
             employee_dt_pairs_q |= Q(employee_id=employee_id, dt=dt)
             existing_dates.append(dt)
 
-        deleted = WorkerDay.objects.filter(
+        to_delete_qs = WorkerDay.objects.filter(
             employee__tabel_code=employee_tabel_code,
             dt__gte=dt_from,
             dt__lte=dt_to,
@@ -1024,7 +1024,12 @@ class WorkerDayViewSet(BaseModelViewSet):
             is_fact=is_fact,
         ).exclude(
             employee_dt_pairs_q,
-        ).delete()
+        )
+        if not is_fact and is_approved:
+            related_fact_ids = list(to_delete_qs.values_list('related_facts__id', flat=True))
+            if related_fact_ids:
+                transaction.on_commit(lambda: recalc_wdays.delay(id__in=related_fact_ids))
+        deleted = to_delete_qs.delete()
 
         wdays_to_create = []
         for dt in [d.date() for d in pd.date_range(dt_from, dt_to)]:
