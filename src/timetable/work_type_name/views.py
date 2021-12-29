@@ -1,11 +1,14 @@
-from rest_framework import serializers, viewsets, permissions
-from rest_framework.pagination import LimitOffsetPagination
+from django.db.models import Q
 from django.utils.translation import gettext as _
-from src.forecast.models import OperationTypeName
-from src.timetable.models import WorkTypeName
+from rest_framework import serializers, permissions
+from rest_framework.pagination import LimitOffsetPagination
+
+from src.base.models import NetworkConnect
 from src.base.serializers import BaseNetworkSerializer
 from src.base.views import BaseActiveNamedModelViewSet
+from src.forecast.models import OperationTypeName
 from src.timetable.filters import WorkTypeNameFilter
+from src.timetable.models import WorkTypeName
 
 
 class WorkTypeNameSerializer(BaseNetworkSerializer):
@@ -38,7 +41,22 @@ class WorkTypeNameViewSet(BaseActiveNamedModelViewSet):
     openapi_tags = ['WorkTypeName',]
 
     def get_queryset(self):
+        include_clients = self.request.query_params.get('include_clients')
+        include_outsources = self.request.query_params.get('include_outsources')
+        network_filter = Q(network_id=self.request.user.network_id)
+        if include_clients:
+            network_filter |= Q(
+                network_id__in=NetworkConnect.objects.filter(
+                    outsourcing_id=self.request.user.network_id,
+                ).values_list('client_id', flat=True)
+            )
+        if include_outsources:
+            network_filter |= Q(
+                network_id__in=NetworkConnect.objects.filter(
+                    client_id=self.request.user.network_id,
+                ).values_list('outsourcing_id', flat=True)
+            )
         return WorkTypeName.objects.filter(
+            network_filter,
             dttm_deleted__isnull=True,
-            network_id=self.request.user.network_id
-        )
+        ).distinct()
