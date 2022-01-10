@@ -349,8 +349,8 @@ class TestPobedaDivider(TestTimesheetMixin, TestCase):
             type=SAWHSettings.FIXED_HOURS,
         )
         sawh_settings_mapping = SAWHSettingsMapping.objects.create(
-            sawh_settings=sawh_settings,
             year=2021,
+            sawh_settings=sawh_settings,
         )
         sawh_settings_mapping.positions.add(cls.position_worker)
         WorkerDayType.objects.filter(
@@ -738,8 +738,8 @@ class TestShiftScheduleDivider(TestTimesheetMixin, TestCase):
             type=SAWHSettings.SHIFT_SCHEDULE,
         )
         sawh_settings_mapping = SAWHSettingsMapping.objects.create(
-            sawh_settings=sawh_settings,
             year=2021,
+            sawh_settings=sawh_settings,
         )
         sawh_settings_mapping.positions.add(cls.position_worker)
         # 7-13 июня рабочие дни по плановому графику
