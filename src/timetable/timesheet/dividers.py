@@ -452,8 +452,9 @@ class ShiftScheduleDivider(BaseTimesheetDivider):
                 if plan_approved_wd and \
                         (main_timesheet_total_hours + additional_timesheet_total_hours) > settings.TIMESHEET_MIN_HOURS_THRESHOLD:
 
-                    # если в плане рабочий день или выходной
-                    if (not plan_approved_wd.type.is_dayoff and plan_approved_wd.type.is_work_hours) or plan_approved_wd.type_id == WorkerDay.TYPE_HOLIDAY:
+                    # если в плане рабочий день или нерабочий день не снижающий норму
+                    if (not plan_approved_wd.type.is_dayoff and plan_approved_wd.type.is_work_hours) or (
+                            plan_approved_wd.type.is_dayoff and not plan_approved_wd.type.is_reduce_norm):
                         shift_schedule_day_hours = self.shift_schedule_data.get(str(dt), {}).get('day_hours', Decimal('0.00'))
                         shift_schedule_night_hours = self.shift_schedule_data.get(str(dt), {}).get('night_hours', Decimal('0.00'))
 
