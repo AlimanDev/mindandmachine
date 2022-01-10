@@ -603,6 +603,18 @@ class TestScheduleDeviation(APITestCase):
             is_fact=False,
             dt=dt + timedelta(1),
         )
+        wd_plan4 = WorkerDayFactory(
+            employee=self.employee2,
+            employment=self.employment2,
+            shop=self.shop2,
+            is_approved=True,
+            type_id=WorkerDay.TYPE_WORKDAY,
+            is_fact=False,
+            cashbox_details__work_type__work_type_name__name='Работа',
+            dttm_work_start=datetime.combine(dt, time(10)),
+            dttm_work_end=datetime.combine(dt, time(20)),
+            dt=dt,
+        )
         WorkerDayFactory(
             employee=self.employee1,
             employment=self.employment1,
@@ -665,7 +677,7 @@ class TestScheduleDeviation(APITestCase):
                 for name in ['Аутсорс сеть 1', 'Аутсорс сеть 2']
             ]
         )
-        report = self.client.get(f'/rest_api/report/schedule_deviation/?dt_from={dt}&dt_to={dt+timedelta(1)}')
+        report = self.client.get(f'/rest_api/report/schedule_deviation/?dt_from={dt}&dt_to={dt+timedelta(1)}&shop_ids={self.shop.id}')
         data = pd.read_excel(report.content).fillna('')
         self.assertEquals(
             list(data.iloc[10, :].values), 
@@ -674,12 +686,18 @@ class TestScheduleDeviation(APITestCase):
         )
         self.assertEquals(
             list(data.iloc[11, :].values), 
-            [2, self.shop.name, datetime.combine(dt, time(0, 0)), '-', '-', '-', 'штат', 'Грузчик', 'Биржа смен', 8.75,
+            [2, self.shop2.name, datetime.combine(dt, time(0, 0)), f'{self.user2.fio} ',
+            self.employee2.tabel_code, self.shop.name, 'штат', '-', 'Биржа смен', 8.75,
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8.75, 1]
         )
         self.assertEquals(
             list(data.iloc[12, :].values), 
-            [3, self.shop.name, datetime.combine(dt, time(0, 0)), '-', '-', 'Аутсорс сеть 1', 'не штат', 'Грузчик', 'Биржа смен', 8.75,
+            [3, self.shop.name, datetime.combine(dt, time(0, 0)), '-', '-', '-', 'штат', 'Грузчик', 'Биржа смен', 8.75,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8.75, 1]
+        )
+        self.assertEquals(
+            list(data.iloc[13, :].values), 
+            [4, self.shop.name, datetime.combine(dt, time(0, 0)), '-', '-', 'Аутсорс сеть 1', 'не штат', 'Грузчик', 'Биржа смен', 8.75,
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8.75, 1]
         )
 
