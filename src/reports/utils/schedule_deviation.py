@@ -71,12 +71,11 @@ def schedule_deviation_report(dt_from, dt_to, *args, title=None, in_memory=False
     if shop_ids:
         data = data.filter(
             Q(shop_id__in=shop_ids)|
-            (Q(employee_id__in=Employment.objects.get_active(
+            Q(employee_id__in=Employment.objects.get_active(
                 dt_from=dt_from,
                 dt_to=dt_to, 
                 shop_id__in=shop_ids,
-            ).values_list('employee_id'))&
-            Q(shop_id__isnull=True))
+            ).values_list('employee_id'))
         )
         unapplied_vacancies = unapplied_vacancies.filter(shop_id__in=shop_ids)
         shop_object = ', '.join(Shop.objects.filter(id__in=shop_ids).values_list('name', flat=True))

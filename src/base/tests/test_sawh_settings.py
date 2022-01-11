@@ -241,6 +241,7 @@ class TestSAWHSettingsQuarterAccPeriod(SawhSettingsHelperMixin, TestCase):
             },
         )
         sawh_settings_mapping2 = SAWHSettingsMapping.objects.create(
+            year=2021,
             sawh_settings=sawh_settings2,
             priority=10,
         )
@@ -283,6 +284,7 @@ class TestSAWHSettingsQuarterAccPeriod(SawhSettingsHelperMixin, TestCase):
             },
         )
         sawh_settings_mapping2 = SAWHSettingsMapping.objects.create(
+            year=2021,
             sawh_settings=sawh_settings2,
             priority=10,
         )
