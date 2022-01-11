@@ -25,13 +25,17 @@ def fix_work_types(work_type_name_ids_to_delete=[], work_type_name_codes_to_dele
         e.save(force_create_work_types=True)
 
     # проставляем в рабочих днях "правильные" типы работ
-    employment_work_types = {e.employment_id: e.work_type_id for e in EmploymentWorkType.objects.all()}
+    employment_work_types = {e.employment_id: e.work_type.work_type_name_id for e in EmploymentWorkType.objects.select_related('work_type').all()}
     details = list(WorkerDayCashboxDetails.objects.select_related('worker_day').all())
+    work_types = {}
+    for wt in WorkType.objects.all():
+        work_types.setdefault(wt.shop_id, {})[wt.work_type_name_id] = wt
 
     for d in details: 
-        work_type_id = employment_work_types.get(d.worker_day.employment_id)
-        if work_type_id:
-            d.work_type_id = work_type_id
+        work_type_name_id = employment_work_types.get(d.worker_day.employment_id)
+        work_type = work_types.get(d.worker_day.shop_id, {}).get(work_type_name_id)
+        if work_type:
+            d.work_type_id = work_type.id
 
     WorkerDayCashboxDetails.objects.bulk_update(details, fields=['work_type_id'], batch_size=1000)   
 
