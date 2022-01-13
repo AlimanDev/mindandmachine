@@ -3,14 +3,15 @@ import os
 import uuid
 
 from django.conf import settings
-from django.contrib.auth.models import Group
+from django.utils.translation import gettext as _
 from django.db import models
 from django.utils.html import format_html
 from django.utils.timezone import now
 from django.utils.translation import gettext_lazy
+from rest_framework.serializers import ValidationError
 
 from src.base.models_abstract import AbstractActiveModel, AbstractActiveNetworkSpecificCodeNamedModel
-from src.timetable.models import User, Shop, Employment, Employee
+from src.timetable.models import User, Shop, Employee
 
 
 def user_directory_path(instance, filename):
@@ -205,3 +206,36 @@ class TickPointToken(models.Model):
 
     def __str__(self):
         return self.key
+
+
+class ShopIpAddress(models.Model):
+    shop = models.ForeignKey(Shop, on_delete=models.PROTECT)
+    tick_point = models.ForeignKey(TickPoint, on_delete=models.SET_NULL, null=True, blank=True)
+    ip_address = models.GenericIPAddressField(unique=True)
+    is_authenticated = True
+    is_anonymous = False
+    USERNAME_FIELD = 'ip_address'
+    REQUIRED_FIELDS = []
+
+    def save(self, *args, **kwargs):
+        if self.tick_point and self.tick_point.shop_id != self.shop_id:
+            raise ValidationError(_('Shop in tick point must be equal to shop in this record.'))
+        return super().save(*args, **kwargs)
+    
+    @property
+    def network_id(self):
+        return self.shop.network_id
+    
+    @property
+    def network(self):
+        return self.shop.network
+    
+    @property
+    def tick_point_obj(self):
+        tick_point = self.tick_point
+        if not tick_point:
+            shop_id = self.shop_id
+            tick_point = TickPoint.objects.filter(shop_id=shop_id, dttm_deleted__isnull=True).first()
+            if tick_point is None:
+                tick_point = TickPoint.objects.create(name=f'autocreate tickpoint {shop_id}', shop_id=shop_id)
+        return tick_point
