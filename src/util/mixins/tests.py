@@ -10,6 +10,7 @@ from django.db import transaction
 from django.urls import reverse
 
 from src.base.models import Employment, FunctionGroup
+from src.recognition.models import TickPoint
 from src.timetable.models import WorkerDay, WorkerDayCashboxDetails, WorkerDayType
 from src.timetable.tests.factories import WorkerDayTypeFactory, WorkerDayFactory
 from src.util.test import create_departments_and_users
@@ -33,6 +34,26 @@ class TestsHelperMixin:
 
         token = response.json()['token']
         self.client.defaults['HTTP_AUTHORIZATION'] = 'Token %s' % token
+    
+    def _authorize_tick_point(self, name='test', shop=None):
+        if not shop:
+            shop = self.shop
+        t = TickPoint.objects.create(
+            network_id=shop.network_id,
+            name=name,
+            shop=shop,
+        )
+
+        response = self.client.post(
+            path='/api/v1/token-auth/',
+            data={
+                'key': t.key,
+            }
+        )
+
+        token = response.json()['token']
+        self.client.defaults['HTTP_AUTHORIZATION'] = 'Token %s' % token
+        return response
 
     @classmethod
     def create_departments_and_users(cls):
