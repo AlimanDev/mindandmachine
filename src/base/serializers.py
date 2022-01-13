@@ -483,9 +483,10 @@ class EmploymentSerializer(serializers.ModelSerializer):
             if shop.network_id != position.network_id:
                 raise serializers.ValidationError(self.error_messages['bad_network_shop_position'])
 
-        if self.context['request'].user.network.descrease_employment_dt_fired_in_api:
-            if 'dt_hired' in attrs and attrs['dt_fired']:
-                attrs['dt_fired'] = attrs['dt_fired'] - timedelta(1)
+        descrease_dt_fired_cond = getattr(self.context['request'], 'by_code', False) and self.context[
+            'request'].user.network.descrease_employment_dt_fired_in_api and 'dt_hired' in attrs and attrs['dt_fired']
+        if descrease_dt_fired_cond:
+            attrs['dt_fired'] = attrs['dt_fired'] - timedelta(1)
 
         return attrs
 
