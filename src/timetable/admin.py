@@ -324,12 +324,14 @@ class WorkerDayTypeAdmin(admin.ModelAdmin):
 @admin.register(GroupWorkerDayPermission)
 class GroupWorkerDayPermissionAdmin(ImportMixin, ExportActionMixin, BaseNotWrapRelatedModelaAdmin):
     not_wrap_fields = ['worker_day_permission']
-    list_display = ('id', 'group', 'worker_day_permission', 'limit_days_in_past', 'limit_days_in_future')
-    list_editable = ('limit_days_in_past', 'limit_days_in_future')
+    list_display = ('id', 'group', 'worker_day_permission', 'limit_days_in_past', 'limit_days_in_future', 'employee_type', 'shop_type')
+    list_editable = ('limit_days_in_past', 'limit_days_in_future', 'employee_type', 'shop_type')
     list_filter = [
         ('group', CustomRelatedDropdownFilter),
         'worker_day_permission__action',
         'worker_day_permission__graph_type',
+        'employee_type',
+        'shop_type',
         ('worker_day_permission__wd_type', CustomRelatedDropdownFilter),
     ]
     list_select_related = ('group', 'worker_day_permission__wd_type')

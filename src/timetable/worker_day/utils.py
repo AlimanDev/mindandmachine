@@ -1,8 +1,8 @@
 import datetime
 import json
-
 from collections import OrderedDict
 
+import pandas as pd
 from django.conf import settings
 from django.contrib.postgres.aggregates import StringAgg
 from django.core.serializers.json import DjangoJSONEncoder
@@ -447,8 +447,11 @@ def check_worker_day_permissions(
         user, shop_id, action, graph_type, wd_types, dt_from, dt_to, error_messages, wd_types_dict, employee_id=None, is_vacancy=False):
     user_shops = list(user.get_shops(include_descendants=True).values_list('id', flat=True))
     user_subordinates = Group.get_subordinate_ids(user)
-    for dt in [dt_from + datetime.timedelta(i) for i in range((dt_to - dt_from).days + 1)]:
-        if not WorkerDay._has_group_permissions(user, employee_id, dt, user_shops=user_shops, user_subordinates=user_subordinates, shop_id=shop_id, is_vacancy=is_vacancy):
+    for dt in pd.date_range(dt_from, dt_to).date:
+        if not WorkerDay._has_group_permissions(
+                user, employee_id, dt,
+                user_shops=user_shops, user_subordinates=user_subordinates, shop_id=shop_id, is_vacancy=is_vacancy,
+        ):
             raise PermissionDenied(
                 error_messages['employee_not_in_subordinates'].format(
                 employee=User.objects.filter(employees__id=employee_id).first().fio),
@@ -458,7 +461,7 @@ def check_worker_day_permissions(
         worker_day_permission__action=action,
         worker_day_permission__graph_type=graph_type,
     ).select_related('worker_day_permission').values_list(
-        'worker_day_permission__wd_type_id', 'limit_days_in_past', 'limit_days_in_future',
+        'worker_day_permission__wd_type_id', 'limit_days_in_past', 'limit_days_in_future', 'employee_type', 'shop_type',
     ).distinct()
     wd_perms_dict = {wdp[0]: wdp for wdp in wd_perms}
 

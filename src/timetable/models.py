@@ -634,8 +634,7 @@ class WorkerDay(AbstractModel):
         return ['dt', 'employee_id', 'is_fact', 'is_approved']
 
     @classmethod
-    def _enrich_create_or_update_perms_data(cls, create_or_update_perms_data, obj_dict):
-        action = WorkerDayPermission.CREATE_OR_UPDATE
+    def _enrich_perms_data(cls, action, perms_data, obj_dict):
         graph_type = WorkerDayPermission.FACT if obj_dict.get('is_fact') else WorkerDayPermission.PLAN
         wd_type_id = obj_dict.get('type_id') or obj_dict.get('type').code
         dt = obj_dict.get('dt')
@@ -643,7 +642,7 @@ class WorkerDay(AbstractModel):
         employee_id = obj_dict.get('employee_id')
         is_vacancy = obj_dict.get('is_vacancy', False)
         k = f'{graph_type}_{action}_{wd_type_id}_{shop_id}_{employee_id}_{is_vacancy}'
-        create_or_update_perms_data.setdefault(k, set()).add(dt)
+        perms_data.setdefault(k, set()).add(dt)
 
     @classmethod
     def _get_check_batch_perms_extra_kwargs(cls):
@@ -700,10 +699,10 @@ class WorkerDay(AbstractModel):
             )
 
     @classmethod
-    def _check_create_or_update_perms(cls, user, create_or_update_perms_data, **kwargs):
+    def _check_create_or_update_perms(cls, user, perms_data, **kwargs):
         from src.timetable.worker_day.utils import check_worker_day_permissions
         from src.timetable.worker_day.views import WorkerDayViewSet
-        for k, dates_set in create_or_update_perms_data.items():
+        for k, dates_set in perms_data.items():
             graph_type, action, wd_type_id, shop_id, employee_id, is_vacancy = k.split('_')
             if shop_id == 'None':
                 shop_id = None
@@ -750,7 +749,8 @@ class WorkerDay(AbstractModel):
         }
 
     @classmethod
-    def _has_group_permissions(cls, user, employee_id, dt, user_shops=None, user_subordinates=None, is_vacancy=False, shop_id=None):
+    def _has_group_permissions(
+            cls, user, employee_id, dt, user_shops=None, user_subordinates=None, is_vacancy=False, shop_id=None, action=None):
         if not employee_id:
             return True
         if is_vacancy:
@@ -760,9 +760,8 @@ class WorkerDay(AbstractModel):
                 shop_id = int(shop_id)
             if shop_id in user_shops:
                 return True
-        employee = Employee.get_subordinates(
-            user, 
-            dt=dt, 
+        employee = user.get_subordinates(
+            dt=dt,
             user_shops=user_shops,
             user_subordinates=user_subordinates,
         ).filter(id=employee_id).first()
@@ -2374,12 +2373,15 @@ class WorkerDayPermission(AbstractModel):
         (FACT, 'Факт'),
     )
 
-    CREATE_OR_UPDATE = 'CU'
-    DELETE = 'D'
+    # изменение типа дня в существующем дне считается как 2 действия: создание нового типа и удаление старого типа.
+    CREATE = 'C'  # создание нового дня с каким-то типом
+    UPDATE = 'U'  # изменение каких-то значений дня без изменения его типа
+    DELETE = 'D'  # удаление какого-то типа дня
     APPROVE = 'A'
 
     ACTIONS = (
-        (CREATE_OR_UPDATE, _('Create/update')),
+        (CREATE, _('Create')),
+        (UPDATE, _('Update')),
         # Remove, т.к. Delete почему-то переводится в "Удалено", даже если в django.py "Удаление".
         (DELETE, _('Remove')),
         (APPROVE, _('Approve')),
@@ -2401,6 +2403,32 @@ class WorkerDayPermission(AbstractModel):
 
 
 class GroupWorkerDayPermission(AbstractModel):
+    MY_SHOPS_ANY_EMPLOYEE = 1
+    SUBORDINATE_EMPLOYEE = 2
+    OUTSOURCE_NETWORK_EMPLOYEE = 3
+
+    EMPLOYEE_TYPE_CHOICES = (
+        (MY_SHOPS_ANY_EMPLOYEE, 'Любые сотрудники моих магазинов'),  # с трудоустройством в моем магазине
+        (SUBORDINATE_EMPLOYEE, 'Подчиненные сотрудники'),  # с трудоустройством в моем магазине
+        (OUTSOURCE_NETWORK_EMPLOYEE, 'Сотрудники аутсорс компании'),  # без трудоустройства в моем магазине и из сети, аутсорсящей сеть пользователя, соверщающего действие
+        # TODO: я как аутсорс менеджер могу изменять рабочие дни аутсорс сотрудников?
+        #  или могу только выводить их на вакансию?
+    )
+    EMPLOYEE_TYPE_CHOICES_REVERSED_DICT = {v: k for k, v in dict(EMPLOYEE_TYPE_CHOICES).items()}
+
+    MY_SHOPS = 1
+    MY_NETWORK_SHOPS = 2
+    OUTSOURCE_NETWORK_SHOPS = 3
+    CLIENT_NETWORK_SHOPS = 4
+
+    SHOP_TYPE_CHOICES = (
+        (MY_SHOPS, 'Мои магазины'),
+        (MY_NETWORK_SHOPS, 'Любые магазин моей сети'),
+        (OUTSOURCE_NETWORK_SHOPS, 'Магазины аутсорс сетей'),
+        (CLIENT_NETWORK_SHOPS, 'Магазины сети аутсорс-клиента'),
+    )
+    SHOP_TYPE_CHOICES_REVERSED_DICT = {v: k for k, v in dict(SHOP_TYPE_CHOICES).items()}
+
     group = models.ForeignKey('base.Group', on_delete=models.CASCADE, verbose_name='Группа доступа')
     worker_day_permission = models.ForeignKey(
         'timetable.WorkerDayPermission', on_delete=models.CASCADE, verbose_name='Разрешение для рабочего дня')
@@ -2412,29 +2440,57 @@ class GroupWorkerDayPermission(AbstractModel):
         null=True, blank=True, verbose_name='Ограничение на дни в будущем',
         help_text='Если null - нет ограничений, если n - можно выполнять действие только n будущих дней',
     )
+    allow_actions_on_vacancies = models.BooleanField(
+        verbose_name='Разрешить действия над вакансиями',
+        default=True,
+        help_text='Вакансией в данном случае является день, если он был явно создан как вакансия, '
+                  'либо если магазин в трудоустройстве не совпадает с магазином выхода '
+                  '(актуально для рабочий типов дней)',
+    )
+    # need_closest_plan_approved = models.BooleanField(  # TODO: нужно?
+    #     verbose_name='Нужен ближайший план',
+    #     default=False, help_text='Актуально для создания, *изменения??? фактических записей')
+    employee_type = models.PositiveSmallIntegerField(
+        verbose_name='Тип сотрудника', default=SUBORDINATE_EMPLOYEE, choices=EMPLOYEE_TYPE_CHOICES)
+    shop_type = models.PositiveSmallIntegerField(
+        verbose_name='Тип магазина', help_text='Актуально только для рабочих типов дней',
+        default=MY_NETWORK_SHOPS, choices=SHOP_TYPE_CHOICES,
+    )
 
     class Meta:
         verbose_name = 'Разрешение группы для рабочего дня'
         verbose_name_plural = 'Разрешения группы для рабочего дня'
-        unique_together = ('group', 'worker_day_permission',)
+        unique_together = ('group', 'worker_day_permission', 'employee_type', 'shop_type')
 
     def __str__(self):
         return f'{self.group.name} {self.worker_day_permission}'
 
+    # TODO: кэширование проверок доступа (на n дней), инвалидация кэша при изменении прав; по какому паттерну?
     @classmethod
-    def has_permission(cls, user, action, graph_type, wd_type, wd_dt):
+    def has_permission(cls, user, action, graph_type, wd_type, wd_dt, shop=None, employee=None):
+        """
+        :param user: пользователь, который совершает действие
+        :param employee: сотрудник, для дня которого совершается действие
+        :param action: действие (создание/изменение/удаление)
+        :param graph_type: тип графика (план/факт)
+        :param wd_type: тип дня
+        :param wd_dt: дата дня
+        :param shop: магазин (для рабочих типов дней)
+        :return: есть доступ или нет
+        """
         if isinstance(wd_dt, str):
             wd_dt = datetime.datetime.strptime(wd_dt, settings.QOS_DATE_FORMAT).date()
-        # FIXME-devx: будет временной лаг из-за того, что USE_TZ=False, откуда брать таймзону? - из shop?
-        today = (datetime.datetime.now() + datetime.timedelta(hours=3)).date()
+        today = (datetime.datetime.now() + datetime.timedelta(
+            hours=shop.get_tz_offset() if shop else settings.CLIENT_TIMEZONE)).date()
         return cls.objects.filter(
             Q(limit_days_in_past__isnull=True) | Q(limit_days_in_past__gte=(today - wd_dt).days),
             Q(limit_days_in_future__isnull=True) | Q(limit_days_in_future__gte=(wd_dt - today).days),
-            group__in=user.get_group_ids(),  # добавить shop ?
+            group__in=user.get_group_ids(shop=shop),  # учитывать вложенность?
             worker_day_permission__action=action,
             worker_day_permission__graph_type=graph_type,
             worker_day_permission__wd_type=wd_type,
         ).exists()
+
 
 class PlanAndFactHoursAbstract(models.Model):
     id = models.CharField(max_length=256, primary_key=True)

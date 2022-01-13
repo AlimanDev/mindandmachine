@@ -1212,6 +1212,31 @@ class User(DjangoAbstractUser, AbstractModel):
 
         return super(User, self).save(*args, **kwargs)
 
+    def get_subordinates(self, dt=None, user_shops=None, user_subordinates=None, dt_to_shift=None):
+        if not user_shops:
+            user_shops = self.get_shops(include_descendants=True).values_list('id', flat=True)
+        if not user_subordinates:
+            user_subordinates = Group.get_subordinate_ids(self)
+        dt_to = dt
+        if dt_to_shift and dt_to:
+            dt_to += dt_to_shift
+
+        return Employee.objects.annotate(
+            is_subordinate=models.Exists(
+                Employment.objects.get_active(
+                    extra_q=models.Q(position__group_id__in=user_subordinates) |
+                            models.Q(function_group_id__in=user_subordinates) |
+                            (models.Q(function_group_id__isnull=True) & models.Q(position__group__isnull=True)),
+                    dt_from=dt,
+                    dt_to=dt_to,
+                    employee_id=OuterRef('id'),
+                    shop_id__in=user_shops,
+                )
+            )
+        ).filter(
+            is_subordinate=True,
+        )
+
 
 class WorkerPosition(AbstractActiveNetworkSpecificCodeNamedModel):
     """
@@ -1320,32 +1345,6 @@ class Employee(AbstractModel):
         if self.tabel_code:
             s += f' ({self.tabel_code})'
         return s
-    
-    @classmethod
-    def get_subordinates(cls, user, dt=None, user_shops=None, user_subordinates=None, dt_to_shift=None):
-        if not user_shops:
-            user_shops = user.get_shops(include_descendants=True).values_list('id', flat=True)
-        if not user_subordinates:
-            user_subordinates = Group.get_subordinate_ids(user)
-        dt_to = dt
-        if dt_to_shift and dt_to:
-            dt_to += dt_to_shift
-            
-        return Employee.objects.annotate(
-            is_subordinate=models.Exists(
-                Employment.objects.get_active(
-                    extra_q=models.Q(position__group_id__in=user_subordinates) | 
-                    models.Q(function_group_id__in=user_subordinates) |
-                    (models.Q(function_group_id__isnull=True) & models.Q(position__group__isnull=True)),
-                    dt_from=dt,
-                    dt_to=dt_to,
-                    employee_id=OuterRef('id'),
-                    shop_id__in=user_shops,
-                )
-            )
-        ).filter(
-            is_subordinate=True,
-        )
 
 
 class Employment(AbstractActiveModel):

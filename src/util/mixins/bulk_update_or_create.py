@@ -57,7 +57,7 @@ class BatchUpdateOrCreateModelMixin:
         pass
 
     @classmethod
-    def _enrich_create_or_update_perms_data(cls, create_or_update_perms_data, obj_dict):
+    def _enrich_perms_data(cls, action, perms_data, obj_dict):
         pass
 
     @classmethod
@@ -65,7 +65,7 @@ class BatchUpdateOrCreateModelMixin:
         return {}
 
     @classmethod
-    def _check_create_or_update_perms(cls, user, create_or_update_perms_data, **kwargs):
+    def _check_create_or_update_perms(cls, user, perms_data, **kwargs):
         pass
 
     @classmethod
@@ -210,6 +210,8 @@ class BatchUpdateOrCreateModelMixin:
         # TODO: Сигналы post_batch_update, post_batch_create ?
         # TODO: Не обновлять существующие объекты если ни 1 поле не изменилось ?
         """
+        from src.timetable.models import WorkerDayPermission
+
         allowed_update_key_fields = cls._get_allowed_update_key_fields()
         if update_key_field not in allowed_update_key_fields:
             raise BatchUpdateOrCreateException(
@@ -222,7 +224,7 @@ class BatchUpdateOrCreateModelMixin:
                     diff_lookup_fields = cls._get_diff_lookup_fields()
                     diff_obj_keys = tuple(lookup_field.split('__') for lookup_field in diff_lookup_fields)
                     diff_headers = cls._get_diff_headers()
-                create_or_update_perms_data = {}
+                perms_data = {}
                 check_perms_extra_kwargs = {}
                 if user:
                     check_perms_extra_kwargs = cls._get_check_batch_perms_extra_kwargs()
@@ -255,15 +257,11 @@ class BatchUpdateOrCreateModelMixin:
                     update_key = obj_dict.get(update_key_field)
                     if update_key is None:
                         to_create.append(obj_dict)
+                        if user:
+                            cls._enrich_perms_data(WorkerDayPermission.CREATE, perms_data, obj_dict)
                     else:
                         update_keys.append(update_key)
                         to_update_dict[update_key] = obj_dict
-
-                    if user:
-                        cls._enrich_create_or_update_perms_data(create_or_update_perms_data, obj_dict)
-
-                if user:
-                    cls._check_create_or_update_perms(user, create_or_update_perms_data, **check_perms_extra_kwargs)
 
                 filter_kwargs = {
                     f"{update_key_field}__in": update_keys,
@@ -280,6 +278,8 @@ class BatchUpdateOrCreateModelMixin:
                         to_update_dict[update_key]['dttm_modified'] = now
                         obj_to_create = to_update_dict.pop(update_key)
                         to_create.append(obj_to_create)
+                        if user:
+                            cls._enrich_perms_data(WorkerDayPermission.CREATE, perms_data, obj_dict)
                     else:
                         existing_obj = existing_objs.get(update_key)
                         if all(getattr(existing_obj, k) == v for k, v in to_update_dict[update_key].items() if
@@ -292,6 +292,11 @@ class BatchUpdateOrCreateModelMixin:
                                     tuple(obj_deep_get(obj_to_skip, *keys) for keys in diff_obj_keys))
                         else:
                             to_update_dict[update_key]['dttm_modified'] = now
+                            if user:
+                                cls._enrich_perms_data(WorkerDayPermission.UPDATE, perms_data, obj_dict)
+
+                if user:
+                    cls._check_create_or_update_perms(user, perms_data, **check_perms_extra_kwargs)
 
                 if to_skip:
                     skip_rel_objs_data = cls._pop_rel_objs_data(

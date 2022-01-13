@@ -440,7 +440,7 @@ def create_departments_and_users(self, dt=None):
             group=self.chief_group,
             worker_day_permission=wdp,
         ) for wdp in WorkerDayPermission.objects.filter(
-            action__in=[WorkerDayPermission.CREATE_OR_UPDATE, WorkerDayPermission.DELETE])
+            action__in=[WorkerDayPermission.CREATE, WorkerDayPermission.UPDATE, WorkerDayPermission.DELETE])
     )
 
     # employee

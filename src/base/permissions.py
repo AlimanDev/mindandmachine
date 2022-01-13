@@ -3,10 +3,14 @@ from django.utils.translation import gettext_lazy as _
 from rest_framework import permissions
 from rest_framework.exceptions import ValidationError, NotFound
 
-from src.base.models import Employment, Shop
+from src.base.models import Employment, Shop, Employee, Network
 from src.timetable.models import WorkerDay, WorkerDayPermission, GroupWorkerDayPermission
-from src.timetable.worker_day_permissions.serializers import WsPermissionDataSerializer
 
+from src.timetable.worker_day_permissions.checkers import (
+    CreateSingleWdPermissionChecker,
+    UpdateSingleWdPermissionChecker,
+    DeleteSingleWdPermissionChecker,
+)
 
 VIEW_FUNC_ACTIONS = {
     'list': 'GET',
@@ -59,21 +63,31 @@ class Permission(permissions.BasePermission):
 
 
 class WdPermission(Permission):
+    def _set_is_vacancy(self, wd_data):
+        # рефакторинг
+        if 'is_vacancy' not in wd_data and wd_data.get('employee_id') and wd_data.get(
+                'shop_id') and wd_data.get('dt'):
+            wd_data['is_vacancy'] = not Employment.objects.get_active(
+                employee_id=wd_data.get('employee_id'),
+                shop_id=wd_data.get('shop_id'),
+                dt_from=wd_data.get('dt'),
+                dt_to=wd_data.get('dt'),
+            ).exists()
+
     def has_permission(self, request, view):
         has_permission = super(WdPermission, self).has_permission(request, view)
         if has_permission is False:
             return has_permission
 
         view_action = view.action.lower()
-        if view_action in ['create', 'update', 'destroy']:
-            action = WorkerDayPermission.DELETE if view_action == 'destroy' else WorkerDayPermission.CREATE_OR_UPDATE
+        if view_action in ['create', 'update', 'destroy']:  # TODO: approve? -- для подтверждения конкретного рабочего дня
             if view_action == 'create':
-                # проверка пермишнов происходит раньше, чем валидация данных,
-                # поэтому предварительно провалидируем данные, используемые для проверки доступа
-                WsPermissionDataSerializer(data=request.data).is_valid(raise_exception=True)
-                wd_dict = request.data
-            else:
-                wd_dict = WorkerDay.objects.filter(id=view.kwargs['pk']).values(
+                wd_data = request.data
+                self._set_is_vacancy(wd_data=wd_data)
+                return CreateSingleWdPermissionChecker(user=request.user, wd_data=wd_data).has_permission()
+            elif view_action == 'update':
+                wd_id = view.kwargs['pk']
+                wd_data = WorkerDay.objects.filter(id=wd_id).values(
                     'type', 
                     'dt', 
                     'is_fact', 
@@ -81,17 +95,36 @@ class WdPermission(Permission):
                     'shop_id',
                     'is_vacancy',
                 ).first()
-            if not wd_dict:
-                return False
-            if view_action == 'update':
-                wd_dict['type'] = request.data.get('type', wd_dict.get('type'))
-            return GroupWorkerDayPermission.has_permission(
-                user=request.user,
-                action=action,
-                graph_type=WorkerDayPermission.FACT if wd_dict.get('is_fact') else WorkerDayPermission.PLAN,
-                wd_type=wd_dict.get('type'),
-                wd_dt=wd_dict.get('dt'),
-            ) and WorkerDay._has_group_permissions(request.user, wd_dict.get('employee_id'), wd_dict.get('dt'), is_vacancy=wd_dict.get('is_vacancy', False), shop_id=wd_dict.get('shop_id'))
+                if not wd_data:
+                    return NotFound(_('Not found worker day with id={wd_id}').format(wd_id=wd_id))
+                if wd_data['type'] != request.data.get('type') or wd_data['shop_id'] != request.data.get('shop_id') or \
+                        wd_data['dt'] != request.data.get('dt'):
+                    # TODO: опционально или на постоянку такую логику оставить?
+                    has_delete_permission = DeleteSingleWdPermissionChecker(
+                        user=request.user, wd_id=wd_id).has_permission()
+                    if has_delete_permission is False:
+                        return False
+                    wd_data = request.data
+                    self._set_is_vacancy(wd_data=wd_data)
+                    has_create_permission = CreateSingleWdPermissionChecker(
+                        user=request.user, wd_data=wd_data).has_permission()
+                    if has_create_permission is False:
+                        return False
+                else:
+                    return UpdateSingleWdPermissionChecker(
+                        user=request.user, wd_id=wd_id, wd_data=wd_data).has_permission()
+            elif view_action == 'destroy':
+                wd_id = view.kwargs['pk']
+                return DeleteSingleWdPermissionChecker(user=request.user, wd_id=wd_id).has_permission()
+
+            # return wd_perm_checker_cls(**wd_perm_checker_kwargs).has_permission()
+            # GroupWorkerDayPermission.has_permission(
+            #     user=request.user,
+            #     action=action,
+            #     graph_type=WorkerDayPermission.FACT if wd_data.get('is_fact') else WorkerDayPermission.PLAN,
+            #     wd_type=wd_data.get('type'),
+            #     wd_dt=wd_data.get('dt'),
+            # ) and WorkerDay._has_group_permissions(request.user, wd_data.get('employee_id'), wd_data.get('dt'), is_vacancy=wd_data.get('is_vacancy', False), shop_id=wd_data.get('shop_id'))
 
         return has_permission
 

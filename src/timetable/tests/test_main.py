@@ -1546,13 +1546,13 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
     def test_worker_day_permissions(self):
         # create
         self._test_wd_perm(
-            self.url, 'post', WorkerDayPermission.CREATE_OR_UPDATE, WorkerDayPermission.PLAN, WorkerDay.TYPE_WORKDAY)
+            self.url, 'post', WorkerDayPermission.CREATE, WorkerDayPermission.PLAN, WorkerDay.TYPE_WORKDAY)
         wd = WorkerDay.objects.last()
 
         # update
         self._test_wd_perm(
             f"{self.url}{wd.id}/", 'put',
-            WorkerDayPermission.CREATE_OR_UPDATE, WorkerDayPermission.PLAN, WorkerDay.TYPE_HOLIDAY,
+            WorkerDayPermission.UPDATE, WorkerDayPermission.PLAN, WorkerDay.TYPE_HOLIDAY,  # TODO: на самом деле удаление и создание
         )
         wd.refresh_from_db()
         self.assertEqual(wd.type_id, WorkerDay.TYPE_HOLIDAY)
@@ -2065,33 +2065,51 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
         wd = WorkerDay.objects.get(id=resp_data['id'])
         self.assertEqual(wd.employment.id, e2_2.id)
 
-    # def test_cant_create_fact_worker_day_when_there_is_no_plan(self):
-    #     data = {
-    #         "shop_id": self.shop2.id,
-    #         "worker_id": self.user8.id,
-    #         "dt": self.dt,
-    #         "is_fact": True,
-    #         "is_approved": True,
-    #         "type": WorkerDay.TYPE_WORKDAY,
-    #         "dttm_work_start": datetime.combine(self.dt, time(10, 0, 0)),
-    #         "dttm_work_end": datetime.combine(self.dt, time(20, 0, 0)),
-    #         "worker_day_details": [{
-    #             "work_part": 1.0,
-    #             "work_type_id": self.work_type2.id}
-    #         ]
-    #     }
-    #     resp = self.client.post(self.url, data, format='json')
-    #     self.assertEqual(resp.status_code, 400)
-    #     self.assertDictEqual(
-    #         resp.json(),
-    #         {
-    #             "error": [
-    #                 "Не существует рабочего дня в плановом подтвержденном графике. "
-    #                 "Необходимо создать и подтвердить рабочий день в плановом графике, "
-    #                 "или проверить, что магазины в плановом и фактическом графиках совпадают."
-    #             ]
-    #         },
-    #     )
+    def test_cant_create_fact_worker_day_when_there_is_no_plan_for_outsource_user(self):
+        outsource_network = Network.objects.create(name='outsource')
+        outsource_user = User.objects.create(
+            username='outsource',
+            network=outsource_network,
+        )
+        outsource_shop = Shop.objects.create(
+            name='outsource',
+            network=outsource_network,
+            region=self.region,
+        )
+        outsource_employee = Employee.objects.create(
+            user=outsource_user,
+            tabel_code='outsource',
+        )
+        outsource_employment = Employment.objects.create(
+            employee=outsource_employee,
+            shop=outsource_shop,
+        )
+        data = {
+            "shop_id": self.shop2.id,
+            "employee_id": outsource_employee.id,
+            "dt": self.dt,
+            "is_fact": True,
+            "is_approved": True,
+            "type": WorkerDay.TYPE_WORKDAY,
+            "dttm_work_start": datetime.combine(self.dt, time(10, 0, 0)),
+            "dttm_work_end": datetime.combine(self.dt, time(20, 0, 0)),
+            "worker_day_details": [{
+                "work_part": 1.0,
+                "work_type_id": self.work_type2.id}
+            ]
+        }
+        resp = self.client.post(self.url, data, format='json')
+        self.assertEqual(resp.status_code, 400)
+        self.assertDictEqual(
+            resp.json(),
+            {
+                "error": [
+                    "Не существует рабочего дня в плановом подтвержденном графике. "
+                    "Необходимо создать и подтвердить рабочий день в плановом графике, "
+                    "или проверить, что магазины в плановом и фактическом графиках совпадают."
+                ]
+            },
+        )
 
     def test_valid_error_message_returned_when_dt_is_none(self):
         data = {
@@ -2812,14 +2830,25 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
         self.assertContains(
             resp, 'У вас нет прав на создание/изменение типа дня', status_code=403)
 
-        create_or_update_plan_workday_perm = WorkerDayPermission.objects.get(
-            action=WorkerDayPermission.CREATE_OR_UPDATE,
+        create_plan_workday_perm = WorkerDayPermission.objects.get(
+            action=WorkerDayPermission.CREATE,
             graph_type=WorkerDayPermission.PLAN,
             wd_type_id=WorkerDay.TYPE_WORKDAY,
         )
         gwdp = GroupWorkerDayPermission.objects.create(
             group=self.admin_group,
-            worker_day_permission=create_or_update_plan_workday_perm,
+            worker_day_permission=create_plan_workday_perm,
+            limit_days_in_past=1,
+            limit_days_in_future=1,
+        )
+        update_plan_workday_perm = WorkerDayPermission.objects.get(
+            action=WorkerDayPermission.UPDATE,
+            graph_type=WorkerDayPermission.PLAN,
+            wd_type_id=WorkerDay.TYPE_WORKDAY,
+        )
+        gwdp = GroupWorkerDayPermission.objects.create(
+            group=self.admin_group,
+            worker_day_permission=update_plan_workday_perm,
             limit_days_in_past=1,
             limit_days_in_future=1,
         )

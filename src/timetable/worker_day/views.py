@@ -109,7 +109,6 @@ class WorkerDayViewSet(BaseModelViewSet):
     filter_backends = [MultiShopsFilterBackend]
     openapi_tags = ['WorkerDay',]
 
-
     def get_queryset(self):
         queryset = WorkerDay.objects.filter(canceled=False).prefetch_related(Prefetch('outsources', to_attr='outsources_list'))
 
@@ -349,7 +348,7 @@ class WorkerDayViewSet(BaseModelViewSet):
             ).values_list('employee_id', flat=True)
 
             wd_types_grouped_by_limit = {}
-            for wd_type, limit_days_in_past, limit_days_in_future in wd_perms:
+            for wd_type, limit_days_in_past, limit_days_in_future, employee_type, shop_type in wd_perms:
                 # фильтруем только по тем типам, которые переданы
                 if wd_type in wd_types:
                     wd_types_grouped_by_limit.setdefault((limit_days_in_past, limit_days_in_future), []).append(wd_type)
@@ -417,7 +416,7 @@ class WorkerDayViewSet(BaseModelViewSet):
             ).filter(
                 approve_condition,
                 is_approved=True,
-                any_draft_wd_exists=True,
+                any_draft_wd_exists=True,  # TODO: избавиться от типа "пусто" ?
             ).annotate(
                 work_type_ids=StringAgg(
                     Cast('work_types', CharField()),
@@ -815,8 +814,7 @@ class WorkerDayViewSet(BaseModelViewSet):
         dt = datetime.date.today()
         user_shops = list(request.user.get_shops(include_descendants=True).values_list('id', flat=True))
         available_employee = list(
-            Employee.get_subordinates(
-                request.user, 
+            request.user.get_subordinates(
                 dt=dt,
                 dt_to_shift=relativedelta(months=6),
                 user_shops=user_shops,
@@ -1649,7 +1647,7 @@ class WorkerDayViewSet(BaseModelViewSet):
         check_worker_day_permissions(
             request.user,
             data['shop_id'],
-            WorkerDayPermission.CREATE_OR_UPDATE,
+            WorkerDayPermission.CREATE,
             WorkerDayPermission.PLAN,
             [data['type_id'],],
             data['dt_from'],
