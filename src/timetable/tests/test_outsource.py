@@ -168,23 +168,6 @@ class TestOutsource(TestsHelperMixin, APITestCase):
         self.assertEqual(response.status_code, 200)
         return vacancy
 
-    def _authorize_tick_point(self):
-        t = TickPoint.objects.create(
-            network=self.client_network,
-            name='test',
-            shop=self.client_shop,
-        )
-
-        response = self.client.post(
-            path='/api/v1/token-auth/',
-            data={
-                'key': t.key,
-            }
-        )
-
-        token = response.json()['token']
-        self.client.defaults['HTTP_AUTHORIZATION'] = 'Token %s' % token
-
     def test_vacancy_creation(self):
         dt_now = self.dt_now
         not_created = self._create_vacancy(dt_now, datetime.combine(dt_now, time(8)), datetime.combine(dt_now, time(20)), is_vacancy=False)
@@ -492,7 +475,7 @@ class TestOutsource(TestsHelperMixin, APITestCase):
     def test_get_worker_days_for_urv(self):
         vacancy = self._create_and_apply_vacancy(night_shift=True)
         self.client.logout()
-        self._authorize_tick_point()
+        self._authorize_tick_point(shop=self.client_shop)
         response = self.client.get(self.get_url('TimeAttendanceWorkerDay-list'))
         data = [
             {

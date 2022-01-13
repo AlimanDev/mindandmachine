@@ -12,7 +12,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Django REST framework\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2022-01-12 09:25+0000\n"
+"POT-Creation-Date: 2022-01-13 06:50+0000\n"
 "PO-Revision-Date: 2017-08-03 14:58+0000\n"
 "Last-Translator: Grigory Mishchenko <grishkokot@gmail.com>\n"
 "Language-Team: Russian (http://www.transifex.com/django-rest-framework-1/"
@@ -370,7 +370,7 @@ msgstr ""
 msgid "There is not load template with code {}."
 msgstr "Шаблон нагрузки с кодом {} не найден."
 
-#: src/base/models.py:1401
+#: src/base/models.py:1397
 msgid ""
 "Unable to define worker access group. Assign an access group to him or a "
 "position associated with an access group."
@@ -657,13 +657,17 @@ msgstr ""
 "Сервис распознавания временно недоступен. Пожалуйста, обратитесь к "
 "администратору системы."
 
-#: src/recognition/models.py:191
+#: src/recognition/models.py:192
 msgid "Key"
 msgstr "Ключ"
 
-#: src/recognition/models.py:196
+#: src/recognition/models.py:197
 msgid "Created"
 msgstr "Создан"
+
+#: src/recognition/models.py:222
+msgid "Shop in tick point must be equal to shop in this record."
+msgstr "Магазин в точке отметки должен совпадать с магазином в записи."
 
 #: src/recognition/serializers.py:40
 msgid "Must include \"username\" and \"password\"."
@@ -678,7 +682,7 @@ msgstr ""
 "Дистанция до магазина не должна превышать {allowed_distance_km} км (сейчас "
 "{distance_now_km} км)"
 
-#: src/recognition/views.py:272
+#: src/recognition/views.py:288
 msgid ""
 "You do not have an active employment at the moment, the action can not be "
 "performed, please refer to your management"
@@ -686,11 +690,11 @@ msgstr ""
 "У вас нет трудоустройства на текущий момент, действие выполнить невозможно, "
 "пожалуйста, обратитесь к вашему руководству"
 
-#: src/recognition/views.py:288
+#: src/recognition/views.py:304
 msgid "Today, the employee does not have a working day in this shop"
 msgstr "Сегодня у сотрудника нет рабочего дня в данном магазине"
 
-#: src/recognition/views.py:315 src/recognition/views.py:383
+#: src/recognition/views.py:331 src/recognition/views.py:400
 msgid "The tick does not exist"
 msgstr "Отметка не существует"
 

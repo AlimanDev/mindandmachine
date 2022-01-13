@@ -470,14 +470,14 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
         self.assertIsNone(self.employment3.position_id)
         self.assertIsNone(self.employment3.dt_fired)
 
-    def test_descrease_employment_dt_hired_if_setting_is_enabled(self):
+    def test_not_descreased_employment_dt_hired_if_setting_is_enabled_and_not_by_code(self):
         self.user1.network.descrease_employment_dt_fired_in_api = True
         self.user1.network.save()
 
         put_data = {
             'position_id': self.worker_position.id,
-            'dt_hired': date(2021, 1, 1).strftime('%Y-%m-%d'),
-            'dt_fired': date(2021, 5, 25).strftime('%Y-%m-%d'),
+            'dt_hired': date(2021, 1, 1),
+            'dt_fired': date(2021, 5, 25),
             'shop_id': self.shop2.id,
             'employee_id': self.employee2.id,
         }
@@ -494,13 +494,34 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
             dt_fired=put_data['dt_fired'],
             employee_id=put_data['employee_id'],
             position_id=put_data['position_id'],
-        ).count() == 0)
+        ).count() == 1)
+
+    def test_descrease_employment_dt_hired_if_setting_is_enabled_and_by_code(self):
+        self.user1.network.descrease_employment_dt_fired_in_api = True
+        self.user1.network.save()
+
+        put_data = {
+            'by_code': True,
+            'position_code': self.worker_position.code,
+            'dt_hired': date(2021, 1, 1),
+            'dt_fired': date(2021, 5, 25),
+            'shop_code': self.shop2.code,
+            'username': self.employee2.user.username,
+            'tabel_code': self.employee2.tabel_code,
+        }
+
+        resp = self.client.put(
+            path=self.get_url('Employment-detail', pk='not_used'),
+            data=self.dump_data(put_data),
+            content_type='application/json',
+        )
+        self.assertEqual(resp.status_code, 201)
         self.assertTrue(Employment.objects.filter(
-            shop_id=put_data['shop_id'],
-            dt_hired=put_data['dt_hired'],
-            dt_fired=date(2021, 5, 24).strftime('%Y-%m-%d'),
-            employee_id=put_data['employee_id'],
-            position_id=put_data['position_id'],
+            shop_id=self.shop2.id,
+            dt_hired=date(2021, 1, 1),
+            dt_fired=date(2021, 5, 24),
+            employee_id=self.employee2.id,
+            position_id=self.worker_position.id,
         ).count() == 1)
 
     def test_delete_employment_by_code(self):
