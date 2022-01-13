@@ -1,7 +1,7 @@
 from rest_framework.test import APITestCase
 
 from src.base.tests.factories import NetworkFactory, ShopFactory, UserFactory, GroupFactory, EmploymentFactory, EmployeeFactory
-from src.recognition.models import TickPoint
+from src.recognition.models import ShopIpAddress, TickPoint
 from src.util.mixins.tests import TestsHelperMixin
 from .factories import TickPointFactory
 
@@ -88,3 +88,32 @@ class TestTickPointViewSet(TestsHelperMixin, APITestCase):
         self.assertTrue(TickPoint.objects.filter(id=self.tick_point.id).exists())
         self.tick_point.refresh_from_db()
         self.assertIsNotNone(self.tick_point.dttm_deleted)
+
+    def test_get_current_tick_point(self):
+        self.client.logout()
+
+        response_tick = self.client.get('/api/v1/tick_points/current_tick_point/', HTTP_X_FORWARDED_FOR='123.123.123.123')
+
+        self.assertEqual(response_tick.status_code, 403)
+
+        response = self._authorize_tick_point().json()
+
+        response.pop('token', None)
+
+        response_tick = self.client.get('/api/v1/tick_points/current_tick_point/')
+
+        self.assertEqual(response_tick.status_code, 200)
+
+        self.assertEqual(response_tick.json(), response)
+
+        self.client.defaults.pop('HTTP_AUTHORIZATION', None)
+        ShopIpAddress.objects.create(
+            shop=self.shop,
+            ip_address='123.123.123.123',
+            tick_point_id=response['tick_point']['id'],
+        )
+        response_tick = self.client.get('/api/v1/tick_points/current_tick_point/', HTTP_X_FORWARDED_FOR='123.123.123.123')
+
+        self.assertEqual(response_tick.status_code, 200)
+
+        self.assertEqual(response_tick.json(), response)

@@ -7,7 +7,7 @@ from .models import ShopIpAddress, TickPointToken
 class TickPointTokenAuthentication(authentication.TokenAuthentication):
     model = TickPointToken
 
-    def __init__(self, raise_auth_exc=True, **kwargs):
+    def __init__(self, raise_auth_exc=False, **kwargs):
         self.raise_auth_exc = raise_auth_exc
         super(TickPointTokenAuthentication, self).__init__(**kwargs)
 

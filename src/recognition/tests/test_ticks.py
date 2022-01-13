@@ -33,24 +33,6 @@ class TestTicksViewSet(TestsHelperMixin, APITestCase):
     def setUp(self):
         self._set_authorization_token(self.user2.username)
 
-    def _authorize_tick_point(self, name='test'):
-        t = TickPoint.objects.create(
-            network=self.network,
-            name=name,
-            shop=self.shop,
-        )
-
-        response = self.client.post(
-            path='/api/v1/token-auth/',
-            data={
-                'key': t.key,
-            }
-        )
-
-        token = response.json()['token']
-        self.client.defaults['HTTP_AUTHORIZATION'] = 'Token %s' % token
-        return response
-
     def test_create_and_update_and_list_ticks(self):
         resp_coming = self.client.post(
             self.get_url('Tick-list'),

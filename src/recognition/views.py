@@ -541,6 +541,29 @@ class TickPointViewSet(BaseModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(network_id=self.request.user.network_id)
+    
+    @action(
+        detail=False, 
+        methods=['get'], 
+        permission_classes=[permissions.IsAuthenticated],
+        authentication_classes=[
+            ShopIPAuthentication,
+            TickPointTokenAuthentication,
+        ],
+    )
+    def current_tick_point(self, request):
+        if isinstance(request.user, TickPoint):
+            tick_point = request.user
+        elif isinstance(request.user, ShopIpAddress):
+            tick_point = request.user.tick_point_obj
+        else:
+            raise NotImplementedError()
+        
+        return Response({
+            'tick_point': TickPointSerializer(tick_point).data,
+            'shop': ShopSerializer(tick_point.shop).data,
+            'network': NetworkSerializer(tick_point.shop.network).data,
+        })
 
 
 class DownloadViolatorsReportAdminView(SuperuserRequiredMixin, FormView):
