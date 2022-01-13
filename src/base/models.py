@@ -7,6 +7,7 @@ from decimal import Decimal
 import pandas as pd
 from celery import chain
 from dateutil.relativedelta import relativedelta
+from dateutil.parser import parse
 from django.conf import settings
 from django.contrib.auth.models import (
     AbstractUser as DjangoAbstractUser,
@@ -714,6 +715,14 @@ class Shop(MPTTModel, AbstractActiveNetworkSpecificCodeNamedModel):
     @tracker
     def save(self, *args, force_create_director_employment=False, force_set_defaults=False, **kwargs):
         is_new = self.id is None
+
+        forecast_step = self.forecast_step_minutes
+        if isinstance(forecast_step, str):
+            forecast_step = parse(forecast_step)
+        
+        if forecast_step.hour == 0 and forecast_step.minute == 0:
+            raise ValidationError(_("Forecast step can't be 0."))
+
         if self.open_times.keys() != self.close_times.keys():
             raise ValidationError(_('Keys of open times and close times are different.'))
         if self.open_times.get('all') and len(self.open_times) != 1:

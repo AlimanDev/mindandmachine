@@ -347,22 +347,26 @@ msgstr "Значение перерыва не может быть больше 
 msgid "Shop with parent_code={code} not found"
 msgstr "Подразделение с parent_code={code} не найдено"
 
-#: src/base/models.py:718
+#: src/base/models.py:719
+msgid "Forecast step can't be 0."
+msgstr "Шаг прогноза не может быть 0."
+
+#: src/base/models.py:722
 msgid "Keys of open times and close times are different."
 msgstr "Ключи в времени открытия и времени закрытия различаются."
 
-#: src/base/models.py:720
+#: src/base/models.py:724
 msgid "'All' and individual days cannot be specified."
 msgstr "Нельзя указывать all и отдельные дни."
 
-#: src/base/models.py:733
+#: src/base/models.py:737
 msgid ""
 "It is not possible to change the load template as it is in the calculation "
 "process."
 msgstr ""
 "Невозможно изменить шаблон нагрузки, так как он находится в процессе расчета."
 
-#: src/base/models.py:747
+#: src/base/models.py:751
 msgid "There is not load template with code {}."
 msgstr "Шаблон нагрузки с кодом {} не найден."
 
