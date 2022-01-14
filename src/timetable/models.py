@@ -690,8 +690,7 @@ class WorkerDay(AbstractModel):
         return ['dt', 'employee_id', 'is_fact', 'is_approved']
 
     @classmethod
-    def _enrich_create_or_update_perms_data(cls, create_or_update_perms_data, obj_dict):
-        action = WorkerDayPermission.CREATE_OR_UPDATE
+    def _enrich_create_or_update_perms_data(cls, action, create_or_update_perms_data, obj_dict):
         graph_type = WorkerDayPermission.FACT if obj_dict.get('is_fact') else WorkerDayPermission.PLAN
         wd_type_id = obj_dict.get('type_id') or obj_dict.get('type').code
         dt = obj_dict.get('dt')
@@ -806,10 +805,17 @@ class WorkerDay(AbstractModel):
         }
 
     @classmethod
-    def _has_group_permissions(cls, user, employee_id, dt, user_shops=None, user_subordinates=None, is_vacancy=False, shop_id=None):
+    def _has_group_permissions(cls, user, employee_id, dt, user_shops=None, user_subordinates=None, is_vacancy=False, shop_id=None, action=None, graph_type=None):
         if not employee_id:
             return True
-        if is_vacancy:
+
+        check_is_vacancy_perm_cond = (
+            (not action and not graph_type) or
+            (graph_type == WorkerDayPermission.PLAN and action in [
+                WorkerDayPermission.UPDATE, WorkerDayPermission.DELETE]) or
+            (graph_type == WorkerDayPermission.FACT)
+        )
+        if is_vacancy and check_is_vacancy_perm_cond:
             if not user_shops:
                 user_shops = user.get_shops(include_descendants=True).values_list('id', flat=True)
             if isinstance(shop_id, str):
@@ -2427,6 +2433,8 @@ class WorkerDayPermission(AbstractModel):
     )
 
     CREATE_OR_UPDATE = 'CU'
+    CREATE = 'C'
+    UPDATE = 'U'
     DELETE = 'D'
     APPROVE = 'A'
 

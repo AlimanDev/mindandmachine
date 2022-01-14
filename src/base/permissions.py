@@ -59,6 +59,17 @@ class Permission(permissions.BasePermission):
 
 
 class WdPermission(Permission):
+    def _set_is_vacancy(self, wd_data):
+        # рефакторинг
+        if 'is_vacancy' not in wd_data and wd_data.get('employee_id') and wd_data.get(
+                'shop_id') and wd_data.get('dt'):
+            wd_data['is_vacancy'] = not Employment.objects.get_active(
+                employee_id=wd_data.get('employee_id'),
+                shop_id=wd_data.get('shop_id'),
+                dt_from=wd_data.get('dt'),
+                dt_to=wd_data.get('dt'),
+            ).exists()
+
     def has_permission(self, request, view):
         has_permission = super(WdPermission, self).has_permission(request, view)
         if has_permission is False:
@@ -68,11 +79,14 @@ class WdPermission(Permission):
         if view_action in ['create', 'update', 'destroy']:
             action = WorkerDayPermission.DELETE if view_action == 'destroy' else WorkerDayPermission.CREATE_OR_UPDATE
             if view_action == 'create':
+                action_for_group_perm_check = WorkerDayPermission.CREATE
                 # проверка пермишнов происходит раньше, чем валидация данных,
                 # поэтому предварительно провалидируем данные, используемые для проверки доступа
                 WsPermissionDataSerializer(data=request.data).is_valid(raise_exception=True)
                 wd_dict = request.data
+                self._set_is_vacancy(wd_data=wd_dict)
             else:
+                action_for_group_perm_check = WorkerDayPermission.DELETE
                 wd_dict = WorkerDay.objects.filter(id=view.kwargs['pk']).values(
                     'type', 
                     'dt', 
@@ -84,14 +98,20 @@ class WdPermission(Permission):
             if not wd_dict:
                 return False
             if view_action == 'update':
+                action_for_group_perm_check = WorkerDayPermission.UPDATE
                 wd_dict['type'] = request.data.get('type', wd_dict.get('type'))
+            graph_type = WorkerDayPermission.FACT if wd_dict.get('is_fact') else WorkerDayPermission.PLAN
             return GroupWorkerDayPermission.has_permission(
                 user=request.user,
                 action=action,
-                graph_type=WorkerDayPermission.FACT if wd_dict.get('is_fact') else WorkerDayPermission.PLAN,
+                graph_type=graph_type,
                 wd_type=wd_dict.get('type'),
                 wd_dt=wd_dict.get('dt'),
-            ) and WorkerDay._has_group_permissions(request.user, wd_dict.get('employee_id'), wd_dict.get('dt'), is_vacancy=wd_dict.get('is_vacancy', False), shop_id=wd_dict.get('shop_id'))
+            ) and WorkerDay._has_group_permissions(request.user, wd_dict.get('employee_id'), wd_dict.get('dt'),
+                                                   is_vacancy=wd_dict.get('is_vacancy', False),
+                                                   shop_id=wd_dict.get('shop_id'), action=action_for_group_perm_check,
+                                                   graph_type=graph_type)
+
 
         return has_permission
 
