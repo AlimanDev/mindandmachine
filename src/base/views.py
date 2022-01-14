@@ -147,9 +147,12 @@ class UserViewSet(UpdateorCreateViewSet):
 
     def get_queryset(self):
         user = self.request.user
+        additional_networks_filter = Q(allow_assign_employements_from_outsource=True)\
+            | Q(allow_choose_shop_from_client_for_employement=True)
+        if self.action in ['add_biometrics', 'delete_biometrics'] and user.network.settings_values_prop.get('allow_change_outsource_biometrics', True):
+            additional_networks_filter = Q()
         allowed_networks = list(NetworkConnect.objects.filter(
-            Q(allow_assign_employements_from_outsource=True) | 
-            Q(allow_choose_shop_from_client_for_employement=True),
+            additional_networks_filter,
             client_id=user.network_id,
         ).values_list('outsourcing_id', flat=True)) + [user.network_id]
         return User.objects.filter(
