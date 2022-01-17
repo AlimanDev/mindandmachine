@@ -97,7 +97,7 @@ def exchange(data, error_messages):
         # если у пользователя нет группы с наличием прав на изменение защищенных дней, то проверяем,
         # что в списке изменяемых дней нету защищенных дней, если есть, то выдаем ошибку
         has_permission_to_change_protected_wdays = Group.objects.filter(
-            id__in=data['user'].get_group_ids(day_pairs[0][0].shop),
+            id__in=data['user'].get_group_ids(day_pairs[0][0].shop_id),
             has_perm_to_change_protected_wdays=True,
         ).exists()
         if not has_permission_to_change_protected_wdays:
@@ -446,18 +446,18 @@ def create_worker_days_range(dates, type_id=WorkerDay.TYPE_WORKDAY, shop_id=None
 def check_worker_day_permissions(
         user, shop_id, action, graph_type, wd_types, dt_from, dt_to, error_messages, wd_types_dict, employee_id=None, is_vacancy=False):
     user_shops = list(user.get_shops(include_descendants=True).values_list('id', flat=True))
-    user_subordinates = Group.get_subordinate_ids(user)
+    get_subordinated_group_ids = Group.get_subordinated_group_ids(user)
     for dt in pd.date_range(dt_from, dt_to).date:
         if not WorkerDay._has_group_permissions(
                 user, employee_id, dt,
-                user_shops=user_shops, user_subordinates=user_subordinates, shop_id=shop_id, is_vacancy=is_vacancy,
+                user_shops=user_shops, get_subordinated_group_ids=get_subordinated_group_ids, shop_id=shop_id, is_vacancy=is_vacancy,
         ):
             raise PermissionDenied(
                 error_messages['employee_not_in_subordinates'].format(
                 employee=User.objects.filter(employees__id=employee_id).first().fio),
             )
     wd_perms = GroupWorkerDayPermission.objects.filter(
-        group__in=user.get_group_ids(Shop.objects.get(id=shop_id) if shop_id else None),
+        group__in=user.get_group_ids(shop_id=shop_id),
         worker_day_permission__action=action,
         worker_day_permission__graph_type=graph_type,
     ).select_related('worker_day_permission').values_list(

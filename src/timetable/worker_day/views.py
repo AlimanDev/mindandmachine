@@ -364,7 +364,7 @@ class WorkerDayViewSet(BaseModelViewSet):
 
             shop = Shop.objects.get(id=serializer.validated_data['shop_id'])
             has_perm_to_approve_other_shop_days = Group.objects.filter(
-                id__in=request.user.get_group_ids(shop),
+                id__in=request.user.get_group_ids(shop_id=shop.id),
                 has_perm_to_approve_other_shop_days=True,
             ).exists()
 
@@ -456,7 +456,7 @@ class WorkerDayViewSet(BaseModelViewSet):
                 # если у пользователя нет группы с наличием прав на изменение защищенных дней, то проверяем,
                 # что в списке подтверждаемых дней нету защищенных дней, если есть, то выдаем ошибку
                 has_permission_to_change_protected_wdays = Group.objects.filter(
-                    id__in=request.user.get_group_ids(shop),
+                    id__in=request.user.get_group_ids(shop_id=shop.id),
                     has_perm_to_change_protected_wdays=True,
                 ).exists()
                 if not has_permission_to_change_protected_wdays:

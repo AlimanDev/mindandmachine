@@ -1,3 +1,11 @@
+from django.db.models import Q
+
+from src.base.models import (
+    Shop,
+    Group,
+    Employment,
+    NetworkConnect,
+)
 from src.timetable.models import (
     WorkerDay,
     WorkerDayPermission,
@@ -14,10 +22,10 @@ class BaseWdPermissionChecker:
         :param user:
         :param cached_data:
             user_shops
-            user_subordinates
+            get_subordinated_group_ids
         """
         self.user = user
-        self.cached_data = cached_data
+        self.cached_data = cached_data or {}
 
     def has_permission(self):
         raise NotImplementedError
@@ -25,19 +33,95 @@ class BaseWdPermissionChecker:
 
 class BaseSingleWdPermissionChecker(BaseWdPermissionChecker):
     def _has_single_permission(self, employee_id, shop_id, action, graph_type, wd_type, wd_dt, is_vacancy):
-        return GroupWorkerDayPermission.has_permission(
+        user_shops = self.cached_data.get('user_shops') or self.user.get_shops(
+            include_descendants=True).values_list('id', flat=True)
+        user_subordinated_group_ids = self.cached_data.get(
+            'user_subordinated_group_ids') or Group.get_subordinated_group_ids(self.user)
+
+        employee_and_shop_types = GroupWorkerDayPermission.get_perms_qs(
             user=self.user,
             action=action,
             graph_type=graph_type,
             wd_type=wd_type,
             wd_dt=wd_dt,
-        ) and WorkerDay._has_group_permissions(
-            self.user,
-            employee_id,
-            wd_dt,
             is_vacancy=is_vacancy,
-            shop_id=shop_id,
-        )
+        ).values_list('employee_type', 'shop_type').distinct()
+        if not employee_and_shop_types:
+            return False
+
+        if employee_and_shop_types:
+            for employee_type, shop_type in employee_and_shop_types:
+                employment_q = Q()
+                shop_q = Q()
+                # маппинг типа сотрудника и типа магазина к лукапу
+                if employee_id:
+                    employment_inner_q = Q()
+                    if employee_type == GroupWorkerDayPermission.SUBORDINATE_EMPLOYEE:
+                        employment_inner_q &= Q(
+                            employee_id=employee_id,
+                            employee_id__in=self.user.get_subordinates(
+                                dt=wd_dt,
+                                user_shops=user_shops,
+                                user_subordinated_group_ids=user_subordinated_group_ids,
+                            )
+                        )
+                    elif employee_type == GroupWorkerDayPermission.MY_SHOPS_ANY_EMPLOYEE:
+                        employment_inner_q &= Q(
+                            shop_id__in=user_shops,
+                        )
+                    elif employee_type == GroupWorkerDayPermission.MY_NETWORK_EMPLOYEE:
+                        employment_inner_q &= Q(
+                            employee__user__network_id=self.user.network_id,
+                            shop__network_id=self.user.network_id,
+                        )
+                    elif employee_type == GroupWorkerDayPermission.OUTSOURCE_NETWORK_EMPLOYEE:
+                        employment_inner_q &= Q(
+                            employee__user__network_id__in=NetworkConnect.objects.filter(
+                                client_id=self.user.network_id).values_list('outsourcing_id', flat=True),
+                        )
+
+                    if employment_inner_q:
+                        employment_q |= employment_inner_q
+
+                if shop_id:
+                    shop_inner_q = Q()
+                    if shop_type == GroupWorkerDayPermission.MY_SHOPS:
+                        shop_inner_q &= Q(
+                            id__in=user_shops,
+                        )
+                    elif shop_type == GroupWorkerDayPermission.MY_NETWORK_SHOPS:
+                        shop_inner_q &= Q(
+                            network_id=self.user.network_id,
+                        )
+                    elif shop_type == GroupWorkerDayPermission.OUTSOURCE_NETWORK_SHOPS:
+                        shop_inner_q &= Q(
+                            network_id__in=NetworkConnect.objects.filter(
+                                client_id=self.user.network_id).values_list('outsourcing_id', flat=True),
+                        )
+                    elif shop_type == GroupWorkerDayPermission.CLIENT_NETWORK_SHOPS:
+                        shop_inner_q &= Q(
+                            network_id__in=NetworkConnect.objects.filter(
+                                outsourcing_id=self.user.network_id).values_list('client_id', flat=True),
+                        )
+
+                    if shop_inner_q:
+                        shop_q |= shop_inner_q
+
+                if (employment_q or not employee_id) and (shop_q or not shop_id):
+                    has_perm = (not employee_id or Employment.objects.get_active(
+                        dt_from=wd_dt,
+                        dt_to=wd_dt,
+                        employee_id=employee_id,
+                        extra_q=employment_q,
+                    ).exists()) and (not shop_id or Shop.objects.filter(
+                        shop_q,
+                        id=shop_id,
+                    ).exists())
+
+                    if has_perm:
+                        return True
+
+            return False
 
 
 class BaseSingleWdDataPermissionChecker(BaseSingleWdPermissionChecker):
@@ -94,10 +178,6 @@ class CreateSingleWdPermissionChecker(BaseSingleWdDataPermissionChecker):
 class UpdateSingleWdPermissionChecker(BaseSingleWdDataPermissionChecker):
     action = WorkerDayPermission.UPDATE
 
-    def __init__(self, *args, wd_id, **kwargs):
-        self.wd_id = wd_id
-        super(UpdateSingleWdPermissionChecker, self).__init__(*args, **kwargs)
-
     def has_permission(self):
         return self._has_single_wd_data_permission()
 
@@ -106,7 +186,7 @@ class DeleteSingleWdPermissionChecker(BaseSingleWdPermissionChecker):
     action = WorkerDayPermission.DELETE
 
     def __init__(self, *args, wd_obj=None, wd_id=None, **kwargs):
-        assert wd_obj or wd_id  # TODO: так?
+        assert wd_obj or wd_id
         self.wd_obj = wd_obj
         self.wd_id = wd_id
         super(DeleteSingleWdPermissionChecker, self).__init__(*args, **kwargs)
@@ -136,6 +216,14 @@ class DeleteQsWdPermissionChecker(BaseQsWdPermissionChecker):
     def __init__(self, *args, wd_qs, **kwargs):
         self.wd_qs = wd_qs
         super(DeleteQsWdPermissionChecker, self).__init__(*args, **kwargs)
+
+    def has_permission(self):
+        for wd in self.wd_qs:
+            if not DeleteSingleWdPermissionChecker(
+                    user=self.user, wd_obj=wd, cached_data=self.cached_data).has_permission():
+                return False
+
+        return True
 
 
 # class UpdateQsWdPermissionChecker(BaseQsWdPermissionChecker):

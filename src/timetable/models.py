@@ -645,83 +645,41 @@ class WorkerDay(AbstractModel):
         perms_data.setdefault(k, set()).add(dt)
 
     @classmethod
-    def _get_check_batch_perms_extra_kwargs(cls):
+    def _get_check_perms_extra_kwargs(cls):
         return {
             'wd_types_dict': WorkerDayType.get_wd_types_dict(),
         }
 
     @classmethod
-    def _check_batch_delete_qs_perms(cls, user, delete_qs, **kwargs):
-        from src.timetable.worker_day.utils import check_worker_day_permissions
-        from src.timetable.worker_day.views import WorkerDayViewSet
-        action = WorkerDayPermission.DELETE
-        employees_and_shops = delete_qs.values_list(
-            'employee_id',
-            'dt',
-            'shop_id',
-            'is_vacancy',
-        ).distinct()
-        user_shops = list(user.get_shops(include_descendants=True).values_list('id', flat=True))
-        user_subordinates = Group.get_subordinate_ids(user)
-        for employee_id, dt, shop_id, is_vacancy in employees_and_shops:
-            if not cls._has_group_permissions(
-                user, employee_id, dt, user_shops=user_shops, 
-                user_subordinates=user_subordinates, shop_id=shop_id, is_vacancy=is_vacancy):
-                raise PermissionDenied(
-                    WorkerDayViewSet.error_messages['employee_not_in_subordinates'].format(
-                    employee=User.objects.filter(employees__id=employee_id).first().fio),
-                )
-        grouped_qs = delete_qs.values(
-            'is_fact',
-            'type_id',
-            'shop_id',
-        ).annotate(
-            dt_min=Min('dt'),
-            dt_max=Min('dt'),
-        ).values_list(
-            'is_fact',
-            'type_id',
-            'shop_id',
-            'dt_min',
-            'dt_max',
-        ).distinct()
-        for is_fact, wd_type_id, shop_id, dt_min, dt_max in grouped_qs:
-            check_worker_day_permissions(
-                user=user,
-                shop_id=shop_id,
-                action=action,
-                graph_type=WorkerDayPermission.FACT if is_fact else WorkerDayPermission.PLAN,
-                wd_types=[wd_type_id],
-                dt_from=dt_min,
-                dt_to=dt_max,
-                error_messages=WorkerDayViewSet.error_messages,
-                wd_types_dict=kwargs.get('wd_types_dict'),
-            )
+    def _check_delete_qs_perm(cls, user, delete_qs, **kwargs):
+        from src.timetable.worker_day_permissions.checkers import DeleteQsWdPermissionChecker
+        if not DeleteQsWdPermissionChecker(
+            user=user,
+            wd_qs=delete_qs,
+            cached_data={
+                'wd_types_dict': kwargs.get('wd_types_dict'),
+            },
+        ).has_permission():
+            raise PermissionDenied()
 
     @classmethod
-    def _check_create_or_update_perms(cls, user, perms_data, **kwargs):
-        from src.timetable.worker_day.utils import check_worker_day_permissions
-        from src.timetable.worker_day.views import WorkerDayViewSet
-        for k, dates_set in perms_data.items():
-            graph_type, action, wd_type_id, shop_id, employee_id, is_vacancy = k.split('_')
-            if shop_id == 'None':
-                shop_id = None
-            if employee_id == 'None':
-                employee_id = None
-            is_vacancy = bool(distutils.util.strtobool(is_vacancy))
-            check_worker_day_permissions(
-                user=user,
-                shop_id=shop_id,
-                action=action,
-                graph_type=graph_type,
-                wd_types=[wd_type_id],
-                dt_from=min(dates_set),
-                dt_to=max(dates_set),
-                error_messages=WorkerDayViewSet.error_messages,
-                wd_types_dict=kwargs.get('wd_types_dict'),
-                employee_id=employee_id,
-                is_vacancy=is_vacancy,
-            )
+    def _check_create_single_obj_perm(cls, user, obj_data, **extra_kwargs):
+        from src.timetable.worker_day_permissions.checkers import CreateSingleWdPermissionChecker
+        if not CreateSingleWdPermissionChecker(user=user, wd_data=obj_data).has_permission():
+            raise PermissionDenied()
+
+    @classmethod
+    def _check_update_single_obj_perm(cls, user, existing_obj, obj_data, **extra_kwargs):
+        from src.timetable.worker_day_permissions.checkers import UpdateSingleWdPermissionChecker
+        # TODO: сравнение сущ. объекта и новых данных
+        if not UpdateSingleWdPermissionChecker(user=user, wd_data=obj_data).has_permission():
+            raise PermissionDenied()
+
+    @classmethod
+    def _check_delete_single_obj_perm(cls, user, existing_obj=None, obj_id=None, **extra_kwargs):
+        from src.timetable.worker_day_permissions.checkers import DeleteSingleWdPermissionChecker
+        if not DeleteSingleWdPermissionChecker(user=user, wd_obj=existing_obj, wd_id=obj_id).has_permission():
+            raise PermissionDenied()
 
     @classmethod
     def _get_batch_update_or_create_transaction_checks_kwargs(cls, **kwargs):
@@ -750,7 +708,7 @@ class WorkerDay(AbstractModel):
 
     @classmethod
     def _has_group_permissions(
-            cls, user, employee_id, dt, user_shops=None, user_subordinates=None, is_vacancy=False, shop_id=None, action=None):
+            cls, user, employee_id, dt, user_shops=None, get_subordinated_group_ids=None, is_vacancy=False, shop_id=None, action=None, graph_type=None):
         if not employee_id:
             return True
         if is_vacancy:
@@ -763,7 +721,7 @@ class WorkerDay(AbstractModel):
         employee = user.get_subordinates(
             dt=dt,
             user_shops=user_shops,
-            user_subordinates=user_subordinates,
+            user_subordinated_group_ids=get_subordinated_group_ids,
         ).filter(id=employee_id).first()
         if not employee:
             active_empls = Employment.objects.get_active(
@@ -2378,6 +2336,7 @@ class WorkerDayPermission(AbstractModel):
     UPDATE = 'U'  # изменение каких-то значений дня без изменения его типа
     DELETE = 'D'  # удаление какого-то типа дня
     APPROVE = 'A'
+    # CONFIRM_VACANCY_TO_WORKER = 'CVTW'
 
     ACTIONS = (
         (CREATE, _('Create')),
@@ -2385,10 +2344,11 @@ class WorkerDayPermission(AbstractModel):
         # Remove, т.к. Delete почему-то переводится в "Удалено", даже если в django.py "Удаление".
         (DELETE, _('Remove')),
         (APPROVE, _('Approve')),
+        # (CONFIRM_VACANCY_TO_WORKER, _('Confirm vacancy to worker')),
     )
     ACTIONS_DICT = dict(ACTIONS)
 
-    action = models.CharField(choices=ACTIONS, max_length=2, verbose_name='Действие')
+    action = models.CharField(choices=ACTIONS, max_length=4, verbose_name='Действие')
     graph_type = models.CharField(choices=GRAPH_TYPES, max_length=1, verbose_name='Тип графика')
     wd_type = models.ForeignKey('timetable.WorkerDayType', verbose_name='Тип дня', on_delete=models.CASCADE)
 
@@ -2406,13 +2366,13 @@ class GroupWorkerDayPermission(AbstractModel):
     MY_SHOPS_ANY_EMPLOYEE = 1
     SUBORDINATE_EMPLOYEE = 2
     OUTSOURCE_NETWORK_EMPLOYEE = 3
+    MY_NETWORK_EMPLOYEE = 4
 
     EMPLOYEE_TYPE_CHOICES = (
         (MY_SHOPS_ANY_EMPLOYEE, 'Любые сотрудники моих магазинов'),  # с трудоустройством в моем магазине
         (SUBORDINATE_EMPLOYEE, 'Подчиненные сотрудники'),  # с трудоустройством в моем магазине
         (OUTSOURCE_NETWORK_EMPLOYEE, 'Сотрудники аутсорс компании'),  # без трудоустройства в моем магазине и из сети, аутсорсящей сеть пользователя, соверщающего действие
-        # TODO: я как аутсорс менеджер могу изменять рабочие дни аутсорс сотрудников?
-        #  или могу только выводить их на вакансию?
+        (MY_NETWORK_EMPLOYEE, 'Любые сотрудники моей сети'),
     )
     EMPLOYEE_TYPE_CHOICES_REVERSED_DICT = {v: k for k, v in dict(EMPLOYEE_TYPE_CHOICES).items()}
 
@@ -2423,7 +2383,7 @@ class GroupWorkerDayPermission(AbstractModel):
 
     SHOP_TYPE_CHOICES = (
         (MY_SHOPS, 'Мои магазины'),
-        (MY_NETWORK_SHOPS, 'Любые магазин моей сети'),
+        (MY_NETWORK_SHOPS, 'Любые магазины моей сети'),
         (OUTSOURCE_NETWORK_SHOPS, 'Магазины аутсорс сетей'),
         (CLIENT_NETWORK_SHOPS, 'Магазины сети аутсорс-клиента'),
     )
@@ -2465,31 +2425,60 @@ class GroupWorkerDayPermission(AbstractModel):
     def __str__(self):
         return f'{self.group.name} {self.worker_day_permission}'
 
-    # TODO: кэширование проверок доступа (на n дней), инвалидация кэша при изменении прав; по какому паттерну?
     @classmethod
-    def has_permission(cls, user, action, graph_type, wd_type, wd_dt, shop=None, employee=None):
-        """
-        :param user: пользователь, который совершает действие
-        :param employee: сотрудник, для дня которого совершается действие
-        :param action: действие (создание/изменение/удаление)
-        :param graph_type: тип графика (план/факт)
-        :param wd_type: тип дня
-        :param wd_dt: дата дня
-        :param shop: магазин (для рабочих типов дней)
-        :return: есть доступ или нет
-        """
+    def get_perms_qs(cls, user, action, graph_type, wd_type, wd_dt, shop_id=None, is_vacancy=None):
         if isinstance(wd_dt, str):
             wd_dt = datetime.datetime.strptime(wd_dt, settings.QOS_DATE_FORMAT).date()
         today = (datetime.datetime.now() + datetime.timedelta(
-            hours=shop.get_tz_offset() if shop else settings.CLIENT_TIMEZONE)).date()
+            hours=Shop.get_cached_tz_offset_by_shop_id(shop_id=shop_id) if shop_id else settings.CLIENT_TIMEZONE)).date()
+        kwargs = {}
+        if is_vacancy:
+            kwargs['allow_actions_on_vacancies'] = True
         return cls.objects.filter(
             Q(limit_days_in_past__isnull=True) | Q(limit_days_in_past__gte=(today - wd_dt).days),
             Q(limit_days_in_future__isnull=True) | Q(limit_days_in_future__gte=(wd_dt - today).days),
-            group__in=user.get_group_ids(shop=shop),  # учитывать вложенность?
+            group__in=user.get_group_ids(shop_id=shop_id),
             worker_day_permission__action=action,
             worker_day_permission__graph_type=graph_type,
             worker_day_permission__wd_type=wd_type,
-        ).exists()
+            **kwargs,
+        )
+
+    # # TODO: кэширование проверок доступа (на n дней), инвалидация кэша при изменении прав; по какому паттерну?
+    # @classmethod
+    # def has_permission(cls, user, action, graph_type, wd_type, wd_dt, employee_type=None, shop_id=None, shop_type=None, is_vacancy=None):
+    #     """
+    #     :param user: пользователь, который совершает действие
+    #     :param employee_type: тип сотрудника, для дня которого совершается действие
+    #     :param action: действие (создание/изменение/удаление)
+    #     :param graph_type: тип графика (план/факт)
+    #     :param wd_type: тип дня
+    #     :param wd_dt: дата дня
+    #     :param employee_type: тип сотрудника
+    #     :param shop_type: тип магазина
+    #     :param is_vacancy: вакансия
+    #     :return: есть доступ или нет
+    #     """
+    #     if isinstance(wd_dt, str):
+    #         wd_dt = datetime.datetime.strptime(wd_dt, settings.QOS_DATE_FORMAT).date()
+    #     today = (datetime.datetime.now() + datetime.timedelta(
+    #         hours=Shop.get_cached_tz_offset_by_shop_id(shop_id=shop_id) if shop_id else settings.CLIENT_TIMEZONE)).date()
+    #     kwargs = {}
+    #     if employee_type:
+    #         kwargs['employee_type'] = employee_type
+    #     if shop_type:
+    #         kwargs['shop_type'] = shop_type
+    #     if is_vacancy:
+    #         kwargs['allow_actions_on_vacancies'] = True
+    #     return cls.objects.filter(
+    #         Q(limit_days_in_past__isnull=True) | Q(limit_days_in_past__gte=(today - wd_dt).days),
+    #         Q(limit_days_in_future__isnull=True) | Q(limit_days_in_future__gte=(wd_dt - today).days),
+    #         group__in=user.get_group_ids(shop_id=shop_id),
+    #         worker_day_permission__action=action,
+    #         worker_day_permission__graph_type=graph_type,
+    #         worker_day_permission__wd_type=wd_type,
+    #         **kwargs,
+    #     ).exists()
 
 
 class PlanAndFactHoursAbstract(models.Model):

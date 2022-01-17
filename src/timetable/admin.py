@@ -337,6 +337,7 @@ class GroupWorkerDayPermissionAdmin(ImportMixin, ExportActionMixin, BaseNotWrapR
     list_select_related = ('group', 'worker_day_permission__wd_type')
     resource_class = GroupWorkerDayPermissionResource
     form = GroupWorkerDayPermissionForm
+    save_as = True
 
     def get_import_form(self):
         return CustomImportFunctionGroupForm

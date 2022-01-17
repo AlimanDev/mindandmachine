@@ -49,7 +49,7 @@ class BatchUpdateOrCreateModelMixin:
         pass
 
     @classmethod
-    def _check_batch_delete_qs_perms(cls, user, delete_qs, **kwargs):
+    def _check_delete_qs_perm(cls, user, delete_qs, **kwargs):
         """
         Првоерка прав на удаление объектов на основе qs
             (для объектов, которые удаляем -- можем использовать qs)
@@ -57,16 +57,20 @@ class BatchUpdateOrCreateModelMixin:
         pass
 
     @classmethod
-    def _enrich_perms_data(cls, action, perms_data, obj_dict):
+    def _check_create_single_obj_perm(cls, user, obj_data, **extra_kwargs):
         pass
 
     @classmethod
-    def _get_check_batch_perms_extra_kwargs(cls):
+    def _check_update_single_obj_perm(cls, user, existing_obj, obj_data, **extra_kwargs):
+        pass
+
+    @classmethod
+    def _check_delete_single_obj_perm(cls, user, existing_obj=None, obj_id=None, **extra_kwargs):
+        pass
+
+    @classmethod
+    def _get_check_perms_extra_kwargs(cls):
         return {}
-
-    @classmethod
-    def _check_create_or_update_perms(cls, user, perms_data, **kwargs):
-        pass
 
     @classmethod
     def _pop_rel_objs_data(cls, objs_data, rel_objs_mapping):
@@ -210,8 +214,6 @@ class BatchUpdateOrCreateModelMixin:
         # TODO: Сигналы post_batch_update, post_batch_create ?
         # TODO: Не обновлять существующие объекты если ни 1 поле не изменилось ?
         """
-        from src.timetable.models import WorkerDayPermission
-
         allowed_update_key_fields = cls._get_allowed_update_key_fields()
         if update_key_field not in allowed_update_key_fields:
             raise BatchUpdateOrCreateException(
@@ -224,10 +226,9 @@ class BatchUpdateOrCreateModelMixin:
                     diff_lookup_fields = cls._get_diff_lookup_fields()
                     diff_obj_keys = tuple(lookup_field.split('__') for lookup_field in diff_lookup_fields)
                     diff_headers = cls._get_diff_headers()
-                perms_data = {}
                 check_perms_extra_kwargs = {}
                 if user:
-                    check_perms_extra_kwargs = cls._get_check_batch_perms_extra_kwargs()
+                    check_perms_extra_kwargs = cls._get_check_perms_extra_kwargs()
                 stats = stats if stats is not None else {}
                 delete_scope_fields_list = delete_scope_fields_list or cls._get_batch_delete_scope_fields_list()
                 delete_scope_values_set = set()
@@ -258,7 +259,7 @@ class BatchUpdateOrCreateModelMixin:
                     if update_key is None:
                         to_create.append(obj_dict)
                         if user:
-                            cls._enrich_perms_data(WorkerDayPermission.CREATE, perms_data, obj_dict)
+                            cls._check_create_single_obj_perm(user, obj_dict, **check_perms_extra_kwargs)
                     else:
                         update_keys.append(update_key)
                         to_update_dict[update_key] = obj_dict
@@ -279,7 +280,7 @@ class BatchUpdateOrCreateModelMixin:
                         obj_to_create = to_update_dict.pop(update_key)
                         to_create.append(obj_to_create)
                         if user:
-                            cls._enrich_perms_data(WorkerDayPermission.CREATE, perms_data, obj_dict)
+                            cls._check_create_single_obj_perm(user, obj_dict, **check_perms_extra_kwargs)
                     else:
                         existing_obj = existing_objs.get(update_key)
                         if all(getattr(existing_obj, k) == v for k, v in to_update_dict[update_key].items() if
@@ -293,10 +294,8 @@ class BatchUpdateOrCreateModelMixin:
                         else:
                             to_update_dict[update_key]['dttm_modified'] = now
                             if user:
-                                cls._enrich_perms_data(WorkerDayPermission.UPDATE, perms_data, obj_dict)
-
-                if user:
-                    cls._check_create_or_update_perms(user, perms_data, **check_perms_extra_kwargs)
+                                cls._check_update_single_obj_perm(
+                                    user, existing_obj, obj_dict, **check_perms_extra_kwargs)
 
                 if to_skip:
                     skip_rel_objs_data = cls._pop_rel_objs_data(
@@ -370,7 +369,7 @@ class BatchUpdateOrCreateModelMixin:
                         delete_qs = delete_manager.filter(
                             q_for_delete, **delete_filter_kwargs).exclude(id__in=list(obj.id for obj in objs if obj.id))
                         if user:
-                            cls._check_batch_delete_qs_perms(user, delete_qs, **check_perms_extra_kwargs)
+                            cls._check_delete_qs_perm(user, delete_qs, **check_perms_extra_kwargs)
                         if diff_report_email_to:
                             diff_data['deleted'] = list(delete_qs.values_list(*diff_lookup_fields))
                         _total_deleted_count, deleted_dict = delete_qs.delete()
