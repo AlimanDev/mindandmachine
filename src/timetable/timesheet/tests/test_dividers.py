@@ -1087,3 +1087,33 @@ class TestShiftScheduleDivider(TestTimesheetMixin, TestCase):
             self.assertIsNotNone(donor_additional_ts_item)
             self.assertEqual(donor_additional_ts_item.day_type_id, WorkerDay.TYPE_WORKDAY)
             self.assertEqual(donor_additional_ts_item.day_hours + donor_additional_ts_item.night_hours, 3)
+
+    def test_move_from_additional_when_total_hours_to_subtract_equal_to_shift_schedule_hours(self):
+        dt = date(2021, 6, 11)
+        WorkerDay.objects.filter(dt=dt, is_fact=True).delete()
+        for wd in WorkerDay.objects.filter(dt=dt, is_fact=False):
+            wd.type_id = WorkerDay.TYPE_HOLIDAY
+            wd.dttm_work_start = None
+            wd.dttm_work_end = None
+            wd.shop = None
+            wd.save()
+        dt_donor = date(2021, 6, 12)
+        for wd in WorkerDay.objects.filter(dt=dt_donor).order_by('is_fact'):
+            wd.dttm_work_start = datetime.combine(dt, time(22))
+            wd.dttm_work_end = datetime.combine(dt + timedelta(days=1), time(6))
+            wd.save()
+        WorkerDay.objects.filter(~Q(dt__in=[dt, dt_donor])).delete()
+        for employee in [self.employee_worker]:
+            self._calc_timesheets(employee_id=employee.id, reraise_exc=True, dttm_now=datetime(2021, 6, 25))
+            main_ts_item = TimesheetItem.objects.get(
+                employee=employee, dt=dt, timesheet_type=TimesheetItem.TIMESHEET_TYPE_MAIN)
+            additional_ts_item = TimesheetItem.objects.filter(
+                employee=employee, dt=dt, timesheet_type=TimesheetItem.TIMESHEET_TYPE_ADDITIONAL).first()
+            self.assertEqual(main_ts_item.day_type_id, WorkerDay.TYPE_WORKDAY)
+            self.assertEqual(main_ts_item.day_hours, 7)
+            self.assertEqual(main_ts_item.night_hours, 0)
+            self.assertIsNone(additional_ts_item)
+
+            donor_additional_ts_item = TimesheetItem.objects.filter(
+                employee=employee, dt=dt_donor, timesheet_type=TimesheetItem.TIMESHEET_TYPE_ADDITIONAL).first()
+            self.assertIsNone(donor_additional_ts_item)
