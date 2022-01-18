@@ -4649,6 +4649,44 @@ class TestAttendanceRecords(TestsHelperMixin, APITestCase):
         self.assertIsNotNone(wd_approved_fact.closest_plan_approved_id)
         self.assertEqual(wd_approved_fact.closest_plan_approved_id, plan_approved.id)
 
+    def test_dont_set_deleted_work_type_received_by_plan_work_type(self):
+        self.worker_day_fact_approved.delete()
+        tm_start = datetime.combine(self.dt, time(6, 0, 0))
+        plan_worker_day_details = self.worker_day_plan_approved.worker_day_details.select_related('work_type')
+        self.assertEqual(len(plan_worker_day_details), 1)
+        # shop2 deleted wt
+        WorkType.objects.create(
+            shop=self.shop2,
+            work_type_name=plan_worker_day_details[0].work_type.work_type_name,
+            dttm_deleted=self.dt - timedelta(days=15),
+        )
+        wt_not_deleted = WorkType.objects.create(
+            shop=self.shop2,
+            work_type_name= WorkTypeName.objects.create(
+                network=self.network,
+                name='shop2 not deleted wt',
+            )
+        )
+        AttendanceRecords.objects.create(
+            dttm=tm_start,
+            type=AttendanceRecords.TYPE_COMING,
+            shop=self.shop2,
+            user=self.user2,
+        )
+        fact_approved = WorkerDay.objects.get(
+            is_fact=True,
+            is_approved=True,
+            employee=self.employee2,
+            dt=self.dt,
+        )
+        fact_worker_day_details = fact_approved.worker_day_details.all()
+        self.assertEqual(len(fact_worker_day_details), 1)
+        self.assertNotEqual(fact_worker_day_details[0].work_type_id, plan_worker_day_details[0].work_type_id)
+        self.assertEqual(
+            fact_worker_day_details[0].work_type.id,
+            wt_not_deleted.id,
+        )
+
 
 class TestVacancy(TestsHelperMixin, APITestCase):
     @classmethod
