@@ -2121,11 +2121,11 @@ class AttendanceRecords(AbstractModel):
     def _create_or_update_not_approved_fact(self, fact_approved):
         # TODO: попробовать найти вариант без удаления workerday?
         WorkerDay.objects.filter(
+            Q(last_edited_by__isnull=True) | Q(type_id=WorkerDay.TYPE_EMPTY),
             dt=fact_approved.dt,
             employee_id=fact_approved.employee_id,
             is_fact=True,
             is_approved=False,
-            last_edited_by__isnull=True,
         ).delete()
 
         other_facts_approved = list(WorkerDay.objects.filter(
@@ -2237,6 +2237,9 @@ class AttendanceRecords(AbstractModel):
                 # TODO: проставление такого же типа как в плане? (тест + проверить)
                 setattr(fact_approved, 'type_id',
                         closest_plan_approved.type_id if closest_plan_approved else WorkerDay.TYPE_WORKDAY)
+                setattr(fact_approved, 'shop_id', self.shop_id)
+                setattr(fact_approved, 'last_edited_by', None)
+                setattr(fact_approved, 'created_by', None)
                 if closest_plan_approved and not fact_approved.closest_plan_approved_id:
                     fact_approved.closest_plan_approved = closest_plan_approved
                 if not fact_approved.worker_day_details.exists():
@@ -2259,6 +2262,9 @@ class AttendanceRecords(AbstractModel):
                         setattr(prev_fa_wd, self.TYPE_2_DTTM_FIELD[self.type], self.dttm)
                         setattr(prev_fa_wd, 'type_id',
                                 closest_plan_approved.type_id if closest_plan_approved else WorkerDay.TYPE_WORKDAY)
+                        setattr(prev_fa_wd, 'shop_id', self.shop_id)
+                        setattr(prev_fa_wd, 'last_edited_by', None)
+                        setattr(prev_fa_wd, 'created_by', None)
                         if closest_plan_approved and not prev_fa_wd.closest_plan_approved_id:
                             prev_fa_wd.closest_plan_approved = closest_plan_approved
                         prev_fa_wd.save()
