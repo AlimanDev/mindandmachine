@@ -808,9 +808,9 @@ class WorkerDayViewSet(BaseModelViewSet):
             raise utils.translate_validation(filterset_class.errors)
         
         paginator = LimitOffsetPagination()
-        worker_day_outsource_network_subq = WorkerDay.objects.filter(
-            pk=OuterRef('pk'),
-            outsources__id=self.request.user.network_id,
+        allowed_outsource_network_subq = WorkerDayOutsourceNetwork.objects.filter(
+            workerday_id=OuterRef('id'),
+            network_id=self.request.user.network_id,
         )
         dt = datetime.date.today()
         user_shops = list(request.user.get_shops(include_descendants=True).values_list('id', flat=True))
@@ -832,7 +832,7 @@ class WorkerDayViewSet(BaseModelViewSet):
                 is_vacancy=True,
                 type__is_work_hours=True,
             ).annotate(
-                worker_day_outsource_network_exitst=Exists(worker_day_outsource_network_subq),
+                outsource_network_allowed=Exists(allowed_outsource_network_subq),
             ).filter(
                 (
                     Q(shop__network_id=request.user.network_id)&
@@ -843,7 +843,7 @@ class WorkerDayViewSet(BaseModelViewSet):
                     )
                 ) | 
                 (
-                    Q(is_outsource=True, worker_day_outsource_network_exitst=True, is_approved=True)&
+                    Q(is_outsource=True, outsource_network_allowed=True, is_approved=True) &
                     (Q(employee__isnull=True) | Q(employee__user__network_id=request.user.network_id)) # чтобы не попадали вакансии с сотрудниками другой аутсорс сети
                 ), # аутсорс фильтр
             ).select_related(
