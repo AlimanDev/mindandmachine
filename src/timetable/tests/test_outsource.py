@@ -203,13 +203,26 @@ class TestOutsource(TestsHelperMixin, APITestCase):
         NetworkConnect.objects.filter(id=self.network_connect.id).delete()
         dt_now = self.dt_now
         self.client.force_authenticate(user=self.user1)
-        not_created = self._create_vacancy(dt_now, datetime.combine(dt_now, time(8)), datetime.combine(dt_now, time(20)), is_outsource=False)
-        self.assertEqual(not_created.json(), {'non_field_errors': ['В вашей сети нет такого магазина.']})
+        not_created = self._create_vacancy(
+            dt_now, datetime.combine(dt_now, time(8)), datetime.combine(dt_now, time(20)), is_outsource=False)
+        self.assertEqual(not_created.json(),
+                         {'detail': 'У вас нет прав на создание типа дня "Рабочий день" в подразделении Магазин'})
 
     def test_can_create_vacancy_with_shop_from_other_network_but_from_outsource_client(self):
         dt_now = self.dt_now
         self.client.force_authenticate(user=self.user1)
-        resp = self._create_vacancy(dt_now, datetime.combine(dt_now, time(8)), datetime.combine(dt_now, time(20)), is_outsource=False)
+        GroupWorkerDayPermission.objects.create(
+            group=self.admin_group,
+            worker_day_permission=WorkerDayPermission.objects.get(
+                action=WorkerDayPermission.CREATE,
+                graph_type=WorkerDayPermission.PLAN,
+                wd_type_id=WorkerDay.TYPE_WORKDAY,
+            ),
+            employee_type=GroupWorkerDayPermission.SUBORDINATE_EMPLOYEE,
+            shop_type=GroupWorkerDayPermission.CLIENT_NETWORK_SHOPS,
+        )
+        resp = self._create_vacancy(
+            dt_now, datetime.combine(dt_now, time(8)), datetime.combine(dt_now, time(20)), is_outsource=False)
         self.assertEqual(resp.status_code, 201)
 
     def test_vacancy_creation_with_null_or_empty_outsourcings_ids(self):
@@ -313,15 +326,20 @@ class TestOutsource(TestsHelperMixin, APITestCase):
         vacancy = self._create_vacancy(dt_now, datetime.combine(dt_now, time(8)), datetime.combine(dt_now, time(20)), outsources=[self.outsource_network.id,]).json()
         WorkerDay.objects.all().update(is_approved=True)
         self.client.force_authenticate(user=self.user1)
-        response = self.client.post(
+        resp = self.client.post(
             f'/rest_api/worker_day/{vacancy["id"]}/confirm_vacancy_to_worker/',
             data={
                 'user_id': self.user2.id,
                 'employee_id': self.employee2.id,
             }
         )
-        self.assertContains(
-            response, f'Сотрудник {self.user2.fio} не является Вашим подчиненным.', status_code=403)
+        self.assertEqual(resp.status_code, 403)
+        self.assertDictEqual(
+            resp.json(),
+            {
+                "detail": f"У вас нет прав на создание типа дня \"Рабочий день\" для сотрудника {self.user2.short_fio} в подразделении Shop1"
+            }
+        )
         self.admin_group.subordinates.add(self.employment2.function_group)
         Employment.objects.filter(employee=self.employee1).update(shop=self.shop2)
         response = self.client.post(
@@ -331,8 +349,13 @@ class TestOutsource(TestsHelperMixin, APITestCase):
                 'employee_id': self.employee2.id,
             }
         )
-        self.assertContains(
-            response, f'Сотрудник {self.user2.fio} не является Вашим подчиненным.', status_code=403)
+        self.assertEqual(resp.status_code, 403)
+        self.assertDictEqual(
+            resp.json(),
+            {
+                "detail": f"У вас нет прав на создание типа дня \"Рабочий день\" для сотрудника {self.user2.short_fio} в подразделении Shop1"
+            }
+        )
         Employment.objects.filter(employee=self.employee1).update(shop=self.shop)
         response = self.client.post(
             f'/rest_api/worker_day/{vacancy["id"]}/confirm_vacancy_to_worker/',
@@ -405,26 +428,36 @@ class TestOutsource(TestsHelperMixin, APITestCase):
         )
         self.assertEqual(response.json(), {'result': 'Вакансия успешно принята.'})
         self.admin_group.subordinates.clear()
-        response = self.client.post(
+        resp = self.client.post(
             f'/rest_api/worker_day/{vacancy["id"]}/reconfirm_vacancy_to_worker/',
             data={
                 'user_id': self.user2.id,
                 'employee_id': self.employee2.id,
             }
         )
-        self.assertContains(
-            response, f'Сотрудник {self.user2.fio} не является Вашим подчиненным.', status_code=403)
+        self.assertEqual(resp.status_code, 403)
+        self.assertDictEqual(
+            resp.json(),
+            {
+                "detail": f"У вас нет прав на создание типа дня \"Рабочий день\" для сотрудника {self.user2.short_fio} в подразделении Shop1"
+            }
+        )
         self.admin_group.subordinates.add(self.employment2.function_group)
         Employment.objects.filter(employee=self.employee1).update(shop=self.shop2)
-        response = self.client.post(
+        resp = self.client.post(
             f'/rest_api/worker_day/{vacancy["id"]}/reconfirm_vacancy_to_worker/',
             data={
                 'user_id': self.user2.id,
                 'employee_id': self.employee2.id,
             }
         )
-        self.assertContains(
-            response, f'Сотрудник {self.user2.fio} не является Вашим подчиненным.', status_code=403)
+        self.assertEqual(resp.status_code, 403)
+        self.assertDictEqual(
+            resp.json(),
+            {
+                "detail": f"У вас нет прав на создание типа дня \"Рабочий день\" для сотрудника {self.user2.short_fio} в подразделении Shop1"
+            }
+        )
         Employment.objects.filter(employee=self.employee1).update(shop=self.shop)
         response = self.client.post(
             f'/rest_api/worker_day/{vacancy["id"]}/reconfirm_vacancy_to_worker/',

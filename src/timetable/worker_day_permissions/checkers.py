@@ -1,6 +1,11 @@
+import datetime
+
+from django.conf import settings
 from django.db.models import Q
+from django.utils.translation import gettext as _
 
 from src.base.models import (
+    Employee,
     Shop,
     Group,
     Employment,
@@ -8,6 +13,7 @@ from src.base.models import (
 )
 from src.timetable.models import (
     WorkerDay,
+    WorkerDayType,
     WorkerDayPermission,
     GroupWorkerDayPermission,
 )
@@ -23,34 +29,73 @@ class BaseWdPermissionChecker:
         :param cached_data:
             user_shops
             get_subordinated_group_ids
+            wd_types_dict
         """
         self.user = user
         self.cached_data = cached_data or {}
+        self.err_message = None
+
+    def _get_err_msg(self, action, wd_type_id, employee_id=None, shop_id=None, dt_interval=None):
+        # рефакторинг
+        from src.timetable.worker_day.views import WorkerDayViewSet
+        wd_type_display_str = (self.cached_data.get(
+            'wd_types_dict', {}) or WorkerDayType.get_wd_types_dict()).get(wd_type_id).name
+        action_str = WorkerDayPermission.ACTIONS_DICT.get(action).lower()
+        if dt_interval:
+            err_msg = WorkerDayViewSet.error_messages['approve_days_interval_restriction'].format(
+                wd_type_str=wd_type_display_str,
+                action_str=action_str,
+                dt_interval=dt_interval,
+            )
+        else:
+            err_msg = WorkerDayViewSet.error_messages['no_action_perm_for_wd_type'].format(
+                wd_type_str=wd_type_display_str,
+                action_str=action_str,
+            )
+            if employee_id:
+                err_msg += f" для сотрудника {Employee.objects.select_related('user').get(id=employee_id).user.short_fio}"
+            if shop_id:
+                err_msg += f" в подразделении {Shop.objects.filter(id=shop_id).values_list('name', flat=True).first()}"
+
+        return err_msg
 
     def has_permission(self):
         raise NotImplementedError
 
 
 class BaseSingleWdPermissionChecker(BaseWdPermissionChecker):
-    def _has_single_permission(self, employee_id, shop_id, action, graph_type, wd_type, wd_dt, is_vacancy):
+    def _has_single_permission(self, employee_id, shop_id, action, graph_type, wd_type_id, wd_dt, is_vacancy):
+        from src.util.models_converter import Converter
+        if employee_id:
+            active_empls = Employment.objects.get_active(
+                dt_from=wd_dt,
+                dt_to=wd_dt,
+                employee_id=employee_id,
+            )
+            if not active_empls.exists():
+                self.err_message = _(
+                    "Can't create a working day in the schedule, since the user is not employed during this period")
+                return False
+
         user_shops = self.cached_data.get('user_shops') or self.user.get_shops(
             include_descendants=True).values_list('id', flat=True)
         user_subordinated_group_ids = self.cached_data.get(
             'user_subordinated_group_ids') or Group.get_subordinated_group_ids(self.user)
 
-        employee_and_shop_types = GroupWorkerDayPermission.get_perms_qs(
+        gwdp = GroupWorkerDayPermission.get_perms_qs(
             user=self.user,
             action=action,
             graph_type=graph_type,
-            wd_type=wd_type,
+            wd_type_id=wd_type_id,
             wd_dt=wd_dt,
             is_vacancy=is_vacancy,
-        ).values_list('employee_type', 'shop_type').distinct()
-        if not employee_and_shop_types:
+        ).values_list('employee_type', 'shop_type', 'limit_days_in_past', 'limit_days_in_future').distinct()
+        if not gwdp:
+            self.err_message = self._get_err_msg(action, wd_type_id)
             return False
 
-        if employee_and_shop_types:
-            for employee_type, shop_type in employee_and_shop_types:
+        if gwdp:
+            for employee_type, shop_type, limit_days_in_past, limit_days_in_future in gwdp:
                 employment_q = Q()
                 shop_q = Q()
                 # маппинг типа сотрудника и типа магазина к лукапу
@@ -119,8 +164,30 @@ class BaseSingleWdPermissionChecker(BaseWdPermissionChecker):
                     ).exists())
 
                     if has_perm:
+                        # FIXME: с допущением, что удовл. только 1 пермишну, проверим интервал, если неудовлетворяет,
+                        #  то кидаем ошибку.
+                        if isinstance(wd_dt, str):
+                            wd_dt = datetime.datetime.strptime(wd_dt, settings.QOS_DATE_FORMAT).date()
+                        today = (datetime.datetime.now() + datetime.timedelta(
+                            hours=Shop.get_cached_tz_offset_by_shop_id(shop_id=shop_id) if shop_id else settings.CLIENT_TIMEZONE)).date()
+                        date_limit_in_past = None
+                        date_limit_in_future = None
+                        dt_from = wd_dt
+                        dt_to = wd_dt
+                        if limit_days_in_past is not None:
+                            date_limit_in_past = today - datetime.timedelta(days=limit_days_in_past)
+                        if limit_days_in_future is not None:
+                            date_limit_in_future = today + datetime.timedelta(days=limit_days_in_future)
+                        if date_limit_in_past or date_limit_in_future:
+                            if (date_limit_in_past and dt_from < date_limit_in_past) or \
+                                    (date_limit_in_future and dt_to > date_limit_in_future):
+                                dt_interval = f'с {Converter.convert_date(date_limit_in_past) or "..."} ' \
+                                              f'по {Converter.convert_date(date_limit_in_future) or "..."}'
+                                self.err_message = self._get_err_msg(action, wd_type_id, dt_interval=dt_interval)
+                                return False
                         return True
 
+            self.err_message = self._get_err_msg(action, wd_type_id, employee_id=employee_id, shop_id=shop_id)
             return False
 
 
@@ -138,12 +205,17 @@ class BaseSingleWdDataPermissionChecker(BaseSingleWdPermissionChecker):
         super(BaseSingleWdDataPermissionChecker, self).__init__(*args, **kwargs)
 
     def _has_single_wd_data_permission(self):
+        # рефакторинг
+        wd_type_id = self.wd_data.get('type_id') or self.wd_data.get('type')
+        if isinstance(wd_type_id, WorkerDayType):
+            wd_type_id = wd_type_id.code
+
         return self._has_single_permission(
             employee_id=self.wd_data.get('employee_id'),
             shop_id=self.wd_data.get('shop_id'),
             action=self.action,
             graph_type=WorkerDayPermission.FACT if self.wd_data.get('is_fact') else WorkerDayPermission.PLAN,
-            wd_type=self.wd_data.get('type'),
+            wd_type_id=wd_type_id,
             wd_dt=self.wd_data.get('dt'),
             is_vacancy=self.wd_data.get('is_vacancy'),
         )
@@ -200,7 +272,7 @@ class DeleteSingleWdPermissionChecker(BaseSingleWdPermissionChecker):
             shop_id=self.wd_obj.shop_id,
             action=self.action,
             graph_type=WorkerDayPermission.FACT if self.wd_obj.is_fact else WorkerDayPermission.PLAN,
-            wd_type=self.wd_obj.type,
+            wd_type_id=self.wd_obj.type_id,
             wd_dt=self.wd_obj.dt,
             is_vacancy=self.wd_obj.is_vacancy,
         )
@@ -221,6 +293,8 @@ class DeleteQsWdPermissionChecker(BaseQsWdPermissionChecker):
         for wd in self.wd_qs:
             if not DeleteSingleWdPermissionChecker(
                     user=self.user, wd_obj=wd, cached_data=self.cached_data).has_permission():
+                self.err_message = self._get_err_msg(
+                    self.action, wd.type_id, employee_id=wd.employee_id, shop_id=wd.shop_id)
                 return False
 
         return True

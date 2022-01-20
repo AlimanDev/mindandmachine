@@ -1,11 +1,11 @@
+from django.conf import settings
 from django.db.models import ObjectDoesNotExist, Q
 from django.utils.translation import gettext_lazy as _
 from rest_framework import permissions
 from rest_framework.exceptions import ValidationError, NotFound
 
-from src.base.models import Employment, Shop, Employee, Network
-from src.timetable.models import WorkerDay, WorkerDayPermission, GroupWorkerDayPermission
-
+from src.base.models import Employment, Shop
+from src.timetable.models import WorkerDay
 from src.timetable.worker_day_permissions.checkers import (
     CreateSingleWdPermissionChecker,
     UpdateSingleWdPermissionChecker,
@@ -74,6 +74,12 @@ class WdPermission(Permission):
                 dt_to=wd_data.get('dt'),
             ).exists()
 
+    def _has_perm(self, perm_checker):
+        has_perm = perm_checker.has_permission()
+        if has_perm is False:
+            self.message = perm_checker.err_message
+        return has_perm
+
     def has_permission(self, request, view):
         has_permission = super(WdPermission, self).has_permission(request, view)
         if has_permission is False:
@@ -84,8 +90,9 @@ class WdPermission(Permission):
             if view_action == 'create':
                 wd_data = request.data
                 self._set_is_vacancy(wd_data=wd_data)
-                return CreateSingleWdPermissionChecker(
-                    user=request.user, wd_data=wd_data, need_preliminary_wd_data_check=True).has_permission()
+                perm_checker = CreateSingleWdPermissionChecker(
+                    user=request.user, wd_data=wd_data, need_preliminary_wd_data_check=True)
+                return self._has_perm(perm_checker)
             elif view_action == 'update':
                 wd_id = view.kwargs['pk']
                 wd_data = WorkerDay.objects.filter(id=wd_id).values(
@@ -100,24 +107,27 @@ class WdPermission(Permission):
                     return NotFound(_('Not found worker day with id={wd_id}').format(wd_id=wd_id))
                 # TODO: опционально или на постоянку такую логику оставить?
                 if wd_data['type'] != request.data.get('type') or wd_data['shop_id'] != request.data.get('shop_id') or \
-                        wd_data['dt'] != request.data.get('dt'):
-                    if request.user.network.settings_values_prop.get('check_delete_single_wd_perm_on_update', False):
-                        has_delete_permission = DeleteSingleWdPermissionChecker(
-                            user=request.user, wd_id=wd_id).has_permission()
+                        wd_data['dt'].strftime(settings.QOS_DATE_FORMAT) != request.data.get('dt'):
+                    if request.user.network.settings_values_prop.get('check_delete_single_wd_perm_on_update', True):
+                        perm_checker = DeleteSingleWdPermissionChecker(user=request.user, wd_id=wd_id)
+                        has_delete_permission = self._has_perm(perm_checker)
                         if has_delete_permission is False:
-                            return False
+                            return has_delete_permission
                     wd_data = request.data
                     self._set_is_vacancy(wd_data=wd_data)
-                    has_create_permission = CreateSingleWdPermissionChecker(
-                        user=request.user, wd_data=wd_data, need_preliminary_wd_data_check=True).has_permission()
+                    perm_checker = CreateSingleWdPermissionChecker(
+                        user=request.user, wd_data=wd_data, need_preliminary_wd_data_check=True)
+                    has_create_permission = self._has_perm(perm_checker)
                     if has_create_permission is False:
                         return False
                 else:
-                    return UpdateSingleWdPermissionChecker(
-                        user=request.user, wd_data=wd_data).has_permission()
+                    perm_checker = UpdateSingleWdPermissionChecker(user=request.user, wd_data=wd_data)
+                    return self._has_perm(perm_checker)
             elif view_action == 'destroy':
                 wd_id = view.kwargs['pk']
-                return DeleteSingleWdPermissionChecker(user=request.user, wd_id=wd_id).has_permission()
+                perm_checker = DeleteSingleWdPermissionChecker(
+                    user=request.user, wd_id=wd_id)
+                return self._has_perm(perm_checker)
 
         return has_permission
 

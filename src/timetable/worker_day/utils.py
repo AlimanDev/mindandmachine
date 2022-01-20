@@ -456,6 +456,7 @@ def check_worker_day_permissions(
                 error_messages['employee_not_in_subordinates'].format(
                 employee=User.objects.filter(employees__id=employee_id).first().fio),
             )
+
     wd_perms = GroupWorkerDayPermission.objects.filter(
         group__in=user.get_group_ids(shop_id=shop_id),
         worker_day_permission__action=action,
@@ -492,6 +493,7 @@ def check_worker_day_permissions(
                 raise PermissionDenied(
                     error_messages['approve_days_interval_restriction'].format(
                         wd_type_str=wd_type_display_str,
+                        action_str=WorkerDayPermission.ACTIONS_DICT.get(action).lower(),
                         dt_interval=dt_interval,
                     )
                 )

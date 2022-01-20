@@ -1,7 +1,6 @@
 import datetime
 import json
 from decimal import Decimal
-import distutils.util
 
 from django.conf import settings
 from django.contrib.auth.models import (
@@ -10,7 +9,7 @@ from django.contrib.auth.models import (
 from django.db import models
 from django.db import transaction
 from django.db.models import (
-    Subquery, OuterRef, Max, Q, Case, When, Value, FloatField, F, IntegerField, Exists, BooleanField, Min, Count
+    Subquery, OuterRef, Max, Q, Case, When, Value, FloatField, F, IntegerField, Exists, BooleanField, Count,
 )
 from django.db.models.fields import PositiveSmallIntegerField
 from django.db.models.functions import Abs, Cast, Extract, Least
@@ -653,33 +652,37 @@ class WorkerDay(AbstractModel):
     @classmethod
     def _check_delete_qs_perm(cls, user, delete_qs, **kwargs):
         from src.timetable.worker_day_permissions.checkers import DeleteQsWdPermissionChecker
-        if not DeleteQsWdPermissionChecker(
+        perm_checker = DeleteQsWdPermissionChecker(
             user=user,
             wd_qs=delete_qs,
             cached_data={
                 'wd_types_dict': kwargs.get('wd_types_dict'),
             },
-        ).has_permission():
-            raise PermissionDenied()
+        )
+        if not perm_checker.has_permission():
+            raise PermissionDenied(perm_checker.err_message)
 
     @classmethod
     def _check_create_single_obj_perm(cls, user, obj_data, **extra_kwargs):
         from src.timetable.worker_day_permissions.checkers import CreateSingleWdPermissionChecker
-        if not CreateSingleWdPermissionChecker(user=user, wd_data=obj_data).has_permission():
-            raise PermissionDenied()
+        perm_checker = CreateSingleWdPermissionChecker(user=user, wd_data=obj_data)
+        if not perm_checker.has_permission():
+            raise PermissionDenied(perm_checker.err_message)
 
     @classmethod
     def _check_update_single_obj_perm(cls, user, existing_obj, obj_data, **extra_kwargs):
         from src.timetable.worker_day_permissions.checkers import UpdateSingleWdPermissionChecker
         # TODO: сравнение сущ. объекта и новых данных
-        if not UpdateSingleWdPermissionChecker(user=user, wd_data=obj_data).has_permission():
-            raise PermissionDenied()
+        perm_checker = UpdateSingleWdPermissionChecker(user=user, wd_data=obj_data)
+        if not perm_checker.has_permission():
+            raise PermissionDenied(perm_checker.err_message)
 
     @classmethod
     def _check_delete_single_obj_perm(cls, user, existing_obj=None, obj_id=None, **extra_kwargs):
         from src.timetable.worker_day_permissions.checkers import DeleteSingleWdPermissionChecker
-        if not DeleteSingleWdPermissionChecker(user=user, wd_obj=existing_obj, wd_id=obj_id).has_permission():
-            raise PermissionDenied()
+        perm_checker = DeleteSingleWdPermissionChecker(user=user, wd_obj=existing_obj, wd_id=obj_id)
+        if not perm_checker.has_permission():
+            raise PermissionDenied(perm_checker.err_message)
 
     @classmethod
     def _get_batch_update_or_create_transaction_checks_kwargs(cls, **kwargs):
@@ -2340,7 +2343,7 @@ class WorkerDayPermission(AbstractModel):
 
     ACTIONS = (
         (CREATE, _('Create')),
-        (UPDATE, _('Update')),
+        (UPDATE, _('Change')),
         # Remove, т.к. Delete почему-то переводится в "Удалено", даже если в django.py "Удаление".
         (DELETE, _('Remove')),
         (APPROVE, _('Approve')),
@@ -2426,59 +2429,17 @@ class GroupWorkerDayPermission(AbstractModel):
         return f'{self.group.name} {self.worker_day_permission}'
 
     @classmethod
-    def get_perms_qs(cls, user, action, graph_type, wd_type, wd_dt, shop_id=None, is_vacancy=None):
-        if isinstance(wd_dt, str):
-            wd_dt = datetime.datetime.strptime(wd_dt, settings.QOS_DATE_FORMAT).date()
-        today = (datetime.datetime.now() + datetime.timedelta(
-            hours=Shop.get_cached_tz_offset_by_shop_id(shop_id=shop_id) if shop_id else settings.CLIENT_TIMEZONE)).date()
+    def get_perms_qs(cls, user, action, graph_type, wd_type_id, wd_dt, shop_id=None, is_vacancy=None):
         kwargs = {}
         if is_vacancy:
             kwargs['allow_actions_on_vacancies'] = True
         return cls.objects.filter(
-            Q(limit_days_in_past__isnull=True) | Q(limit_days_in_past__gte=(today - wd_dt).days),
-            Q(limit_days_in_future__isnull=True) | Q(limit_days_in_future__gte=(wd_dt - today).days),
             group__in=user.get_group_ids(shop_id=shop_id),
             worker_day_permission__action=action,
             worker_day_permission__graph_type=graph_type,
-            worker_day_permission__wd_type=wd_type,
+            worker_day_permission__wd_type_id=wd_type_id,
             **kwargs,
         )
-
-    # # TODO: кэширование проверок доступа (на n дней), инвалидация кэша при изменении прав; по какому паттерну?
-    # @classmethod
-    # def has_permission(cls, user, action, graph_type, wd_type, wd_dt, employee_type=None, shop_id=None, shop_type=None, is_vacancy=None):
-    #     """
-    #     :param user: пользователь, который совершает действие
-    #     :param employee_type: тип сотрудника, для дня которого совершается действие
-    #     :param action: действие (создание/изменение/удаление)
-    #     :param graph_type: тип графика (план/факт)
-    #     :param wd_type: тип дня
-    #     :param wd_dt: дата дня
-    #     :param employee_type: тип сотрудника
-    #     :param shop_type: тип магазина
-    #     :param is_vacancy: вакансия
-    #     :return: есть доступ или нет
-    #     """
-    #     if isinstance(wd_dt, str):
-    #         wd_dt = datetime.datetime.strptime(wd_dt, settings.QOS_DATE_FORMAT).date()
-    #     today = (datetime.datetime.now() + datetime.timedelta(
-    #         hours=Shop.get_cached_tz_offset_by_shop_id(shop_id=shop_id) if shop_id else settings.CLIENT_TIMEZONE)).date()
-    #     kwargs = {}
-    #     if employee_type:
-    #         kwargs['employee_type'] = employee_type
-    #     if shop_type:
-    #         kwargs['shop_type'] = shop_type
-    #     if is_vacancy:
-    #         kwargs['allow_actions_on_vacancies'] = True
-    #     return cls.objects.filter(
-    #         Q(limit_days_in_past__isnull=True) | Q(limit_days_in_past__gte=(today - wd_dt).days),
-    #         Q(limit_days_in_future__isnull=True) | Q(limit_days_in_future__gte=(wd_dt - today).days),
-    #         group__in=user.get_group_ids(shop_id=shop_id),
-    #         worker_day_permission__action=action,
-    #         worker_day_permission__graph_type=graph_type,
-    #         worker_day_permission__wd_type=wd_type,
-    #         **kwargs,
-    #     ).exists()
 
 
 class PlanAndFactHoursAbstract(models.Model):
