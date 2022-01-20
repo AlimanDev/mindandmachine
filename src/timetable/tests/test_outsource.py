@@ -208,8 +208,23 @@ class TestOutsource(TestsHelperMixin, APITestCase):
         self._create_vacancy(dt_now, datetime.combine(dt_now, time(8)), datetime.combine(dt_now, time(20)), outsources=[self.outsource_network.id, self.outsource_network2.id])
         self._create_vacancy(dt_now, datetime.combine(dt_now, time(8)), datetime.combine(dt_now, time(20)), outsources=[self.outsource_network2.id,])
         self._create_vacancy(dt_now, datetime.combine(dt_now, time(8)), datetime.combine(dt_now, time(20)), is_outsource=False)
-        self.client.force_authenticate(user=self.user1)
         WorkerDay.objects.all().update(is_approved=True)
+        WorkerDay.objects.create(
+            employee=self.client_employee,
+            employment=self.client_employment,
+            type_id=WorkerDay.TYPE_HOLIDAY,
+            dt=dt_now,
+            is_approved=True,
+        )
+        self.client_network.allow_workers_confirm_outsource_vacancy = True
+        self.client_network.save()
+        response = self.client.get('/rest_api/worker_day/vacancy/?only_available=True&limit=10&offset=0')
+        self.assertEqual(response.json()['count'], 4)
+        self.client_network.allow_workers_confirm_outsource_vacancy = False
+        self.client_network.save()
+        response = self.client.get('/rest_api/worker_day/vacancy/?only_available=True&limit=10&offset=0')
+        self.assertEqual(response.json()['count'], 1)
+        self.client.force_authenticate(user=self.user1)
         response = self.client.get('/rest_api/worker_day/vacancy/?only_available=True&limit=10&offset=0')
         self.assertEqual(response.json()['count'], 2)
         resp_data = sorted(response.json()['results'], key=lambda i: i['id'])
