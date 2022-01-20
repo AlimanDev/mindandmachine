@@ -448,11 +448,15 @@ def check_worker_day_permissions(
     user_shops = list(user.get_shops(include_descendants=True).values_list('id', flat=True))
     user_subordinates = Group.get_subordinate_ids(user)
     for dt in [dt_from + datetime.timedelta(i) for i in range((dt_to - dt_from).days + 1)]:
-        if not WorkerDay._has_group_permissions(user, employee_id, dt, user_shops=user_shops, user_subordinates=user_subordinates, shop_id=shop_id, is_vacancy=is_vacancy):
+        if not WorkerDay._has_group_permissions(
+                user=user, employee_id=employee_id, dt=dt, user_shops=user_shops, user_subordinates=user_subordinates,
+                shop_id=shop_id, is_vacancy=is_vacancy, action=action, graph_type=graph_type,
+        ):
             raise PermissionDenied(
                 error_messages['employee_not_in_subordinates'].format(
                 employee=User.objects.filter(employees__id=employee_id).first().fio),
             )
+    action = WorkerDayPermission.CREATE_OR_UPDATE if action in ['C', 'U'] else action
     wd_perms = GroupWorkerDayPermission.objects.filter(
         group__in=user.get_group_ids(Shop.objects.get(id=shop_id) if shop_id else None),
         worker_day_permission__action=action,

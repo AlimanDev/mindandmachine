@@ -634,8 +634,7 @@ class WorkerDay(AbstractModel):
         return ['dt', 'employee_id', 'is_fact', 'is_approved']
 
     @classmethod
-    def _enrich_create_or_update_perms_data(cls, create_or_update_perms_data, obj_dict):
-        action = WorkerDayPermission.CREATE_OR_UPDATE
+    def _enrich_create_or_update_perms_data(cls, action, create_or_update_perms_data, obj_dict):
         graph_type = WorkerDayPermission.FACT if obj_dict.get('is_fact') else WorkerDayPermission.PLAN
         wd_type_id = obj_dict.get('type_id') or obj_dict.get('type').code
         dt = obj_dict.get('dt')
@@ -750,10 +749,17 @@ class WorkerDay(AbstractModel):
         }
 
     @classmethod
-    def _has_group_permissions(cls, user, employee_id, dt, user_shops=None, user_subordinates=None, is_vacancy=False, shop_id=None):
+    def _has_group_permissions(cls, user, employee_id, dt, user_shops=None, user_subordinates=None, is_vacancy=False, shop_id=None, action=None, graph_type=None):
         if not employee_id:
             return True
-        if is_vacancy:
+
+        check_is_vacancy_perm_cond = (
+            (not action and not graph_type) or
+            (graph_type == WorkerDayPermission.PLAN and action in [
+                WorkerDayPermission.UPDATE, WorkerDayPermission.DELETE]) or
+            (graph_type == WorkerDayPermission.FACT)
+        )
+        if is_vacancy and check_is_vacancy_perm_cond:
             if not user_shops:
                 user_shops = user.get_shops(include_descendants=True).values_list('id', flat=True)
             if isinstance(shop_id, str):
@@ -2057,62 +2063,69 @@ class AttendanceRecords(AbstractModel):
 
     def _create_wd_details(self, dt, fact_approved, active_user_empl, closest_plan_approved):
         if closest_plan_approved:
-            if fact_approved.shop_id == closest_plan_approved.shop_id:
-                WorkerDayCashboxDetails.objects.bulk_create(
-                    [
+            fact_shop_details_list = []
+            for plan_details in closest_plan_approved.worker_day_details.select_related('work_type'):
+                work_type = plan_details.work_type if (
+                            fact_approved.shop_id == closest_plan_approved.shop_id) else WorkType.objects.filter(
+                    shop_id=fact_approved.shop_id,
+                    work_type_name_id=plan_details.work_type.work_type_name_id,
+                ).first()
+                if not work_type.dttm_deleted:
+                    fact_shop_details_list.append(
                         WorkerDayCashboxDetails(
-                            work_part=details.work_part,
+                            work_part=plan_details.work_part,
                             worker_day=fact_approved,
-                            work_type_id=details.work_type_id,
+                            work_type=work_type,
                         )
-                        for details in closest_plan_approved.worker_day_details.all()
-                    ]
-                )
-            else:
-                WorkerDayCashboxDetails.objects.bulk_create(
-                    [
-                        WorkerDayCashboxDetails(
-                            work_part=details.work_part,
-                            worker_day=fact_approved,
-                            work_type=WorkType.objects.filter(
-                                shop_id=fact_approved.shop_id,
-                                work_type_name_id=details.work_type.work_type_name_id,
-                            ).first(),
-                        )
-                        for details in closest_plan_approved.worker_day_details.select_related('work_type')
-                    ]
-                )
-        elif active_user_empl:
-            work_type_id = getattr(
-                EmploymentWorkType.objects.filter(
-                    employment=active_user_empl,
-                ).order_by('-priority').first(), 
-                'work_type_id', 
-                None,
-            ) or\
-            getattr(
-                WorkType.objects.filter(
-                    Q(dttm_deleted__isnull=True)|Q(dttm_deleted__gte=timezone.now()),
-                    shop_id=active_user_empl.shop_id,
-                ).first(),
-                'id',
-                None,
+                    )
+
+            if fact_shop_details_list:
+                WorkerDayCashboxDetails.objects.bulk_create(fact_shop_details_list)
+                return
+
+        if active_user_empl:
+            employment_work_type = EmploymentWorkType.objects.filter(
+                Q(work_type__dttm_deleted__isnull=True) | Q(work_type__dttm_deleted__gte=timezone.now()),
+                employment=active_user_empl,
+            ).order_by('-priority').select_related('work_type').first()
+            if employment_work_type:
+                if active_user_empl.shop_id == fact_approved.shop_id:
+                    work_type = employment_work_type.work_type
+                else:
+                    work_type = WorkType.objects.filter(
+                        Q(dttm_deleted__isnull=True) | Q(dttm_deleted__gte=timezone.now()),
+                        shop_id=fact_approved.shop_id,
+                        work_type_name_id=employment_work_type.work_type.work_type_name_id,
+                    ).first()
+
+                if work_type:
+                    WorkerDayCashboxDetails.objects.create(
+                        work_part=1,
+                        worker_day=fact_approved,
+                        work_type=work_type,
+                    )
+                    return
+
+        work_type = WorkType.objects.filter(
+            Q(dttm_deleted__isnull=True) | Q(dttm_deleted__gte=timezone.now()),
+            shop_id=fact_approved.shop_id,
+        ).first()
+        if work_type:
+            WorkerDayCashboxDetails.objects.create(
+                work_part=1,
+                worker_day=fact_approved,
+                work_type=work_type,
             )
-            if work_type_id:
-                WorkerDayCashboxDetails.objects.create(
-                    work_part=1,
-                    worker_day=fact_approved,
-                    work_type_id=work_type_id,
-                )
+            return
 
     def _create_or_update_not_approved_fact(self, fact_approved):
         # TODO: попробовать найти вариант без удаления workerday?
         WorkerDay.objects.filter(
+            Q(last_edited_by__isnull=True) | Q(type_id=WorkerDay.TYPE_EMPTY),
             dt=fact_approved.dt,
             employee_id=fact_approved.employee_id,
             is_fact=True,
             is_approved=False,
-            last_edited_by__isnull=True,
         ).delete()
 
         other_facts_approved = list(WorkerDay.objects.filter(
@@ -2224,6 +2237,9 @@ class AttendanceRecords(AbstractModel):
                 # TODO: проставление такого же типа как в плане? (тест + проверить)
                 setattr(fact_approved, 'type_id',
                         closest_plan_approved.type_id if closest_plan_approved else WorkerDay.TYPE_WORKDAY)
+                setattr(fact_approved, 'shop_id', self.shop_id)
+                setattr(fact_approved, 'last_edited_by', None)
+                setattr(fact_approved, 'created_by', None)
                 if closest_plan_approved and not fact_approved.closest_plan_approved_id:
                     fact_approved.closest_plan_approved = closest_plan_approved
                 if not fact_approved.worker_day_details.exists():
@@ -2246,6 +2262,9 @@ class AttendanceRecords(AbstractModel):
                         setattr(prev_fa_wd, self.TYPE_2_DTTM_FIELD[self.type], self.dttm)
                         setattr(prev_fa_wd, 'type_id',
                                 closest_plan_approved.type_id if closest_plan_approved else WorkerDay.TYPE_WORKDAY)
+                        setattr(prev_fa_wd, 'shop_id', self.shop_id)
+                        setattr(prev_fa_wd, 'last_edited_by', None)
+                        setattr(prev_fa_wd, 'created_by', None)
                         if closest_plan_approved and not prev_fa_wd.closest_plan_approved_id:
                             prev_fa_wd.closest_plan_approved = closest_plan_approved
                         prev_fa_wd.save()
@@ -2375,6 +2394,8 @@ class WorkerDayPermission(AbstractModel):
     )
 
     CREATE_OR_UPDATE = 'CU'
+    CREATE = 'C'
+    UPDATE = 'U'
     DELETE = 'D'
     APPROVE = 'A'
 
