@@ -402,14 +402,14 @@ class WorkerDayViewSet(BaseModelViewSet):
                     output_field=CharField(),
                 ),
             ).values_list(*columns))
-            draft_df = pd.DataFrame(draft_wdays, columns=columns)
+            draft_df = pd.DataFrame(draft_wdays, columns=columns).drop_duplicates()
 
             approved_wdays = list(WorkerDay.objects.annotate(
                 any_draft_wd_exists=Exists(
                     WorkerDay.objects.filter(
                         approve_condition,
+                        Q(employee__isnull=False, employee_id=OuterRef('employee_id')),
                         is_approved=False,
-                        employee_id=OuterRef('employee_id'),
                         dt=OuterRef('dt'),
                         is_fact=OuterRef('is_fact'),
                     ),
