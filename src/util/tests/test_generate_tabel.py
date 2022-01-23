@@ -7,7 +7,7 @@ from django.test import TestCase
 
 from src.base.models import Employment
 from src.timetable.models import WorkTypeName, WorkType
-from src.util.dg.timesheet import T13TimesheetGenerator, CustomT13TimesheetGenerator, MTSTimesheetGenerator, AigulTimesheetGenerator
+from src.util.dg.timesheet import T13TimesheetGenerator, CustomT13TimesheetGenerator, MTSTimesheetGenerator, DefaultTimesheetGenerator
 from src.util.mixins.tests import TestsHelperMixin
 
 
@@ -64,7 +64,7 @@ class TestGenerateTabel(TestsHelperMixin, TestCase):
             f.write(content)
 
     def test_generate_aigul_tabel(self):
-        g = AigulTimesheetGenerator(shop=self.shop, dt_from=self.dt_from, dt_to=self.dt_to)
+        g = DefaultTimesheetGenerator(shop=self.shop, dt_from=self.dt_from, dt_to=self.dt_to)
         content = g.generate(convert_to='xlsx')
 
         with open(f'aigul_t.xlsx', 'wb') as f:

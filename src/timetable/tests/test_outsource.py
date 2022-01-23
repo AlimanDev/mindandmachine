@@ -168,23 +168,6 @@ class TestOutsource(TestsHelperMixin, APITestCase):
         self.assertEqual(response.status_code, 200)
         return vacancy
 
-    def _authorize_tick_point(self):
-        t = TickPoint.objects.create(
-            network=self.client_network,
-            name='test',
-            shop=self.client_shop,
-        )
-
-        response = self.client.post(
-            path='/api/v1/token-auth/',
-            data={
-                'key': t.key,
-            }
-        )
-
-        token = response.json()['token']
-        self.client.defaults['HTTP_AUTHORIZATION'] = 'Token %s' % token
-
     def test_vacancy_creation(self):
         dt_now = self.dt_now
         not_created = self._create_vacancy(dt_now, datetime.combine(dt_now, time(8)), datetime.combine(dt_now, time(20)), is_vacancy=False)
@@ -238,8 +221,23 @@ class TestOutsource(TestsHelperMixin, APITestCase):
         self._create_vacancy(dt_now, datetime.combine(dt_now, time(8)), datetime.combine(dt_now, time(20)), outsources=[self.outsource_network.id, self.outsource_network2.id])
         self._create_vacancy(dt_now, datetime.combine(dt_now, time(8)), datetime.combine(dt_now, time(20)), outsources=[self.outsource_network2.id,])
         self._create_vacancy(dt_now, datetime.combine(dt_now, time(8)), datetime.combine(dt_now, time(20)), is_outsource=False)
-        self.client.force_authenticate(user=self.user1)
         WorkerDay.objects.all().update(is_approved=True)
+        WorkerDay.objects.create(
+            employee=self.client_employee,
+            employment=self.client_employment,
+            type_id=WorkerDay.TYPE_HOLIDAY,
+            dt=dt_now,
+            is_approved=True,
+        )
+        self.client_network.allow_workers_confirm_outsource_vacancy = True
+        self.client_network.save()
+        response = self.client.get('/rest_api/worker_day/vacancy/?only_available=True&limit=10&offset=0')
+        self.assertEqual(response.json()['count'], 4)
+        self.client_network.allow_workers_confirm_outsource_vacancy = False
+        self.client_network.save()
+        response = self.client.get('/rest_api/worker_day/vacancy/?only_available=True&limit=10&offset=0')
+        self.assertEqual(response.json()['count'], 1)
+        self.client.force_authenticate(user=self.user1)
         response = self.client.get('/rest_api/worker_day/vacancy/?only_available=True&limit=10&offset=0')
         self.assertEqual(response.json()['count'], 2)
         resp_data = sorted(response.json()['results'], key=lambda i: i['id'])
@@ -284,7 +282,7 @@ class TestOutsource(TestsHelperMixin, APITestCase):
         self.assertEqual(mail.outbox[0].to[0], self.client_user.email)
         self.assertEqual(
             mail.outbox[0].body, 
-            f'Здравствуйте, {self.client_user.first_name}!\n\n\n\n\n\n\nСотрудник {self.user1.last_name} {self.user1.first_name} откликнулся на вакансию с типом работ {self.client_work_type_name.name}\n'
+            f'Здравствуйте, {self.client_user.first_name}!\n\n\n\n\n\n\nАутсорс сотрудник {self.user1.last_name} {self.user1.first_name} откликнулся на вакансию с типом работ {self.client_work_type_name.name}\n'
             f'Дата: {vacancy["dt"]}\nПодразделение: {self.client_shop.name}\n\n\n\n\n\nПисьмо отправлено роботом. Подробности можно узнать по ссылке'
         )
         vacancy = WorkerDay.objects.get(id=vacancy['id'])
@@ -525,7 +523,7 @@ class TestOutsource(TestsHelperMixin, APITestCase):
     def test_get_worker_days_for_urv(self):
         vacancy = self._create_and_apply_vacancy(night_shift=True)
         self.client.logout()
-        self._authorize_tick_point()
+        self._authorize_tick_point(shop=self.client_shop)
         response = self.client.get(self.get_url('TimeAttendanceWorkerDay-list'))
         data = [
             {

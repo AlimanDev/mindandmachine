@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, time, timedelta
 from decimal import Decimal
 from unittest import mock
 
@@ -7,6 +7,7 @@ from dateutil.relativedelta import relativedelta
 from django.db import transaction
 from django.utils import timezone
 from rest_framework import status
+from rest_framework.serializers import ValidationError
 from rest_framework.test import APITestCase
 
 from src.base.models import Shop, ShopSchedule, NetworkConnect, Network, Employment, Group, User
@@ -940,3 +941,14 @@ class TestDepartment(TestsHelperMixin, APITestCase):
         self.assertEquals(response[0]['children'][1]['label'], self.reg_shop2.name)
         self.assertEquals(len(response[0]['children'][0]['children']), 2)
         self.assertEquals(len(response[0]['children'][1]['children']), 1)
+
+    def test_cant_set_forecast_step_to_zero(self):
+        self.shop.forecast_step_minutes = time(0)
+        saved = False
+        try:
+            self.shop.save()
+            saved = True
+        except ValidationError as e:
+            self.assertEqual(e.detail, ['Шаг прогноза не может быть 0.'])
+
+        self.assertFalse(saved)

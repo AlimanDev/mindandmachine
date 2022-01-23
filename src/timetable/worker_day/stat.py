@@ -655,7 +655,7 @@ class WorkersStatsGetter:
                 is_fact=False,
                 is_approved=True,
                 type__is_reduce_norm=True,
-            ).values('id'))),
+            ).values('id')[:1])),
             vacation_or_sick_plan_approved_count_selected_period=Count(Subquery(WorkerDay.objects.filter(
                 selected_period_q,
                 employee_id=OuterRef('employee_id'),
@@ -664,7 +664,7 @@ class WorkersStatsGetter:
                 is_fact=False,
                 is_approved=True,
                 type__is_reduce_norm=True,
-            ).values('id'))),
+            ).values('id')[:1])),
             has_vacation_or_sick_plan_not_approved=Exists(WorkerDay.objects.filter(
                 employee_id=OuterRef('employee_id'),
                 employment_id=OuterRef('employment_id'),
@@ -680,7 +680,7 @@ class WorkersStatsGetter:
                 is_fact=False,
                 is_approved=False,
                 type__is_reduce_norm=True,
-            ).values('id'))),
+            ).values('id')[:1])),
             vacation_or_sick_plan_not_approved_count_selected_period=Count(Subquery(WorkerDay.objects.filter(
                 selected_period_q,
                 employee_id=OuterRef('employee_id'),
@@ -689,7 +689,7 @@ class WorkersStatsGetter:
                 is_fact=False,
                 is_approved=False,
                 type__is_reduce_norm=True,
-            ).values('id'))),
+            ).values('id')[:1])),
             norm_hours_acc_period=Coalesce(
                 Sum('norm_hours'), 0.0),
             norm_hours_prev_months=Coalesce(

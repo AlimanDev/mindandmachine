@@ -31,7 +31,7 @@ from src.base.views_abstract import BaseModelViewSet
 from src.events.signals import event_signal
 from src.reports.utils.overtimes_undertimes import overtimes_undertimes_xlsx
 from src.timetable.backends import MultiShopsFilterBackend
-from src.timetable.events import REQUEST_APPROVE_EVENT_TYPE, APPROVE_EVENT_TYPE, VACANCY_CONFIRMED_TYPE
+from src.timetable.events import REQUEST_APPROVE_EVENT_TYPE, APPROVE_EVENT_TYPE
 from src.timetable.filters import WorkerDayFilter, WorkerDayStatFilter, VacancyFilter
 from src.timetable.models import (
     WorkerDay,
@@ -401,14 +401,14 @@ class WorkerDayViewSet(BaseModelViewSet):
                     output_field=CharField(),
                 ),
             ).values_list(*columns))
-            draft_df = pd.DataFrame(draft_wdays, columns=columns)
+            draft_df = pd.DataFrame(draft_wdays, columns=columns).drop_duplicates()
 
             approved_wdays = list(WorkerDay.objects.annotate(
                 any_draft_wd_exists=Exists(
                     WorkerDay.objects.filter(
                         approve_condition,
+                        Q(employee__isnull=False, employee_id=OuterRef('employee_id')),
                         is_approved=False,
-                        employee_id=OuterRef('employee_id'),
                         dt=OuterRef('dt'),
                         is_fact=OuterRef('is_fact'),
                     ),
@@ -807,9 +807,9 @@ class WorkerDayViewSet(BaseModelViewSet):
             raise utils.translate_validation(filterset_class.errors)
         
         paginator = LimitOffsetPagination()
-        worker_day_outsource_network_subq = WorkerDay.objects.filter(
-            pk=OuterRef('pk'),
-            outsources__id=self.request.user.network_id,
+        allowed_outsource_network_subq = WorkerDayOutsourceNetwork.objects.filter(
+            workerday_id=OuterRef('id'),
+            network_id=self.request.user.network_id,
         )
         dt = datetime.date.today()
         user_shops = list(request.user.get_shops(include_descendants=True).values_list('id', flat=True))
@@ -830,7 +830,7 @@ class WorkerDayViewSet(BaseModelViewSet):
                 is_vacancy=True,
                 type__is_work_hours=True,
             ).annotate(
-                worker_day_outsource_network_exitst=Exists(worker_day_outsource_network_subq),
+                outsource_network_allowed=Exists(allowed_outsource_network_subq),
             ).filter(
                 (
                     Q(shop__network_id=request.user.network_id)&
@@ -841,7 +841,7 @@ class WorkerDayViewSet(BaseModelViewSet):
                     )
                 ) | 
                 (
-                    Q(is_outsource=True, worker_day_outsource_network_exitst=True, is_approved=True)&
+                    Q(is_outsource=True, outsource_network_allowed=True, is_approved=True) &
                     (Q(employee__isnull=True) | Q(employee__user__network_id=request.user.network_id)) # чтобы не попадали вакансии с сотрудниками другой аутсорс сети
                 ), # аутсорс фильтр
             ).select_related(
@@ -878,25 +878,6 @@ class WorkerDayViewSet(BaseModelViewSet):
         result = confirm_vacancy(pk, request.user, employee_id=self.request.data.get('employee_id', None))
         status_code = result['status_code']
         result = result['text']
-        if status_code == 200:
-            vacancy = WorkerDay.objects.get(pk=pk)
-            work_types = list(vacancy.work_types.all().values_list('work_type_name__name', flat=True))
-            event_signal.send(
-                sender=None,
-                network_id=vacancy.shop.network_id,
-                event_code=VACANCY_CONFIRMED_TYPE,
-                user_author_id=None,
-                shop_id=vacancy.shop_id,
-                context={
-                    'user': {
-                        'last_name': request.user.last_name,
-                        'first_name': request.user.first_name,
-                    },
-                    'dt': str(vacancy.dt),
-                    'work_types': work_types,
-                    'shop_id': vacancy.shop_id,
-                },
-            )
 
         return Response({'result': result}, status=status_code)
 

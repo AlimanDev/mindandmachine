@@ -35,8 +35,8 @@ class TestAutoSettings(APITestCase):
         create_departments_and_users(self, dt=date(2021, 1, 1))
         self.work_type_name = WorkTypeName.objects.create(name='Магазин')
         self.work_type_name2 = WorkTypeName.objects.create(name='Ломбард')
-        self.operation_type_name = OperationTypeName.objects.create(name='Магазин', work_type_name=self.work_type_name)
-        self.operation_type_name2 = OperationTypeName.objects.create(name='Ломбард', work_type_name=self.work_type_name2)
+        self.operation_type_name = self.work_type_name.operation_type_name
+        self.operation_type_name2 = self.work_type_name2.operation_type_name
         self.work_type = WorkType.objects.create(
             work_type_name=self.work_type_name,
             shop=self.shop)
@@ -44,16 +44,8 @@ class TestAutoSettings(APITestCase):
             work_type_name=self.work_type_name2,
             shop=self.shop)
 
-        self.operation_type = OperationType.objects.create(
-            work_type=self.work_type,
-            operation_type_name=self.operation_type_name,
-            shop=self.shop,
-        )
-        self.operation_type2 = OperationType.objects.create(
-            work_type=self.work_type2,
-            operation_type_name=self.operation_type_name2,
-            shop=self.shop,
-        )
+        self.operation_type = self.work_type.operation_type
+        self.operation_type2 = self.work_type2.operation_type
 
         self.breaks = Break.objects.create(
             network=self.network,

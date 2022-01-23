@@ -67,6 +67,14 @@ class TestTickPhotos(TestsHelperMixin, APITestCase):
             f'Табельный номер\n\n\n{self.employee3.tabel_code}\n\n\n{self.employee1.tabel_code}\n\n\n\n\nПодразделение\n\n\n{self.shop.name}\n\n\n{self.root_shop.name}\n\n\n\n\n'
             f'Ссылка на биошаблон\n\n\nбиошаблон\n\n\nбиошаблон\n\n\n\n\n\n\n\n\n\n\n\nПисьмо отправлено роботом. Подробности можно узнать по ссылке'
         )
+        mail.outbox.clear()
+        self.user1.avatar = None
+        self.user1.save()
+        with mock.patch.object(Recognition, 'identify', lambda x, y: 1) as identify:
+            with override_settings(CELERY_TASK_ALWAYS_EAGER=True):
+                ret_data = check_duplicate_biometrics(None, self.user3, shop_id=self.shop2.id)
+        self.assertEqual(ret_data, "An error occurred while checking duplicate biometrics: The 'avatar' attribute has no file associated with it.")
+        self.assertEqual(len(mail.outbox), 0)
 
     def _test_lateness(self, type, photo_type, dttm, assert_lateness, tick_id=None, assert_tick_lateness=True):
         with mock.patch('src.recognition.views.now', lambda: dttm - timedelta(hours=3)):

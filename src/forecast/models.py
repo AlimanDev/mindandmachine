@@ -34,7 +34,7 @@ class OperationTypeName(AbstractActiveNetworkSpecificCodeNamedModel):
     )
 
     is_special = models.BooleanField(default=False)
-    work_type_name = models.ForeignKey('timetable.WorkTypeName', on_delete=models.PROTECT, null=True, blank=True)
+    work_type_name = models.OneToOneField('timetable.WorkTypeName', on_delete=models.PROTECT, null=True, blank=True, related_name='operation_type_name')
     do_forecast = models.CharField(max_length=1, default=FORECAST, choices=FORECAST_CHOICES)
 
     def __str__(self):

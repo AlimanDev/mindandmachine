@@ -483,7 +483,7 @@ class ShiftScheduleDivider(BaseTimesheetDivider):
 
                             total_hours_to_subtract = Decimal(
                                 shift_schedule_hours) - self.fiscal_timesheet.main_timesheet.get_total_hours_sum(dt=dt)
-                            if total_hours_to_subtract < shift_schedule_hours:
+                            if total_hours_to_subtract <= shift_schedule_hours:
                                 items = self.fiscal_timesheet.additional_timesheet.subtract_hours(
                                     hours_to_subtract=total_hours_to_subtract)
                                 for item in items:

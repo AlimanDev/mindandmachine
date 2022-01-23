@@ -194,12 +194,15 @@ class VacancyFilter(FilterSetWithInitial):
                 is_fact=False,
                 type__is_work_hours=True,
             )
+            current_network_filter = Q(shop__network_id=self.request.user.network_id, approved_exists=True)
+            if not self.request.user.network.allow_workers_confirm_outsource_vacancy:
+                current_network_filter &= ~Q(is_outsource=True)
             return queryset.annotate(
                 approved_exists=Exists(approved_subq),
                 active_employment_exists=Exists(active_employment_subq),
                 worker_day_type_paid=Exists(worker_day_paid_subq),
             ).filter(
-                Q(shop__network_id=self.request.user.network_id, approved_exists=True) | 
+                current_network_filter | 
                 Q(is_outsource=True) & ~Q(shop__network_id=self.request.user.network_id), # аутсорс фильтр
                 active_employment_exists=True,
                 worker_day_type_paid=False,

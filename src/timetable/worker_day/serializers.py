@@ -11,7 +11,7 @@ from rest_framework.exceptions import PermissionDenied, ValidationError, NotFoun
 from src.base.exceptions import FieldError
 from src.base.models import Employment, User, Shop, Employee, Network
 from src.base.models import NetworkConnect
-from src.base.serializers import NetworkListSerializer, UserShorSerializer, NetworkSerializer
+from src.base.serializers import ModelSerializerWithCreateOnlyFields, NetworkListSerializer, UserShorSerializer, NetworkSerializer
 from src.base.shop.serializers import ShopListSerializer, ShopSerializer
 from src.conf.djconfig import QOS_DATE_FORMAT
 from src.timetable.models import (
@@ -125,7 +125,7 @@ class WorkerDayListSerializer(serializers.Serializer, UnaccountedOvertimeMixin):
         return obj.work_hours
 
 
-class WorkerDaySerializer(serializers.ModelSerializer, UnaccountedOvertimeMixin):
+class WorkerDaySerializer(ModelSerializerWithCreateOnlyFields, UnaccountedOvertimeMixin):
     default_error_messages = {
         'check_dates': _('Date start should be less then date end'),
         'worker_day_exist': _("Worker day already exist."),
@@ -414,20 +414,6 @@ class WorkerDaySerializer(serializers.ModelSerializer, UnaccountedOvertimeMixin)
             )
 
             return res
-
-    def to_internal_value(self, data):
-        data = super(WorkerDaySerializer, self).to_internal_value(data)
-        if self.instance:
-            # update
-            for field in self.Meta.create_only_fields:
-                if field in data:
-                    data.pop(field)
-        else:
-            # shop_id is required for create
-            for field in self.Meta.create_only_fields:
-                if field not in data:
-                    raise serializers.ValidationError({field: self.error_messages['required']})
-        return data
 
     def get_unaccounted_overtime(self, obj):
         return self.unaccounted_overtime_getter(obj)

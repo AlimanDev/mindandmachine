@@ -12,7 +12,7 @@ from django.utils.timezone import now
 from rangefilter.filter import DateTimeRangeFilter
 from src.base.admin_filters import CustomRelatedOnlyDropdownFilter, RelatedOnlyDropdownLastNameOrderedFilter, RelatedOnlyDropdownNameOrderedFilter
 
-from src.recognition.models import TickPoint, Tick, TickPhoto, UserConnecter
+from src.recognition.models import ShopIpAddress, TickPoint, Tick, TickPhoto, UserConnecter
 from src.timetable.models import User, Employment
 from src.util.dg.ticks_report import TicksOdsReportGenerator, TicksOdtReportGenerator
 
@@ -249,3 +249,11 @@ class UserConnecterAdmin(admin.ModelAdmin):
     list_display = ['partner_id', 'user']
     list_select_related = ('user',)
     raw_id_fields = ('user',)
+
+
+@admin.register(ShopIpAddress)
+class ShopIpAddressAdmin(admin.ModelAdmin):
+    list_display = ['shop', 'ip_address']
+    search_fields = ['shop__name']
+    list_select_related = ('shop',)
+    raw_id_fields = ('shop',)

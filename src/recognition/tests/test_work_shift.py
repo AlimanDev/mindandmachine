@@ -28,24 +28,6 @@ class TestWorkShiftViewSet(TestsHelperMixin, APITestCase):
     def setUp(self):
         self._set_authorization_token(self.user2.username)
 
-    def _authorize_tick_point(self):
-        t = TickPoint.objects.create(
-            network=self.network,
-            name='test',
-            shop=self.shop,
-        )
-
-        response = self.client.post(
-            path='/api/v1/token-auth/',
-            data={
-                'key': t.key,
-            }
-        )
-
-        token = response.json()['token']
-        self.client.defaults['HTTP_AUTHORIZATION'] = 'Token %s' % token
-        return response
-
     def _test_work_shift(self, dt, username, expected_start=None, expected_end=None, expected_shop_code=None):
         resp = self.client.get(
             self.get_url('TimeAttendanceWorkerDay-work-shift'),

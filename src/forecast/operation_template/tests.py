@@ -1,10 +1,9 @@
 from datetime import datetime, timedelta, time
 from rest_framework import status
 from rest_framework.test import APITestCase
-from dateutil.relativedelta import relativedelta
 from src.util.test import create_departments_and_users
 from src.util.models_converter import Converter
-from src.forecast.models import OperationTypeName, OperationType, OperationTemplate
+from src.forecast.models import OperationTemplate
 from src.timetable.models import WorkTypeName, WorkType
 
 
@@ -24,26 +23,9 @@ class TestOperationTemplate(APITestCase):
         )
         self.work_type1 = WorkType.objects.create(shop=self.shop, work_type_name=self.work_type_name1)
         self.work_type2 = WorkType.objects.create(shop=self.shop2, work_type_name=self.work_type_name1)
+        self.operation_type = self.work_type1.operation_type
 
-        self.operation_type_name1 = OperationTypeName.objects.create(
-            name='продажа',
-        )
-
-        self.operation_type_name2 = OperationTypeName.objects.create(
-            name='продажа2',
-        )
-
-        self.operation_type = OperationType.objects.create(
-            operation_type_name=self.operation_type_name1,
-            work_type=self.work_type1,
-            shop=self.work_type1.shop,
-        )
-
-        self.operation_type2 = OperationType.objects.create(
-            operation_type_name=self.operation_type_name2,
-            work_type=self.work_type2,
-            shop=self.work_type2.shop,
-        )
+        self.operation_type2 = self.work_type2.operation_type
 
         self.dt_from = datetime.now().date() + timedelta(days=5)
 
