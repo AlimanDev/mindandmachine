@@ -64,9 +64,16 @@ class BaseWdPermissionChecker:
 
 
 class BaseSingleWdPermissionChecker(BaseWdPermissionChecker):
+    def __init__(self, *args, check_active_empl=True, **kwargs):
+        """
+        :param check_active_empl: проверять наличие активного трудоустройства на дату дня
+        """
+        self.check_active_empl = check_active_empl
+        super(BaseSingleWdPermissionChecker, self).__init__(*args, **kwargs)
+
     def _has_single_permission(self, employee_id, shop_id, action, graph_type, wd_type_id, wd_dt, is_vacancy):
         from src.util.models_converter import Converter
-        if employee_id:
+        if employee_id and self.check_active_empl:
             active_empls = Employment.objects.get_active(
                 dt_from=wd_dt,
                 dt_to=wd_dt,
