@@ -532,7 +532,12 @@ class UploadDownloadTimetableCells(BaseUploadDownloadTimeTable):
                         ]
                     new_wdays_data.append(new_wd_dict)
 
-        WorkerDay.batch_update_or_create(new_wdays_data, user=self.user)
+        WorkerDay.batch_update_or_create(
+            data=new_wdays_data, user=self.user,
+            check_perms_extra_kwargs=dict(
+                check_active_empl=False,
+            ),
+        )
         return Response()
 
     def _download(self, workbook, form):
@@ -881,7 +886,12 @@ class UploadDownloadTimetableRows(BaseUploadDownloadTimeTable):
                     ]
                 new_wdays_data.append(new_wd_data)
 
-            WorkerDay.batch_update_or_create(new_wdays_data, user=self.user)
+            WorkerDay.batch_update_or_create(
+                data=new_wdays_data, user=self.user,
+                check_perms_extra_kwargs=dict(
+                    check_active_empl=False,
+                ),
+            )
 
         return Response()      
 

@@ -700,10 +700,16 @@ class WorkerDay(AbstractModel):
         perms_data.setdefault(k, set()).add(dt)
 
     @classmethod
-    def _get_check_perms_extra_kwargs(cls):
-        return {
+    def _get_check_perms_extra_kwargs(cls, user=None):
+        kwargs = {
             'wd_types_dict': WorkerDayType.get_wd_types_dict(),
         }
+        if user:
+            kwargs['cached_data'] = {
+                'user_shops': list(user.get_shops(include_descendants=True).values_list('id', flat=True)),
+                'user_subordinated_group_ids': list(Group.get_subordinated_group_ids(user)),
+            }
+        return kwargs
 
     @classmethod
     def _check_delete_qs_perm(cls, user, delete_qs, **kwargs):

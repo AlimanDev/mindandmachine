@@ -69,7 +69,7 @@ class BatchUpdateOrCreateModelMixin:
         pass
 
     @classmethod
-    def _get_check_perms_extra_kwargs(cls):
+    def _get_check_perms_extra_kwargs(cls, user=None):
         return {}
 
     @classmethod
@@ -228,7 +228,7 @@ class BatchUpdateOrCreateModelMixin:
                     diff_headers = cls._get_diff_headers()
                 check_perms_extra_kwargs = check_perms_extra_kwargs or {}
                 if user:
-                    check_perms_extra_kwargs = cls._get_check_perms_extra_kwargs()
+                    check_perms_extra_kwargs = cls._get_check_perms_extra_kwargs(user=user)
                 stats = stats if stats is not None else {}
                 delete_scope_fields_list = delete_scope_fields_list or cls._get_batch_delete_scope_fields_list()
                 delete_scope_values_set = set()
