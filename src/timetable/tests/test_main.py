@@ -6591,6 +6591,34 @@ class TestAditionalFunctions(TestsHelperMixin, APITestCase):
         self.assertEquals(len(data), 31)
         self.assertEquals(WorkerDay.objects.filter(employee_id=self.employee1.id, type_id=WorkerDay.TYPE_VACATION, dt__gte=dt_from, dt__lte=dt_to, source=WorkerDay.SOURCE_CHANGE_LIST).count(), 31)
 
+    def test_change_list_create_multiple_vacs_on_one_date(self):
+        dt_from = date(2021, 1, 1)
+        dt_to = date(2021, 1, 5)
+        data = {
+            'shop_id': self.shop.id,
+            'type': WorkerDay.TYPE_WORKDAY,
+            'tm_work_start': '10:00:00',
+            'tm_work_end': '22:00:00',
+            'cashbox_details': [
+                {
+                    'work_type_id': self.work_type.id,
+                    'work_part': 1,
+                },
+            ],
+            'is_vacancy': True,
+            'dt_from': dt_from,
+            'dt_to': dt_to,
+        }
+        url = f'{self.url}change_list/'
+        self.client.post(url, data, format='json')
+        resp = self.client.post(url, data, format='json')
+        resp_data = resp.json()
+        self.assertEquals(len(resp_data), 5)
+        self.assertEquals(
+            WorkerDay.objects.filter(
+                type_id=WorkerDay.TYPE_WORKDAY, is_vacancy=True, dt__gte=dt_from,
+                dt__lte=dt_to, source=WorkerDay.SOURCE_CHANGE_LIST).count(), 10)
+
     def test_change_list_create_vacancy_many_work_types(self):
         dt_from = date.today()
         work_type_name2 = WorkTypeName.objects.create(name='Магазин2', network=self.network)
@@ -6731,6 +6759,8 @@ class TestAditionalFunctions(TestsHelperMixin, APITestCase):
         self.assertContains(resp2, 'Не найдено сотрудников удовлетворяющих условиям запроса.', status_code=400)
 
     def test_duplicate_for_multiple_wdays_on_one_date(self):
+        self.network.allow_creation_several_wdays_for_one_employee_for_one_date = True
+        self.network.save()
         dt_from = date.today()
         self.create_worker_days(self.employment2, dt_from, 5, 10, 14, True)
         self.create_worker_days(self.employment2, dt_from, 5, 18, 22, True)

@@ -174,7 +174,7 @@ class BatchUpdateOrCreateModelMixin:
     def batch_update_or_create(
             cls, data: list, update_key_field: str = 'id', delete_scope_fields_list: list = None,
             delete_scope_values_list: list = None, delete_scope_filters: dict = None, stats=None, user=None,
-            dry_run=False, diff_report_email_to: list = None):
+            dry_run=False, diff_report_email_to: list = None, check_perms_extra_kwargs=None):
         """
         Функция для массового создания и/или обновления объектов
 
@@ -226,7 +226,7 @@ class BatchUpdateOrCreateModelMixin:
                     diff_lookup_fields = cls._get_diff_lookup_fields()
                     diff_obj_keys = tuple(lookup_field.split('__') for lookup_field in diff_lookup_fields)
                     diff_headers = cls._get_diff_headers()
-                check_perms_extra_kwargs = {}
+                check_perms_extra_kwargs = check_perms_extra_kwargs or {}
                 if user:
                     check_perms_extra_kwargs = cls._get_check_perms_extra_kwargs()
                 stats = stats if stats is not None else {}

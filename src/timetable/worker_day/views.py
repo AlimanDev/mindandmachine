@@ -928,7 +928,6 @@ class WorkerDayViewSet(BaseModelViewSet):
 
         return Response({'result': result}, status=status_code)
 
-
     @swagger_auto_schema(
         operation_description='''
         Метод для подтверждения вакансии
@@ -1177,34 +1176,41 @@ class WorkerDayViewSet(BaseModelViewSet):
                     grouped_wds.setdefault(k, []).append(wd)
                 source_wdays_list = [wd for wdays_list in grouped_wds.values() for wd in wdays_list]
 
-            WorkerDay.objects.bulk_create(
-                [
-                    WorkerDay(
-                        shop=wd.shop,
-                        employee_id=wd.employee_id,
-                        employment=wd.employment,
-                        work_hours=wd.work_hours,
-                        dttm_work_start=wd.dttm_work_start,
-                        dttm_work_end=wd.dttm_work_end,
-                        dt=wd.dt,
-                        is_fact=is_copying_to_fact,
-                        is_approved=False,
-                        type=wd.type,
-                        created_by=wd.created_by if (wd.is_fact and wd.is_approved) else self.request.user,
-                        last_edited_by=wd.last_edited_by if (wd.is_fact and wd.is_approved) else self.request.user,
-                        is_vacancy=wd.is_vacancy,
-                        is_outsource=wd.is_outsource,
-                        comment=wd.comment,
-                        canceled=wd.canceled,
-                        parent_worker_day_id=wd.id,
-                        closest_plan_approved_id=wd.id if (
-                                is_copying_to_fact and wd.is_plan and wd.is_approved) else None,
-                        need_count_wh=True,
-                        source=data['source'],
+            wdays = []
+            for wd in source_wdays_list:
+                wd_data = dict(
+                    shop_id=wd.shop_id,
+                    employee_id=wd.employee_id,
+                    employment_id=wd.employment_id,
+                    work_hours=wd.work_hours,
+                    dttm_work_start=wd.dttm_work_start,
+                    dttm_work_end=wd.dttm_work_end,
+                    dt=wd.dt,
+                    is_fact=is_copying_to_fact,
+                    is_approved=False,
+                    type=wd.type,
+                    created_by=wd.created_by if (wd.is_fact and wd.is_approved) else self.request.user,
+                    last_edited_by=wd.last_edited_by if (wd.is_fact and wd.is_approved) else self.request.user,
+                    is_vacancy=wd.is_vacancy,
+                    is_outsource=wd.is_outsource,
+                    comment=wd.comment,
+                    canceled=wd.canceled,
+                    parent_worker_day_id=wd.id,
+                    closest_plan_approved_id=wd.id if (
+                            is_copying_to_fact and wd.is_plan and wd.is_approved) else None,
+                    source=data['source'],
+                )
+                if not is_copying_to_fact:
+                    wd_data['outsources'] = [dict(network_id=network.id) for network in wd.outsources_list]
+                wd_data['worker_day_details'] = [
+                    dict(
+                        work_type_id=wd_cashbox_details_parent.work_type_id,
+                        work_part=wd_cashbox_details_parent.work_part,
                     )
-                    for wd in source_wdays_list
+                    for wd_cashbox_details_parent in wd.worker_day_details.all()
                 ]
-            )
+                wdays.append(wd_data)
+            WorkerDay.batch_update_or_create(wdays, user=self.request.user)
 
             copied_wdays_qs = WorkerDay.objects.filter(
                 is_fact=is_copying_to_fact,
@@ -1213,38 +1219,6 @@ class WorkerDayViewSet(BaseModelViewSet):
                 employee_id__in=data['employee_ids'],
             )
 
-            search_wds = {}
-            for copied_wd in copied_wdays_qs:
-                search_wds[copied_wd.parent_worker_day_id] = copied_wd
-
-            # в факт не копируем outsources
-            if not is_copying_to_fact:
-                WorkerDayOutsourceNetwork.objects.bulk_create(
-                    [
-                        WorkerDayOutsourceNetwork(
-                            workerday=search_wds[source_wd.id],
-                            network=network,
-                        )
-                        for source_wd in source_wdays_list
-                        for network in source_wd.outsources_list
-                    ]
-                )
-
-            WorkerDayCashboxDetails.objects.bulk_create(
-                [
-                    WorkerDayCashboxDetails(
-                        work_part=details.work_part,
-                        worker_day=search_wds[source_wd.id],
-                        work_type_id=details.work_type_id,
-                    )
-                    for source_wd in source_wdays_list
-                    for details in source_wd.worker_day_details.all()
-                ]
-            )
-
-            WorkerDay.check_work_time_overlap(
-                employee_id__in=data['employee_ids'], dt__in=data['dates'], exc_cls=ValidationError)
-        
         return Response(WorkerDayListSerializer(copied_wdays_qs.prefetch_related(Prefetch('worker_day_details', to_attr='worker_day_details_list')).select_related('last_edited_by'), many=True, context={'request':request}).data)
 
     @swagger_auto_schema(
@@ -1264,11 +1238,11 @@ class WorkerDayViewSet(BaseModelViewSet):
 
         with transaction.atomic():
             created_wds, work_types = copy_as_excel_cells(
-                from_employee_id,
-                data['from_dates'],
-                to_employee_id,
-                data['to_dates'],
-                created_by=request.user.id,
+                from_employee_id=from_employee_id,
+                from_dates=data['from_dates'],
+                to_employee_id=to_employee_id,
+                to_dates=data['to_dates'],
+                user=request.user,
                 is_approved=data['is_approved'],
             )
             for shop_id, work_type in set(work_types):
@@ -1303,7 +1277,7 @@ class WorkerDayViewSet(BaseModelViewSet):
                     from_dates,
                     employee_id,
                     to_dates,
-                    created_by=request.user.id,
+                    user=request.user,
                     is_approved=data['is_approved'],
                     include_spaces=True,
                     worker_day_types=data['worker_day_types'],
@@ -1364,13 +1338,6 @@ class WorkerDayViewSet(BaseModelViewSet):
             data['user'] = request.user
 
             res = Response(WorkerDaySerializer(exchange(data, self.error_messages), many=True).data)
-
-            WorkerDay.check_work_time_overlap(
-                employee_id__in=[data['employee1_id'], data['employee2_id']],
-                dt__in=data['dates'],
-                exc_cls=ValidationError,
-            )
-
         return res
 
     @swagger_auto_schema(
@@ -1625,18 +1592,6 @@ class WorkerDayViewSet(BaseModelViewSet):
             data=request.data, context={'request': request, 'wd_types_dict': wd_types_dict})
         data.is_valid(raise_exception=True)
         data = data.validated_data
-        check_worker_day_permissions(
-            request.user,
-            data['shop_id'],
-            WorkerDayPermission.CREATE,
-            WorkerDayPermission.PLAN,
-            [data['type_id'],],
-            data['dt_from'],
-            data['dt_to'],
-            self.error_messages,
-            wd_types_dict=wd_types_dict,
-            employee_id=data.get('employee_id'),
-        )
         response = WorkerDaySerializer(
             create_worker_days_range(
                 data['dates'], 

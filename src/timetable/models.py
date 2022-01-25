@@ -719,22 +719,22 @@ class WorkerDay(AbstractModel):
             raise PermissionDenied(perm_checker.err_message)
 
     @classmethod
-    def _check_create_single_obj_perm(cls, user, obj_data, **extra_kwargs):
+    def _check_create_single_obj_perm(cls, user, obj_data, check_active_empl=True, **extra_kwargs):
         from src.timetable.worker_day_permissions.checkers import CreateSingleWdPermissionChecker
         perm_checker = CreateSingleWdPermissionChecker(user=user, wd_data=obj_data)
         if not perm_checker.has_permission():
             raise PermissionDenied(perm_checker.err_message)
 
     @classmethod
-    def _check_update_single_obj_perm(cls, user, existing_obj, obj_data, **extra_kwargs):
+    def _check_update_single_obj_perm(cls, user, existing_obj, obj_data, check_active_empl=True, **extra_kwargs):
         from src.timetable.worker_day_permissions.checkers import UpdateSingleWdPermissionChecker
         # TODO: сравнение сущ. объекта и новых данных
-        perm_checker = UpdateSingleWdPermissionChecker(user=user, wd_data=obj_data)
+        perm_checker = UpdateSingleWdPermissionChecker(user=user, wd_data=obj_data, check_active_empl=check_active_empl)
         if not perm_checker.has_permission():
             raise PermissionDenied(perm_checker.err_message)
 
     @classmethod
-    def _check_delete_single_obj_perm(cls, user, existing_obj=None, obj_id=None, **extra_kwargs):
+    def _check_delete_single_obj_perm(cls, user, existing_obj=None, obj_id=None, check_active_empl=True, **extra_kwargs):
         from src.timetable.worker_day_permissions.checkers import DeleteSingleWdPermissionChecker
         perm_checker = DeleteSingleWdPermissionChecker(user=user, wd_obj=existing_obj, wd_id=obj_id)
         if not perm_checker.has_permission():
@@ -2411,7 +2411,6 @@ class WorkerDayPermission(AbstractModel):
     UPDATE = 'U'  # изменение каких-то значений дня без изменения его типа
     DELETE = 'D'  # удаление какого-то типа дня
     APPROVE = 'A'
-    # CONFIRM_VACANCY_TO_WORKER = 'CVTW'
 
     ACTIONS = (
         (CREATE, _('Create')),
@@ -2419,7 +2418,6 @@ class WorkerDayPermission(AbstractModel):
         # Remove, т.к. Delete почему-то переводится в "Удалено", даже если в django.py "Удаление".
         (DELETE, _('Remove')),
         (APPROVE, _('Approve')),
-        # (CONFIRM_VACANCY_TO_WORKER, _('Confirm vacancy to worker')),
     )
     ACTIONS_DICT = dict(ACTIONS)
 
