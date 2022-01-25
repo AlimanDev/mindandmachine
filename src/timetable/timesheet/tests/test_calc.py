@@ -292,3 +292,22 @@ class TestTimesheetCalc(TestTimesheetMixin, TestCase):
         self._calc_timesheets(dttm_now=dttm_now, dt_from=date(2021, 6, 1), dt_to=date(2021, 6, 30))
         self.assertEqual(TimesheetItem.objects.filter(
             employee=self.employee_worker, timesheet_type=TimesheetItem.TIMESHEET_TYPE_FACT).count(), 9)
+
+    def test_get_dayoff_from_plan_if_fact_workday_has_zero_work_hours(self):
+        self.network.only_fact_hours_that_in_approved_plan = True
+        self.network.save()
+        dt = date(2021, 6, 7)
+        WorkerDay.objects.filter(dt=dt, is_fact=False, is_approved=True).delete()
+        WorkerDayFactory(
+            is_approved=True,
+            is_fact=False,
+            employment=self.employment_worker,
+            employee=self.employee_worker,
+            dt=dt,
+            type_id=WorkerDay.TYPE_VACATION,
+        )
+        fact_wd = WorkerDay.objects.filter(is_fact=True, is_approved=True, dt=dt).first()
+        fact_wd.save()
+        self._calc_timesheets()
+        dt_timesheet = TimesheetItem.objects.get(dt=dt)
+        self.assertEqual(dt_timesheet.day_type_id, WorkerDay.TYPE_VACATION)
