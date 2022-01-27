@@ -551,6 +551,7 @@ class TestOutsource(TestsHelperMixin, APITestCase):
                     'rebuild_timetable_min_delta': 2,
                     'show_remaking_choice': False,
                     'analytics_iframe': '',
+                    'analytics_type': 'metabase',
                     'show_employee_shift_schedule_tab': False,
                     'shop_name_form': {
                         "singular": {

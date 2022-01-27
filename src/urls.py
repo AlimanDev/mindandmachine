@@ -3,14 +3,9 @@ from django.conf.urls import include, url
 from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import path
-from rest_framework import permissions
-from drf_yasg.views import get_schema_view
 from drf_yasg import openapi
-from src.util.openapi.auto_schema import WFMOpenAPISchemaGenerator, WFMIntegrationAPISchemaGenerator
-
-from src.base import urls as base_api
-from src.conf.djconfig import DEBUG
-from src.forecast import urls as forecast_api
+from drf_yasg.views import get_schema_view
+from rest_framework import permissions
 from src.main.auth import urls as auth_urls
 from src.main.cashbox import urls as cashbox_urls
 from src.main.demand import urls as demand_urls
@@ -22,14 +17,19 @@ from src.main.tablet import urls as tablet_urls
 from src.main.timetable import urls as timetable_urls
 from src.main.upload import urls as upload_urls
 from src.main.urv import urls as urv_urls
+
+from src.base import urls as base_api
+from src.conf.djconfig import DEBUG
+from src.forecast import urls as forecast_api
+from src.forecast.views import RecalcLoadAdminView, UploadDemandAdminView
 from src.misc import urls as misc_api
 from src.recognition.urls import router as recognition_router
+from src.recognition.views import DownloadViolatorsReportAdminView
+from src.reports import urls as reports_urls
+from src.tasks import urls as task_urls
 from src.timetable import urls as timetable_api
 from src.timetable.views import RecalcWhAdminView
-from src.forecast.views import RecalcLoadAdminView, UploadDemandAdminView
-from src.recognition.views import DownloadViolatorsReportAdminView
-from src.tasks import urls as task_urls
-from src.reports import urls as reports_urls
+from src.util.openapi.auto_schema import WFMOpenAPISchemaGenerator, WFMIntegrationAPISchemaGenerator
 
 api_urlpatterns = [
     path('auth/', include(auth_urls)),
@@ -55,6 +55,7 @@ urlpatterns = [
     path('admin/recognition/ticks/download_violators/', DownloadViolatorsReportAdminView.as_view(), name='download_violators'),
     path('admin/', admin.site.urls),
     path('rest_api/recognition/', include(recognition_router.get_urls())),
+    path('rest_api/pbi/', include('src.pbi.urls')),
     path('rest_api/integration/mda/', include('src.integration.mda.urls')),
     path('rest_api/', include(
         base_api.urlpatterns +
