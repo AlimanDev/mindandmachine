@@ -1,3 +1,4 @@
+import re
 from rest_framework import serializers
 from src.forecast.models import (
     OperationTypeTemplate, 
@@ -452,7 +453,7 @@ def prepare_load_template_request(load_template_id, shop_id, dt_from, dt_to):
     relations = {}
     for rel in OperationTypeRelation.objects.filter(
             base__load_template_id=load_template_id,
-            type=OperationTypeRelation.TYPE_FORMULA,
+            type__in=[OperationTypeRelation.TYPE_FORMULA, OperationTypeRelation.TYPE_PREDICTION],
         ).annotate(
             base_name=F('base__operation_type_name_id'),
             depended_name=F('depended__operation_type_name_id'),
@@ -496,11 +497,13 @@ def prepare_load_template_request(load_template_id, shop_id, dt_from, dt_to):
             }
         )
     data['timeserie'] = timeseries
+    replace_types = {
+        'H': 'F',
+        'F': 'O',
+        'FS': 'FS',
+    }
     for o_type in data['operation_types']:
-        if str(o_type['operation_type_name']) in timeseries.keys() or o_type['type'] == 'H':
-            o_type['type'] = 'F'
-        else:
-            o_type['type'] = 'O'
+        o_type['type'] = replace_types[o_type['type']]
     data['change_workload_between'] = [
         {
             'to_serie': rel.base_name, 
@@ -508,6 +511,7 @@ def prepare_load_template_request(load_template_id, shop_id, dt_from, dt_to):
             'threshold': rel.threshold, 
             'max_value': rel.max_value, 
             'days_of_week': rel.days_of_week_list,
+            'order': rel.order,
         }
         for rel in OperationTypeRelation.objects.filter(
             base__load_template_id=load_template_id,
@@ -524,21 +528,29 @@ def upload_load_template(template_file, form, lang='ru'):
     df = pd.read_excel(template_file)
     network_id = form['network_id']
     o_types = {otn.name: otn for otn in OperationTypeName.objects.filter(network_id=network_id)}
+    lambda_check = r'^(if|else|\+|-|\*|/|\s|a|[0-9]|=|>|<|\.|\(|\))*'
     O_TYPE_COL = df.columns[0]
     DEPENDENCY_COL = df.columns[1]
     FORMULA_COL = df.columns[2]
     CONSTANT_COL = df.columns[3]
     MAX_VALUE_COL = df.columns[4]
     THRESHOLD_COL = df.columns[5]
-    DAYS_OF_WEEK_COL = df.columns[6]
-    TIMESTEP_COL = df.columns[7]
-    TM_START_COL = df.columns[8]
-    TM_END_COL = df.columns[9]
-    WORK_TYPE_COL = df.columns[10]
+    ORDER_COL = df.columns[6]
+    DAYS_OF_WEEK_COL = df.columns[7]
+    TIMESTEP_COL = df.columns[8]
+    TM_START_COL = df.columns[9]
+    TM_END_COL = df.columns[10]
     o_types_db_set = set(o_types.keys())
     undefined_o_types = set(df[O_TYPE_COL].dropna()).difference(o_types_db_set)
     if len(undefined_o_types):
-        raise serializers.ValidationError(_('These operation types do not exist: {types}.').format(types=undefined_o_types))
+        raise serializers.ValidationError(_('These operation types do not exist: {types}.').format(types=', '.join(undefined_o_types)))
+    bad_dependences = set(df[DEPENDENCY_COL].dropna()).difference(df[O_TYPE_COL].dropna())
+    if len(bad_dependences):
+        raise serializers.ValidationError(
+            _(
+                'These operation types listed in dependencies, but not listed in operation types: {types}.'
+            ).format(types=', '.join(bad_dependences))
+        )
     with transaction.atomic():
         lt = LoadTemplate.objects.create(name=form['name'], network_id=network_id)
         df = df.fillna('')
@@ -553,9 +565,11 @@ def upload_load_template(template_file, form, lang='ru'):
         for i, row in df.iterrows():
             if not row[O_TYPE_COL] == '':
                 if not forecast_steps.get(row[TIMESTEP_COL]):
-                    error_msg = _('Timestep is required. Row {row}.').format(row=i + 2)
+                    error_msg = _('Error in row {}.').format(i+2) + ' ' + _('Timestep is required.')
                     if row[TIMESTEP_COL]:
-                        error_msg = _('Timestep {timestep} is not valid choice, choices are {timesteps}.').format(
+                        error_msg = _('Error in row {}.').format(i+2) + ' ' + _(
+                            'Timestep {timestep} is not valid choice, choices are {timesteps}.'
+                        ).format(
                             timestep=row[TIMESTEP_COL],
                             timesteps=', '.join(forecast_steps.keys()),
                         )
@@ -580,43 +594,89 @@ def upload_load_template(template_file, form, lang='ru'):
                 name = row[O_TYPE_COL]
                 prev_name = name
             if not row[DEPENDENCY_COL] == '':
+                base = created_templates[name]
+                depended = created_templates[row[DEPENDENCY_COL]]
                 max_value = None
                 threshold = None
+                order = None
                 days_of_week = []
                 type = OperationTypeRelation.TYPE_FORMULA
                 if row[FORMULA_COL] == '':
-                    type = OperationTypeRelation.TYPE_CHANGE_WORKLOAD_BETWEEN
-                    max_value = row[MAX_VALUE_COL]
-                    threshold = row[THRESHOLD_COL]
-                    try:
-                        days_of_week = list(set(map(int, row[DAYS_OF_WEEK_COL].split(','))).intersection(available_days_of_week))
-                    except:
-                        raise serializers.ValidationError(
-                            _("Invalid days of week '{}', should be comma separated int in interfval from 0 to 6.").format(
-                                row[DAYS_OF_WEEK_COL],
-                            )
+                    check_conditions = [
+                        (
+                            base.operation_type_name.do_forecast == OperationTypeName.FORECAST_FORMULA and not (
+                                bool(
+                                    base.operation_type_name.work_type_name_id
+                                ) == bool(
+                                    depended.operation_type_name.work_type_name_id
+                                ) and bool(base.operation_type_name.work_type_name_id)
+                            ),
+                            _('Error in row {}.').format(i+2) + ' ' + _('Formula required in relation {} -> {}').format(name, row[DEPENDENCY_COL]),
+                            base.operation_type_name.do_forecast == OperationTypeName.FORECAST_FORMULA,
+                            OperationTypeRelation.TYPE_CHANGE_WORKLOAD_BETWEEN,
+                        ),
+                        (
+                            base.operation_type_name.do_forecast == OperationTypeName.FORECAST and\
+                            depended.operation_type_name.do_forecast == OperationTypeName.FORECAST_FORMULA,
+                            _('Error in row {}.').format(i+2) + ' ' + _(
+                                'Forecast type {} cannot be depended from {} with formula type.'
+                            ).format(name, row[DEPENDENCY_COL]),
+                            base.operation_type_name.do_forecast == OperationTypeName.FORECAST,
+                            OperationTypeRelation.TYPE_PREDICTION,
+                        ),
+                        (
+                            base.operation_type_name.do_forecast == OperationTypeName.FEATURE_SERIE,
+                            _('Error in row {}.').format(i+2) + ' ' + _('Feature serie {} cannot have dependences.').format(name, row[DEPENDENCY_COL]),
+                            False,
+                            None,
                         )
-                    if not all([max_value, threshold, days_of_week]):
-                        error_msgs = []
-                        if not max_value:
-                            error_msgs.append(_('max value'))
-                        if not threshold:
-                            error_msgs.append(_('threshold'))
-                        if not days_of_week:
-                            error_msgs.append(_('days of week'))
-                        raise serializers.ValidationError(
-                            _("For relation 'change workload between' {} are required.").format(
-                                ', '.join(error_msgs)
+                    ]
+                    type = None
+                    for error_condition, error_message, type_condition, relation_type in check_conditions:
+                        if error_condition:
+                            raise serializers.ValidationError(error_message)
+                        elif type_condition:
+                            type = relation_type
+                            break
+                    
+                    if type == OperationTypeRelation.TYPE_CHANGE_WORKLOAD_BETWEEN:
+                        max_value = row[MAX_VALUE_COL]
+                        threshold = row[THRESHOLD_COL]
+                        order = row[ORDER_COL] or 999
+                        try:
+                            days_of_week = list(set(map(int, row[DAYS_OF_WEEK_COL].split(','))).intersection(available_days_of_week))
+                        except:
+                            raise serializers.ValidationError(
+                                _('Error in row {}.').format(i+2) + ' ' + _("Invalid days of week '{}', should be comma separated int in interfval from 0 to 6.").format(
+                                    row[DAYS_OF_WEEK_COL],
+                                )
                             )
-                        )
+                        if not all([max_value, threshold, days_of_week]):
+                            error_msgs = []
+                            if not max_value:
+                                error_msgs.append(_('max value'))
+                            if not threshold:
+                                error_msgs.append(_('threshold'))
+                            if not days_of_week:
+                                error_msgs.append(_('days of week'))
+                            raise serializers.ValidationError(
+                                _('Error in row {}.').format(i+2) + ' ' + _("For relation 'change workload between' {} are required.").format(
+                                    ', '.join(error_msgs)
+                                )
+                            )
+                elif not re.fullmatch(lambda_check, row[FORMULA_COL]):
+                    raise serializers.ValidationError(
+                        _('Error in row {}.').format(i+2) + ' ' + _("Error in formula: {formula}.").format(formula=row[FORMULA_COL])
+                    )
                 OperationTypeRelation.objects.create(
-                    base=created_templates[name],
-                    depended=created_templates[row[DEPENDENCY_COL]],
+                    base=base,
+                    depended=depended,
                     formula=row[FORMULA_COL],
                     max_value=max_value,
                     threshold=threshold,
                     type=type,
                     days_of_week=days_of_week,
+                    order=order,
                 )
     return Response()
             
@@ -634,7 +694,7 @@ def download_load_template(request, workbook, load_template_id):
         ).annotate(
             base_name=F('base__operation_type_name_id'),
             depended_name=F('depended__operation_type_name__name'),
-        ).values('type', 'formula', 'depended_name', 'base_name', 'max_value', 'threshold', 'days_of_week'):
+        ).values('type', 'formula', 'depended_name', 'base_name', 'max_value', 'threshold', 'days_of_week', 'order'):
         key = rel.get('base_name')
         if not key in relations:
             relations[key] = []
@@ -642,15 +702,22 @@ def download_load_template(request, workbook, load_template_id):
     operation_types = [
         {
             'operation_type_name': o.operation_type_name.name,
-            'work_type_name': o.operation_type_name.work_type_name.name if o.operation_type_name.work_type_name else '',
+            'type': o.operation_type_name.do_forecast,
+            'work_type_name_id': o.operation_type_name.work_type_name_id,
             'tm_from': o.tm_from or '',
             'tm_to': o.tm_to or '',
             'const_value': o.const_value or '',
             'forecast_step': forecast_steps.get(o.forecast_step),
             'dependences': relations.get(o.operation_type_name_id, [])
         }
-        for o in OperationTypeTemplate.objects.select_related('operation_type_name', 'operation_type_name__work_type_name').filter(load_template_id=load_template_id)
+        for o in OperationTypeTemplate.objects.select_related('operation_type_name').filter(load_template_id=load_template_id)
     ]
+    operation_ordering = {
+        OperationTypeName.FEATURE_SERIE: lambda x: 0,
+        OperationTypeName.FORECAST: lambda x: 1 if not x['dependences'] else 2,
+        OperationTypeName.FORECAST_FORMULA: lambda x: 3 if not x['work_type_name_id'] else 4,
+    }
+    operation_types = sorted(operation_types, key=lambda x: operation_ordering[x['type']](x))
     worksheet = workbook.book.add_worksheet('Шаблон нагрузки')
     worksheet.set_column(0, 3, 30)
     worksheet.write(0, 0, 'Тип операции')
@@ -659,20 +726,19 @@ def download_load_template(request, workbook, load_template_id):
     worksheet.write(0, 3, 'Константа')
     worksheet.write(0, 4, 'Максимальное значение')
     worksheet.write(0, 5, 'Порог')
-    worksheet.write(0, 6, 'Дни недели (через запятую)')
-    worksheet.write(0, 7, 'Шаг прогноза')
-    worksheet.write(0, 8, 'Время начала')
-    worksheet.write(0, 9, 'Время окончания')
-    worksheet.write(0, 10, 'Тип работ')
+    worksheet.write(0, 6, 'Порядок')
+    worksheet.write(0, 7, 'Дни недели (через запятую)')
+    worksheet.write(0, 8, 'Шаг прогноза')
+    worksheet.write(0, 9, 'Время начала')
+    worksheet.write(0, 10, 'Время окончания')
     index = 0
     for ot in operation_types:
         index += 1
         worksheet.write(index, 0, ot['operation_type_name'])
         worksheet.write(index, 3, ot['const_value'])
-        worksheet.write(index, 7, ot['forecast_step'])
-        worksheet.write(index, 8, str(ot['tm_from']))
-        worksheet.write(index, 9, str(ot['tm_to']))
-        worksheet.write(index, 10, ot['work_type_name'])
+        worksheet.write(index, 8, ot['forecast_step'])
+        worksheet.write(index, 9, str(ot['tm_from']))
+        worksheet.write(index, 10, str(ot['tm_to']))
         if len(ot['dependences']):
             index -= 1
             for dependency in ot['dependences']:
@@ -681,7 +747,8 @@ def download_load_template(request, workbook, load_template_id):
                 worksheet.write(index, 2, dependency['formula'] or '')
                 worksheet.write(index, 4, dependency['max_value'] or '')
                 worksheet.write(index, 5, dependency['threshold'] or '')
+                worksheet.write(index, 6, dependency['order'] or '')
                 days_of_week = json.loads(dependency['days_of_week'] or '[]')
-                worksheet.write(index, 6, ','.join(list(map(str,days_of_week))))
+                worksheet.write(index, 7, ','.join(list(map(str,days_of_week))))
             
     return workbook, 'Load_template'

@@ -12,7 +12,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Django REST framework\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2022-01-13 06:50+0000\n"
+"POT-Creation-Date: 2022-01-28 08:24+0000\n"
 "PO-Revision-Date: 2017-08-03 14:58+0000\n"
 "Last-Translator: Grigory Mishchenko <grishkokot@gmail.com>\n"
 "Language-Team: Russian (http://www.transifex.com/django-rest-framework-1/"
@@ -93,99 +93,99 @@ msgstr "Нет такого пользователя"
 msgid "Unable to log in with provided credentials."
 msgstr "Невозможно войти с предоставленными учетными данными."
 
-#: src/base/models.py:48 src/reports/models.py:46
+#: src/base/models.py:49 src/reports/models.py:46
 msgid "Month"
 msgstr "Месяц"
 
-#: src/base/models.py:49 src/reports/models.py:47
+#: src/base/models.py:50 src/reports/models.py:47
 msgid "Quarter"
 msgstr "Квартал"
 
-#: src/base/models.py:50 src/reports/models.py:48
+#: src/base/models.py:51 src/reports/models.py:48
 msgid "Half a year"
 msgstr "Пол года"
 
-#: src/base/models.py:51 src/reports/models.py:49
+#: src/base/models.py:52 src/reports/models.py:49
 msgid "Year"
 msgstr "Год"
 
-#: src/base/models.py:82
+#: src/base/models.py:83
 msgid "Cells"
 msgstr "Ячейки"
 
-#: src/base/models.py:83
+#: src/base/models.py:84
 msgid "Rows"
 msgstr "Строки"
 
-#: src/base/models.py:104
+#: src/base/models.py:105
 msgid "Logo"
 msgstr "Лого"
 
-#: src/base/models.py:106
+#: src/base/models.py:107
 msgid "Primary color"
 msgstr "Основной цвет"
 
-#: src/base/models.py:107
+#: src/base/models.py:108
 msgid "Secondary color"
 msgstr "Вторичный цвет"
 
-#: src/base/models.py:108
+#: src/base/models.py:109
 msgid "Name"
 msgstr "Название"
 
-#: src/base/models.py:109
+#: src/base/models.py:110
 msgid "Code"
 msgstr "Код"
 
-#: src/base/models.py:111
+#: src/base/models.py:112
 msgid "Need symbol for vacancy"
 msgstr "Нужен ли идентификатор сотруднка чтобы откликнуться на вакансию"
 
-#: src/base/models.py:112
+#: src/base/models.py:113
 msgid "Settings values"
 msgstr "Значения настроек"
 
-#: src/base/models.py:114
+#: src/base/models.py:115
 msgid "Allowed interval for late_arrival"
 msgstr "Допустимый интервал для опоздания"
 
-#: src/base/models.py:116
+#: src/base/models.py:117
 msgid "Allowed interval for early departure"
 msgstr "Допустимый интервал для раннего ухода"
 
-#: src/base/models.py:118
+#: src/base/models.py:119
 #, fuzzy
 #| msgid "Allowed interval for late_arrival"
 msgid "Allowed interval for early arrival"
 msgstr "Допустимый интервал для опоздания"
 
-#: src/base/models.py:120
+#: src/base/models.py:121
 #, fuzzy
 #| msgid "Allowed interval for early departure"
 msgid "Allowed interval for late departure"
 msgstr "Допустимый интервал для раннего ухода"
 
-#: src/base/models.py:122
+#: src/base/models.py:123
 msgid "Allow workers confirm outsource vacancy"
 msgstr "Разрешать работникам сети откликаться на аутсорс вакансии"
 
-#: src/base/models.py:123
+#: src/base/models.py:124
 msgid "OKPO code"
 msgstr "Код по ОКПО"
 
-#: src/base/models.py:126
+#: src/base/models.py:127
 msgid "Allowed geo distance (km)"
 msgstr "Разрешенная дистанция до магазина при создании отметок (км)"
 
-#: src/base/models.py:129
+#: src/base/models.py:130
 msgid "Enable camera ticks"
 msgstr "Включить отметки по камере в мобильной версии"
 
-#: src/base/models.py:131
+#: src/base/models.py:132
 msgid "Show worker day additional info"
 msgstr "Отображать доп. информацию в подтвержденных факте и плане"
 
-#: src/base/models.py:132
+#: src/base/models.py:133
 msgid ""
 "Displaying information about who last edited a worker day and when, when "
 "hovering over the corner"
@@ -193,117 +193,117 @@ msgstr ""
 "Отображение при наведении на уголок информации о том, кто и когда последний "
 "раз редактировал рабочий день"
 
-#: src/base/models.py:134
+#: src/base/models.py:135
 msgid "Show worker day tasks"
 msgstr "Отображать задачи в доп. информацию по рабочему дню"
 
-#: src/base/models.py:136
+#: src/base/models.py:137
 msgid "Crop work hours by shop schedule"
 msgstr "Обрезать рабочие часы по времени работы магазина"
 
-#: src/base/models.py:139
+#: src/base/models.py:140
 msgid "Clean worker days on employment date change"
 msgstr "Запускать скрипт очистки дней при изменении дат трудойстройства"
 
-#: src/base/models.py:142
+#: src/base/models.py:143
 msgid "Accounting period length"
 msgstr "Длина учетного периода"
 
-#: src/base/models.py:145
+#: src/base/models.py:146
 msgid "Count only fact hours that in approved plan"
 msgstr ""
 "Считать только те фактические часы, которые есть в подтвержденном плановом "
 "графике"
 
-#: src/base/models.py:148
+#: src/base/models.py:149
 msgid "Copy plan to fact crossing"
 msgstr "Копировать план в факт без перезаписи факта"
 
-#: src/base/models.py:150
+#: src/base/models.py:151
 msgid "Download tabel template"
 msgstr "Шаблон для табеля"
 
-#: src/base/models.py:154
+#: src/base/models.py:155
 msgid "Timetable format"
 msgstr "Формат загрузки/выгрузки расписания"
 
-#: src/base/models.py:157
+#: src/base/models.py:158
 msgid "Upload employments from excel"
 msgstr "Добавлять сотрудников из Excel"
 
-#: src/base/models.py:159
+#: src/base/models.py:160
 msgid "Convert tabel to"
 msgstr "Конвертировать табель в"
 
-#: src/base/models.py:169
+#: src/base/models.py:170
 msgid "Default breaks"
 msgstr "Перерывы по умолчанию"
 
-#: src/base/models.py:177
+#: src/base/models.py:178
 msgid "Default load template"
 msgstr "Шаблон нагрузки по умолчанию"
 
-#: src/base/models.py:185
+#: src/base/models.py:186
 msgid "Default exchange settings"
 msgstr "Настройки биржи смен по умолчанию"
 
-#: src/base/models.py:190
+#: src/base/models.py:191
 msgid "Worker position default values"
 msgstr "Параметры должностей по умолчанию"
 
-#: src/base/models.py:191
+#: src/base/models.py:192
 msgid "Shop default values"
 msgstr "Параметры магазина по умолчанию"
 
-#: src/base/models.py:193
+#: src/base/models.py:194
 msgid "Descrease employment date fired in api"
 msgstr "Уменьшать дату окончания трудоустройства"
 
-#: src/base/models.py:194
+#: src/base/models.py:195
 msgid "Relevant for data received via the api"
 msgstr "Актуально для данных, получаемых через api"
 
-#: src/base/models.py:197
+#: src/base/models.py:198
 msgid "Consider remaining hours in previous months when calculating norm hours"
 msgstr ""
 "Учитывать неотработанные часы за предыдущие месяца при расчете нормы часов"
 
-#: src/base/models.py:200
+#: src/base/models.py:201
 msgid ""
 "Корректировать норму часов для последнего месяца уч. периода (если уч. "
 "период != 1 мес)"
 msgstr ""
 
-#: src/base/models.py:209
+#: src/base/models.py:210
 msgid "Ignore parent code when updating department via api"
 msgstr "Не учитывать parent_code при изменении подразделения через api"
 
-#: src/base/models.py:210
+#: src/base/models.py:211
 msgid ""
 "It must be enabled for cases when the organizational structure is maintained "
 "manually"
 msgstr ""
 "Необходимо включить для случаев, когда оргструктура поддерживается вручную"
 
-#: src/base/models.py:214
+#: src/base/models.py:215
 msgid "Create employment on set or update director code"
 msgstr ""
 "Создавать скрытое трудоустройство при проставлении/изменении director_code в "
 "подразделении"
 
-#: src/base/models.py:218
+#: src/base/models.py:219
 msgid "Show user biometrics block"
 msgstr "Отображать блок биометрии в деталях сотрудника"
 
-#: src/base/models.py:222
+#: src/base/models.py:223
 msgid "Fines settings"
 msgstr "Настройки штрафов"
 
-#: src/base/models.py:232
+#: src/base/models.py:233
 msgid "Maximum shift length (in seconds)"
 msgstr "Максимальная длительность смены (в секундах)"
 
-#: src/base/models.py:234
+#: src/base/models.py:235
 msgid ""
 "Skip the creation of a departure mark if more than the Maximum shift length "
 "has passed since the opening of the previous shift"
@@ -311,11 +311,11 @@ msgstr ""
 "Пропускать создание отметки об уходе, если с момента открытия предыдущей "
 "смены прошло больше, чем максимальная длительность смены."
 
-#: src/base/models.py:239
+#: src/base/models.py:240
 msgid "Create attendance record without check photo."
 msgstr "Создавать отметки без проверки биометрии."
 
-#: src/base/models.py:243
+#: src/base/models.py:244
 msgid ""
 "Max difference between the start or end time to \"pull\" to the planned work "
 "day"
@@ -323,7 +323,7 @@ msgstr ""
 "Максимальная разность между временем начала или окончания для \"притягивания"
 "\" к рабочему дню"
 
-#: src/base/models.py:381 src/base/models.py:387
+#: src/base/models.py:382 src/base/models.py:388
 #, python-brace-format
 msgid ""
 "Bad break triplet format {triplet}, should be [[int, int, [int, int,]],]."
@@ -331,46 +331,46 @@ msgstr ""
 "Некорректный формат перерыва {triplet}, должно быть [[int, int, [int, "
 "int,]],]."
 
-#: src/base/models.py:384
+#: src/base/models.py:385
 #, python-brace-format
 msgid "First value of period can not be greater then second value: {triplet}"
 msgstr ""
 "Первое значение периода не может быть больше второго значения: {triplet}"
 
-#: src/base/models.py:390
+#: src/base/models.py:391
 #, python-brace-format
 msgid "Value of break can not be greater than value of period: {triplet}"
 msgstr "Значение перерыва не может быть больше значения периода: {triplet}"
 
-#: src/base/models.py:574
+#: src/base/models.py:575
 #, python-brace-format
 msgid "Shop with parent_code={code} not found"
 msgstr "Подразделение с parent_code={code} не найдено"
 
-#: src/base/models.py:719
+#: src/base/models.py:724
 msgid "Forecast step can't be 0."
 msgstr "Шаг прогноза не может быть 0."
 
-#: src/base/models.py:722
+#: src/base/models.py:727
 msgid "Keys of open times and close times are different."
 msgstr "Ключи в времени открытия и времени закрытия различаются."
 
-#: src/base/models.py:724
+#: src/base/models.py:729
 msgid "'All' and individual days cannot be specified."
 msgstr "Нельзя указывать all и отдельные дни."
 
-#: src/base/models.py:737
+#: src/base/models.py:742
 msgid ""
 "It is not possible to change the load template as it is in the calculation "
 "process."
 msgstr ""
 "Невозможно изменить шаблон нагрузки, так как он находится в процессе расчета."
 
-#: src/base/models.py:751
+#: src/base/models.py:756
 msgid "There is not load template with code {}."
 msgstr "Шаблон нагрузки с кодом {} не найден."
 
-#: src/base/models.py:1397
+#: src/base/models.py:1406
 msgid ""
 "Unable to define worker access group. Assign an access group to him or a "
 "position associated with an access group."
@@ -378,7 +378,7 @@ msgstr ""
 "Невозможно определить группу доступа работника. Назначьте ему группу доступа "
 "либо должность, связанную с группой доступа."
 
-#: src/base/permissions.py:114
+#: src/base/permissions.py:134
 msgid "shop_id should be defined"
 msgstr "Произошла ошибка. Попробуйте перезагрузить страницу."
 
@@ -460,17 +460,17 @@ msgstr ""
 "Неправильный формат времени {time} для значения {key}. Формат должен быть "
 "{format}."
 
-#: src/base/views.py:191
+#: src/base/views.py:194
 #, fuzzy
 #| msgid "It is necessary to transfer a biometrics template (file)."
 msgid "It is necessary to transfer a biometrics template (file field)."
 msgstr "Необходимо передать шаблон биометрии (поле file)"
 
-#: src/base/views.py:209
+#: src/base/views.py:212
 msgid "Biometrics template added successfully."
 msgstr "Шаблон биометрии успешно добавлен."
 
-#: src/base/views.py:212
+#: src/base/views.py:215
 msgid ""
 "The employee has biometrics. To add a new biometrics template, you need to "
 "delete the current template."
@@ -483,23 +483,51 @@ msgid ""
 "поля наименования магазина в WFM-системе\" должно быть заполнено."
 msgstr ""
 
-#: src/forecast/load_template/utils.py:541
+#: src/forecast/load_template/utils.py:544
 #, python-brace-format
 msgid "These operation types do not exist: {types}."
 msgstr "Данные типы операций не существуют: {types}."
 
-#: src/forecast/load_template/utils.py:556
-#, python-brace-format
-msgid "Timestep is required. Row {row}."
-msgstr "Шаг прогноза обязателен. Строка {row}."
+#: src/forecast/load_template/utils.py:549
+msgid ""
+"These operation types listed in dependencies, but not listed in operation "
+"types: {types}."
+msgstr "Данные типы операций есть в зависимостях, но отсутствуют в списке операций: {types}."
 
-#: src/forecast/load_template/utils.py:558
+#: src/forecast/load_template/utils.py:566
+#: src/forecast/load_template/utils.py:568
+#: src/forecast/load_template/utils.py:612
+#: src/forecast/load_template/utils.py:619
+#: src/forecast/load_template/utils.py:629
+#: src/forecast/load_template/utils.py:650
+#: src/forecast/load_template/utils.py:663
+msgid "Error in row {}."
+msgstr "Ошибка в строке {}."
+
+#: src/forecast/load_template/utils.py:566
+msgid "Timestep is required."
+msgstr "Шаг прогноза обязателен."
+
+#: src/forecast/load_template/utils.py:569
 #, python-brace-format
 msgid "Timestep {timestep} is not valid choice, choices are {timesteps}."
 msgstr ""
 "Шаг прогноза {timestep} не является валидным, следует выбрать из {timesteps}."
 
-#: src/forecast/load_template/utils.py:595
+#: src/forecast/load_template/utils.py:612
+msgid "Formula required in relation {} -> {}"
+msgstr "Формула обязательна в отношении {} -> {}"
+
+#: src/forecast/load_template/utils.py:620
+msgid "Forecast type {} cannot be depended from {} with formula type."
+msgstr ""
+"Прогнозируемый тип {} не может зависеть от {} с типом расчета по формуле."
+
+#: src/forecast/load_template/utils.py:629
+msgid "Feature serie {} cannot have dependences."
+msgstr "Тип операции для помощи в прогнозе {} не может иметь зависимостей."
+
+#: src/forecast/load_template/utils.py:650
 msgid ""
 "Invalid days of week '{}', should be comma separated int in interfval from 0 "
 "to 6."
@@ -507,19 +535,19 @@ msgstr ""
 "Некорректное значение дней недели '{}', должны быть целочисленные значения "
 "от 0 до 6, разделенные запятой."
 
-#: src/forecast/load_template/utils.py:602
+#: src/forecast/load_template/utils.py:657
 msgid "max value"
 msgstr "максимальное значение"
 
-#: src/forecast/load_template/utils.py:604
+#: src/forecast/load_template/utils.py:659
 msgid "threshold"
 msgstr "порог"
 
-#: src/forecast/load_template/utils.py:606
+#: src/forecast/load_template/utils.py:661
 msgid "days of week"
 msgstr "дни недели"
 
-#: src/forecast/load_template/utils.py:608
+#: src/forecast/load_template/utils.py:663
 msgid "For relation 'change workload between' {} are required."
 msgstr ""
 "Для отношения 'перекидывание нагрузки между типами работ' {} обязательны."
@@ -550,40 +578,50 @@ msgid "Base and depended demand models cannot be the same."
 msgstr "Базовая и зависимая модели нагрузки не могут совпадать."
 
 #: src/forecast/operation_type_relation/views.py:26
+msgid "Feature serie cannot have dependences."
+msgstr "Тип операции для помощи в прогнозе не может иметь зависимостей."
+
+#: src/forecast/operation_type_relation/views.py:27
+msgid "Forecast dependence cannot be between formula operations."
+msgstr ""
+"Прогнозируемый тип зависимости не может быть между операциями с типом "
+"расчета по формуле."
+
+#: src/forecast/operation_type_relation/views.py:28
 msgid "Demand model cannot depend on itself."
 msgstr "Циклическая зависимость: операция зависит сама от себя."
 
-#: src/forecast/operation_type_relation/views.py:27
+#: src/forecast/operation_type_relation/views.py:29
 msgid "Backward dependency already exists."
 msgstr "Уже существует обратная зависимость"
 
-#: src/forecast/operation_type_relation/views.py:28
+#: src/forecast/operation_type_relation/views.py:30
 msgid "Base and depended demand models cannot have different templates."
 msgstr "Базовая и зависимая модели не могут иметь разный шаблон нагрузки"
 
-#: src/forecast/operation_type_relation/views.py:29
+#: src/forecast/operation_type_relation/views.py:31
 #, python-brace-format
 msgid "Error in formula: {formula}."
 msgstr "Ошибка в формуле: {formula}"
 
-#: src/forecast/operation_type_relation/views.py:30
+#: src/forecast/operation_type_relation/views.py:32
 msgid "Base model not formula."
 msgstr "У базовой модели тип расчета должен быть формула"
 
-#: src/forecast/operation_type_relation/views.py:31
+#: src/forecast/operation_type_relation/views.py:33
 msgid ""
 "Both templates should be work type for 'Change workload between' relation."
 msgstr ""
 "Оба шаблона должны быть типами работ для взаимосвязи 'Перекидывание типов "
 "работ'"
 
-#: src/forecast/operation_type_relation/views.py:32
+#: src/forecast/operation_type_relation/views.py:34
 msgid "Depended must have same or bigger forecast step, got {} -> {}"
 msgstr ""
 "Зависимая операция должна иметь одинаковый или больший шаг прогноза, имеется "
 "{} -> {}"
 
-#: src/forecast/operation_type_relation/views.py:33
+#: src/forecast/operation_type_relation/views.py:35
 msgid "Bad day of week, possible values: 0, 1, 2, 3, 4, 5, 6"
 msgstr ""
 "Некорректное значение дня недели, возможные значения: 0, 1, 2, 3, 4, 5, 6"
@@ -942,7 +980,7 @@ msgid ""
 "одного сотрудника запрещено. ({error_str})"
 msgstr ""
 
-#: src/timetable/models.py:835 src/timetable/worker_day/serializers.py:137
+#: src/timetable/models.py:841 src/timetable/worker_day/serializers.py:137
 msgid ""
 "Can't create a working day in the schedule, since the user is not employed "
 "during this period"
@@ -950,111 +988,111 @@ msgstr ""
 "Невозможно создать рабочий день, так как пользователь в этот период не "
 "трудоустроен"
 
-#: src/timetable/models.py:1689
+#: src/timetable/models.py:1695
 msgid "Fact"
 msgstr "Факт"
 
-#: src/timetable/models.py:1690
+#: src/timetable/models.py:1696
 msgid "Main"
 msgstr "Осн"
 
-#: src/timetable/models.py:1691
+#: src/timetable/models.py:1697
 msgid "Additional"
 msgstr "Доп"
 
-#: src/timetable/models.py:1700
+#: src/timetable/models.py:1706
 #, fuzzy
 #| msgid "Timetable"
 msgid "Planned timetable"
 msgstr "Расписание"
 
-#: src/timetable/models.py:1701
+#: src/timetable/models.py:1707
 msgid "Actual timetable"
 msgstr "Фактический график"
 
-#: src/timetable/models.py:1702
+#: src/timetable/models.py:1708
 msgid "Manual changes"
 msgstr "Ручные изменения"
 
-#: src/timetable/models.py:1703
+#: src/timetable/models.py:1709
 msgid "Determined by the system"
 msgstr "Определено системой"
 
-#: src/timetable/models.py:2081 src/timetable/models.py:2109
+#: src/timetable/models.py:2087 src/timetable/models.py:2115
 msgid "You have no active employment"
 msgstr "У вас нет активного трудоустройства"
 
-#: src/timetable/models.py:2370
+#: src/timetable/models.py:2389
 msgid "Automatic create vacancies"
 msgstr "Автоматически создавать вакансии"
 
-#: src/timetable/models.py:2372
+#: src/timetable/models.py:2391
 msgid "Automatic delete vacancies"
 msgstr "Автоматически удалять вакансии"
 
-#: src/timetable/models.py:2374
+#: src/timetable/models.py:2393
 msgid "Automatic check lack timegap"
 msgstr "Период, за который проверяем"
 
-#: src/timetable/models.py:2376
+#: src/timetable/models.py:2395
 msgid "Automatic holiday worker select timegap"
 msgstr "С какого дня выводить с выходного"
 
-#: src/timetable/models.py:2378
+#: src/timetable/models.py:2397
 msgid "Automatic exchange"
 msgstr "Включить автоматическую биржу смен"
 
-#: src/timetable/models.py:2380
+#: src/timetable/models.py:2399
 msgid "Max working hours"
 msgstr "Максимальное количество рабочих часов в месяц для вывода с выходного"
 
-#: src/timetable/models.py:2382
+#: src/timetable/models.py:2401
 msgid "Constraints"
 msgstr "Ограничения"
 
-#: src/timetable/models.py:2383
+#: src/timetable/models.py:2402
 msgid "Exclude positions"
 msgstr "Должности которые не участвуют в обмене сменами"
 
-#: src/timetable/models.py:2385
+#: src/timetable/models.py:2404
 msgid "Automatic create vacancy lack min"
 msgstr "Минимальная потребность в сотруднике при создании вакансии"
 
-#: src/timetable/models.py:2387
+#: src/timetable/models.py:2406
 msgid "Automatic delete vacancy lack max"
 msgstr "Максимальная потребность в сотруднике для удалении вакансии"
 
-#: src/timetable/models.py:2390
+#: src/timetable/models.py:2409
 msgid "Automatic worker select timegap"
 msgstr "Только автоназначение сотрудников"
 
-#: src/timetable/models.py:2392
+#: src/timetable/models.py:2411
 msgid "Automatic worker select timegap to"
 msgstr "Период за который делаем обмен сменами"
 
-#: src/timetable/models.py:2394
+#: src/timetable/models.py:2413
 msgid "Automatic worker select overflow min"
 msgstr "Дробное число, на какую долю сотрудник не занят, чтобы совершить обмен"
 
-#: src/timetable/models.py:2397
+#: src/timetable/models.py:2416
 msgid "Working shift min hours"
 msgstr "Минимальная длина смены"
 
-#: src/timetable/models.py:2398
+#: src/timetable/models.py:2417
 msgid "Working shift max hours"
 msgstr "Максимальная длина смены"
 
-#: src/timetable/models.py:2401
+#: src/timetable/models.py:2420
 msgid "Automatic worker select tree level"
 msgstr ""
 "Расстояние до родителя, в поддереве которого ищем сотрудников для "
 "автоназначения"
 
-#: src/timetable/models.py:2404
+#: src/timetable/models.py:2423
 msgid "Outsourcing companies"
 msgstr "Аутсорс компании"
 
-#: src/timetable/models.py:2405
+#: src/timetable/models.py:2424
 msgid ""
 "Outsourcing companies that will be able to respond to an automatically "
 "created vacancy"
@@ -1062,15 +1100,15 @@ msgstr ""
 "Аутсорс компании, которым можно будет откликаться на автоматически созданную "
 "вакансию"
 
-#: src/timetable/models.py:2434
+#: src/timetable/models.py:2455
 msgid "Create/update"
 msgstr "Создание/изменение"
 
-#: src/timetable/models.py:2436
+#: src/timetable/models.py:2457
 msgid "Remove"
 msgstr "Удаление"
 
-#: src/timetable/models.py:2437
+#: src/timetable/models.py:2458
 msgid "Approve"
 msgstr "Подтверждение"
 

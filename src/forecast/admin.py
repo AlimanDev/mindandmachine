@@ -122,13 +122,44 @@ class LoadTemplateAdmin(admin.ModelAdmin):
 
 @admin.register(OperationTypeTemplate)
 class OperationTypeTemplateAdmin(admin.ModelAdmin):
-    list_display = ('id', 'operation_type_name',)
-    search_fields = ('operation_type_name__name', 'operation_type_name__work_type_name__name')
+    list_display = ('operation_name', 'load_template_name')
+    list_select_related = ('operation_type_name', 'load_template')
+    search_fields = ('operation_type_name__name', 'load_template__name')
+
+    @staticmethod
+    def operation_name(obj: OperationTypeTemplate):
+        return obj.operation_type_name.name
+
+    @staticmethod
+    def load_template_name(obj: OperationTypeTemplate):
+        return obj.load_template.name
+
+    def get_readonly_fields(self, request, obj=None):
+        if obj:
+            return self.readonly_fields + ('operation_type_name', 'load_template')
+        return self.readonly_fields
 
 
 @admin.register(OperationTypeRelation)
 class OperationTypeRelationAdmin(admin.ModelAdmin):
-    list_display = ('id', 'base_id', 'depended_id', 'formula')
+    list_display = ('base_name', 'depended_name', 'type')
+    list_select_related = ('base__operation_type_name', 'depended__operation_type_name')
+    list_filter = (
+        ('base__load_template', RelatedOnlyDropdownNameOrderedFilter),
+    )
+
+    @staticmethod
+    def base_name(obj: OperationTypeRelation):
+        return obj.base.operation_type_name.name
+
+    @staticmethod
+    def depended_name(obj: OperationTypeRelation):
+        return obj.depended.operation_type_name.name
+
+    def get_readonly_fields(self, request, obj=None):
+        if obj:
+            return self.readonly_fields + ('base', 'depended')
+        return self.readonly_fields
 
 
 

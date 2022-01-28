@@ -23,6 +23,8 @@ from src.base.views_abstract import BaseModelViewSet
 class OperationTypeRelationSerializer(serializers.ModelSerializer):
     default_error_messages = {
         "depended_base_same": _("Base and depended demand models cannot be the same."),
+        "base_feature_serie": _("Feature serie cannot have dependences."),
+        "forecast_dependence_only_forecast": _("Forecast dependence cannot be between formula operations."),
         "cycle_relation": _("Demand model cannot depend on itself."),
         "reversed_relation": _("Backward dependency already exists."),
         "not_same_template": _("Base and depended demand models cannot have different templates."),
@@ -42,7 +44,7 @@ class OperationTypeRelationSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = OperationTypeRelation
-        fields = ['id', 'base', 'depended', 'formula', 'depended_id', 'base_id', 'type', 'max_value', 'threshold', 'days_of_week']
+        fields = ['id', 'base', 'depended', 'formula', 'depended_id', 'base_id', 'type', 'max_value', 'threshold', 'days_of_week', 'order']
         validators = [
             UniqueTogetherValidator(
                 queryset=OperationTypeRelation.objects.all(),
@@ -55,9 +57,7 @@ class OperationTypeRelationSerializer(serializers.ModelSerializer):
         
         if not super().is_valid(*args, **kwargs):
             return False
-        lambda_check = r'^(if|else|\+|-|\*|/|\s|a|[0-9]|=|>|<|\.)*'
-        if self.validated_data.get('type', 'F') == OperationTypeRelation.TYPE_PREDICTION:
-            self.validated_data['formula'] = 'a'
+        lambda_check = r'^(if|else|\+|-|\*|/|\s|a|[0-9]|=|>|<|\.|\(|\))*'
         if self.validated_data.get('type', 'F') == OperationTypeRelation.TYPE_FORMULA and not re.fullmatch(lambda_check, self.validated_data.get('formula', '')):
             raise FieldError(self.error_messages["error_in_formula"].format(formula=self.validated_data['formula']), 'formula')
 
@@ -82,6 +82,14 @@ class OperationTypeRelationSerializer(serializers.ModelSerializer):
         base = OperationTypeTemplate.objects.select_related('operation_type_name').get(pk=self.validated_data['base_id'])
         self.validated_data['depended'] = depended
         self.validated_data['base'] = base
+
+        if (base.operation_type_name.do_forecast == OperationTypeName.FEATURE_SERIE):
+            raise FieldError(self.error_messages["base_feature_serie"])
+        
+        if self.validated_data.get('type', 'F') == OperationTypeRelation.TYPE_PREDICTION:
+            self.validated_data['formula'] = ''
+            if OperationTypeName.FORECAST_FORMULA in [base.operation_type_name.do_forecast, depended.operation_type_name.do_forecast]:
+                raise FieldError(self.error_messages["forecast_dependence_only_forecast"])
 
         if (depended.forecast_step == timedelta(hours=1) and not (base.forecast_step in [timedelta(hours=1), timedelta(minutes=30)])) or\
            (depended.forecast_step == timedelta(minutes=30) and not (base.forecast_step in [timedelta(minutes=30)])):

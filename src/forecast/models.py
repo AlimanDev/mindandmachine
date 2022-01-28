@@ -28,14 +28,16 @@ class OperationTypeName(AbstractActiveNetworkSpecificCodeNamedModel):
 
     FORECAST = 'H'
     FORECAST_FORMULA = 'F'
+    FEATURE_SERIE = 'FS'
     FORECAST_CHOICES = (
         (FORECAST, 'Forecast',),
         (FORECAST_FORMULA, 'Formula'),
+        (FEATURE_SERIE, 'Feature serie'),
     )
 
     is_special = models.BooleanField(default=False)
     work_type_name = models.OneToOneField('timetable.WorkTypeName', on_delete=models.PROTECT, null=True, blank=True, related_name='operation_type_name')
-    do_forecast = models.CharField(max_length=1, default=FORECAST, choices=FORECAST_CHOICES)
+    do_forecast = models.CharField(max_length=2, default=FORECAST, choices=FORECAST_CHOICES)
 
     def __str__(self):
         return 'id: {}, name: {}, code: {}'.format(
@@ -145,10 +147,11 @@ class OperationTypeRelation(AbstractModel):
     base = models.ForeignKey(OperationTypeTemplate, on_delete=models.CASCADE, related_name='depends') # child
     depended = models.ForeignKey(OperationTypeTemplate, on_delete=models.CASCADE, related_name='bases') # parent
     formula = models.CharField(max_length=1024, null=True, blank=True)
-    type = models.CharField(max_length=1, default=TYPE_FORMULA)
+    type = models.CharField(max_length=1, default=TYPE_FORMULA, choices=TYPES)
     max_value = models.FloatField(null=True, blank=True)
     threshold = models.FloatField(null=True, blank=True)
     days_of_week = models.CharField(max_length=48, null=True, blank=True, default='[0, 1, 2, 3, 4, 5, 6]')
+    order = models.IntegerField(null=True, blank=True)
 
     def __str__(self):
         text = 'base_id {}, depended_id: {},'.format(
@@ -167,6 +170,11 @@ class OperationTypeRelation(AbstractModel):
         if isinstance(data, str):
             data = json.loads(data or '[]')
         return data or []
+
+    def save(self, *args, **kwargs):
+        if self.type == self.TYPE_CHANGE_WORKLOAD_BETWEEN and self.order is None:
+            self.order = 999
+        return super().save(*args, **kwargs)
 
 
 class OperationTemplate(AbstractActiveNetworkSpecificCodeNamedModel):

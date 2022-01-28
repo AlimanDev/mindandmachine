@@ -49,6 +49,16 @@ class TestLoadTemplate(APITestCase):
             network=self.network,
         )
         self.operation_type_name3 = self.work_type_name2.operation_type_name
+        self.operation_type_name4 = OperationTypeName.objects.create(
+            name='Продажи',
+            do_forecast=OperationTypeName.FEATURE_SERIE,
+            network=self.network,
+        )
+        self.operation_type_name5 = OperationTypeName.objects.create(
+            name='Входящие',
+            do_forecast=OperationTypeName.FORECAST,
+            network=self.network,
+        )
 
         self.load_template = LoadTemplate.objects.create(
             name='Test1',
@@ -66,6 +76,10 @@ class TestLoadTemplate(APITestCase):
         self.operation_type_template3 = OperationTypeTemplate.objects.create(
             load_template=self.load_template,
             operation_type_name=self.operation_type_name3,
+        )
+        self.operation_type_template4 = OperationTypeTemplate.objects.create(
+            load_template=self.load_template,
+            operation_type_name=self.operation_type_name4,
         )
 
         self.client.force_authenticate(user=self.user1)
@@ -127,6 +141,21 @@ class TestLoadTemplate(APITestCase):
                         'code': None,
                         'do_forecast': self.operation_type_name3.do_forecast,
                         'work_type_name_id': self.work_type_name2.id, 
+                    },
+                    'tm_from': None, 
+                    'tm_to': None, 
+                    'forecast_step': '01:00:00',
+                    'const_value': None,
+                },
+                {
+                    'id': self.operation_type_template4.id, 
+                    'load_template_id': self.load_template.id, 
+                    'operation_type_name': {
+                        'id': self.operation_type_name4.id, 
+                        'name': self.operation_type_name4.name, 
+                        'code': None,
+                        'do_forecast': self.operation_type_name4.do_forecast,
+                        'work_type_name_id': None, 
                     },
                     'tm_from': None, 
                     'tm_to': None, 
@@ -204,6 +233,21 @@ class TestLoadTemplate(APITestCase):
                 'forecast_step': '01:00:00',
                 'const_value': None,
             }, 
+            {
+                'id': self.operation_type_template4.id, 
+                'load_template_id': self.load_template.id, 
+                'operation_type_name': {
+                    'id': self.operation_type_name4.id, 
+                    'name': self.operation_type_name4.name, 
+                    'code': None,
+                    'do_forecast': self.operation_type_name4.do_forecast,
+                    'work_type_name_id': None, 
+                },
+                'tm_from': None, 
+                'tm_to': None, 
+                'forecast_step': '01:00:00',
+                'const_value': None,
+            },
         ]
         self.assertEqual(load_template, data)
 
@@ -216,7 +260,7 @@ class TestLoadTemplate(APITestCase):
             response = self.client.post(f'{self.url}apply/', data, format='json')
             self.assertEqual(response.status_code, 200)
 
-            self.assertEqual(OperationType.objects.filter(shop=self.shop).count(), 3)
+            self.assertEqual(OperationType.objects.filter(shop=self.shop).count(), 4)
             self.assertEqual(WorkType.objects.filter(shop=self.shop, dttm_deleted__isnull=True).count(), 2)
             WorkType.objects.filter(shop=self.shop).update(dttm_deleted=datetime.now())
             self.assertEqual(WorkType.objects.filter(shop=self.shop, dttm_deleted__isnull=True).count(), 0)
@@ -226,6 +270,11 @@ class TestLoadTemplate(APITestCase):
 
     def test_prepare_load_template_request(self):
         with self.settings(CELERY_TASK_ALWAYS_EAGER=True):
+            OperationTypeRelation.objects.create(
+                base=self.operation_type_template2,
+                depended=self.operation_type_template4,
+                type=OperationTypeRelation.TYPE_PREDICTION,
+            )
             OperationTypeRelation.objects.create(
                 base=self.operation_type_template1,
                 depended=self.operation_type_template2,
@@ -237,6 +286,7 @@ class TestLoadTemplate(APITestCase):
                 max_value=1.0,
                 threshold=0.4,
                 days_of_week=[1, 2, 4],
+                order=1,
                 type=OperationTypeRelation.TYPE_CHANGE_WORKLOAD_BETWEEN,
             )
             dt_now = datetime.now().date()
@@ -254,22 +304,28 @@ class TestLoadTemplate(APITestCase):
             self.shop.save()
 
             operation_type = OperationType.objects.get(shop=self.shop, operation_type_name=self.operation_type_name2)
-
-            for day in range(2):
-                dt = dt_now + timedelta(days=day)
-                for tm in range(24):
-                    PeriodClients.objects.create(
-                        dttm_forecast=datetime.combine(dt, time(tm)),
-                        value=2.0,
-                        operation_type=operation_type,
-                        type=PeriodClients.FACT_TYPE,
-                    )
+            operation_type2 = OperationType.objects.get(shop=self.shop, operation_type_name=self.operation_type_name4)
+            for ot in [operation_type, operation_type2]:
+                for day in range(2):
+                    dt = dt_now + timedelta(days=day)
+                    for tm in range(24):
+                        PeriodClients.objects.create(
+                            dttm_forecast=datetime.combine(dt, time(tm)),
+                            value=2.0,
+                            operation_type=ot,
+                            type=PeriodClients.FACT_TYPE,
+                        )
             request = prepare_load_template_request(self.load_template.id, self.shop.id, dt_from=dt_now, dt_to=dt_now + timedelta(days=1))
             self.assertEqual(request['shop']['reserve_coef'], 0.2)
             self.assertEqual(len(request['timeserie'][str(self.operation_type_name2.id)]), 48)
-            self.assertEqual(len(request['operation_types']), 3)
+            self.assertEqual(len(request['timeserie'][str(self.operation_type_name4.id)]), 48)
+            self.assertEqual(len(request['operation_types']), 4)
             self.assertEqual(len(request['operation_types'][0]['dependences']), 1)
-            self.assertEqual(len(request['operation_types'][1]['dependences']), 0)            
+            self.assertEqual(request['operation_types'][0]['type'], 'O')
+            self.assertEqual(len(request['operation_types'][1]['dependences']), 1)            
+            self.assertEqual(request['operation_types'][1]['type'], 'F')            
+            self.assertEqual(len(request['operation_types'][3]['dependences']), 0)            
+            self.assertEqual(request['operation_types'][3]['type'], 'FS')            
             self.assertEqual(len(request['change_workload_between']), 1)            
             self.assertEqual(
                 request['change_workload_between'][0], 
@@ -279,6 +335,7 @@ class TestLoadTemplate(APITestCase):
                     'threshold': 0.4, 
                     'max_value': 1.0, 
                     'days_of_week': [1, 2, 4],
+                    'order': 1,
                 }
             )            
 
@@ -377,10 +434,15 @@ class TestLoadTemplate(APITestCase):
         self.assertEqual(WorkType.objects.filter(shop=self.shop).count(), 0)
         self.shop.load_template = self.load_template
         self.shop.save()
-        self.assertEqual(OperationType.objects.filter(shop=self.shop).count(), 3)
+        self.assertEqual(OperationType.objects.filter(shop=self.shop).count(), 4)
         self.assertEqual(WorkType.objects.filter(shop=self.shop).count(), 2)
 
     def test_download_upload(self):
+        OperationTypeRelation.objects.create(
+            base=self.operation_type_template2,
+            depended=self.operation_type_template4,
+            type=OperationTypeRelation.TYPE_PREDICTION,
+        )
         OperationTypeRelation.objects.create(
             base=self.operation_type_template1,
             depended=self.operation_type_template2,
@@ -392,6 +454,7 @@ class TestLoadTemplate(APITestCase):
             max_value=1.0,
             threshold=0.4,
             days_of_week=[1, 2, 4],
+            order=1,
             type=OperationTypeRelation.TYPE_CHANGE_WORKLOAD_BETWEEN,
         )
         response = self.client.get(f'/rest_api/load_template/{self.load_template.id}/download/')
@@ -399,17 +462,43 @@ class TestLoadTemplate(APITestCase):
         df = pd.read_excel(response.content).fillna('')
         data = [
             {
+                'Тип операции': 'Продажи', 
+                'Зависимости': '', 
+                'Формула': '', 
+                'Константа': '', 
+                'Максимальное значение': '', 
+                'Порог': '', 
+                'Порядок': '', 
+                'Дни недели (через запятую)': '', 
+                'Шаг прогноза': '1h', 
+                'Время начала': '', 
+                'Время окончания': '', 
+            }, 
+            {
+                'Тип операции': 'Строительные работы', 
+                'Зависимости': 'Продажи', 
+                'Формула': '', 
+                'Константа': '', 
+                'Максимальное значение': '', 
+                'Порог': '', 
+                'Порядок': '', 
+                'Дни недели (через запятую)': '0,1,2,3,4,5,6', 
+                'Шаг прогноза': '1h', 
+                'Время начала': '', 
+                'Время окончания': '', 
+            }, 
+            {
                 'Тип операции': 'Кассы', 
                 'Зависимости': 'Строительные работы', 
                 'Формула': 'a * 2 + a', 
                 'Константа': '', 
                 'Максимальное значение': '', 
                 'Порог': '', 
+                'Порядок': '', 
                 'Дни недели (через запятую)': '0,1,2,3,4,5,6', 
                 'Шаг прогноза': '1h', 
                 'Время начала': '', 
-                'Время окончания': '', 
-                'Тип работ': 'Кассы'
+                'Время окончания': '',
             }, 
             {
                 'Тип операции': '', 
@@ -418,24 +507,11 @@ class TestLoadTemplate(APITestCase):
                 'Константа': '', 
                 'Максимальное значение': 1.0, 
                 'Порог': 0.4, 
+                'Порядок': 1.0,
                 'Дни недели (через запятую)': '1,2,4', 
                 'Шаг прогноза': '', 
                 'Время начала': '', 
                 'Время окончания': '', 
-                'Тип работ': ''
-            }, 
-            {
-                'Тип операции': 'Строительные работы', 
-                'Зависимости': '', 
-                'Формула': '', 
-                'Константа': '', 
-                'Максимальное значение': '', 
-                'Порог': '', 
-                'Дни недели (через запятую)': '', 
-                'Шаг прогноза': '1h', 
-                'Время начала': '', 
-                'Время окончания': '', 
-                'Тип работ': ''
             }, 
             {
                 'Тип операции': 'ДМ', 
@@ -444,11 +520,11 @@ class TestLoadTemplate(APITestCase):
                 'Константа': '', 
                 'Максимальное значение': '', 
                 'Порог': '', 
+                'Порядок': '', 
                 'Дни недели (через запятую)': '', 
                 'Шаг прогноза': '1h', 
                 'Время начала': '', 
                 'Время окончания': '', 
-                'Тип работ': 'ДМ'
             }
         ]
         self.assertEquals(df.to_dict('records'), data)
@@ -461,22 +537,26 @@ class TestLoadTemplate(APITestCase):
         )
         self.assertEquals(response.status_code, 200)
         lt = LoadTemplate.objects.get(name='Test2')
-        self.assertEquals(OperationTypeTemplate.objects.filter(load_template=lt).count(), 3)
-        self.assertEquals(OperationTypeRelation.objects.filter(base__load_template=lt).count(), 2)
+        self.assertEquals(OperationTypeTemplate.objects.filter(load_template=lt).count(), 4)
+        self.assertEquals(OperationTypeRelation.objects.filter(base__load_template=lt).count(), 3)
         formula_relation = OperationTypeRelation.objects.get(base__load_template=lt, type=OperationTypeRelation.TYPE_FORMULA)
         self.assertEquals(formula_relation.formula, 'a * 2 + a')
         self.assertEquals(formula_relation.days_of_week_list, [])
-        self.assertEquals(formula_relation.base.operation_type_name, self.operation_type_name1)
-        self.assertEquals(formula_relation.depended.operation_type_name, self.operation_type_name2)
+        self.assertEquals(formula_relation.base.operation_type_name_id, self.operation_type_name1.id)
+        self.assertEquals(formula_relation.depended.operation_type_name_id, self.operation_type_name2.id)
         self.assertEquals(formula_relation.max_value, None)
         self.assertEquals(formula_relation.threshold, None)
         change_workload_relation = OperationTypeRelation.objects.get(base__load_template=lt, type=OperationTypeRelation.TYPE_CHANGE_WORKLOAD_BETWEEN)
         self.assertEquals(change_workload_relation.formula, '')
         self.assertEquals(change_workload_relation.days_of_week_list, [1,2,4])
-        self.assertEquals(change_workload_relation.base.operation_type_name, self.operation_type_name1)
-        self.assertEquals(change_workload_relation.depended.operation_type_name, self.operation_type_name3)
+        self.assertEquals(change_workload_relation.base.operation_type_name_id, self.operation_type_name1.id)
+        self.assertEquals(change_workload_relation.depended.operation_type_name_id, self.operation_type_name3.id)
         self.assertEquals(change_workload_relation.max_value, 1.0)
         self.assertEquals(change_workload_relation.threshold, 0.4)
+        self.assertEquals(change_workload_relation.order, 1)
+        forecast_relation = OperationTypeRelation.objects.get(base__load_template=lt, type=OperationTypeRelation.TYPE_PREDICTION)
+        self.assertEquals(forecast_relation.base.operation_type_name_id, self.operation_type_name2.id)
+        self.assertEquals(forecast_relation.depended.operation_type_name_id, self.operation_type_name4.id)
 
     def _test_upload_errors(self, data, error_msg):
         output = BytesIO()
@@ -504,11 +584,11 @@ class TestLoadTemplate(APITestCase):
                 'Константа': '', 
                 'Максимальное значение': '', 
                 'Порог': '', 
+                'Порядок': '', 
                 'Дни недели (через запятую)': '0,1,2,3,4,5,6', 
                 'Шаг прогноза': '', 
                 'Время начала': '', 
                 'Время окончания': '', 
-                'Тип работ': 'Кассы'
             }, 
             {
                 'Тип операции': '', 
@@ -517,11 +597,11 @@ class TestLoadTemplate(APITestCase):
                 'Константа': '', 
                 'Максимальное значение': 1.0, 
                 'Порог': 0.4, 
+                'Порядок': 1, 
                 'Дни недели (через запятую)': '1,2,4', 
                 'Шаг прогноза': '', 
                 'Время начала': '', 
                 'Время окончания': '', 
-                'Тип работ': ''
             }, 
             {
                 'Тип операции': 'Строительные работы', 
@@ -530,11 +610,11 @@ class TestLoadTemplate(APITestCase):
                 'Константа': '', 
                 'Максимальное значение': '', 
                 'Порог': '', 
+                'Порядок': '', 
                 'Дни недели (через запятую)': '', 
                 'Шаг прогноза': '1h', 
                 'Время начала': '', 
                 'Время окончания': '', 
-                'Тип работ': ''
             }, 
             {
                 'Тип операции': 'ДМ', 
@@ -543,22 +623,48 @@ class TestLoadTemplate(APITestCase):
                 'Константа': '', 
                 'Максимальное значение': '', 
                 'Порог': '', 
+                'Порядок': '', 
                 'Дни недели (через запятую)': '', 
                 'Шаг прогноза': '1h', 
                 'Время начала': '', 
                 'Время окончания': '', 
-                'Тип работ': 'ДМ'
-            }
+            },
+            {
+                'Тип операции': 'Продажи', 
+                'Зависимости': '', 
+                'Формула': '', 
+                'Константа': '', 
+                'Максимальное значение': '', 
+                'Порог': '', 
+                'Порядок': '', 
+                'Дни недели (через запятую)': '', 
+                'Шаг прогноза': '1h', 
+                'Время начала': '', 
+                'Время окончания': '', 
+            },
         ]
-        self._test_upload_errors(data, ['Шаг прогноза обязателен. Строка 2.'])
+        self._test_upload_errors(data, ['Ошибка в строке 2. Шаг прогноза обязателен.'])
         data[0]['Шаг прогноза'] = '11h'
-        self._test_upload_errors(data, ['Шаг прогноза 11h не является валидным, следует выбрать из 1h, 30min, 1d.'])
+        self._test_upload_errors(data, ['Ошибка в строке 2. Шаг прогноза 11h не является валидным, следует выбрать из 1h, 30min, 1d.'])
         data[0]['Шаг прогноза'] = '1h'
+        data[0]['Формула'] = ''
+        self._test_upload_errors(data, ['Ошибка в строке 2. Формула обязательна в отношении Кассы -> Строительные работы'])
+        data[0]['Формула'] = 'a * 2 , a'
+        self._test_upload_errors(data, ['Ошибка в строке 2. Ошибка в формуле: a * 2 , a'])
+        data[0]['Формула'] = 'a * 2 + a'
+        data[4]['Зависимости'] = 'Строительные работы'
+        self._test_upload_errors(data, ['Ошибка в строке 6. Тип операции для помощи в прогнозе Продажи не может иметь зависимостей.'])
+        data[4]['Зависимости'] = ''
+        data[3]['Зависимости'] = 'Входящие'
+        self._test_upload_errors(data, ['Данные типы операций есть в зависимостях, но отсутствуют в списке операций: Входящие.'])
+        data[3]['Зависимости'] = ''
+        data[2]['Зависимости'] = 'ДМ'
+        self._test_upload_errors(data, ['Ошибка в строке 4. Прогнозируемый тип Строительные работы не может зависеть от ДМ с типом расчета по формуле.'])
         data[1]['Максимальное значение'] = ''
-        self._test_upload_errors(data, ["Для отношения 'перекидывание нагрузки между типами работ' максимальное значение обязательны."])
+        self._test_upload_errors(data, ["Ошибка в строке 3. Для отношения 'перекидывание нагрузки между типами работ' максимальное значение обязательны."])
         data[1]['Порог'] = ''
         data[1]['Дни недели (через запятую)'] = ''
-        self._test_upload_errors(data, ["Некорректное значение дней недели '', должны быть целочисленные значения от 0 до 6, разделенные запятой."])
+        self._test_upload_errors(data, ["Ошибка в строке 3. Некорректное значение дней недели '', должны быть целочисленные значения от 0 до 6, разделенные запятой."])
         data[1]['Дни недели (через запятую)'] = '1,2'
-        self._test_upload_errors(data, ["Для отношения 'перекидывание нагрузки между типами работ' максимальное значение, порог обязательны."])
+        self._test_upload_errors(data, ["Ошибка в строке 3. Для отношения 'перекидывание нагрузки между типами работ' максимальное значение, порог обязательны."])
         

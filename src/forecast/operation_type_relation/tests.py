@@ -126,7 +126,8 @@ class TestOperationTypeRelation(APITestCase):
             'type': 'F',
             'max_value': None,
             'threshold': None,
-            'days_of_week': [0, 1, 2, 3, 4, 5, 6]
+            'days_of_week': [0, 1, 2, 3, 4, 5, 6],
+            'order': None,
         }
         self.assertEqual(response.json(), data)
 
@@ -186,7 +187,8 @@ class TestOperationTypeRelation(APITestCase):
             'type': 'F',
             'max_value': None,
             'threshold': None,
-            'days_of_week': [0, 1, 2, 3, 4, 5, 6]
+            'days_of_week': [0, 1, 2, 3, 4, 5, 6],
+            'order': None,
         }
         self.assertEqual(operation_type_relataion, data)
 
@@ -249,7 +251,8 @@ class TestOperationTypeRelation(APITestCase):
             'type': 'C',
             'max_value': 1.0,
             'threshold': 0.3,
-            'days_of_week': [1, 2, 3]
+            'days_of_week': [1, 2, 3],
+            'order': 999,
         }
         self.assertEqual(operation_type_relataion, data)
         data = {
@@ -259,6 +262,7 @@ class TestOperationTypeRelation(APITestCase):
             'max_value': 1.0,
             'threshold': 0.5,
             'days_of_week': [0, 1, 2, 6],
+            'order': 1,
         }
         response = self.client.post(self.url, data, format='json')
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
@@ -299,7 +303,8 @@ class TestOperationTypeRelation(APITestCase):
             'type': 'C',
             'max_value': 1.0,
             'threshold': 0.5,
-            'days_of_week': [0, 1, 2, 6]
+            'days_of_week': [0, 1, 2, 6],
+            'order': 1,
         }
         self.assertEqual(operation_type_relataion, data)
 
@@ -437,10 +442,10 @@ class TestOperationTypeRelation(APITestCase):
         data = {
             'base_id': op_temp1.id,
             'depended_id': op_temp2.id,
-            'formula': 'a + a ( 2'
+            'formula': 'a + a , 2'
         }
         response = self.client.post(self.url, data, format='json')
-        self.assertEqual(response.json(), {'formula': 'Ошибка в формуле: a + a ( 2'})
+        self.assertEqual(response.json(), {'formula': 'Ошибка в формуле: a + a , 2'})
 
 
     def test_base_depended_same(self):
