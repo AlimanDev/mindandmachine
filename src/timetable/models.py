@@ -1149,6 +1149,32 @@ class WorkerDay(AbstractModel):
 
     def get_department(self):
         return self.shop
+    
+    @classmethod
+    def get_overlap_qs(cls, user_id=OuterRef('employee__user_id')):
+        return cls.objects.filter(
+            ~Q(id=OuterRef('id')),
+            Q(
+                Q(dttm_work_end__lt=OuterRef('dttm_work_start')) &
+                Q(dttm_work_start__gte=OuterRef('dttm_work_start'))
+            ) |
+            Q(
+                Q(dttm_work_start__lt=OuterRef('dttm_work_end')) &
+                Q(dttm_work_end__gte=OuterRef('dttm_work_end'))
+            ) |
+            Q(
+                Q(dttm_work_start__gte=OuterRef('dttm_work_start')) &
+                Q(dttm_work_end__lte=OuterRef('dttm_work_end'))
+            ) |
+            Q(
+                Q(dttm_work_start__lte=OuterRef('dttm_work_start')) &
+                Q(dttm_work_end__gte=OuterRef('dttm_work_end'))
+            ),
+            employee__user_id=user_id,
+            dt=OuterRef('dt'),
+            is_fact=OuterRef('is_fact'),
+            is_approved=OuterRef('is_approved'),
+        )
 
     @classmethod
     def get_breaktime(cls, network_id, break_calc_field_name):
@@ -1325,31 +1351,7 @@ class WorkerDay(AbstractModel):
             q &= employee_days_q
 
         overlaps_qs = cls.objects.filter(q).annotate(
-            has_overlap=Exists(
-                WorkerDay.objects.filter(
-                    ~Q(id=OuterRef('id')),
-                    Q(
-                        Q(dttm_work_end__lt=OuterRef('dttm_work_start')) &
-                        Q(dttm_work_start__gte=OuterRef('dttm_work_start'))
-                    ) |
-                    Q(
-                        Q(dttm_work_start__lt=OuterRef('dttm_work_end')) &
-                        Q(dttm_work_end__gte=OuterRef('dttm_work_end'))
-                    ) |
-                    Q(
-                        Q(dttm_work_start__gte=OuterRef('dttm_work_start')) &
-                        Q(dttm_work_end__lte=OuterRef('dttm_work_end'))
-                    ) |
-                    Q(
-                        Q(dttm_work_start__lte=OuterRef('dttm_work_start')) &
-                        Q(dttm_work_end__gte=OuterRef('dttm_work_end'))
-                    ),
-                    employee__user_id=OuterRef('employee__user_id'),
-                    dt=OuterRef('dt'),
-                    is_fact=OuterRef('is_fact'),
-                    is_approved=OuterRef('is_approved'),
-                )
-            )
+            has_overlap=Exists(cls.get_overlap_qs())
         ).filter(
             has_overlap=True,
         ).values('employee__user__last_name', 'employee__user__first_name', 'dt').distinct()

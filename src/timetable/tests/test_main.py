@@ -4935,7 +4935,9 @@ class TestVacancy(TestsHelperMixin, APITestCase):
         response = self.client.get(f'{self.url}?shop_id={self.shop.id}&limit=100')
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.json()['results']), 5)
-        self.assertEqual(response.json()['results'][0]['comment'], 'Test')
+        vacanct_vacancy_resp = list(filter(lambda x: x['id'] == vacanct_vacancy.id, response.json()['results']))
+        self.assertEqual(len(vacanct_vacancy_resp), 1)
+        self.assertEqual(vacanct_vacancy_resp[0]['comment'], 'Test')
         self.assertCountEqual(
             list(map(lambda x: x['id'], response.json()['results'])), 
             [vacanct_vacancy.id, own_vacancy.id, outsource_vacancy.id, subordinate_vacancy.id, not_subordinate__in_own_shop_vacancy.id],
