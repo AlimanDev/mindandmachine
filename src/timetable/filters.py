@@ -195,29 +195,6 @@ class VacancyFilter(FilterSetWithInitial):
                 type__is_work_hours=True,
                 is_vacancy=False,
             )
-            overlap_qs = WorkerDay.objects.filter(
-                ~Q(id=OuterRef('id')),
-                Q(
-                    Q(dttm_work_end__lt=OuterRef('dttm_work_start')) &
-                    Q(dttm_work_start__gte=OuterRef('dttm_work_start'))
-                ) |
-                Q(
-                    Q(dttm_work_start__lt=OuterRef('dttm_work_end')) &
-                    Q(dttm_work_end__gte=OuterRef('dttm_work_end'))
-                ) |
-                Q(
-                    Q(dttm_work_start__gte=OuterRef('dttm_work_start')) &
-                    Q(dttm_work_end__lte=OuterRef('dttm_work_end'))
-                ) |
-                Q(
-                    Q(dttm_work_start__lte=OuterRef('dttm_work_start')) &
-                    Q(dttm_work_end__gte=OuterRef('dttm_work_end'))
-                ),
-                employee__user_id=self.request.user.id,
-                dt=OuterRef('dt'),
-                is_fact=OuterRef('is_fact'),
-                is_approved=OuterRef('is_approved'),
-            )
             current_network_filter = Q(shop__network_id=self.request.user.network_id, approved_exists=True)
             if not self.request.user.network.allow_workers_confirm_outsource_vacancy:
                 current_network_filter &= ~Q(is_outsource=True)
@@ -225,7 +202,7 @@ class VacancyFilter(FilterSetWithInitial):
                 approved_exists=Exists(approved_subq),
                 active_employment_exists=Exists(active_employment_subq),
                 worker_day_type_paid=Exists(worker_day_paid_subq),
-                has_overlap=Exists(overlap_qs),
+                has_overlap=Exists(WorkerDay.get_overlap_qs(self.request.user.id)),
             ).filter(
                 current_network_filter | 
                 Q(is_outsource=True) & ~Q(shop__network_id=self.request.user.network_id), # аутсорс фильтр
