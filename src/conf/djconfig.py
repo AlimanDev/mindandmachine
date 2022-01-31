@@ -89,6 +89,7 @@ INSTALLED_APPS = [
     'src.tasks',
     'polymorphic',
     'src.exchange',
+    'src.pbi',
 ]
 
 REST_FRAMEWORK = {

@@ -156,6 +156,7 @@ class NetworkSerializer(serializers.ModelSerializer):
             'show_employee_shift_schedule_tab',
             'rebuild_timetable_min_delta',
             'analytics_iframe',
+            'analytics_type',
         ]
 
 class NetworkListSerializer(serializers.Serializer):

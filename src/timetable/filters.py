@@ -193,6 +193,7 @@ class VacancyFilter(FilterSetWithInitial):
                 is_approved=True,
                 is_fact=False,
                 type__is_work_hours=True,
+                is_vacancy=False,
             )
             current_network_filter = Q(shop__network_id=self.request.user.network_id, approved_exists=True)
             if not self.request.user.network.allow_workers_confirm_outsource_vacancy:
@@ -201,10 +202,12 @@ class VacancyFilter(FilterSetWithInitial):
                 approved_exists=Exists(approved_subq),
                 active_employment_exists=Exists(active_employment_subq),
                 worker_day_type_paid=Exists(worker_day_paid_subq),
+                has_overlap=Exists(WorkerDay.get_overlap_qs(self.request.user.id)),
             ).filter(
                 current_network_filter | 
                 Q(is_outsource=True) & ~Q(shop__network_id=self.request.user.network_id), # аутсорс фильтр
                 active_employment_exists=True,
+                has_overlap=False,
                 worker_day_type_paid=False,
                 is_approved=True,
                 employee__isnull=True,
