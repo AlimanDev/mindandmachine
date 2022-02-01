@@ -629,6 +629,8 @@ class WorkersStatsGetter:
                 any_day_count_outside_of_selected_period[wd_dict['dt__month']] = any_day_count_outside_of_selected_period.get(
                     wd_dict['dt__month'], 0) + wd_dict['any_day_count_outside_of_selected_period']
 
+        reduce_norm_types = list(WorkerDayType.objects.filter(is_reduce_norm=True).values_list('code', flat=True))
+
         prod_cal_qs = ProdCal.objects.filter(
             dt__gte=acc_period_dt_from,
             dt__lte=acc_period_dt_to,
@@ -646,7 +648,7 @@ class WorkersStatsGetter:
                 dt=OuterRef('dt'),
                 is_fact=False,
                 is_approved=True,
-                type__is_reduce_norm=True,
+                type_id__in=reduce_norm_types,
             )),
             vacation_or_sick_plan_approved_count=Count(Subquery(WorkerDay.objects.filter(
                 employee_id=OuterRef('employee_id'),
@@ -654,7 +656,7 @@ class WorkersStatsGetter:
                 dt=OuterRef('dt'),
                 is_fact=False,
                 is_approved=True,
-                type__is_reduce_norm=True,
+                type_id__in=reduce_norm_types,
             ).values('id')[:1])),
             vacation_or_sick_plan_approved_count_selected_period=Count(Subquery(WorkerDay.objects.filter(
                 selected_period_q,
@@ -663,7 +665,7 @@ class WorkersStatsGetter:
                 dt=OuterRef('dt'),
                 is_fact=False,
                 is_approved=True,
-                type__is_reduce_norm=True,
+                type_id__in=reduce_norm_types,
             ).values('id')[:1])),
             has_vacation_or_sick_plan_not_approved=Exists(WorkerDay.objects.filter(
                 employee_id=OuterRef('employee_id'),
@@ -671,7 +673,7 @@ class WorkersStatsGetter:
                 dt=OuterRef('dt'),
                 is_fact=False,
                 is_approved=False,
-                type__is_reduce_norm=True,
+                type_id__in=reduce_norm_types,
             )),
             vacation_or_sick_plan_not_approved_count=Count(Subquery(WorkerDay.objects.filter(
                 employee_id=OuterRef('employee_id'),
@@ -679,7 +681,7 @@ class WorkersStatsGetter:
                 dt=OuterRef('dt'),
                 is_fact=False,
                 is_approved=False,
-                type__is_reduce_norm=True,
+                type_id__in=reduce_norm_types,
             ).values('id')[:1])),
             vacation_or_sick_plan_not_approved_count_selected_period=Count(Subquery(WorkerDay.objects.filter(
                 selected_period_q,
@@ -688,7 +690,7 @@ class WorkersStatsGetter:
                 dt=OuterRef('dt'),
                 is_fact=False,
                 is_approved=False,
-                type__is_reduce_norm=True,
+                type_id__in=reduce_norm_types,
             ).values('id')[:1])),
             norm_hours_acc_period=Coalesce(
                 Sum('norm_hours'), 0.0),
