@@ -88,7 +88,6 @@ class Network(AbstractActiveModel):
         ('pdf', 'PDF'),
     )
 
-
     ROUND_TO_HALF_AN_HOUR = 0
     ROUND_WH_ALGS = {
         ROUND_TO_HALF_AN_HOUR: lambda wh: round(wh * 2) / 2,
@@ -269,10 +268,20 @@ class Network(AbstractActiveModel):
     api_timesheet_lines_group_by = models.PositiveSmallIntegerField(
         verbose_name='Группировать данные табеля в api методе /rest_api/timesheet/lines/ по',
         choices=TIMESHEET_LINES_GROUP_BY_CHOICES, default=TIMESHEET_LINES_GROUP_BY_EMPLOYEE_POSITION_SHOP)
-    
     show_cost_for_inner_vacancies = models.BooleanField('Отображать поле "стоимость работ" для внутренних вакансий', default=False)
-
     rebuild_timetable_min_delta = models.IntegerField(default=2, verbose_name='Минимальное время для составления графика')
+
+    ANALYTICS_TYPE_METABASE = 'metabase'
+    ANALYTICS_TYPE_CUSTOM_IFRAME = 'custom_iframe'
+    ANALYTICS_TYPE_POWER_BI_EMBED = 'power_bi_embed'
+
+    ANALYTICS_TYPE_CHOICES = (
+        (ANALYTICS_TYPE_METABASE, 'Метабейз'),
+        (ANALYTICS_TYPE_CUSTOM_IFRAME, 'Кастомный iframe (из json настройки analytics_iframe)'),
+        (ANALYTICS_TYPE_POWER_BI_EMBED, 'Power BI через получение embed токена'),
+    )
+    analytics_type = models.CharField(
+        verbose_name='Вид аналитики', max_length=32, choices=ANALYTICS_TYPE_CHOICES, default=ANALYTICS_TYPE_METABASE)
 
     DEFAULT_NIGHT_EDGES = (
         '22:00:00',
@@ -329,6 +338,12 @@ class Network(AbstractActiveModel):
 
     def __str__(self):
         return f'name: {self.name}, code: {self.code}'
+
+    def clean(self):
+        if self.analytics_type == Network.ANALYTICS_TYPE_CUSTOM_IFRAME:
+            analytics_iframe = self.settings_values_prop.get('analytics_iframe')
+            if not analytics_iframe:
+                raise DjangoValidationError('Необходимо заполнить analytics_iframe в значениях настроек')
 
 
 class NetworkConnect(AbstractActiveModel):
@@ -1987,6 +2002,7 @@ class ShiftScheduleInterval(AbstractModel):
         if self.code:
             s += f' ({self.code})'
         return s
+
 
 class ContentBlock(AbstractActiveNetworkSpecificCodeNamedModel):
     name = models.CharField(max_length=128, verbose_name='Имя текстового блока')
