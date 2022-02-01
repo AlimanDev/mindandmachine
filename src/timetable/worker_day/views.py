@@ -1219,7 +1219,7 @@ class WorkerDayViewSet(BaseModelViewSet):
                         canceled=wd.canceled,
                         parent_worker_day_id=wd.id,
                         closest_plan_approved_id=wd.id if (
-                                is_copying_to_fact and wd.is_plan and wd.is_approved) else None,
+                                is_copying_to_fact and wd.is_plan and wd.is_approved) else wd.closest_plan_approved_id,
                         need_count_wh=True,
                         source=data['source'],
                     )
