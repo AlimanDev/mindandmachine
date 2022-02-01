@@ -59,6 +59,11 @@ class TestLoadTemplate(APITestCase):
             do_forecast=OperationTypeName.FORECAST,
             network=self.network,
         )
+        self.operation_type_name6 = OperationTypeName.objects.create(
+            name='Пробитие чека',
+            do_forecast=OperationTypeName.FORECAST_FORMULA,
+            network=self.network,
+        )
 
         self.load_template = LoadTemplate.objects.create(
             name='Test1',
@@ -278,7 +283,7 @@ class TestLoadTemplate(APITestCase):
             OperationTypeRelation.objects.create(
                 base=self.operation_type_template1,
                 depended=self.operation_type_template2,
-                formula='lambda a: a * 2 + a',
+                formula='a * 2 + a',
             )
             OperationTypeRelation.objects.create(
                 base=self.operation_type_template1,
@@ -345,7 +350,7 @@ class TestLoadTemplate(APITestCase):
             OperationTypeRelation.objects.create(
                 base=self.operation_type_template1,
                 depended=self.operation_type_template2,
-                formula='lambda a: a * 2 + a',
+                formula='a * 2 + a',
             )
             dt_now = datetime.now().date()
             self.shop.load_template = self.load_template
@@ -482,7 +487,7 @@ class TestLoadTemplate(APITestCase):
                 'Максимальное значение': '', 
                 'Порог': '', 
                 'Порядок': '', 
-                'Дни недели (через запятую)': '0,1,2,3,4,5,6', 
+                'Дни недели (через запятую)': '', 
                 'Шаг прогноза': '1h', 
                 'Время начала': '', 
                 'Время окончания': '', 
@@ -495,7 +500,7 @@ class TestLoadTemplate(APITestCase):
                 'Максимальное значение': '', 
                 'Порог': '', 
                 'Порядок': '', 
-                'Дни недели (через запятую)': '0,1,2,3,4,5,6', 
+                'Дни недели (через запятую)': '', 
                 'Шаг прогноза': '1h', 
                 'Время начала': '', 
                 'Время окончания': '',
@@ -617,6 +622,19 @@ class TestLoadTemplate(APITestCase):
                 'Время окончания': '', 
             }, 
             {
+                'Тип операции': 'Пробитие чека', 
+                'Зависимости': '', 
+                'Формула': '', 
+                'Константа': '', 
+                'Максимальное значение': '', 
+                'Порог': '', 
+                'Порядок': '', 
+                'Дни недели (через запятую)': '', 
+                'Шаг прогноза': '1h', 
+                'Время начала': '', 
+                'Время окончания': '', 
+            }, 
+            {
                 'Тип операции': 'ДМ', 
                 'Зависимости': '', 
                 'Формула': '', 
@@ -652,19 +670,27 @@ class TestLoadTemplate(APITestCase):
         data[0]['Формула'] = 'a * 2 , a'
         self._test_upload_errors(data, ['Ошибка в строке 2. Ошибка в формуле: a * 2 , a'])
         data[0]['Формула'] = 'a * 2 + a'
-        data[4]['Зависимости'] = 'Строительные работы'
-        self._test_upload_errors(data, ['Ошибка в строке 6. Тип операции для помощи в прогнозе Продажи не может иметь зависимостей.'])
+        data[5]['Зависимости'] = 'Строительные работы'
+        self._test_upload_errors(data, ['Ошибка в строке 7. Тип операции для помощи в прогнозе Продажи не может иметь зависимостей.'])
+        data[5]['Зависимости'] = ''
+        data[4]['Зависимости'] = 'Продажи'
+        data[4]['Формула'] = 'a * 2'
+        self._test_upload_errors(data, ['Ошибка в строке 6. Только прогнозируемые типы операций могут зависеть от операций для помощи в прогнозе.'])
         data[4]['Зависимости'] = ''
-        data[3]['Зависимости'] = 'Входящие'
+        data[4]['Формула'] = ''
+        data[3]['Зависимости'] = 'ДМ'
+        data[3]['Формула'] = 'a * 2'
+        self._test_upload_errors(data, ['Ошибка в строке 5. Тип операции Пробитие чека не может зависеть от типа работ ДМ.'])
+        data[3]['Завивимости'] = ''
+        data[3]['Формула'] = ''
+        data[4]['Зависимости'] = 'Входящие'
         self._test_upload_errors(data, ['Данные типы операций есть в зависимостях, но отсутствуют в списке операций: Входящие.'])
-        data[3]['Зависимости'] = ''
+        data[4]['Зависимости'] = ''
         data[2]['Зависимости'] = 'ДМ'
         self._test_upload_errors(data, ['Ошибка в строке 4. Прогнозируемый тип Строительные работы не может зависеть от ДМ с типом расчета по формуле.'])
         data[1]['Максимальное значение'] = ''
         self._test_upload_errors(data, ["Ошибка в строке 3. Для отношения 'перекидывание нагрузки между типами работ' максимальное значение обязательны."])
         data[1]['Порог'] = ''
-        data[1]['Дни недели (через запятую)'] = ''
-        self._test_upload_errors(data, ["Ошибка в строке 3. Некорректное значение дней недели '', должны быть целочисленные значения от 0 до 6, разделенные запятой."])
         data[1]['Дни недели (через запятую)'] = '1,2'
         self._test_upload_errors(data, ["Ошибка в строке 3. Для отношения 'перекидывание нагрузки между типами работ' максимальное значение, порог обязательны."])
         

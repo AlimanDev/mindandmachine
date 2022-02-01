@@ -1,11 +1,14 @@
+import re
 from dateutil.relativedelta import relativedelta
-from django.db import models
+from django.db import models, transaction
 from django.db.models.aggregates import Max, Min
 from django.utils.functional import cached_property
+from django.utils.translation import gettext as _
+from rest_framework import serializers
 import json
 
 from src.base import models_utils
-import datetime
+from datetime import timedelta, date, datetime, time
 from django.utils import timezone
 
 from src.base.models_abstract import AbstractModel, AbstractActiveModel, AbstractActiveNetworkSpecificCodeNamedModel
@@ -45,6 +48,11 @@ class OperationTypeName(AbstractActiveNetworkSpecificCodeNamedModel):
             self.name,
             self.code,
         )
+
+    def save(self, *args, **kwargs):
+        if self.work_type_name_id:
+            self.do_forecast = self.FORECAST_FORMULA
+        return super().save(*args, **kwargs)
 
 
 class LoadTemplate(AbstractModel):
@@ -118,7 +126,7 @@ class OperationTypeTemplate(AbstractModel):
     operation_type_name = models.ForeignKey(OperationTypeName, on_delete=models.PROTECT)
     tm_from = models.TimeField(null=True, blank=True)
     tm_to = models.TimeField(null=True, blank=True)
-    forecast_step = models.DurationField(default=datetime.timedelta(hours=1))
+    forecast_step = models.DurationField(default=timedelta(hours=1))
     const_value = models.FloatField(null=True, blank=True)
 
     def __str__(self):
@@ -166,15 +174,167 @@ class OperationTypeRelation(AbstractModel):
 
     @cached_property
     def days_of_week_list(self):
+        available_days_of_week = {0, 1, 2, 3, 4, 5, 6}
         data = self.days_of_week
         if isinstance(data, str):
             data = json.loads(data or '[]')
-        return data or []
+        return list(set(data).intersection(available_days_of_week))
+    
+    def _enrich_error_msg(self, msg):
+        row = self.row
+        if row:
+            row = _('Error in row {}.').format(row) + ' '
+        return (row or '') + msg
+
+    def __init__(self, *args, **kwargs):
+        self.row = kwargs.pop('row', None)
+        super().__init__(*args, **kwargs)
+
+    def get_relation_type(self):
+        base = self.base
+        depended = self.depended
+        type = None
+
+        is_base_work_type = bool(base.operation_type_name.work_type_name_id)
+        is_depended_work_type = bool(depended.operation_type_name.work_type_name_id)
+
+        types_coniditions = [
+            (
+                self.formula and base.operation_type_name.do_forecast == OperationTypeName.FORECAST_FORMULA and\
+                depended.operation_type_name.do_forecast in [OperationTypeName.FORECAST_FORMULA, OperationTypeName.FORECAST] and\
+                not is_depended_work_type,
+                self.TYPE_FORMULA,
+            ),
+            (
+                base.operation_type_name.do_forecast == OperationTypeName.FORECAST_FORMULA and (
+                    is_base_work_type and is_depended_work_type
+                ) and self.max_value and self.threshold and self.days_of_week,
+                self.TYPE_CHANGE_WORKLOAD_BETWEEN,
+            ),
+            (
+                base.operation_type_name.do_forecast == OperationTypeName.FORECAST and\
+                depended.operation_type_name.do_forecast in [OperationTypeName.FORECAST, OperationTypeName.FEATURE_SERIE],
+                self.TYPE_PREDICTION,
+            )
+        ]
+        for condition, t in types_coniditions:
+            if condition:
+                type = t
+                break
+        
+        if not type:
+            change_workload_between_required_errors = [
+                (self.max_value, _('max value')),
+                (self.threshold, _('threshold')),
+                (self.days_of_week, _('days of week')),
+            ]
+            check_conditions = [
+                (
+                    base.operation_type_name.do_forecast == OperationTypeName.FORECAST_FORMULA and\
+                    depended.operation_type_name.do_forecast in [OperationTypeName.FORECAST_FORMULA, OperationTypeName.FORECAST] and\
+                    not is_depended_work_type and not self.formula,
+                    self._enrich_error_msg(_('Formula required in relation {} -> {}').format(base.operation_type_name.name, depended.operation_type_name.name)),
+                ),
+                (
+                    base.operation_type_name.do_forecast == OperationTypeName.FORECAST_FORMULA and (
+                        is_base_work_type and is_depended_work_type
+                    ) and not (self.max_value and self.threshold and self.days_of_week),
+                    self._enrich_error_msg(
+                        _("For relation 'change workload between' {} are required.").format(
+                            ', '.join([msg for cond, msg in change_workload_between_required_errors if not cond])
+                        )
+                    ),
+                ),
+                (
+                    base.operation_type_name.do_forecast == OperationTypeName.FORECAST and\
+                    depended.operation_type_name.do_forecast == OperationTypeName.FORECAST_FORMULA,
+                    self._enrich_error_msg(_(
+                            'Forecast type {} cannot be depended from {} with formula type.'
+                        ).format(base.operation_type_name.name, depended.operation_type_name.name)
+                    ),
+                ),
+                (
+                    not is_base_work_type and is_depended_work_type,
+                    self._enrich_error_msg(_('Operation type {} cannot be depended from work type {}.').format(base.operation_type_name.name, depended.operation_type_name.name)),
+                ),
+                (
+                    base.operation_type_name.do_forecast != OperationTypeName.FORECAST and\
+                    depended.operation_type_name.do_forecast == OperationTypeName.FEATURE_SERIE,
+                    self._enrich_error_msg(_('Only forecast types can depend from feature serie.')),
+                ),
+                (
+                    base.operation_type_name.do_forecast == OperationTypeName.FEATURE_SERIE,
+                    self._enrich_error_msg(_('Feature serie {} cannot have dependences.').format(base.operation_type_name.name)),
+                )
+            ]
+            for condition, error_msg in check_conditions:
+                if condition:
+                    raise serializers.ValidationError(error_msg)
+        
+        return type
+
+    def _check_relations(self, base_id, depended_id):
+        relations = self.relations.get(depended_id)
+        if not relations:
+            return
+        else:
+            for relation in relations:
+                if relation == base_id:
+                    raise serializers.ValidationError(self._enrich_error_msg(_("Demand model cannot depend on itself.")))
+                else:
+                    self._check_relations(base_id, relation)
+    
+    def check_reverse_relation(self):
+        from src.forecast.load_template.utils import create_operation_type_relations_dict
+        if OperationTypeRelation.objects.filter(base_id=self.depended_id, depended_id=self.base_id).exists():
+            raise serializers.ValidationError(self._enrich_error_msg(_("Backward dependency already exists.")))
+        self.relations = create_operation_type_relations_dict(self.base.load_template_id)
+
+        self._check_relations(self.base_id, self.depended_id)
 
     def save(self, *args, **kwargs):
-        if self.type == self.TYPE_CHANGE_WORKLOAD_BETWEEN and self.order is None:
-            self.order = 999
-        return super().save(*args, **kwargs)
+        if self.depended_id == self.base_id:
+            raise serializers.ValidationError(self._enrich_error_msg(_("Base and depended demand models cannot be the same.")))
+
+        if (self.depended.load_template_id != self.base.load_template_id):
+            raise serializers.ValidationError(self._enrich_error_msg(_("Base and depended demand models cannot have different templates.")))
+
+        if (self.depended.forecast_step == timedelta(hours=1) and not (self.base.forecast_step in [timedelta(hours=1), timedelta(minutes=30)])) or\
+           (self.depended.forecast_step == timedelta(minutes=30) and not (self.base.forecast_step in [timedelta(minutes=30)])):
+            raise serializers.ValidationError(
+                self._enrich_error_msg(
+                    _("Depended must have same or bigger forecast step, got {} -> {}").format(
+                        self.depended.forecast_step, self.base.forecast_step,
+                    )
+                )
+            )
+
+        self.days_of_week = self.days_of_week_list
+        self.type = self.get_relation_type()
+        if self.type == self.TYPE_FORMULA:
+            lambda_check = r'^(if|else|\+|-|\*|/|\s|a|[0-9]|=|>|<|\.|\(|\))*'
+            if not re.fullmatch(lambda_check, self.formula):
+                raise serializers.ValidationError(
+                    self._enrich_error_msg(_("Error in formula: {formula}.").format(formula=self.formula))
+                )
+            self.max_value = None
+            self.threshold = None
+            self.order = None
+            self.days_of_week = []
+        elif self.type == self.TYPE_PREDICTION:
+            self.formula = None
+            self.max_value = None
+            self.threshold = None
+            self.order = None
+            self.days_of_week = []
+        elif self.type == self.TYPE_CHANGE_WORKLOAD_BETWEEN:
+            if not self.order:
+                self.order = 999
+        
+        with transaction.atomic():
+            super().save(*args, **kwargs)
+            if not self.type == self.TYPE_CHANGE_WORKLOAD_BETWEEN:
+                self.check_reverse_relation()
 
 
 class OperationTemplate(AbstractActiveNetworkSpecificCodeNamedModel):
@@ -260,11 +420,11 @@ class OperationTemplate(AbstractActiveNetworkSpecificCodeNamedModel):
 
     def generate_dates(self, dt_from, dt_to):
         def generate_times(dt, step):
-            dt0 = datetime.datetime.combine(dt, self.tm_start)
-            dt1 = datetime.datetime.combine(dt, self.tm_end)
+            dt0 = datetime.combine(dt, self.tm_start)
+            dt1 = datetime.combine(dt, self.tm_end)
             while dt0 < dt1:
                 yield dt0
-                dt0 += datetime.timedelta(minutes=step)
+                dt0 += timedelta(minutes=step)
 
         days_in_period = self.days_in_period
         shop = self.operation_type.work_type.shop
@@ -274,7 +434,7 @@ class OperationTemplate(AbstractActiveNetworkSpecificCodeNamedModel):
             while dt_from <= dt_to:
                 for t in generate_times(dt_from, step):
                     yield t
-                dt_from += datetime.timedelta(days=1)
+                dt_from += timedelta(days=1)
             return
 
         lambda_get_day = None
@@ -290,13 +450,13 @@ class OperationTemplate(AbstractActiveNetworkSpecificCodeNamedModel):
                     continue
                 elif period_day > day:
                     delta = period_day - day
-                    dt_from += datetime.timedelta(days=delta)
+                    dt_from += timedelta(days=delta)
                     if dt_from > dt_to:
                         return
 
                 for t in generate_times(dt_from, step):
                     yield t
-                dt_from += datetime.timedelta(days=1)
+                dt_from += timedelta(days=1)
                 if dt_from > dt_to:
                     return
                 day = lambda_get_day(dt_from)
@@ -304,7 +464,7 @@ class OperationTemplate(AbstractActiveNetworkSpecificCodeNamedModel):
                 for t in generate_times(dt_from, step):
                     yield t
 
-            dt_from += datetime.timedelta(days=1)
+            dt_from += timedelta(days=1)
             day = lambda_get_day(dt_from)
 
     def get_department(self):
@@ -327,8 +487,8 @@ class PeriodClientsManager(models.Manager):
                 tm_start = v
                 tm_end = shop.close_times[k]
                 week_day = (int(k) + 2) % 7 or 7
-                if tm_end == datetime.time(0):
-                    tm_end = datetime.time(23, 59)
+                if tm_end == time(0):
+                    tm_end = time(23, 59)
                 if tm_start < tm_end:
                     filt |= (models.Q(dttm_forecast__week_day=week_day) & (models.Q(dttm_forecast__time__gte=tm_start) & models.Q(dttm_forecast__time__lt=tm_end)))
                 elif tm_start > tm_end:
@@ -336,7 +496,7 @@ class PeriodClientsManager(models.Manager):
             return self.filter(filt, *args, **kwargs)
         else:
             if not dt_from:
-                dt_from = datetime.date.today().replace(day=1)
+                dt_from = date.today().replace(day=1)
             if not dt_to:
                 dt_to = dt_from + relativedelta(day=31)
             shop_times = ShopSchedule.objects.filter(
@@ -348,7 +508,7 @@ class PeriodClientsManager(models.Manager):
                 open=Min('opens'),
                 close=Max('closes'),
             )
-            max_shop_time = datetime.time(23, 59) if datetime.time(0,0) == shop_times['close'] else shop_times['close']
+            max_shop_time = time(23, 59) if time(0,0) == shop_times['close'] else shop_times['close']
             min_shop_time = shop_times['open']
             time_filter = {}
             if max_shop_time != min_shop_time:

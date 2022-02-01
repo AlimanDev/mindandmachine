@@ -158,7 +158,7 @@ class OperationTypeRelationAdmin(admin.ModelAdmin):
 
     def get_readonly_fields(self, request, obj=None):
         if obj:
-            return self.readonly_fields + ('base', 'depended')
+            return self.readonly_fields + ('base', 'depended', 'type')
         return self.readonly_fields
 
 
