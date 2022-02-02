@@ -1,6 +1,9 @@
 from datetime import date, time, datetime, timedelta
 from decimal import Decimal
+from unittest import mock
 
+from django.db import transaction
+from django.core.cache import cache
 from django.test import override_settings, TestCase
 
 from etc.scripts import fill_calendar
@@ -75,6 +78,7 @@ class SawhSettingsHelperMixin(TestsHelperMixin):
         self.shop.refresh_from_db()
         self.worker_position.refresh_from_db()
         self.employment.refresh_from_db()
+        cache.clear()
 
     def _set_obj_data(self, obj, **data):
         for i, v in data.items():
@@ -131,47 +135,48 @@ class TestSAWHSettingsMonthAccPeriod(SawhSettingsHelperMixin, TestCase):
         )
 
     def test_subtract_sick_days_from_norm_hours_exact(self):
-        # часть новогодн. праздников
-        for day_num in range(1, 5):
-            WorkerDayFactory(
-                employee=self.employee,
-                employment=self.employment,
-                shop=self.shop,
-                type_id=WorkerDay.TYPE_SICK,
-                dt=date(2021, 1, day_num),
-                is_fact=False,
-                is_approved=True,
-            )
+        with mock.patch.object(transaction, 'on_commit', lambda t: t()):
+            # часть новогодн. праздников
+            for day_num in range(1, 5):
+                WorkerDayFactory(
+                    employee=self.employee,
+                    employment=self.employment,
+                    shop=self.shop,
+                    type_id=WorkerDay.TYPE_SICK,
+                    dt=date(2021, 1, day_num),
+                    is_fact=False,
+                    is_approved=True,
+                )
 
-        # выходные
-        for day_num in range(30, 32):
-            WorkerDayFactory(
-                employee=self.employee,
-                employment=self.employment,
-                shop=self.shop,
-                type_id=WorkerDay.TYPE_SICK,
-                dt=date(2021, 1, day_num),
-                is_fact=False,
-                is_approved=True,
-            )
+            # выходные
+            for day_num in range(30, 32):
+                WorkerDayFactory(
+                    employee=self.employee,
+                    employment=self.employment,
+                    shop=self.shop,
+                    type_id=WorkerDay.TYPE_SICK,
+                    dt=date(2021, 1, day_num),
+                    is_fact=False,
+                    is_approved=True,
+                )
 
-        self._test_hours_for_acc_period(
-            dt=date(2021, 1, 1), expected_norm_hours=120.0, hours_k='norm_hours', period_k='acc_period')
+            self._test_hours_for_acc_period(
+                dt=date(2021, 1, 1), expected_norm_hours=120.0, hours_k='norm_hours', period_k='acc_period')
 
-        # рабочая неделя
-        for day_num in range(25, 30):
-            WorkerDayFactory(
-                employee=self.employee,
-                employment=self.employment,
-                shop=self.shop,
-                type_id=WorkerDay.TYPE_SICK,
-                dt=date(2021, 1, day_num),
-                is_fact=False,
-                is_approved=True,
-            )
+            # рабочая неделя
+            for day_num in range(25, 30):
+                WorkerDayFactory(
+                    employee=self.employee,
+                    employment=self.employment,
+                    shop=self.shop,
+                    type_id=WorkerDay.TYPE_SICK,
+                    dt=date(2021, 1, day_num),
+                    is_fact=False,
+                    is_approved=True,
+                )
 
-        self._test_hours_for_acc_period(
-            dt=date(2021, 1, 1), expected_norm_hours=80.0, hours_k='norm_hours', period_k='acc_period')
+            self._test_hours_for_acc_period(
+                dt=date(2021, 1, 1), expected_norm_hours=80.0, hours_k='norm_hours', period_k='acc_period')
 
     def test_subtract_sick_days_from_norm_hours_mean(self):
         # часть новогодн. праздников
@@ -507,25 +512,26 @@ class TestSAWHSettingsQuarterAccPeriod(SawhSettingsHelperMixin, TestCase):
                 date(2021, 8, 11),
             )),
         )
-        for (wd_type_id, tm_start, tm_end), dates in wdays:
-            for dt in dates:
-                is_night_work = False
-                if tm_start and tm_end and tm_end < tm_start:
-                    is_night_work = True
+        with mock.patch.object(transaction, 'on_commit', lambda t: t()):
+            for (wd_type_id, tm_start, tm_end), dates in wdays:
+                for dt in dates:
+                    is_night_work = False
+                    if tm_start and tm_end and tm_end < tm_start:
+                        is_night_work = True
 
-                is_work_day = wd_type_id == WorkerDay.TYPE_WORKDAY
-                WorkerDayFactory(
-                    type_id=wd_type_id,
-                    dt=dt,
-                    shop=self.shop,
-                    employee=self.employee,
-                    employment=self.employment,
-                    dttm_work_start=datetime.combine(dt, tm_start) if is_work_day else None,
-                    dttm_work_end=datetime.combine(dt + timedelta(days=1) if is_night_work else dt,
-                                                   tm_end) if is_work_day else None,
-                    is_fact=is_work_day,
-                    is_approved=True,
-                )
+                    is_work_day = wd_type_id == WorkerDay.TYPE_WORKDAY
+                    WorkerDayFactory(
+                        type_id=wd_type_id,
+                        dt=dt,
+                        shop=self.shop,
+                        employee=self.employee,
+                        employment=self.employment,
+                        dttm_work_start=datetime.combine(dt, tm_start) if is_work_day else None,
+                        dttm_work_end=datetime.combine(dt + timedelta(days=1) if is_night_work else dt,
+                                                    tm_end) if is_work_day else None,
+                        is_fact=is_work_day,
+                        is_approved=True,
+                    )
 
         self._test_hours_for_period(
             dt_from=date(2021, 7, 1),
@@ -552,7 +558,8 @@ class TestSAWHSettingsQuarterAccPeriod(SawhSettingsHelperMixin, TestCase):
 
         subregion = RegionFactory(parent=self.region, name='Татарстан', code='tatarstan')
         self.shop.region = subregion
-        self.shop.save(update_fields=['region'])
+        with mock.patch.object(transaction, 'on_commit', lambda t: t()):
+            self.shop.save(update_fields=['region'])
         ProductionDay.objects.create(
             region=subregion, dt=date(2021, 7, 19), type=ProductionDay.TYPE_SHORT_WORK)
         ProductionDay.objects.create(
