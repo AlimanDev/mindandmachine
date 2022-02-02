@@ -88,7 +88,6 @@ class Network(AbstractActiveModel):
         ('pdf', 'PDF'),
     )
 
-
     ROUND_TO_HALF_AN_HOUR = 0
     ROUND_WH_ALGS = {
         ROUND_TO_HALF_AN_HOUR: lambda wh: round(wh * 2) / 2,
@@ -269,10 +268,20 @@ class Network(AbstractActiveModel):
     api_timesheet_lines_group_by = models.PositiveSmallIntegerField(
         verbose_name='Группировать данные табеля в api методе /rest_api/timesheet/lines/ по',
         choices=TIMESHEET_LINES_GROUP_BY_CHOICES, default=TIMESHEET_LINES_GROUP_BY_EMPLOYEE_POSITION_SHOP)
-    
     show_cost_for_inner_vacancies = models.BooleanField('Отображать поле "стоимость работ" для внутренних вакансий', default=False)
-
     rebuild_timetable_min_delta = models.IntegerField(default=2, verbose_name='Минимальное время для составления графика')
+
+    ANALYTICS_TYPE_METABASE = 'metabase'
+    ANALYTICS_TYPE_CUSTOM_IFRAME = 'custom_iframe'
+    ANALYTICS_TYPE_POWER_BI_EMBED = 'power_bi_embed'
+
+    ANALYTICS_TYPE_CHOICES = (
+        (ANALYTICS_TYPE_METABASE, 'Метабейз'),
+        (ANALYTICS_TYPE_CUSTOM_IFRAME, 'Кастомный iframe (из json настройки analytics_iframe)'),
+        (ANALYTICS_TYPE_POWER_BI_EMBED, 'Power BI через получение embed токена'),
+    )
+    analytics_type = models.CharField(
+        verbose_name='Вид аналитики', max_length=32, choices=ANALYTICS_TYPE_CHOICES, default=ANALYTICS_TYPE_METABASE)
 
     DEFAULT_NIGHT_EDGES = (
         '22:00:00',
@@ -329,6 +338,12 @@ class Network(AbstractActiveModel):
 
     def __str__(self):
         return f'name: {self.name}, code: {self.code}'
+
+    def clean(self):
+        if self.analytics_type == Network.ANALYTICS_TYPE_CUSTOM_IFRAME:
+            analytics_iframe = self.settings_values_prop.get('analytics_iframe')
+            if not analytics_iframe:
+                raise DjangoValidationError('Необходимо заполнить analytics_iframe в значениях настроек')
 
 
 class NetworkConnect(AbstractActiveModel):
@@ -910,14 +925,22 @@ class EmploymentManager(models.Manager):
         return self.filter(q, **kwargs)
 
     def get_active_empl_by_priority(  # TODO: переделать, чтобы можно было в 1 запросе получать активные эмплойменты для пар (сотрудник, даты)?
-            self, network_id=None, dt=None, priority_shop_id=None, priority_employment_id=None,
-            priority_work_type_id=None, priority_by_visible=True, extra_q=None, **kwargs):
-        qs = self.get_active(network_id=network_id, dt_from=dt, dt_to=dt, extra_q=extra_q, **kwargs)
+            self, network_id=None, dt=None, dt_from=None, dt_to=None, priority_shop_id=None, priority_employment_id=None,
+            priority_work_type_id=None, priority_by_visible=True, extra_q=None, priority_shop_network_id=None, **kwargs):
+        assert dt or (dt_from and dt_to)
+        dt_from = dt or dt_from
+        dt_to = dt or dt_to
+        qs = self.get_active(network_id=network_id, dt_from=dt_from, dt_to=dt_to, extra_q=extra_q, **kwargs)
 
         order_by = []
-
         if priority_by_visible:
             order_by.append('-is_visible')
+
+        if priority_shop_network_id:
+            qs = qs.annotate_value_equality(
+                'is_equal_shop_networks', 'shop__network_id', priority_shop_network_id,
+            )
+            order_by.append('-is_equal_shop_networks')
 
         if priority_employment_id:
             qs = qs.annotate_value_equality(
@@ -1987,6 +2010,7 @@ class ShiftScheduleInterval(AbstractModel):
         if self.code:
             s += f' ({self.code})'
         return s
+
 
 class ContentBlock(AbstractActiveNetworkSpecificCodeNamedModel):
     name = models.CharField(max_length=128, verbose_name='Имя текстового блока')
