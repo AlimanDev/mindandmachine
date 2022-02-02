@@ -555,7 +555,7 @@ class WorkerDayType(AbstractModel):
 
     @tracker
     def save(self, *args, **kwargs):
-        if self.tracker.has_changed('is_reduce_norm'):
+        if self.code and self.tracker.has_changed('is_reduce_norm'):
             cache.delete_pattern("prod_cal_*_*_*")
         return super().save(*args, **kwargs)
 

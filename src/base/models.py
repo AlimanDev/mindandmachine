@@ -298,7 +298,7 @@ class Network(AbstractActiveModel):
 
     @tracker
     def save(self, *args, **kwargs):
-        if self.tracker.has_changed('accounting_period_length'):
+        if self.id and self.tracker.has_changed('accounting_period_length'):
             cache.delete_pattern("prod_cal_*_*_*")
         return super().save(*args, **kwargs)
 
@@ -1321,7 +1321,7 @@ class WorkerPosition(AbstractActiveNetworkSpecificCodeNamedModel):
         res = super(WorkerPosition, self).save(*args, **kwargs)
         if is_new or force_set_defaults:
             self._set_m2m_defaults()
-        if self.tracker.has_changed('hours_in_a_week'):
+        if not is_new and self.tracker.has_changed('hours_in_a_week'):
             cache.delete_pattern("prod_cal_*_*_*")
         return res
 

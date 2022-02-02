@@ -340,6 +340,7 @@ class TestWorkersStatsGetter(TestsHelperMixin, TestCase):
             employment.employee_id: employment.id
             for employment in [self.employment, self.employment2]
         }
+        position2 = WorkerPositionFactory(name='Вторая должность')
         
         self._test_cache(2, [self.employee.id, self.employee2.id])
         self._test_cache(0)
@@ -387,6 +388,10 @@ class TestWorkersStatsGetter(TestsHelperMixin, TestCase):
             self._test_cache(1, [self.employee2.id])
 
             self.employment2.dt_fired = self.dt_to + timedelta(days=60)
+            self.employment2.save()
+            self._test_cache(1, [self.employee2.id])
+
+            self.employment2.position = position2
             self.employment2.save()
             self._test_cache(1, [self.employee2.id])
 
