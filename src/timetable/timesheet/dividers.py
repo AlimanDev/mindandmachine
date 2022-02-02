@@ -180,11 +180,11 @@ class BaseTimesheetDivider:
     def _get_overtime(self, norm_hours):
         return self.fiscal_timesheet.main_timesheet.get_total_hours_sum() - norm_hours
 
-    def _get_subtract_filters(self, dt):
+    def _get_subtract_filters(self, active_employment, dt):
         return {}
 
     def _get_sawh_hours_key(self):
-        return 'curr_month'
+        return getattr(settings, 'TIMESHEET_DIVIDER_SAWH_HOURS_KEY', 'curr_month')
 
     def _get_min_hours_threshold(self, dt):
         if callable(settings.TIMESHEET_MIN_HOURS_THRESHOLD):
@@ -201,10 +201,15 @@ class BaseTimesheetDivider:
         from src.timetable.worker_day.stat import (
             WorkersStatsGetter,
         )
+        # получаем сеть из осн. тр-ва на начало периода, для того, чтобы корректно
+        dt_from_active_employment = self.fiscal_timesheet._get_active_employment(dt=self.fiscal_timesheet.dt_from)
+        network = dt_from_active_employment.shop.network if \
+            dt_from_active_employment else self.fiscal_timesheet.employee.user.network
+
         worker_stats = WorkersStatsGetter(
             dt_from=self.fiscal_timesheet.dt_from,
             dt_to=self.fiscal_timesheet.dt_to,
-            network=self.fiscal_timesheet.employee.user.network,
+            network=network,
             employee_id=self.fiscal_timesheet.employee.id,
         ).run()
 
@@ -220,7 +225,11 @@ class BaseTimesheetDivider:
         logger.info(f'overtime_plan at the beginning: {overtime_plan}')
 
         for dt in pd.date_range(self.fiscal_timesheet.dt_from, self.fiscal_timesheet.dt_to).date:
-            subtract_filters = self._get_subtract_filters(dt=dt)
+            active_employment = self.fiscal_timesheet._get_active_employment(dt)
+            if not active_employment:
+                continue
+
+            subtract_filters = self._get_subtract_filters(active_employment=active_employment, dt=dt)
             if overtime_plan == 0.0:  # не будет ли проблем из-за того, что часы у нас не целые часы?
                 logger.debug('overtime_plan == 0.0, break')
                 break
@@ -363,15 +372,14 @@ class PobedaTimesheetDivider(BaseTimesheetDivider):
                         day_type=self.fiscal_timesheet.wd_types_dict.get(WorkerDay.TYPE_HOLIDAY),
                     ))
 
-    def _get_subtract_filters(self, dt):
-        active_employment = self.fiscal_timesheet._get_active_employment(dt)
+    def _get_subtract_filters(self, active_employment, dt):
         return {
             'position': active_employment.position,
             'shop': active_employment.shop,
         }
 
     def _get_sawh_hours_key(self):
-        return 'curr_month_without_reduce_norm'
+        return getattr(settings, 'TIMESHEET_DIVIDER_SAWH_HOURS_KEY', 'curr_month_without_reduce_norm')
 
     def _redistribute_vacations_from_additional_timesheet_to_main_timesheet(self):
         vacation_hours = Decimal('0.00')
