@@ -482,7 +482,7 @@ USERS_WITH_ACTIVE_EMPLOYEE_OR_VACANCY_ONLY = False
 CALCULATE_LOAD_TEMPLATE = False  # параметр отключающий автоматический расчет нагрузки
 
 CACHE_TTL = {
-    'prod_cal': 86400, # время жизни кэша в статистике, по умолчанию 1 день == 86400 сек.
+    'prod_cal': 604800, # время жизни кэша в статистике, по умолчанию 7 дней == 604800 сек.
 }
 
 CLIENT_TIMEZONE = 3
@@ -669,6 +669,11 @@ BEAT_SCHEDULE = {
         'schedule': crontab(hour=0, minute=0),
         'options': {'queue': BACKEND_QUEUE},
         'enabled': ZKTECO_INTEGRATION,
+    },
+    'task-set-prod-cal-cache-cur-and-next-month': {
+        'task': 'src.celery.tasks.set_prod_cal_cache_cur_and_next_month',
+        'schedule': crontab(hour=0, minute=0),
+        'options': {'queue': BACKEND_QUEUE},
     },
 }
 

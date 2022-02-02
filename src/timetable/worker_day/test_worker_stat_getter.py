@@ -1,9 +1,10 @@
 from datetime import date, timedelta, datetime, time
 from unittest import expectedFailure, mock
 
+from dateutil.relativedelta import relativedelta
 from django.core.cache import cache
 from django.db import transaction
-from django.test import TestCase
+from django.test import TestCase, override_settings
 
 from etc.scripts import fill_calendar
 from src.base.models import ProductionDay, Region
@@ -16,6 +17,7 @@ from src.base.tests.factories import (
     WorkerPositionFactory,
     EmployeeFactory,
 )
+from src.celery.tasks import set_prod_cal_cache_cur_and_next_month
 from src.timetable.models import WorkerDay, WorkerDayType
 from src.timetable.tests.factories import WorkerDayFactory
 from src.util.mixins.tests import TestsHelperMixin
@@ -291,7 +293,7 @@ class TestWorkersStatsGetter(TestsHelperMixin, TestCase):
             0,
         )
 
-    def _test_cache(self, call_count, called_with=[], resp_count=2):
+    def _test_cache(self, call_count, called_with=[], resp_count=2, dt_from=None, dt_to=None):
 
         def _data_for_employee(e):
             return [
@@ -321,13 +323,14 @@ class TestWorkersStatsGetter(TestsHelperMixin, TestCase):
         mock_prod_call = mock.MagicMock(side_effect=_data_for_employee)
 
         with mock.patch.object(WorkersStatsGetter, '_get_prod_cal_for_employee', mock_prod_call):
-            stat = self._get_worker_stats()
+            stat = self._get_worker_stats(dt_from=dt_from, dt_to=dt_to)
             self.assertEqual(len(stat), resp_count)
             self.assertEqual(mock_prod_call.call_count, call_count)
             if called_with:
                 calls = [mock.call(call) for call in called_with]
                 mock_prod_call.assert_has_calls(calls, any_order=True)
 
+    @override_settings(CELERY_TASK_ALWAYS_EAGER=True)
     def test_cache(self):
         self.user2 = UserFactory()
         self.employee2 = EmployeeFactory(user=self.user2)
@@ -432,6 +435,19 @@ class TestWorkersStatsGetter(TestsHelperMixin, TestCase):
             wd2.delete()
             self._test_cache(0)
 
+            cache.clear()
+            self.employment2.dt_fired = None
+            self.employment2.save()
+
+            dt_from_cur, dt_to_cur = date.today().replace(day=1), date.today() + relativedelta(day=31)
+            dt_from_next = (dt_from_cur + relativedelta(months=1)).replace(day=1)
+            dt_to_next = dt_from_next + relativedelta(day=31)
+            fill_calendar.fill_days(dt_from_cur.strftime('%Y.%m.%d'), dt_to_next.strftime('%Y.%m.%d'), self.shop.region.id)
+            set_prod_cal_cache_cur_and_next_month()
+            self._test_cache(0, dt_from=dt_from_cur, dt_to=dt_to_cur)
+            self._test_cache(0, dt_from=dt_from_next, dt_to=dt_to_next)
+
+            self._test_cache(2, [self.employee.id, self.employee2.id])
             self.employment2.delete()
             self._test_cache(0, resp_count=1)
             self.assertIsNone(cache.get(f'prod_cal_{self.dt_from}_{self.dt_to}_{self.employee2.id}'))
