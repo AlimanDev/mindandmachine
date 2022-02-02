@@ -186,6 +186,13 @@ class BaseTimesheetDivider:
     def _get_sawh_hours_key(self):
         return 'curr_month'
 
+    def _get_min_hours_threshold(self, dt):
+        if callable(settings.TIMESHEET_MIN_HOURS_THRESHOLD):
+            active_employment = self.fiscal_timesheet._get_active_employment(dt)
+            return settings.TIMESHEET_MIN_HOURS_THRESHOLD(active_employment.norm_work_hours)
+        else:
+            return settings.TIMESHEET_MIN_HOURS_THRESHOLD
+
     def _check_overtimes(self):
         logger.info(
             f'start overtimes check '
@@ -222,7 +229,7 @@ class BaseTimesheetDivider:
                 continue
 
             if overtime_plan > 0:
-                default_threshold_hours = settings.TIMESHEET_MIN_HOURS_THRESHOLD
+                default_threshold_hours = self._get_min_hours_threshold(dt=dt)
                 main_timesheet_total_hours = self.fiscal_timesheet.main_timesheet.get_total_hours_sum(dt)
                 hours_overflow = main_timesheet_total_hours - default_threshold_hours
                 hours_transfer = min(hours_overflow, overtime_plan)
@@ -449,8 +456,9 @@ class ShiftScheduleDivider(BaseTimesheetDivider):
             main_timesheet_total_hours = self.fiscal_timesheet.main_timesheet.get_total_hours_sum(dt=dt)
             if shift_schedule_hours and main_timesheet_total_hours < shift_schedule_hours:
                 plan_approved_wd = self.plan_approved_data.get(dt)
+                min_hours_threshold = self._get_min_hours_threshold(dt=dt)
                 if plan_approved_wd and \
-                        (main_timesheet_total_hours + additional_timesheet_total_hours) > settings.TIMESHEET_MIN_HOURS_THRESHOLD:
+                        (main_timesheet_total_hours + additional_timesheet_total_hours) > min_hours_threshold:
 
                     # если в плане рабочий день или нерабочий день не снижающий норму
                     if (not plan_approved_wd.type.is_dayoff and plan_approved_wd.type.is_work_hours) or (
