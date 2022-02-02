@@ -1,4 +1,5 @@
 import json
+from unittest import mock
 import uuid
 from datetime import datetime, time, date, timedelta
 from unittest import skip, expectedFailure
@@ -7,6 +8,7 @@ from unittest.mock import patch
 import pandas as pd
 import requests
 from dateutil.relativedelta import relativedelta
+from django.db import transaction
 from django.test import override_settings
 from django.utils.timezone import now
 from rest_framework.test import APITestCase
@@ -747,16 +749,17 @@ class TestAutoSettings(APITestCase):
         self.assertEqual(employment2Info['norm_work_amount'], 151.0)
         self.assertEqual(employment3Info['norm_work_amount'], 151.0)
 
-        for day in range(3):
-            dt = dt + timedelta(days=1)
-            WorkerDay.objects.create(
-                employment=self.employment2,
-                employee=self.employment2.employee,
-                shop=self.employment2.shop,
-                dt=dt,
-                type_id=WorkerDay.TYPE_VACATION,
-                is_approved=True,
-            )
+        with mock.patch.object(transaction, 'on_commit', lambda t: t()):
+            for day in range(3):
+                dt = dt + timedelta(days=1)
+                WorkerDay.objects.create(
+                    employment=self.employment2,
+                    employee=self.employment2.employee,
+                    shop=self.employment2.shop,
+                    dt=dt,
+                    type_id=WorkerDay.TYPE_VACATION,
+                    is_approved=True,
+                )
         data = self._test_create_tt(dt_from, dt_to, use_not_approved=False)
 
         employment2Info = list(filter(lambda x: x['general_info']['id'] == self.employee2.id, data['cashiers']))[0]

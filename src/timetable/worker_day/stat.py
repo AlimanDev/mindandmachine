@@ -2,11 +2,13 @@ from calendar import monthrange
 from copy import deepcopy
 from datetime import timedelta, datetime
 from functools import lru_cache
+from django.conf import settings
 
 import pandas as pd
 from dateutil.relativedelta import relativedelta
 from django.db.models import (
     Case, When, BooleanField, )
+from django.core.cache import cache
 from django.db.models import (
     Count, Sum,
     Exists, OuterRef, Subquery,
@@ -402,8 +404,8 @@ class WorkersStatsGetter:
 
         return result
 
-    def run(self):
-        res = {}
+    @cached_property
+    def prod_cal_qs(self):
         acc_period_dt_from, acc_period_dt_to = self.acc_period_range
         selected_period_q = Q(dt__gte=self.dt_from, dt__lte=self.dt_to)
         prev_months_dt_from, prev_months_dt_to = self.prev_months_range
@@ -412,6 +414,106 @@ class WorkersStatsGetter:
         curr_month_q = Q(dt__gte=curr_month_dt_from, dt__lte=curr_month_dt_to)
         curr_month_end_dt_from, curr_month_end_dt_to = self.curr_month_end_range
         curr_month_end_q = Q(dt__gte=curr_month_end_dt_from, dt__lte=curr_month_end_dt_to)
+        outside_of_selected_period_q = Q(Q(dt__lt=self.dt_from) | Q(dt__gt=self.dt_to))
+        reduce_norm_types = list(WorkerDayType.objects.filter(is_reduce_norm=True).values_list('code', flat=True))
+
+        return ProdCal.objects.filter( 
+            dt__gte=acc_period_dt_from,
+            dt__lte=acc_period_dt_to,
+        ).values(
+            'employee_id',
+            'employment_id',
+            'dt__month',
+        ).annotate(
+            period_start=Greatest('employment__dt_hired', Value(acc_period_dt_from)),
+            period_end=Least('employment__dt_fired', Value(acc_period_dt_to)),
+            has_vacation_or_sick_plan_approved=Exists(WorkerDay.objects.filter(
+                employee_id=OuterRef('employee_id'),
+                employment_id=OuterRef('employment_id'),
+                dt=OuterRef('dt'),
+                is_fact=False,
+                is_approved=True,
+                type_id__in=reduce_norm_types,
+            )),
+            vacation_or_sick_plan_approved_count=Count(Subquery(WorkerDay.objects.filter(
+                employee_id=OuterRef('employee_id'),
+                employment_id=OuterRef('employment_id'),
+                dt=OuterRef('dt'),
+                is_fact=False,
+                is_approved=True,
+                type_id__in=reduce_norm_types,
+            ).values('id')[:1])),
+            vacation_or_sick_plan_approved_count_selected_period=Count(Subquery(WorkerDay.objects.filter(
+                selected_period_q,
+                employee_id=OuterRef('employee_id'),
+                employment_id=OuterRef('employment_id'),
+                dt=OuterRef('dt'),
+                is_fact=False,
+                is_approved=True,
+                type_id__in=reduce_norm_types,
+            ).values('id')[:1])),
+            has_vacation_or_sick_plan_not_approved=Exists(WorkerDay.objects.filter(
+                employee_id=OuterRef('employee_id'),
+                employment_id=OuterRef('employment_id'),
+                dt=OuterRef('dt'),
+                is_fact=False,
+                is_approved=False,
+                type_id__in=reduce_norm_types,
+            )),
+            vacation_or_sick_plan_not_approved_count=Count(Subquery(WorkerDay.objects.filter(
+                employee_id=OuterRef('employee_id'),
+                employment_id=OuterRef('employment_id'),
+                dt=OuterRef('dt'),
+                is_fact=False,
+                is_approved=False,
+                type_id__in=reduce_norm_types,
+            ).values('id')[:1])),
+            vacation_or_sick_plan_not_approved_count_selected_period=Count(Subquery(WorkerDay.objects.filter(
+                selected_period_q,
+                employee_id=OuterRef('employee_id'),
+                employment_id=OuterRef('employment_id'),
+                dt=OuterRef('dt'),
+                is_fact=False,
+                is_approved=False,
+                type_id__in=reduce_norm_types,
+            ).values('id')[:1])),
+            norm_hours_acc_period=Coalesce(
+                Sum('norm_hours'), 0.0),
+            norm_hours_prev_months=Coalesce(
+                Sum('norm_hours', filter=prev_months_q), 0.0),
+            norm_hours_curr_month=Coalesce(
+                Sum('norm_hours', filter=curr_month_q), 0.0),
+            norm_hours_curr_month_end=Coalesce(
+                Sum('norm_hours', filter=curr_month_end_q), 0.0),
+            norm_hours_selected_period=Coalesce(
+                Sum('norm_hours', filter=selected_period_q), 0.0),
+            empl_days_count=Count('dt'),
+            empl_days_count_selected_period=Count('dt', filter=selected_period_q),
+            empl_days_count_outside_of_selected_period=Count('dt', filter=outside_of_selected_period_q),
+        )
+
+    def _get_prod_cal_for_employee(self, employee_id):
+        return list(self.prod_cal_qs.filter(employee_id=employee_id))
+
+    def _get_prod_cal_cached(self):
+        cached_data = []
+
+        for e in self.employees_dict.keys():
+            key = f'prod_cal_{self.dt_from}_{self.dt_to}_{e}'
+            cached = cache.get(key)
+            if not cached:
+                cached = self._get_prod_cal_for_employee(e)
+                cache.set(key, cached, timeout=settings.CACHE_TTL.get('prod_cal', 86400))
+            cached_data.extend(cached)
+        
+        return cached_data
+
+    def run(self):
+        res = {}
+        acc_period_dt_from, acc_period_dt_to = self.acc_period_range
+        selected_period_q = Q(dt__gte=self.dt_from, dt__lte=self.dt_to)
+        prev_months_dt_from, prev_months_dt_to = self.prev_months_range
+        prev_months_q = Q(dt__gte=prev_months_dt_from, dt__lte=prev_months_dt_to)
         until_acc_period_end_dt_from, until_acc_period_end_dt_to = self.until_acc_period_end_range
         until_acc_period_end_q = Q(dt__gte=until_acc_period_end_dt_from, dt__lte=until_acc_period_end_dt_to)
         outside_of_selected_period_q = Q(Q(dt__lt=self.dt_from) | Q(dt__gt=self.dt_to))
@@ -629,85 +731,9 @@ class WorkersStatsGetter:
                 any_day_count_outside_of_selected_period[wd_dict['dt__month']] = any_day_count_outside_of_selected_period.get(
                     wd_dict['dt__month'], 0) + wd_dict['any_day_count_outside_of_selected_period']
 
-        reduce_norm_types = list(WorkerDayType.objects.filter(is_reduce_norm=True).values_list('code', flat=True))
+        prod_cal_cached = self._get_prod_cal_cached()
 
-        prod_cal_qs = ProdCal.objects.filter(
-            dt__gte=acc_period_dt_from,
-            dt__lte=acc_period_dt_to,
-            employee_id__in=self.employees_dict.keys(),
-        ).values(
-            'employee_id',
-            'employment_id',
-            'dt__month',
-        ).annotate(
-            period_start=Greatest('employment__dt_hired', Value(acc_period_dt_from)),
-            period_end=Least('employment__dt_fired', Value(acc_period_dt_to)),
-            has_vacation_or_sick_plan_approved=Exists(WorkerDay.objects.filter(
-                employee_id=OuterRef('employee_id'),
-                employment_id=OuterRef('employment_id'),
-                dt=OuterRef('dt'),
-                is_fact=False,
-                is_approved=True,
-                type_id__in=reduce_norm_types,
-            )),
-            vacation_or_sick_plan_approved_count=Count(Subquery(WorkerDay.objects.filter(
-                employee_id=OuterRef('employee_id'),
-                employment_id=OuterRef('employment_id'),
-                dt=OuterRef('dt'),
-                is_fact=False,
-                is_approved=True,
-                type_id__in=reduce_norm_types,
-            ).values('id')[:1])),
-            vacation_or_sick_plan_approved_count_selected_period=Count(Subquery(WorkerDay.objects.filter(
-                selected_period_q,
-                employee_id=OuterRef('employee_id'),
-                employment_id=OuterRef('employment_id'),
-                dt=OuterRef('dt'),
-                is_fact=False,
-                is_approved=True,
-                type_id__in=reduce_norm_types,
-            ).values('id')[:1])),
-            has_vacation_or_sick_plan_not_approved=Exists(WorkerDay.objects.filter(
-                employee_id=OuterRef('employee_id'),
-                employment_id=OuterRef('employment_id'),
-                dt=OuterRef('dt'),
-                is_fact=False,
-                is_approved=False,
-                type_id__in=reduce_norm_types,
-            )),
-            vacation_or_sick_plan_not_approved_count=Count(Subquery(WorkerDay.objects.filter(
-                employee_id=OuterRef('employee_id'),
-                employment_id=OuterRef('employment_id'),
-                dt=OuterRef('dt'),
-                is_fact=False,
-                is_approved=False,
-                type_id__in=reduce_norm_types,
-            ).values('id')[:1])),
-            vacation_or_sick_plan_not_approved_count_selected_period=Count(Subquery(WorkerDay.objects.filter(
-                selected_period_q,
-                employee_id=OuterRef('employee_id'),
-                employment_id=OuterRef('employment_id'),
-                dt=OuterRef('dt'),
-                is_fact=False,
-                is_approved=False,
-                type_id__in=reduce_norm_types,
-            ).values('id')[:1])),
-            norm_hours_acc_period=Coalesce(
-                Sum('norm_hours'), 0.0),
-            norm_hours_prev_months=Coalesce(
-                Sum('norm_hours', filter=prev_months_q), 0.0),
-            norm_hours_curr_month=Coalesce(
-                Sum('norm_hours', filter=curr_month_q), 0.0),
-            norm_hours_curr_month_end=Coalesce(
-                Sum('norm_hours', filter=curr_month_end_q), 0.0),
-            norm_hours_selected_period=Coalesce(
-                Sum('norm_hours', filter=selected_period_q), 0.0),
-            empl_days_count=Count('dt'),
-            empl_days_count_selected_period=Count('dt', filter=selected_period_q),
-            empl_days_count_outside_of_selected_period=Count('dt', filter=outside_of_selected_period_q),
-        )
-
-        for pc_dict in prod_cal_qs:
+        for pc_dict in prod_cal_cached:
             for is_fact_key in ['plan', 'fact']:
                 for is_approved_key in ['approved', 'not_approved']:
                     data = res.setdefault(
