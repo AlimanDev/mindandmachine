@@ -946,14 +946,22 @@ class EmploymentManager(models.Manager):
         return self.filter(q, **kwargs)
 
     def get_active_empl_by_priority(  # TODO: переделать, чтобы можно было в 1 запросе получать активные эмплойменты для пар (сотрудник, даты)?
-            self, network_id=None, dt=None, priority_shop_id=None, priority_employment_id=None,
-            priority_work_type_id=None, priority_by_visible=True, extra_q=None, **kwargs):
-        qs = self.get_active(network_id=network_id, dt_from=dt, dt_to=dt, extra_q=extra_q, **kwargs)
+            self, network_id=None, dt=None, dt_from=None, dt_to=None, priority_shop_id=None, priority_employment_id=None,
+            priority_work_type_id=None, priority_by_visible=True, extra_q=None, priority_shop_network_id=None, **kwargs):
+        assert dt or (dt_from and dt_to)
+        dt_from = dt or dt_from
+        dt_to = dt or dt_to
+        qs = self.get_active(network_id=network_id, dt_from=dt_from, dt_to=dt_to, extra_q=extra_q, **kwargs)
 
         order_by = []
-
         if priority_by_visible:
             order_by.append('-is_visible')
+
+        if priority_shop_network_id:
+            qs = qs.annotate_value_equality(
+                'is_equal_shop_networks', 'shop__network_id', priority_shop_network_id,
+            )
+            order_by.append('-is_equal_shop_networks')
 
         if priority_employment_id:
             qs = qs.annotate_value_equality(
