@@ -3417,7 +3417,7 @@ class TestWorkerDayCreateFact(TestsHelperMixin, APITestCase):
         plan_id = response.json()['id']
 
     def test_closest_plan_approved_set_on_fact_creation(self):
-        plan_approved = WorkerDayFactory(
+        WorkerDayFactory(
             is_fact=False,
             is_approved=True,
             dt=self.dt,
@@ -3425,8 +3425,20 @@ class TestWorkerDayCreateFact(TestsHelperMixin, APITestCase):
             employment=self.employment2,
             shop=self.shop,
             type_id=WorkerDay.TYPE_WORKDAY,
-            dttm_work_start=datetime.combine(self.dt, time(8, 0, 0)),
-            dttm_work_end=datetime.combine(self.dt, time(20, 0, 0)),
+            dttm_work_start=datetime.combine(self.dt, time(10, 0, 0)),
+            dttm_work_end=datetime.combine(self.dt, time(12, 0, 0)),
+            cashbox_details__work_type=self.work_type,
+        )
+        plan_approved2 = WorkerDayFactory(
+            is_fact=False,
+            is_approved=True,
+            dt=self.dt,
+            employee=self.employee2,
+            employment=self.employment2,
+            shop=self.shop,
+            type_id=WorkerDay.TYPE_WORKDAY,
+            dttm_work_start=datetime.combine(self.dt, time(12, 0, 0)),
+            dttm_work_end=datetime.combine(self.dt, time(14, 0, 0)),
             cashbox_details__work_type=self.work_type,
         )
 
@@ -3437,8 +3449,8 @@ class TestWorkerDayCreateFact(TestsHelperMixin, APITestCase):
             "dt": self.dt,
             "is_fact": True,
             "type": WorkerDay.TYPE_WORKDAY,
-            "dttm_work_start": datetime.combine(self.dt, time(8, 0, 0)),
-            "dttm_work_end": datetime.combine(self.dt, time(20, 0, 0)),
+            "dttm_work_start": datetime.combine(self.dt, time(12, 1, 0)),
+            "dttm_work_end": datetime.combine(self.dt, time(14, 5, 0)),
             "worker_day_details": [{
                 "work_part": 1.0,
                 "work_type_id": self.work_type.id}
@@ -3449,7 +3461,7 @@ class TestWorkerDayCreateFact(TestsHelperMixin, APITestCase):
         self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
         fact_id = resp.json()['id']
         fact = WorkerDay.objects.get(id=fact_id)
-        self.assertEqual(fact.closest_plan_approved_id, plan_approved.id)
+        self.assertEqual(fact.closest_plan_approved_id, plan_approved2.id)
 
     def test_closest_plan_approved_set_on_fact_creation_when_single_plan_far_from_fact(self):
         plan_approved = WorkerDayFactory(
