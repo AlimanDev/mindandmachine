@@ -3,6 +3,7 @@ from datetime import timedelta
 import pandas as pd
 from django.db import transaction
 from django.db.models import Q
+from django.db.models.expressions import RawSQL
 from django.utils.functional import cached_property
 from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
@@ -12,7 +13,7 @@ from src.base.exceptions import FieldError
 from src.base.models import Employment, User, Shop, Employee, Network
 from src.base.models import NetworkConnect
 from src.base.serializers import NetworkListSerializer, UserShorSerializer, NetworkSerializer
-from src.base.shop.serializers import ShopListSerializer, ShopSerializer
+from src.base.shop.serializers import ShopListSerializer
 from src.conf.djconfig import QOS_DATE_FORMAT
 from src.timetable.models import (
     WorkerDay,
@@ -319,6 +320,13 @@ class WorkerDaySerializer(serializers.ModelSerializer, UnaccountedOvertimeMixin)
                     dttm_work_start=attrs['dttm_work_start'],
                     dttm_work_end=attrs['dttm_work_end'],
                     delta_in_secs=self.context['request'].user.network.set_closest_plan_approved_delta_for_manual_fact,
+                ).annotate(
+                    order_by_val=RawSQL("""LEAST(
+                        ABS(EXTRACT(EPOCH FROM (%s - "timetable_workerday"."dttm_work_start"))),
+                        ABS(EXTRACT(EPOCH FROM (%s - "timetable_workerday"."dttm_work_end")))
+                    )""", [attrs['dttm_work_start'], attrs['dttm_work_end']])
+                ).order_by(
+                    'order_by_val',
                 ).only('id').first()
                 if closest_plan_approved:
                     attrs['closest_plan_approved_id'] = closest_plan_approved.id
