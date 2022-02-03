@@ -2602,7 +2602,6 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
             self.get_url('WorkerDay-batch-update-or-create'), self.dump_data(delete_data), content_type='application/json')
         self.assertEquals(resp.status_code, status.HTTP_200_OK)
 
-
     def test_work_hours_recalculated_on_batch_update(self):
         WorkerDay.objects.all().delete()
         options = {
@@ -3251,6 +3250,56 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
         self.assertEquals(response.json(), data)
         self.worker_day_plan_not_approved.refresh_from_db()
         self.assertEquals(self.worker_day_plan_not_approved.cost_per_hour, None)
+
+    def test_worker_day_details_deleted_on_wd_type_change_from_workday_to_nonworkday(self):
+        self.network.allow_creation_several_wdays_for_one_employee_for_one_date = True
+        self.network.save()
+        WorkerDay.objects.all().delete()
+        data = {
+            'data': [
+                {
+                    "shop_id": self.shop.id,
+                    "employee_id": self.employee2.id,
+                    "dt": self.dt,
+                    "is_fact": False,
+                    "is_approved": False,
+                    "type": WorkerDay.TYPE_WORKDAY,
+                    "dttm_work_start": datetime.combine(self.dt, time(16)),
+                    "dttm_work_end": datetime.combine(self.dt, time(23)),
+                    "worker_day_details": [
+                        {
+                            "work_part": 1.0,
+                            "work_type_id": self.work_type.id
+                        }
+                    ]
+                },
+            ],
+        }
+        resp = self.client.post(
+            self.get_url('WorkerDay-batch-update-or-create'), self.dump_data(data), content_type='application/json')
+        self.assertEqual(resp.status_code, 200)
+        plan_not_approved = WorkerDay.objects.filter(is_fact=False, is_approved=False).first()
+        data = {
+            'data': [
+                {
+                    "id": plan_not_approved.id,
+                    "shop_id": self.shop.id,
+                    "employee_id": self.employee2.id,
+                    "dt": self.dt,
+                    "is_fact": False,
+                    "is_approved": False,
+                    "type": WorkerDay.TYPE_HOLIDAY,
+                },
+            ],
+        }
+        resp = self.client.post(
+            self.get_url('WorkerDay-batch-update-or-create'), self.dump_data(data), content_type='application/json')
+        self.assertEqual(resp.status_code, 200)
+        plan_not_approved.refresh_from_db()
+        self.assertEqual(plan_not_approved.type_id, WorkerDay.TYPE_HOLIDAY)
+        self.assertIsNone(plan_not_approved.dttm_work_start)
+        self.assertIsNone(plan_not_approved.dttm_work_end)
+        self.assertEqual(plan_not_approved.worker_day_details.count(), 0)
 
 
 class TestCropSchedule(TestsHelperMixin, APITestCase):

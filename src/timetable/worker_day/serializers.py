@@ -264,7 +264,7 @@ class WorkerDaySerializer(serializers.ModelSerializer, UnaccountedOvertimeMixin)
                 self.fail('no_user', amount=len(users), username=username)
 
         if not wd_type == WorkerDay.TYPE_WORKDAY:
-            attrs.pop('worker_day_details', None)
+            attrs['worker_day_details'] = []
             attrs['is_vacancy'] = False
             attrs['is_outsource'] = False
         elif not (attrs.get('worker_day_details')):
