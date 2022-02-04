@@ -483,6 +483,20 @@ class TestWorkersStatsGetter(TestsHelperMixin, TestCase):
             self.assertEqual(result.get('WorkerDay', {}).get('deleted'), 2)
             self._test_cache(1, [self.employee2.id])
 
+            batch_data = [
+                {
+                    'dt': self.dt_from + timedelta(2),
+                    'employee_id': self.employee.id,
+                    'employment_id': self.employment.id,
+                    'type_id': WorkerDay.TYPE_HOLIDAY,
+                    'is_fact': False,
+                    'is_approved': False,
+                },
+            ]
+            _, result = WorkerDay.batch_update_or_create(batch_data)
+            self.assertEqual(result.get('WorkerDay', {}).get('created'), 1)
+            self._test_cache(0)
+
             cache.clear()
             self.employment2.dt_fired = None
             self.employment2.save()
