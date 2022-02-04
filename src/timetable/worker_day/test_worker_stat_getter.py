@@ -435,6 +435,54 @@ class TestWorkersStatsGetter(TestsHelperMixin, TestCase):
             wd2.delete()
             self._test_cache(0)
 
+            batch_data = [
+                {
+                    'dt': self.dt_from + timedelta(2),
+                    'employee_id': self.employee2.id,
+                    'employment_id': self.employment2.id,
+                    'type_id': WorkerDay.TYPE_VACATION,
+                    'is_fact': False,
+                    'is_approved': False,
+                },
+                {
+                    'dt': self.dt_from + timedelta(3),
+                    'employee_id': self.employee2.id,
+                    'employment_id': self.employment2.id,
+                    'type_id': WorkerDay.TYPE_HOLIDAY,
+                    'is_fact': False,
+                    'is_approved': False,
+                }
+            ]
+
+            created_days, result = WorkerDay.batch_update_or_create(batch_data)
+            for i, data in enumerate(batch_data):
+                data['id'] = created_days[i].id
+            self._test_cache(1, [self.employee2.id])
+            self.assertEqual(result.get('WorkerDay', {}).get('created'), 2)
+            
+            batch_data[0]['type_id'] = WorkerDay.TYPE_HOLIDAY
+            _, result = WorkerDay.batch_update_or_create(batch_data)
+            self.assertEqual(result.get('WorkerDay', {}).get('updated'), 1)
+            self._test_cache(1, [self.employee2.id])
+
+            batch_data[0]['type_id'] = WorkerDay.TYPE_EMPTY
+            _, result = WorkerDay.batch_update_or_create(batch_data)
+            self.assertEqual(result.get('WorkerDay', {}).get('updated'), 1)
+            self._test_cache(0)
+
+            batch_data[1]['type_id'] = WorkerDay.TYPE_VACATION
+            _, result = WorkerDay.batch_update_or_create(batch_data)
+            self.assertEqual(result.get('WorkerDay', {}).get('updated'), 1)
+            self._test_cache(1, [self.employee2.id])
+
+            _, result = WorkerDay.batch_update_or_create(
+                data=[],
+                delete_scope_fields_list=['dt', 'is_approved', 'is_fact', 'employee_id'],
+                delete_scope_values_list=batch_data,
+            )
+            self.assertEqual(result.get('WorkerDay', {}).get('deleted'), 2)
+            self._test_cache(1, [self.employee2.id])
+
             cache.clear()
             self.employment2.dt_fired = None
             self.employment2.save()

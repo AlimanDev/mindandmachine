@@ -119,7 +119,7 @@ class BatchUpdateOrCreateModelMixin:
 
     @classmethod
     def _get_diff_lookup_fields(cls):
-        pass
+        return []
 
     @classmethod
     def _get_diff_headers(cls):
@@ -165,6 +165,13 @@ class BatchUpdateOrCreateModelMixin:
             },
         )
         send_mass_html_mail(datatuple)
+    
+    @classmethod
+    def _post_batch(cls, **kwargs):
+        """
+        Функция, которая будет вызвана после выполнения метода batch_update_or_create
+        """
+        pass
 
     @classmethod
     def batch_update_or_create(
@@ -217,11 +224,10 @@ class BatchUpdateOrCreateModelMixin:
 
         try:
             with transaction.atomic():
-                if diff_report_email_to:
-                    diff_data = {}
-                    diff_lookup_fields = cls._get_diff_lookup_fields()
-                    diff_obj_keys = tuple(lookup_field.split('__') for lookup_field in diff_lookup_fields)
-                    diff_headers = cls._get_diff_headers()
+                diff_data = {}
+                diff_lookup_fields = cls._get_diff_lookup_fields()
+                diff_obj_keys = tuple(lookup_field.split('__') for lookup_field in diff_lookup_fields)
+                diff_headers = cls._get_diff_headers()
                 create_or_update_perms_data = {}
                 check_perms_extra_kwargs = {}
                 if user:
@@ -319,9 +325,8 @@ class BatchUpdateOrCreateModelMixin:
                     for update_dict in to_update:
                         update_key = update_dict.get(update_key_field)
                         obj = existing_objs.get(update_key)
-                        if diff_report_email_to:
-                            diff_data.setdefault('before_update', []).append(
-                                tuple(obj_deep_get(obj, *keys) for keys in diff_obj_keys))
+                        diff_data.setdefault('before_update', []).append(
+                            tuple(obj_deep_get(obj, *keys) for keys in diff_obj_keys))
                         for k, v in update_dict.items():
                             setattr(obj, k, v)
                             update_fields_set.add(k)
@@ -333,6 +338,7 @@ class BatchUpdateOrCreateModelMixin:
                 objs = objs_to_create + objs_to_update + objs_to_skip
 
                 deleted_dict = {}
+                deleted_objs = []
                 q_for_delete = Q()
                 if delete_scope_fields_list:
                     if not delete_scope_values_list:
@@ -369,6 +375,7 @@ class BatchUpdateOrCreateModelMixin:
                             q_for_delete, **delete_filter_kwargs).exclude(id__in=list(obj.id for obj in objs if obj.id))
                         if user:
                             cls._check_batch_delete_qs_perms(user, delete_qs, **check_perms_extra_kwargs)
+                        deleted_objs = list(delete_qs.values())
                         if diff_report_email_to:
                             diff_data['deleted'] = list(delete_qs.values_list(*diff_lookup_fields))
                         _total_deleted_count, deleted_dict = delete_qs.delete()
@@ -416,6 +423,8 @@ class BatchUpdateOrCreateModelMixin:
 
                 if diff_report_email_to:
                     cls._create_and_send_diff_report(diff_report_email_to, diff_data, diff_headers, now)
+
+                cls._post_batch(created_objs=objs_to_create, updated_objs=objs_to_update, deleted_objs=deleted_objs, diff_data=diff_data)
 
                 if dry_run:
                     raise DryRunRevertException()
