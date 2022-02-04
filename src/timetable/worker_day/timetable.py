@@ -11,7 +11,7 @@ from dateutil.relativedelta import relativedelta
 from django.conf import settings
 from django.db import transaction
 from django.db.models import Q, F, Count, Sum
-from django.db.models.expressions import OuterRef, Subquery
+from django.db.models.expressions import OuterRef, Subquery, RawSQL
 from django.db.models.functions import Coalesce
 from django.http.response import HttpResponse
 from django.utils.encoding import escape_uri_path
@@ -521,7 +521,14 @@ class UploadDownloadTimetableCells(BaseUploadDownloadTimeTable):
                             dttm_work_start=dttm_work_start,
                             dttm_work_end=dttm_work_end,
                             delta_in_secs=self.user.network.set_closest_plan_approved_delta_for_manual_fact,
-                        ).first() if (is_fact and not wd_type_obj.is_dayoff) else None,
+                        ).annotate(
+                            order_by_val=RawSQL("""LEAST(
+                                ABS(EXTRACT(EPOCH FROM (U0."dttm_work_start" - "timetable_workerday"."dttm_work_start"))),
+                                ABS(EXTRACT(EPOCH FROM (U0."dttm_work_end" - "timetable_workerday"."dttm_work_end")))
+                            )""", [])
+                        ).order_by(
+                            'order_by_val',
+                        ).values('id').first() if (is_fact and not wd_type_obj.is_dayoff) else None,
                         source=WorkerDay.SOURCE_UPLOAD,
                     )
                     if wd_type_id == WorkerDay.TYPE_WORKDAY:
