@@ -735,6 +735,30 @@ class WorkerDay(AbstractModel):
             raise PermissionDenied(perm_checker.err_message)
 
     @classmethod
+    def _get_diff_lookup_fields(cls):
+        return [
+            'type_id',
+        ]
+
+    @classmethod
+    def _post_batch(cls, **kwargs):
+        reduce_norm_types = set(WorkerDayType.objects.filter(is_reduce_norm=True).values_list('code', flat=True))
+        groupped_by_employee = {}
+        for obj in kwargs.get('created_objs', []):
+            groupped_by_employee.setdefault(obj.employee_id, []).append(obj.type_id)
+        for obj in kwargs.get('deleted_objs', []):
+            groupped_by_employee.setdefault(obj['employee_id'], []).append(obj['type_id'])
+        for i, obj in enumerate(kwargs.get('updated_objs', [])):
+            prev_type = kwargs['diff_data']['before_update'][i][0]
+            new_type = obj.type_id
+            if prev_type != new_type or new_type in reduce_norm_types:
+                groupped_by_employee.setdefault(obj.employee_id, []).extend([new_type, prev_type])
+
+        for employee_id, types in groupped_by_employee.items():
+            if set(types).intersection(reduce_norm_types):
+                transaction.on_commit(lambda: cache.delete_pattern(f"prod_cal_*_*_{employee_id}"))
+
+    @classmethod
     def _check_create_single_obj_perm(cls, user, obj_data, check_active_empl=True, **extra_kwargs):
         from src.timetable.worker_day_permissions.checkers import CreateSingleWdPermissionChecker
         perm_checker = CreateSingleWdPermissionChecker(user=user, wd_data=obj_data)
