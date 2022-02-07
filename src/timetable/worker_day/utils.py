@@ -274,6 +274,7 @@ def copy_as_excel_cells(from_employee_id, from_dates, to_employee_id, to_dates, 
             user=user,
             check_perms_extra_kwargs=dict(
                 check_active_empl=False,
+                grouped_checks=True,
             )
         )
 
@@ -400,6 +401,7 @@ def create_worker_days_range(dates, type_id=WorkerDay.TYPE_WORKDAY, shop_id=None
                 data=wdays, user=created_by,
                 check_perms_extra_kwargs=dict(
                     check_active_empl=False,  # проверка наличия трудоустройства происходит выше
+                    grouped_checks=True,
                 ),
                 delete_scope_filters={'employee__isnull': False},  # не удаляем открытые вакансии при создании новых
             )

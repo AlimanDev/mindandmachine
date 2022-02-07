@@ -1,5 +1,4 @@
 import datetime
-import distutils.util
 import json
 from decimal import Decimal
 
@@ -8,6 +7,7 @@ from django.contrib.auth.models import (
     UserManager
 )
 from django.core.cache import cache
+from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models
 from django.db import transaction
 from django.db.models import (
@@ -737,31 +737,86 @@ class WorkerDay(AbstractModel):
     @classmethod
     def _get_diff_lookup_fields(cls):
         return [
+            'dt',
+            'employee_id',
+            'shop_id',
             'type_id',
+            'is_fact',
+            'is_vacancy',
         ]
+
+    @classmethod
+    def _get_grouped_perm_check_data(self, diff_data):
+        grouped_wd_min_max_dt_data = {}
+        grouped_wd_perm_check_data = []
+        for dt, employee_id, shop_id, type_id, is_fact, is_vacancy in diff_data:
+            k_data = dict(
+                employee_id=employee_id,
+                type_id=type_id,
+                shop_id=shop_id,
+                is_fact=is_fact,
+                is_vacancy=is_vacancy,
+            )
+            k = json.dumps(k_data, sort_keys=True, cls=DjangoJSONEncoder)
+            min_max_dt_data = grouped_wd_min_max_dt_data.setdefault(k, {})
+            min_max_dt_data['min_dt'] = min(min_max_dt_data.get('min_dt', dt), dt)
+            min_max_dt_data['max_dt'] = max(min_max_dt_data.get('max_dt', dt), dt)
+        for k, min_max_dt_data in grouped_wd_min_max_dt_data.items():
+            wd_data = json.loads(k)
+            if min_max_dt_data.get('min_dt') == min_max_dt_data.get('max_dt'):
+                single_wd_data = wd_data.copy()
+                single_wd_data['dt'] = min_max_dt_data.get('min_dt')
+                grouped_wd_perm_check_data.append(single_wd_data)
+            else:
+                min_wd_data = wd_data.copy()
+                min_wd_data['dt'] = min_max_dt_data.get('min_dt')
+                grouped_wd_perm_check_data.append(min_wd_data)
+                max_wd_data = wd_data.copy()
+                max_wd_data['dt'] = min_max_dt_data.get('max_dt')
+                grouped_wd_perm_check_data.append(max_wd_data)
+        return grouped_wd_perm_check_data
+
+    @classmethod
+    def _pre_batch(cls, user, **kwargs):
+        check_perms_extra_kwargs = kwargs.get('check_perms_extra_kwargs', {})
+        grouped_checks = check_perms_extra_kwargs.pop('grouped_checks', False)
+        if grouped_checks:
+            diff_data = kwargs.get('diff_data')
+            if diff_data:
+                check_active_empl = check_perms_extra_kwargs.pop('check_active_empl', True)
+                created = diff_data.get('created')
+                if created:
+                    grouped_wd_perm_check_data = cls._get_grouped_perm_check_data(created)
+                    for wd_data in grouped_wd_perm_check_data:
+                        cls._check_create_single_obj_perm(user, wd_data, check_active_empl=check_active_empl)
+                deleted = diff_data.get('deleted')
+                if deleted:
+                    grouped_wd_perm_check_data = cls._get_grouped_perm_check_data(deleted)
+                    for wd_data in grouped_wd_perm_check_data:
+                        cls._check_create_single_obj_perm(user, wd_data)
 
     @classmethod
     def _post_batch(cls, **kwargs):
         reduce_norm_types = set(WorkerDayType.objects.filter(is_reduce_norm=True).values_list('code', flat=True))
-        groupped_by_employee = {}
+        grouped_by_employee = {}
         for obj in kwargs.get('created_objs', []):
-            groupped_by_employee.setdefault(obj.employee_id, []).append(obj.type_id)
+            grouped_by_employee.setdefault(obj.employee_id, []).append(obj.type_id)
         for obj in kwargs.get('deleted_objs', []):
-            groupped_by_employee.setdefault(obj['employee_id'], []).append(obj['type_id'])
+            grouped_by_employee.setdefault(obj.employee_id, []).append(obj.type_id)
         for i, obj in enumerate(kwargs.get('updated_objs', [])):
-            prev_type = kwargs['diff_data']['before_update'][i][0]
+            prev_type = kwargs['diff_data']['before_update'][i][3]
             new_type = obj.type_id
             if prev_type != new_type or new_type in reduce_norm_types:
-                groupped_by_employee.setdefault(obj.employee_id, []).extend([new_type, prev_type])
+                grouped_by_employee.setdefault(obj.employee_id, []).extend([new_type, prev_type])
 
-        for employee_id, types in groupped_by_employee.items():
+        for employee_id, types in grouped_by_employee.items():
             if set(types).intersection(reduce_norm_types):
                 transaction.on_commit(lambda: cache.delete_pattern(f"prod_cal_*_*_{employee_id}"))
 
     @classmethod
     def _check_create_single_obj_perm(cls, user, obj_data, check_active_empl=True, **extra_kwargs):
         from src.timetable.worker_day_permissions.checkers import CreateSingleWdPermissionChecker
-        perm_checker = CreateSingleWdPermissionChecker(user=user, wd_data=obj_data)
+        perm_checker = CreateSingleWdPermissionChecker(user=user, wd_data=obj_data, check_active_empl=check_active_empl)
         if not perm_checker.has_permission():
             raise PermissionDenied(perm_checker.err_message)
 
@@ -774,9 +829,16 @@ class WorkerDay(AbstractModel):
             raise PermissionDenied(perm_checker.err_message)
 
     @classmethod
-    def _check_delete_single_obj_perm(cls, user, existing_obj=None, obj_id=None, check_active_empl=True, **extra_kwargs):
+    def _check_delete_single_obj_perm(cls, user, existing_obj=None, obj_id=None, check_active_empl=False, **extra_kwargs):
         from src.timetable.worker_day_permissions.checkers import DeleteSingleWdPermissionChecker
         perm_checker = DeleteSingleWdPermissionChecker(user=user, wd_obj=existing_obj, wd_id=obj_id)
+        if not perm_checker.has_permission():
+            raise PermissionDenied(perm_checker.err_message)
+
+    @classmethod
+    def _check_delete_single_wd_data_perm(cls, user, obj_data, **extra_kwargs):
+        from src.timetable.worker_day_permissions.checkers import DeleteSingleWdDataPermissionChecker
+        perm_checker = DeleteSingleWdDataPermissionChecker(user=user, wd_data=obj_data)
         if not perm_checker.has_permission():
             raise PermissionDenied(perm_checker.err_message)
 

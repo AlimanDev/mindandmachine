@@ -228,8 +228,18 @@ class BaseSingleWdDataPermissionChecker(BaseSingleWdPermissionChecker):
         )
 
 
-# class BaseListWdPermissionChecker(BaseWdPermissionChecker):  # TODO: зачем? получится?
-#     pass
+# class BaseListWdPermissionChecker(BaseWdPermissionChecker):
+#     def __init__(self, *args, wd_list, **kwargs):
+#         """
+#         :param wd_list:
+#             dt
+#             type_id
+#             employee_id
+#             shop_id
+#             is_vacancy
+#         """
+#         self.wd_list = wd_list
+#         super(BaseListWdPermissionChecker, self).__init__(*args, **kwargs)
 
 
 class CreateSingleWdPermissionChecker(BaseSingleWdDataPermissionChecker):
@@ -256,6 +266,13 @@ class CreateSingleWdPermissionChecker(BaseSingleWdDataPermissionChecker):
 
 class UpdateSingleWdPermissionChecker(BaseSingleWdDataPermissionChecker):
     action = WorkerDayPermission.UPDATE
+
+    def has_permission(self):
+        return self._has_single_wd_data_permission()
+
+
+class DeleteSingleWdDataPermissionChecker(BaseSingleWdDataPermissionChecker):
+    action = WorkerDayPermission.DELETE
 
     def has_permission(self):
         return self._has_single_wd_data_permission()
