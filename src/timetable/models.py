@@ -1,4 +1,5 @@
 import datetime
+import distutils.util
 import json
 from decimal import Decimal
 
@@ -6,11 +7,13 @@ from django.conf import settings
 from django.contrib.auth.models import (
     UserManager
 )
+from django.core.cache import cache
 from django.db import models
 from django.db import transaction
 from django.db.models import (
     Subquery, OuterRef, Max, Q, Case, When, Value, FloatField, F, IntegerField, Exists, BooleanField, Count,
 )
+from django.db.models.expressions import RawSQL
 from django.db.models.fields import PositiveSmallIntegerField
 from django.db.models.functions import Abs, Cast, Extract, Least
 from django.db.models.query import QuerySet
@@ -533,6 +536,7 @@ class WorkerDayType(AbstractModel):
     )
     ordering = models.PositiveSmallIntegerField(default=0)
     is_active = models.BooleanField(default=True)
+    tracker = FieldTracker(fields=('is_reduce_norm',))
 
     class Meta(AbstractModel.Meta):
         ordering = ['-ordering', 'name']
@@ -549,6 +553,12 @@ class WorkerDayType(AbstractModel):
     @classmethod
     def get_wd_types_dict(cls):
         return {wdt.code: wdt for wdt in cls.objects.prefetch_related('allowed_additional_types', 'allowed_as_additional_for')}
+
+    @tracker
+    def save(self, *args, **kwargs):
+        if self.code and self.tracker.has_changed('is_reduce_norm'):
+            cache.delete_pattern("prod_cal_*_*_*")
+        return super().save(*args, **kwargs)
 
 
 class WorkerDay(AbstractModel):
@@ -1059,7 +1069,7 @@ class WorkerDay(AbstractModel):
     objects = WorkerDayManager.from_queryset(WorkerDayQuerySet)()  # исключает раб. дни у которых employment_id is null
     objects_with_excluded = models.Manager.from_queryset(WorkerDayQuerySet)()
 
-    tracker = FieldTracker(fields=('work_hours',))
+    tracker = FieldTracker(fields=('work_hours', 'type',))
 
     @property
     def total_cost(self):
@@ -1230,8 +1240,15 @@ class WorkerDay(AbstractModel):
                     'is_new': is_new,
                 },
             ))
+        if self.type.is_reduce_norm or (not is_new and self.tracker.has_changed('type') and WorkerDayType.objects.get(pk=self.tracker.previous('type')).is_reduce_norm):
+            transaction.on_commit(lambda: cache.delete_pattern(f"prod_cal_*_*_{self.employee_id}"))
 
         return res
+
+    def delete(self, *args, **kwargs):
+        if self.type.is_reduce_norm:
+            transaction.on_commit(lambda: cache.delete_pattern(f"prod_cal_*_*_{self.employee_id}"))
+        return super().delete(*args, **kwargs)
 
     @classmethod
     def get_closest_plan_approved(cls, user_id, priority_shop_id, dttm, record_type=None):
@@ -1642,6 +1659,13 @@ class WorkerDay(AbstractModel):
                     dttm_work_end=OuterRef('dttm_work_end'),
                     delta_in_secs=delta_in_secs,
                     use_annotated_filter=False,
+                ).annotate(
+                    order_by_val=RawSQL("""LEAST(
+                        ABS(EXTRACT(EPOCH FROM (U0."dttm_work_start" - "timetable_workerday"."dttm_work_start"))),
+                        ABS(EXTRACT(EPOCH FROM (U0."dttm_work_end" - "timetable_workerday"."dttm_work_end")))
+                    )""", [])
+                ).order_by(
+                    'order_by_val',
                 ).values('id')[:1])
             )
             qs.filter(plan_approved_count=1).update(

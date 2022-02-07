@@ -233,10 +233,11 @@ class FiscalTimesheet:
     def __init__(self, employee, dt_from, dt_to, wd_types_dict):
         self.wd_types_dict = wd_types_dict
         self.employee = employee
-        self.active_employments = list(EmploymentModel.objects.get_active(
+        self.active_employments = list(EmploymentModel.objects.get_active_empl_by_priority(
             dt_from=dt_from,
             dt_to=dt_to,
             employee=employee,
+            # priority_shop_network_id=...  # TODO: сделать передачу для какого магазина происходит расчет табеля? -- чтобы в приоритете бралось тр-во оттуда?
         ).select_related(
             'shop',
             'employee__user',

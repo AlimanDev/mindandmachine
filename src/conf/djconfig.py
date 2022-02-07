@@ -418,6 +418,16 @@ CELERYD_CONCURRENCY = 2
 CELERYD_PREFETCH_MULTIPLIER = 1
 BACKEND_QUEUE = env.str('BACKEND_QUEUE', default='backend_queue')
 
+CACHES = {
+    "default": {
+        "BACKEND": "django_redis.cache.RedisCache",
+        "LOCATION": CELERY_BROKER_URL + '/1',
+        "OPTIONS": {
+            "CLIENT_CLASS": "django_redis.client.DefaultClient",
+        }
+    }
+}
+
 # for change celery configs must be before (for BACKEND_QUEUE)
 # todo: do normal parameters changer
 
@@ -470,6 +480,10 @@ USERS_WITH_SCHEDULE_ONLY = False
 USERS_WITH_ACTIVE_EMPLOYEE_OR_VACANCY_ONLY = False
 
 CALCULATE_LOAD_TEMPLATE = False  # параметр отключающий автоматический расчет нагрузки
+
+CACHE_TTL = {
+    'prod_cal': 604800, # время жизни кэша в статистике, по умолчанию 7 дней == 604800 сек.
+}
 
 CLIENT_TIMEZONE = 3
 
@@ -665,6 +679,11 @@ BEAT_SCHEDULE = {
         'schedule': crontab(hour=0, minute=0),
         'options': {'queue': BACKEND_QUEUE},
         'enabled': ZKTECO_INTEGRATION,
+    },
+    'task-set-prod-cal-cache-cur-and-next-month': {
+        'task': 'src.celery.tasks.set_prod_cal_cache_cur_and_next_month',
+        'schedule': crontab(hour=0, minute=0),
+        'options': {'queue': BACKEND_QUEUE},
     },
 }
 

@@ -15,6 +15,7 @@ from django.contrib.auth.models import (
 from django.core.cache import cache
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.core.serializers.json import DjangoJSONEncoder
+from django.core.cache import cache
 from django.db import models
 from django.db import transaction
 from django.db.models import Case, When, Sum, Value, IntegerField, Subquery, OuterRef, Q
@@ -286,6 +287,8 @@ class Network(AbstractActiveModel):
     analytics_type = models.CharField(
         verbose_name='Вид аналитики', max_length=32, choices=ANALYTICS_TYPE_CHOICES, default=ANALYTICS_TYPE_METABASE)
 
+    tracker = FieldTracker(fields=('accounting_period_length',))
+
     DEFAULT_NIGHT_EDGES = (
         '22:00:00',
         '06:00:00',
@@ -294,6 +297,12 @@ class Network(AbstractActiveModel):
     @property
     def settings_values_prop(self):
         return json.loads(self.settings_values)
+
+    @tracker
+    def save(self, *args, **kwargs):
+        if self.id and self.tracker.has_changed('accounting_period_length'):
+            cache.delete_pattern("prod_cal_*_*_*")
+        return super().save(*args, **kwargs)
 
     def set_settings_value(self, k, v):
         settings_values = json.loads(self.settings_values)
@@ -535,7 +544,7 @@ class Shop(MPTTModel, AbstractActiveNetworkSpecificCodeNamedModel):
     city = models.CharField(max_length=128, null=True, blank=True, verbose_name='Город')
 
     tracker = FieldTracker(
-        fields=['tm_open_dict', 'tm_close_dict', 'load_template', 'latitude', 'longitude', 'fias_code', 'director_id'])
+        fields=['tm_open_dict', 'tm_close_dict', 'load_template', 'latitude', 'longitude', 'fias_code', 'director_id', 'region_id'])
 
     def __str__(self):
         return '{}, {}, {}'.format(
@@ -819,6 +828,9 @@ class Shop(MPTTModel, AbstractActiveNetworkSpecificCodeNamedModel):
         if is_new or force_set_defaults:
             self._set_shop_defaults()
 
+        if not is_new and self.tracker.has_changed('region_id'):
+            transaction.on_commit(lambda: cache.delete_pattern("prod_cal_*_*_*"))
+
         return res
 
     def get_exchange_settings(self):
@@ -954,14 +966,22 @@ class EmploymentManager(models.Manager):
         return self.filter(q, **kwargs)
 
     def get_active_empl_by_priority(  # TODO: переделать, чтобы можно было в 1 запросе получать активные эмплойменты для пар (сотрудник, даты)?
-            self, network_id=None, dt=None, priority_shop_id=None, priority_employment_id=None,
-            priority_work_type_id=None, priority_by_visible=True, extra_q=None, **kwargs):
-        qs = self.get_active(network_id=network_id, dt_from=dt, dt_to=dt, extra_q=extra_q, **kwargs)
+            self, network_id=None, dt=None, dt_from=None, dt_to=None, priority_shop_id=None, priority_employment_id=None,
+            priority_work_type_id=None, priority_by_visible=True, extra_q=None, priority_shop_network_id=None, **kwargs):
+        assert dt or (dt_from and dt_to)
+        dt_from = dt or dt_from
+        dt_to = dt or dt_to
+        qs = self.get_active(network_id=network_id, dt_from=dt_from, dt_to=dt_to, extra_q=extra_q, **kwargs)
 
         order_by = []
-
         if priority_by_visible:
             order_by.append('-is_visible')
+
+        if priority_shop_network_id:
+            qs = qs.annotate_value_equality(
+                'is_equal_shop_networks', 'shop__network_id', priority_shop_network_id,
+            )
+            order_by.append('-is_equal_shop_networks')
 
         if priority_employment_id:
             qs = qs.annotate_value_equality(
@@ -1142,6 +1162,10 @@ class ProductionDay(AbstractModel):
         ).values_list('dt__month', 'norm_work_hours')
         return dict(norm_work_hours)
 
+    def save(self, *args, **kwargs):
+        cache.delete_pattern("prod_cal_*_*_*")
+        return super().save(*args, **kwargs)
+
 
 class User(DjangoAbstractUser, AbstractModel):
     class Meta:
@@ -1308,6 +1332,7 @@ class WorkerPosition(AbstractActiveNetworkSpecificCodeNamedModel):
     breaks = models.ForeignKey(Break, on_delete=models.PROTECT, null=True, blank=True)
     hours_in_a_week = models.PositiveSmallIntegerField(default=40, verbose_name='Часов в рабочей неделе')
     ordering = models.PositiveSmallIntegerField(default=9999, verbose_name='Индекс должности для сортировки')
+    tracker = FieldTracker(fields=['hours_in_a_week'])
 
     def __str__(self):
         return '{}, {}'.format(self.name, self.id)
@@ -1348,6 +1373,7 @@ class WorkerPosition(AbstractActiveNetworkSpecificCodeNamedModel):
                 self.default_work_type_names.set(
                     WorkTypeName.objects.filter(network=self.network, code__in=default_work_type_names_codes))
 
+    @tracker
     def save(self, *args, force_set_defaults=False, **kwargs):
         is_new = self.id is None
         if is_new or force_set_defaults:
@@ -1355,6 +1381,8 @@ class WorkerPosition(AbstractActiveNetworkSpecificCodeNamedModel):
         res = super(WorkerPosition, self).save(*args, **kwargs)
         if is_new or force_set_defaults:
             self._set_m2m_defaults()
+        if not is_new and self.tracker.has_changed('hours_in_a_week'):
+            cache.delete_pattern("prod_cal_*_*_*")
         return res
 
     def get_department(self):
@@ -1436,7 +1464,7 @@ class Employment(AbstractActiveModel):
     dt_new_week_availability_from = models.DateField(null=True, blank=True)
     is_visible = models.BooleanField(default=True)
 
-    tracker = FieldTracker(fields=['position', 'dt_hired', 'dt_fired'])
+    tracker = FieldTracker(fields=['position', 'dt_hired', 'dt_fired', 'norm_work_hours'])
 
     objects = EmploymentManager.from_queryset(EmploymentQuerySet)()
     objects_with_excluded = models.Manager.from_queryset(EmploymentQuerySet)()
@@ -1471,6 +1499,7 @@ class Employment(AbstractActiveModel):
             if self.employee.user.network.clean_wdays_on_employment_dt_change:
                 transaction.on_commit(lambda: clean_wdays.delay(id__in=wdays_ids))
             transaction.on_commit(lambda: export_or_delete_employment_zkteco.delay(self.id))
+            transaction.on_commit(lambda: cache.delete_pattern(f"prod_cal_*_*_{self.employee_id}"))
             return super(Employment, self).delete(**kwargs)
 
     def __init__(self, *args, **kwargs):
@@ -1570,6 +1599,9 @@ class Employment(AbstractActiveModel):
 
         if (is_new or self.tracker.has_changed('dt_hired') or self.tracker.has_changed('dt_fired')) and settings.ZKTECO_INTEGRATION:
             transaction.on_commit(lambda: export_or_delete_employment_zkteco.delay(self.id))
+
+        if (is_new or self.tracker.has_changed('dt_hired') or self.tracker.has_changed('dt_fired') or position_has_changed or self.tracker.has_changed('norm_work_hours')):
+            transaction.on_commit(lambda: cache.delete_pattern(f"prod_cal_*_*_{self.employee_id}"))
 
         return res
 

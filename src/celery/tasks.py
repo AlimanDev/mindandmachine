@@ -15,6 +15,7 @@ from src.main.operation_template.utils import build_period_clients
 from src.main.upload.utils import upload_demand_util, upload_employees_util, upload_vacation_util, sftp_download
 
 from src.base.models import (
+    Network,
     Shop,
     User,
     Notification,
@@ -33,6 +34,7 @@ from src.timetable.models import (
     WorkerDayCashboxDetails,
     EmploymentWorkType,
 )
+from src.timetable.worker_day.stat import WorkersStatsGetter
 
 
 @app.task
@@ -442,3 +444,25 @@ def auto_delete_biometrics():
         except HTTPError:
             return
     UserConnecter.objects.filter(user_id__in=deleted_uc).delete()
+
+@app.task
+def set_prod_cal_cache(dt_from):
+    if isinstance(dt_from, str):
+        dt_from = datetime.strptime(dt_from, settings.QOS_DATETIME_FORMAT).date()
+    dt_from = dt_from.replace(day=1)
+    dt_to = dt_from + relativedelta(day=31)
+
+    for network in Network.objects.all():
+        active_employees = Employment.objects.get_active(
+            network_id=network.id,
+            dt_from=dt_from, 
+            dt_to=dt_to,
+        ).values_list('employee_id', flat=True)
+        ws_getter = WorkersStatsGetter(dt_from, dt_to, employee_id__in=active_employees, network=network)
+        ws_getter._get_prod_cal_cached()
+
+@app.task
+def set_prod_cal_cache_cur_and_next_month():
+    dt = date.today()
+    set_prod_cal_cache.delay(dt)
+    set_prod_cal_cache.delay(dt + relativedelta(months=1))

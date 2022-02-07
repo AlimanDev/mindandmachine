@@ -87,6 +87,7 @@ class BatchUpdateOrCreateModelMixin:
     @classmethod
     def _batch_update_or_create_rel_objs(cls, rel_objs_data, objs, rel_objs_mapping, stats, update_key_field):
         all_rel_objs_mapped_by_type = {}
+        delete_scope_values_list_by_type = {}
         for idx, rel_objs_to_create_or_update in rel_objs_data.items():
             obj = objs[idx]
             for rel_obj_key, rel_obj_data_list in rel_objs_to_create_or_update.items():
@@ -95,12 +96,15 @@ class BatchUpdateOrCreateModelMixin:
                     rel_obj_dict[
                         rel_obj_reverse_fk_field] = obj.pk
                 all_rel_objs_mapped_by_type.setdefault(rel_obj_key, []).extend(rel_obj_data_list)
+                delete_scope_values_list_by_type.setdefault(rel_obj_key, []).append({rel_obj_reverse_fk_field: obj.pk})
 
         for rel_obj_key, rel_obj_data_list in all_rel_objs_mapped_by_type.items():
             rel_obj_cls, rel_obj_reverse_fk_field = rel_objs_mapping.get(rel_obj_key)
+            delete_scope_values_list = delete_scope_values_list_by_type.get(rel_obj_key)
             rel_obj_cls.batch_update_or_create(
                 data=rel_obj_data_list, update_key_field=update_key_field,
-                delete_scope_fields_list=[rel_obj_reverse_fk_field], stats=stats)
+                delete_scope_fields_list=[rel_obj_reverse_fk_field],
+                delete_scope_values_list=delete_scope_values_list, stats=stats)
 
     @classmethod
     def _is_field_exist(cls, field_name):
