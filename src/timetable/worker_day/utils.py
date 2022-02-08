@@ -263,7 +263,7 @@ def copy_as_excel_cells(from_employee_id, from_dates, to_employee_id, to_dates, 
                     last_edited_by=user,
                     source=source,
                     work_hours=blank_day.work_hours,
-                    is_vacancy=worker_active_empl.shop_id != blank_day.shop_id if blank_day.shop_id else None,
+                    is_vacancy=worker_active_empl.shop_id != blank_day.shop_id if blank_day.shop_id else False,
                 )
                 if blank_day.shop_id:
                     wd_data['is_outsource'] = blank_day.shop.network_id != worker_active_empl.employee.user.network_id
