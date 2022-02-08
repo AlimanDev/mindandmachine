@@ -138,6 +138,7 @@ class TestIntegration(APITestCase):
         ).update(
             position=self.position,
         )
+        self.employment1.position = self.position
         
         self.client.force_authenticate(user=self.user1)
 
@@ -1280,6 +1281,124 @@ class TestIntegration(APITestCase):
                     ]
                 )
                 self.assertFalse(UserExternalCode.objects.filter(external_system=self.ext_system, user=self.user1).exists())
+    
+    def test_change_zone_on_employment_change_shop(self):
+        self.att_area2, _ = AttendanceArea.objects.update_or_create(
+            code='2',
+            external_system=self.ext_system,
+            defaults={
+                'name': 'Тестовая зона2',
+            }
+        )
+        ShopExternalCode.objects.create(
+            attendance_area=self.att_area,
+            shop=self.shop,
+        )
+        self.root_shop_code = ShopExternalCode.objects.create(
+            attendance_area=self.att_area,
+            shop=self.root_shop,
+        )
+        UserExternalCode.objects.create(
+            external_system=self.ext_system,
+            user=self.user1,
+            code=settings.ZKTECO_USER_ID_SHIFT + self.user1.id,
+        )   
+        with patch.object(transaction, 'on_commit', lambda t: t()):
+            with patch('src.integration.zkteco.requests', spec=TestRequestMock) as mock_request:
+                mock_request.json.return_value = {"code": 0}
+                mock_request.request.return_value = mock_request
+                
+                self.employment1.shop = self.shop
+                self.employment1.save()
+                self.assertEqual(
+                    mock_request.request.call_args_list, 
+                    [
+                        call(
+                            'POST', 
+                            '/attAreaPerson/set', 
+                            data=None, 
+                            json={'pins': [str(settings.ZKTECO_USER_ID_SHIFT + self.user1.id)], 'code': str(self.att_area.code)}, 
+                            params={'access_token': settings.ZKTECO_KEY}
+                        ),
+                    ]
+                )
+                self.assertTrue(UserExternalCode.objects.filter(external_system=self.ext_system, user=self.user1).exists())
+                mock_request.request.call_args_list.clear()
+                self.root_shop_code.attendance_area = self.att_area2
+                self.root_shop_code.save()
+                self.employment1.shop = self.root_shop
+                self.employment1.save()
+                self.assertEqual(
+                    mock_request.request.call_args_list, 
+                    [
+                        call(
+                            'POST', 
+                            '/attAreaPerson/set', 
+                            data=None, 
+                            json={'pins': [str(settings.ZKTECO_USER_ID_SHIFT + self.user1.id)], 'code': str(self.att_area2.code)}, 
+                            params={'access_token': settings.ZKTECO_KEY}
+                        ),
+                        call(
+                            'POST', 
+                            '/attAreaPerson/delete', 
+                            data=None, 
+                            json={'pins': [str(settings.ZKTECO_USER_ID_SHIFT + self.user1.id)], 'code': str(self.att_area.code)}, 
+                            params={'access_token': settings.ZKTECO_KEY}
+                        ),
+                    ]
+                )
+                self.assertTrue(UserExternalCode.objects.filter(external_system=self.ext_system, user=self.user1).exists())
+    
+
+    def test_not_delete_area_when_same_area_in_other_shop(self):
+        self.maxDiff = None
+        ShopExternalCode.objects.create(
+            attendance_area=self.att_area,
+            shop=self.shop,
+        )
+        ShopExternalCode.objects.create(
+            attendance_area=self.att_area,
+            shop=self.root_shop,
+        )
+        with patch.object(transaction, 'on_commit', lambda t: t()):
+            with patch('src.integration.zkteco.requests', spec=TestRequestMock) as mock_request:
+                mock_request.json.return_value = {"code": 0}
+                mock_request.request.return_value = mock_request
+                Employment.objects.create(
+                    shop=self.shop,
+                    employee_id=self.employment1.employee_id,
+                    position=self.position,
+                )
+                self.assertEqual(
+                    mock_request.request.call_args_list, 
+                    [
+                        call(
+                            'POST', 
+                            '/person/add', 
+                            data=None, 
+                            json={
+                                'pin': settings.ZKTECO_USER_ID_SHIFT + self.user1.id, 
+                                'deptCode': settings.ZKTECO_DEPARTMENT_CODE, 
+                                'name': self.user1.first_name, 
+                                'lastName': self.user1.last_name,
+                            }, 
+                            params={'access_token': settings.ZKTECO_KEY}
+                        ),
+                        call(
+                            'POST', 
+                            '/attAreaPerson/set', 
+                            data=None, 
+                            json={'pins': [settings.ZKTECO_USER_ID_SHIFT + self.user1.id], 'code': str(self.att_area.code)}, 
+                            params={'access_token': settings.ZKTECO_KEY}
+                        ),
+                    ]
+                )
+                mock_request.request.call_args_list.clear()
+                self.employment1.dt_fired = date(2019, 1, 1)
+                self.employment1.save()
+                self.assertEquals(mock_request.request.call_args_list, [])
+                self.assertTrue(UserExternalCode.objects.filter(external_system=self.ext_system, user=self.user1).exists())
+
 
     def test_worker_not_exported_for_fired_person(self):
         ShopExternalCode.objects.create(
