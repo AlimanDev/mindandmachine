@@ -1319,15 +1319,8 @@ class WorkerDayViewSet(BaseModelViewSet):
                 dt__in=data['dates'],
                 **filt,
             )
-            delete_values = wdays_qs.values_list(
-                'dt',
-                'employee_id',
-                'shop_id',
-                'type_id',
-                'is_fact',
-                'is_vacancy',
-            )
             deleted_wdays = list(wdays_qs)
+            delete_values = list(map(lambda x: (x.dt, x.employee_id, x.shop_id, x.type_id, x.is_fact, x.is_vacancy), deleted_wdays))
             grouped_perm_check_data = WorkerDay._get_grouped_perm_check_data(delete_values)
             for wd_data in grouped_perm_check_data:
                 WorkerDay._check_delete_single_wd_data_perm(self.request.user, wd_data)
