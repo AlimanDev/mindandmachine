@@ -1296,7 +1296,7 @@ class WorkerDayViewSet(BaseModelViewSet):
         operation_description='''
         Метод для удаления рабочих дней
         ''',
-        responses={200:'empty response'},
+        responses={200: 'empty response'},
     )
     @action(detail=False, methods=['post'])
     def delete_worker_days(self, request):

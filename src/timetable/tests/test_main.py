@@ -5667,25 +5667,27 @@ class TestAditionalFunctions(TestsHelperMixin, APITestCase):
 
     def test_delete_worker_days(self):
         dt_from = date.today()
-        self.create_worker_days(self.employment2, dt_from, 4, 10, 20, True)
-        self.create_worker_days(self.employment3, dt_from, 4, 9, 21, True)
-        self.create_worker_days(self.employment2, dt_from, 2, 16, 20, False)
-        self.create_worker_days(self.employment2, dt_from + timedelta(2), 1, 16, 20, False, shop_id=self.shop2.id)
-        self.create_worker_days(self.employment3, dt_from, 4, 10, 21, False)
-        self.update_or_create_holidays(self.employment2, dt_from + timedelta(3), 1, False)
+        self.create_worker_days(self.employment2, dt_from, 6, 10, 20, True)
+        self.create_worker_days(self.employment3, dt_from, 6, 9, 21, True)
+        self.create_worker_days(self.employment2, dt_from, 4, 16, 20, False)
+        self.create_worker_days(self.employment2, dt_from + timedelta(4), 1, 16, 20, False, shop_id=self.shop2.id)
+        self.create_worker_days(self.employment3, dt_from, 6, 10, 21, False)
+        self.update_or_create_holidays(self.employment2, dt_from + timedelta(5), 1, False)
 
         url = f'{self.url}delete_worker_days/'
         data = {
             'employee_ids':[self.employment2.employee_id, self.employment3.employee_id],
-            'dates':[
+            'dates': [
                 dt_from + timedelta(i)
-                for i in range(3)
+                for i in range(5)
             ]
         }
-        response = self.client.post(url, data, format='json')
+        with mock.patch.object(WorkerDay, '_check_delete_single_wd_data_perm') as _check_delete_single_wd_data_perm:
+            response = self.client.post(url, data, format='json')
+            self.assertEqual(_check_delete_single_wd_data_perm.call_count, 5)
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(WorkerDay.objects.filter(is_approved=True).count(), 8)
+        self.assertEqual(WorkerDay.objects.filter(is_approved=True).count(), 12)
         self.assertEqual(WorkerDay.objects.filter(is_approved=False).count(), 2)
 
     def test_delete_exclude_other_shops(self):

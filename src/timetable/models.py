@@ -747,6 +747,11 @@ class WorkerDay(AbstractModel):
 
     @classmethod
     def _get_grouped_perm_check_data(self, diff_data):
+        """
+        :param diff_data: список кортежей с данным полей из _get_diff_lookup_fields (важен порядок)
+        :return: данные для проверка по мин. и по макс. дате (
+            например, если создается выходной на месяц, то проверка пойдет для первого и последнего дня месяца).
+        """
         grouped_wd_min_max_dt_data = {}
         grouped_wd_perm_check_data = []
         for dt, employee_id, shop_id, type_id, is_fact, is_vacancy in diff_data:
