@@ -544,7 +544,8 @@ class Shop(MPTTModel, AbstractActiveNetworkSpecificCodeNamedModel):
     city = models.CharField(max_length=128, null=True, blank=True, verbose_name='Город')
 
     tracker = FieldTracker(
-        fields=['tm_open_dict', 'tm_close_dict', 'load_template', 'latitude', 'longitude', 'fias_code', 'director_id', 'region_id'])
+        fields=['tm_open_dict', 'tm_close_dict', 'load_template', 'latitude', 'longitude', 'fias_code', 'director_id',
+                'region_id', 'timezone'])
 
     def __str__(self):
         return '{}, {}, {}'.format(
@@ -764,6 +765,10 @@ class Shop(MPTTModel, AbstractActiveNetworkSpecificCodeNamedModel):
         if hasattr(self, 'parent_code'):
             self.parent = self._get_parent_or_400(self.parent_code)
         load_template_changed = self.tracker.has_changed('load_template')
+        timezone_changed = self.tracker.has_changed('timezone')
+        if not is_new and timezone_changed:
+            transaction.on_commit(lambda: cache.delete(f'shop_tz_offset:{self.id}'))
+
         if load_template_changed and self.load_template_status == self.LOAD_TEMPLATE_PROCESS:
             raise ValidationError(_('It is not possible to change the load template as it is in the calculation process.'))
 
