@@ -418,16 +418,6 @@ CELERYD_CONCURRENCY = 2
 CELERYD_PREFETCH_MULTIPLIER = 1
 BACKEND_QUEUE = env.str('BACKEND_QUEUE', default='backend_queue')
 
-CACHES = {
-    "default": {
-        "BACKEND": "django_redis.cache.RedisCache",
-        "LOCATION": CELERY_BROKER_URL + '/1',
-        "OPTIONS": {
-            "CLIENT_CLASS": "django_redis.client.DefaultClient",
-        }
-    }
-}
-
 # for change celery configs must be before (for BACKEND_QUEUE)
 # todo: do normal parameters changer
 
