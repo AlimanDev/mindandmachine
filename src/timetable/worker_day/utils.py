@@ -265,9 +265,10 @@ def copy_as_excel_cells(from_employee_id, from_dates, to_employee_id, to_dates, 
                     work_hours=blank_day.work_hours,
                     is_vacancy=worker_active_empl.shop_id != blank_day.shop_id if blank_day.shop_id else None,
                 )
-                wd_data['is_outsource'] = blank_day.shop.network_id != worker_active_empl.employee.user.network_id
-                if wd_data['is_outsource']:
-                    wd_data['outsources'] = [dict(network_id=network.id) for network in blank_day.outsources_list]
+                if blank_day.shop_id:
+                    wd_data['is_outsource'] = blank_day.shop.network_id != worker_active_empl.employee.user.network_id
+                    if wd_data['is_outsource']:
+                        wd_data['outsources'] = [dict(network_id=network.id) for network in blank_day.outsources_list]
                 new_wdcds = main_worker_days_details.get(blank_day.id, [])
                 wd_data['worker_day_details'] = [
                     dict(work_type_id=new_wdcd.work_type_id, work_part=new_wdcd.work_part, ) for new_wdcd in new_wdcds]
