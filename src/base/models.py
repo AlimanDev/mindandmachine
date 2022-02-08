@@ -1469,7 +1469,7 @@ class Employment(AbstractActiveModel):
     dt_new_week_availability_from = models.DateField(null=True, blank=True)
     is_visible = models.BooleanField(default=True)
 
-    tracker = FieldTracker(fields=['position', 'dt_hired', 'dt_fired', 'norm_work_hours'])
+    tracker = FieldTracker(fields=['position', 'dt_hired', 'dt_fired', 'norm_work_hours', 'shop_id'])
 
     objects = EmploymentManager.from_queryset(EmploymentQuerySet)()
     objects_with_excluded = models.Manager.from_queryset(EmploymentQuerySet)()
@@ -1602,8 +1602,8 @@ class Employment(AbstractActiveModel):
 
             transaction.on_commit(lambda: clean_wdays.apply_async(**kwargs))
 
-        if (is_new or self.tracker.has_changed('dt_hired') or self.tracker.has_changed('dt_fired')) and settings.ZKTECO_INTEGRATION:
-            transaction.on_commit(lambda: export_or_delete_employment_zkteco.delay(self.id))
+        if (is_new or self.tracker.has_changed('dt_hired') or self.tracker.has_changed('dt_fired') or self.tracker.has_changed('shop_id')) and settings.ZKTECO_INTEGRATION:
+            transaction.on_commit(lambda: export_or_delete_employment_zkteco.delay(self.id, prev_shop_id=(self.tracker.previous('shop_id') if self.tracker.has_changed('shop_id') else None)))
 
         if (is_new or self.tracker.has_changed('dt_hired') or self.tracker.has_changed('dt_fired') or position_has_changed or self.tracker.has_changed('norm_work_hours')):
             transaction.on_commit(lambda: cache.delete_pattern(f"prod_cal_*_*_{self.employee_id}"))

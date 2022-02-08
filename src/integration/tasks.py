@@ -262,15 +262,21 @@ def sync_att_area_zkteco():
             print(f"Sync attendance area {area.name} with code {area.code}")
 
 @app.task
-def export_or_delete_employment_zkteco(employment_id):
+def export_or_delete_employment_zkteco(employment_id, prev_shop_id=None):
     zkteco = ZKTeco()
     ext_system, _created = ExternalSystem.objects.get_or_create(code='zkteco')
     employment = Employment.objects_with_excluded.get(id=employment_id)
     active_employments = Employment.objects.get_active(
-        shop_id=employment.shop_id,
         employee__user_id=employment.employee.user_id,
         position__isnull=False,
+    )
+    active_employments_in_shop = active_employments.filter(
+        shop_id=employment.shop_id,
     ).exists()
+    active_external_codes = ShopExternalCode.objects.filter(
+        shop_id__in=active_employments.values_list('shop_id', flat=True),
+        attendance_area__external_system=ext_system,
+    ).values_list('attendance_area_id', flat=True)
     shop_code = ShopExternalCode.objects.filter(
         shop_id=employment.shop_id,
         attendance_area__external_system=ext_system,
@@ -280,7 +286,7 @@ def export_or_delete_employment_zkteco(employment_id):
             user_id=employment.employee.user_id,
             external_system=ext_system,
         ).first()
-        if active_employments and shop_code:
+        if active_employments_in_shop and shop_code:
             if not user_code:
                 user_code = UserExternalCode.objects.create(
                     user_id=employment.employee.user_id,
@@ -298,15 +304,16 @@ def export_or_delete_employment_zkteco(employment_id):
             res_area = zkteco.add_personarea(user_code, shop_code.attendance_area)
             if not('code' in res_area and res_area['code'] == 0):
                 raise ValueError(f'Error in {res_area} while set area for user {user_code.user} to zkteco')
-        elif not active_employments and shop_code and user_code:            
+        if prev_shop_id:
+            shop_code = ShopExternalCode.objects.filter(
+                shop_id=prev_shop_id,
+                attendance_area__external_system=ext_system,
+            ).first()
+        if (prev_shop_id or not active_employments_in_shop) and shop_code and user_code and not shop_code.attendance_area_id in active_external_codes:
             res = zkteco.delete_personarea(user_code, shop_code.attendance_area)
             if 'code' in res and res['code'] == 0:
                 print(f"Delete area for fired user {user_code.user} {employment}")
-                active_employments = Employment.objects.get_active(
-                    employee__user_id=employment.employee.user_id,
-                    position__isnull=False,
-                ).exists()
-                if not active_employments:
+                if not prev_shop_id and not active_employments.exists():
                     user_code.delete()
                     print(f"Delete userexternalcode for fired user {user_code.user}")
             else:
