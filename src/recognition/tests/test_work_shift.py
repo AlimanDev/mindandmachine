@@ -108,7 +108,6 @@ class TestWorkShiftViewSet(TestsHelperMixin, APITestCase):
         )
         self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
 
-
     def test_no_active_employee(self):
         self._authorize_tick_point()
         resp = self.client.get(

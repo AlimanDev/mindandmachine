@@ -27,6 +27,7 @@ def vacancies_create_and_cancel():
 
         vacancies_create_and_cancel_for_shop(shop.id)
 
+
 @app.task
 def vacancies_create_and_cancel_for_shop(shop_id):
     """

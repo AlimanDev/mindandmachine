@@ -749,7 +749,6 @@ def confirm_vacancy(vacancy_id, user=None, employee_id=None, exchange=False, rec
                     # вызывать cancel_vacancy + поправить внутри логику?
                     cancel_vacancy(vacancy.id, auto=False, delete=False)
 
-
                 vacancy.employee = active_employment.employee
                 vacancy.employment = active_employment
                 vacancy.save(

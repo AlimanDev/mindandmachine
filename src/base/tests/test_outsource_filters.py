@@ -48,20 +48,20 @@ class TestOutsource(TestsHelperMixin, APITestCase):
             parent=cls.client_root_shop,
             code='client',
         )
-        cls.cleint_admin_group = Group.objects.create(name='Администратор client', code='client admin', network=cls.client_network)
+        cls.client_admin_group = Group.objects.create(name='Администратор client', code='client admin', network=cls.client_network)
         FunctionGroup.objects.bulk_create([
             FunctionGroup(
-                group=cls.cleint_admin_group,
+                group=cls.client_admin_group,
                 method=method,
                 func=func,
                 level_up=1,
                 level_down=99,
             ) for func, _ in FunctionGroup.FUNCS_TUPLE for method, _ in FunctionGroup.METHODS_TUPLE
         ])
-        cls.cleint_admin_group.subordinates.add(*Group.objects.all())
+        cls.client_admin_group.subordinates.add(*Group.objects.all())
         GroupWorkerDayPermission.objects.bulk_create(
             GroupWorkerDayPermission(
-                group=cls.cleint_admin_group,
+                group=cls.client_admin_group,
                 worker_day_permission=wdp,
             ) for wdp in WorkerDayPermission.objects.all()
         )
@@ -78,7 +78,7 @@ class TestOutsource(TestsHelperMixin, APITestCase):
         cls.client_employment = Employment.objects.create(
             employee=cls.client_employee,
             shop=cls.client_root_shop,
-            function_group=cls.cleint_admin_group,
+            function_group=cls.client_admin_group,
         )
         cls.client_work_type_name = WorkTypeName.objects.create(
             network=cls.client_network,

@@ -49,7 +49,7 @@ class BatchUpdateOrCreateModelMixin:
         pass
 
     @classmethod
-    def _check_batch_delete_qs_perms(cls, user, delete_qs, **kwargs):
+    def _check_delete_qs_perm(cls, user, delete_qs, **kwargs):
         """
         Првоерка прав на удаление объектов на основе qs
             (для объектов, которые удаляем -- можем использовать qs)
@@ -57,16 +57,24 @@ class BatchUpdateOrCreateModelMixin:
         pass
 
     @classmethod
-    def _enrich_create_or_update_perms_data(cls, action, create_or_update_perms_data, obj_dict):
+    def _check_create_single_obj_perm(cls, user, obj_data, **extra_kwargs):
         pass
 
     @classmethod
-    def _get_check_batch_perms_extra_kwargs(cls):
+    def _check_update_single_obj_perm(cls, user, existing_obj, obj_data, **extra_kwargs):
+        pass
+
+    @classmethod
+    def _check_delete_single_obj_perm(cls, user, existing_obj=None, obj_id=None, **extra_kwargs):
+        pass
+
+    @classmethod
+    def _check_delete_single_wd_data_perm(cls, user, obj_data, **extra_kwargs):
+        pass
+
+    @classmethod
+    def _get_check_perms_extra_kwargs(cls, user=None):
         return {}
-
-    @classmethod
-    def _check_create_or_update_perms(cls, user, create_or_update_perms_data, **kwargs):
-        pass
 
     @classmethod
     def _pop_rel_objs_data(cls, objs_data, rel_objs_mapping):
@@ -169,7 +177,14 @@ class BatchUpdateOrCreateModelMixin:
             },
         )
         send_mass_html_mail(datatuple)
-    
+
+    @classmethod
+    def _pre_batch(cls, **kwargs):
+        """
+        Функция, которая будет вызвана перед созданием/удалением/изменением объектов
+        """
+        pass
+
     @classmethod
     def _post_batch(cls, **kwargs):
         """
@@ -181,7 +196,7 @@ class BatchUpdateOrCreateModelMixin:
     def batch_update_or_create(
             cls, data: list, update_key_field: str = 'id', delete_scope_fields_list: list = None,
             delete_scope_values_list: list = None, delete_scope_filters: dict = None, stats=None, user=None,
-            dry_run=False, diff_report_email_to: list = None):
+            dry_run=False, diff_report_email_to: list = None, check_perms_extra_kwargs=None):
         """
         Функция для массового создания и/или обновления объектов
 
@@ -219,7 +234,6 @@ class BatchUpdateOrCreateModelMixin:
             должна быть ошибка если объект был изменен?
         # TODO: Настройка, которая определяет сколько объектов может быть создано в рамках delete_scope_fields_list? -- ???
         # TODO: Сигналы post_batch_update, post_batch_create ?
-        # TODO: Не обновлять существующие объекты если ни 1 поле не изменилось ?
         """
         allowed_update_key_fields = cls._get_allowed_update_key_fields()
         if update_key_field not in allowed_update_key_fields:
@@ -232,10 +246,9 @@ class BatchUpdateOrCreateModelMixin:
                 diff_lookup_fields = cls._get_diff_lookup_fields()
                 diff_obj_keys = tuple(lookup_field.split('__') for lookup_field in diff_lookup_fields)
                 diff_headers = cls._get_diff_headers()
-                create_or_update_perms_data = {}
-                check_perms_extra_kwargs = {}
+                check_perms_extra_kwargs = check_perms_extra_kwargs or {}
                 if user:
-                    check_perms_extra_kwargs = cls._get_check_batch_perms_extra_kwargs()
+                    check_perms_extra_kwargs.update(cls._get_check_perms_extra_kwargs(user=user))
                 stats = stats if stats is not None else {}
                 delete_scope_fields_list = delete_scope_fields_list or cls._get_batch_delete_scope_fields_list()
                 delete_scope_values_set = set()
@@ -265,8 +278,8 @@ class BatchUpdateOrCreateModelMixin:
                     update_key = obj_dict.get(update_key_field)
                     if update_key is None:
                         to_create.append(obj_dict)
-                        if user:
-                            cls._enrich_create_or_update_perms_data('C', create_or_update_perms_data, obj_dict)
+                        if user and not check_perms_extra_kwargs.get('grouped_checks'):
+                            cls._check_create_single_obj_perm(user, obj_dict, **check_perms_extra_kwargs)
                     else:
                         update_keys.append(update_key)
                         to_update_dict[update_key] = obj_dict
@@ -286,8 +299,8 @@ class BatchUpdateOrCreateModelMixin:
                         to_update_dict[update_key]['dttm_modified'] = now
                         obj_to_create = to_update_dict.pop(update_key)
                         to_create.append(obj_to_create)
-                        if user:
-                            cls._enrich_create_or_update_perms_data('C', create_or_update_perms_data, obj_dict)
+                        if user and not check_perms_extra_kwargs.get('grouped_checks'):
+                            cls._check_create_single_obj_perm(user, obj_dict, **check_perms_extra_kwargs)
                     else:
                         existing_obj = existing_objs.get(update_key)
                         if all(getattr(existing_obj, k) == v for k, v in to_update_dict[update_key].items() if
@@ -295,16 +308,13 @@ class BatchUpdateOrCreateModelMixin:
                             to_skip.append(to_update_dict.pop(update_key))
                             obj_to_skip = existing_objs.pop(update_key)
                             objs_to_skip.append(obj_to_skip)
-                            if diff_report_email_to:
-                                diff_data.setdefault('skipped', []).append(
-                                    tuple(obj_deep_get(obj_to_skip, *keys) for keys in diff_obj_keys))
+                            diff_data.setdefault('skipped', []).append(
+                                tuple(obj_deep_get(obj_to_skip, *keys) for keys in diff_obj_keys))
                         else:
                             to_update_dict[update_key]['dttm_modified'] = now
                             if user:
-                                cls._enrich_create_or_update_perms_data('U', create_or_update_perms_data, obj_dict)
-
-                if user:
-                    cls._check_create_or_update_perms(user, create_or_update_perms_data, **check_perms_extra_kwargs)
+                                cls._check_update_single_obj_perm(
+                                    user, existing_obj, obj_dict, **check_perms_extra_kwargs)
 
                 if to_skip:
                     skip_rel_objs_data = cls._pop_rel_objs_data(
@@ -317,9 +327,8 @@ class BatchUpdateOrCreateModelMixin:
                     for obj_dict in to_create:
                         obj_to_create = cls(**obj_dict, **cls._get_batch_create_extra_kwargs())
                         objs_to_create.append(obj_to_create)
-                        if diff_report_email_to:
-                            diff_data.setdefault('created', []).append(
-                                tuple(obj_deep_get(obj_to_create, *keys) for keys in diff_obj_keys))
+                        diff_data.setdefault('created', []).append(
+                            tuple(obj_deep_get(obj_to_create, *keys) for keys in diff_obj_keys))
 
                 update_fields_set = {"dttm_modified"}
                 if to_update_dict:
@@ -338,11 +347,13 @@ class BatchUpdateOrCreateModelMixin:
                         if extra_update_fields:
                             update_fields_set.update(extra_update_fields)
                         objs_to_update.append(obj)
+                        diff_data.setdefault('after_update', []).append(
+                            tuple(obj_deep_get(obj, *keys) for keys in diff_obj_keys))
 
                 objs = objs_to_create + objs_to_update + objs_to_skip
 
                 deleted_dict = {}
-                deleted_objs = []
+                objs_to_delete = []
                 q_for_delete = Q()
                 if delete_scope_fields_list:
                     if not delete_scope_values_list:
@@ -377,12 +388,17 @@ class BatchUpdateOrCreateModelMixin:
                             delete_filter_kwargs.update(delete_scope_filters)
                         delete_qs = delete_manager.filter(
                             q_for_delete, **delete_filter_kwargs).exclude(id__in=list(obj.id for obj in objs if obj.id))
-                        if user:
-                            cls._check_batch_delete_qs_perms(user, delete_qs, **check_perms_extra_kwargs)
-                        deleted_objs = list(delete_qs.values())
-                        if diff_report_email_to:
-                            diff_data['deleted'] = list(delete_qs.values_list(*diff_lookup_fields))
-                        _total_deleted_count, deleted_dict = delete_qs.delete()
+                        if user and not check_perms_extra_kwargs.get('grouped_checks'):
+                            cls._check_delete_qs_perm(user, delete_qs, **check_perms_extra_kwargs)
+                        objs_to_delete = list(delete_qs)
+                        for obj_to_delete in objs_to_delete:
+                            diff_data.setdefault('deleted', []).append(
+                                tuple(obj_deep_get(obj_to_delete, *keys) for keys in diff_obj_keys))
+
+                cls._pre_batch(user=user, diff_data=diff_data, check_perms_extra_kwargs=check_perms_extra_kwargs)
+
+                if objs_to_delete:
+                    _total_deleted_count, deleted_dict = delete_qs.delete()
 
                 if objs_to_skip:
                     cls._batch_update_or_create_rel_objs(
@@ -398,10 +414,6 @@ class BatchUpdateOrCreateModelMixin:
                 if objs_to_update:
                     update_fields_set.discard(cls._meta.pk.name)
                     cls.objects.bulk_update(objs_to_update, fields=update_fields_set)
-                    if diff_report_email_to:
-                        for obj_to_update in objs_to_update:
-                            diff_data.setdefault('after_update', []).append(
-                                tuple(obj_deep_get(obj_to_update, *keys) for keys in diff_obj_keys))
                     cls._batch_update_or_create_rel_objs(
                         rel_objs_data=update_rel_objs_data, objs=objs_to_update, rel_objs_mapping=rel_objs_mapping,
                         stats=stats, update_key_field=update_key_field)
@@ -428,7 +440,10 @@ class BatchUpdateOrCreateModelMixin:
                 if diff_report_email_to:
                     cls._create_and_send_diff_report(diff_report_email_to, diff_data, diff_headers, now)
 
-                cls._post_batch(created_objs=objs_to_create, updated_objs=objs_to_update, deleted_objs=deleted_objs, diff_data=diff_data)
+                cls._post_batch(
+                    created_objs=objs_to_create, updated_objs=objs_to_update, deleted_objs=objs_to_delete,
+                    diff_data=diff_data,
+                )
 
                 if dry_run:
                     raise DryRunRevertException()

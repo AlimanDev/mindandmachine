@@ -1740,6 +1740,16 @@ class TestVacancyNotification(APITestCase, TestsHelperMixin):
         vacancy.employee = self.outsource_employee_empl1
         vacancy.employment = self.outsource_employment_empl1
         vacancy.save()
+        GroupWorkerDayPermission.objects.create(
+            group=self.admin_group,
+            worker_day_permission=WorkerDayPermission.objects.get(
+                action=WorkerDayPermission.DELETE,
+                graph_type=WorkerDayPermission.PLAN,
+                wd_type_id=WorkerDay.TYPE_WORKDAY,
+            ),
+            employee_type=GroupWorkerDayPermission.OUTSOURCE_NETWORK_EMPLOYEE,
+            shop_type=GroupWorkerDayPermission.MY_NETWORK_SHOPS,
+        )
         response = self.client.delete(
             f'/rest_api/worker_day/{vacancy.id}/',
         )

@@ -418,16 +418,6 @@ CELERYD_CONCURRENCY = 2
 CELERYD_PREFETCH_MULTIPLIER = 1
 BACKEND_QUEUE = env.str('BACKEND_QUEUE', default='backend_queue')
 
-CACHES = {
-    "default": {
-        "BACKEND": "django_redis.cache.RedisCache",
-        "LOCATION": CELERY_BROKER_URL + '/1',
-        "OPTIONS": {
-            "CLIENT_CLASS": "django_redis.client.DefaultClient",
-        }
-    }
-}
-
 # for change celery configs must be before (for BACKEND_QUEUE)
 # todo: do normal parameters changer
 
@@ -531,6 +521,16 @@ DOWNLOAD_TIMETABLE_GET_CODE_FUNC = lambda e: e.employee.tabel_code or ''
 DEFAULT_AUTO_FIELD = 'django.db.models.AutoField'
 
 X_FRAME_OPTIONS = 'SAMEORIGIN'
+
+CACHES = {
+    'default': {
+        "BACKEND": "django_redis.cache.RedisCache",
+        'LOCATION': 'redis://' + REDIS_HOST + ':6379/0',
+        "OPTIONS": {
+            "CLIENT_CLASS": "django_redis.client.DefaultClient",
+        }
+    },
+}
 
 if is_config_exists('djconfig_local.py'):
     from .djconfig_local import *

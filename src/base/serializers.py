@@ -291,7 +291,7 @@ class AuthUserSerializer(UserSerializer):
         return list(set(allowed_tabs))
     
     def get_subordinate_employee_ids(self, obj: User):
-        return list(Employee.get_subordinates(obj, dt=now().date(), dt_to_shift=relativedelta(months=6)).values_list('id', flat=True))
+        return list(obj.get_subordinates(dt=now().date(), dt_to_shift=relativedelta(months=6)).values_list('id', flat=True))
     
     def get_self_employee_ids(self, obj: User):
         dt = now().date()

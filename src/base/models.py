@@ -12,22 +12,25 @@ from django.conf import settings
 from django.contrib.auth.models import (
     AbstractUser as DjangoAbstractUser,
 )
+from django.core.cache import cache
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.core.serializers.json import DjangoJSONEncoder
 from django.core.cache import cache
 from django.db import models
 from django.db import transaction
 from django.db.models import Case, When, Sum, Value, IntegerField, Subquery, OuterRef, Q
 from django.db.models.query import QuerySet
+from django.template import Template, Context
 from django.utils import timezone
 from django.utils.functional import cached_property
 from django.utils.translation import gettext_lazy as _
-from django.template import Template, Context
 from model_utils import FieldTracker
 from mptt.models import MPTTModel, TreeForeignKey
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.serializers import ValidationError
 from timezone_field import TimeZoneField
-from django.core.exceptions import ValidationError as DjangoValidationError
+
+from src.base.fields import MultipleChoiceField
 from src.base.models_abstract import (
     AbstractActiveModel,
     AbstractModel,
@@ -37,7 +40,6 @@ from src.base.models_abstract import (
 )
 from src.conf.djconfig import QOS_TIME_FORMAT
 from src.util.mixins.qs import AnnotateValueEqualityQSMixin
-from src.base.fields import MultipleChoiceField
 
 
 class Network(AbstractActiveModel):
@@ -542,7 +544,8 @@ class Shop(MPTTModel, AbstractActiveNetworkSpecificCodeNamedModel):
     city = models.CharField(max_length=128, null=True, blank=True, verbose_name='Город')
 
     tracker = FieldTracker(
-        fields=['tm_open_dict', 'tm_close_dict', 'load_template', 'latitude', 'longitude', 'fias_code', 'director_id', 'region_id'])
+        fields=['tm_open_dict', 'tm_close_dict', 'load_template', 'latitude', 'longitude', 'fias_code', 'director_id',
+                'region_id', 'timezone'])
 
     def __str__(self):
         return '{}, {}, {}'.format(
@@ -762,6 +765,10 @@ class Shop(MPTTModel, AbstractActiveNetworkSpecificCodeNamedModel):
         if hasattr(self, 'parent_code'):
             self.parent = self._get_parent_or_400(self.parent_code)
         load_template_changed = self.tracker.has_changed('load_template')
+        timezone_changed = self.tracker.has_changed('timezone')
+        if not is_new and timezone_changed:
+            transaction.on_commit(lambda: cache.delete(f'shop_tz_offset:{self.id}'))
+
         if load_template_changed and self.load_template_status == self.LOAD_TEMPLATE_PROCESS:
             raise ValidationError(_('It is not possible to change the load template as it is in the calculation process.'))
 
@@ -837,6 +844,24 @@ class Shop(MPTTModel, AbstractActiveNetworkSpecificCodeNamedModel):
     def get_tz_offset(self):
         if self.timezone:
             offset = int(self.timezone.utcoffset(datetime.datetime.now()).seconds / 3600)
+        else:
+            offset = settings.CLIENT_TIMEZONE
+
+        return offset
+
+    @classmethod
+    def get_cached_tz_offset_by_shop_id(cls, shop_id):
+        # ключ shop_tz_offset:{shop_id}, значение Moscow/Europe
+        k = f'shop_tz_offset:{shop_id}'
+        cached_timezone = cache.get(k)
+        if not cached_timezone:
+            timezone = Shop.objects.filter(id=shop_id).values_list('timezone', flat=True).first()
+            if timezone:
+                cache.set(k, timezone)
+        else:
+            timezone = cached_timezone
+        if timezone:
+            offset = int(timezone.utcoffset(datetime.datetime.now()).seconds / 3600)
         else:
             offset = settings.CLIENT_TIMEZONE
 
@@ -1030,7 +1055,7 @@ class Group(AbstractActiveNetworkSpecificCodeNamedModel):
         return group_perm
     
     @classmethod
-    def get_subordinate_ids(cls, user):
+    def get_subordinated_group_ids(cls, user):
         return list(cls.objects.filter(id__in=user.get_group_ids()).values_list('subordinates__id', flat=True).distinct())
 
     @classmethod
@@ -1228,20 +1253,27 @@ class User(DjangoAbstractUser, AbstractModel):
     def fio(self):
         return self.get_fio()
 
-    def get_active_employments(self, shop=None, dt_from=None, dt_to=None):
-        kwargs = {
-            'employee__user__network_id': self.network_id,
-            'shop__network_id': self.network_id,
-        }
-        if shop:
-            kwargs['shop__in'] = shop.get_ancestors(include_self=True)
+    def get_active_employments(self, shop_id=None, dt_from=None, dt_to=None):
+        q = Q(
+            Q(employee__user__network_id=self.network_id) |
+            Q(shop__network_id=self.network_id)
+        )
+        if shop_id:
+            q &= Q(
+                shop__in=Shop.objects.get_queryset_ancestors(
+                    queryset=Shop.objects.filter(id=shop_id),
+                    include_self=True,
+                )
+            )
+        kwargs = {}
         if dt_from:
             kwargs['dt_from'] = dt_from
         if dt_to:
             kwargs['dt_to'] = dt_to
         return Employment.objects.get_active(
             employee__user=self,
-            **kwargs,
+            extra_q=q,
+            **kwargs
         )
     
     def get_shops(self, include_descendants=False):
@@ -1250,8 +1282,8 @@ class User(DjangoAbstractUser, AbstractModel):
             shops = Shop.objects.get_queryset_descendants(shops, include_self=True)
         return shops
 
-    def get_group_ids(self, shop=None):
-        groups = self.get_active_employments(shop=shop).values_list('position__group_id', 'function_group_id')
+    def get_group_ids(self, shop_id=None):
+        groups = self.get_active_employments(shop_id=shop_id).values_list('position__group_id', 'function_group_id')
         return list(set(list(map(lambda x: x[0], groups)) + list(map(lambda x: x[1], groups))))
 
     def save(self, *args, **kwargs):
@@ -1259,6 +1291,31 @@ class User(DjangoAbstractUser, AbstractModel):
             self.set_password(self.username)
 
         return super(User, self).save(*args, **kwargs)
+
+    def get_subordinates(self, dt=None, user_shops=None, user_subordinated_group_ids=None, dt_to_shift=None):
+        if not user_shops:
+            user_shops = self.get_shops(include_descendants=True).values_list('id', flat=True)
+        if not user_subordinated_group_ids:
+            user_subordinated_group_ids = Group.get_subordinated_group_ids(self)
+        dt_to = dt
+        if dt_to_shift and dt_to:
+            dt_to += dt_to_shift
+
+        return Employee.objects.annotate(
+            is_subordinate=models.Exists(
+                Employment.objects.get_active(
+                    extra_q=models.Q(position__group_id__in=user_subordinated_group_ids) |
+                            models.Q(function_group_id__in=user_subordinated_group_ids) |
+                            (models.Q(function_group_id__isnull=True) & models.Q(position__group__isnull=True)),
+                    dt_from=dt,
+                    dt_to=dt_to,
+                    employee_id=OuterRef('id'),
+                    shop_id__in=user_shops,
+                )
+            )
+        ).filter(
+            is_subordinate=True,
+        )
 
 
 class WorkerPosition(AbstractActiveNetworkSpecificCodeNamedModel):
@@ -1372,32 +1429,6 @@ class Employee(AbstractModel):
         if self.tabel_code:
             s += f' ({self.tabel_code})'
         return s
-    
-    @classmethod
-    def get_subordinates(cls, user, dt=None, user_shops=None, user_subordinates=None, dt_to_shift=None):
-        if not user_shops:
-            user_shops = user.get_shops(include_descendants=True).values_list('id', flat=True)
-        if not user_subordinates:
-            user_subordinates = Group.get_subordinate_ids(user)
-        dt_to = dt
-        if dt_to_shift and dt_to:
-            dt_to += dt_to_shift
-            
-        return Employee.objects.annotate(
-            is_subordinate=models.Exists(
-                Employment.objects.get_active(
-                    extra_q=models.Q(position__group_id__in=user_subordinates) | 
-                    models.Q(function_group_id__in=user_subordinates) |
-                    (models.Q(function_group_id__isnull=True) & models.Q(position__group__isnull=True)),
-                    dt_from=dt,
-                    dt_to=dt_to,
-                    employee_id=OuterRef('id'),
-                    shop_id__in=user_shops,
-                )
-            )
-        ).filter(
-            is_subordinate=True,
-        )
 
 
 class Employment(AbstractActiveModel):
