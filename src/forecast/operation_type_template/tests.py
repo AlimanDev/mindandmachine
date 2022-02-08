@@ -39,12 +39,7 @@ class TestOperationTypeTemplate(APITestCase):
             name='Test1',
             network=self.network,
         )
-        self.operation_type_name1 = OperationTypeName.objects.create(
-            name='Кассы',
-            work_type_name=self.work_type_name1,
-            do_forecast=OperationTypeName.FORECAST_FORMULA,
-            network=self.network,
-        )
+        self.operation_type_name1 = self.work_type_name1.operation_type_name
         self.operation_type_name2 = OperationTypeName.objects.create(
             name='Строительные работы',
             do_forecast=OperationTypeName.FORECAST,

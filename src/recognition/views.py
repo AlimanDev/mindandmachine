@@ -30,8 +30,8 @@ from src.base.permissions import Permission
 from src.base.views_abstract import BaseModelViewSet
 from src.base.serializers import NetworkSerializer
 from src.recognition.api.recognition import Recognition
-from src.recognition.authentication import TickPointTokenAuthentication
-from src.recognition.models import Tick, TickPhoto, TickPoint, UserConnecter, TickPointToken
+from src.recognition.authentication import ShopIPAuthentication, TickPointTokenAuthentication
+from src.recognition.models import ShopIpAddress, Tick, TickPhoto, TickPoint, UserConnecter, TickPointToken
 from src.recognition.filters import TickPointFilterSet
 from src.recognition.serializers import (
     HashSigninSerializer,
@@ -154,6 +154,19 @@ class TickPointAuthTickViewStrategy(TickViewStrategy):
         user_id = data['user_id']
         return user_id, data.get('employee_id'), tick_point
 
+class ShopIPAuthTickViewStrategy(TickPointAuthTickViewStrategy):
+    def filter_qs(self, queryset):
+        shop_ip = self.view.request.user
+        queryset = queryset.filter(
+            tick_point__shop_id=shop_ip.shop_id,
+        )
+        return queryset
+
+    def get_user_id_employee_id_and_tick_point(self, data):
+        shop_ip = self.view.request.user
+        user_id = data['user_id']
+        return user_id, data.get('employee_id'), shop_ip.tick_point_obj
+
 
 class TickViewSet(BaseModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
@@ -163,6 +176,7 @@ class TickViewSet(BaseModelViewSet):
 
     def get_authenticators(self):
         return [
+            ShopIPAuthentication(),
             TickPointTokenAuthentication(raise_auth_exc=False),
             CsrfExemptSessionAuthentication(),
             TokenAuthentication()
@@ -174,6 +188,8 @@ class TickViewSet(BaseModelViewSet):
             return UserAuthTickViewStrategy(self)
         elif isinstance(self.request.user, TickPoint):
             return TickPointAuthTickViewStrategy(self)
+        elif isinstance(self.request.user, ShopIpAddress):
+            return ShopIPAuthTickViewStrategy(self)
 
         raise NotImplementedError
 
@@ -349,6 +365,7 @@ class TickPhotoViewSet(BaseModelViewSet):
 
     def get_authenticators(self):
         return [
+            ShopIPAuthentication(),
             TickPointTokenAuthentication(raise_auth_exc=False),
             CsrfExemptSessionAuthentication(),
             TokenAuthentication()
@@ -524,6 +541,29 @@ class TickPointViewSet(BaseModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(network_id=self.request.user.network_id)
+    
+    @action(
+        detail=False, 
+        methods=['get'], 
+        permission_classes=[permissions.IsAuthenticated],
+        authentication_classes=[
+            ShopIPAuthentication,
+            TickPointTokenAuthentication,
+        ],
+    )
+    def current_tick_point(self, request):
+        if isinstance(request.user, TickPoint):
+            tick_point = request.user
+        elif isinstance(request.user, ShopIpAddress):
+            tick_point = request.user.tick_point_obj
+        else:
+            raise NotImplementedError()
+        
+        return Response({
+            'tick_point': TickPointSerializer(tick_point).data,
+            'shop': ShopSerializer(tick_point.shop).data,
+            'network': NetworkSerializer(tick_point.shop.network).data,
+        })
 
 
 class DownloadViolatorsReportAdminView(SuperuserRequiredMixin, FormView):

@@ -1,11 +1,15 @@
 from datetime import datetime, date, timedelta, time
+from unittest import mock
 
 from django.test import override_settings
 from freezegun import freeze_time
 from rest_framework.test import APITestCase
+from django.core.files.uploadedfile import SimpleUploadedFile
 
 from src.base.models import Shop, NetworkConnect, Network, User, Employee, Employment, Group, FunctionGroup, \
     WorkerPosition
+from src.recognition.api import recognition
+from src.recognition.models import UserConnecter
 from src.timetable.models import (
     WorkerConstraint,
     WorkerDay,
@@ -44,20 +48,20 @@ class TestOutsource(TestsHelperMixin, APITestCase):
             parent=cls.client_root_shop,
             code='client',
         )
-        cls.cleint_admin_group = Group.objects.create(name='Администратор client', code='client admin', network=cls.client_network)
+        cls.client_admin_group = Group.objects.create(name='Администратор client', code='client admin', network=cls.client_network)
         FunctionGroup.objects.bulk_create([
             FunctionGroup(
-                group=cls.cleint_admin_group,
+                group=cls.client_admin_group,
                 method=method,
                 func=func,
                 level_up=1,
                 level_down=99,
             ) for func, _ in FunctionGroup.FUNCS_TUPLE for method, _ in FunctionGroup.METHODS_TUPLE
         ])
-        cls.cleint_admin_group.subordinates.add(*Group.objects.all())
+        cls.client_admin_group.subordinates.add(*Group.objects.all())
         GroupWorkerDayPermission.objects.bulk_create(
             GroupWorkerDayPermission(
-                group=cls.cleint_admin_group,
+                group=cls.client_admin_group,
                 worker_day_permission=wdp,
             ) for wdp in WorkerDayPermission.objects.all()
         )
@@ -74,7 +78,7 @@ class TestOutsource(TestsHelperMixin, APITestCase):
         cls.client_employment = Employment.objects.create(
             employee=cls.client_employee,
             shop=cls.client_root_shop,
-            function_group=cls.cleint_admin_group,
+            function_group=cls.client_admin_group,
         )
         cls.client_work_type_name = WorkTypeName.objects.create(
             network=cls.client_network,
@@ -385,3 +389,87 @@ class TestOutsource(TestsHelperMixin, APITestCase):
         employees = self.client.get(f'/rest_api/employee/?other_deps_employees_with_wd_in_curr_shop=true')
         self.assertEqual(len(employees.json()), 9)
         self.assertTrue(_get_employee(employees.json(), self.employee2.id).get('from_another_network'))
+
+    
+    def _test_add_biometrics(self, status_code=200):
+        self.user1.avatar = None
+        self.user1.save()
+        UserConnecter.objects.filter(user=self.user1).delete()
+
+        class TevianMock:
+            def create_person(self, data):
+                partner_id = 123123
+                return partner_id
+
+            def upload_photo(self, partner_id, image):
+                photo_id = 313123
+                return photo_id
+
+        with mock.patch.object(recognition, 'Tevian', TevianMock):
+            dummy_file = SimpleUploadedFile("file.jpg", b"image content", content_type="image/jpeg")
+            response = self.client.post(
+                self.get_url('User-add-biometrics', pk=self.user1.id),
+                data={'file': dummy_file},
+                format='multipart',
+            )
+
+        self.assertEqual(response.status_code, status_code)
+        self.user1.refresh_from_db()
+        if status_code == 200:
+            self.assertEqual(UserConnecter.objects.count(), 1)
+            self.assertTrue(bool(self.user1.avatar))
+        else:
+            self.assertEqual(UserConnecter.objects.count(), 0)
+            self.assertFalse(bool(self.user1.avatar))
+
+    def _test_delete_biometrics(self, status_code=200):
+        self.user1.avatar = 'test/path/avatar.jpg'
+        self.user1.save()
+        self.assertIsNotNone(self.user1.avatar.url)
+        self.assertTrue(bool(self.user1.avatar))
+        UserConnecter.objects.get_or_create(
+            user=self.user1,
+            defaults={
+                'partner_id': '1234',
+            }
+        )
+        class TevianMock:
+            def delete_person(self, person_id):
+                return 200
+        with mock.patch.object(recognition, 'Tevian', TevianMock):
+            response = self.client.post(
+                self.get_url('User-delete-biometrics', pk=self.user1.id),
+            )
+
+        self.assertEqual(response.status_code, status_code)
+        self.user1.refresh_from_db()
+
+        if status_code == 200:
+            self.assertEqual(UserConnecter.objects.count(), 0)
+            self.assertFalse(bool(self.user1.avatar))
+        else:
+            self.assertEqual(UserConnecter.objects.count(), 1)
+            self.assertTrue(bool(self.user1.avatar))
+
+    def test_client_can_change_outsource_biometrics(self):
+        NetworkConnect.objects.update(
+            allow_assign_employements_from_outsource=False, 
+            allow_choose_shop_from_client_for_employement=False,
+        )
+        
+        self._test_add_biometrics()
+        self._test_delete_biometrics()
+
+        self.client_network.set_settings_value('allow_change_outsource_biometrics', False)
+        self.client_network.save()
+
+        self._test_add_biometrics(404)
+        self._test_delete_biometrics(404)
+
+        self.client_network.set_settings_value('allow_change_outsource_biometrics', True)
+        self.client_network.save()
+
+        NetworkConnect.objects.all().delete()
+
+        self._test_add_biometrics(404)
+        self._test_delete_biometrics(404)

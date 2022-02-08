@@ -25,13 +25,13 @@ class TestWorkerDayPermissions(TestsHelperMixin, APITestCase):
     def test_get_worker_day_permissions(self):
         resp = self._get_wd_perms()
         self.assertEqual(resp.status_code, 200)
-        self.assertEqual(len(resp.json()), 66)
+        self.assertEqual(len(resp.json()), 88)
 
     def test_filter_worker_day_permissions_by_action(self):
-        resp = self._get_wd_perms(extra_data={'action': WorkerDayPermission.CREATE_OR_UPDATE})
+        resp = self._get_wd_perms(extra_data={'action': WorkerDayPermission.CREATE})
         self.assertEqual(resp.status_code, 200)
         self.assertTrue(
-            all(wdp['worker_day_permission']['action'] == WorkerDayPermission.CREATE_OR_UPDATE for wdp in resp.json()))
+            all(wdp['worker_day_permission']['action'] == WorkerDayPermission.CREATE for wdp in resp.json()))
         self.assertEqual(len(resp.json()), len(WorkerDay.TYPES_USED) * len(WorkerDayPermission.GRAPH_TYPES))
 
     def test_filter_worker_day_permissions_by_graph_type(self):

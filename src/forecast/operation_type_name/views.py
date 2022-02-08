@@ -11,6 +11,7 @@ from src.base.filters import BaseActiveNamedModelFilter
 class OperationTypeNameSerializer(BaseNetworkSerializer):
     name = serializers.CharField(required=False)
     code = serializers.CharField(required=False)
+    work_type_name_id = serializers.IntegerField(read_only=True) # привязка только при создании work_type_name
 
     class Meta:
         model = OperationTypeName

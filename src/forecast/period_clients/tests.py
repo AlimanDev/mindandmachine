@@ -36,18 +36,23 @@ class TestDemand(APITestCase):
 
         self.work_type_name1 = WorkTypeName.objects.create(
             name='Кассы',
+            code="Cashbox",
         )
         self.work_type_name2 = WorkTypeName.objects.create(
             name='Торговый зал',
+            code="Trade hall",
         )
         self.work_type_name3 = WorkTypeName.objects.create(
             name='Кассы3',
+            code="Cashbox3",
         )
         self.work_type_name4 = WorkTypeName.objects.create(
             name='Кассы4',
+            code="Cashbox4",
         )
         self.work_type_name5 = WorkTypeName.objects.create(
             name='Кассы5',
+            code="clients",
         )
         self.work_type1 = WorkType.objects.create(shop=self.shop, work_type_name=self.work_type_name1)
         self.work_type2 = WorkType.objects.create(shop=self.shop, work_type_name=self.work_type_name2)
@@ -56,52 +61,14 @@ class TestDemand(APITestCase):
         self.work_type5 = WorkType.objects.create(shop=self.shop, work_type_name=self.work_type_name5)
 
         self.date = datetime.now().date() + timedelta(days=1)
-        self.op_type_name = OperationTypeName.objects.create(
-            name='Кассы',
-            do_forecast=OperationTypeName.FORECAST,
-            work_type_name=self.work_type_name1,
-        )
-        self.op_type_name2 = OperationTypeName.objects.create(
-            name='Торговый зал',
-            work_type_name=self.work_type_name2,
-        )
-        op_type_name3 = OperationTypeName.objects.create(
-            name='O_TYPE3',
-            do_forecast=OperationTypeName.FORECAST,
-        )
-        op_type_name4 = OperationTypeName.objects.create(
-            name='O_TYPE4',
-            code='clients',
-        )
-        op_type_name5 = OperationTypeName.objects.create(
-            name='O_TYPE5',
-            code='O_TYPE5',
-        )
-        self.o_type_1 = OperationType.objects.create(
-            work_type=self.work_type1,
-            operation_type_name=self.op_type_name,
-            shop=self.work_type1.shop,
-        )
-        self.o_type_2 = OperationType.objects.create(
-            work_type=self.work_type2,
-            operation_type_name=op_type_name4,
-            shop=self.work_type2.shop,
-        )
-        self.o_type_3 = OperationType.objects.create(
-            work_type=self.work_type3,
-            operation_type_name=op_type_name3,
-            shop=self.work_type3.shop,
-        )
-        self.o_type_4 = OperationType.objects.create(
-            work_type=self.work_type5,
-            operation_type_name=self.op_type_name2,
-            shop=self.work_type5.shop,
-        )
-        self.o_type_5 = OperationType.objects.create(
-            work_type=self.work_type4,
-            operation_type_name=op_type_name5,
-            shop=self.work_type4.shop,
-        )
+        self.op_type_name = self.work_type_name1.operation_type_name
+        self.op_type_name2 = self.work_type_name2.operation_type_name
+        self.o_type_1 = self.work_type1.operation_type
+        self.o_type_2 = self.work_type2.operation_type
+        self.o_type_3 = self.work_type3.operation_type
+        self.o_type_4 = self.work_type5.operation_type
+        self.o_type_5 = self.work_type4.operation_type
+
         test_data = {
             'PeriodClients': [
                 {
@@ -643,7 +610,7 @@ class TestDemand(APITestCase):
             f'{self.url}download/?dt_from={dt_from}&dt_to={dt_to}&shop_id={self.shop.id}')
         tabel = pandas.read_excel(io.BytesIO(response.content))
         self.assertEquals(response.status_code, 200)
-        self.assertCountEqual(list(tabel.columns), ['dttm', 'Кассы', 'Торговый зал', 'O_TYPE3', 'O_TYPE4', 'O_TYPE5'])
+        self.assertCountEqual(list(tabel.columns), ['dttm', 'Кассы', 'Торговый зал', 'Кассы3', 'Кассы4', 'Кассы5'])
         self.assertEquals(tabel[tabel.columns[0]][0], datetime(2019, 5, 30))
         self.assertEquals(tabel[tabel.columns[1]][0], 0)
         response = self.client.get(
@@ -657,7 +624,7 @@ class TestDemand(APITestCase):
             f'{self.url}download/?dt_from={dt_from}&dt_to={dt_to}&shop_id={self.shop.id}&operation_type_ids={self.o_type_1.id},{self.o_type_2.id}')
         tabel = pandas.read_excel(io.BytesIO(response.content))
         self.assertEquals(response.status_code, 200)
-        self.assertCountEqual(list(tabel.columns), ['dttm', 'Кассы', 'O_TYPE4'])
+        self.assertCountEqual(list(tabel.columns), ['dttm', 'Кассы', 'Торговый зал'])
 
     def test_get_demand_xlsx_no_data(self):
         dt_from = Converter.convert_date(datetime(2019, 5, 30).date())

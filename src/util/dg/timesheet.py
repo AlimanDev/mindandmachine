@@ -264,13 +264,13 @@ class MtsTimesheetDataGetter(BaseTimesheetDataGetter):
         }
 
 
-class AigulTimesheetDataGetter(T13TimesheetDataGetter):
+class DefaultTimesheetDataGetter(T13TimesheetDataGetter):
     def set_day_data(self, day_data, wday):
         day_data['value'] = (wday.day_hours + wday.night_hours) if (
                     wday and not wday.day_type.is_dayoff) else self._get_tabel_type(wday.day_type) if wday else ''
 
 
-class TimesheetLinesDataGetter(AigulTimesheetDataGetter):
+class TimesheetLinesDataGetter(DefaultTimesheetDataGetter):
     def set_day_data(self, day_data, wday):
         if not wday:
             day_data['value'] = ''
@@ -419,15 +419,16 @@ class MTSTimesheetGenerator(BaseTimesheetGenerator):
         return os.path.join(settings.BASE_DIR, 'src/util/dg/templates/t_mts.ods')
 
 
-class AigulTimesheetGenerator(BaseTimesheetGenerator):
+class DefaultTimesheetGenerator(BaseTimesheetGenerator):
     """
-    Шаблон табеля для Айгуль
+    Шаблон табеля по умолчанию
     """
 
-    tabel_data_getter_cls = AigulTimesheetDataGetter
+    tabel_data_getter_cls = DefaultTimesheetDataGetter
 
     def get_template_path(self):
-        return os.path.join(settings.BASE_DIR, 'src/util/dg/templates/t_aigul.ods')
+        filename = 't_default' if self.network.settings_values_prop.get('exclude_tabel_code_from_default_tabel', False) else 't_default_with_tabel'
+        return os.path.join(settings.BASE_DIR, f'src/util/dg/templates/{filename}.ods')
 
 
 class TimesheetLinesGenerator(BaseTimesheetGenerator):
@@ -442,11 +443,10 @@ class TimesheetLinesGenerator(BaseTimesheetGenerator):
 
 
 tabel_formats = {  # TODO: поменять имена клиентов на какие-то общие названия
-    'default': MTSTimesheetGenerator,
     'mts': MTSTimesheetGenerator,
     't13': T13TimesheetGenerator,
     't13_custom': CustomT13TimesheetGenerator,
-    'aigul': AigulTimesheetGenerator,
+    'default': DefaultTimesheetGenerator,
     'lines': TimesheetLinesGenerator,
 }
 

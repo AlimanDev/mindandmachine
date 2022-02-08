@@ -1,13 +1,13 @@
 from rest_framework import authentication
 from rest_framework import exceptions
 
-from .models import TickPointToken
+from .models import ShopIpAddress, TickPointToken
 
 
 class TickPointTokenAuthentication(authentication.TokenAuthentication):
     model = TickPointToken
 
-    def __init__(self, raise_auth_exc=True, **kwargs):
+    def __init__(self, raise_auth_exc=False, **kwargs):
         self.raise_auth_exc = raise_auth_exc
         super(TickPointTokenAuthentication, self).__init__(**kwargs)
 
@@ -17,3 +17,26 @@ class TickPointTokenAuthentication(authentication.TokenAuthentication):
         except exceptions.AuthenticationFailed:
             if self.raise_auth_exc:
                 raise
+
+class ShopIPAuthentication(authentication.BaseAuthentication):
+
+    def get_ip_addr(self, request):
+        return request.META.get('HTTP_X_FORWARDED_FOR', '').split(',')[0]
+        
+    def authenticate(self, request):
+       
+        ip = self.get_ip_addr(request)
+
+        if not ip:
+            return None
+
+        return self.authenticate_credentials(ip)
+
+    def authenticate_credentials(self, ip):
+        
+        shop_ip = ShopIpAddress.objects.filter(ip_address=ip).first()
+
+        if not shop_ip:
+            return None
+
+        return (shop_ip, None)

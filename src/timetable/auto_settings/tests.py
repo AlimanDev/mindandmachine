@@ -1,4 +1,5 @@
 import json
+from unittest import mock
 import uuid
 from datetime import datetime, time, date, timedelta
 from unittest import skip, expectedFailure
@@ -7,6 +8,7 @@ from unittest.mock import patch
 import pandas as pd
 import requests
 from dateutil.relativedelta import relativedelta
+from django.db import transaction
 from django.test import override_settings
 from django.utils.timezone import now
 from rest_framework.test import APITestCase
@@ -35,8 +37,8 @@ class TestAutoSettings(APITestCase):
         create_departments_and_users(self, dt=date(2021, 1, 1))
         self.work_type_name = WorkTypeName.objects.create(name='Магазин')
         self.work_type_name2 = WorkTypeName.objects.create(name='Ломбард')
-        self.operation_type_name = OperationTypeName.objects.create(name='Магазин', work_type_name=self.work_type_name)
-        self.operation_type_name2 = OperationTypeName.objects.create(name='Ломбард', work_type_name=self.work_type_name2)
+        self.operation_type_name = self.work_type_name.operation_type_name
+        self.operation_type_name2 = self.work_type_name2.operation_type_name
         self.work_type = WorkType.objects.create(
             work_type_name=self.work_type_name,
             shop=self.shop)
@@ -44,16 +46,8 @@ class TestAutoSettings(APITestCase):
             work_type_name=self.work_type_name2,
             shop=self.shop)
 
-        self.operation_type = OperationType.objects.create(
-            work_type=self.work_type,
-            operation_type_name=self.operation_type_name,
-            shop=self.shop,
-        )
-        self.operation_type2 = OperationType.objects.create(
-            work_type=self.work_type2,
-            operation_type_name=self.operation_type_name2,
-            shop=self.shop,
-        )
+        self.operation_type = self.work_type.operation_type
+        self.operation_type2 = self.work_type2.operation_type
 
         self.breaks = Break.objects.create(
             network=self.network,
@@ -755,16 +749,17 @@ class TestAutoSettings(APITestCase):
         self.assertEqual(employment2Info['norm_work_amount'], 151.0)
         self.assertEqual(employment3Info['norm_work_amount'], 151.0)
 
-        for day in range(3):
-            dt = dt + timedelta(days=1)
-            WorkerDay.objects.create(
-                employment=self.employment2,
-                employee=self.employment2.employee,
-                shop=self.employment2.shop,
-                dt=dt,
-                type_id=WorkerDay.TYPE_VACATION,
-                is_approved=True,
-            )
+        with mock.patch.object(transaction, 'on_commit', lambda t: t()):
+            for day in range(3):
+                dt = dt + timedelta(days=1)
+                WorkerDay.objects.create(
+                    employment=self.employment2,
+                    employee=self.employment2.employee,
+                    shop=self.employment2.shop,
+                    dt=dt,
+                    type_id=WorkerDay.TYPE_VACATION,
+                    is_approved=True,
+                )
         data = self._test_create_tt(dt_from, dt_to, use_not_approved=False)
 
         employment2Info = list(filter(lambda x: x['general_info']['id'] == self.employee2.id, data['cashiers']))[0]

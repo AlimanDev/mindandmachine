@@ -144,15 +144,10 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
             operation_type_name=otn1,
             shop=self.shop,
         )
-        otn2 = OperationTypeName.objects.create(
-            is_special=False,
-            name='not special'
-        )
-        ot2 = OperationType.objects.create(
-            operation_type_name=otn2,
-            shop=self.shop,
-            work_type=self.work_type,
-        )
+        otn2 = self.work_type_name.operation_type_name
+        otn2.is_special = False
+        otn2.save()
+        ot2 = self.work_type.operation_type
 
         for dt in [dt1]:
             for ot in [ot1, ot2]:
