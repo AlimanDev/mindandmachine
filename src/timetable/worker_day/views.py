@@ -1248,9 +1248,6 @@ class WorkerDayViewSet(BaseModelViewSet):
             for shop_id, work_type in set(work_types):
                 cancel_vacancies(shop_id, work_type)
 
-            WorkerDay.check_work_time_overlap(
-                employee_id=to_employee_id, dt__in=data['to_dates'], exc_cls=ValidationError)
-
         return Response(WorkerDaySerializer(created_wds, many=True).data)
 
     @swagger_auto_schema(

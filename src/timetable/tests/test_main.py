@@ -1931,7 +1931,7 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
             },
         )
 
-    def test_can_create_workday_for_user_from_outsourcing_network(self):
+    def test_can_create_workday_for_user_from_outsourcing_network_only_with_explicit_perms(self):
         outsource_network = Network.objects.create(
             name='outsource',
             code='outsource',
@@ -1965,7 +1965,16 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
         }
         resp = self.client.post(self.url, data, format='json')
         self.assertEqual(resp.status_code, 403)
-        Employment.objects.filter(employee__user=self.user2).update(shop=self.shop)
+        GroupWorkerDayPermission.objects.create(
+            group=self.admin_group,
+            worker_day_permission=WorkerDayPermission.objects.get(
+                action=WorkerDayPermission.CREATE,
+                graph_type=WorkerDayPermission.PLAN,
+                wd_type_id=WorkerDay.TYPE_WORKDAY,
+            ),
+            employee_type=GroupWorkerDayPermission.OUTSOURCE_NETWORK_EMPLOYEE,
+            shop_type=GroupWorkerDayPermission.MY_SHOPS,
+        )
         resp = self.client.post(self.url, data, format='json')
         self.assertEqual(resp.status_code, 201)
 
@@ -5656,6 +5665,7 @@ class TestAditionalFunctions(TestsHelperMixin, APITestCase):
                 is_approved=approved,
                 parent_worker_day=parent_worker_day,
                 is_blocked=is_blocked,
+                is_vacancy=employment.shop_id != shop_id if shop_id else False,
             )
             result[date] = wd
 
@@ -6875,6 +6885,76 @@ class TestAditionalFunctions(TestsHelperMixin, APITestCase):
         resp_data = response.json()
         self.assertEqual(len(resp_data), 5)
         self.assertEqual(WorkerDay.objects.get(id=resp_data[0]['id']).work_hours, timedelta(hours=12))
+
+    def test_duplicate_outsource_vacancy(self):
+        outsource_network = Network.objects.create(
+            name='outsource',
+            code='outsource',
+        )
+        NetworkConnect.objects.create(
+            client_id=self.user2.network_id,
+            outsourcing=outsource_network,
+        )
+        outsource_shop = Shop.objects.create(
+            network=outsource_network,
+            name='oursource_shop',
+            region=self.region,
+        )
+        User.objects.filter(id=self.user2.id).update(network=outsource_network)
+        Employment.objects.filter(employee__user=self.user2).update(shop=outsource_shop)
+        dt_from = datetime.now().date()
+        self.create_worker_days(self.employment3, dt_from, 1, 9, 21, False, shop_id=self.shop2.id)
+        data = {
+            'from_employee_id': self.employee3.id,
+            'from_dates': [Converter.convert_date(dt_from)],
+            'to_employee_id': self.employee2.id,
+            'to_dates':  [Converter.convert_date(dt_from)],
+        }
+        url = f'{self.url}duplicate/'
+        resp = self.client.post(url, data, format='json')
+        self.assertEqual(resp.status_code, 403)
+        resp_data = resp.json()
+        self.assertDictEqual(
+            resp_data,
+            {
+                "detail": "У вас нет прав на создание типа дня \"Рабочий день\""
+                          " для сотрудника Иванов И. в подразделении Shop2"
+            }
+        )
+        GroupWorkerDayPermission.objects.create(
+            group=self.admin_group,
+            worker_day_permission=WorkerDayPermission.objects.get(
+                action=WorkerDayPermission.CREATE,
+                graph_type=WorkerDayPermission.PLAN,
+                wd_type_id=WorkerDay.TYPE_WORKDAY,
+            ),
+            employee_type=GroupWorkerDayPermission.OUTSOURCE_NETWORK_EMPLOYEE,
+            shop_type=GroupWorkerDayPermission.MY_SHOPS,
+        )
+        resp = self.client.post(url, data, format='json')
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(WorkerDay.objects.filter(
+            employee=self.employee2, is_approved=False, shop=self.shop2,
+            source=WorkerDay.SOURCE_DUPLICATE, is_vacancy=True, is_outsource=True,
+        ).count(), 1)
+
+    def test_duplicate_inner_vacancy(self):
+        dt_from = datetime.now().date()
+        Employment.objects.filter(employee=self.employee3).update(shop=self.shop3)
+        self.create_worker_days(self.employment3, dt_from, 1, 9, 21, False, shop_id=self.shop3.id)
+        data = {
+            'from_employee_id': self.employee3.id,
+            'from_dates': [Converter.convert_date(dt_from)],
+            'to_employee_id': self.employee2.id,
+            'to_dates':  [Converter.convert_date(dt_from)],
+        }
+        url = f'{self.url}duplicate/'
+        resp = self.client.post(url, data, format='json')
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(WorkerDay.objects.filter(
+            employee=self.employee2, is_approved=False, shop=self.shop3,
+            source=WorkerDay.SOURCE_DUPLICATE, is_vacancy=True, is_outsource=False,
+        ).count(), 1)
 
 
 class TestFineLogic(APITestCase):
