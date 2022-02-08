@@ -802,6 +802,10 @@ class WorkerDay(AbstractModel):
 
     @classmethod
     def _post_batch(cls, **kwargs):
+        cls._invalidate_cache(**kwargs)
+
+    @classmethod
+    def _invalidate_cache(cls, **kwargs):
         reduce_norm_types = set(WorkerDayType.objects.filter(is_reduce_norm=True).values_list('code', flat=True))
         grouped_by_employee = {}
         for obj in kwargs.get('created_objs', []):

@@ -525,7 +525,7 @@ X_FRAME_OPTIONS = 'SAMEORIGIN'
 CACHES = {
     'default': {
         "BACKEND": "django_redis.cache.RedisCache",
-        'LOCATION': 'redis://' + REDIS_HOST + ':6379/0',
+        'LOCATION': 'redis://' + REDIS_HOST + ':6379/1',
         "OPTIONS": {
             "CLIENT_CLASS": "django_redis.client.DefaultClient",
         }
