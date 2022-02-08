@@ -2526,8 +2526,8 @@ class WorkerDayPermission(AbstractModel):
     FACT = 'F'
 
     GRAPH_TYPES = (
-        (PLAN, 'План'),
-        (FACT, 'Факт'),
+        (PLAN, _('Plan')),
+        (FACT, _('Fact')),
     )
 
     # изменение типа дня в существующем дне считается как 2 действия: создание нового типа и удаление старого типа.
@@ -2566,10 +2566,10 @@ class GroupWorkerDayPermission(AbstractModel):
     MY_NETWORK_EMPLOYEE = 4
 
     EMPLOYEE_TYPE_CHOICES = (
-        (MY_SHOPS_ANY_EMPLOYEE, 'Любые сотрудники моих магазинов'),  # с трудоустройством в моем магазине
-        (SUBORDINATE_EMPLOYEE, 'Подчиненные сотрудники'),  # с трудоустройством в моем магазине
-        (OUTSOURCE_NETWORK_EMPLOYEE, 'Сотрудники аутсорс компании'),  # без трудоустройства в моем магазине и из сети, аутсорсящей сеть пользователя, соверщающего действие
-        (MY_NETWORK_EMPLOYEE, 'Любые сотрудники моей сети'),
+        (MY_SHOPS_ANY_EMPLOYEE, _('My shops employees')),  # с трудоустройством в моем магазине
+        (SUBORDINATE_EMPLOYEE, _('Subordinate employees')),  # с трудоустройством в моем магазине
+        (OUTSOURCE_NETWORK_EMPLOYEE, _('Outsource network employees')),  # без трудоустройства в моем магазине и из сети, аутсорсящей сеть пользователя, соверщающего действие
+        (MY_NETWORK_EMPLOYEE, _('My network employees')),
     )
     EMPLOYEE_TYPE_CHOICES_REVERSED_DICT = {v: k for k, v in dict(EMPLOYEE_TYPE_CHOICES).items()}
 
@@ -2579,10 +2579,10 @@ class GroupWorkerDayPermission(AbstractModel):
     CLIENT_NETWORK_SHOPS = 4
 
     SHOP_TYPE_CHOICES = (
-        (MY_SHOPS, 'Мои магазины'),
-        (MY_NETWORK_SHOPS, 'Любые магазины моей сети'),
-        (OUTSOURCE_NETWORK_SHOPS, 'Магазины аутсорс сетей'),
-        (CLIENT_NETWORK_SHOPS, 'Магазины сети аутсорс-клиента'),
+        (MY_SHOPS, _('My shops')),
+        (MY_NETWORK_SHOPS, _('My network shops')),
+        (OUTSOURCE_NETWORK_SHOPS, _('Outsource network shops')),
+        (CLIENT_NETWORK_SHOPS, _('Client network shops')),
     )
     SHOP_TYPE_CHOICES_REVERSED_DICT = {v: k for k, v in dict(SHOP_TYPE_CHOICES).items()}
 
@@ -2598,11 +2598,11 @@ class GroupWorkerDayPermission(AbstractModel):
         help_text='Если null - нет ограничений, если n - можно выполнять действие только n будущих дней',
     )
     allow_actions_on_vacancies = models.BooleanField(
-        verbose_name='Разрешить действия над вакансиями',
+        verbose_name=_('Allow actions on vacancies'),
         default=True,
-        help_text='Вакансией в данном случае является день, если он был явно создан как вакансия, '
+        help_text=_('Вакансией в данном случае является день, если он был явно создан как вакансия, '
                   'либо если магазин в трудоустройстве не совпадает с магазином выхода '
-                  '(актуально для рабочий типов дней)',
+                  '(актуально для рабочий типов дней)'),
     )
     # need_closest_plan_approved = models.BooleanField(  # TODO: нужно?
     #     verbose_name='Нужен ближайший план',

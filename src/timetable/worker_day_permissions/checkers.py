@@ -4,6 +4,7 @@ from django.conf import settings
 from django.db.models import Q
 from django.utils.translation import gettext as _
 
+from django.utils.encoding import force_text
 from src.base.models import (
     Employee,
     Shop,
@@ -40,7 +41,7 @@ class BaseWdPermissionChecker:
         from src.timetable.worker_day.views import WorkerDayViewSet
         wd_type_display_str = (self.cached_data.get(
             'wd_types_dict', {}) or WorkerDayType.get_wd_types_dict()).get(wd_type_id).name
-        action_str = WorkerDayPermission.ACTIONS_DICT.get(action).lower()
+        action_str = force_text(WorkerDayPermission.ACTIONS_DICT.get(action)).lower()
         if dt_interval:
             err_msg = WorkerDayViewSet.error_messages['approve_days_interval_restriction'].format(
                 wd_type_str=wd_type_display_str,
@@ -52,10 +53,12 @@ class BaseWdPermissionChecker:
                 wd_type_str=wd_type_display_str,
                 action_str=action_str,
             )
+            for_employee_text = force_text(_('for employee'))
+            in_department_text = force_text(_('in department'))
             if employee_id:
-                err_msg += f" для сотрудника {Employee.objects.select_related('user').get(id=employee_id).user.short_fio}"
+                err_msg += f" {for_employee_text} {Employee.objects.select_related('user').get(id=employee_id).user.short_fio}"
             if shop_id:
-                err_msg += f" в подразделении {Shop.objects.filter(id=shop_id).values_list('name', flat=True).first()}"
+                err_msg += f" {in_department_text} {Shop.objects.filter(id=shop_id).values_list('name', flat=True).first()}"
 
         return err_msg
 
