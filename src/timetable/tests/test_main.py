@@ -5665,7 +5665,7 @@ class TestAditionalFunctions(TestsHelperMixin, APITestCase):
             )
         return result
 
-    def test_delete(self):
+    def test_delete_worker_days(self):
         dt_from = date.today()
         self.create_worker_days(self.employment2, dt_from, 4, 10, 20, True)
         self.create_worker_days(self.employment3, dt_from, 4, 9, 21, True)

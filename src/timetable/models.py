@@ -836,9 +836,10 @@ class WorkerDay(AbstractModel):
             raise PermissionDenied(perm_checker.err_message)
 
     @classmethod
-    def _check_delete_single_wd_data_perm(cls, user, obj_data, **extra_kwargs):
+    def _check_delete_single_wd_data_perm(cls, user, obj_data, check_active_empl=False, **extra_kwargs):
         from src.timetable.worker_day_permissions.checkers import DeleteSingleWdDataPermissionChecker
-        perm_checker = DeleteSingleWdDataPermissionChecker(user=user, wd_data=obj_data)
+        perm_checker = DeleteSingleWdDataPermissionChecker(
+            user=user, wd_data=obj_data, check_active_empl=check_active_empl)
         if not perm_checker.has_permission():
             raise PermissionDenied(perm_checker.err_message)
 
