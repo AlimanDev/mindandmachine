@@ -7,6 +7,10 @@ from src.pbi.entities.embedtoken import EmbedToken
 from src.pbi.entities.embedtokenrequestbody import EmbedTokenRequestBody
 from src.pbi.entities.reportconfig import ReportConfig
 from src.pbi.services.aadservice import AadService
+from django.conf import settings
+
+
+PBI_DYNAMIC_RLS_ROLE_NAME = getattr(settings, 'PBI_DYNAMIC_RLS_ROLE_NAME', 'DynamicRlsRole')
 
 
 class PbiEmbedServiceException(Exception):
@@ -14,8 +18,9 @@ class PbiEmbedServiceException(Exception):
 
 
 class PbiEmbedService:
-    def __init__(self, report_config):
+    def __init__(self, report_config, user_id=None):
         self.report_config = report_config
+        self.user_id = user_id
 
     def get_embed_params_for_single_report(self):
         '''Get embed params for a report and a workspace
@@ -51,6 +56,7 @@ class PbiEmbedService:
             report_id (str): Report Id
             dataset_ids (list): Dataset Ids
             target_workspace_id (str, optional): Workspace Id. Defaults to None.
+            identities (list, optional): The list of identities to use for row-level security rules
 
         Returns:
             EmbedToken: Embed token
@@ -60,6 +66,19 @@ class PbiEmbedService:
 
         for dataset_id in dataset_ids:
             request_body.datasets.append({'id': dataset_id})
+            if self.user_id:
+                if not hasattr(request_body, 'identities'):
+                    request_body.identities = []
+
+                request_body.identities.append({
+                    'username': str(self.user_id),
+                    'roles': [
+                        PBI_DYNAMIC_RLS_ROLE_NAME,
+                    ],
+                    'datasets': [
+                        dataset_id
+                    ]
+                })
 
         request_body.reports.append({'id': self.report_config.report_id})
 

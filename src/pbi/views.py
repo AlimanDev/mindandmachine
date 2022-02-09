@@ -22,7 +22,8 @@ class GetEmbedInfoAPIView(APIView):
             raise PermissionDenied('Нет доступных отчетов.')
 
         try:
-            embed_info = PbiEmbedService(report_permission.report).get_embed_params_for_single_report()
+            embed_info = PbiEmbedService(
+                report_permission.report, user_id=request.user.id).get_embed_params_for_single_report()
             return Response(embed_info)
         except Exception as ex:
             raise APIException(str(ex))
