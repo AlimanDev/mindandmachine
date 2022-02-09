@@ -1228,8 +1228,8 @@ class WorkerDay(AbstractModel):
         return cls.objects.filter(
             ~Q(id=OuterRef('id')),
             Q(
-                Q(dttm_work_end__lt=OuterRef('dttm_work_start')) &
-                Q(dttm_work_start__gte=OuterRef('dttm_work_start'))
+                Q(dttm_work_start__lte=OuterRef('dttm_work_start')) &
+                Q(dttm_work_end__gt=OuterRef('dttm_work_start'))
             ) |
             Q(
                 Q(dttm_work_start__lt=OuterRef('dttm_work_end')) &
@@ -1242,6 +1242,14 @@ class WorkerDay(AbstractModel):
             Q(
                 Q(dttm_work_start__lte=OuterRef('dttm_work_start')) &
                 Q(dttm_work_end__gte=OuterRef('dttm_work_end'))
+            ) | 
+            Q(
+                Q(dttm_work_start__lte=OuterRef('dttm_work_start')) &
+                Q(dttm_work_end__isnull=True)
+            ) |
+            Q(
+                Q(dttm_work_end__gte=OuterRef('dttm_work_end')) &
+                Q(dttm_work_start__isnull=True)
             ),
             employee__user_id=user_id,
             dt=OuterRef('dt'),
