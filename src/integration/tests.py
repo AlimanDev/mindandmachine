@@ -1,7 +1,7 @@
 from datetime import datetime, time, date, timedelta
-from unittest import expectedFailure
 from django.conf import settings
 from django.db import transaction
+from django.db.models import Q
 
 from django.test import override_settings
 
@@ -1419,7 +1419,6 @@ class TestIntegration(TestsHelperMixin, APITestCase):
                 self.assertEquals(mock_request.request.call_args_list, [])
                 self.assertFalse(UserExternalCode.objects.filter(external_system=self.ext_system, user=self.user1).exists())
 
-    @expectedFailure
     def test_fact_not_duplicated_on_approve(self):
         dt = date.today()
         WorkerDay.objects.all().delete()
@@ -1466,6 +1465,7 @@ class TestIntegration(TestsHelperMixin, APITestCase):
 
         work_type_name = WorkTypeNameFactory()
 
+        WorkTypeFactory(shop=self.shop, work_type_name=work_type_name)
         work_type = WorkTypeFactory(shop=self.shop2, work_type_name=work_type_name)
 
         with patch('src.integration.zkteco.requests', new_callable=TestRequestMock):
@@ -1474,8 +1474,8 @@ class TestIntegration(TestsHelperMixin, APITestCase):
         self.assertEqual(AttendanceRecords.objects.count(), 1)
         self.assertEqual(AttendanceRecords.objects.first().shop_id, self.shop.id)
         
-        fact_wdays = WorkerDay.objects.filter(is_fact=True, employee=self.employee2)
-        plan_wdays = WorkerDay.objects.filter(is_fact=False, employee=self.employee2)
+        fact_wdays = WorkerDay.objects.filter(is_fact=True, employee=self.employee2, type_id=WorkerDay.TYPE_WORKDAY)
+        plan_wdays = WorkerDay.objects.filter(is_fact=False, employee=self.employee2, type_id=WorkerDay.TYPE_WORKDAY)
 
         self.assertEqual(fact_wdays.count(), 2)
 
@@ -1497,7 +1497,7 @@ class TestIntegration(TestsHelperMixin, APITestCase):
                 'dttm_work_start': datetime.combine(dt, time(6)),
                 'dttm_work_end': datetime.combine(dt, time(16)),
                 'dt': dt,
-                'shop_od': self.shop2.id,
+                'shop_id': self.shop2.id,
                 'worker_day_details': [
                     {
                         'work_type_id': work_type.id,
@@ -1512,6 +1512,8 @@ class TestIntegration(TestsHelperMixin, APITestCase):
                 content_type='application/json',
             )
             self.assertEqual(response.status_code, 201)
+
+            wd_fact = response.json()
 
             wday_data['is_fact'] = False
 
@@ -1530,7 +1532,7 @@ class TestIntegration(TestsHelperMixin, APITestCase):
                 'dt_to': dt,
                 'shop_id': self.shop2.id,
                 'is_fact': False,
-            } 
+            }
             response = self.client.post(
                 self.get_url('WorkerDay-approve'),
                 self.dump_data(approve_data),
@@ -1539,7 +1541,7 @@ class TestIntegration(TestsHelperMixin, APITestCase):
             self.assertEqual(response.status_code, 200)
 
             self.assertEqual(plan_wdays.count(), 2)
-            self.assertEqual(fact_wdays.count(), 3)
+            self.assertEqual(fact_wdays.count(), 2)
 
             approve_data['is_fact'] = True
             response = self.client.post(
@@ -1551,3 +1553,5 @@ class TestIntegration(TestsHelperMixin, APITestCase):
 
             self.assertEqual(plan_wdays.count(), 2)
             self.assertEqual(fact_wdays.count(), 2)
+            self.assertTrue(fact_wdays.filter(is_approved=True, id=wd_fact['id']).exists())
+            self.assertFalse(fact_wdays.filter(Q(dttm_work_start__isnull=True) | Q(dttm_work_end__isnull=True)).exists())
