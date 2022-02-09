@@ -4,11 +4,14 @@ from unittest import expectedFailure, mock
 from dateutil.relativedelta import relativedelta
 from django.core.cache import cache
 from django.db import transaction
-from django.test import TestCase, override_settings
+from django.test import override_settings
+
+from rest_framework.test import APITestCase
 
 from etc.scripts import fill_calendar
 from src.base.models import ProductionDay, Region
 from src.base.tests.factories import (
+    GroupFactory,
     NetworkFactory,
     ShopFactory,
     UserFactory,
@@ -18,13 +21,13 @@ from src.base.tests.factories import (
     EmployeeFactory,
 )
 from src.celery.tasks import set_prod_cal_cache_cur_and_next_month
-from src.timetable.models import WorkerDay, WorkerDayType
+from src.timetable.models import GroupWorkerDayPermission, WorkerDay, WorkerDayPermission, WorkerDayType
 from src.timetable.tests.factories import WorkerDayFactory
 from src.util.mixins.tests import TestsHelperMixin
 from .stat import WorkersStatsGetter
 
 
-class TestWorkersStatsGetter(TestsHelperMixin, TestCase):
+class TestWorkersStatsGetter(TestsHelperMixin, APITestCase):
     @classmethod
     def setUpTestData(cls):
         cls.dt_from = date(2020, 12, 1)
@@ -36,7 +39,8 @@ class TestWorkersStatsGetter(TestsHelperMixin, TestCase):
         cls.shop2 = ShopFactory(settings=cls.shop_settings)
         cls.user = UserFactory()
         cls.employee = EmployeeFactory(user=cls.user)
-        cls.position = WorkerPositionFactory()
+        cls.group = GroupFactory()
+        cls.position = WorkerPositionFactory(group=cls.group)
         cls.employment = EmploymentFactory(
             shop=cls.shop, employee=cls.employee,
             dt_hired=cls.dt_from - timedelta(days=90), dt_fired=None,
@@ -45,6 +49,7 @@ class TestWorkersStatsGetter(TestsHelperMixin, TestCase):
         fill_calendar.fill_days('2020.12.1', '2020.12.31', cls.shop.region.id)
 
     def setUp(self):
+        self.client.force_authenticate(user=self.user)
         self.network.refresh_from_db()
         self.position.refresh_from_db()
         cache.clear()
@@ -434,6 +439,61 @@ class TestWorkersStatsGetter(TestsHelperMixin, TestCase):
 
             wd2.delete()
             self._test_cache(0)
+
+            wd = WorkerDayFactory(
+                employee=self.employee2,
+                employment=self.employment2,
+                type_id=WorkerDay.TYPE_HOLIDAY,
+                dt=self.dt_from,
+                dttm_work_start=None,
+                dttm_work_end=None,
+                is_fact=False,
+                is_approved=False,
+            )
+            GroupWorkerDayPermission.objects.bulk_create(
+                GroupWorkerDayPermission(
+                    group=self.group,
+                    worker_day_permission=wdp,
+                    employee_type=GroupWorkerDayPermission.MY_NETWORK_EMPLOYEE,
+                    shop_type=GroupWorkerDayPermission.MY_NETWORK_SHOPS,
+                ) for wdp in WorkerDayPermission.objects.all()
+            )
+            self.add_group_perm(self.group, 'WorkerDay_approve', 'POST')
+            self.add_group_perm(self.group, 'WorkerDay_delete_worker_days', 'POST')
+            self.create_departments_and_users
+            response = self.client.post(
+                self.get_url('WorkerDay-approve'), 
+                {
+                    'dt_from': self.dt_from, 
+                    'dt_to': self.dt_to, 
+                    'shop_id': self.shop.id,
+                    'is_fact': False,
+                },
+            )
+            self.assertEqual(response.status_code, 200)
+
+            self._test_cache(1, [self.employee2.id])
+
+            wd2 = WorkerDayFactory(
+                employee=self.employee,
+                employment=self.employment,
+                type_id=WorkerDay.TYPE_VACATION,
+                dt=self.dt_from,
+                dttm_work_start=None,
+                dttm_work_end=None,
+            )
+            self._test_cache(1, [self.employee.id])
+
+            response = self.client.post(
+                self.get_url('WorkerDay-delete-worker-days'), 
+                {
+                    'dates': [self.dt_from,], 
+                    'employee_ids': [self.employee.id, self.employee2.id],
+                    'is_fact': False,
+                },
+            )
+            self.assertEqual(response.status_code, 200)
+            self._test_cache(1, [self.employee.id])
 
             batch_data = [
                 {

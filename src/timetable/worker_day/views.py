@@ -8,6 +8,7 @@ import pandas as pd
 from django.conf import settings
 from django.contrib.postgres.aggregates import StringAgg
 from django.core.serializers.json import DjangoJSONEncoder
+from django.core.cache import cache
 from django.db import transaction
 from django.db.models import OuterRef, Subquery, Q, F, Exists, Case, When, Value, CharField
 from django.db.models.functions import Concat, Cast
@@ -436,6 +437,9 @@ class WorkerDayViewSet(BaseModelViewSet):
             worker_dates_dict = {}
             for employee_id, dates_grouper in groupby(employee_dt_pairs_list, key=lambda i: i[0]):
                 worker_dates_dict[employee_id] = tuple(i[1] for i in list(dates_grouper))
+
+            transaction.on_commit(lambda: [cache.delete_pattern(f"prod_cal_*_*_{employee_id}") for employee_id in worker_dates_dict.keys()])
+
             if employee_dt_pairs_list:
                 employee_days_q = Q()
                 employee_days_set = set()
@@ -1315,18 +1319,13 @@ class WorkerDayViewSet(BaseModelViewSet):
                 dt__in=data['dates'],
                 **filt,
             )
-            delete_values = wdays_qs.values_list(
-                'dt',
-                'employee_id',
-                'shop_id',
-                'type_id',
-                'is_fact',
-                'is_vacancy',
-            )
+            deleted_wdays = list(wdays_qs)
+            delete_values = list(map(lambda x: (x.dt, x.employee_id, x.shop_id, x.type_id, x.is_fact, x.is_vacancy), deleted_wdays))
             grouped_perm_check_data = WorkerDay._get_grouped_perm_check_data(delete_values)
             for wd_data in grouped_perm_check_data:
                 WorkerDay._check_delete_single_wd_data_perm(self.request.user, wd_data)
             wdays_qs.delete()
+            WorkerDay._invalidate_cache(deleted_objs=deleted_wdays)
 
         return Response()
 
