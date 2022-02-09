@@ -1,8 +1,8 @@
 import datetime
 import json
-
 from collections import OrderedDict
 
+import pandas as pd
 from django.conf import settings
 from django.contrib.postgres.aggregates import StringAgg
 from django.core.serializers.json import DjangoJSONEncoder
@@ -30,8 +30,8 @@ from src.util.models_converter import Converter
 
 
 def exchange(data, error_messages):
-    new_wds = []
-    def create_worker_day(wd_target, wd_source):
+    created_wdays = []
+    def get_wd_data(wd_target, wd_source):
         employment = wd_target.employment
         if (wd_source.type_id == WorkerDay.TYPE_WORKDAY and employment is None):
             employment = Employment.objects.get_active_empl_by_priority(
@@ -41,7 +41,7 @@ def exchange(data, error_messages):
             ).select_related(
                 'position__breaks',
             ).first()
-        wd_new = WorkerDay(
+        wd_data = dict(
             type_id=wd_source.type_id,
             dttm_work_start=wd_source.dttm_work_start,
             dttm_work_end=wd_source.dttm_work_end,
@@ -54,17 +54,15 @@ def exchange(data, error_messages):
             shop_id=wd_source.shop_id,
             source=WorkerDay.SOURCE_EXCHANGE_APPROVED if data['is_approved'] else WorkerDay.SOURCE_EXCHANGE,
         )
-        wd_new.save()
-        new_wds.append(wd_new)
-        wd_new.outsources.add(*wd_source.outsources_list)
-        WorkerDayCashboxDetails.objects.bulk_create([
-            WorkerDayCashboxDetails(
-                worker_day_id=wd_new.id,
+        wd_data['outsources'] = [dict(network_id=network.id) for network in wd_source.outsources_list]
+        wd_data['worker_day_details'] = [
+            dict(
                 work_type_id=wd_cashbox_details_parent.work_type_id,
                 work_part=wd_cashbox_details_parent.work_part,
             )
             for wd_cashbox_details_parent in wd_source.worker_day_details.all()
-        ])
+        ]
+        return wd_data
 
     days = len(data['dates'])
     with transaction.atomic():
@@ -97,7 +95,7 @@ def exchange(data, error_messages):
         # если у пользователя нет группы с наличием прав на изменение защищенных дней, то проверяем,
         # что в списке изменяемых дней нету защищенных дней, если есть, то выдаем ошибку
         has_permission_to_change_protected_wdays = Group.objects.filter(
-            id__in=data['user'].get_group_ids(day_pairs[0][0].shop),
+            id__in=data['user'].get_group_ids(day_pairs[0][0].shop_id),
             has_perm_to_change_protected_wdays=True,
         ).exists()
         if not has_permission_to_change_protected_wdays:
@@ -168,20 +166,16 @@ def exchange(data, error_messages):
                 transaction.on_commit(
                     lambda f_json_data=json_data: send_doctors_schedule_to_mis.delay(json_data=f_json_data))
 
-        WorkerDay.objects_with_excluded.filter(
-            employee_id__in=(data['employee1_id'], data['employee2_id']),
-            dt__in=data['dates'],
-            is_approved=data['is_approved'],
-            is_fact=False,
-        ).delete()
-
+        wdays = []
         for day_pair in day_pairs:
-            create_worker_day(day_pair[0], day_pair[1])
-            create_worker_day(day_pair[1], day_pair[0])
-    return new_wds
+            wdays.append(get_wd_data(day_pair[0], day_pair[1]))
+            wdays.append(get_wd_data(day_pair[1], day_pair[0]))
+        created_wdays, stats = WorkerDay.batch_update_or_create(data=wdays, user=data['user'])
+    return created_wdays
 
 
-def copy_as_excel_cells(from_employee_id, from_dates, to_employee_id, to_dates, created_by=None, is_approved=False, worker_day_types=None, include_spaces=False):
+def copy_as_excel_cells(from_employee_id, from_dates, to_employee_id, to_dates, user=None,
+                              is_approved=False, worker_day_types=None, include_spaces=False):
     main_worker_days = WorkerDay.objects.filter(
         employee_id=from_employee_id,
         dt__in=from_dates,
@@ -210,10 +204,7 @@ def copy_as_excel_cells(from_employee_id, from_dates, to_employee_id, to_dates, 
 
     main_worker_days_details = {}
     for detail in main_worker_days_details_set:
-        key = detail.worker_day_id
-        if key not in main_worker_days_details:
-            main_worker_days_details[key] = []
-        main_worker_days_details[key].append(detail)
+        main_worker_days_details.setdefault(detail.worker_day_id, []).append(detail)
 
     main_worker_days_grouped_by_dt = OrderedDict()
     if include_spaces:
@@ -224,22 +215,10 @@ def copy_as_excel_cells(from_employee_id, from_dates, to_employee_id, to_dates, 
 
     main_worker_days_lists = list(main_worker_days_grouped_by_dt.values())
     length_main_wds = len(main_worker_days_lists)
-    delete_dates = to_dates
-    if include_spaces:
-        # удаляем только те даты на которые есть дни
-        delete_dates = [dt for i, dt in enumerate(to_dates) if main_worker_days_lists[i % length_main_wds]]
 
-    WorkerDay.objects_with_excluded.filter(
-        employee_id=to_employee_id,
-        dt__in=delete_dates,
-        is_approved=False,
-        is_fact=False,
-    ).delete()
     created_wds = []
-    wdcds_list_to_create = []
-    wd_outsource_network_to_create = []
-
     if main_worker_days:
+        new_wdays_data = []
         for i, dt in enumerate(to_dates):
             i = i % length_main_wds
 
@@ -248,11 +227,12 @@ def copy_as_excel_cells(from_employee_id, from_dates, to_employee_id, to_dates, 
                 continue
 
             worker_active_empl = Employment.objects.get_active_empl_by_priority(
-                network_id=blank_days[0].employment.shop.network_id if blank_days[0].employment else None, employee_id=to_employee_id,
+                employee_id=to_employee_id,
                 dt=dt,
                 priority_shop_id=blank_days[0].shop_id,
             ).select_related(
                 'position__breaks',
+                'employee__user',
             ).first()
 
             # не создавать день, если нету активного трудоустройства на эту дату
@@ -267,11 +247,11 @@ def copy_as_excel_cells(from_employee_id, from_dates, to_employee_id, to_dates, 
                 if blank_day.dttm_work_end and blank_day.dttm_work_start and blank_day.dttm_work_end.date() > blank_day.dttm_work_start.date():
                     dt_to = dt + datetime.timedelta(days=1)
 
-                new_wd = WorkerDay.objects.create(
+                wd_data = dict(
                     employee_id=worker_active_empl.employee_id,
                     employment=worker_active_empl,
                     dt=dt,
-                    shop=blank_day.shop,
+                    shop_id=blank_day.shop_id,
                     type_id=blank_day.type_id,
                     dttm_work_start=datetime.datetime.combine(
                         dt, blank_day.dttm_work_start.timetz()) if blank_day.dttm_work_start else None,
@@ -279,37 +259,29 @@ def copy_as_excel_cells(from_employee_id, from_dates, to_employee_id, to_dates, 
                         dt_to, blank_day.dttm_work_end.timetz()) if blank_day.dttm_work_end else None,
                     is_approved=False,
                     is_fact=False,
-                    created_by_id=created_by,
-                    last_edited_by_id=created_by,
+                    created_by=user,
+                    last_edited_by=user,
                     source=source,
                     work_hours=blank_day.work_hours,
+                    is_vacancy=worker_active_empl.shop_id != blank_day.shop_id if blank_day.shop_id else False,
                 )
-                wd_outsource_network_to_create.extend(
-                    [
-                        WorkerDayOutsourceNetwork(
-                            workerday=new_wd,
-                            network=network,
-                        )
-                        for network in blank_day.outsources_list
-                    ]
-                )
-                created_wds.append(new_wd)
-
+                if blank_day.shop_id:
+                    wd_data['is_outsource'] = blank_day.shop.network_id != worker_active_empl.employee.user.network_id
+                    if wd_data['is_outsource']:
+                        wd_data['outsources'] = [dict(network_id=network.id) for network in blank_day.outsources_list]
                 new_wdcds = main_worker_days_details.get(blank_day.id, [])
-                for new_wdcd in new_wdcds:
-                    wdcds_list_to_create.append(
-                        WorkerDayCashboxDetails(
-                            worker_day=new_wd,
-                            work_type_id=new_wdcd.work_type_id,
-                            work_part=new_wdcd.work_part,
-                        )
-                    )
+                wd_data['worker_day_details'] = [
+                    dict(work_type_id=new_wdcd.work_type_id, work_part=new_wdcd.work_part, ) for new_wdcd in new_wdcds]
+                new_wdays_data.append(wd_data)
 
-    if wdcds_list_to_create:
-        WorkerDayCashboxDetails.objects.bulk_create(wdcds_list_to_create)
-
-    if wd_outsource_network_to_create:
-        WorkerDayOutsourceNetwork.objects.bulk_create(wd_outsource_network_to_create)
+        created_wds, stats = WorkerDay.batch_update_or_create(
+            data=new_wdays_data,
+            user=user,
+            check_perms_extra_kwargs=dict(
+                check_active_empl=False,
+                grouped_checks=True,
+            )
+        )
 
     work_types = [
         (wdcds.work_type.shop_id, wdcds.work_type_id)
@@ -383,16 +355,10 @@ def create_worker_days_range(dates, type_id=WorkerDay.TYPE_WORKDAY, shop_id=None
     with transaction.atomic():
         created_wds = []
         employment = None
-        if employee_id:
-            WorkerDay.objects.filter(
-                dt__in=dates,
-                is_approved=is_approved,
-                is_fact=False,
-                employee_id=employee_id,
-            ).delete()
         priority_work_type_id = None
         if cashbox_details:
             priority_work_type_id = sorted(cashbox_details, key=lambda x: x['work_part'])[0]['work_type_id']
+        wdays = []
         for date in dates:
             if employee_id:
                 employment = Employment.objects.get_active_empl_by_priority(
@@ -414,11 +380,11 @@ def create_worker_days_range(dates, type_id=WorkerDay.TYPE_WORKDAY, shop_id=None
             dt_to = date
             if tm_work_start and tm_work_end and tm_work_end < tm_work_start:
                 dt_to = date + datetime.timedelta(days=1)
-            wd = WorkerDay.objects.create(
+            wd_data = dict(
                 dt=date,
                 shop_id=shop_id,
                 employee_id=employee_id,
-                employment=employment,
+                employment_id=employment.id if employment else None,
                 is_vacancy=is_vacancy,
                 is_approved=is_approved,
                 dttm_work_start=datetime.datetime.combine(date, tm_work_start) if tm_work_start else None,
@@ -431,14 +397,19 @@ def create_worker_days_range(dates, type_id=WorkerDay.TYPE_WORKDAY, shop_id=None
             )
             if type_id == WorkerDay.TYPE_WORKDAY:
                 if outsources and is_vacancy:
-                    wd.outsources.add(*outsources)
-                for detail in cashbox_details:
-                    WorkerDayCashboxDetails.objects.create(
-                        worker_day=wd,
-                        work_type_id=detail['work_type_id'],
-                        work_part=detail['work_part'],
-                    )
-            created_wds.append(wd)
+                    wd_data['outsources'] = [dict(network_id=network.id) for network in outsources]
+                wd_data['worker_day_details'] = [dict(work_type_id=detail['work_type_id'], work_part=detail['work_part']) for detail in cashbox_details]
+            wdays.append(wd_data)
+
+        if wdays:
+            created_wds, _stats = WorkerDay.batch_update_or_create(
+                data=wdays, user=created_by,
+                check_perms_extra_kwargs=dict(
+                    check_active_empl=False,  # проверка наличия трудоустройства происходит выше
+                    grouped_checks=True,
+                ),
+                delete_scope_filters={'employee__isnull': False},  # не удаляем открытые вакансии при создании новых
+            )
 
         return created_wds
 
@@ -446,23 +417,23 @@ def create_worker_days_range(dates, type_id=WorkerDay.TYPE_WORKDAY, shop_id=None
 def check_worker_day_permissions(
         user, shop_id, action, graph_type, wd_types, dt_from, dt_to, error_messages, wd_types_dict, employee_id=None, is_vacancy=False):
     user_shops = list(user.get_shops(include_descendants=True).values_list('id', flat=True))
-    user_subordinates = Group.get_subordinate_ids(user)
-    for dt in [dt_from + datetime.timedelta(i) for i in range((dt_to - dt_from).days + 1)]:
+    get_subordinated_group_ids = Group.get_subordinated_group_ids(user)
+    for dt in pd.date_range(dt_from, dt_to).date:
         if not WorkerDay._has_group_permissions(
-                user=user, employee_id=employee_id, dt=dt, user_shops=user_shops, user_subordinates=user_subordinates,
-                shop_id=shop_id, is_vacancy=is_vacancy, action=action, graph_type=graph_type,
+                user, employee_id, dt,
+                user_shops=user_shops, get_subordinated_group_ids=get_subordinated_group_ids, shop_id=shop_id, is_vacancy=is_vacancy,
         ):
             raise PermissionDenied(
                 error_messages['employee_not_in_subordinates'].format(
                 employee=User.objects.filter(employees__id=employee_id).first().fio),
             )
-    action = WorkerDayPermission.CREATE_OR_UPDATE if action in ['C', 'U'] else action
+
     wd_perms = GroupWorkerDayPermission.objects.filter(
-        group__in=user.get_group_ids(Shop.objects.get(id=shop_id) if shop_id else None),
+        group__in=user.get_group_ids(shop_id=shop_id),
         worker_day_permission__action=action,
         worker_day_permission__graph_type=graph_type,
     ).select_related('worker_day_permission').values_list(
-        'worker_day_permission__wd_type_id', 'limit_days_in_past', 'limit_days_in_future',
+        'worker_day_permission__wd_type_id', 'limit_days_in_past', 'limit_days_in_future', 'employee_type', 'shop_type',
     ).distinct()
     wd_perms_dict = {wdp[0]: wdp for wdp in wd_perms}
 
@@ -493,6 +464,7 @@ def check_worker_day_permissions(
                 raise PermissionDenied(
                     error_messages['approve_days_interval_restriction'].format(
                         wd_type_str=wd_type_display_str,
+                        action_str=WorkerDayPermission.ACTIONS_DICT.get(action).lower(),
                         dt_interval=dt_interval,
                     )
                 )

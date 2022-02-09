@@ -29,6 +29,11 @@ class OperationTypeAdmin(admin.ModelAdmin):
     @staticmethod
     def work_type_name(instance: OperationType):
         return instance.work_type.work_type_name.name if instance.work_type else 'Без типа работ'
+    
+    def get_readonly_fields(self, request, obj=None):
+        if obj:
+            return self.readonly_fields + ('operation_type_name', 'work_type')
+        return self.readonly_fields
 
 
 @admin.register(WorkType)
@@ -50,6 +55,11 @@ class WorkTypeAdmin(admin.ModelAdmin):
     @staticmethod
     def parent_title(instance: WorkType):
         return instance.shop.parent_title()
+    
+    def get_readonly_fields(self, request, obj=None):
+        if obj:
+            return self.readonly_fields + ('work_type_name',)
+        return self.readonly_fields
 
 
 @admin.register(PeriodClients)
@@ -95,6 +105,11 @@ class OperationTemplateAdmin(admin.ModelAdmin):
 class OperationTypeNameAdmin(admin.ModelAdmin):
     list_display = ('id', 'name', 'do_forecast', 'work_type_name')
     search_fields = ('name',)
+
+    def get_readonly_fields(self, request, obj=None):
+        if obj:
+            return self.readonly_fields + ('work_type_name',)
+        return self.readonly_fields
 
 
 @admin.register(LoadTemplate)

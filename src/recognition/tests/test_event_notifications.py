@@ -768,7 +768,6 @@ class TestEmployeeNotCheckedEventNotifications(TestsHelperMixin, APITestCase):
             name='SHOP_NAME',
             network=cls.network,
             email='shop@example.com',
-            director=cls.user_dir,
         )
         cls.group_dir = GroupFactory(name='Директор', network=cls.network)
         cls.employee_dir = EmployeeFactory(user=cls.user_dir)
@@ -830,19 +829,20 @@ class TestEmployeeNotCheckedEventNotifications(TestsHelperMixin, APITestCase):
     def test_employee_not_checked_notification_sent(self):
         with self.settings(CELERY_TASK_ALWAYS_EAGER=True):
             subject_in = 'Сотрудник не отметился на приход'
-            EventEmailNotification.objects.create(
+            in_notification = EventEmailNotification.objects.create(
                 event_type=self.event_in,
                 subject=subject_in,
                 system_email_template='notifications/email/employee_not_checked.html',
-                get_recipients_from_event_type=True,
             )
+            in_notification.shop_groups.add(self.group_dir)
             subject_out = 'Сотрудник не отметился на уход'
-            EventEmailNotification.objects.create(
+            out_notification = EventEmailNotification.objects.create(
                 event_type=self.event_out,
                 subject=subject_out,
                 system_email_template='notifications/email/employee_not_checked.html',
                 get_recipients_from_event_type=True,
             )
+            out_notification.shop_groups.add(self.group_dir)
             
             employee_not_checked()
             
@@ -872,19 +872,19 @@ class TestEmployeeNotCheckedEventNotifications(TestsHelperMixin, APITestCase):
         )
         with self.settings(CELERY_TASK_ALWAYS_EAGER=True):
             subject_in = 'Сотрудник не отметился на приход'
-            EventEmailNotification.objects.create(
+            in_notification = EventEmailNotification.objects.create(
                 event_type=self.event_in,
                 subject=subject_in,
                 system_email_template='notifications/email/employee_not_checked.html',
-                get_recipients_from_event_type=True,
             )
+            in_notification.shop_groups.add(self.group_dir)
             subject_out = 'Сотрудник не отметился на уход'
-            EventEmailNotification.objects.create(
+            out_notification = EventEmailNotification.objects.create(
                 event_type=self.event_out,
                 subject=subject_out,
                 system_email_template='notifications/email/employee_not_checked.html',
-                get_recipients_from_event_type=True,
             )
+            out_notification.shop_groups.add(self.group_dir)
             
             employee_not_checked()
             
@@ -920,19 +920,19 @@ class TestEmployeeNotCheckedEventNotifications(TestsHelperMixin, APITestCase):
         )
         with self.settings(CELERY_TASK_ALWAYS_EAGER=True):
             subject_in = 'Сотрудник не отметился на приход'
-            EventEmailNotification.objects.create(
+            in_notification = EventEmailNotification.objects.create(
                 event_type=self.event_in,
                 subject=subject_in,
                 system_email_template='notifications/email/employee_not_checked.html',
-                get_recipients_from_event_type=True,
             )
+            in_notification.shop_groups.add(self.group_dir)
             subject_out = 'Сотрудник не отметился на уход'
-            EventEmailNotification.objects.create(
+            out_notification = EventEmailNotification.objects.create(
                 event_type=self.event_out,
                 subject=subject_out,
                 system_email_template='notifications/email/employee_not_checked.html',
-                get_recipients_from_event_type=True,
             )
+            out_notification.shop_groups.add(self.group_dir)
             
             employee_not_checked()
             
@@ -969,7 +969,6 @@ class TestEmployeeWorkingNotAccordingToPlanEventNotifications(TestsHelperMixin, 
             name='SHOP_NAME',
             network=cls.network,
             email='shop@example.com',
-            director=cls.user_dir,
         )
         cls.employee_dir = EmployeeFactory(user=cls.user_dir)
         cls.user_urs = UserFactory(email='urs@example.com', network=cls.network)
@@ -1016,8 +1015,8 @@ class TestEmployeeWorkingNotAccordingToPlanEventNotifications(TestsHelperMixin, 
                     event_type=self.event,
                     subject=subject,
                     system_email_template='notifications/email/employee_working_not_according_to_plan.html',
-                    get_recipients_from_event_type=True,
                 )
+                event_email_notification.shop_groups.add(self.group_dir)
                 AttendanceRecords.objects.create(
                     shop=self.shop,
                     type=AttendanceRecords.TYPE_COMING,

@@ -1,7 +1,7 @@
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from src.forecast.models import OperationTypeName
+from src.forecast.models import OperationType, OperationTypeName
 from src.timetable.models import WorkTypeName, WorkType
 from src.util.test import create_departments_and_users
 
@@ -104,3 +104,60 @@ class TestWorkTypeName(APITestCase):
         self.assertEqual(len(resp_data), 1)
 
         self.assertEqual(resp_data[0]['id'], self.work_type_name2.id)
+
+    def test_work_type_name_create(self):
+        OperationType.objects.all().delete()
+        WorkType.objects.all().delete()
+        # with name only
+        wtn = WorkTypeName.objects.create(
+            name='WorkTypeName',
+            network=self.network,
+        )
+        otn = OperationTypeName.objects.filter(work_type_name_id=wtn.id).first()
+        self.assertIsNotNone(otn)
+        self.assertEqual(otn.name, wtn.name)
+
+        OperationTypeName.objects.all().delete()
+        WorkTypeName.objects.all().delete()
+
+        otn = OperationTypeName.objects.create(
+            name='WorkTypeName',
+            network=self.network,
+        )
+        wtn = WorkTypeName.objects.create(
+            name='WorkTypeName',
+            network=self.network,
+        )
+        otn.refresh_from_db()
+        self.assertEqual(otn.work_type_name_id, wtn.id)
+
+        OperationTypeName.objects.all().delete()
+        WorkTypeName.objects.all().delete()
+
+        # with code
+        otn = OperationTypeName.objects.create(
+            name='OperationTypeName',
+            code='work_type',
+            network=self.network,
+        )
+        wtn = WorkTypeName.objects.create(
+            name='WorkTypeName',
+            code='work_type',
+            network=self.network,
+        )
+        otn.refresh_from_db()
+        self.assertEqual(otn.work_type_name_id, wtn.id)
+        self.assertEqual(otn.name, wtn.name)
+
+        otn.name = 'Other name'
+        otn.save()
+        wtn.name = 'Other work type name'
+        wtn.save()
+        otn.refresh_from_db()
+        self.assertEqual(otn.name, wtn.name)
+
+        wtn.delete()
+        wtn.refresh_from_db()
+        otn.refresh_from_db()
+        self.assertIsNotNone(wtn.dttm_deleted)
+        self.assertIsNotNone(otn.dttm_deleted)

@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta, time, date
 from decimal import Decimal
+from unittest.case import skip
 
 from dateutil.relativedelta import relativedelta
 from rest_framework import status
@@ -126,6 +127,7 @@ class TestWorkType(APITestCase, TestsHelperMixin):
         data.pop('work_type_name_id')
         self.assertEqual(work_type, data)
 
+    @skip('Пока что не используем')
     def test_update_by_code(self):
         data = {
             'min_workers_amount': 30,
@@ -151,6 +153,7 @@ class TestWorkType(APITestCase, TestsHelperMixin):
         }
         self.assertEqual(work_type, data)
 
+    @skip('Пока не используем')
     def test_update_by_id(self):
         data = {
             'max_workers_amount': 30,
@@ -188,26 +191,12 @@ class TestWorkType(APITestCase, TestsHelperMixin):
         after_after_tomorrow = dt_now + timedelta(days=3)
 
         main('2019.1.1', (datetime.now() + timedelta(days=365)).strftime('%Y.%m.%d'), region_id=1)
-        op_name = OperationTypeName.objects.create(
-            name='Test',
-        )
-        op_name3 = OperationTypeName.objects.create(
-            name='Test3',
-        )
         op_name_income = OperationTypeName.objects.create(
             name='Income',
             code='income',
         )
-        op_type = OperationType.objects.create(
-            shop=self.shop,
-            work_type=self.work_type1,
-            operation_type_name=op_name,
-        )
-        op_type3 = OperationType.objects.create(
-            shop=self.shop,
-            work_type=self.work_type3,
-            operation_type_name=op_name3,
-        )
+        op_type = self.work_type1.operation_type
+        op_type3 = self.work_type3.operation_type
         op_type_income = OperationType.objects.create(
             shop=self.shop,
             operation_type_name=op_name_income,
@@ -523,3 +512,33 @@ class TestWorkType(APITestCase, TestsHelperMixin):
         self.assertIsNone(response.json()['preliminary_cost_per_hour'])
         self.work_type1.refresh_from_db()
         self.assertIsNone(self.work_type1.preliminary_cost_per_hour)
+
+
+    def test_work_type_create(self):
+        # with name only
+        wtn = WorkTypeName.objects.create(
+            name='WorkTypeName',
+            network=self.network,
+        )
+        otn = OperationTypeName.objects.filter(work_type_name_id=wtn.id).first()
+        self.assertIsNotNone(otn)
+        work_type = WorkType.objects.create(
+            work_type_name=wtn,
+            shop=self.shop,
+        )
+        operation_type = OperationType.objects.filter(work_type_id=work_type.id).first()
+        self.assertIsNotNone(operation_type)
+
+        self.assertEqual(operation_type.operation_type_name_id, otn.id)
+        self.assertEqual(operation_type.shop_id, work_type.shop_id)
+        
+        work_type.shop = self.shop2
+        work_type.save()
+        operation_type.refresh_from_db()
+        self.assertEqual(operation_type.shop_id, work_type.shop_id)
+
+        work_type.delete()
+        operation_type.refresh_from_db()
+        self.assertIsNotNone(work_type.dttm_deleted)
+        self.assertIsNotNone(operation_type.dttm_deleted)
+        

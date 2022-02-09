@@ -20,6 +20,8 @@ services:
       context: .
       dockerfile: ./etc/compose/postgres/Dockerfile
     restart: unless-stopped
+    volumes:
+      - ./etc/compose/tests_mounts/postgres:/var/lib/postgresql/data
     environment:
       POSTGRES_DB: qostest
       POSTGRES_USER: qostest

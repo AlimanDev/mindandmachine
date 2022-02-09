@@ -19,7 +19,8 @@ from src.base.models import (
     Employee,
     User as WFMUser
 )
-from src.recognition.authentication import TickPointTokenAuthentication
+from src.recognition.authentication import ShopIPAuthentication, TickPointTokenAuthentication
+from src.recognition.models import ShopIpAddress, TickPoint
 from src.recognition.wfm.serializers import WfmWorkerDaySerializer, WorkShiftSerializer
 from src.timetable.models import WorkerDay
 from .filters import WorkShiftFilter
@@ -51,18 +52,18 @@ class WorkerDayViewSet(viewsets.ReadOnlyModelViewSet):
     filter_backends = [DjangoFilterBackend, filters.SearchFilter]
 
     def get_authenticators(self):
-        return [TickPointTokenAuthentication(raise_auth_exc=False), TokenAuthentication()]
+        return [ShopIPAuthentication(), TickPointTokenAuthentication(raise_auth_exc=False), TokenAuthentication()]
 
     # filterset_class = WorkerDayFilterSet
     def get_queryset(self):
-        tick_point = self.request.user
+        shop = self.request.user.shop
 
-        dt_from = (now() + timedelta(hours=tick_point.shop.get_tz_offset())).date()
+        dt_from = (now() + timedelta(hours=shop.get_tz_offset())).date()
 
         wd_cond = WorkerDay.objects.filter(
             Q(dt=dt_from, dttm_work_start__isnull=False, dttm_work_end__isnull=False) |
             Q(dt=dt_from - timedelta(1), dttm_work_end__date=dt_from), # чтобы ночные смены попадали
-            shop_id=tick_point.shop_id,
+            shop_id=shop.id,
             # child__id__isnull=True,
             is_fact=False,
             is_approved=True,
@@ -74,7 +75,7 @@ class WorkerDayViewSet(viewsets.ReadOnlyModelViewSet):
         shop_emp_cond = Employment.objects.get_active(
             self.request.user.network_id,
             dt_from, dt_from, # чтобы не попались трудоустройства с завтрашнего дня
-            shop_id=tick_point.shop_id,
+            shop_id=shop.id,
         )
         q = Q(has_wdays=True, has_employments=True)
         if not USERS_WITH_SCHEDULE_ONLY:
@@ -92,7 +93,7 @@ class WorkerDayViewSet(viewsets.ReadOnlyModelViewSet):
                         queryset=Employment.objects.get_active_empl_by_priority(
                             None,
                             dt=dt_from,
-                            priority_shop_id=tick_point.shop_id,
+                            priority_shop_id=shop.id,
                         ).select_related('shop', 'position')
                     )
                 )
@@ -102,7 +103,7 @@ class WorkerDayViewSet(viewsets.ReadOnlyModelViewSet):
                 queryset=WorkerDay.objects.filter(
                     Q(dt=dt_from, dttm_work_start__isnull=False, dttm_work_end__isnull=False) |
                     Q(dt=dt_from - timedelta(1), dttm_work_end__date=dt_from),
-                    shop_id=tick_point.shop_id,
+                    shop_id=shop.id,
                     is_fact=False,
                     is_approved=True,
                 )

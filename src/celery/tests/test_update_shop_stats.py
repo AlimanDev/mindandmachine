@@ -23,15 +23,10 @@ class TestUpdateShopStats(TestsHelperMixin, TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.create_departments_and_users()
-        cls.work_type_name = WorkTypeName.objects.create(name='Тест', code='test')
+        cls.work_type_name = WorkTypeName.objects.create(name='Кассы', code='test')
         cls.work_type = WorkType.objects.create(shop=cls.shop, work_type_name=cls.work_type_name)
 
-        cls.otm = OperationTypeName.objects.create(
-            name='Кассы',
-            do_forecast=OperationTypeName.FORECAST,
-            network=cls.network,
-        )
-        cls.operation_type = OperationType.objects.create(shop=cls.shop, operation_type_name=cls.otm, work_type=cls.work_type)
+        cls.operation_type = OperationType.objects.get(shop=cls.shop, work_type=cls.work_type)
         for day in range(2):
             dt = timezone.now() + datetime.timedelta(days=day)
             for tm in range(24):

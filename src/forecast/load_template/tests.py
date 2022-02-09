@@ -38,12 +38,7 @@ class TestLoadTemplate(APITestCase):
             name='Кассы',
             network=self.network,
         )
-        self.operation_type_name1 = OperationTypeName.objects.create(
-            name='Кассы',
-            do_forecast=OperationTypeName.FORECAST_FORMULA,
-            work_type_name=self.work_type_name1,
-            network=self.network,
-        )
+        self.operation_type_name1 = self.work_type_name1.operation_type_name
         self.operation_type_name2 = OperationTypeName.objects.create(
             name='Строительные работы',
             do_forecast=OperationTypeName.FORECAST,
@@ -53,12 +48,7 @@ class TestLoadTemplate(APITestCase):
             name='ДМ',
             network=self.network,
         )
-        self.operation_type_name3 = OperationTypeName.objects.create(
-            name='ДМ',
-            do_forecast=OperationTypeName.FORECAST_FORMULA,
-            work_type_name=self.work_type_name2,
-            network=self.network,
-        )
+        self.operation_type_name3 = self.work_type_name2.operation_type_name
 
         self.load_template = LoadTemplate.objects.create(
             name='Test1',

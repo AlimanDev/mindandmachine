@@ -135,6 +135,13 @@ class TestIntegration(TestsHelperMixin, APITestCase):
                 'name': 'Тестовая зона',
             }
         )
+        self.att_area2, _ = AttendanceArea.objects.update_or_create(
+            code='2',
+            external_system=self.ext_system,
+            defaults={
+                'name': 'Тестовая зона 2',
+            }
+        )
 
         Employment.objects.filter(
             shop=self.shop,
@@ -175,6 +182,28 @@ class TestIntegration(TestsHelperMixin, APITestCase):
         )
         ShopExternalCode.objects.create(
             attendance_area=self.att_area,
+            shop=self.shop2,
+        )
+        with patch('src.integration.zkteco.requests', new_callable=TestRequestMock) as mock_request:
+            export_workers_zkteco()
+            self.assertEqual(UserExternalCode.objects.count(), 5)
+            self.employment2.dt_fired = date.today() - timedelta(days=2)
+            self.employment2.save()
+            Employment.objects.create(
+                employee_id=self.employment2.employee_id,
+                shop_id=self.shop2.id,
+                position=self.position,
+            )
+            delete_workers_zkteco()
+        self.assertEqual(UserExternalCode.objects.count(), 5)
+    
+    def test_delete_workers_many_shops_to_one_user(self):
+        ShopExternalCode.objects.create(
+            attendance_area=self.att_area,
+            shop=self.shop,
+        )
+        ShopExternalCode.objects.create(
+            attendance_area=self.att_area2,
             shop=self.shop2,
         )
         with patch('src.integration.zkteco.requests', new_callable=TestRequestMock) as mock_request:

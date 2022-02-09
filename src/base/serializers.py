@@ -10,6 +10,7 @@ from django.core.validators import EmailValidator
 from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
+from rest_framework.fields import empty
 from rest_framework.validators import UniqueValidator, UniqueTogetherValidator
 
 from src.base.fields import CurrentUserNetwork, UserworkShop
@@ -35,6 +36,24 @@ from src.base.models import (
 from src.timetable.serializers import EmploymentWorkTypeSerializer, EmploymentWorkTypeListSerializer
 from src.timetable.worker_constraint.serializers import WorkerConstraintSerializer, WorkerConstraintListSerializer
 
+
+class ModelSerializerWithCreateOnlyFields(serializers.ModelSerializer):
+    class Meta:
+        create_only_fields = []
+
+    def to_internal_value(self, data):
+        data = super().to_internal_value(data)
+        create_only_fields = getattr(self.Meta, 'create_only_fields', [])
+        if self.instance:
+            # update
+            for field in create_only_fields:
+                data.pop(field, None)
+        else:
+            for field in create_only_fields:
+                seralizer_field = self.fields.get(field)
+                if seralizer_field and seralizer_field.default is empty and field not in data:
+                    raise serializers.ValidationError({field: self.error_messages['required']})
+        return data
 
 class BaseNetworkSerializer(serializers.ModelSerializer):
     network_id = serializers.HiddenField(default=CurrentUserNetwork())
@@ -272,7 +291,7 @@ class AuthUserSerializer(UserSerializer):
         return list(set(allowed_tabs))
     
     def get_subordinate_employee_ids(self, obj: User):
-        return list(Employee.get_subordinates(obj, dt=now().date(), dt_to_shift=relativedelta(months=6)).values_list('id', flat=True))
+        return list(obj.get_subordinates(dt=now().date(), dt_to_shift=relativedelta(months=6)).values_list('id', flat=True))
     
     def get_self_employee_ids(self, obj: User):
         dt = now().date()
@@ -465,9 +484,10 @@ class EmploymentSerializer(serializers.ModelSerializer):
             if shop.network_id != position.network_id:
                 raise serializers.ValidationError(self.error_messages['bad_network_shop_position'])
 
-        if self.context['request'].user.network.descrease_employment_dt_fired_in_api:
-            if 'dt_hired' in attrs and attrs['dt_fired']:
-                attrs['dt_fired'] = attrs['dt_fired'] - timedelta(1)
+        descrease_dt_fired_cond = getattr(self.context['request'], 'by_code', False) and self.context[
+            'request'].user.network.descrease_employment_dt_fired_in_api and 'dt_hired' in attrs and attrs['dt_fired']
+        if descrease_dt_fired_cond:
+            attrs['dt_fired'] = attrs['dt_fired'] - timedelta(1)
 
         return attrs
 
