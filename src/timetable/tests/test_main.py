@@ -30,6 +30,7 @@ from src.base.models import (
 from src.events.models import EventType
 from src.notifications.models.event_notification import EventEmailNotification
 from src.timetable.events import VACANCY_CONFIRMED_TYPE
+from src.timetable.exceptions import WorkTimeOverlap
 from src.timetable.models import (
     WorkerDay,
     AttendanceRecords,
@@ -3391,6 +3392,86 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
         self.assertIsNone(plan_not_approved.dttm_work_start)
         self.assertIsNone(plan_not_approved.dttm_work_end)
         self.assertEqual(plan_not_approved.worker_day_details.count(), 0)
+
+    def _test_overlap(self, tm_work_start_first, tm_work_end_first, tm_work_start_second, tm_work_end_second, error_raised=True):
+        dt = date.today()
+        WorkerDay.objects.all().delete()
+        wd_data = {
+            'employee': self.employee2,
+            'employment': self.employment2,
+            'dt': dt,
+            'type_id': WorkerDay.TYPE_WORKDAY,
+            'shop': self.shop,
+            'is_fact': False,
+            'is_approved': False,
+            'dttm_work_start': datetime.combine(dt, tm_work_start_first) if tm_work_start_first else None,
+            'dttm_work_end': datetime.combine(dt, tm_work_end_first) if tm_work_end_first else None,
+        }
+        WorkerDay.objects.create(**wd_data)
+        wd_data.update(
+            {
+                'dttm_work_start': datetime.combine(dt, tm_work_start_second) if tm_work_start_second else None,
+                'dttm_work_end': datetime.combine(dt, tm_work_end_second) if tm_work_end_second else None,
+            }
+        )
+        WorkerDay.objects.create(**wd_data)
+        has_overlap = False
+        try:
+            WorkerDay.check_work_time_overlap(employee_id=self.employee2.id, is_fact=False, is_approved=False)
+        except WorkTimeOverlap:
+            has_overlap = True
+
+        self.assertEqual(has_overlap, error_raised)
+
+    def test_overlap(self):
+        
+        # start1 | start2 | end1 | end2
+        self._test_overlap(time(8), time(20), time(14), time(22))
+
+        # start2 | start1 | end2 | end1
+        self._test_overlap(time(8), time(20), time(5), time(15))
+
+        # start1 | start2 | end1 | None
+        self._test_overlap(time(8), time(20), time(14), None)
+
+        # start2 | start1 | end2 | None
+        self._test_overlap(time(8), None, time(5), time(15))
+
+        # None | start2 | end1 | end2
+        self._test_overlap(None, time(20), time(14), time(22))
+
+        # None | start1 | end2 | end1
+        self._test_overlap(time(8), time(20), None, time(15))
+
+        # start1 | start2 | end2 | end1
+        self._test_overlap(time(8), time(20), time(10), time(15))
+
+        # start2 | start1 | end1 | end2
+        self._test_overlap(time(10), time(15), time(8), time(20))
+
+        # start1 | start2 | end2 | None
+        self._test_overlap(time(8), None, time(10), time(20))
+
+        # start1==start2 | end2 | None
+        self._test_overlap(time(8), None, time(8), time(20))
+
+        # None | start2 | end2 | end1
+        self._test_overlap(None, time(21), time(8), time(20))
+
+        # None | start2 | end2==end1
+        self._test_overlap(None, time(21), time(8), time(21))
+
+        # start1 | end1 | start2 | end2
+        self._test_overlap(time(10), time(15), time(16), time(20), False)
+
+        # start1 | end1==start2 | end2
+        self._test_overlap(time(10), time(15), time(15), time(20), False)
+
+        # start1 | end1 | start2 | None
+        self._test_overlap(time(10), time(15), time(15), None, False)
+
+        # None | end1 | start2 | end2
+        self._test_overlap(None, time(15), time(15), time(20), False)
 
 
 class TestCropSchedule(TestsHelperMixin, APITestCase):
