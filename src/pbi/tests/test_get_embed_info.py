@@ -60,6 +60,7 @@ class TestGetEmbedInfo(TestsHelperMixin, APITestCase):
             client_secret='client secret',
             workspace_id=str(uuid4()),
             report_id=str(uuid4()),
+            use_rls=True,
         )
         cls.report_urs = Report.objects.create(
             name='Urs report',
@@ -68,16 +69,15 @@ class TestGetEmbedInfo(TestsHelperMixin, APITestCase):
             client_secret='client secret',
             workspace_id=str(uuid4()),
             report_id=str(uuid4()),
+            use_rls=True,
         )
         ReportPermission.objects.create(
             report=cls.report_dir,
             group=cls.group_dir,
-            use_rls=True,
         )
         ReportPermission.objects.create(
             report=cls.report_urs,
             group=cls.group_urs,
-            use_rls=True,
         )
 
     def test_receive_report_permission(self):
