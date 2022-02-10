@@ -6324,6 +6324,25 @@ class TestAditionalFunctions(TestsHelperMixin, APITestCase):
         self.assertEqual(WorkerDay.objects.filter(is_approved=False, source=WorkerDay.SOURCE_COPY_APPROVED_PLAN_TO_PLAN).count(), 12)
         self.assertEqual(WorkerDay.objects.filter(is_approved=False, employee_id=self.employment2.employee_id).count(), 0)
         self.assertEqual(WorkerDay.objects.filter(is_approved=False, dt=dt_now + timedelta(days=6)).count(), 0)
+    
+    def test_copy_approved_when_approved_not_exists(self):
+        dt_now = date.today()
+        self.create_worker_days(self.employment1, dt_now, 3, 10, 20, False)
+
+        data = {
+            'employee_ids': [
+                self.employment1.employee_id,
+            ],
+            'dates': [
+                dt_now + timedelta(days=i)
+                for i in range(6)
+            ]
+        }
+        self.assertEqual(WorkerDay.objects.filter(is_approved=False).count(), 3)
+        response = self.client.post(self.url + 'copy_approved/', data=data)
+
+        self.assertEqual(len(response.json()), 0)
+        self.assertEqual(WorkerDay.objects.filter(is_approved=False).count(), 0)
 
     def test_copy_approved_to_fact(self):
         self.network.only_fact_hours_that_in_approved_plan = True

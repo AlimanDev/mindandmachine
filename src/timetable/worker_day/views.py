@@ -1211,7 +1211,9 @@ class WorkerDayViewSet(BaseModelViewSet):
             WorkerDay.batch_update_or_create(
                 wdays, 
                 user=self.request.user, 
-                delete_scope_filters=dict(is_fact=is_copying_to_fact,
+                generate_delete_scope_values=False,
+                delete_scope_filters=dict(
+                    is_fact=is_copying_to_fact,
                     dt__in=data['dates'],
                     employee_id__in=data['employee_ids'],
                     is_approved=False,
