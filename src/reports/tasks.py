@@ -131,8 +131,7 @@ def fill_user_shop_groups(consider_position_groups=True, consider_function_group
 def fill_user_subordinates(dt=None, dt_to_shift_days=None, use_user_shop_groups=False):
     user_subordinates = []
     for user in User.objects.all():
-        subordinate_ids = Employee.get_subordinates(
-            user=user,
+        subordinate_ids = user.get_subordinates(
             dt=dt,
             user_shops=UserShopGroups.objects.filter(
                 user=user).values_list('shop_id', flat=True) if use_user_shop_groups else None,
