@@ -1140,12 +1140,6 @@ class WorkerDayViewSet(BaseModelViewSet):
             )
             is_copying_to_fact = data['type'] in (
                 CopyApprovedSerializer.TYPE_PLAN_TO_FACT, CopyApprovedSerializer.TYPE_FACT_TO_FACT)
-            WorkerDay.objects_with_excluded.filter(
-                is_fact=is_copying_to_fact,
-                dt__in=data['dates'],
-                employee_id__in=data['employee_ids'],
-                is_approved=False,
-            ).delete()
 
             if data['type'] == CopyApprovedSerializer.TYPE_PLAN_TO_FACT and request.user.network.copy_plan_to_fact_crossing:
                 grouped_wds = {}
@@ -1214,7 +1208,18 @@ class WorkerDayViewSet(BaseModelViewSet):
                     for wd_cashbox_details_parent in wd.worker_day_details.all()
                 ]
                 wdays.append(wd_data)
-            WorkerDay.batch_update_or_create(wdays, user=self.request.user)
+            WorkerDay.batch_update_or_create(
+                wdays, 
+                user=self.request.user, 
+                delete_scope_filters=dict(is_fact=is_copying_to_fact,
+                    dt__in=data['dates'],
+                    employee_id__in=data['employee_ids'],
+                    is_approved=False,
+                ),
+                check_perms_extra_kwargs=dict(
+                    grouped_checks=True,
+                ),
+            )
 
             copied_wdays_qs = WorkerDay.objects.filter(
                 is_fact=is_copying_to_fact,

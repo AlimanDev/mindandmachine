@@ -820,7 +820,7 @@ class WorkerDay(AbstractModel):
 
         for employee_id, types in grouped_by_employee.items():
             if set(types).intersection(reduce_norm_types):
-                transaction.on_commit(lambda: cache.delete_pattern(f"prod_cal_*_*_{employee_id}"))
+                transaction.on_commit(lambda empl_id=employee_id: cache.delete_pattern(f"prod_cal_*_*_{empl_id}"))
 
     @classmethod
     def _check_create_single_obj_perm(cls, user, obj_data, check_active_empl=True, **extra_kwargs):
