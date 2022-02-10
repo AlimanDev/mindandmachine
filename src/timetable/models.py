@@ -786,6 +786,10 @@ class WorkerDay(AbstractModel):
                     _("Can't create a working day in the schedule, since the user is not employed during this period"))
         return True
 
+    @classmethod
+    def _get_skip_update_equality_fields(cls):
+        return ['created_by', 'last_edited_by', 'source']
+
     def calc_day_and_night_work_hours(self, work_hours=None, work_start=None, work_end=None):
         from src.util.models_converter import Converter
         # TODO: нужно учитывать работу в праздничные дни? -- сейчас is_celebration в ProductionDay всегда False

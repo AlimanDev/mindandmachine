@@ -1,4 +1,5 @@
 import io
+from datetime import date, datetime
 
 import pandas as pd
 from django.core.exceptions import FieldDoesNotExist
@@ -130,8 +131,12 @@ class BatchUpdateOrCreateModelMixin:
         pass
 
     @classmethod
-    def _get_diff_report_subject_fmt(self):
+    def _get_diff_report_subject_fmt(cls):
         pass
+
+    @classmethod
+    def _get_skip_update_equality_fields(cls):
+        return []
 
     @classmethod
     def _create_and_send_diff_report(cls, diff_report_email_to, diff_data, diff_headers, now):
@@ -275,17 +280,26 @@ class BatchUpdateOrCreateModelMixin:
                 existing_objs = {
                     getattr(obj, update_key_field): obj for obj in update_qs
                 }
+                skip_update_equality_fields = cls._get_skip_update_equality_fields()
                 for update_key in update_keys:
+                    update_obj_dict = to_update_dict[update_key]
                     if update_key not in existing_objs:
-                        to_update_dict[update_key]['dttm_modified'] = now
+                        update_obj_dict['dttm_modified'] = now
                         obj_to_create = to_update_dict.pop(update_key)
                         to_create.append(obj_to_create)
                         if user:
                             cls._enrich_create_or_update_perms_data('C', create_or_update_perms_data, obj_dict)
                     else:
                         existing_obj = existing_objs.get(update_key)
-                        if all(getattr(existing_obj, k) == v for k, v in to_update_dict[update_key].items() if
-                               k not in rel_objs_mapping):
+                        need_to_skip = True
+                        for k, v in update_obj_dict.items():
+                            if k not in rel_objs_mapping and k not in skip_update_equality_fields:
+                                existing_obj_k_value = getattr(existing_obj, k)
+                                is_equal = existing_obj_k_value == v
+                                if not is_equal:
+                                    need_to_skip = False
+                                    break
+                        if need_to_skip:
                             to_skip.append(to_update_dict.pop(update_key))
                             obj_to_skip = existing_objs.pop(update_key)
                             objs_to_skip.append(obj_to_skip)
@@ -293,7 +307,7 @@ class BatchUpdateOrCreateModelMixin:
                                 diff_data.setdefault('skipped', []).append(
                                     tuple(obj_deep_get(obj_to_skip, *keys) for keys in diff_obj_keys))
                         else:
-                            to_update_dict[update_key]['dttm_modified'] = now
+                            update_obj_dict['dttm_modified'] = now
                             if user:
                                 cls._enrich_create_or_update_perms_data('U', create_or_update_perms_data, obj_dict)
 

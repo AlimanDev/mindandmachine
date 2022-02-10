@@ -223,6 +223,10 @@ class WorkerDaySerializer(serializers.ModelSerializer, UnaccountedOvertimeMixin)
         if not wd_type_obj.is_work_hours:
             attrs['is_vacancy'] = False
 
+        # рефакторинг
+        if not (wd_type_obj.is_work_hours and wd_type_obj.is_dayoff):
+            attrs.pop('work_hours', None)
+
         shop_id = attrs.get('shop_id')
         if wd_type_obj.is_dayoff:
             attrs['dttm_work_start'] = None
