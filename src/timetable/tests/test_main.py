@@ -30,6 +30,7 @@ from src.base.models import (
 from src.events.models import EventType
 from src.notifications.models.event_notification import EventEmailNotification
 from src.timetable.events import VACANCY_CONFIRMED_TYPE
+from src.timetable.exceptions import WorkTimeOverlap
 from src.timetable.models import (
     WorkerDay,
     AttendanceRecords,
@@ -2602,7 +2603,6 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
             self.get_url('WorkerDay-batch-update-or-create'), self.dump_data(delete_data), content_type='application/json')
         self.assertEquals(resp.status_code, status.HTTP_200_OK)
 
-
     def test_work_hours_recalculated_on_batch_update(self):
         WorkerDay.objects.all().delete()
         options = {
@@ -3252,6 +3252,136 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
         self.worker_day_plan_not_approved.refresh_from_db()
         self.assertEquals(self.worker_day_plan_not_approved.cost_per_hour, None)
 
+    def test_worker_day_details_deleted_on_wd_type_change_from_workday_to_nonworkday(self):
+        self.network.allow_creation_several_wdays_for_one_employee_for_one_date = True
+        self.network.save()
+        WorkerDay.objects.all().delete()
+        data = {
+            'data': [
+                {
+                    "shop_id": self.shop.id,
+                    "employee_id": self.employee2.id,
+                    "dt": self.dt,
+                    "is_fact": False,
+                    "is_approved": False,
+                    "type": WorkerDay.TYPE_WORKDAY,
+                    "dttm_work_start": datetime.combine(self.dt, time(16)),
+                    "dttm_work_end": datetime.combine(self.dt, time(23)),
+                    "worker_day_details": [
+                        {
+                            "work_part": 1.0,
+                            "work_type_id": self.work_type.id
+                        }
+                    ]
+                },
+            ],
+        }
+        resp = self.client.post(
+            self.get_url('WorkerDay-batch-update-or-create'), self.dump_data(data), content_type='application/json')
+        self.assertEqual(resp.status_code, 200)
+        plan_not_approved = WorkerDay.objects.filter(is_fact=False, is_approved=False).first()
+        data = {
+            'data': [
+                {
+                    "id": plan_not_approved.id,
+                    "shop_id": self.shop.id,
+                    "employee_id": self.employee2.id,
+                    "dt": self.dt,
+                    "is_fact": False,
+                    "is_approved": False,
+                    "type": WorkerDay.TYPE_HOLIDAY,
+                },
+            ],
+        }
+        resp = self.client.post(
+            self.get_url('WorkerDay-batch-update-or-create'), self.dump_data(data), content_type='application/json')
+        self.assertEqual(resp.status_code, 200)
+        plan_not_approved.refresh_from_db()
+        self.assertEqual(plan_not_approved.type_id, WorkerDay.TYPE_HOLIDAY)
+        self.assertIsNone(plan_not_approved.dttm_work_start)
+        self.assertIsNone(plan_not_approved.dttm_work_end)
+        self.assertEqual(plan_not_approved.worker_day_details.count(), 0)
+
+    def _test_overlap(self, tm_work_start_first, tm_work_end_first, tm_work_start_second, tm_work_end_second, error_raised=True):
+        dt = date.today()
+        WorkerDay.objects.all().delete()
+        wd_data = {
+            'employee': self.employee2,
+            'employment': self.employment2,
+            'dt': dt,
+            'type_id': WorkerDay.TYPE_WORKDAY,
+            'shop': self.shop,
+            'is_fact': False,
+            'is_approved': False,
+            'dttm_work_start': datetime.combine(dt, tm_work_start_first) if tm_work_start_first else None,
+            'dttm_work_end': datetime.combine(dt, tm_work_end_first) if tm_work_end_first else None,
+        }
+        WorkerDay.objects.create(**wd_data)
+        wd_data.update(
+            {
+                'dttm_work_start': datetime.combine(dt, tm_work_start_second) if tm_work_start_second else None,
+                'dttm_work_end': datetime.combine(dt, tm_work_end_second) if tm_work_end_second else None,
+            }
+        )
+        WorkerDay.objects.create(**wd_data)
+        has_overlap = False
+        try:
+            WorkerDay.check_work_time_overlap(employee_id=self.employee2.id, is_fact=False, is_approved=False)
+        except WorkTimeOverlap:
+            has_overlap = True
+
+        self.assertEqual(has_overlap, error_raised)
+
+    def test_overlap(self):
+        
+        # start1 | start2 | end1 | end2
+        self._test_overlap(time(8), time(20), time(14), time(22))
+
+        # start2 | start1 | end2 | end1
+        self._test_overlap(time(8), time(20), time(5), time(15))
+
+        # start1 | start2 | end1 | None
+        self._test_overlap(time(8), time(20), time(14), None)
+
+        # start2 | start1 | end2 | None
+        self._test_overlap(time(8), None, time(5), time(15))
+
+        # None | start2 | end1 | end2
+        self._test_overlap(None, time(20), time(14), time(22))
+
+        # None | start1 | end2 | end1
+        self._test_overlap(time(8), time(20), None, time(15))
+
+        # start1 | start2 | end2 | end1
+        self._test_overlap(time(8), time(20), time(10), time(15))
+
+        # start2 | start1 | end1 | end2
+        self._test_overlap(time(10), time(15), time(8), time(20))
+
+        # start1 | start2 | end2 | None
+        self._test_overlap(time(8), None, time(10), time(20))
+
+        # start1==start2 | end2 | None
+        self._test_overlap(time(8), None, time(8), time(20))
+
+        # None | start2 | end2 | end1
+        self._test_overlap(None, time(21), time(8), time(20))
+
+        # None | start2 | end2==end1
+        self._test_overlap(None, time(21), time(8), time(21))
+
+        # start1 | end1 | start2 | end2
+        self._test_overlap(time(10), time(15), time(16), time(20), False)
+
+        # start1 | end1==start2 | end2
+        self._test_overlap(time(10), time(15), time(15), time(20), False)
+
+        # start1 | end1 | start2 | None
+        self._test_overlap(time(10), time(15), time(15), None, False)
+
+        # None | end1 | start2 | end2
+        self._test_overlap(None, time(15), time(15), time(20), False)
+
 
 class TestCropSchedule(TestsHelperMixin, APITestCase):
     @classmethod
@@ -3417,7 +3547,7 @@ class TestWorkerDayCreateFact(TestsHelperMixin, APITestCase):
         plan_id = response.json()['id']
 
     def test_closest_plan_approved_set_on_fact_creation(self):
-        plan_approved = WorkerDayFactory(
+        WorkerDayFactory(
             is_fact=False,
             is_approved=True,
             dt=self.dt,
@@ -3425,8 +3555,20 @@ class TestWorkerDayCreateFact(TestsHelperMixin, APITestCase):
             employment=self.employment2,
             shop=self.shop,
             type_id=WorkerDay.TYPE_WORKDAY,
-            dttm_work_start=datetime.combine(self.dt, time(8, 0, 0)),
-            dttm_work_end=datetime.combine(self.dt, time(20, 0, 0)),
+            dttm_work_start=datetime.combine(self.dt, time(10, 0, 0)),
+            dttm_work_end=datetime.combine(self.dt, time(12, 0, 0)),
+            cashbox_details__work_type=self.work_type,
+        )
+        plan_approved2 = WorkerDayFactory(
+            is_fact=False,
+            is_approved=True,
+            dt=self.dt,
+            employee=self.employee2,
+            employment=self.employment2,
+            shop=self.shop,
+            type_id=WorkerDay.TYPE_WORKDAY,
+            dttm_work_start=datetime.combine(self.dt, time(12, 0, 0)),
+            dttm_work_end=datetime.combine(self.dt, time(14, 0, 0)),
             cashbox_details__work_type=self.work_type,
         )
 
@@ -3437,8 +3579,8 @@ class TestWorkerDayCreateFact(TestsHelperMixin, APITestCase):
             "dt": self.dt,
             "is_fact": True,
             "type": WorkerDay.TYPE_WORKDAY,
-            "dttm_work_start": datetime.combine(self.dt, time(8, 0, 0)),
-            "dttm_work_end": datetime.combine(self.dt, time(20, 0, 0)),
+            "dttm_work_start": datetime.combine(self.dt, time(12, 1, 0)),
+            "dttm_work_end": datetime.combine(self.dt, time(14, 5, 0)),
             "worker_day_details": [{
                 "work_part": 1.0,
                 "work_type_id": self.work_type.id}
@@ -3449,7 +3591,7 @@ class TestWorkerDayCreateFact(TestsHelperMixin, APITestCase):
         self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
         fact_id = resp.json()['id']
         fact = WorkerDay.objects.get(id=fact_id)
-        self.assertEqual(fact.closest_plan_approved_id, plan_approved.id)
+        self.assertEqual(fact.closest_plan_approved_id, plan_approved2.id)
 
     def test_closest_plan_approved_set_on_fact_creation_when_single_plan_far_from_fact(self):
         plan_approved = WorkerDayFactory(

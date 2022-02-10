@@ -1,7 +1,7 @@
 import datetime
+import distutils.util
 import json
 from decimal import Decimal
-import distutils.util
 
 from django.conf import settings
 from django.contrib.auth.models import (
@@ -12,6 +12,7 @@ from django.db import transaction
 from django.db.models import (
     Subquery, OuterRef, Max, Q, Case, When, Value, FloatField, F, IntegerField, Exists, BooleanField, Min, Count
 )
+from django.db.models.expressions import RawSQL
 from django.db.models.fields import PositiveSmallIntegerField
 from django.db.models.functions import Abs, Cast, Extract, Least
 from django.db.models.query import QuerySet
@@ -1273,8 +1274,8 @@ class WorkerDay(AbstractModel):
                 WorkerDay.objects.filter(
                     ~Q(id=OuterRef('id')),
                     Q(
-                        Q(dttm_work_end__lt=OuterRef('dttm_work_start')) &
-                        Q(dttm_work_start__gte=OuterRef('dttm_work_start'))
+                        Q(dttm_work_start__lte=OuterRef('dttm_work_start')) &
+                        Q(dttm_work_end__gt=OuterRef('dttm_work_start'))
                     ) |
                     Q(
                         Q(dttm_work_start__lt=OuterRef('dttm_work_end')) &
@@ -1287,6 +1288,14 @@ class WorkerDay(AbstractModel):
                     Q(
                         Q(dttm_work_start__lte=OuterRef('dttm_work_start')) &
                         Q(dttm_work_end__gte=OuterRef('dttm_work_end'))
+                    ) | 
+                    Q(
+                        Q(dttm_work_start__lte=OuterRef('dttm_work_start')) &
+                        Q(dttm_work_end__isnull=True)
+                    ) |
+                    Q(
+                        Q(dttm_work_end__gte=OuterRef('dttm_work_end')) &
+                        Q(dttm_work_start__isnull=True)
                     ),
                     employee__user_id=OuterRef('employee__user_id'),
                     dt=OuterRef('dt'),
@@ -1617,6 +1626,13 @@ class WorkerDay(AbstractModel):
                     dttm_work_end=OuterRef('dttm_work_end'),
                     delta_in_secs=delta_in_secs,
                     use_annotated_filter=False,
+                ).annotate(
+                    order_by_val=RawSQL("""LEAST(
+                        ABS(EXTRACT(EPOCH FROM (U0."dttm_work_start" - "timetable_workerday"."dttm_work_start"))),
+                        ABS(EXTRACT(EPOCH FROM (U0."dttm_work_end" - "timetable_workerday"."dttm_work_end")))
+                    )""", [])
+                ).order_by(
+                    'order_by_val',
                 ).values('id')[:1])
             )
             qs.filter(plan_approved_count=1).update(
