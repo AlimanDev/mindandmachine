@@ -196,7 +196,7 @@ class BatchUpdateOrCreateModelMixin:
     def batch_update_or_create(
             cls, data: list, update_key_field: str = 'id', delete_scope_fields_list: list = None,
             delete_scope_values_list: list = None, delete_scope_filters: dict = None, stats=None, user=None,
-            dry_run=False, diff_report_email_to: list = None, check_perms_extra_kwargs=None):
+            dry_run=False, diff_report_email_to: list = None, check_perms_extra_kwargs=None, generate_delete_scope_values=True):
         """
         Функция для массового создания и/или обновления объектов
 
@@ -356,7 +356,7 @@ class BatchUpdateOrCreateModelMixin:
                 objs_to_delete = []
                 q_for_delete = Q()
                 if delete_scope_fields_list:
-                    if not delete_scope_values_list:
+                    if not delete_scope_values_list and generate_delete_scope_values:
                         for obj_to_update in objs_to_update:
                             delete_scope_values_tuple = tuple(
                                 (k, getattr(obj_to_update, k)) for k in delete_scope_fields_list if
@@ -378,7 +378,7 @@ class BatchUpdateOrCreateModelMixin:
                             if delete_scope_values_tuple:
                                 delete_scope_values_set.add(delete_scope_values_tuple)
 
-                    if delete_scope_values_set:
+                    if delete_scope_values_set or (not generate_delete_scope_values and delete_scope_filters):
                         for delete_scope_values_tuples in delete_scope_values_set:
                             q_for_delete |= Q(**dict(delete_scope_values_tuples))
 
