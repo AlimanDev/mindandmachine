@@ -217,3 +217,14 @@ class ReportConfig(models.Model):
             )
     
         return recipients
+
+
+class UserShopGroups(models.Model):
+    user = models.ForeignKey('base.User', on_delete=models.CASCADE)
+    shop = models.ForeignKey('base.Shop', on_delete=models.CASCADE)
+    group_name = models.CharField(max_length=128, blank=False, null=True)
+
+
+class UserSubordinates(models.Model):
+    user = models.ForeignKey('base.User', on_delete=models.CASCADE)
+    employee = models.ForeignKey('base.Employee', on_delete=models.CASCADE)

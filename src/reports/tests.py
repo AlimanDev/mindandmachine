@@ -1,18 +1,18 @@
+from calendar import monthrange
 from datetime import date, datetime, time, timedelta
 
 import pandas as pd
 from dateutil.relativedelta import relativedelta
 from django.core import mail
-from calendar import monthrange
+from django.test import TestCase
 from django_celery_beat.models import CrontabSchedule
 from rest_framework.test import APITestCase
-
 from src.base.models import FunctionGroup, Network, WorkerPosition
 from src.base.tests.factories import EmployeeFactory, EmploymentFactory, GroupFactory, NetworkFactory, ShopFactory, \
     UserFactory
-from src.reports.models import ReportConfig, ReportType, Period
+from src.reports.models import ReportConfig, ReportType, Period, UserShopGroups, UserSubordinates
 from src.reports.reports import PIVOT_TABEL
-from src.reports.tasks import cron_report
+from src.reports.tasks import cron_report, fill_user_shop_groups, fill_user_subordinates
 from src.timetable.models import ScheduleDeviations, WorkerDay, WorkerDayOutsourceNetwork, WorkerDayType
 from src.timetable.tests.factories import WorkerDayFactory
 from src.util.mixins.tests import TestsHelperMixin
@@ -742,3 +742,55 @@ class TestScheduleDeviation(APITestCase):
                 [i + 1, self.shop.name if wd_type.is_work_hours else '-', datetime.combine(dt_from + timedelta(i), time(0, 0)), 
                 f'{self.user1.fio} ', self.root_shop.name, 'штат', self.position.name, 'Биржа смен' if wd_type.code == WorkerDay.TYPE_WORKDAY else wd_type.name]
             )
+
+
+class TestFillReportsData(TestsHelperMixin, TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.network = NetworkFactory()
+        cls.base_shop = ShopFactory(code='base', network=cls.network)
+        cls.division1 = ShopFactory(parent=cls.base_shop, code='division1', network=cls.network)
+        cls.region1 = ShopFactory(parent=cls.division1, code='region1', network=cls.network)
+        cls.shop1 = ShopFactory(parent=cls.region1, code='shop1', network=cls.network)
+        cls.group_admin = GroupFactory(code='admin', name='Администратор', network=cls.network)
+        cls.group_urs = GroupFactory(code='urs', name='УРС', network=cls.network)
+        cls.group_director = GroupFactory(code='director', name='Директор', network=cls.network)
+        cls.group_worker = GroupFactory(code='worker', name='Сотрудник', network=cls.network)
+        cls.group_admin.subordinates.add(cls.group_urs, cls.group_director, cls.group_worker)
+        cls.group_urs.subordinates.add(cls.group_director, cls.group_worker)
+        cls.group_director.subordinates.add(cls.group_worker)
+        cls.position_admin = WorkerPosition.objects.create(group=cls.group_admin, name='Администратор', code='admin', network=cls.network)
+        cls.position_director = WorkerPosition.objects.create(group=cls.group_director, name='Директор', code='director', network=cls.network)
+        cls.position_urs = WorkerPosition.objects.create(group=cls.group_urs, name='УРС', code='urs', network=cls.network)
+        cls.position_seller = WorkerPosition.objects.create(group=cls.group_worker, name='Продавец-кассир', code='seller', network=cls.network)
+        cls.dt_now = datetime.now()
+        cls.employment_admin = EmploymentFactory(
+            employee__user__network=cls.network,
+            shop=cls.base_shop, function_group=cls.group_admin,
+        )
+        cls.employment_urs = EmploymentFactory(
+            employee__user__network=cls.network,
+            shop=cls.region1, position=cls.position_urs,
+        )
+        cls.employment_dir = EmploymentFactory(
+            employee__user__network=cls.network,
+            shop=cls.shop1, position=cls.position_director,
+        )
+        cls.employment_worker = EmploymentFactory(
+            employee__user__network=cls.network,
+            shop=cls.shop1, position=cls.position_seller,
+        )
+
+    def test_fill_user_shop_groups(self):
+        fill_user_shop_groups()
+        self.assertEquals(UserShopGroups.objects.filter(user=self.employment_admin.employee.user).count(), 4)
+        self.assertEquals(UserShopGroups.objects.filter(user=self.employment_urs.employee.user).count(), 2)
+        self.assertEquals(UserShopGroups.objects.filter(user=self.employment_dir.employee.user).count(), 1)
+        self.assertEquals(UserShopGroups.objects.filter(user=self.employment_worker.employee.user).count(), 1)
+
+    def test_fill_user_subordinates(self):
+        fill_user_subordinates(use_user_shop_groups=True)
+        self.assertEquals(UserSubordinates.objects.filter(user=self.employment_admin.employee.user).count(), 3)
+        self.assertEquals(UserSubordinates.objects.filter(user=self.employment_urs.employee.user).count(), 2)
+        self.assertEquals(UserSubordinates.objects.filter(user=self.employment_dir.employee.user).count(), 1)
+        self.assertEquals(UserSubordinates.objects.filter(user=self.employment_worker.employee.user).count(), 0)

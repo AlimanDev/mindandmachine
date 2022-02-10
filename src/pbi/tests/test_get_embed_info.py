@@ -72,10 +72,12 @@ class TestGetEmbedInfo(TestsHelperMixin, APITestCase):
         ReportPermission.objects.create(
             report=cls.report_dir,
             group=cls.group_dir,
+            use_rls=True,
         )
         ReportPermission.objects.create(
             report=cls.report_urs,
             group=cls.group_urs,
+            use_rls=True,
         )
 
     def test_receive_report_permission(self):
