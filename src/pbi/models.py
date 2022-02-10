@@ -16,6 +16,7 @@ class Report(AbstractModel):
     client_secret = models.CharField(max_length=128)
     workspace_id = models.CharField(max_length=128)
     report_id = models.CharField(max_length=512)
+    use_rls = models.BooleanField(default=False)
 
     class Meta:
         verbose_name = 'Отчет'
@@ -29,7 +30,6 @@ class ReportPermission(AbstractModel):
     report = models.ForeignKey('pbi.Report', on_delete=models.CASCADE)
     group = models.OneToOneField('base.Group', on_delete=models.CASCADE, null=True, blank=True)
     user = models.OneToOneField('base.User', on_delete=models.CASCADE, null=True, blank=True)
-    use_rls = models.BooleanField(default=False)
 
     class Meta:
         verbose_name = 'Доступ к отчету'
