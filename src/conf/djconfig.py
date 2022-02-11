@@ -76,7 +76,6 @@ INSTALLED_APPS = [
     'src.base',
     'src.forecast',
     'src.timetable',
-    'src.main',
     'django_celery_beat',
     'src.celery',
     'fcm_django',

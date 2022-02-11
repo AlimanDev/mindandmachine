@@ -1694,8 +1694,6 @@ class FunctionGroup(AbstractModel):
         ('LoadTemplate_download', 'Скачать шаблон нагрузки (Получить) (load_template/download/)'),
         ('LoadTemplate_upload', 'Загрузить шаблон нагрузки (Создать) (load_template/upload/)'),
         ('Network', 'Сеть (network)'),
-        ('Notification', 'Уведомление (notification)'),
-        ('OperationTemplate', 'Шаблон операции (operation_template)'),
         ('OperationTypeName', 'Название типа операции (operation_type_name)'),
         ('OperationType', 'Тип операции (operation_type)'),
         ('OperationTypeRelation', 'Отношение типов операций (operation_type_relation)'),
@@ -1717,7 +1715,6 @@ class FunctionGroup(AbstractModel):
         ('Shop_internal_tree', 'Дерево отделов сети пользователя (Получить) (department/internal_tree/)'),
         ('Shop_load_template', 'Изменить шаблон нагрузки магазина (Обновить) (department/{pk}/load_template/)'),
         ('Shop_outsource_tree', 'Дерево отделов клиентов (для аутсорс компаний) (Получить) (department/outsource_tree/)'),
-        ('Subscribe', 'Subscribe (subscribe)'),
         ('TickPoint', 'Точка отметки (tick_points)'),
         ('Timesheet', 'Табель (timesheet)'),
         ('Timesheet_stats', 'Статистика табеля (Получить) (timesheet/stats/)'),
@@ -1797,54 +1794,6 @@ class FunctionGroup(AbstractModel):
             self.access_type,
             self.func,
         )
-
-
-EVENT_TYPES = [
-    ('vacancy', 'Вакансия'),
-    ('timetable', 'Изменения в расписании'),
-    ('load_template_err', 'Ошибка применения шаблона нагрузки'),
-    ('load_template_apply', 'Шаблон нагрузки применён'),
-    ('shift_elongation', 'Расширение смены'),
-    ('holiday_exchange', 'Вывод с выходного'),
-    ('auto_vacancy', 'Автоматическая биржа смен'),
-    ('vacancy_canceled', 'Вакансия отменена'),
-]
-
-
-class Event(AbstractModel):
-    dttm_added = models.DateTimeField(auto_now_add=True)
-    dttm_valid_to = models.DateTimeField(auto_now_add=True)
-    worker_day = models.ForeignKey('timetable.WorkerDay', null=True, blank=True, on_delete=models.CASCADE)
-
-    type = models.CharField(choices=EVENT_TYPES, max_length=20)
-    shop = models.ForeignKey(Shop, null=True, blank=True, on_delete=models.PROTECT, related_name="events")
-    params = models.CharField(default='{}', max_length=512)
-
-
-class Subscribe(AbstractActiveModel):
-    type = models.CharField(choices=EVENT_TYPES, max_length=20)
-    user = models.ForeignKey(User, null=False, on_delete=models.PROTECT)
-    shop = models.ForeignKey(Shop, null=False, on_delete=models.PROTECT)
-
-
-class Notification(AbstractModel):
-    class Meta(object):
-        verbose_name = 'Уведомления'
-
-    def __str__(self):
-        return '{}, {}, {}, id: {}'.format(
-            self.worker,
-            self.event,
-            self.dttm_added,
-            # self.text[:60],
-            self.id
-        )
-
-    dttm_added = models.DateTimeField(auto_now_add=True)
-    worker = models.ForeignKey(User, on_delete=models.PROTECT)
-
-    is_read = models.BooleanField(default=False)
-    event = models.ForeignKey(Event, on_delete=models.CASCADE, null=True)
 
 
 def current_year():

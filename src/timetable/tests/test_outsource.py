@@ -316,8 +316,8 @@ class TestOutsource(TestsHelperMixin, APITestCase):
         self.assertEqual(vacancy.employment_id, self.employment1.id)
         not_approved_vacancy = WorkerDay.objects.filter(parent_worker_day_id=vacancy.id).first()
         self.assertIsNotNone(not_approved_vacancy)
-        self.assertEquals(list(not_approved_vacancy.outsources.all()), [self.outsource_network,])
-        self.assertEquals(list(vacancy.outsources.all()), [self.outsource_network,])
+        self.assertEqual(list(not_approved_vacancy.outsources.all()), [self.outsource_network,])
+        self.assertEqual(list(vacancy.outsources.all()), [self.outsource_network,])
 
     def test_confirm_vacancy_to_worker(self):
         dt_now = self.dt_now
@@ -689,7 +689,7 @@ class TestOutsource(TestsHelperMixin, APITestCase):
         self.assertTrue(wd.is_approved)
         nawd = WorkerDay.objects.filter(parent_worker_day=wd).first()
         self.assertIsNotNone(nawd)
-        self.assertEquals(list(nawd.outsources.all()), [self.outsource_network,])
+        self.assertEqual(list(nawd.outsources.all()), [self.outsource_network,])
 
     def test_client_can_get_and_approve_wd_for_employee_from_other_network_emploeed_in_own_shop(self):
         self.employment2.shop = self.client_shop
@@ -701,14 +701,14 @@ class TestOutsource(TestsHelperMixin, APITestCase):
             dt=date.today(),
         )
         response = self.client.get(f'/rest_api/worker_day/?employee_id__in={self.employee2.id}')
-        self.assertEquals(len(response.json()), 1)
-        self.assertEquals(len(list(filter(lambda x: x['id'] == wd.id, response.json()))), 1)
+        self.assertEqual(len(response.json()), 1)
+        self.assertEqual(len(list(filter(lambda x: x['id'] == wd.id, response.json()))), 1)
         response = self.client.post('/rest_api/worker_day/approve/', {
             'shop_id': self.client_shop.id,
             'dt_from': date.today(),
             'dt_to': date.today(),
         })
-        self.assertEquals(response.status_code, 200)
+        self.assertEqual(response.status_code, 200)
         wd.refresh_from_db()
         self.assertTrue(wd.is_approved)
 
@@ -718,14 +718,14 @@ class TestOutsource(TestsHelperMixin, APITestCase):
         WorkerDay.objects.all().update(is_approved=True)
         self.client.force_authenticate(user=self.user1)
         response = self.client.get('/rest_api/worker_day/vacancy/?limit=10&offset=0')
-        self.assertEquals(len(response.json()['results']), 1)
-        self.assertEquals(len(list(filter(lambda x: x["id"] == vacancy["id"], response.json()['results']))), 1)
+        self.assertEqual(len(response.json()['results']), 1)
+        self.assertEqual(len(list(filter(lambda x: x["id"] == vacancy["id"], response.json()['results']))), 1)
         self.client.force_authenticate(user=self.outsource_user)
         response = self.client.post(f'/rest_api/worker_day/{vacancy["id"]}/confirm_vacancy/')
         self.assertEqual(response.status_code, 200)
         self.client.force_authenticate(user=self.user1)
         response = self.client.get('/rest_api/worker_day/vacancy/?limit=10&offset=0')
-        self.assertEquals(len(response.json()['results']), 0)
+        self.assertEqual(len(response.json()['results']), 0)
 
     def test_outource_cant_reconfirm_vacancy_applied_by_worker_from_other_network(self):
         dt_now = self.dt_now
@@ -733,8 +733,8 @@ class TestOutsource(TestsHelperMixin, APITestCase):
         WorkerDay.objects.all().update(is_approved=True)
         self.client.force_authenticate(user=self.user1)
         response = self.client.get('/rest_api/worker_day/vacancy/?limit=10&offset=0')
-        self.assertEquals(len(response.json()['results']), 1)
-        self.assertEquals(len(list(filter(lambda x: x["id"] == vacancy["id"], response.json()['results']))), 1)
+        self.assertEqual(len(response.json()['results']), 1)
+        self.assertEqual(len(list(filter(lambda x: x["id"] == vacancy["id"], response.json()['results']))), 1)
         self.client.force_authenticate(user=self.outsource_user)
         response = self.client.post(f'/rest_api/worker_day/{vacancy["id"]}/confirm_vacancy/')
         self.assertEqual(response.status_code, 200)
@@ -755,7 +755,7 @@ class TestOutsource(TestsHelperMixin, APITestCase):
         self.assertTrue(wd.is_approved)
         nawd = WorkerDay.objects.filter(parent_worker_day=wd).first()
         self.assertIsNotNone(nawd)
-        self.assertEquals(list(nawd.outsources.all()), [self.outsource_network,])
+        self.assertEqual(list(nawd.outsources.all()), [self.outsource_network,])
 
     def test_copy_plan_to_plan_copy_outsources(self):
         dt_now = self.dt_now
@@ -783,7 +783,7 @@ class TestOutsource(TestsHelperMixin, APITestCase):
         self.assertEqual(response.status_code, 200)
         copied = WorkerDay.objects.filter(parent_worker_day=wd).first()
         self.assertIsNotNone(copied)
-        self.assertEquals(list(copied.outsources.all()), [self.outsource_network,])
+        self.assertEqual(list(copied.outsources.all()), [self.outsource_network,])
 
     def test_copy_plan_to_fact_copy_outsources(self):
         dt_now = self.dt_now
@@ -811,7 +811,7 @@ class TestOutsource(TestsHelperMixin, APITestCase):
         self.assertEqual(response.status_code, 200)
         copied = WorkerDay.objects.filter(parent_worker_day=wd).first()
         self.assertIsNotNone(copied)
-        self.assertEquals(list(copied.outsources.all()), [])
+        self.assertEqual(list(copied.outsources.all()), [])
 
     def test_copy_range_copy_outsources(self):
         dt_now = self.dt_now
@@ -844,7 +844,7 @@ class TestOutsource(TestsHelperMixin, APITestCase):
         self.assertEqual(response.status_code, 200)
         nawd = WorkerDay.objects.filter(dt=dt_now + timedelta(1), employee=self.employee1.id).first()
         self.assertIsNotNone(nawd)
-        self.assertEquals(list(nawd.outsources.all()), [self.outsource_network,])
+        self.assertEqual(list(nawd.outsources.all()), [self.outsource_network,])
 
     def test_exhange_copy_outsources(self):
         dt_now = self.dt_now
@@ -885,7 +885,7 @@ class TestOutsource(TestsHelperMixin, APITestCase):
         employee2_wd = WorkerDay.objects.filter(employee=self.employee2, dt=dt_now).first()
         self.assertIsNotNone(employee1_wd)
         self.assertIsNotNone(employee2_wd)
-        self.assertEquals(list(employee2_wd.outsources.all()), [self.outsource_network,])
+        self.assertEqual(list(employee2_wd.outsources.all()), [self.outsource_network,])
 
     def test_outsourcing_network_id__in_filter(self):
         dt_now = self.dt_now
@@ -895,14 +895,14 @@ class TestOutsource(TestsHelperMixin, APITestCase):
         vacancy4 = self._create_vacancy(dt_now, datetime.combine(dt_now, time(8)), datetime.combine(dt_now, time(20)), outsources=[self.outsource_network2.id]).json()
         WorkerDay.objects.all().update(is_approved=True)
         response = self.client.get('/rest_api/worker_day/vacancy/?limit=10&offset=0')
-        self.assertEquals(len(response.json()['results']), 4)
+        self.assertEqual(len(response.json()['results']), 4)
         response = self.client.get(f'/rest_api/worker_day/vacancy/?limit=10&offset=0&outsourcing_network_id__in={self.outsource_network.id}')
-        self.assertEquals(len(response.json()['results']), 3)
+        self.assertEqual(len(response.json()['results']), 3)
         vac_ids = list(map(lambda x: x['id'], response.json()['results']))
         self.assertCountEqual(vac_ids, [vacancy['id'], vacancy2['id'], vacancy3['id']])
         response = self.client.get(f'/rest_api/worker_day/vacancy/?limit=10&offset=0&outsourcing_network_id__in={self.outsource_network2.id}')
-        self.assertEquals(len(response.json()['results']), 2)
+        self.assertEqual(len(response.json()['results']), 2)
         vac_ids = list(map(lambda x: x['id'], response.json()['results']))
         self.assertCountEqual(vac_ids, [vacancy3['id'], vacancy4['id']])
         response = self.client.get(f'/rest_api/worker_day/vacancy/?limit=10&offset=0&outsourcing_network_id__in={self.outsource_network.id},{self.outsource_network2.id}')
-        self.assertEquals(len(response.json()['results']), 4)
+        self.assertEqual(len(response.json()['results']), 4)

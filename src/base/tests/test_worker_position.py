@@ -151,9 +151,9 @@ class TestWorkerPositionAPI(TestsHelperMixin, APITestCase):
             ),
             content_type='application/json',
         )
-        self.assertEquals(response.status_code, status_code)
+        self.assertEqual(response.status_code, status_code)
         self.worker_position.refresh_from_db()
-        self.assertEquals(self.worker_position.group_id, assert_group_id)
+        self.assertEqual(self.worker_position.group_id, assert_group_id)
 
     def test_update_group_id(self):
         self.admin_group.subordinates.clear()

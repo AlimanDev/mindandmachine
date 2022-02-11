@@ -2,10 +2,8 @@ from django.contrib import admin
 from src.base.admin_filters import RelatedOnlyDropdownNameOrderedFilter
 from src.forecast.models import (
     PeriodClients,
-    PeriodDemandChangeLog,
     WorkType,
     OperationType,
-    OperationTemplate,
     OperationTypeName,
     LoadTemplate,
     OperationTypeTemplate,
@@ -77,28 +75,6 @@ class PeriodClientsAdmin(admin.ModelAdmin):
     @staticmethod
     def operation_type_name(instance: PeriodClients):
         return instance.operation_type.operation_type_name.name or instance.operation_type.id
-
-
-@admin.register(PeriodDemandChangeLog)
-class PeriodDemandChangeLogAdmin(admin.ModelAdmin):
-    list_display = ('operation_type_name', 'dttm_from', 'dttm_to')
-    search_fields = ('operation_type_name', 'operation_type__shop__name', 'id')
-    list_filter = ('operation_type__shop', )
-
-    @staticmethod
-    def operation_type_name(instance: PeriodDemandChangeLog):
-        return instance.operation_type.name
-
-    @staticmethod
-    def shop_title(instance: PeriodDemandChangeLog):
-        return instance.operation_type.work_type.shop.name
-
-
-@admin.register(OperationTemplate)
-class OperationTemplateAdmin(admin.ModelAdmin):
-    list_display = ('id', 'name', 'operation_type')
-    list_filter = ('operation_type', )
-    search_fields = ('name',)
 
 
 @admin.register(OperationTypeName)

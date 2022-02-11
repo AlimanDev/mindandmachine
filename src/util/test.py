@@ -31,7 +31,6 @@ from src.forecast.models import (
 )
 from src.timetable.models import (
     AttendanceRecords,
-    Cashbox,
     Slot,
     ShopMonthStat,
     WorkerDayCashboxDetails,
@@ -133,35 +132,6 @@ class LocalTestCase(LocalTestCaseAsserts, TestCase):
             self.operation_type_name4,
             ]
         )
-
-        # cashboxes
-        self.cashbox1 = Cashbox.objects.create(
-            type=self.work_type1,
-            name=1,
-            id=1,
-        )
-        self.cashbox2 = Cashbox.objects.create(
-            type=self.work_type2,
-            name=2,
-            id=2,
-        )
-        self.cashbox3 = Cashbox.objects.create(
-            type=self.work_type3,
-            dttm_deleted=dttm_now - datetime.timedelta(days=3),
-            name=3,
-            id=3,
-        )
-        for i in range(4, 10):
-            Cashbox.objects.create(
-                type=self.work_type4,
-                name=i,
-                id=i,
-            )
-        Cashbox.objects.update(dttm_added=datetime.datetime(2018, 1, 1, 8, 30, 0))
-
-        # CameraGates
-        # self.entry_gate = CameraClientGate.objects.create(type=CameraClientGate.TYPE_ENTRY, name='Вход')
-        # self.exit_gate = CameraClientGate.objects.create(type=CameraClientGate.TYPE_OUT, name='Выход')
 
         # if periodclients:
         #
@@ -323,63 +293,10 @@ class LocalTestCase(LocalTestCaseAsserts, TestCase):
         response = self.client.post(*args, **kwargs)
         return response
 
-    def create_many_users(self, amount, from_date, to_date):
-        time_start = datetime.time(7, 0)
-        time_end = datetime.time(1, 0)
-        active_cashboxes = Cashbox.objects.qos_filter_active(from_date, to_date)
-        for i in range(amount):
-            user = User.objects.create(
-                id=1000 + i,
-                last_name='user_{}'.format(1000 + i),
-                shop=self.shop,
-                first_name='Иван',
-                username='user_{}'.format(1000 + i),
-            )
-            dt = from_date
-            while dt < to_date:
-                wd = WorkerDay.objects.create(
-                    dttm_work_start=datetime.datetime.combine(dt, time_start),
-                    dttm_work_end=datetime.datetime.combine(dt + datetime.timedelta(days=1), time_end),
-                    type_id=WorkerDay.TYPE_WORKDAY,
-                    dt=dt,
-                    worker=user
-                )
-                cashbox = active_cashboxes.order_by('?').first()
-                WorkerDayCashboxDetails.objects.create(
-                    worker_day=wd,
-                    work_type=cashbox.type,
-                )
-                dt += datetime.timedelta(days=1)
-
     @staticmethod
     def refresh_model(item: TypeVar) -> TypeVar:
         """Re-fetch provided item from database"""
         return item.__class__.objects.get(pk=item.pk)
-
-
-    def create_worker_day(
-            self,
-            employment,
-            dt,
-            dttm_work_start,
-            dttm_work_end,
-            type_id=WorkerDay.TYPE_WORKDAY
-    ):
-        worker_day = WorkerDay.objects.create(
-            employment=employment,
-            worker=employment.user,
-            shop=employment.shop,
-            type_id=type_id,
-            dt=dt,
-            dttm_work_start=dttm_work_start,
-            dttm_work_end=dttm_work_end,
-        )
-        cashbox = self.cashbox3
-        WorkerDayCashboxDetails.objects.create(
-            worker_day=worker_day,
-            work_type=cashbox.type,
-        )
-        return worker_day
 
 
 def create_departments_and_users(self, dt=None):

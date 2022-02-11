@@ -215,7 +215,7 @@ class TestTicksViewSet(TestsHelperMixin, APITestCase):
         tick_point_id2 = self._authorize_tick_point().json()['tick_point']['id']
         response = self.client.get(self.get_url('Tick-list'))
         self.assertEqual(len(response.json()), 2)
-        self.assertNotEquals(response.json()[0]['tick_point_id'], tick_point_id2)
+        self.assertNotEqual(response.json()[0]['tick_point_id'], tick_point_id2)
 
     def test_get_ticks_with_yesterday_leving_for_tick_point(self):
         tick_point_id = self._authorize_tick_point().json()['tick_point']['id']

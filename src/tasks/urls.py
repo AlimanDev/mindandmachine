@@ -1,4 +1,5 @@
-from django.conf.urls import url, include
+from django.conf.urls import include
+from django.urls import re_path
 from rest_framework_nested import routers
 
 from .views import TaskViewSet
@@ -7,5 +8,5 @@ router = routers.DefaultRouter()
 router.register(r'task', TaskViewSet, basename='Task')
 
 urlpatterns = [
-    url(r'^', include(router.urls)),
+    re_path(r'^', include(router.urls)),
 ]

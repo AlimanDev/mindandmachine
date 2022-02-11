@@ -495,9 +495,9 @@ class TestWorkType(APITestCase, TestsHelperMixin):
                 'preliminary_cost_per_hour': 200.12,
             }
         )
-        self.assertEquals(response.json()['preliminary_cost_per_hour'], '200.12')
+        self.assertEqual(response.json()['preliminary_cost_per_hour'], '200.12')
         self.work_type1.refresh_from_db()
-        self.assertEquals(self.work_type1.preliminary_cost_per_hour, Decimal('200.12'))
+        self.assertEqual(self.work_type1.preliminary_cost_per_hour, Decimal('200.12'))
 
     def test_set_preliminary_cost_per_hour_empty(self):
         response = self.client.put(

@@ -542,7 +542,7 @@ def upload_load_template(template_file, form, lang='ru'):
     with transaction.atomic():
         lt = LoadTemplate.objects.create(name=form['name'], network_id=network_id)
         df = df.fillna('')
-        df[DAYS_OF_WEEK_COL] = df[DAYS_OF_WEEK_COL].astype(str).str.replace('.', ',')
+        df[DAYS_OF_WEEK_COL] = df[DAYS_OF_WEEK_COL].astype(str).str.replace('.', ',', regex=False)
         forecast_steps = {
             '1h': datetime.timedelta(hours=1),
             '30min': datetime.timedelta(minutes=30),
