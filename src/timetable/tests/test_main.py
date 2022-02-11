@@ -2377,7 +2377,7 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
         resp_data = resp.json()
         resp_data.get('data')[0]["dttm_work_start"] = datetime.combine(self.dt, time(9))
         self.assertDictEqual(resp_data['stats'], {'WorkerDay': {'deleted': 1, 'skipped': 1},
-            'WorkerDayCashboxDetails': {'created': 1, 'deleted': 2},
+            'WorkerDayCashboxDetails': {'deleted': 1, 'skipped': 1},
             'WorkerDayOutsourceNetwork': {}})
         id2 = resp_data.get('data')[0]['id']
         self.assertEqual(len(resp_data.get('data')), 1)
