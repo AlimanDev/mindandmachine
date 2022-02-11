@@ -3382,6 +3382,73 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
         # None | end1 | start2 | end2
         self._test_overlap(None, time(15), time(15), time(20), False)
 
+    def test_batch_skip_worker_day_if_changed_only_created_by_last_edited_by_or_source(self):
+        WorkerDay.objects.all().delete()
+        data = {
+            'data': [
+                {
+                    "shop_id": self.shop.id,
+                    "employee_id": self.employee2.id,
+                    "dt": self.dt,
+                    "is_fact": False,
+                    "is_approved": False,
+                    "type": WorkerDay.TYPE_WORKDAY,
+                    "dttm_work_start": datetime.combine(self.dt, time(11)),
+                    "dttm_work_end": datetime.combine(self.dt, time(20)),
+                    "worker_day_details": [{
+                        "work_part": 1.0,
+                        "work_type_id": self.work_type.id}
+                    ]
+                },
+            ],
+            'options': {
+                'return_response': True,
+            }
+        }
+        resp = self.client.post(
+            self.get_url('WorkerDay-batch-update-or-create'), self.dump_data(data), content_type='application/json')
+        self.assertEqual(resp.status_code, 200)
+        resp_data = resp.json()
+        self.assertDictEqual(
+            resp.json(),
+            {
+                "stats": {
+                    "WorkerDayCashboxDetails": {
+                        "created": 1
+                    },
+                    "WorkerDayOutsourceNetwork": {},
+                    "WorkerDay": {
+                        "created": 1
+                    }
+                },
+                "data": mock.ANY
+            }
+        )
+        wd = WorkerDay.objects.first()
+        wd.created_by = self.user2
+        wd.last_edited_by = self.user2
+        wd.source = wd.source + 1
+        wd.save()
+        data['data'] = resp_data['data']
+        resp = self.client.post(
+            self.get_url('WorkerDay-batch-update-or-create'), self.dump_data(data), content_type='application/json')
+        self.assertEqual(resp.status_code, 200)
+        self.assertDictEqual(
+            resp.json(),
+            {
+                "stats": {
+                    "WorkerDayCashboxDetails": {
+                        "skipped": 1
+                    },
+                    "WorkerDayOutsourceNetwork": {},
+                    "WorkerDay": {
+                        "skipped": 1
+                    }
+                },
+                "data": mock.ANY
+            }
+        )
+
 
 class TestCropSchedule(TestsHelperMixin, APITestCase):
     @classmethod

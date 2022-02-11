@@ -79,6 +79,11 @@ class WorkerDayCashboxDetailsSerializer(serializers.ModelSerializer):
         model = WorkerDayCashboxDetails
         fields = ['id', 'work_type_id', 'work_part']
 
+    def __init__(self, *args, **kwargs):
+        super(WorkerDayCashboxDetailsSerializer, self).__init__(*args, **kwargs)
+        if self.context.get('batch'):
+            self.fields['id'].read_only = False
+
 
 class WorkerDayCashboxDetailsListSerializer(serializers.Serializer):
     id = serializers.IntegerField()
@@ -141,7 +146,6 @@ class WorkerDaySerializer(serializers.ModelSerializer, UnaccountedOvertimeMixin)
         "no_such_shop_in_network": _("There is no such shop in your network."),
     }
 
-    worker_day_details = WorkerDayCashboxDetailsSerializer(many=True, required=False)
     employee_id = serializers.IntegerField(required=False, allow_null=True)
     employment_id = serializers.IntegerField(required=False, allow_null=True)
     shop_id = serializers.IntegerField(required=False)
@@ -185,6 +189,11 @@ class WorkerDaySerializer(serializers.ModelSerializer, UnaccountedOvertimeMixin)
                 'read_only': True,
             },
         }
+
+    def get_fields(self, *args, **kwargs):
+        fields = super(WorkerDaySerializer, self).get_fields(*args, **kwargs)
+        fields['worker_day_details'] = WorkerDayCashboxDetailsSerializer(many=True, required=False, context=self.context)
+        return fields
 
     @cached_property
     def wd_types_dict(self):
