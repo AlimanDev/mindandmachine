@@ -757,9 +757,9 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
             ),
             content_type='application/json',
         )
-        self.assertEquals(response.status_code, status_code)
+        self.assertEqual(response.status_code, status_code)
         self.employment3.refresh_from_db()
-        self.assertEquals(self.employment3.position_id, assert_position_id)
+        self.assertEqual(self.employment3.position_id, assert_position_id)
 
     def test_update_worker_position_permissions(self):
         self.admin_group.subordinates.clear()
@@ -806,9 +806,9 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
             ),
             content_type='application/json',
         )
-        self.assertEquals(response.status_code, status_code)
+        self.assertEqual(response.status_code, status_code)
         self.employment3.refresh_from_db()
-        self.assertEquals(self.employment3.function_group_id, assert_group_id)
+        self.assertEqual(self.employment3.function_group_id, assert_group_id)
 
     def test_update_group_permissions(self):
         self.admin_group.subordinates.clear()

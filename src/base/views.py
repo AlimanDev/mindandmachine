@@ -10,19 +10,15 @@ from django.utils.translation import gettext as _
 from drf_yasg.utils import swagger_auto_schema
 from requests.exceptions import HTTPError
 from rest_auth.views import UserDetailsView
-from rest_framework import mixins
 from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.pagination import LimitOffsetPagination
 from rest_framework.parsers import MultiPartParser
-from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from rest_framework.viewsets import GenericViewSet, ReadOnlyModelViewSet
+from rest_framework.viewsets import ReadOnlyModelViewSet
 
 from src.base.filters import (
-    NotificationFilter,
-    SubscribeFilter,
     EmploymentFilter,
     BaseActiveNamedModelFilter,
     ShopScheduleFilter,
@@ -34,9 +30,6 @@ from src.base.models import (
     FunctionGroup,
     Network,
     NetworkConnect,
-    Notification,
-    Shop,
-    Subscribe,
     ShopSettings,
     WorkerPosition,
     User,
@@ -52,8 +45,6 @@ from src.base.serializers import (
     UserSerializer,
     FunctionGroupSerializer,
     WorkerPositionSerializer,
-    NotificationSerializer,
-    SubscribeSerializer,
     PasswordSerializer,
     ShopSettingsSerializer,
     NetworkSerializer,
@@ -382,38 +373,6 @@ class WorkerPositionViewSet(UpdateorCreateViewSet):
         ).filter(
             network_filter,
         )
-
-
-class SubscribeViewSet(BaseModelViewSet):
-    permission_classes = [IsAuthenticated]
-    serializer_class = SubscribeSerializer
-    filterset_class = SubscribeFilter
-    openapi_tags = ['Subscribe',]
-
-    def get_queryset(self):
-        user = self.request.user
-        return Subscribe.objects.filter(user=user)
-
-    def perform_create(self, serializer):
-        serializer.save(user=self.request.user)
-
-
-class NotificationViewSet(
-                   mixins.RetrieveModelMixin,
-                   mixins.UpdateModelMixin,
-                   mixins.ListModelMixin,
-                   GenericViewSet
-):
-    permission_classes = [IsAuthenticated]
-    serializer_class = NotificationSerializer
-    filterset_class = NotificationFilter
-    http_method_names = ['get', 'put']
-    openapi_tags = ['Notification',]
-
-    def get_queryset(self):
-        user = self.request.user
-        return Notification.objects.filter(worker=user).select_related('event', 'event__worker_day_details', 'event__shop')
-
 
 class ShopSettingsViewSet(BaseActiveNamedModelViewSet):
     pagination_class = LimitOffsetPagination

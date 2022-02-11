@@ -248,7 +248,6 @@ class TestDemand(APITestCase):
             operation_type_id=self.o_type_5.id
         ).values('dttm_forecast', 'value', 'operation_type_id', 'type')), correct_data)
         self.assertEqual(response.status_code, 201)
-        # self.assertEqual(Event.objects.first().text, f'Cоставлен новый спрос на период с {Converter.convert_date(datetime(2019, 9, 1))} по {Converter.convert_date(datetime(2019, 11, 2))}')
 
     def test_create_fact(self):
 
@@ -591,7 +590,7 @@ class TestDemand(APITestCase):
         )
         response = self.client.post(f'{self.url}upload_demand/', {'file': file, 'type': 'F', 'operation_type_name_id': self.op_type_name.id})
         file.close()
-        self.assertEquals(response.json(), [['0123', 20], ['122', 20]])
+        self.assertEqual(response.json(), [['0123', 20], ['122', 20]])
         self.assertEqual(response.status_code, 200)
         self.assertEqual(
             PeriodClients.objects.filter(
@@ -609,21 +608,21 @@ class TestDemand(APITestCase):
         response = self.client.get(
             f'{self.url}download/?dt_from={dt_from}&dt_to={dt_to}&shop_id={self.shop.id}')
         tabel = pandas.read_excel(io.BytesIO(response.content))
-        self.assertEquals(response.status_code, 200)
+        self.assertEqual(response.status_code, 200)
         self.assertCountEqual(list(tabel.columns), ['dttm', 'Кассы', 'Торговый зал', 'Кассы3', 'Кассы4', 'Кассы5'])
-        self.assertEquals(tabel[tabel.columns[0]][0], datetime(2019, 5, 30))
-        self.assertEquals(tabel[tabel.columns[1]][0], 0)
+        self.assertEqual(tabel[tabel.columns[0]][0], datetime(2019, 5, 30))
+        self.assertEqual(tabel[tabel.columns[1]][0], 0)
         response = self.client.get(
             f'{self.url}download/?dt_from={dt_from}&dt_to={dt_to}&shop_id={self.shop.id}&operation_type_name_ids={self.op_type_name.id},{self.op_type_name2.id}')
         tabel = pandas.read_excel(io.BytesIO(response.content))
-        self.assertEquals(response.status_code, 200)
-        self.assertEquals(list(tabel.columns), ['dttm', 'Кассы', 'Торговый зал'])
-        self.assertEquals(tabel[tabel.columns[0]][0], datetime(2019, 5, 30))
-        self.assertEquals(tabel[tabel.columns[1]][0], 0)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(list(tabel.columns), ['dttm', 'Кассы', 'Торговый зал'])
+        self.assertEqual(tabel[tabel.columns[0]][0], datetime(2019, 5, 30))
+        self.assertEqual(tabel[tabel.columns[1]][0], 0)
         response = self.client.get(
             f'{self.url}download/?dt_from={dt_from}&dt_to={dt_to}&shop_id={self.shop.id}&operation_type_ids={self.o_type_1.id},{self.o_type_2.id}')
         tabel = pandas.read_excel(io.BytesIO(response.content))
-        self.assertEquals(response.status_code, 200)
+        self.assertEqual(response.status_code, 200)
         self.assertCountEqual(list(tabel.columns), ['dttm', 'Кассы', 'Торговый зал'])
 
     def test_get_demand_xlsx_no_data(self):
@@ -637,13 +636,13 @@ class TestDemand(APITestCase):
             f'{self.url}download/?dt_from={dt_from}&dt_to={dt_to}&shop_id={self.shop2.id}')
         tabel = pandas.read_excel(response.content)
         tabel.dttm = tabel.dttm.dt.round('s')
-        self.assertEquals(response.status_code, 200)
+        self.assertEqual(response.status_code, 200)
         self.assertCountEqual(list(tabel.columns), ['dttm', 'Кассы'])
-        self.assertEquals(tabel[tabel.columns[0]][0], datetime(2019, 5, 30))
-        self.assertEquals(len(tabel[tabel.columns[0]]), 96)
-        self.assertEquals(tabel[tabel.columns[0]][95], datetime(2019, 6, 2, 23))
-        self.assertEquals(tabel[tabel.columns[1]][0], 0)
-        self.assertEquals(tabel[tabel.columns[1]][72], 0)
+        self.assertEqual(tabel[tabel.columns[0]][0], datetime(2019, 5, 30))
+        self.assertEqual(len(tabel[tabel.columns[0]]), 96)
+        self.assertEqual(tabel[tabel.columns[0]][95], datetime(2019, 6, 2, 23))
+        self.assertEqual(tabel[tabel.columns[1]][0], 0)
+        self.assertEqual(tabel[tabel.columns[1]][72], 0)
 
     def test_duplicates_dont_created_for_the_same_dttm_forecast_and_operation_type(self):
         initial_pc_count = PeriodClients.objects.count()
@@ -688,4 +687,4 @@ class TestDemand(APITestCase):
 
         response = self.client.post(self.url, test_data)
         self.assertEqual(response.status_code, 400)
-        self.assertEquals(response.json(), ['Operation type with code non_existent does not exist in shop Shop1'])
+        self.assertEqual(response.json(), ['Operation type with code non_existent does not exist in shop Shop1'])

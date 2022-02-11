@@ -1,7 +1,7 @@
 from django.db.models import Q
 from django_filters.rest_framework import FilterSet, DateFilter, NumberFilter, CharFilter, BooleanFilter, OrderingFilter
 
-from src.base.models import Employment, User, Notification, Subscribe, Shop, ShopSchedule, Employee, ShiftScheduleDay
+from src.base.models import Employment, User, Shop, ShopSchedule, Employee, ShiftScheduleDay
 from src.util.drf.filters import (
     ListFilter,
     QCharFilter,
@@ -137,21 +137,6 @@ class EmployeeFilter(QFilterSet):
     class Meta:
         model = Employee
         fields = []
-
-
-class NotificationFilter(FilterSet):
-    class Meta:
-        model = Notification
-        fields = ['worker_id', 'is_read']
-
-
-
-class SubscribeFilter(FilterSet):
-    shop_id = NumberFilter(field_name='employments__shop_id')
-
-    class Meta:
-        model = Subscribe
-        fields = ('user_id', 'shop_id')
 
 
 class ShopScheduleFilter(FilterSet):

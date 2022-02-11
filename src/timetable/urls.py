@@ -1,4 +1,5 @@
-from django.conf.urls import url, include
+from django.conf.urls import include
+from django.urls import re_path
 from rest_framework_nested import routers
 
 from src.base.urls import employment_nested_router
@@ -32,7 +33,7 @@ router.register(r'worker_day_type', WorkerDayTypeViewSet, basename='WorkerDayTyp
 employment_nested_router.register(r'worker_constraint', WorkerConstraintViewSet, basename='WorkerConstraint')
 
 urlpatterns = [
-    url(r'^', include(router.urls)),
-    url(r'^', include(employment_nested_router.urls)),
-    url(r'^worker_day_permissions/$', WorkerDayPermissionsAPIView.as_view(), name='worker_day_permissions')
+    re_path(r'^', include(router.urls)),
+    re_path(r'^', include(employment_nested_router.urls)),
+    re_path(r'^worker_day_permissions/$', WorkerDayPermissionsAPIView.as_view(), name='worker_day_permissions')
 ]

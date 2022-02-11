@@ -1,4 +1,5 @@
-from django.conf.urls import url, include
+from django.conf.urls import include
+from django.urls import re_path
 from rest_auth.views import LoginView
 from rest_auth.views import (
     LogoutView,
@@ -18,8 +19,6 @@ from src.base.views import (
     FunctionGroupView,
     AuthUserView,
     WorkerPositionViewSet,
-    NotificationViewSet,
-    SubscribeViewSet,
     ShopSettingsViewSet,
     NetworkViewSet,
     GroupViewSet,
@@ -33,15 +32,15 @@ from .shift_schedule.views import (
 )
 
 rest_auth_urls = [
-    url(r'^login/$', LoginView.as_view(), name='rest_login'),
-    url(r'^logout/$', LogoutView.as_view(), name='rest_logout'),
-    url(r'^password/change/$', PasswordChangeView.as_view(), name='rest_password_change'),
-    url(r'^user/$', AuthUserView.as_view(), name='user'),
-    url(r'^allowed_functions/$', FunctionGroupView.as_view({'get': 'list'}), name='user'),
-    url(r'^signin_token/?$', WFMTokenLoginView.as_view(), kwargs={'version': '0.9'}, name='signin_token'),
+    re_path(r'^login/$', LoginView.as_view(), name='rest_login'),
+    re_path(r'^logout/$', LogoutView.as_view(), name='rest_logout'),
+    re_path(r'^password/change/$', PasswordChangeView.as_view(), name='rest_password_change'),
+    re_path(r'^user/$', AuthUserView.as_view(), name='user'),
+    re_path(r'^allowed_functions/$', FunctionGroupView.as_view({'get': 'list'}), name='user'),
+    re_path(r'^signin_token/?$', WFMTokenLoginView.as_view(), kwargs={'version': '0.9'}, name='signin_token'),
     # Использует Ортека старый формат
     # url(r'^notification', NotificationViewSet.as_view(), name='notification'),
-    url(r'^otp/$', OneTimePassView.as_view(), name='one_time_pass'),
+    re_path(r'^otp/$', OneTimePassView.as_view(), name='one_time_pass'),
 ]
 
 # Routers provide an easy way of automatically determining the URL conf.
@@ -51,8 +50,6 @@ router.register(r'employment', EmploymentViewSet, basename='Employment')
 router.register(r'user', UserViewSet, basename='User')
 router.register(r'employee', EmployeeViewSet, basename='Employee')
 router.register(r'worker_position', WorkerPositionViewSet, basename='WorkerPosition')
-router.register(r'subscribe', SubscribeViewSet, basename='Subscribe')
-router.register(r'notification', NotificationViewSet, basename='Notification')
 router.register(r'shop_settings', ShopSettingsViewSet, basename='ShopSettings')
 router.register(r'network', NetworkViewSet, basename='Network')
 router.register(r'function_group', FunctionGroupView, basename='FunctionGroupView')
@@ -69,8 +66,8 @@ shop_nested_router.register(r'schedule', ShopScheduleViewSet, basename='ShopSche
 # Wire up our API using automatic URL routing.
 # Additionally, we include login URLs for the browsable API.
 urlpatterns = [
-    url(r'^auth/', include((rest_auth_urls, 'auth'), namespace='auth')),
-    url(r'^', include(router.urls)),
-    url(r'^api-auth/', include('rest_framework.urls', namespace='rest_framework')),
-    url(r'^', include(shop_nested_router.urls)),
+    re_path(r'^auth/', include((rest_auth_urls, 'auth'), namespace='auth')),
+    re_path(r'^', include(router.urls)),
+    re_path(r'^api-auth/', include('rest_framework.urls', namespace='rest_framework')),
+    re_path(r'^', include(shop_nested_router.urls)),
 ]

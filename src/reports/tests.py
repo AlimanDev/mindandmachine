@@ -48,7 +48,7 @@ class TestReportConfig(APITestCase):
             'dt_from': date.today() - timedelta(1),
             'dt_to': date.today() - timedelta(1),
         }
-        self.assertEquals(data, dates)
+        self.assertEqual(data, dates)
 
     def test_today(self):
         config = self._create_config(1, Period.ACC_PERIOD_DAY, period_start=Period.PERIOD_START_TODAY)
@@ -57,7 +57,7 @@ class TestReportConfig(APITestCase):
             'dt_from': date.today(),
             'dt_to': date.today(),
         }
-        self.assertEquals(data, dates)
+        self.assertEqual(data, dates)
 
     def test_5days(self):
         config = self._create_config(5, Period.ACC_PERIOD_DAY, period_start=Period.PERIOD_START_TODAY)
@@ -66,7 +66,7 @@ class TestReportConfig(APITestCase):
             'dt_from': date.today() - timedelta(4),
             'dt_to': date.today(),
         }
-        self.assertEquals(data, dates)
+        self.assertEqual(data, dates)
         config.period.period_start = Period.PERIOD_START_YESTERDAY
         config.period.save()
         dates = config.get_dates()
@@ -74,7 +74,7 @@ class TestReportConfig(APITestCase):
             'dt_from': date.today() - timedelta(5),
             'dt_to': date.today() - timedelta(1),
         }
-        self.assertEquals(data, dates)
+        self.assertEqual(data, dates)
 
     def test_month(self):
         config = self._create_config(1, Period.ACC_PERIOD_MONTH, period_start=Period.PERIOD_START_TODAY)
@@ -83,7 +83,7 @@ class TestReportConfig(APITestCase):
             'dt_from': date.today() - relativedelta(months=1),
             'dt_to': date.today(),
         }
-        self.assertEquals(data, dates)
+        self.assertEqual(data, dates)
         config.period.period_start = Period.PERIOD_START_YESTERDAY
         config.period.save()
         dates = config.get_dates()
@@ -91,7 +91,7 @@ class TestReportConfig(APITestCase):
             'dt_from': (date.today() - relativedelta(days=1)) - relativedelta(months=1),
             'dt_to': date.today() - timedelta(1),
         }
-        self.assertEquals(data, dates)
+        self.assertEqual(data, dates)
         config.period.count_of_periods = 3
         config.period.save()
         dates = config.get_dates()
@@ -99,7 +99,7 @@ class TestReportConfig(APITestCase):
             'dt_from': (date.today() - relativedelta(days=1)) - relativedelta(months=3),
             'dt_to': date.today() - timedelta(1),
         }
-        self.assertEquals(data, dates)
+        self.assertEqual(data, dates)
 
     def test_quarter(self):
         config = self._create_config(1, Period.ACC_PERIOD_QUARTER, period_start=Period.PERIOD_START_TODAY)
@@ -108,7 +108,7 @@ class TestReportConfig(APITestCase):
             'dt_from': date.today() - relativedelta(months=3),
             'dt_to': date.today(),
         }
-        self.assertEquals(data, dates)
+        self.assertEqual(data, dates)
         config.period.period_start = Period.PERIOD_START_YESTERDAY
         config.period.save()
         dates = config.get_dates()
@@ -116,7 +116,7 @@ class TestReportConfig(APITestCase):
             'dt_from': (date.today() - timedelta(1)) - relativedelta(months=3),
             'dt_to': date.today() - timedelta(1),
         }
-        self.assertEquals(data, dates)
+        self.assertEqual(data, dates)
         config.period.count_of_periods = 3
         config.period.save()
         dates = config.get_dates()
@@ -124,7 +124,7 @@ class TestReportConfig(APITestCase):
             'dt_from': (date.today() - relativedelta(days=1)) - relativedelta(months=9),
             'dt_to': date.today() - timedelta(1),
         }
-        self.assertEquals(data, dates)
+        self.assertEqual(data, dates)
 
     def test_half_year(self):
         config = self._create_config(1, Period.ACC_PERIOD_HALF_YEAR, period_start=Period.PERIOD_START_TODAY)
@@ -133,7 +133,7 @@ class TestReportConfig(APITestCase):
             'dt_from': date.today() - relativedelta(months=6),
             'dt_to': date.today(),
         }
-        self.assertEquals(data, dates)
+        self.assertEqual(data, dates)
         config.period.period_start = Period.PERIOD_START_YESTERDAY
         config.period.save()
         dates = config.get_dates()
@@ -141,7 +141,7 @@ class TestReportConfig(APITestCase):
             'dt_from': date.today() - timedelta(1) - relativedelta(months=6),
             'dt_to': date.today() - timedelta(1),
         }
-        self.assertEquals(data, dates)
+        self.assertEqual(data, dates)
         config.period.count_of_periods = 3
         config.period.save()
         dates = config.get_dates()
@@ -149,7 +149,7 @@ class TestReportConfig(APITestCase):
             'dt_from': date.today() - timedelta(1) - (relativedelta(months=6) * 3),
             'dt_to': date.today() - timedelta(1),
         }
-        self.assertEquals(data, dates)
+        self.assertEqual(data, dates)
 
     def test_year(self):
         config = self._create_config(1, Period.ACC_PERIOD_YEAR, period_start=Period.PERIOD_START_TODAY)
@@ -158,7 +158,7 @@ class TestReportConfig(APITestCase):
             'dt_from': date.today() - relativedelta(years=1),
             'dt_to': date.today(),
         }
-        self.assertEquals(data, dates)
+        self.assertEqual(data, dates)
         config.period.period_start = Period.PERIOD_START_YESTERDAY
         config.period.save()
         dates = config.get_dates()
@@ -166,7 +166,7 @@ class TestReportConfig(APITestCase):
             'dt_from': date.today() - relativedelta(years=1, days=1),
             'dt_to': date.today() - timedelta(1),
         }
-        self.assertEquals(data, dates)
+        self.assertEqual(data, dates)
         config.period.count_of_periods = 3
         config.period.save()
         dates = config.get_dates()
@@ -174,31 +174,31 @@ class TestReportConfig(APITestCase):
             'dt_from': date.today() - relativedelta(years=3, days=1),
             'dt_to': date.today() - timedelta(1),
         }
-        self.assertEquals(data, dates)
+        self.assertEqual(data, dates)
 
     def test_period_start(self):
         config = self._create_config(1, Period.ACC_PERIOD_YEAR, period_start=Period.PERIOD_START_PREVIOUS_MONTH)
-        self.assertEquals(config.period._get_start_date(date(2021, 1, 23)), date(2020, 12, 31))
-        self.assertEquals(config.period._get_start_date(date(2021, 3, 30)), date(2021, 2, 28))
-        self.assertEquals(config.period._get_start_date(date(2021, 12, 31)), date(2021, 11, 30))
+        self.assertEqual(config.period._get_start_date(date(2021, 1, 23)), date(2020, 12, 31))
+        self.assertEqual(config.period._get_start_date(date(2021, 3, 30)), date(2021, 2, 28))
+        self.assertEqual(config.period._get_start_date(date(2021, 12, 31)), date(2021, 11, 30))
         config.period.period_start = Period.PERIOD_START_PREVIOUS_QUARTER
         config.period.save()
-        self.assertEquals(config.period._get_start_date(date(2021, 1, 23)), date(2020, 12, 31))
-        self.assertEquals(config.period._get_start_date(date(2021, 3, 30)), date(2020, 12, 31))
-        self.assertEquals(config.period._get_start_date(date(2021, 4, 1)), date(2021, 3, 31))
-        self.assertEquals(config.period._get_start_date(date(2021, 6, 30)), date(2021, 3, 31))
-        self.assertEquals(config.period._get_start_date(date(2021, 7, 8)), date(2021, 6, 30))
-        self.assertEquals(config.period._get_start_date(date(2021, 12, 8)), date(2021, 9, 30))
+        self.assertEqual(config.period._get_start_date(date(2021, 1, 23)), date(2020, 12, 31))
+        self.assertEqual(config.period._get_start_date(date(2021, 3, 30)), date(2020, 12, 31))
+        self.assertEqual(config.period._get_start_date(date(2021, 4, 1)), date(2021, 3, 31))
+        self.assertEqual(config.period._get_start_date(date(2021, 6, 30)), date(2021, 3, 31))
+        self.assertEqual(config.period._get_start_date(date(2021, 7, 8)), date(2021, 6, 30))
+        self.assertEqual(config.period._get_start_date(date(2021, 12, 8)), date(2021, 9, 30))
         config.period.period_start = Period.PERIOD_START_PREVIOUS_HALF_YEAR
         config.period.save()
-        self.assertEquals(config.period._get_start_date(date(2021, 1, 23)), date(2020, 12, 31))
-        self.assertEquals(config.period._get_start_date(date(2021, 6, 30)), date(2020, 12, 31))
-        self.assertEquals(config.period._get_start_date(date(2021, 7, 1)), date(2021, 6, 30))
-        self.assertEquals(config.period._get_start_date(date(2021, 12, 31)), date(2021, 6, 30))
+        self.assertEqual(config.period._get_start_date(date(2021, 1, 23)), date(2020, 12, 31))
+        self.assertEqual(config.period._get_start_date(date(2021, 6, 30)), date(2020, 12, 31))
+        self.assertEqual(config.period._get_start_date(date(2021, 7, 1)), date(2021, 6, 30))
+        self.assertEqual(config.period._get_start_date(date(2021, 12, 31)), date(2021, 6, 30))
         config.period.period_start = Period.PERIOD_START_PREVIOUS_YEAR
         config.period.save()
-        self.assertEquals(config.period._get_start_date(date(2021, 1, 23)), date(2020, 12, 31))
-        self.assertEquals(config.period._get_start_date(date(2021, 8, 30)), date(2020, 12, 31))
+        self.assertEqual(config.period._get_start_date(date(2021, 1, 23)), date(2020, 12, 31))
+        self.assertEqual(config.period._get_start_date(date(2021, 8, 30)), date(2020, 12, 31))
 
     def test_period_start_prev_month_period_month(self):
         config = self._create_config(1, Period.ACC_PERIOD_MONTH, period_start=Period.PERIOD_START_PREVIOUS_MONTH)
@@ -207,7 +207,7 @@ class TestReportConfig(APITestCase):
             'dt_from': (date.today() - relativedelta(months=1)).replace(day=1),
             'dt_to': (date.today() - relativedelta(months=1)) + relativedelta(day=31),
         }
-        self.assertEquals(data, dates)
+        self.assertEqual(data, dates)
 
 
 class TestPivotTabelReportNotifications(TestsHelperMixin, APITestCase):
@@ -316,13 +316,13 @@ class TestPivotTabelReportNotifications(TestsHelperMixin, APITestCase):
             )
             self.assertEqual(emails, [self.user_dir.email, self.shop.email, self.user_urs.email])
             df = pd.read_excel(mail.outbox[0].attachments[0][1])
-            self.assertEquals(len(df.columns), 6 + monthrange(self.dt.year, self.dt.month)[1])
-            self.assertEquals(len(df.values), 3)
+            self.assertEqual(len(df.columns), 6 + monthrange(self.dt.year, self.dt.month)[1])
+            self.assertEqual(len(df.values), 3)
             first_date = datetime.combine(self.dt - timedelta(1), time())
             second_date = datetime.combine(self.dt, time())
-            self.assertEquals(list(df.loc[0, [first_date, second_date, 'Часов за период']].values), [0.00, 10.75, 10.75])
-            self.assertEquals(list(df.loc[1, [first_date, second_date, 'Часов за период']].values), [10.75, 10.75, 21.50])
-            self.assertEquals(list(df.loc[2, [first_date, second_date, 'Часов за период']].values), [10.75, 21.50, 32.25])
+            self.assertEqual(list(df.loc[0, [first_date, second_date, 'Часов за период']].values), [0.00, 10.75, 10.75])
+            self.assertEqual(list(df.loc[1, [first_date, second_date, 'Часов за период']].values), [10.75, 10.75, 21.50])
+            self.assertEqual(list(df.loc[2, [first_date, second_date, 'Часов за период']].values), [10.75, 21.50, 32.25])
 
 
 class TestReportsViewSet(TestsHelperMixin, APITestCase):
@@ -404,13 +404,13 @@ class TestReportsViewSet(TestsHelperMixin, APITestCase):
 
     def test_report_pivot_tabel_get(self):
         response = self.client.get(f'/rest_api/report/pivot_tabel/?dt_from={self.dt - timedelta(1)}&dt_to={self.dt}')
-        self.assertEquals(response.status_code, 200)
+        self.assertEqual(response.status_code, 200)
         df = pd.read_excel(response.content)
-        self.assertEquals(len(df.columns), 8)
-        self.assertEquals(len(df.values), 3)
-        self.assertEquals(list(df.iloc[0, 5:].values), [0.00, 10.75, 10.75])
-        self.assertEquals(list(df.iloc[1, 5:].values), [10.75, 10.75, 21.50])
-        self.assertEquals(list(df.iloc[2, 5:].values), [10.75, 21.50, 32.25])
+        self.assertEqual(len(df.columns), 8)
+        self.assertEqual(len(df.values), 3)
+        self.assertEqual(list(df.iloc[0, 5:].values), [0.00, 10.75, 10.75])
+        self.assertEqual(list(df.iloc[1, 5:].values), [10.75, 10.75, 21.50])
+        self.assertEqual(list(df.iloc[2, 5:].values), [10.75, 21.50, 32.25])
 
 
 class TestScheduleDeviation(APITestCase):
@@ -463,7 +463,7 @@ class TestScheduleDeviation(APITestCase):
             'fact_without_plan_count': fact_without_plan_count, 
             'lost_work_hours_count': lost_work_hours_count,
         }
-        self.assertEquals(ScheduleDeviations.objects.values(*data.keys())[0], data)
+        self.assertEqual(ScheduleDeviations.objects.values(*data.keys())[0], data)
 
     def test_plan_and_fact_hours_values(self):
         dt = date.today()
@@ -679,23 +679,23 @@ class TestScheduleDeviation(APITestCase):
         )
         report = self.client.get(f'/rest_api/report/schedule_deviation/?dt_from={dt}&dt_to={dt+timedelta(1)}&shop_ids={self.shop.id}')
         data = pd.read_excel(report.content).fillna('')
-        self.assertEquals(
+        self.assertEqual(
             list(data.iloc[10, :].values), 
             [1, self.shop.name, datetime.combine(dt, time(0, 0)), f'{self.user1.fio} ', '-', self.root_shop.name, 'штат', self.position.name, 'Биржа смен', 10,
             10.5, 4.5, 0.5, 1, 0.5, 1, 0, 0, 1, 2, 0, 0, 0, 0]
         )
-        self.assertEquals(
+        self.assertEqual(
             list(data.iloc[11, :].values), 
             [2, self.shop2.name, datetime.combine(dt, time(0, 0)), f'{self.user2.fio} ',
             self.employee2.tabel_code, self.shop.name, 'штат', '-', 'Биржа смен', 8.75,
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8.75, 1]
         )
-        self.assertEquals(
+        self.assertEqual(
             list(data.iloc[12, :].values), 
             [3, self.shop.name, datetime.combine(dt, time(0, 0)), '-', '-', '-', 'штат', 'Грузчик', 'Биржа смен', 8.75,
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8.75, 1]
         )
-        self.assertEquals(
+        self.assertEqual(
             list(data.iloc[13, :].values), 
             [4, self.shop.name, datetime.combine(dt, time(0, 0)), '-', '-', 'Аутсорс сеть 1', 'не штат', 'Грузчик', 'Биржа смен', 8.75,
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8.75, 1]
@@ -704,9 +704,9 @@ class TestScheduleDeviation(APITestCase):
     def test_get_schedule_deviation_no_data(self):
         dt = date.today()
         report = self.client.get(f'/rest_api/report/schedule_deviation/?dt_from={dt}&dt_to={dt+timedelta(1)}')
-        self.assertEquals(report.status_code, 200)
+        self.assertEqual(report.status_code, 200)
         data = pd.read_excel(report.content).fillna('')
-        self.assertEquals(len(data), 10)
+        self.assertEqual(len(data), 10)
 
     def test_get_schedule_deviation_different_worker_day_types(self):
         dt_from = date.today()
@@ -737,7 +737,7 @@ class TestScheduleDeviation(APITestCase):
         report = self.client.get(f'/rest_api/report/schedule_deviation/?dt_from={dt_from}&dt_to={dt_to}')
         data = pd.read_excel(report.content).fillna('')
         for i, wd_type in enumerate(WorkerDayType.objects.all()):
-            self.assertEquals(
+            self.assertEqual(
                 list(data.iloc[10 + i, [0, 1, 2, 3, 5, 6, 7, 8]].values), 
                 [i + 1, self.shop.name if wd_type.is_work_hours else '-', datetime.combine(dt_from + timedelta(i), time(0, 0)), 
                 f'{self.user1.fio} ', self.root_shop.name, 'штат', self.position.name, 'Биржа смен' if wd_type.code == WorkerDay.TYPE_WORKDAY else wd_type.name]
@@ -783,14 +783,14 @@ class TestFillReportsData(TestsHelperMixin, TestCase):
 
     def test_fill_user_shop_groups(self):
         fill_user_shop_groups()
-        self.assertEquals(UserShopGroups.objects.filter(user=self.employment_admin.employee.user).count(), 4)
-        self.assertEquals(UserShopGroups.objects.filter(user=self.employment_urs.employee.user).count(), 2)
-        self.assertEquals(UserShopGroups.objects.filter(user=self.employment_dir.employee.user).count(), 1)
-        self.assertEquals(UserShopGroups.objects.filter(user=self.employment_worker.employee.user).count(), 1)
+        self.assertEqual(UserShopGroups.objects.filter(user=self.employment_admin.employee.user).count(), 4)
+        self.assertEqual(UserShopGroups.objects.filter(user=self.employment_urs.employee.user).count(), 2)
+        self.assertEqual(UserShopGroups.objects.filter(user=self.employment_dir.employee.user).count(), 1)
+        self.assertEqual(UserShopGroups.objects.filter(user=self.employment_worker.employee.user).count(), 1)
 
     def test_fill_user_subordinates(self):
         fill_user_subordinates(use_user_shop_groups=True)
-        self.assertEquals(UserSubordinates.objects.filter(user=self.employment_admin.employee.user).count(), 3)
-        self.assertEquals(UserSubordinates.objects.filter(user=self.employment_urs.employee.user).count(), 2)
-        self.assertEquals(UserSubordinates.objects.filter(user=self.employment_dir.employee.user).count(), 1)
-        self.assertEquals(UserSubordinates.objects.filter(user=self.employment_worker.employee.user).count(), 0)
+        self.assertEqual(UserSubordinates.objects.filter(user=self.employment_admin.employee.user).count(), 3)
+        self.assertEqual(UserSubordinates.objects.filter(user=self.employment_urs.employee.user).count(), 2)
+        self.assertEqual(UserSubordinates.objects.filter(user=self.employment_dir.employee.user).count(), 1)
+        self.assertEqual(UserSubordinates.objects.filter(user=self.employment_worker.employee.user).count(), 0)

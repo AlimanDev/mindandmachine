@@ -36,15 +36,6 @@ def apply_load_template_to_shops(load_template_id, dt_from, shop_id=None):
     shops = [Shop.objects.get(pk=shop_id)] if shop_id else load_template.shops.all()
     for shop in shops:
         apply_load_template(load_template_id, shop.id, dt_from)
-    # event = Event.objects.create(
-    #     type="load_template_apply",
-    #     params={
-    #         'name': load_template.name,
-    #     },
-    #     dttm_valid_to=datetime.now() + timedelta(days=2),
-    #     shop=Shop.objects.filter(level=0).first(),
-    # )
-    # create_notifications_for_event(event.id)
 
 
 @app.task

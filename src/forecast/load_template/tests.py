@@ -451,7 +451,7 @@ class TestLoadTemplate(APITestCase):
                 'Тип работ': 'ДМ'
             }
         ]
-        self.assertEquals(df.to_dict('records'), data)
+        self.assertEqual(df.to_dict('records'), data)
         response = self.client.post(
             '/rest_api/load_template/upload/',
             {
@@ -459,24 +459,24 @@ class TestLoadTemplate(APITestCase):
                 'file': SimpleUploadedFile('template.xlsx', response.content)
             }
         )
-        self.assertEquals(response.status_code, 200)
+        self.assertEqual(response.status_code, 200)
         lt = LoadTemplate.objects.get(name='Test2')
-        self.assertEquals(OperationTypeTemplate.objects.filter(load_template=lt).count(), 3)
-        self.assertEquals(OperationTypeRelation.objects.filter(base__load_template=lt).count(), 2)
+        self.assertEqual(OperationTypeTemplate.objects.filter(load_template=lt).count(), 3)
+        self.assertEqual(OperationTypeRelation.objects.filter(base__load_template=lt).count(), 2)
         formula_relation = OperationTypeRelation.objects.get(base__load_template=lt, type=OperationTypeRelation.TYPE_FORMULA)
-        self.assertEquals(formula_relation.formula, 'a * 2 + a')
-        self.assertEquals(formula_relation.days_of_week_list, [])
-        self.assertEquals(formula_relation.base.operation_type_name, self.operation_type_name1)
-        self.assertEquals(formula_relation.depended.operation_type_name, self.operation_type_name2)
-        self.assertEquals(formula_relation.max_value, None)
-        self.assertEquals(formula_relation.threshold, None)
+        self.assertEqual(formula_relation.formula, 'a * 2 + a')
+        self.assertEqual(formula_relation.days_of_week_list, [])
+        self.assertEqual(formula_relation.base.operation_type_name, self.operation_type_name1)
+        self.assertEqual(formula_relation.depended.operation_type_name, self.operation_type_name2)
+        self.assertEqual(formula_relation.max_value, None)
+        self.assertEqual(formula_relation.threshold, None)
         change_workload_relation = OperationTypeRelation.objects.get(base__load_template=lt, type=OperationTypeRelation.TYPE_CHANGE_WORKLOAD_BETWEEN)
-        self.assertEquals(change_workload_relation.formula, '')
-        self.assertEquals(change_workload_relation.days_of_week_list, [1,2,4])
-        self.assertEquals(change_workload_relation.base.operation_type_name, self.operation_type_name1)
-        self.assertEquals(change_workload_relation.depended.operation_type_name, self.operation_type_name3)
-        self.assertEquals(change_workload_relation.max_value, 1.0)
-        self.assertEquals(change_workload_relation.threshold, 0.4)
+        self.assertEqual(change_workload_relation.formula, '')
+        self.assertEqual(change_workload_relation.days_of_week_list, [1,2,4])
+        self.assertEqual(change_workload_relation.base.operation_type_name, self.operation_type_name1)
+        self.assertEqual(change_workload_relation.depended.operation_type_name, self.operation_type_name3)
+        self.assertEqual(change_workload_relation.max_value, 1.0)
+        self.assertEqual(change_workload_relation.threshold, 0.4)
 
     def _test_upload_errors(self, data, error_msg):
         output = BytesIO()
@@ -491,8 +491,8 @@ class TestLoadTemplate(APITestCase):
                 'file': SimpleUploadedFile('template.xlsx', output.read())
             }
         )
-        self.assertEquals(response.status_code, 400)
-        self.assertEquals(response.json(), error_msg)
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json(), error_msg)
         self.assertIsNone(LoadTemplate.objects.filter(name='Test2').first())
 
     def test_upload_errors(self):

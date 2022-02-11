@@ -22,7 +22,7 @@ from django.utils.translation import gettext_lazy as _
 from model_utils import FieldTracker
 from rest_framework.exceptions import PermissionDenied, ValidationError
 
-from src.base.models import Shop, Employment, User, Event, Network, Break, ProductionDay, Employee, Group
+from src.base.models import Shop, Employment, User, Network, Break, ProductionDay, Employee, Group
 from src.base.models_abstract import AbstractModel, AbstractActiveModel, AbstractActiveNetworkSpecificCodeNamedModel, \
     AbstractActiveModelManager
 from src.events.signals import event_signal
@@ -190,9 +190,6 @@ class WorkType(AbstractActiveModel):
 
     def delete(self):
         from src.forecast.models import OperationType
-        if Cashbox.objects.filter(type_id=self.id, dttm_deleted__isnull=True).exists():
-            raise models.ProtectedError('There is cashboxes with such work_type', Cashbox.objects.filter(type_id=self.id, dttm_deleted__isnull=True))
-
         super(WorkType, self).delete()
         operation_type = OperationType.objects.filter(work_type_id=self.pk).first()
         if operation_type:
@@ -247,48 +244,6 @@ class Slot(AbstractActiveNetworkSpecificCodeNamedModel):
     workers_needed = models.IntegerField(default=1)
 
     worker = models.ManyToManyField(User, through=UserWeekdaySlot)
-
-
-class CashboxManager(models.Manager):
-    def qos_filter_active(self, dt_from, dt_to, *args, **kwargs):
-        """
-        added earlier then dt_from, deleted later then dt_to
-        :param dt_from:
-        :param dt_to:
-        :param args:
-        :param kwargs:
-        :return:
-        """
-
-        return self.filter(
-            Q(dttm_added__date__lte=dt_from) | Q(dttm_added__isnull=True)
-        ).filter(
-            Q(dttm_deleted__date__gt=dt_to) | Q(dttm_deleted__isnull=True)
-        ).filter(*args, **kwargs)
-
-
-class Cashbox(AbstractActiveNetworkSpecificCodeNamedModel):
-    class Meta(AbstractActiveNetworkSpecificCodeNamedModel.Meta):
-        verbose_name = 'Рабочее место '
-        verbose_name_plural = 'Рабочие места'
-
-    def __str__(self):
-        return '{}, {}, {}, {}, {}'.format(
-            self.type.work_type_name.name,
-            self.type.shop.name,
-            self.type.shop.parent.name,
-            self.id,
-            self.name
-        )
-
-    id = models.BigAutoField(primary_key=True)
-
-    type = models.ForeignKey(WorkType, on_delete=models.PROTECT)
-    name = models.CharField(max_length=128)
-    code = models.CharField(max_length=64, default='', blank=True)
-    bio = models.CharField(max_length=512, default='', blank=True)
-    objects = CashboxManager()
-
 
 class EmploymentWorkType(AbstractModel):
     class Meta(object):
@@ -1892,202 +1847,6 @@ class WorkerDayCashboxDetails(AbstractActiveModel):
         super(AbstractActiveModel, self).delete(*args, **kwargs)
 
     objects = WorkerDayCashboxDetailsManager()
-
-
-class WorkerDayChangeRequest(AbstractActiveModel):
-    class Meta(object):
-        verbose_name = 'Запрос на изменения рабочего дня'
-        unique_together = ('worker', 'dt')
-
-    def __str__(self):
-        return '{}, {}, {}'.format(self.worker.id, self.dt, self.status_type)
-
-    TYPE_APPROVED = 'A'
-    TYPE_DECLINED = 'D'
-    TYPE_PENDING = 'P'
-
-    STATUS_CHOICES = (
-        (TYPE_APPROVED, 'Approved'),
-        (TYPE_DECLINED, 'Declined'),
-        (TYPE_PENDING, 'Pending'),
-    )
-
-    id = models.BigAutoField(primary_key=True)
-    status_type = models.CharField(max_length=1, choices=STATUS_CHOICES, default=TYPE_PENDING)
-
-    worker = models.ForeignKey(User, on_delete=models.PROTECT)
-    dt = models.DateField()
-    type = models.CharField(choices=WorkerDay.TYPES, max_length=2, default=WorkerDay.TYPE_EMPTY)
-
-    dttm_work_start = models.DateTimeField(null=True, blank=True)
-    dttm_work_end = models.DateTimeField(null=True, blank=True)
-    wish_text = models.CharField(null=True, blank=True, max_length=512)
-
-
-class EventManager(models.Manager):
-    def mm_event_create(self, users, push_title=None, **kwargs):
-        event = self.create(**kwargs)
-
-        # users = User.objects.filter(
-        #     function_group__allowed_functions__func=noti_groups['func'],
-        #     function_group__allowed_functions__access_type__in=noti_groups['access_types'],
-        # )
-        # if event.department:
-        #     users = users.filter(shop=event.department)
-
-        notis = Notifications.objects.bulk_create([Notifications(event=event, to_worker=u) for u in users])
-        # todo: add sending push notifies
-        if (not push_title is None) and IS_PUSH_ACTIVE:
-            devices = FCMDevice.objects.filter(user__in=users)
-            devices.send_message(title=push_title, body=event.text)
-        return event
-
-
-class Event(AbstractModel):
-    dttm_added = models.DateTimeField(auto_now_add=True)
-
-    text = models.CharField(max_length=256)
-    # hidden_text = models.CharField(max_length=256, default='')
-
-    department = models.ForeignKey(Shop, null=True, blank=True, on_delete=models.PROTECT) # todo: should be department model?
-
-    workerday_details = models.ForeignKey(WorkerDayCashboxDetails, null=True, blank=True, on_delete=models.PROTECT, related_name='events')
-
-    objects = EventManager()
-
-    def get_text(self):
-        if self.workerday_details:
-            from src.util.models_converter import Converter
-
-            if self.workerday_details.dttm_deleted:
-                return 'Вакансия отмена'
-            elif self.workerday_details.worker_day_id:
-                return 'Вакансия на {} в {} уже выбрана.'.format(
-                    Converter.convert_date(self.workerday_details.dttm_from.date()),
-                    self.workerday_details.work_type.shop.name,
-                )
-            else:
-                return 'Открыта вакансия на {} на {} в {}. Время работы: с {} по {}. Хотите выйти?'.format(
-                    self.workerday_details.work_type.work_type_name.name,
-                    Converter.convert_date(self.workerday_details.dttm_from.date()),
-                    self.workerday_details.work_type.shop.name,
-                    Converter.convert_time(self.workerday_details.dttm_from.time()),
-                    Converter.convert_time(self.workerday_details.dttm_to.time()),
-                )
-
-        else:
-            return self.text
-
-    def is_question(self):
-        return not self.workerday_details_id is None
-
-    def do_action(self, user):
-        res = {
-            'status': 0,
-            'text': '',
-        }
-
-        if self.workerday_details_id: # действие -- выход на вакансию
-            vacancy = self.workerday_details
-            user_worker_day = WorkerDay.objects.qos_current_version().filter(
-                worker=user,
-                dt=vacancy.dttm_from.date()
-            ).first()
-
-            if user_worker_day and vacancy:
-                is_updated = False
-                update_condition = user_worker_day.type != WorkerDay.TYPE_WORKDAY or \
-                                   WorkerDayCashboxDetails.objects.filter(
-                                       Q(dttm_from__gte=vacancy.dttm_from, dttm_from__lt=vacancy.dttm_to) |
-                                       Q(dttm_to__gt=vacancy.dttm_from, dttm_to__lte=vacancy.dttm_to) |
-                                       Q(dttm_from__lte=vacancy.dttm_from, dttm_to__gte=vacancy.dttm_to),
-                                       worker_day_id=user_worker_day.id,
-                                       dttm_deleted__isnull=True,
-                                   ).count() == 0
-
-                # todo: actually should be transaction (check condition and update)
-                # todo: add time for go between shops
-                if update_condition:
-                    is_updated = WorkerDayCashboxDetails.objects.filter(
-                        id=vacancy.id,
-                        worker_day__isnull=True,
-                        dttm_deleted__isnull=True,
-                    ).update(
-                        worker_day_id=user_worker_day.id,
-                        status=WorkerDayCashboxDetails.TYPE_WORK,
-                    )
-
-                    if is_updated:
-                        user_worker_day.type = WorkerDay.TYPE_WORKDAY
-
-                        if (user_worker_day.dttm_work_start is None) or (user_worker_day.dttm_work_start > vacancy.dttm_from):
-                            user_worker_day.dttm_work_start = vacancy.dttm_from
-
-                        if (user_worker_day.dttm_work_end is None) or (user_worker_day.dttm_work_end < vacancy.dttm_to):
-                            user_worker_day.dttm_work_end = vacancy.dttm_to
-
-                        user_worker_day.save()
-
-                    if not is_updated:
-                        res['status'] = 3
-                        res['text'] = 'Невозможно выполнить действие'
-
-                else:
-                    res['status'] = 4
-                    res['text'] = 'Вы не можете выйти на эту смену'
-            else:
-                res['status'] = 2
-                res['text'] = 'График на этот период еще не составлен'
-        else:
-            res['status'] = 1
-            res['text'] = 'К этому уведомлению не может быть действия'
-        return res
-
-    def is_action_active(self):
-        if self.workerday_details and (self.workerday_details.dttm_deleted is None) and (self.workerday_details.worker_day_id is None):
-            return True
-        return False
-
-
-class NotificationManager(models.Manager):
-    def mm_filter(self, *args, **kwargs):
-        return self.filter(*args, **kwargs).select_related(
-            'event',
-            'event__workerday_details',
-            'event__workerday_details__work_type',
-            'event__workerday_details__work_type__shop'
-        )
-
-
-class Notifications(AbstractModel):
-    class Meta(object):
-        verbose_name = 'Уведомления'
-
-    def __str__(self):
-        return '{}, {}, {}, id: {}'.format(
-            self.to_worker.last_name,
-            self.shop.name if self.shop else 'no shop',
-            self.dttm_added,
-            # self.text[:60],
-            self.id
-        )
-
-    id = models.BigAutoField(primary_key=True)
-    shop = models.ForeignKey(Shop, null=True, on_delete=models.PROTECT, related_name='notifications')
-
-    dttm_added = models.DateTimeField(auto_now_add=True)
-    to_worker = models.ForeignKey(User, on_delete=models.PROTECT)
-
-    was_read = models.BooleanField(default=False)
-    event = models.ForeignKey(Event, on_delete=models.PROTECT, null=True)
-
-    # text = models.CharField(max_length=512)
-    # type = models.CharField(max_length=1, choices=TYPES, default=TYPE_SUCCESS)
-
-    # content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE, blank=True, null=True)
-    # object_id = models.PositiveIntegerField(blank=True, null=True)
-    # object = GenericForeignKey(ct_field='content_type', fk_field='object_id')
-    objects = NotificationManager()
 
 
 class ShopMonthStat(AbstractModel):
