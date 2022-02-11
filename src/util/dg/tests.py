@@ -365,6 +365,39 @@ class TestGenerateTabel(TestsHelperMixin, TestCase):
         self.assertEqual(user_data['full_month_wdays'], 1)
         self.assertEqual(len(list(filter(lambda x: x['value'] != '', user_data['days'].values()))), 1)
 
+    def test_generate_tabel_with_2_days_on_one_date(self):
+        WorkerDay.objects.all().delete()
+        dttms = [
+            (datetime.combine(self.dt_now, time(8)), datetime.combine(self.dt_now, time(14))),
+            (datetime.combine(self.dt_now, time(16)), datetime.combine(self.dt_now, time(20))),
+        ]
+        self.employee2.refresh_from_db()
+        for start, end in dttms:
+            approved_wd = None
+            for is_fact in [False, True]:
+                for is_approved in [False, True]:
+                    wd = self._create_worker_day(
+                        self.employment2, 
+                        start,
+                        end,
+                        shop_id=self.shop.id,
+                        is_fact=is_fact,
+                        is_approved=is_approved,
+                    )
+                    if not is_fact and is_approved:
+                        approved_wd = wd
+                    elif is_fact:
+                        wd.closest_plan_approved = approved_wd
+                        wd.save()
+        
+        calc_timesheets(dt_from=self.dt_from, dt_to=self.dt_to)
+        self.assertEqual(TimesheetItem.objects.filter(dt=self.dt_now, employee=self.employee2, timesheet_type=TimesheetItem.TIMESHEET_TYPE_FACT).count(), 2)
+
+        g = T13TimesheetDataGetter(shop=self.shop, dt_from=self.dt_from, dt_to=self.dt_to, timesheet_type=TimesheetItem.TIMESHEET_TYPE_FACT)
+        data = g.get_data()
+        user_data = list(filter(lambda x: x['tabel_code'] == self.employee2.tabel_code, data['users']))[0]
+        self.assertEqual(user_data['full_month_wdays'], 1)
+
     def test_generate_custom_t13_tabel_fired_hired(self):
         self.second_empl.dt_fired = self.dt_from + timedelta(10)
         self.second_empl.save()
