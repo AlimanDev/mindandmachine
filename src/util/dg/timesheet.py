@@ -183,9 +183,9 @@ class T13TimesheetDataGetter(BaseTimesheetDataGetter):
 
         for grouped_attrs, wds in grouped_worker_days.items():
             employee_id = grouped_attrs[0]
-            first_half_month_wdays = 0
+            first_half_month_wdays = set()
             first_half_month_whours = 0
-            second_half_month_wdays = 0
+            second_half_month_wdays = set()
             second_half_month_whours = 0
             days = {}
             for wd in wds:
@@ -195,10 +195,10 @@ class T13TimesheetDataGetter(BaseTimesheetDataGetter):
                 days[day_key] = day_data
                 if not wd.day_type.is_dayoff or (wd.day_type.is_dayoff and wd.day_type.is_work_hours):
                     if wd.dt.day <= 15:  # первая половина месяца
-                        first_half_month_wdays += 1
+                        first_half_month_wdays.add(wd.dt)
                         first_half_month_whours += wd.day_hours + wd.night_hours
                     else:
-                        second_half_month_wdays += 1
+                        second_half_month_wdays.add(wd.dt)
                         second_half_month_whours += wd.day_hours + wd.night_hours
             e = sorted(empls.get(employee_id), key=lambda x: x.dt_fired or datetime.max.date(), reverse=True)[0]
             user_data = {
@@ -210,11 +210,11 @@ class T13TimesheetDataGetter(BaseTimesheetDataGetter):
                 'position': self.get_position_name(e, wds),
                 'shop': self.get_shop_name(e, wds),
                 'days': days,
-                'first_half_month_wdays': first_half_month_wdays,
+                'first_half_month_wdays': len(first_half_month_wdays),
                 'first_half_month_whours': first_half_month_whours,
-                'second_half_month_wdays': second_half_month_wdays,
+                'second_half_month_wdays': len(second_half_month_wdays),
                 'second_half_month_whours': second_half_month_whours,
-                'full_month_wdays': first_half_month_wdays + second_half_month_wdays,
+                'full_month_wdays': len(first_half_month_wdays) + len(second_half_month_wdays),
                 'full_month_whours': first_half_month_whours + second_half_month_whours,
             }
             users.append(user_data)

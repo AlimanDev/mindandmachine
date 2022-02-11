@@ -105,8 +105,8 @@ def wd_stat_count_total(worker_days, shop):
 
 
 class CleanWdaysHelper:
-    def __init__(self, filter_kwargs: dict = None):
-        self.filter_kwargs = filter_kwargs or {}
+    def __init__(self, **kwargs):
+        self.filter_kwargs = kwargs
 
     def run(self):
         fix_wd_employments(**self.filter_kwargs)

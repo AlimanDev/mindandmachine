@@ -1600,7 +1600,7 @@ class Employment(AbstractActiveModel):
                     'dt__gte': Converter.convert_date(dt__gte),
                 }
 
-            transaction.on_commit(lambda: clean_wdays.apply_async(**kwargs))
+            transaction.on_commit(lambda: clean_wdays.delay(**kwargs))
 
         if (is_new or self.tracker.has_changed('dt_hired') or self.tracker.has_changed('dt_fired') or self.tracker.has_changed('shop_id')) and settings.ZKTECO_INTEGRATION:
             transaction.on_commit(lambda: export_or_delete_employment_zkteco.delay(self.id, prev_shop_id=(self.tracker.previous('shop_id') if self.tracker.has_changed('shop_id') else None)))
