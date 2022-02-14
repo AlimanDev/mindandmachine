@@ -1416,12 +1416,11 @@ msgstr "У вас нет прав на {action_str} типа дня \"{wd_type_s
 #: src/timetable/worker_day/views.py:96
 msgid ""
 "You do not have the rights to {action_str} the type of day \"{wd_type_str}\" "
-"on the selected dates. You need to change the interval for approve. Allowed "
-"inteval for approve: {dt_interval}"
+"on the selected dates. You need to change the dates. Allowed "
+"interval: {dt_interval}"
 msgstr ""
 "У вас нет прав на {action_str} типа дня \"{wd_type_str}\" в выбранные даты. "
-"Необходимо изменить интервал для подтверждения. Разрешенный интевал для "
-"подтверждения: {dt_interval}"
+"Необходимо изменить даты. Разрешенный интервал: {dt_interval}"
 
 #: src/timetable/worker_day/views.py:100
 #, python-brace-format

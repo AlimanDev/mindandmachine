@@ -333,8 +333,8 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
             response.json(),
             {
                 'detail': 'У вас нет прав на подтверждение типа дня "Выходной" в выбранные '
-                          'даты. Необходимо изменить интервал для подтверждения. '
-                          'Разрешенный интевал для подтверждения: '
+                          'даты. Необходимо изменить даты. '
+                          'Разрешенный интервал: '
                           f'с {Converter.convert_date(self.dt - timedelta(days=gwdp.limit_days_in_past))} '
                           f'по {Converter.convert_date(self.dt + timedelta(days=gwdp.limit_days_in_future))}'
             }
@@ -2921,14 +2921,14 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
         wd_data['dttm_work_end'] = datetime.combine(self.dt - timedelta(days=2), time(15))
         resp = self.client.post(
             self.get_url('WorkerDay-batch-update-or-create'), self.dump_data(data), content_type='application/json')
-        self.assertContains(resp, 'Необходимо изменить интервал для подтверждения', status_code=403)
+        self.assertContains(resp, 'Необходимо изменить даты', status_code=403)
 
         wd_data['dt'] = self.dt + timedelta(days=2)
         wd_data['dttm_work_start'] = datetime.combine(self.dt + timedelta(days=2), time(11))
         wd_data['dttm_work_end'] = datetime.combine(self.dt + timedelta(days=2), time(15))
         resp = self.client.post(
             self.get_url('WorkerDay-batch-update-or-create'), self.dump_data(data), content_type='application/json')
-        self.assertContains(resp, 'Необходимо изменить интервал для подтверждения', status_code=403)
+        self.assertContains(resp, 'Необходимо изменить даты', status_code=403)
 
         gwdp_create.limit_days_in_past = None
         gwdp_create.limit_days_in_future = None

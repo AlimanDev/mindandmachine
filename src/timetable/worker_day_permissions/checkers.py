@@ -1,7 +1,7 @@
 import datetime
 
 from django.conf import settings
-from django.db.models import Q
+from django.db.models import Q, F
 from django.utils.translation import gettext as _
 
 from django.utils.encoding import force_text
@@ -99,7 +99,15 @@ class BaseSingleWdPermissionChecker(BaseWdPermissionChecker):
             wd_type_id=wd_type_id,
             wd_dt=wd_dt,
             is_vacancy=is_vacancy,
-        ).values_list('employee_type', 'shop_type', 'limit_days_in_past', 'limit_days_in_future').distinct()
+        ).order_by(
+            F('limit_days_in_past').desc(nulls_first=True),
+            F('limit_days_in_future').desc(nulls_first=True),
+        ).values_list(
+            'employee_type',
+            'shop_type',
+            'limit_days_in_past',
+            'limit_days_in_future',
+        ).distinct()
         if not gwdp:
             self.err_message = self._get_err_msg(action, wd_type_id)
             return False
@@ -174,8 +182,6 @@ class BaseSingleWdPermissionChecker(BaseWdPermissionChecker):
                     ).exists())
 
                     if has_perm:
-                        # FIXME: с допущением, что удовл. только 1 пермишну, проверим интервал, если неудовлетворяет,
-                        #  то кидаем ошибку.
                         if isinstance(wd_dt, str):
                             wd_dt = datetime.datetime.strptime(wd_dt, settings.QOS_DATE_FORMAT).date()
                         today = (datetime.datetime.now() + datetime.timedelta(
