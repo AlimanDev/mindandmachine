@@ -8,6 +8,7 @@ def add_permissions(apps, schema_editor):
         ('User_add_biometrics', 'POST', ('admin', 'admin_outsource', 'admin_client', 'urs')),
         ('WorkerDay_confirm_vacancy_to_worker', 'POST', ('admin', 'admin_outsource', 'admin_client', 'urs', 'director')),
         ('WorkerDay_reconfirm_vacancy_to_worker', 'POST', ('admin', 'admin_outsource', 'admin_client', 'urs', 'director')),
+        ('Network', 'GET', ('director',)),
     ]
     worker_day_permissions = [
         ('P', 'U', 40, 60, ('director',)),
