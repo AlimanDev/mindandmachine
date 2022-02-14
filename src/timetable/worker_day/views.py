@@ -93,10 +93,10 @@ class WorkerDayViewSet(BaseModelViewSet):
         'cannot_delete': _("Cannot_delete approved version."),
         'na_worker_day_exists': _("Not approved version already exists."),
         'no_action_perm_for_wd_type': _('You do not have rights to {action_str} the day type "{wd_type_str}"'),
-        'approve_days_interval_restriction': _('You do not have the rights to {action_str} the type of day "{wd_type_str}" '
+        'wd_interval_restriction': _('You do not have the rights to {action_str} the type of day "{wd_type_str}" '
                                                'on the selected dates. '
-                                               'You need to change the interval for approve. '
-                                               'Allowed inteval for approve: {dt_interval}'),
+                                               'You need to change the dates. '
+                                               'Allowed interval: {dt_interval}'),
         'has_no_perm_to_approve_protected_wdays': _('You do not have rights to approve protected worker days ({protected_wdays}). '
                                                    'Please contact your system administrator.'),
         "no_such_user_in_network": _("There is no such user in your network."),

@@ -43,7 +43,7 @@ class BaseWdPermissionChecker:
             'wd_types_dict', {}) or WorkerDayType.get_wd_types_dict()).get(wd_type_id).name
         action_str = force_text(WorkerDayPermission.ACTIONS_DICT.get(action)).lower()
         if dt_interval:
-            err_msg = WorkerDayViewSet.error_messages['approve_days_interval_restriction'].format(
+            err_msg = WorkerDayViewSet.error_messages['wd_interval_restriction'].format(
                 wd_type_str=wd_type_display_str,
                 action_str=action_str,
                 dt_interval=dt_interval,

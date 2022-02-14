@@ -462,7 +462,7 @@ def check_worker_day_permissions(
                 dt_interval = f'с {Converter.convert_date(date_limit_in_past) or "..."} ' \
                                 f'по {Converter.convert_date(date_limit_in_future) or "..."}'
                 raise PermissionDenied(
-                    error_messages['approve_days_interval_restriction'].format(
+                    error_messages['wd_interval_restriction'].format(
                         wd_type_str=wd_type_display_str,
                         action_str=WorkerDayPermission.ACTIONS_DICT.get(action).lower(),
                         dt_interval=dt_interval,
