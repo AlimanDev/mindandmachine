@@ -1,6 +1,7 @@
 from datetime import datetime, time, date, timedelta
 from django.conf import settings
 from django.db import transaction
+from django.db.models import Q
 
 from django.test import override_settings
 
@@ -12,6 +13,8 @@ from src.timetable.models import WorkerDay, AttendanceRecords
 from src.base.models import WorkerPosition, Employment
 from src.integration.models import AttendanceArea, ExternalSystem, UserExternalCode, ShopExternalCode
 from src.integration.tasks import import_urv_zkteco, export_workers_zkteco, delete_workers_zkteco
+from src.timetable.tests.factories import WorkTypeFactory, WorkTypeNameFactory
+from src.util.mixins.tests import TestsHelperMixin
 from src.util.test import create_departments_and_users
 
 dttm_first = datetime.combine(date.today(), time(10, 48))
@@ -104,7 +107,7 @@ class TestRequestMock:
     ZKTECO_KEY='1234', 
     ZKTECO_USER_ID_SHIFT=10000,
 )
-class TestIntegration(APITestCase):
+class TestIntegration(TestsHelperMixin, APITestCase):
     USER_USERNAME = "user1"
     USER_EMAIL = "q@q.q"
     USER_PASSWORD = "4242"
@@ -114,7 +117,7 @@ class TestIntegration(APITestCase):
 
         self.dt = now().date()
 
-        create_departments_and_users(self)
+        self.create_departments_and_users()
         self.ext_system, _ = ExternalSystem.objects.get_or_create(
             code='zkteco',
             defaults={
@@ -145,6 +148,7 @@ class TestIntegration(APITestCase):
         ).update(
             position=self.position,
         )
+        self.employment1.position = self.position
         
         self.client.force_authenticate(user=self.user1)
 
@@ -1190,7 +1194,7 @@ class TestIntegration(APITestCase):
                     shop=self.shop,
                     position=self.position, 
                 )
-                self.assertEquals(
+                self.assertEqual(
                     mock_request.request.call_args_list, 
                     [
                         call(
@@ -1232,7 +1236,7 @@ class TestIntegration(APITestCase):
                 mock_request.request.return_value = mock_request
                 self.employment1.dt_fired = date(2019, 1, 1)
                 self.employment1.save()
-                self.assertEquals(
+                self.assertEqual(
                     mock_request.request.call_args_list, 
                     [
                         call(
@@ -1267,7 +1271,7 @@ class TestIntegration(APITestCase):
                 mock_request.request.return_value = mock_request
                 self.employment1.dt_fired = date(2019, 1, 1)
                 self.employment1.save()
-                self.assertEquals(
+                self.assertEqual(
                     mock_request.request.call_args_list, 
                     [
                         call(
@@ -1296,7 +1300,7 @@ class TestIntegration(APITestCase):
                 mock_request.json.return_value = {"code": 0}
                 mock_request.request.return_value = mock_request
                 self.employment1.delete()
-                self.assertEquals(
+                self.assertEqual(
                     mock_request.request.call_args_list, 
                     [
                         call(
@@ -1309,6 +1313,124 @@ class TestIntegration(APITestCase):
                     ]
                 )
                 self.assertFalse(UserExternalCode.objects.filter(external_system=self.ext_system, user=self.user1).exists())
+    
+    def test_change_zone_on_employment_change_shop(self):
+        self.att_area2, _ = AttendanceArea.objects.update_or_create(
+            code='2',
+            external_system=self.ext_system,
+            defaults={
+                'name': 'Тестовая зона2',
+            }
+        )
+        ShopExternalCode.objects.create(
+            attendance_area=self.att_area,
+            shop=self.shop,
+        )
+        self.root_shop_code = ShopExternalCode.objects.create(
+            attendance_area=self.att_area,
+            shop=self.root_shop,
+        )
+        UserExternalCode.objects.create(
+            external_system=self.ext_system,
+            user=self.user1,
+            code=settings.ZKTECO_USER_ID_SHIFT + self.user1.id,
+        )   
+        with patch.object(transaction, 'on_commit', lambda t: t()):
+            with patch('src.integration.zkteco.requests', spec=TestRequestMock) as mock_request:
+                mock_request.json.return_value = {"code": 0}
+                mock_request.request.return_value = mock_request
+                
+                self.employment1.shop = self.shop
+                self.employment1.save()
+                self.assertEqual(
+                    mock_request.request.call_args_list, 
+                    [
+                        call(
+                            'POST', 
+                            '/attAreaPerson/set', 
+                            data=None, 
+                            json={'pins': [str(settings.ZKTECO_USER_ID_SHIFT + self.user1.id)], 'code': str(self.att_area.code)}, 
+                            params={'access_token': settings.ZKTECO_KEY}
+                        ),
+                    ]
+                )
+                self.assertTrue(UserExternalCode.objects.filter(external_system=self.ext_system, user=self.user1).exists())
+                mock_request.request.call_args_list.clear()
+                self.root_shop_code.attendance_area = self.att_area2
+                self.root_shop_code.save()
+                self.employment1.shop = self.root_shop
+                self.employment1.save()
+                self.assertEqual(
+                    mock_request.request.call_args_list, 
+                    [
+                        call(
+                            'POST', 
+                            '/attAreaPerson/set', 
+                            data=None, 
+                            json={'pins': [str(settings.ZKTECO_USER_ID_SHIFT + self.user1.id)], 'code': str(self.att_area2.code)}, 
+                            params={'access_token': settings.ZKTECO_KEY}
+                        ),
+                        call(
+                            'POST', 
+                            '/attAreaPerson/delete', 
+                            data=None, 
+                            json={'pins': [str(settings.ZKTECO_USER_ID_SHIFT + self.user1.id)], 'code': str(self.att_area.code)}, 
+                            params={'access_token': settings.ZKTECO_KEY}
+                        ),
+                    ]
+                )
+                self.assertTrue(UserExternalCode.objects.filter(external_system=self.ext_system, user=self.user1).exists())
+    
+
+    def test_not_delete_area_when_same_area_in_other_shop(self):
+        self.maxDiff = None
+        ShopExternalCode.objects.create(
+            attendance_area=self.att_area,
+            shop=self.shop,
+        )
+        ShopExternalCode.objects.create(
+            attendance_area=self.att_area,
+            shop=self.root_shop,
+        )
+        with patch.object(transaction, 'on_commit', lambda t: t()):
+            with patch('src.integration.zkteco.requests', spec=TestRequestMock) as mock_request:
+                mock_request.json.return_value = {"code": 0}
+                mock_request.request.return_value = mock_request
+                Employment.objects.create(
+                    shop=self.shop,
+                    employee_id=self.employment1.employee_id,
+                    position=self.position,
+                )
+                self.assertEqual(
+                    mock_request.request.call_args_list, 
+                    [
+                        call(
+                            'POST', 
+                            '/person/add', 
+                            data=None, 
+                            json={
+                                'pin': settings.ZKTECO_USER_ID_SHIFT + self.user1.id, 
+                                'deptCode': settings.ZKTECO_DEPARTMENT_CODE, 
+                                'name': self.user1.first_name, 
+                                'lastName': self.user1.last_name,
+                            }, 
+                            params={'access_token': settings.ZKTECO_KEY}
+                        ),
+                        call(
+                            'POST', 
+                            '/attAreaPerson/set', 
+                            data=None, 
+                            json={'pins': [settings.ZKTECO_USER_ID_SHIFT + self.user1.id], 'code': str(self.att_area.code)}, 
+                            params={'access_token': settings.ZKTECO_KEY}
+                        ),
+                    ]
+                )
+                mock_request.request.call_args_list.clear()
+                self.employment1.dt_fired = date(2019, 1, 1)
+                self.employment1.save()
+                self.assertEqual(mock_request.request.call_args_list, [])
+                self.assertTrue(UserExternalCode.objects.filter(external_system=self.ext_system, user=self.user1).exists())
+
 
     def test_worker_not_exported_for_fired_person(self):
         ShopExternalCode.objects.create(
@@ -1323,5 +1445,142 @@ class TestIntegration(APITestCase):
                 mock_request.request.return_value = mock_request
                 self.employment1.dt_hired = date(2018, 11, 1)
                 self.employment1.save()
-                self.assertEquals(mock_request.request.call_args_list, [])
+                self.assertEqual(mock_request.request.call_args_list, [])
                 self.assertFalse(UserExternalCode.objects.filter(external_system=self.ext_system, user=self.user1).exists())
+
+    def test_fact_not_duplicated_on_approve(self):
+        dt = date.today()
+        WorkerDay.objects.all().delete()
+        AttendanceRecords.objects.all().delete()
+
+        ShopExternalCode.objects.create(
+            attendance_area=self.att_area,
+            shop=self.shop,
+        )
+
+        UserExternalCode.objects.create(
+            external_system=self.ext_system,
+            user=self.user2,
+            code='1',
+        )
+        self.admin_group.has_perm_to_approve_other_shop_days = True
+        self.admin_group.save()
+
+        self.network.run_recalc_fact_from_att_records_on_plan_approve = True
+        self.network.save()
+
+        dttm = datetime.combine(dt, time(16, 1))
+
+        TestRequestMock.responses["/transaction/listAttTransaction"] = {
+            1:{
+                "code": 0,
+                "message": "success",
+                "data": [
+                    {
+                        "id": "8a8080847322cd7f017323a7df9e0dc2",
+                        "eventTime": dttm.strftime('%Y-%m-%d %H:%M:%S'),
+                        "pin": "1",
+                        "name": "User",
+                        "lastName": "User",
+                        "deptName": "Area Name",
+                        "areaName": "Area Name",
+                        "devSn": "CGXH201360029",
+                        "verifyModeName": "15",
+                        "accZone": "1",
+                    },
+                ],
+            }
+        }
+
+        work_type_name = WorkTypeNameFactory()
+
+        WorkTypeFactory(shop=self.shop, work_type_name=work_type_name)
+        work_type = WorkTypeFactory(shop=self.shop2, work_type_name=work_type_name)
+
+        with patch('src.integration.zkteco.requests', new_callable=TestRequestMock):
+            import_urv_zkteco()
+        
+        self.assertEqual(AttendanceRecords.objects.count(), 1)
+        self.assertEqual(AttendanceRecords.objects.first().shop_id, self.shop.id)
+        
+        fact_wdays = WorkerDay.objects.filter(is_fact=True, employee=self.employee2, type_id=WorkerDay.TYPE_WORKDAY)
+        plan_wdays = WorkerDay.objects.filter(is_fact=False, employee=self.employee2, type_id=WorkerDay.TYPE_WORKDAY)
+
+        self.assertEqual(fact_wdays.count(), 2)
+
+        fact_wdays.delete()
+
+        self.assertEqual(fact_wdays.count(), 0)
+
+        # не обязательно, но для полноты картины
+        self.employment2.shop = self.shop2
+        self.employment2.save()
+
+        with patch.object(transaction, 'on_commit', lambda t: t()):
+
+            wday_data = {
+                'employee_id': self.employee2.id,
+                'employment_id': self.employment2.id,
+                'type': WorkerDay.TYPE_WORKDAY,
+                'is_fact': True,
+                'dttm_work_start': datetime.combine(dt, time(6)),
+                'dttm_work_end': datetime.combine(dt, time(16)),
+                'dt': dt,
+                'shop_id': self.shop2.id,
+                'worker_day_details': [
+                    {
+                        'work_type_id': work_type.id,
+                        'work_part': 1.0, 
+                    }
+                ],
+            }   
+
+            response = self.client.post(
+                self.get_url('WorkerDay-list'),
+                self.dump_data(wday_data),
+                content_type='application/json',
+            )
+            self.assertEqual(response.status_code, 201)
+
+            wd_fact = response.json()
+
+            wday_data['is_fact'] = False
+
+            response = self.client.post(
+                self.get_url('WorkerDay-list'),
+                self.dump_data(wday_data),
+                content_type='application/json',
+            )
+            self.assertEqual(response.status_code, 201)
+
+            self.assertEqual(fact_wdays.count(), 1)
+            self.assertEqual(plan_wdays.count(), 1)
+
+            approve_data = {
+                'dt_from': dt,
+                'dt_to': dt,
+                'shop_id': self.shop2.id,
+                'is_fact': False,
+            }
+            response = self.client.post(
+                self.get_url('WorkerDay-approve'),
+                self.dump_data(approve_data),
+                content_type='application/json',
+            )
+            self.assertEqual(response.status_code, 200)
+
+            self.assertEqual(plan_wdays.count(), 2)
+            self.assertEqual(fact_wdays.count(), 2)
+
+            approve_data['is_fact'] = True
+            response = self.client.post(
+                self.get_url('WorkerDay-approve'),
+                self.dump_data(approve_data),
+                content_type='application/json',
+            )
+            self.assertEqual(response.status_code, 200)
+
+            self.assertEqual(plan_wdays.count(), 2)
+            self.assertEqual(fact_wdays.count(), 2)
+            self.assertTrue(fact_wdays.filter(is_approved=True, id=wd_fact['id']).exists())
+            self.assertFalse(fact_wdays.filter(Q(dttm_work_start__isnull=True) | Q(dttm_work_end__isnull=True)).exists())

@@ -1,5 +1,6 @@
 from src.reports.views import ReportsViewSet
-from django.conf.urls import url, include
+from django.conf.urls import include
+from django.urls import re_path
 from rest_framework_nested import routers
 
 
@@ -8,5 +9,5 @@ router.register(r'report', ReportsViewSet, basename='Reports')
 
 
 urlpatterns = [
-    url(r'^', include(router.urls)),
+    re_path(r'^', include(router.urls)),
 ]

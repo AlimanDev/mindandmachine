@@ -41,8 +41,6 @@ from src.base.models import (
     Employment,
     User,
     Shop,
-    Event,
-    Notification,
     Employee,
 )
 from src.events.signals import event_signal
@@ -62,23 +60,6 @@ from src.timetable.models import (
     VacancyBlackList,
 )
 from src.timetable.work_type.utils import ShopEfficiencyGetter
-
-
-def create_event_and_notify(workers, **kwargs):
-    notification_list = []
-    event = Event.objects.create(
-        **kwargs,
-    )
-    for worker in workers:
-        notification_list.append(
-            Notification(
-                worker=worker,
-                event=event
-            )
-        )
-        print(f"Create notification for {worker}, {event}")
-    Notification.objects.bulk_create(notification_list)
-
 
 def search_candidates(vacancy, **kwargs):
     """
@@ -386,12 +367,6 @@ def do_shift_elongation(vacancy, max_working_hours):
             f'{worker_day.dt}, prev {prev_dttm_start}-{prev_dttm_end}, '
             f'new {wd.dttm_work_start}-{wd.dttm_work_end}, '
             f'worker {candidate.user.first_name} {candidate.user.last_name} '
-        )
-        create_event_and_notify(
-            [candidate.user], 
-            shop=shop,
-            type='shift_elongation',
-            params={'worker_day':wd},
         )
         if (worker_day.shop.email):
             message = f'Это автоматическое уведомление для {worker_day.shop.name} об изменениях в графике:\n\n' + \
@@ -749,7 +724,6 @@ def confirm_vacancy(vacancy_id, user=None, employee_id=None, exchange=False, rec
                     # вызывать cancel_vacancy + поправить внутри логику?
                     cancel_vacancy(vacancy.id, auto=False, delete=False)
 
-
                 vacancy.employee = active_employment.employee
                 vacancy.employment = active_employment
                 vacancy.save(
@@ -800,7 +774,6 @@ def confirm_vacancy(vacancy_id, user=None, employee_id=None, exchange=False, rec
                 except WorkTimeOverlap:
                     pass
 
-                Event.objects.filter(worker_day=vacancy).delete()
                 res['text'] = messages['vacancy_success']
 
                 WorkerDay.check_work_time_overlap(
@@ -1101,12 +1074,6 @@ def holiday_workers_exchange():
                     f'worker {candidate.user.first_name} {candidate.user.last_name}, '
                 )
                 confirm_vacancy(vacancy.id, candidate.user, employee_id=candidate.id)
-                create_event_and_notify(
-                    [candidate.user], 
-                    type='holiday_exchange', 
-                    shop=shop, 
-                    params={'worker_day': vacancy, 'shop': shop}
-                )
 
 
 def worker_shift_elongation():
@@ -1250,12 +1217,6 @@ def workers_exchange():
                         }
                         #не удаляем candidate_to_change потому что создаем неподтвержденную вакансию
                         print(confirm_vacancy(vacancy.id, user, employee_id=candidate_to_change.worker_day.employee_id, exchange=True))
-                        create_event_and_notify(
-                            [user],
-                            type='auto_vacancy', 
-                            shop=shop_to, 
-                            params={'shop': shop_to, 'vacancy': vacancy}
-                        )
 
                         if shop_to.email:
                             message = f'Это автоматическое уведомление для {shop_to.name} об изменениях в графике:\n\n' + \

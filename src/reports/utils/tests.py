@@ -407,7 +407,7 @@ class TestUnaccountedOvertime(APITestCase):
 
     def test_unaccounted_overtimes(self):
         data = get_unaccounted_overtimes(self.network.id, dt_from=self.dt, dt_to=self.dt)
-        self.assertEquals(data.count(), 2)
+        self.assertEqual(data.count(), 2)
         assert_data = [
             {
                 'employee_id': self.employment2.employee_id,
@@ -418,7 +418,7 @@ class TestUnaccountedOvertime(APITestCase):
                 'overtime': 3600 + 1800,
             }
         ]
-        self.assertEquals(list(data.values('employee_id', 'overtime')), assert_data)
+        self.assertEqual(list(data.values('employee_id', 'overtime')), assert_data)
 
     def test_unaccounted_overtimes_xlsx(self):
         data = unaccounted_overtimes_xlsx(self.network.id, dt_from=self.dt, dt_to=self.dt, in_memory=True)
@@ -441,8 +441,8 @@ class TestUnaccountedOvertime(APITestCase):
             'ФИО': self.employment4.employee.user.get_fio(), 
             'Неучтенные переработки': 'более 1 часа'
         }
-        self.assertEquals(dict(df.iloc[0]), data1)
-        self.assertEquals(dict(df.iloc[1]), data2)
+        self.assertEqual(dict(df.iloc[0]), data1)
+        self.assertEqual(dict(df.iloc[1]), data2)
 
 
 class TestOvertimesUndertimes(APITestCase):
@@ -528,7 +528,7 @@ class TestOvertimesUndertimes(APITestCase):
         data = overtimes_undertimes(period_step=period_step)
         self.network.accounting_period_length = period_step
         dt_from, dt_to = self.network.get_acc_period_range(date.today())
-        self.assertEquals(data['months'], [(dt_from + relativedelta(months=i)).month for i in range(period_step)])
+        self.assertEqual(data['months'], [(dt_from + relativedelta(months=i)).month for i in range(period_step)])
         self.assertCountEqual(list(data['data'].values())[0].keys(), [(dt_from + relativedelta(months=i)).month for i in range(period_step)] + ['plan_sum', 'fact_sum', 'norm_sum'])
         return data
 
@@ -536,7 +536,7 @@ class TestOvertimesUndertimes(APITestCase):
         data = overtimes_undertimes_xlsx(period_step=period_step, in_memory=True)
         df = pd.read_excel(data['file'])
         df.fillna('', inplace=True)
-        self.assertEquals(len(df.columns[6:]), period_step * 5)
+        self.assertEqual(len(df.columns[6:]), period_step * 5)
         return df
 
     def _get_norm_for_month(self, date):
@@ -584,22 +584,22 @@ class TestOvertimesUndertimes(APITestCase):
         plan_sum = self._get_norm_for_period(*self.network.get_acc_period_range(date.today()))
         plan = self._get_norm_for_month(date.today())
         self.assertCountEqual(data['employees'], Employee.objects.all())
-        self.assertEquals(data['data'][self.employee1.id]['plan_sum'], 5.5)
-        self.assertEquals(data['data'][self.employee1.id]['fact_sum'], 5.5)
-        self.assertEquals(data['data'][self.employee1.id]['norm_sum'], plan_sum)
-        self.assertEquals(data['data'][self.employee1.id][date.today().month], {'plan': 5.5, 'fact': 5.5, 'norm': plan, 'fact_celebration': 0.0, 'norm_celebration': 0.0})
-        self.assertEquals(data['data'][self.employee2.id]['plan_sum'], 10.8)
-        self.assertEquals(data['data'][self.employee2.id]['fact_sum'], 13.8)
-        self.assertEquals(data['data'][self.employee2.id]['norm_sum'], plan_sum)
-        self.assertEquals(data['data'][self.employee2.id][date.today().month], {'plan': 10.8, 'fact': 13.8, 'norm': plan, 'fact_celebration': 0.0, 'norm_celebration': 0.0})
-        self.assertEquals(data['data'][self.employee3.id]['plan_sum'], 10.8)
-        self.assertEquals(data['data'][self.employee3.id]['fact_sum'], 10.8)
-        self.assertEquals(data['data'][self.employee3.id]['norm_sum'], plan_sum)
-        self.assertEquals(data['data'][self.employee3.id][date.today().month], {'plan': 10.8, 'fact': 10.8, 'norm': plan, 'fact_celebration': 0.0, 'norm_celebration': 0.0})
-        self.assertEquals(data['data'][self.employee4.id]['plan_sum'], 10.8)
-        self.assertEquals(data['data'][self.employee4.id]['fact_sum'], 12.3)
-        self.assertEquals(data['data'][self.employee4.id]['norm_sum'], plan_sum)
-        self.assertEquals(data['data'][self.employee4.id][date.today().month], {'plan': 10.8, 'fact': 12.3, 'norm': plan, 'fact_celebration': 0.0, 'norm_celebration': 0.0})
+        self.assertEqual(data['data'][self.employee1.id]['plan_sum'], 5.5)
+        self.assertEqual(data['data'][self.employee1.id]['fact_sum'], 5.5)
+        self.assertEqual(data['data'][self.employee1.id]['norm_sum'], plan_sum)
+        self.assertEqual(data['data'][self.employee1.id][date.today().month], {'plan': 5.5, 'fact': 5.5, 'norm': plan, 'fact_celebration': 0.0, 'norm_celebration': 0.0})
+        self.assertEqual(data['data'][self.employee2.id]['plan_sum'], 10.8)
+        self.assertEqual(data['data'][self.employee2.id]['fact_sum'], 13.8)
+        self.assertEqual(data['data'][self.employee2.id]['norm_sum'], plan_sum)
+        self.assertEqual(data['data'][self.employee2.id][date.today().month], {'plan': 10.8, 'fact': 13.8, 'norm': plan, 'fact_celebration': 0.0, 'norm_celebration': 0.0})
+        self.assertEqual(data['data'][self.employee3.id]['plan_sum'], 10.8)
+        self.assertEqual(data['data'][self.employee3.id]['fact_sum'], 10.8)
+        self.assertEqual(data['data'][self.employee3.id]['norm_sum'], plan_sum)
+        self.assertEqual(data['data'][self.employee3.id][date.today().month], {'plan': 10.8, 'fact': 10.8, 'norm': plan, 'fact_celebration': 0.0, 'norm_celebration': 0.0})
+        self.assertEqual(data['data'][self.employee4.id]['plan_sum'], 10.8)
+        self.assertEqual(data['data'][self.employee4.id]['fact_sum'], 12.3)
+        self.assertEqual(data['data'][self.employee4.id]['norm_sum'], plan_sum)
+        self.assertEqual(data['data'][self.employee4.id][date.today().month], {'plan': 10.8, 'fact': 12.3, 'norm': plan, 'fact_celebration': 0.0, 'norm_celebration': 0.0})
         self._test_accounting_period(1)
         self._test_accounting_period(6)
         self._test_accounting_period(12)
@@ -614,14 +614,14 @@ class TestOvertimesUndertimes(APITestCase):
             is_fact=True,
         )
         data = self._test_accounting_period(12)
-        self.assertEquals(data['data'][self.employee1.id]['plan_sum'], 5.5)
-        self.assertEquals(data['data'][self.employee1.id]['fact_sum'], 10.4) # может падать 1 января
+        self.assertEqual(data['data'][self.employee1.id]['plan_sum'], 5.5)
+        self.assertEqual(data['data'][self.employee1.id]['fact_sum'], 10.4) # может падать 1 января
         ProductionDay.objects.filter(dt=self.dt - timedelta(1)).update(is_celebration=True)
         data = self._test_accounting_period(12)
-        self.assertEquals(data['data'][self.employee1.id]['plan_sum'], 5.5)
-        self.assertEquals(data['data'][self.employee1.id]['fact_sum'], 5.5)
+        self.assertEqual(data['data'][self.employee1.id]['plan_sum'], 5.5)
+        self.assertEqual(data['data'][self.employee1.id]['fact_sum'], 5.5)
         month = date.today().month if not date.today().day == 1 else date.today().month - 1
-        self.assertEquals(data['data'][self.employee1.id][month]['fact_celebration'], 4.9)
+        self.assertEqual(data['data'][self.employee1.id][month]['fact_celebration'], 4.9)
 
     def test_overtimes_undertimes_xlsx(self):
         self.maxDiff = None
@@ -774,10 +774,10 @@ class TestPivotTabel(APITestCase):
         pt = PlanAndFactPivotTabel()
         table = pt.get_pivot_file(dt__gte=self.dt, dt__lte=self.dt + timedelta(1))
         df = pd.read_excel(table)
-        self.assertEquals(len(df.columns), 8)
-        self.assertEquals(len(df.values), 5)
-        self.assertEquals(list(df.iloc[0, 5:].values), [13.75, 0.00, 13.75])
-        self.assertEquals(list(df.iloc[1, 5:].values), [10.75, 0.00, 10.75])
-        self.assertEquals(list(df.iloc[2, 5:].values), [0.00, 12.25, 12.25])
-        self.assertEquals(list(df.iloc[3, 5:].values), [5.50, 0.00, 5.50])
-        self.assertEquals(list(df.iloc[4, 5:].values), [30.00, 12.25, 42.25])
+        self.assertEqual(len(df.columns), 8)
+        self.assertEqual(len(df.values), 5)
+        self.assertEqual(list(df.iloc[0, 5:].values), [13.75, 0.00, 13.75])
+        self.assertEqual(list(df.iloc[1, 5:].values), [10.75, 0.00, 10.75])
+        self.assertEqual(list(df.iloc[2, 5:].values), [0.00, 12.25, 12.25])
+        self.assertEqual(list(df.iloc[3, 5:].values), [5.50, 0.00, 5.50])
+        self.assertEqual(list(df.iloc[4, 5:].values), [30.00, 12.25, 42.25])

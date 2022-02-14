@@ -5,7 +5,7 @@ from django_filters.rest_framework import FilterSet
 from django_filters import DateFilter, NumberFilter
 from src.util.utils import JsonResponse
 from src.base.permissions import FilteredListPermission
-from src.forecast.models import OperationType, OperationTypeName, PeriodClients, PeriodDemandChangeLog
+from src.forecast.models import OperationType, OperationTypeName, PeriodClients
 from django.db.models import Q, F, Sum
 from src.conf.djconfig import QOS_DATETIME_FORMAT, QOS_DATE_FORMAT
 from rest_framework.decorators import action
@@ -303,14 +303,6 @@ class PeriodClientsViewSet(BaseModelViewSet):
                     tm_to=dttm_to.time(),
                     lang=request.user.lang,
                 )
-        for x in changed_operation_type_ids:
-            PeriodDemandChangeLog.objects.create(
-                dttm_from=dttm_from,
-                dttm_to=dttm_to,
-                operation_type_id=x,
-                multiply_coef=multiply_coef,
-                set_value=set_value
-            )
 
         return Response(status=200)
 

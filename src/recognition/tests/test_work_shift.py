@@ -108,7 +108,6 @@ class TestWorkShiftViewSet(TestsHelperMixin, APITestCase):
         )
         self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
 
-
     def test_no_active_employee(self):
         self._authorize_tick_point()
         resp = self.client.get(
@@ -245,6 +244,7 @@ class TestWorkShiftViewSet(TestsHelperMixin, APITestCase):
                 'rebuild_timetable_min_delta': 2,
                 'show_remaking_choice': False,
                 'analytics_iframe': '',
+                'analytics_type': 'metabase',
                 'show_employee_shift_schedule_tab': False,
                 'url': None,
                 'shop_name_form': {
@@ -396,6 +396,7 @@ class TestWorkShiftViewSet(TestsHelperMixin, APITestCase):
                 'rebuild_timetable_min_delta': 2,
                 'show_remaking_choice': False,
                 'analytics_iframe': '',
+                'analytics_type': 'metabase',
                 'show_employee_shift_schedule_tab': False,
                 'url': None,
                 'shop_name_form': {
@@ -553,6 +554,7 @@ class TestWorkShiftViewSet(TestsHelperMixin, APITestCase):
                 'rebuild_timetable_min_delta': 2,
                 'show_remaking_choice': False,
                 'analytics_iframe': '',
+                'analytics_type': 'metabase',
                 'show_employee_shift_schedule_tab': False,
                 'url': None,
                 'shop_name_form': {

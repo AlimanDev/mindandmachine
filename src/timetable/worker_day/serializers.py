@@ -3,6 +3,7 @@ from datetime import timedelta
 import pandas as pd
 from django.db import transaction
 from django.db.models import Q
+from django.db.models.expressions import RawSQL
 from django.utils.functional import cached_property
 from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
@@ -12,7 +13,7 @@ from src.base.exceptions import FieldError
 from src.base.models import Employment, User, Shop, Employee, Network
 from src.base.models import NetworkConnect
 from src.base.serializers import ModelSerializerWithCreateOnlyFields, NetworkListSerializer, UserShorSerializer, NetworkSerializer
-from src.base.shop.serializers import ShopListSerializer, ShopSerializer
+from src.base.shop.serializers import ShopListSerializer
 from src.conf.djconfig import QOS_DATE_FORMAT
 from src.timetable.models import (
     WorkerDay,
@@ -78,6 +79,11 @@ class WorkerDayCashboxDetailsSerializer(serializers.ModelSerializer):
         model = WorkerDayCashboxDetails
         fields = ['id', 'work_type_id', 'work_part']
 
+    def __init__(self, *args, **kwargs):
+        super(WorkerDayCashboxDetailsSerializer, self).__init__(*args, **kwargs)
+        if self.context.get('batch'):
+            self.fields['id'].read_only = False
+
 
 class WorkerDayCashboxDetailsListSerializer(serializers.Serializer):
     id = serializers.IntegerField()
@@ -140,7 +146,6 @@ class WorkerDaySerializer(ModelSerializerWithCreateOnlyFields, UnaccountedOverti
         "no_such_shop_in_network": _("There is no such shop in your network."),
     }
 
-    worker_day_details = WorkerDayCashboxDetailsSerializer(many=True, required=False)
     employee_id = serializers.IntegerField(required=False, allow_null=True)
     employment_id = serializers.IntegerField(required=False, allow_null=True)
     shop_id = serializers.IntegerField(required=False)
@@ -185,6 +190,11 @@ class WorkerDaySerializer(ModelSerializerWithCreateOnlyFields, UnaccountedOverti
             },
         }
 
+    def get_fields(self, *args, **kwargs):
+        fields = super(WorkerDaySerializer, self).get_fields(*args, **kwargs)
+        fields['worker_day_details'] = WorkerDayCashboxDetailsSerializer(many=True, required=False, context=self.context)
+        return fields
+
     @cached_property
     def wd_types_dict(self):
         """
@@ -221,6 +231,10 @@ class WorkerDaySerializer(ModelSerializerWithCreateOnlyFields, UnaccountedOverti
 
         if not wd_type_obj.is_work_hours:
             attrs['is_vacancy'] = False
+
+        # рефакторинг
+        if not (wd_type_obj.is_work_hours and wd_type_obj.is_dayoff):
+            attrs.pop('work_hours', None)
 
         shop_id = attrs.get('shop_id')
         if wd_type_obj.is_dayoff:
@@ -263,7 +277,7 @@ class WorkerDaySerializer(ModelSerializerWithCreateOnlyFields, UnaccountedOverti
                 self.fail('no_user', amount=len(users), username=username)
 
         if not wd_type == WorkerDay.TYPE_WORKDAY:
-            attrs.pop('worker_day_details', None)
+            attrs['worker_day_details'] = []
             attrs['is_vacancy'] = False
             attrs['is_outsource'] = False
         elif not (attrs.get('worker_day_details')):
@@ -319,6 +333,13 @@ class WorkerDaySerializer(ModelSerializerWithCreateOnlyFields, UnaccountedOverti
                     dttm_work_start=attrs['dttm_work_start'],
                     dttm_work_end=attrs['dttm_work_end'],
                     delta_in_secs=self.context['request'].user.network.set_closest_plan_approved_delta_for_manual_fact,
+                ).annotate(
+                    order_by_val=RawSQL("""LEAST(
+                        ABS(EXTRACT(EPOCH FROM (%s - "timetable_workerday"."dttm_work_start"))),
+                        ABS(EXTRACT(EPOCH FROM (%s - "timetable_workerday"."dttm_work_end")))
+                    )""", [attrs['dttm_work_start'], attrs['dttm_work_end']])
+                ).order_by(
+                    'order_by_val',
                 ).only('id').first()
                 if closest_plan_approved:
                     attrs['closest_plan_approved_id'] = closest_plan_approved.id
@@ -728,6 +749,7 @@ class OvertimesUndertimesReportSerializer(serializers.Serializer):
             raise ValidationError(_('Shop or employees should be defined.'))
         if self.validated_data.get('employee_id__in'):
             self.validated_data['employee_id__in'] = self.validated_data['employee_id__in'].split(',')
+
 
 class ConfirmVacancyToWorkerSerializer(serializers.Serializer):
     default_error_messages = {

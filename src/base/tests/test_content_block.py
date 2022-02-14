@@ -31,9 +31,9 @@ class TestContentBlock(TestsHelperMixin, APITestCase):
         )
         response = self.client.get(f"{self.get_url('ContentBlock-list')}?code=support_modal_text")
         resp = response.json()
-        self.assertEquals(len(resp), 1)
-        self.assertEquals(resp[0]['code'], content_block.code)
-        self.assertEquals(
+        self.assertEqual(len(resp), 1)
+        self.assertEqual(resp[0]['code'], content_block.code)
+        self.assertEqual(
             resp[0]['body'], 
             ('<p>Напишите о проблеме нам на почту <a href="mailto:support@mindandmachine.ru">support@mindandmachine.ru</a>.'
             '<br> Расскажите о ней подробно:'

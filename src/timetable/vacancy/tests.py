@@ -396,12 +396,12 @@ class TestAutoWorkerExchange(APITestCase):
             )
 
     def _assert_vacancy_created_notifications_created(self, assert_count):
-        self.assertEquals(EventHistory.objects.filter(event_type=self.created_event).count(), assert_count)
-        self.assertEquals(len(mail.outbox), assert_count)
+        self.assertEqual(EventHistory.objects.filter(event_type=self.created_event).count(), assert_count)
+        self.assertEqual(len(mail.outbox), assert_count)
 
     def _assert_vacancy_deleted_notifications_created(self, assert_count):
-        self.assertEquals(EventHistory.objects.filter(event_type=self.deleted_event).count(), assert_count)
-        self.assertEquals(len(mail.outbox), assert_count)
+        self.assertEqual(EventHistory.objects.filter(event_type=self.deleted_event).count(), assert_count)
+        self.assertEqual(len(mail.outbox), assert_count)
 
     # Создали прогноз PeriodClients -> нужен 1 человек (1 вакансия), а у нас их 2 -> удаляем 1 вакансию
     def test_cancel_vacancies(self):
@@ -696,15 +696,15 @@ class TestAutoWorkerExchange(APITestCase):
         len_vacancies = len(WorkerDay.objects.filter(is_vacancy=True))
         self.assertEqual(len_vacancies, 0)
         create_vacancies_and_notify(self.shop.id, self.work_type1.id)
-        self.assertEquals(mail.outbox[0].subject, self.event_email_notification_vacancy_created.subject)
-        self.assertEquals(mail.outbox[0].to[0], self.user_dir.email)
+        self.assertEqual(mail.outbox[0].subject, self.event_email_notification_vacancy_created.subject)
+        self.assertEqual(mail.outbox[0].to[0], self.user_dir.email)
         shop_name = self.shop.name
         dt = self.dt_now
         dttm_from = datetime.datetime.combine(self.dt_now, datetime.time(9, 0))
         dttm_to = dttm_from.replace(hour=21, minute=0, second=0, microsecond=0).strftime('%Y-%m-%d %H:%M:%S')
         dttm_from = dttm_from.strftime('%Y-%m-%d %H:%M:%S')
         work_type = self.work_type1.work_type_name.name
-        self.assertEquals(
+        self.assertEqual(
             mail.outbox[0].body, 
             f'Здравствуйте, {self.user_dir.first_name}!\n\n\n\n\n\n\nВ подразделении {shop_name} автоматически создана вакансия для типа работ {work_type}\n'
             f'Дата: {dt}\nВремя с {dttm_from} по {dttm_to}\n\n\n\n\n\nПисьмо отправлено роботом. Подробности можно узнать по ссылке'
@@ -718,14 +718,14 @@ class TestAutoWorkerExchange(APITestCase):
         self.assertEqual(vacancies.count(), 2)
         cancel_vacancies(self.shop.id, self.work_type1.id, approved=True)
         self.assertEqual(vacancies.count(), 1)
-        self.assertEquals(mail.outbox[0].subject, self.event_email_notification_vacancy_deleted.subject)
-        self.assertEquals(mail.outbox[0].to[0], self.user_dir.email)
+        self.assertEqual(mail.outbox[0].subject, self.event_email_notification_vacancy_deleted.subject)
+        self.assertEqual(mail.outbox[0].to[0], self.user_dir.email)
         shop_name = self.shop.name
         dt = self.dt_now
         dttm_from = datetime.datetime.combine(self.dt_now, datetime.time(9, 0))
         dttm_to = dttm_from.replace(hour=20, minute=0, second=0, microsecond=0).strftime('%Y-%m-%d %H:%M:%S')
         dttm_from = dttm_from.strftime('%Y-%m-%d %H:%M:%S')
-        self.assertEquals(
+        self.assertEqual(
             mail.outbox[0].body, 
             f'Здравствуйте, {self.user_dir.first_name}!\n\n\n\n\n\n\nВ подразделении {shop_name} отменена вакансия без сотрудника \n'
             f'Дата: {dt}\nВремя с {dttm_from} по {dttm_to}\n\n\n\n\n\nПисьмо отправлено роботом. Подробности можно узнать по ссылке'
@@ -748,14 +748,14 @@ class TestAutoWorkerExchange(APITestCase):
         self.assertEqual(vacancies.count(), 2)
         cancel_vacancies(self.shop.id, self.work_type1.id, approved=True)
         wd = WorkerDay.objects.filter(employee_id=employments[0].employee_id, is_approved=True, source=WorkerDay.SOURCE_ON_CANCEL_VACANCY).first()
-        self.assertEquals(wd.type_id, WorkerDay.TYPE_HOLIDAY)
+        self.assertEqual(wd.type_id, WorkerDay.TYPE_HOLIDAY)
         self.assertFalse(wd.is_vacancy)
         self.assertEqual(vacancies.count(), 1)
         self.assertEqual(len(mail.outbox), 2)
-        self.assertEquals(mail.outbox[0].subject, self.event_email_notification_employee_vacancy_deleted.subject)
-        self.assertEquals(mail.outbox[0].to[0], employments[0].employee.user.email)
-        self.assertEquals(mail.outbox[1].subject, self.event_email_notification_vacancy_deleted.subject)
-        self.assertEquals(mail.outbox[1].to[0], self.user_dir.email)
+        self.assertEqual(mail.outbox[0].subject, self.event_email_notification_employee_vacancy_deleted.subject)
+        self.assertEqual(mail.outbox[0].to[0], employments[0].employee.user.email)
+        self.assertEqual(mail.outbox[1].subject, self.event_email_notification_vacancy_deleted.subject)
+        self.assertEqual(mail.outbox[1].to[0], self.user_dir.email)
         shop_name = self.shop.name
         dt = self.dt_now
         dttm_from = datetime.datetime.combine(self.dt_now, datetime.time(9, 0))
@@ -763,12 +763,12 @@ class TestAutoWorkerExchange(APITestCase):
         dttm_from = dttm_from.strftime('%Y-%m-%d %H:%M:%S')
         user = employments[0].employee.user
         user = f'{user.last_name} {user.first_name}'
-        self.assertEquals(
+        self.assertEqual(
             mail.outbox[0].body, 
             f'Здравствуйте, {employments[0].employee.user.first_name}!\n\n\n\n\n\n\nУ вас была автоматически отменена вакансия в подразделении {shop_name}.\n'
             f'Дата: {dt}\nВремя работы с {dttm_from} по {dttm_to}\n\n\n\n\n\nПисьмо отправлено роботом. Подробности можно узнать по ссылке'
         )
-        self.assertEquals(
+        self.assertEqual(
             mail.outbox[1].body, 
             f'Здравствуйте, {self.user_dir.first_name}!\n\n\n\n\n\n\nВ подразделении {shop_name} отменена вакансия у сотрудника {user} без табельного номера \n'
             f'Дата: {dt}\nВремя с {dttm_from} по {dttm_to}\n\n\n\n\n\nПисьмо отправлено роботом. Подробности можно узнать по ссылке'
@@ -781,7 +781,7 @@ class TestAutoWorkerExchange(APITestCase):
         create_vacancies_and_notify(self.shop.id, self.work_type1.id)
         worker_day = WorkerDay.objects.filter(is_vacancy=True).first()
         self.assertFalse(worker_day.is_outsource)
-        self.assertEquals(len(worker_day.outsources.all()), 0)
+        self.assertEqual(len(worker_day.outsources.all()), 0)
 
     def test_create_vacancy_with_outsource(self):
         network_outource1 = Network.objects.create(
@@ -797,7 +797,7 @@ class TestAutoWorkerExchange(APITestCase):
         create_vacancies_and_notify(self.shop.id, self.work_type1.id)
         worker_day = WorkerDay.objects.filter(is_vacancy=True).first()
         self.assertTrue(worker_day.is_outsource)
-        self.assertEquals(len(worker_day.outsources.all()), 2)
+        self.assertEqual(len(worker_day.outsources.all()), 2)
 
     def test_create_vacancy_on_approve(self):
         self.create_period_clients(1, self.operation_type)
@@ -820,7 +820,7 @@ class TestAutoWorkerExchange(APITestCase):
             }
             response = self.client.post("/rest_api/worker_day/approve/", data, format='json')
 
-            self.assertEquals(response.status_code, 200)
+            self.assertEqual(response.status_code, 200)
             vacancies = WorkerDay.objects.filter(is_vacancy=True).order_by('dttm_work_start')
             self.assertEqual([vacancies[0].dttm_work_start.time(), vacancies[0].dttm_work_end.time()],
                             [datetime.time(9, 0), datetime.time(21, 0)])
@@ -832,16 +832,16 @@ class TestAutoWorkerExchange(APITestCase):
         len_vacancies = len(WorkerDay.objects.filter(is_vacancy=True))
         self.assertEqual(len_vacancies, 0)
         create_vacancies_and_notify(self.shop.id, self.work_type1.id)
-        self.assertEquals(WorkerDay.objects.filter(is_vacancy=True).count(), 2)
+        self.assertEqual(WorkerDay.objects.filter(is_vacancy=True).count(), 2)
         vacancy = WorkerDay.objects.filter(is_vacancy=True).first()
         self.client.force_authenticate(user=self.user_admin)
         response = self.client.delete(f"/rest_api/worker_day/{vacancy.id}/")
-        self.assertEquals(response.status_code, 204)
-        self.assertEquals(WorkerDay.objects.filter(is_vacancy=True).count(), 2)
-        self.assertEquals(WorkerDay.objects.filter(is_vacancy=True, canceled=True).first().id, vacancy.id)
+        self.assertEqual(response.status_code, 204)
+        self.assertEqual(WorkerDay.objects.filter(is_vacancy=True).count(), 2)
+        self.assertEqual(WorkerDay.objects.filter(is_vacancy=True, canceled=True).first().id, vacancy.id)
         create_vacancies_and_notify(self.shop.id, self.work_type1.id)
-        self.assertEquals(WorkerDay.objects.filter(is_vacancy=True).count(), 2)
-        self.assertEquals(WorkerDay.objects.filter(is_vacancy=True, canceled=True).first().id, vacancy.id)
+        self.assertEqual(WorkerDay.objects.filter(is_vacancy=True).count(), 2)
+        self.assertEqual(WorkerDay.objects.filter(is_vacancy=True, canceled=True).first().id, vacancy.id)
 
     def test_cancel_vacancy_and_create_with_employee(self):
         self.create_users(1)
@@ -849,7 +849,7 @@ class TestAutoWorkerExchange(APITestCase):
         len_vacancies = len(WorkerDay.objects.filter(is_vacancy=True))
         self.assertEqual(len_vacancies, 0)
         create_vacancies_and_notify(self.shop.id, self.work_type1.id)
-        self.assertEquals(WorkerDay.objects.filter(is_vacancy=True).count(), 2)
+        self.assertEqual(WorkerDay.objects.filter(is_vacancy=True).count(), 2)
         employment = self.employment_qs.first()
         vacancy = WorkerDay.objects.filter(is_vacancy=True).first()
         vacancy.employee_id = employment.employee_id
@@ -857,43 +857,43 @@ class TestAutoWorkerExchange(APITestCase):
         vacancy.save()
         self.client.force_authenticate(user=self.user_admin)
         response = self.client.delete(f"/rest_api/worker_day/{vacancy.id}/")
-        self.assertEquals(response.status_code, 204)
-        self.assertEquals(WorkerDay.objects.filter(is_vacancy=True).count(), 2)
-        self.assertEquals(WorkerDay.objects.filter(is_vacancy=True, canceled=True).first().id, vacancy.id)
+        self.assertEqual(response.status_code, 204)
+        self.assertEqual(WorkerDay.objects.filter(is_vacancy=True).count(), 2)
+        self.assertEqual(WorkerDay.objects.filter(is_vacancy=True, canceled=True).first().id, vacancy.id)
         wd = WorkerDay.objects.filter(employee_id=employment.employee_id, is_approved=True).first()
-        self.assertEquals(wd.type_id, WorkerDay.TYPE_HOLIDAY)
+        self.assertEqual(wd.type_id, WorkerDay.TYPE_HOLIDAY)
         self.assertFalse(wd.is_vacancy)
-        self.assertNotEquals(wd.id, vacancy.id)
+        self.assertNotEqual(wd.id, vacancy.id)
         self.assertEqual(len(mail.outbox), 3)
-        self.assertEquals(mail.outbox[2].subject, self.event_email_notification_employee_vacancy_deleted.subject)
-        self.assertEquals(mail.outbox[2].to[0], employment.employee.user.email)
+        self.assertEqual(mail.outbox[2].subject, self.event_email_notification_employee_vacancy_deleted.subject)
+        self.assertEqual(mail.outbox[2].to[0], employment.employee.user.email)
         shop_name = self.shop.name
         dt = self.dt_now
         dttm_from = datetime.datetime.combine(self.dt_now, datetime.time(9, 0))
         dttm_to = dttm_from.replace(hour=21, minute=0, second=0, microsecond=0).strftime('%Y-%m-%d %H:%M:%S')
         dttm_from = dttm_from.strftime('%Y-%m-%d %H:%M:%S')
         user = employment.employee.user
-        self.assertEquals(
+        self.assertEqual(
             mail.outbox[2].body, 
             f'Здравствуйте, {user.first_name}!\n\n\n\n\n\n\nУ вас была отменена вакансия в подразделении {shop_name}.\n'
             f'Дата: {dt}\nВремя работы с {dttm_from} по {dttm_to}\n\n\n\n\n\nПисьмо отправлено роботом. Подробности можно узнать по ссылке'
         )
         create_vacancies_and_notify(self.shop.id, self.work_type1.id)
-        self.assertEquals(WorkerDay.objects.filter(is_vacancy=True).count(), 2)
-        self.assertEquals(WorkerDay.objects.filter(is_vacancy=True, canceled=True).first().id, vacancy.id)
+        self.assertEqual(WorkerDay.objects.filter(is_vacancy=True).count(), 2)
+        self.assertEqual(WorkerDay.objects.filter(is_vacancy=True, canceled=True).first().id, vacancy.id)
 
     def test_cancel_vacancy_and_create_via_api(self):
         self.create_period_clients(2, self.operation_type)
         len_vacancies = len(WorkerDay.objects.filter(is_vacancy=True))
         self.assertEqual(len_vacancies, 0)
         create_vacancies_and_notify(self.shop.id, self.work_type1.id)
-        self.assertEquals(WorkerDay.objects.filter(is_vacancy=True).count(), 2)
+        self.assertEqual(WorkerDay.objects.filter(is_vacancy=True).count(), 2)
         vacancy = WorkerDay.objects.filter(is_vacancy=True).first()
         self.client.force_authenticate(user=self.user_admin)
         response = self.client.delete(f"/rest_api/worker_day/{vacancy.id}/")
-        self.assertEquals(response.status_code, 204)
-        self.assertEquals(WorkerDay.objects.filter(is_vacancy=True).count(), 2)
-        self.assertEquals(WorkerDay.objects.filter(is_vacancy=True, canceled=True).first().id, vacancy.id)
+        self.assertEqual(response.status_code, 204)
+        self.assertEqual(WorkerDay.objects.filter(is_vacancy=True).count(), 2)
+        self.assertEqual(WorkerDay.objects.filter(is_vacancy=True, canceled=True).first().id, vacancy.id)
         response = self.client.post(
             '/rest_api/worker_day/',
             data={
@@ -913,25 +913,25 @@ class TestAutoWorkerExchange(APITestCase):
             },
             format='json'
         )
-        self.assertEquals(response.status_code, 201)
-        self.assertEquals(response.json()['id'], vacancy.id)
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.json()['id'], vacancy.id)
         vacancy.refresh_from_db()
-        self.assertEquals(vacancy.dttm_work_start, datetime.datetime.combine(self.dt_now, datetime.time(10, 0)))
-        self.assertEquals(WorkerDay.objects.filter(is_vacancy=True).count(), 2)
-        self.assertEquals(WorkerDay.objects.filter(is_vacancy=True, canceled=True).count(), 0)
+        self.assertEqual(vacancy.dttm_work_start, datetime.datetime.combine(self.dt_now, datetime.time(10, 0)))
+        self.assertEqual(WorkerDay.objects.filter(is_vacancy=True).count(), 2)
+        self.assertEqual(WorkerDay.objects.filter(is_vacancy=True, canceled=True).count(), 0)
 
     def test_cancel_vacancy_and_create_via_api_another_work_type(self):
         self.create_period_clients(2, self.operation_type)
         len_vacancies = len(WorkerDay.objects.filter(is_vacancy=True))
         self.assertEqual(len_vacancies, 0)
         create_vacancies_and_notify(self.shop.id, self.work_type1.id)
-        self.assertEquals(WorkerDay.objects.filter(is_vacancy=True).count(), 2)
+        self.assertEqual(WorkerDay.objects.filter(is_vacancy=True).count(), 2)
         vacancy = WorkerDay.objects.filter(is_vacancy=True).first()
         self.client.force_authenticate(user=self.user_admin)
         response = self.client.delete(f"/rest_api/worker_day/{vacancy.id}/")
-        self.assertEquals(response.status_code, 204)
-        self.assertEquals(WorkerDay.objects.filter(is_vacancy=True).count(), 2)
-        self.assertEquals(WorkerDay.objects.filter(is_vacancy=True, canceled=True).first().id, vacancy.id)
+        self.assertEqual(response.status_code, 204)
+        self.assertEqual(WorkerDay.objects.filter(is_vacancy=True).count(), 2)
+        self.assertEqual(WorkerDay.objects.filter(is_vacancy=True, canceled=True).first().id, vacancy.id)
         response = self.client.post(
             '/rest_api/worker_day/',
             data={
@@ -951,25 +951,25 @@ class TestAutoWorkerExchange(APITestCase):
             },
             format='json'
         )
-        self.assertEquals(response.status_code, 201)
-        self.assertEquals(WorkerDay.objects.filter(is_vacancy=True).count(), 3)
-        self.assertEquals(WorkerDay.objects.filter(is_vacancy=True, canceled=True).first().id, vacancy.id)
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(WorkerDay.objects.filter(is_vacancy=True).count(), 3)
+        self.assertEqual(WorkerDay.objects.filter(is_vacancy=True, canceled=True).first().id, vacancy.id)
 
     def test_canceled_vacancy_not_showed(self):
         self.create_period_clients(2, self.operation_type)
         len_vacancies = len(WorkerDay.objects.filter(is_vacancy=True))
         self.assertEqual(len_vacancies, 0)
         create_vacancies_and_notify(self.shop.id, self.work_type1.id)
-        self.assertEquals(WorkerDay.objects.filter(is_vacancy=True).count(), 2)
+        self.assertEqual(WorkerDay.objects.filter(is_vacancy=True).count(), 2)
         vacancy = WorkerDay.objects.filter(is_vacancy=True).first()
         self.client.force_authenticate(user=self.user_admin)
         response = self.client.delete(f"/rest_api/worker_day/{vacancy.id}/")
-        self.assertEquals(response.status_code, 204)
-        self.assertEquals(WorkerDay.objects.filter(is_vacancy=True).count(), 2)
-        self.assertEquals(WorkerDay.objects.filter(is_vacancy=True, canceled=True).first().id, vacancy.id)
+        self.assertEqual(response.status_code, 204)
+        self.assertEqual(WorkerDay.objects.filter(is_vacancy=True).count(), 2)
+        self.assertEqual(WorkerDay.objects.filter(is_vacancy=True, canceled=True).first().id, vacancy.id)
         response = self.client.get(f'/rest_api/worker_day/vacancy/?limit=100&offset=0')
-        self.assertEquals(len(response.json()['results']), 1)
-        self.assertNotEquals(response.json()['results'][0]['id'], vacancy.id)
+        self.assertEqual(len(response.json()['results']), 1)
+        self.assertNotEqual(response.json()['results'][0]['id'], vacancy.id)
 
     def test_employees_time_overlap_on_confirm_vacancies(self):
         resp = self.create_users(1)
@@ -999,7 +999,7 @@ class TestAutoWorkerExchange(APITestCase):
         )
         self.client.force_authenticate(user=self.user_admin)
         response = self.client.delete(f"/rest_api/worker_day/{vacancy.id}/")
-        self.assertEquals(response.status_code, 204)
+        self.assertEqual(response.status_code, 204)
         self.assertIsNone(WorkerDay.objects.filter(id=vacancy.id).first())
 
 
@@ -1060,7 +1060,7 @@ class TestVacancyActions(APITestCase, TestsHelperMixin):
         not_approved_vacancy.save()
         cancel_vacancy(approved_vacancy.id, False)
 
-        self.assertEquals(WorkerDay.objects.filter(id__in=[approved_vacancy.id, not_approved_vacancy.id]).count(), 0)
+        self.assertEqual(WorkerDay.objects.filter(id__in=[approved_vacancy.id, not_approved_vacancy.id]).count(), 0)
         self.assertTrue(WorkerDay.objects.filter(employee=self.employee1, type_id=WorkerDay.TYPE_HOLIDAY, is_approved=True).exists())
         self.assertTrue(WorkerDay.objects.filter(employee=self.employee1, type_id=WorkerDay.TYPE_HOLIDAY, is_approved=False).exists())
         WorkerDay.objects.filter(employee=self.employee1).delete()
@@ -1069,8 +1069,8 @@ class TestVacancyActions(APITestCase, TestsHelperMixin):
         not_approved_vacancy.save()
 
         cancel_vacancy(not_approved_vacancy.id, False)
-        self.assertEquals(WorkerDay.objects.filter(id=not_approved_vacancy.id).count(), 0)
-        self.assertEquals(WorkerDay.objects.filter(id=approved_vacancy.id).count(), 1)
+        self.assertEqual(WorkerDay.objects.filter(id=not_approved_vacancy.id).count(), 0)
+        self.assertEqual(WorkerDay.objects.filter(id=approved_vacancy.id).count(), 1)
         self.assertTrue(WorkerDay.objects.filter(employee=self.employee1, type_id=WorkerDay.TYPE_HOLIDAY, is_approved=False).exists())
         self.assertFalse(WorkerDay.objects.filter(employee=self.employee1, type_id=WorkerDay.TYPE_HOLIDAY, is_approved=True).exists())
 
@@ -1112,18 +1112,18 @@ class TestVacancyActions(APITestCase, TestsHelperMixin):
         not_approved_employee_worker_day.save()
         cancel_vacancy(approved_vacancy.id, False)
 
-        self.assertEquals(WorkerDay.objects.filter(id__in=[approved_vacancy.id, not_approved_vacancy.id]).count(), 0)
-        self.assertEquals(WorkerDay.objects.filter(employee=self.employee1, is_approved=True, type_id=WorkerDay.TYPE_WORKDAY).count(), 1)
-        self.assertEquals(WorkerDay.objects.filter(employee=self.employee1, is_approved=False, type_id=WorkerDay.TYPE_WORKDAY).count(), 1)
+        self.assertEqual(WorkerDay.objects.filter(id__in=[approved_vacancy.id, not_approved_vacancy.id]).count(), 0)
+        self.assertEqual(WorkerDay.objects.filter(employee=self.employee1, is_approved=True, type_id=WorkerDay.TYPE_WORKDAY).count(), 1)
+        self.assertEqual(WorkerDay.objects.filter(employee=self.employee1, is_approved=False, type_id=WorkerDay.TYPE_WORKDAY).count(), 1)
         approved_vacancy.save()
         not_approved_vacancy.parent_worker_day_id = approved_vacancy.id
         not_approved_vacancy.save()
 
         cancel_vacancy(not_approved_vacancy.id, False)
-        self.assertEquals(WorkerDay.objects.filter(id=not_approved_vacancy.id).count(), 0)
-        self.assertEquals(WorkerDay.objects.filter(id=approved_vacancy.id).count(), 1)
-        self.assertEquals(WorkerDay.objects.filter(employee=self.employee1, is_approved=True, type_id=WorkerDay.TYPE_WORKDAY).count(), 2)
-        self.assertEquals(WorkerDay.objects.filter(employee=self.employee1, is_approved=False, type_id=WorkerDay.TYPE_WORKDAY).count(), 1)
+        self.assertEqual(WorkerDay.objects.filter(id=not_approved_vacancy.id).count(), 0)
+        self.assertEqual(WorkerDay.objects.filter(id=approved_vacancy.id).count(), 1)
+        self.assertEqual(WorkerDay.objects.filter(employee=self.employee1, is_approved=True, type_id=WorkerDay.TYPE_WORKDAY).count(), 2)
+        self.assertEqual(WorkerDay.objects.filter(employee=self.employee1, is_approved=False, type_id=WorkerDay.TYPE_WORKDAY).count(), 1)
 
     def test_cancel_vacancy_with_worker_with_worker_days_only_approved(self):
         dt = datetime.date.today()
@@ -1158,19 +1158,19 @@ class TestVacancyActions(APITestCase, TestsHelperMixin):
         )
         cancel_vacancy(approved_vacancy.id, False)
 
-        self.assertEquals(WorkerDay.objects.filter(id__in=[approved_vacancy.id, not_approved_vacancy.id]).count(), 0)
-        self.assertEquals(WorkerDay.objects.filter(employee=self.employee1, is_approved=True, type_id=WorkerDay.TYPE_WORKDAY).count(), 1)
-        self.assertEquals(WorkerDay.objects.filter(employee=self.employee1, is_approved=False, type_id=WorkerDay.TYPE_HOLIDAY).count(), 1)
+        self.assertEqual(WorkerDay.objects.filter(id__in=[approved_vacancy.id, not_approved_vacancy.id]).count(), 0)
+        self.assertEqual(WorkerDay.objects.filter(employee=self.employee1, is_approved=True, type_id=WorkerDay.TYPE_WORKDAY).count(), 1)
+        self.assertEqual(WorkerDay.objects.filter(employee=self.employee1, is_approved=False, type_id=WorkerDay.TYPE_HOLIDAY).count(), 1)
         WorkerDay.objects.filter(employee=self.employee1, is_approved=False, type_id=WorkerDay.TYPE_HOLIDAY).delete()
         approved_vacancy.save()
         not_approved_vacancy.parent_worker_day_id = approved_vacancy.id
         not_approved_vacancy.save()
 
         cancel_vacancy(not_approved_vacancy.id, False)
-        self.assertEquals(WorkerDay.objects.filter(id=not_approved_vacancy.id).count(), 0)
-        self.assertEquals(WorkerDay.objects.filter(id=approved_vacancy.id).count(), 1)
-        self.assertEquals(WorkerDay.objects.filter(employee=self.employee1, is_approved=True, type_id=WorkerDay.TYPE_WORKDAY).count(), 2)
-        self.assertEquals(WorkerDay.objects.filter(employee=self.employee1, is_approved=False, type_id=WorkerDay.TYPE_HOLIDAY).count(), 1)
+        self.assertEqual(WorkerDay.objects.filter(id=not_approved_vacancy.id).count(), 0)
+        self.assertEqual(WorkerDay.objects.filter(id=approved_vacancy.id).count(), 1)
+        self.assertEqual(WorkerDay.objects.filter(employee=self.employee1, is_approved=True, type_id=WorkerDay.TYPE_WORKDAY).count(), 2)
+        self.assertEqual(WorkerDay.objects.filter(employee=self.employee1, is_approved=False, type_id=WorkerDay.TYPE_HOLIDAY).count(), 1)
     
     def test_cancel_vacancy_with_worker_with_worker_days_only_not_approved(self):
         dt = datetime.date.today()
@@ -1205,19 +1205,19 @@ class TestVacancyActions(APITestCase, TestsHelperMixin):
         )
         cancel_vacancy(approved_vacancy.id, False)
 
-        self.assertEquals(WorkerDay.objects.filter(id__in=[approved_vacancy.id, not_approved_vacancy.id]).count(), 0)
-        self.assertEquals(WorkerDay.objects.filter(employee=self.employee1, is_approved=True, type_id=WorkerDay.TYPE_HOLIDAY).count(), 1)
-        self.assertEquals(WorkerDay.objects.filter(employee=self.employee1, is_approved=False, type_id=WorkerDay.TYPE_WORKDAY).count(), 1)
+        self.assertEqual(WorkerDay.objects.filter(id__in=[approved_vacancy.id, not_approved_vacancy.id]).count(), 0)
+        self.assertEqual(WorkerDay.objects.filter(employee=self.employee1, is_approved=True, type_id=WorkerDay.TYPE_HOLIDAY).count(), 1)
+        self.assertEqual(WorkerDay.objects.filter(employee=self.employee1, is_approved=False, type_id=WorkerDay.TYPE_WORKDAY).count(), 1)
         WorkerDay.objects.filter(employee=self.employee1, is_approved=True, type_id=WorkerDay.TYPE_HOLIDAY).delete()
         approved_vacancy.save()
         not_approved_vacancy.parent_worker_day_id = approved_vacancy.id
         not_approved_vacancy.save()
 
         cancel_vacancy(not_approved_vacancy.id, False)
-        self.assertEquals(WorkerDay.objects.filter(id=not_approved_vacancy.id).count(), 0)
-        self.assertEquals(WorkerDay.objects.filter(id=approved_vacancy.id).count(), 1)
-        self.assertEquals(WorkerDay.objects.filter(employee=self.employee1, is_approved=True, type_id=WorkerDay.TYPE_HOLIDAY).count(), 0)
-        self.assertEquals(WorkerDay.objects.filter(employee=self.employee1, is_approved=False, type_id=WorkerDay.TYPE_WORKDAY).count(), 1)
+        self.assertEqual(WorkerDay.objects.filter(id=not_approved_vacancy.id).count(), 0)
+        self.assertEqual(WorkerDay.objects.filter(id=approved_vacancy.id).count(), 1)
+        self.assertEqual(WorkerDay.objects.filter(employee=self.employee1, is_approved=True, type_id=WorkerDay.TYPE_HOLIDAY).count(), 0)
+        self.assertEqual(WorkerDay.objects.filter(employee=self.employee1, is_approved=False, type_id=WorkerDay.TYPE_WORKDAY).count(), 1)
 
     def test_confirm_vacancy_from_holiday(self):
         dt = datetime.date.today()
@@ -1246,12 +1246,12 @@ class TestVacancyActions(APITestCase, TestsHelperMixin):
 
         confirm_vacancy(approved_vacancy.id, self.user2, employee_id=self.employee2.id)
 
-        self.assertEquals(WorkerDay.objects.filter(id=approved_employee_holiday.id).count(), 0)
-        self.assertEquals(WorkerDay.objects.filter(id=not_approved_employee_holiday.id).count(), 0)
-        self.assertEquals(WorkerDay.objects.filter(id=approved_vacancy.id, employee=self.employee2).count(), 1)
+        self.assertEqual(WorkerDay.objects.filter(id=approved_employee_holiday.id).count(), 0)
+        self.assertEqual(WorkerDay.objects.filter(id=not_approved_employee_holiday.id).count(), 0)
+        self.assertEqual(WorkerDay.objects.filter(id=approved_vacancy.id, employee=self.employee2).count(), 1)
         wd = WorkerDay.objects.filter(employee=self.employee2, is_approved=False, type_id=WorkerDay.TYPE_WORKDAY, dt=approved_vacancy.dt).first()
         self.assertIsNotNone(wd)
-        self.assertEquals(wd.parent_worker_day_id, approved_vacancy.id)
+        self.assertEqual(wd.parent_worker_day_id, approved_vacancy.id)
 
     def test_confirm_vacancy_from_holiday_when_not_approved_work_day(self):
         dt = datetime.date.today()
@@ -1283,9 +1283,9 @@ class TestVacancyActions(APITestCase, TestsHelperMixin):
 
         confirm_vacancy(approved_vacancy.id, self.user2, employee_id=self.employee2.id)
 
-        self.assertEquals(WorkerDay.objects.filter(id=approved_employee_holiday.id).count(), 0)
-        self.assertEquals(WorkerDay.objects.filter(id=not_approved_employee_worker_day.id).count(), 1)
-        self.assertEquals(WorkerDay.objects.filter(id=approved_vacancy.id, employee=self.employee2).count(), 1)
+        self.assertEqual(WorkerDay.objects.filter(id=approved_employee_holiday.id).count(), 0)
+        self.assertEqual(WorkerDay.objects.filter(id=not_approved_employee_worker_day.id).count(), 1)
+        self.assertEqual(WorkerDay.objects.filter(id=approved_vacancy.id, employee=self.employee2).count(), 1)
         wd = WorkerDay.objects.filter(employee=self.employee2, is_approved=False, type_id=WorkerDay.TYPE_WORKDAY, dt=approved_vacancy.dt).first()
         self.assertIsNotNone(wd)
         self.assertIsNone(wd.parent_worker_day_id)
@@ -1321,10 +1321,10 @@ class TestVacancyActions(APITestCase, TestsHelperMixin):
 
         confirm_vacancy(approved_vacancy.id, self.user2, employee_id=self.employee2.id)
 
-        self.assertEquals(WorkerDay.objects.filter(id=approved_employee_worker_day.id).count(), 1)
-        self.assertEquals(WorkerDay.objects.filter(id=not_approved_employee_worker_day.id).count(), 1)
-        self.assertEquals(WorkerDay.objects.filter(id=approved_vacancy.id, employee=self.employee2).count(), 1)
-        self.assertEquals(
+        self.assertEqual(WorkerDay.objects.filter(id=approved_employee_worker_day.id).count(), 1)
+        self.assertEqual(WorkerDay.objects.filter(id=not_approved_employee_worker_day.id).count(), 1)
+        self.assertEqual(WorkerDay.objects.filter(id=approved_vacancy.id, employee=self.employee2).count(), 1)
+        self.assertEqual(
             WorkerDay.objects.filter(
                 employee=self.employee2, 
                 is_approved=False, 
@@ -1372,9 +1372,9 @@ class TestVacancyActions(APITestCase, TestsHelperMixin):
 
         approved_employee1_vacancy.refresh_from_db()
 
-        self.assertEquals(approved_employee1_vacancy.employee_id, self.employee2.id)
-        self.assertEquals(approved_employee1_vacancy.employment_id, self.employment2.id)
-        self.assertEquals(
+        self.assertEqual(approved_employee1_vacancy.employee_id, self.employee2.id)
+        self.assertEqual(approved_employee1_vacancy.employment_id, self.employment2.id)
+        self.assertEqual(
             WorkerDay.objects.filter(
                 id__in=[not_approved_employee1_vacancy.id, approved_employee2_holiday.id, not_approved_employee2_holiday.id]
             ).count(), 
@@ -1740,6 +1740,16 @@ class TestVacancyNotification(APITestCase, TestsHelperMixin):
         vacancy.employee = self.outsource_employee_empl1
         vacancy.employment = self.outsource_employment_empl1
         vacancy.save()
+        GroupWorkerDayPermission.objects.create(
+            group=self.admin_group,
+            worker_day_permission=WorkerDayPermission.objects.get(
+                action=WorkerDayPermission.DELETE,
+                graph_type=WorkerDayPermission.PLAN,
+                wd_type_id=WorkerDay.TYPE_WORKDAY,
+            ),
+            employee_type=GroupWorkerDayPermission.OUTSOURCE_NETWORK_EMPLOYEE,
+            shop_type=GroupWorkerDayPermission.MY_NETWORK_SHOPS,
+        )
         response = self.client.delete(
             f'/rest_api/worker_day/{vacancy.id}/',
         )

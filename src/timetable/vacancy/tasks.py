@@ -27,6 +27,7 @@ def vacancies_create_and_cancel():
 
         vacancies_create_and_cancel_for_shop(shop.id)
 
+
 @app.task
 def vacancies_create_and_cancel_for_shop(shop_id):
     """
@@ -65,27 +66,3 @@ def workers_hard_exchange():
     :return:
     """
     workers_exchange()
-
-
-# TODO: REWRITE WITH EVENT
-# FIXME: REWRITE WITH EVENT
-                    # notes = Notifications.objects.filter(
-                    #     type=Notifications.TYPE_INFO,
-                    #     text=notification_text,
-                    #     dttm_added__lt=now() + datetime.timedelta(hours=2)
-                    # )
-                    # for note in notes:
-                    #     users_with_such_notes.append(note.to_worker_id)
-
-            #     if to_notify:
-            #         for recipient in managers_dir_list:
-            #             if recipient.id not in users_with_such_notes:
-            #                 notifications_list.append(
-            #                     Notifications(
-            #                         type=Notifications.TYPE_INFO,
-            #                         to_worker=recipient,
-            #                         text=notification_text,
-            #                     )
-            #                 )
-            #
-            # Notifications.objects.bulk_create(notifications_list)

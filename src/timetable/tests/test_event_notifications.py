@@ -428,7 +428,7 @@ class TestSendUnaccountedReport(TestsHelperMixin, APITestCase):
             self.assertCountEqual(list(mails_by_emails.keys()), [user_urs.email, self.user_urs.email])
             df1 = pd.read_excel(mails_by_emails[user_urs.email].attachments[0][1]).fillna('')
             df2 = pd.read_excel(mails_by_emails[self.user_urs.email].attachments[0][1]).fillna('')
-            self.assertNotEquals(df1.to_dict('records'), df2.to_dict('records'))
+            self.assertNotEqual(df1.to_dict('records'), df2.to_dict('records'))
             data1 = [
                 {
                     'Дата': self.dt.strftime('%d.%m.%Y'), 
@@ -702,7 +702,7 @@ class TestVacancyCreatedNotification(TestsHelperMixin, APITestCase):
             self.assertEqual(mail.outbox[0].to[0], self.user_outsource.email)
             dttm_from = self.not_approved_vacancy.dttm_work_start.strftime('%Y-%m-%d %H:%M:%S')
             dttm_to = self.not_approved_vacancy.dttm_work_end.strftime('%Y-%m-%d %H:%M:%S')
-            self.assertEquals(
+            self.assertEqual(
                 mail.outbox[0].body, 
                 f'Здравствуйте, {self.user_outsource.first_name}!\n\n\n\n\n\n\nВ подразделении {self.shop.name} создана вакансия для типа работ Работа\n'
                 f'Дата: {self.dt}\nВремя с {dttm_from} по {dttm_to}\n\n\n\n\n\nПисьмо отправлено роботом. Подробности можно узнать по ссылке'
@@ -726,7 +726,7 @@ class TestVacancyCreatedNotification(TestsHelperMixin, APITestCase):
             self.assertEqual(mail.outbox[0].to[0], self.user_outsource.email)
             dttm_from = self.not_approved_vacancy.dttm_work_start.strftime('%Y-%m-%d %H:%M:%S')
             dttm_to = self.not_approved_vacancy.dttm_work_end.strftime('%Y-%m-%d %H:%M:%S')
-            self.assertEquals(
+            self.assertEqual(
                 mail.outbox[0].body, 
                 f'Здравствуйте, {self.user_outsource.first_name}!\n\n\n\n\n\n\nВ подразделении {self.shop.name} создана вакансия для типа работ Работа\n'
                 f'Дата: {self.dt}\nВремя с {dttm_from} по {dttm_to}\n\n\n\n\n\nПисьмо отправлено роботом. Подробности можно узнать по ссылке'
@@ -754,7 +754,7 @@ class TestVacancyCreatedNotification(TestsHelperMixin, APITestCase):
             self.assertEqual(mail.outbox[0].to[0], self.user_outsource.email)
             dttm_from = self.not_approved_vacancy.dttm_work_start.strftime('%Y-%m-%d %H:%M:%S')
             dttm_to = self.not_approved_vacancy.dttm_work_end.strftime('%Y-%m-%d %H:%M:%S')
-            self.assertEquals(
+            self.assertEqual(
                 mail.outbox[0].body, 
                 f'Здравствуйте, {self.user_outsource.first_name}!\n\n\n\n\n\n\nВ подразделении {self.shop.name} создана вакансия для типов работ Работа, Касса\n'
                 f'Дата: {self.dt}\nВремя с {dttm_from} по {dttm_to}\n\n\n\n\n\nПисьмо отправлено роботом. Подробности можно узнать по ссылке'

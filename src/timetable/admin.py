@@ -13,18 +13,14 @@ from src.base.forms import (
 from src.recognition.admin import RelatedOnlyDropdownNameOrderedFilter
 from src.timetable.forms import ExchangeSettingsForm, GroupWorkerDayPermissionForm
 from src.timetable.models import (
-    Cashbox,
     EmploymentWorkType,
     WorkerDayCashboxDetails,
-    Notifications,
     Slot,
     UserWeekdaySlot,
     WorkerConstraint,
     ShopMonthStat,
-    WorkerDayChangeRequest,
     AttendanceRecords,
     ExchangeSettings,
-    Event,
     WorkerDay,
     WorkTypeName,
     WorkerDayType,
@@ -82,25 +78,6 @@ class UserWeekDaySlotAdmin(admin.ModelAdmin):
     @staticmethod
     def parent_title(instance: UserWeekdaySlot):
         return instance.worker.shop.parent_title()
-
-
-@admin.register(Cashbox)
-class CashboxAdmin(admin.ModelAdmin):
-    list_display = ('type_name', 'shop_title', 'parent_title', 'id', 'name')
-    search_fields = ('type__name', 'type__shop__name', 'type__shop__parent__name', 'id')
-    list_filter = ('type__shop',)
-
-    @staticmethod
-    def type_name(instance: Cashbox):
-        return instance.type.name
-
-    @staticmethod
-    def shop_title(instance: Cashbox):
-        return instance.type.shop.name
-
-    @staticmethod
-    def parent_title(instance: Cashbox):
-        return instance.type.shop.parent_title()
 
 
 @admin.register(EmploymentWorkType)
@@ -228,25 +205,6 @@ class WorkerDayCashboxDetailsAdmin(admin.ModelAdmin):
         return instance.work_type.work_type_name.name if instance.work_type else ''
 
 
-@admin.register(Notifications)
-class NotificationsAdmin(admin.ModelAdmin):
-    list_display = ('worker_last_name', 'shop_title', 'parent_title', 'dttm_added', 'id')
-    search_fields = ('worker_last_name', 'shop_title', 'parent_title', 'id')
-    list_filter = ('shop',)
-
-    @staticmethod
-    def worker_last_name(instance: ShopMonthStat):
-        return instance.to_worker.last_name
-
-    @staticmethod
-    def shop_title(instance: ShopMonthStat):
-        return instance.shop.name
-
-    @staticmethod
-    def parent_title(instance: ShopMonthStat):
-        return instance.shop.parent_title()
-
-
 @admin.register(ShopMonthStat)
 class TimetableAdmin(admin.ModelAdmin):
     list_display = ('id', 'shop_title', 'parent_title', 'dt', 'status', 'dttm_status_change',
@@ -265,11 +223,6 @@ class TimetableAdmin(admin.ModelAdmin):
         return instance.shop.name
 
 
-@admin.register(WorkerDayChangeRequest)
-class WorkerDayChangeRequestAdmin(admin.ModelAdmin):
-    pass
-
-
 @admin.register(AttendanceRecords)
 class AttendanceRecordsAdmin(admin.ModelAdmin):
     list_display = ('id', 'dttm', 'type',)
@@ -280,12 +233,6 @@ class AttendanceRecordsAdmin(admin.ModelAdmin):
 @admin.register(ExchangeSettings)
 class ExchangeSettingsAdmin(admin.ModelAdmin):
     form = ExchangeSettingsForm
-
-
-@admin.register(Event)
-class EventAdmin(admin.ModelAdmin):
-    pass
-
 
 @admin.register(WorkTypeName)
 class WorkTypeNameAdmin(admin.ModelAdmin):
@@ -324,17 +271,20 @@ class WorkerDayTypeAdmin(admin.ModelAdmin):
 @admin.register(GroupWorkerDayPermission)
 class GroupWorkerDayPermissionAdmin(ImportMixin, ExportActionMixin, BaseNotWrapRelatedModelaAdmin):
     not_wrap_fields = ['worker_day_permission']
-    list_display = ('id', 'group', 'worker_day_permission', 'limit_days_in_past', 'limit_days_in_future')
-    list_editable = ('limit_days_in_past', 'limit_days_in_future')
+    list_display = ('id', 'group', 'worker_day_permission', 'limit_days_in_past', 'limit_days_in_future', 'employee_type', 'shop_type')
+    list_editable = ('limit_days_in_past', 'limit_days_in_future', 'employee_type', 'shop_type')
     list_filter = [
         ('group', CustomRelatedDropdownFilter),
         'worker_day_permission__action',
         'worker_day_permission__graph_type',
+        'employee_type',
+        'shop_type',
         ('worker_day_permission__wd_type', CustomRelatedDropdownFilter),
     ]
     list_select_related = ('group', 'worker_day_permission__wd_type')
     resource_class = GroupWorkerDayPermissionResource
     form = GroupWorkerDayPermissionForm
+    save_as = True
 
     def get_import_form(self):
         return CustomImportFunctionGroupForm

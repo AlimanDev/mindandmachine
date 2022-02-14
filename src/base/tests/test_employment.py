@@ -9,7 +9,6 @@ from django.db import transaction
 from django.utils import timezone
 from freezegun import freeze_time
 from rest_framework.test import APITestCase
-from xlrd import open_workbook
 
 from src.base.models import Group, WorkerPosition, Employment, Break, ApiLog
 from src.celery.tasks import delete_inactive_employment_groups
@@ -758,9 +757,9 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
             ),
             content_type='application/json',
         )
-        self.assertEquals(response.status_code, status_code)
+        self.assertEqual(response.status_code, status_code)
         self.employment3.refresh_from_db()
-        self.assertEquals(self.employment3.position_id, assert_position_id)
+        self.assertEqual(self.employment3.position_id, assert_position_id)
 
     def test_update_worker_position_permissions(self):
         self.admin_group.subordinates.clear()
@@ -807,9 +806,9 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
             ),
             content_type='application/json',
         )
-        self.assertEquals(response.status_code, status_code)
+        self.assertEqual(response.status_code, status_code)
         self.employment3.refresh_from_db()
-        self.assertEquals(self.employment3.function_group_id, assert_group_id)
+        self.assertEqual(self.employment3.function_group_id, assert_group_id)
 
     def test_update_group_permissions(self):
         self.admin_group.subordinates.clear()
@@ -1143,3 +1142,28 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
         self.employment1.save()
         response = self.client.get('/rest_api/department/')
         self.assertEqual(response.status_code, 200)
+
+    def test_worker_day_restored_after_employment_creation(self):
+        self.network.clean_wdays_on_employment_dt_change = True
+        self.network.save()
+        with self.settings(CELERY_TASK_ALWAYS_EAGER=True):
+            wd = WorkerDayFactory(
+                dt=date(2021, 1, 1),
+                employee=self.employee2,
+                employment=self.employment2,
+                shop=self.shop2,
+                type_id=WorkerDay.TYPE_WORKDAY,
+                is_fact=False,
+                is_approved=True,
+            )
+            Employment.objects.delete()
+            wd.refresh_from_db()
+            self.assertIsNone(wd.employment_id)
+            with self.captureOnCommitCallbacks(execute=True) as callbacks:
+                e = Employment.objects.create(
+                    shop=self.shop,
+                    employee=self.employee2,
+                    function_group=self.employee_group,
+                )
+            wd.refresh_from_db()
+            self.assertEqual(wd.employment_id, e.id)

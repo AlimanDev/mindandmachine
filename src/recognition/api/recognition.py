@@ -306,5 +306,5 @@ class Tevian:
         if 'data' in res:
             return res['data']
 
-        logger.warn("Recognition error message {} for url {} {}".format(res, url, params))
+        logger.warning("Recognition error message {} for url {} {}".format(res, url, params))
         return None

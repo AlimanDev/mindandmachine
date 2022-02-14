@@ -1,17 +1,19 @@
 import datetime
 import json
 from decimal import Decimal
-import distutils.util
 
 from django.conf import settings
 from django.contrib.auth.models import (
     UserManager
 )
+from django.core.cache import cache
+from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models
 from django.db import transaction
 from django.db.models import (
-    Subquery, OuterRef, Max, Q, Case, When, Value, FloatField, F, IntegerField, Exists, BooleanField, Min, Count
+    Subquery, OuterRef, Max, Q, Case, When, Value, FloatField, F, IntegerField, Exists, BooleanField, Count,
 )
+from django.db.models.expressions import RawSQL
 from django.db.models.fields import PositiveSmallIntegerField
 from django.db.models.functions import Abs, Cast, Extract, Least
 from django.db.models.query import QuerySet
@@ -20,7 +22,7 @@ from django.utils.translation import gettext_lazy as _
 from model_utils import FieldTracker
 from rest_framework.exceptions import PermissionDenied, ValidationError
 
-from src.base.models import Shop, Employment, User, Event, Network, Break, ProductionDay, Employee, Group
+from src.base.models import Shop, Employment, User, Network, Break, ProductionDay, Employee, Group
 from src.base.models_abstract import AbstractModel, AbstractActiveModel, AbstractActiveNetworkSpecificCodeNamedModel, \
     AbstractActiveModelManager
 from src.events.signals import event_signal
@@ -113,7 +115,7 @@ class WorkTypeName(AbstractActiveNetworkSpecificCodeNamedModel):
         else:
             update_or_create_kwargs['work_type_name_id'] = defaults.pop('work_type_name_id')
 
-        
+
         OperationTypeName.objects.update_or_create(
             **update_or_create_kwargs,
             defaults=defaults,
@@ -177,7 +179,7 @@ class WorkType(AbstractActiveModel):
             update_or_create_kwargs['operation_type_name'] = defaults.pop('operation_type_name')
         else:
             update_or_create_kwargs['work_type_id'] = defaults.pop('work_type_id')
-        
+
         OperationType.objects.update_or_create(
             **update_or_create_kwargs,
             defaults=defaults,
@@ -188,9 +190,6 @@ class WorkType(AbstractActiveModel):
 
     def delete(self):
         from src.forecast.models import OperationType
-        if Cashbox.objects.filter(type_id=self.id, dttm_deleted__isnull=True).exists():
-            raise models.ProtectedError('There is cashboxes with such work_type', Cashbox.objects.filter(type_id=self.id, dttm_deleted__isnull=True))
-
         super(WorkType, self).delete()
         operation_type = OperationType.objects.filter(work_type_id=self.pk).first()
         if operation_type:
@@ -245,48 +244,6 @@ class Slot(AbstractActiveNetworkSpecificCodeNamedModel):
     workers_needed = models.IntegerField(default=1)
 
     worker = models.ManyToManyField(User, through=UserWeekdaySlot)
-
-
-class CashboxManager(models.Manager):
-    def qos_filter_active(self, dt_from, dt_to, *args, **kwargs):
-        """
-        added earlier then dt_from, deleted later then dt_to
-        :param dt_from:
-        :param dt_to:
-        :param args:
-        :param kwargs:
-        :return:
-        """
-
-        return self.filter(
-            Q(dttm_added__date__lte=dt_from) | Q(dttm_added__isnull=True)
-        ).filter(
-            Q(dttm_deleted__date__gt=dt_to) | Q(dttm_deleted__isnull=True)
-        ).filter(*args, **kwargs)
-
-
-class Cashbox(AbstractActiveNetworkSpecificCodeNamedModel):
-    class Meta(AbstractActiveNetworkSpecificCodeNamedModel.Meta):
-        verbose_name = 'Рабочее место '
-        verbose_name_plural = 'Рабочие места'
-
-    def __str__(self):
-        return '{}, {}, {}, {}, {}'.format(
-            self.type.work_type_name.name,
-            self.type.shop.name,
-            self.type.shop.parent.name,
-            self.id,
-            self.name
-        )
-
-    id = models.BigAutoField(primary_key=True)
-
-    type = models.ForeignKey(WorkType, on_delete=models.PROTECT)
-    name = models.CharField(max_length=128)
-    code = models.CharField(max_length=64, default='', blank=True)
-    bio = models.CharField(max_length=512, default='', blank=True)
-    objects = CashboxManager()
-
 
 class EmploymentWorkType(AbstractModel):
     class Meta(object):
@@ -534,6 +491,7 @@ class WorkerDayType(AbstractModel):
     )
     ordering = models.PositiveSmallIntegerField(default=0)
     is_active = models.BooleanField(default=True)
+    tracker = FieldTracker(fields=('is_reduce_norm',))
 
     class Meta(AbstractModel.Meta):
         ordering = ['-ordering', 'name']
@@ -550,6 +508,12 @@ class WorkerDayType(AbstractModel):
     @classmethod
     def get_wd_types_dict(cls):
         return {wdt.code: wdt for wdt in cls.objects.prefetch_related('allowed_additional_types', 'allowed_as_additional_for')}
+
+    @tracker
+    def save(self, *args, **kwargs):
+        if self.code and self.tracker.has_changed('is_reduce_norm'):
+            cache.delete_pattern("prod_cal_*_*_*")
+        return super().save(*args, **kwargs)
 
 
 class WorkerDay(AbstractModel):
@@ -690,7 +654,7 @@ class WorkerDay(AbstractModel):
         return ['dt', 'employee_id', 'is_fact', 'is_approved']
 
     @classmethod
-    def _enrich_create_or_update_perms_data(cls, action, create_or_update_perms_data, obj_dict):
+    def _enrich_perms_data(cls, action, perms_data, obj_dict):
         graph_type = WorkerDayPermission.FACT if obj_dict.get('is_fact') else WorkerDayPermission.PLAN
         wd_type_id = obj_dict.get('type_id') or obj_dict.get('type').code
         dt = obj_dict.get('dt')
@@ -698,86 +662,150 @@ class WorkerDay(AbstractModel):
         employee_id = obj_dict.get('employee_id')
         is_vacancy = obj_dict.get('is_vacancy', False)
         k = f'{graph_type}_{action}_{wd_type_id}_{shop_id}_{employee_id}_{is_vacancy}'
-        create_or_update_perms_data.setdefault(k, set()).add(dt)
+        perms_data.setdefault(k, set()).add(dt)
 
     @classmethod
-    def _get_check_batch_perms_extra_kwargs(cls):
-        return {
+    def _get_check_perms_extra_kwargs(cls, user=None):
+        kwargs = {
             'wd_types_dict': WorkerDayType.get_wd_types_dict(),
         }
+        if user:
+            kwargs['cached_data'] = {
+                'user_shops': list(user.get_shops(include_descendants=True).values_list('id', flat=True)),
+                'user_subordinated_group_ids': list(Group.get_subordinated_group_ids(user)),
+            }
+        return kwargs
 
     @classmethod
-    def _check_batch_delete_qs_perms(cls, user, delete_qs, **kwargs):
-        from src.timetable.worker_day.utils import check_worker_day_permissions
-        from src.timetable.worker_day.views import WorkerDayViewSet
-        action = WorkerDayPermission.DELETE
-        employees_and_shops = delete_qs.values_list(
-            'employee_id',
+    def _check_delete_qs_perm(cls, user, delete_qs, **kwargs):
+        from src.timetable.worker_day_permissions.checkers import DeleteQsWdPermissionChecker
+        perm_checker = DeleteQsWdPermissionChecker(
+            user=user,
+            wd_qs=delete_qs,
+            cached_data={
+                'wd_types_dict': kwargs.get('wd_types_dict'),
+            },
+        )
+        if not perm_checker.has_permission():
+            raise PermissionDenied(perm_checker.err_message)
+
+    @classmethod
+    def _get_diff_lookup_fields(cls):
+        return [
             'dt',
+            'employee_id',
             'shop_id',
+            'type_id',
+            'is_fact',
             'is_vacancy',
-        ).distinct()
-        user_shops = list(user.get_shops(include_descendants=True).values_list('id', flat=True))
-        user_subordinates = Group.get_subordinate_ids(user)
-        for employee_id, dt, shop_id, is_vacancy in employees_and_shops:
-            if not cls._has_group_permissions(
-                user, employee_id, dt, user_shops=user_shops, 
-                user_subordinates=user_subordinates, shop_id=shop_id, is_vacancy=is_vacancy):
-                raise PermissionDenied(
-                    WorkerDayViewSet.error_messages['employee_not_in_subordinates'].format(
-                    employee=User.objects.filter(employees__id=employee_id).first().fio),
-                )
-        grouped_qs = delete_qs.values(
-            'is_fact',
-            'type_id',
-            'shop_id',
-        ).annotate(
-            dt_min=Min('dt'),
-            dt_max=Min('dt'),
-        ).values_list(
-            'is_fact',
-            'type_id',
-            'shop_id',
-            'dt_min',
-            'dt_max',
-        ).distinct()
-        for is_fact, wd_type_id, shop_id, dt_min, dt_max in grouped_qs:
-            check_worker_day_permissions(
-                user=user,
-                shop_id=shop_id,
-                action=action,
-                graph_type=WorkerDayPermission.FACT if is_fact else WorkerDayPermission.PLAN,
-                wd_types=[wd_type_id],
-                dt_from=dt_min,
-                dt_to=dt_max,
-                error_messages=WorkerDayViewSet.error_messages,
-                wd_types_dict=kwargs.get('wd_types_dict'),
-            )
+        ]
 
     @classmethod
-    def _check_create_or_update_perms(cls, user, create_or_update_perms_data, **kwargs):
-        from src.timetable.worker_day.utils import check_worker_day_permissions
-        from src.timetable.worker_day.views import WorkerDayViewSet
-        for k, dates_set in create_or_update_perms_data.items():
-            graph_type, action, wd_type_id, shop_id, employee_id, is_vacancy = k.split('_')
-            if shop_id == 'None':
-                shop_id = None
-            if employee_id == 'None':
-                employee_id = None
-            is_vacancy = bool(distutils.util.strtobool(is_vacancy))
-            check_worker_day_permissions(
-                user=user,
-                shop_id=shop_id,
-                action=action,
-                graph_type=graph_type,
-                wd_types=[wd_type_id],
-                dt_from=min(dates_set),
-                dt_to=max(dates_set),
-                error_messages=WorkerDayViewSet.error_messages,
-                wd_types_dict=kwargs.get('wd_types_dict'),
+    def _get_grouped_perm_check_data(self, diff_data):
+        """
+        :param diff_data: список кортежей с данным полей из _get_diff_lookup_fields (важен порядок)
+        :return: данные для проверка по мин. и по макс. дате (
+            например, если создается выходной на месяц, то проверка пойдет для первого и последнего дня месяца).
+        """
+        grouped_wd_min_max_dt_data = {}
+        grouped_wd_perm_check_data = []
+        for dt, employee_id, shop_id, type_id, is_fact, is_vacancy in diff_data:
+            k_data = dict(
                 employee_id=employee_id,
+                type_id=type_id,
+                shop_id=shop_id,
+                is_fact=is_fact,
                 is_vacancy=is_vacancy,
             )
+            k = json.dumps(k_data, sort_keys=True, cls=DjangoJSONEncoder)
+            min_max_dt_data = grouped_wd_min_max_dt_data.setdefault(k, {})
+            min_max_dt_data['min_dt'] = min(min_max_dt_data.get('min_dt', dt), dt)
+            min_max_dt_data['max_dt'] = max(min_max_dt_data.get('max_dt', dt), dt)
+        for k, min_max_dt_data in grouped_wd_min_max_dt_data.items():
+            wd_data = json.loads(k)
+            if min_max_dt_data.get('min_dt') == min_max_dt_data.get('max_dt'):
+                single_wd_data = wd_data.copy()
+                single_wd_data['dt'] = min_max_dt_data.get('min_dt')
+                grouped_wd_perm_check_data.append(single_wd_data)
+            else:
+                min_wd_data = wd_data.copy()
+                min_wd_data['dt'] = min_max_dt_data.get('min_dt')
+                grouped_wd_perm_check_data.append(min_wd_data)
+                max_wd_data = wd_data.copy()
+                max_wd_data['dt'] = min_max_dt_data.get('max_dt')
+                grouped_wd_perm_check_data.append(max_wd_data)
+        return grouped_wd_perm_check_data
+
+    @classmethod
+    def _pre_batch(cls, user, **kwargs):
+        check_perms_extra_kwargs = kwargs.get('check_perms_extra_kwargs', {})
+        grouped_checks = check_perms_extra_kwargs.pop('grouped_checks', False)
+        if grouped_checks:
+            diff_data = kwargs.get('diff_data')
+            if diff_data:
+                check_active_empl = check_perms_extra_kwargs.pop('check_active_empl', True)
+                created = diff_data.get('created')
+                if created:
+                    grouped_wd_perm_check_data = cls._get_grouped_perm_check_data(created)
+                    for wd_data in grouped_wd_perm_check_data:
+                        cls._check_create_single_obj_perm(user, wd_data, check_active_empl=check_active_empl)
+                deleted = diff_data.get('deleted')
+                if deleted:
+                    grouped_wd_perm_check_data = cls._get_grouped_perm_check_data(deleted)
+                    for wd_data in grouped_wd_perm_check_data:
+                        cls._check_create_single_obj_perm(user, wd_data)
+
+    @classmethod
+    def _post_batch(cls, **kwargs):
+        cls._invalidate_cache(**kwargs)
+
+    @classmethod
+    def _invalidate_cache(cls, **kwargs):
+        reduce_norm_types = set(WorkerDayType.objects.filter(is_reduce_norm=True).values_list('code', flat=True))
+        grouped_by_employee = {}
+        for obj in kwargs.get('created_objs', []):
+            grouped_by_employee.setdefault(obj.employee_id, []).append(obj.type_id)
+        for obj in kwargs.get('deleted_objs', []):
+            grouped_by_employee.setdefault(obj.employee_id, []).append(obj.type_id)
+        for i, obj in enumerate(kwargs.get('updated_objs', [])):
+            prev_type = kwargs['diff_data']['before_update'][i][3]
+            new_type = obj.type_id
+            if prev_type != new_type or new_type in reduce_norm_types:
+                grouped_by_employee.setdefault(obj.employee_id, []).extend([new_type, prev_type])
+
+        for employee_id, types in grouped_by_employee.items():
+            if set(types).intersection(reduce_norm_types):
+                transaction.on_commit(lambda empl_id=employee_id: cache.delete_pattern(f"prod_cal_*_*_{empl_id}"))
+
+    @classmethod
+    def _check_create_single_obj_perm(cls, user, obj_data, check_active_empl=True, **extra_kwargs):
+        from src.timetable.worker_day_permissions.checkers import CreateSingleWdPermissionChecker
+        perm_checker = CreateSingleWdPermissionChecker(user=user, wd_data=obj_data, check_active_empl=check_active_empl)
+        if not perm_checker.has_permission():
+            raise PermissionDenied(perm_checker.err_message)
+
+    @classmethod
+    def _check_update_single_obj_perm(cls, user, existing_obj, obj_data, check_active_empl=True, **extra_kwargs):
+        from src.timetable.worker_day_permissions.checkers import UpdateSingleWdPermissionChecker
+        # TODO: сравнение сущ. объекта и новых данных
+        perm_checker = UpdateSingleWdPermissionChecker(user=user, wd_data=obj_data, check_active_empl=check_active_empl)
+        if not perm_checker.has_permission():
+            raise PermissionDenied(perm_checker.err_message)
+
+    @classmethod
+    def _check_delete_single_obj_perm(cls, user, existing_obj=None, obj_id=None, check_active_empl=False, **extra_kwargs):
+        from src.timetable.worker_day_permissions.checkers import DeleteSingleWdPermissionChecker
+        perm_checker = DeleteSingleWdPermissionChecker(user=user, wd_obj=existing_obj, wd_id=obj_id)
+        if not perm_checker.has_permission():
+            raise PermissionDenied(perm_checker.err_message)
+
+    @classmethod
+    def _check_delete_single_wd_data_perm(cls, user, obj_data, check_active_empl=False, **extra_kwargs):
+        from src.timetable.worker_day_permissions.checkers import DeleteSingleWdDataPermissionChecker
+        perm_checker = DeleteSingleWdDataPermissionChecker(
+            user=user, wd_data=obj_data, check_active_empl=check_active_empl)
+        if not perm_checker.has_permission():
+            raise PermissionDenied(perm_checker.err_message)
 
     @classmethod
     def _get_batch_update_or_create_transaction_checks_kwargs(cls, **kwargs):
@@ -805,7 +833,8 @@ class WorkerDay(AbstractModel):
         }
 
     @classmethod
-    def _has_group_permissions(cls, user, employee_id, dt, user_shops=None, user_subordinates=None, is_vacancy=False, shop_id=None, action=None, graph_type=None):
+    def _has_group_permissions(
+            cls, user, employee_id, dt, user_shops=None, get_subordinated_group_ids=None, is_vacancy=False, shop_id=None, action=None, graph_type=None):
         if not employee_id:
             return True
 
@@ -822,11 +851,10 @@ class WorkerDay(AbstractModel):
                 shop_id = int(shop_id)
             if shop_id in user_shops:
                 return True
-        employee = Employee.get_subordinates(
-            user, 
-            dt=dt, 
+        employee = user.get_subordinates(
+            dt=dt,
             user_shops=user_shops,
-            user_subordinates=user_subordinates,
+            user_subordinated_group_ids=get_subordinated_group_ids,
         ).filter(id=employee_id).first()
         if not employee:
             active_empls = Employment.objects.get_active(
@@ -840,6 +868,10 @@ class WorkerDay(AbstractModel):
                 raise ValidationError(
                     _("Can't create a working day in the schedule, since the user is not employed during this period"))
         return True
+
+    @classmethod
+    def _get_skip_update_equality_fields(cls):
+        return ['created_by', 'last_edited_by', 'source']
 
     def calc_day_and_night_work_hours(self, work_hours=None, work_start=None, work_end=None):
         from src.util.models_converter import Converter
@@ -1092,7 +1124,7 @@ class WorkerDay(AbstractModel):
     objects = WorkerDayManager.from_queryset(WorkerDayQuerySet)()  # исключает раб. дни у которых employment_id is null
     objects_with_excluded = models.Manager.from_queryset(WorkerDayQuerySet)()
 
-    tracker = FieldTracker(fields=('work_hours',))
+    tracker = FieldTracker(fields=('work_hours', 'type',))
 
     @property
     def total_cost(self):
@@ -1149,6 +1181,40 @@ class WorkerDay(AbstractModel):
 
     def get_department(self):
         return self.shop
+    
+    @classmethod
+    def get_overlap_qs(cls, user_id=OuterRef('employee__user_id')):
+        return cls.objects.filter(
+            ~Q(id=OuterRef('id')),
+            Q(
+                Q(dttm_work_start__lte=OuterRef('dttm_work_start')) &
+                Q(dttm_work_end__gt=OuterRef('dttm_work_start'))
+            ) |
+            Q(
+                Q(dttm_work_start__lt=OuterRef('dttm_work_end')) &
+                Q(dttm_work_end__gte=OuterRef('dttm_work_end'))
+            ) |
+            Q(
+                Q(dttm_work_start__gte=OuterRef('dttm_work_start')) &
+                Q(dttm_work_end__lte=OuterRef('dttm_work_end'))
+            ) |
+            Q(
+                Q(dttm_work_start__lte=OuterRef('dttm_work_start')) &
+                Q(dttm_work_end__gte=OuterRef('dttm_work_end'))
+            ) | 
+            Q(
+                Q(dttm_work_start__lte=OuterRef('dttm_work_start')) &
+                Q(dttm_work_end__isnull=True)
+            ) |
+            Q(
+                Q(dttm_work_end__gte=OuterRef('dttm_work_end')) &
+                Q(dttm_work_start__isnull=True)
+            ),
+            employee__user_id=user_id,
+            dt=OuterRef('dt'),
+            is_fact=OuterRef('is_fact'),
+            is_approved=OuterRef('is_approved'),
+        )
 
     @classmethod
     def get_breaktime(cls, network_id, break_calc_field_name):
@@ -1237,8 +1303,15 @@ class WorkerDay(AbstractModel):
                     'is_new': is_new,
                 },
             ))
+        if self.type.is_reduce_norm or (not is_new and self.tracker.has_changed('type') and WorkerDayType.objects.get(pk=self.tracker.previous('type')).is_reduce_norm):
+            transaction.on_commit(lambda: cache.delete_pattern(f"prod_cal_*_*_{self.employee_id}"))
 
         return res
+
+    def delete(self, *args, **kwargs):
+        if self.type.is_reduce_norm:
+            transaction.on_commit(lambda: cache.delete_pattern(f"prod_cal_*_*_{self.employee_id}"))
+        return super().delete(*args, **kwargs)
 
     @classmethod
     def get_closest_plan_approved(cls, user_id, priority_shop_id, dttm, record_type=None):
@@ -1325,31 +1398,7 @@ class WorkerDay(AbstractModel):
             q &= employee_days_q
 
         overlaps_qs = cls.objects.filter(q).annotate(
-            has_overlap=Exists(
-                WorkerDay.objects.filter(
-                    ~Q(id=OuterRef('id')),
-                    Q(
-                        Q(dttm_work_end__lt=OuterRef('dttm_work_start')) &
-                        Q(dttm_work_start__gte=OuterRef('dttm_work_start'))
-                    ) |
-                    Q(
-                        Q(dttm_work_start__lt=OuterRef('dttm_work_end')) &
-                        Q(dttm_work_end__gte=OuterRef('dttm_work_end'))
-                    ) |
-                    Q(
-                        Q(dttm_work_start__gte=OuterRef('dttm_work_start')) &
-                        Q(dttm_work_end__lte=OuterRef('dttm_work_end'))
-                    ) |
-                    Q(
-                        Q(dttm_work_start__lte=OuterRef('dttm_work_start')) &
-                        Q(dttm_work_end__gte=OuterRef('dttm_work_end'))
-                    ),
-                    employee__user_id=OuterRef('employee__user_id'),
-                    dt=OuterRef('dt'),
-                    is_fact=OuterRef('is_fact'),
-                    is_approved=OuterRef('is_approved'),
-                )
-            )
+            has_overlap=Exists(cls.get_overlap_qs())
         ).filter(
             has_overlap=True,
         ).values('employee__user__last_name', 'employee__user__first_name', 'dt').distinct()
@@ -1673,6 +1722,13 @@ class WorkerDay(AbstractModel):
                     dttm_work_end=OuterRef('dttm_work_end'),
                     delta_in_secs=delta_in_secs,
                     use_annotated_filter=False,
+                ).annotate(
+                    order_by_val=RawSQL("""LEAST(
+                        ABS(EXTRACT(EPOCH FROM (U0."dttm_work_start" - "timetable_workerday"."dttm_work_start"))),
+                        ABS(EXTRACT(EPOCH FROM (U0."dttm_work_end" - "timetable_workerday"."dttm_work_end")))
+                    )""", [])
+                ).order_by(
+                    'order_by_val',
                 ).values('id')[:1])
             )
             qs.filter(plan_approved_count=1).update(
@@ -1791,202 +1847,6 @@ class WorkerDayCashboxDetails(AbstractActiveModel):
         super(AbstractActiveModel, self).delete(*args, **kwargs)
 
     objects = WorkerDayCashboxDetailsManager()
-
-
-class WorkerDayChangeRequest(AbstractActiveModel):
-    class Meta(object):
-        verbose_name = 'Запрос на изменения рабочего дня'
-        unique_together = ('worker', 'dt')
-
-    def __str__(self):
-        return '{}, {}, {}'.format(self.worker.id, self.dt, self.status_type)
-
-    TYPE_APPROVED = 'A'
-    TYPE_DECLINED = 'D'
-    TYPE_PENDING = 'P'
-
-    STATUS_CHOICES = (
-        (TYPE_APPROVED, 'Approved'),
-        (TYPE_DECLINED, 'Declined'),
-        (TYPE_PENDING, 'Pending'),
-    )
-
-    id = models.BigAutoField(primary_key=True)
-    status_type = models.CharField(max_length=1, choices=STATUS_CHOICES, default=TYPE_PENDING)
-
-    worker = models.ForeignKey(User, on_delete=models.PROTECT)
-    dt = models.DateField()
-    type = models.CharField(choices=WorkerDay.TYPES, max_length=2, default=WorkerDay.TYPE_EMPTY)
-
-    dttm_work_start = models.DateTimeField(null=True, blank=True)
-    dttm_work_end = models.DateTimeField(null=True, blank=True)
-    wish_text = models.CharField(null=True, blank=True, max_length=512)
-
-
-class EventManager(models.Manager):
-    def mm_event_create(self, users, push_title=None, **kwargs):
-        event = self.create(**kwargs)
-
-        # users = User.objects.filter(
-        #     function_group__allowed_functions__func=noti_groups['func'],
-        #     function_group__allowed_functions__access_type__in=noti_groups['access_types'],
-        # )
-        # if event.department:
-        #     users = users.filter(shop=event.department)
-
-        notis = Notifications.objects.bulk_create([Notifications(event=event, to_worker=u) for u in users])
-        # todo: add sending push notifies
-        if (not push_title is None) and IS_PUSH_ACTIVE:
-            devices = FCMDevice.objects.filter(user__in=users)
-            devices.send_message(title=push_title, body=event.text)
-        return event
-
-
-class Event(AbstractModel):
-    dttm_added = models.DateTimeField(auto_now_add=True)
-
-    text = models.CharField(max_length=256)
-    # hidden_text = models.CharField(max_length=256, default='')
-
-    department = models.ForeignKey(Shop, null=True, blank=True, on_delete=models.PROTECT) # todo: should be department model?
-
-    workerday_details = models.ForeignKey(WorkerDayCashboxDetails, null=True, blank=True, on_delete=models.PROTECT, related_name='events')
-
-    objects = EventManager()
-
-    def get_text(self):
-        if self.workerday_details:
-            from src.util.models_converter import Converter
-
-            if self.workerday_details.dttm_deleted:
-                return 'Вакансия отмена'
-            elif self.workerday_details.worker_day_id:
-                return 'Вакансия на {} в {} уже выбрана.'.format(
-                    Converter.convert_date(self.workerday_details.dttm_from.date()),
-                    self.workerday_details.work_type.shop.name,
-                )
-            else:
-                return 'Открыта вакансия на {} на {} в {}. Время работы: с {} по {}. Хотите выйти?'.format(
-                    self.workerday_details.work_type.work_type_name.name,
-                    Converter.convert_date(self.workerday_details.dttm_from.date()),
-                    self.workerday_details.work_type.shop.name,
-                    Converter.convert_time(self.workerday_details.dttm_from.time()),
-                    Converter.convert_time(self.workerday_details.dttm_to.time()),
-                )
-
-        else:
-            return self.text
-
-    def is_question(self):
-        return not self.workerday_details_id is None
-
-    def do_action(self, user):
-        res = {
-            'status': 0,
-            'text': '',
-        }
-
-        if self.workerday_details_id: # действие -- выход на вакансию
-            vacancy = self.workerday_details
-            user_worker_day = WorkerDay.objects.qos_current_version().filter(
-                worker=user,
-                dt=vacancy.dttm_from.date()
-            ).first()
-
-            if user_worker_day and vacancy:
-                is_updated = False
-                update_condition = user_worker_day.type != WorkerDay.TYPE_WORKDAY or \
-                                   WorkerDayCashboxDetails.objects.filter(
-                                       Q(dttm_from__gte=vacancy.dttm_from, dttm_from__lt=vacancy.dttm_to) |
-                                       Q(dttm_to__gt=vacancy.dttm_from, dttm_to__lte=vacancy.dttm_to) |
-                                       Q(dttm_from__lte=vacancy.dttm_from, dttm_to__gte=vacancy.dttm_to),
-                                       worker_day_id=user_worker_day.id,
-                                       dttm_deleted__isnull=True,
-                                   ).count() == 0
-
-                # todo: actually should be transaction (check condition and update)
-                # todo: add time for go between shops
-                if update_condition:
-                    is_updated = WorkerDayCashboxDetails.objects.filter(
-                        id=vacancy.id,
-                        worker_day__isnull=True,
-                        dttm_deleted__isnull=True,
-                    ).update(
-                        worker_day_id=user_worker_day.id,
-                        status=WorkerDayCashboxDetails.TYPE_WORK,
-                    )
-
-                    if is_updated:
-                        user_worker_day.type = WorkerDay.TYPE_WORKDAY
-
-                        if (user_worker_day.dttm_work_start is None) or (user_worker_day.dttm_work_start > vacancy.dttm_from):
-                            user_worker_day.dttm_work_start = vacancy.dttm_from
-
-                        if (user_worker_day.dttm_work_end is None) or (user_worker_day.dttm_work_end < vacancy.dttm_to):
-                            user_worker_day.dttm_work_end = vacancy.dttm_to
-
-                        user_worker_day.save()
-
-                    if not is_updated:
-                        res['status'] = 3
-                        res['text'] = 'Невозможно выполнить действие'
-
-                else:
-                    res['status'] = 4
-                    res['text'] = 'Вы не можете выйти на эту смену'
-            else:
-                res['status'] = 2
-                res['text'] = 'График на этот период еще не составлен'
-        else:
-            res['status'] = 1
-            res['text'] = 'К этому уведомлению не может быть действия'
-        return res
-
-    def is_action_active(self):
-        if self.workerday_details and (self.workerday_details.dttm_deleted is None) and (self.workerday_details.worker_day_id is None):
-            return True
-        return False
-
-
-class NotificationManager(models.Manager):
-    def mm_filter(self, *args, **kwargs):
-        return self.filter(*args, **kwargs).select_related(
-            'event',
-            'event__workerday_details',
-            'event__workerday_details__work_type',
-            'event__workerday_details__work_type__shop'
-        )
-
-
-class Notifications(AbstractModel):
-    class Meta(object):
-        verbose_name = 'Уведомления'
-
-    def __str__(self):
-        return '{}, {}, {}, id: {}'.format(
-            self.to_worker.last_name,
-            self.shop.name if self.shop else 'no shop',
-            self.dttm_added,
-            # self.text[:60],
-            self.id
-        )
-
-    id = models.BigAutoField(primary_key=True)
-    shop = models.ForeignKey(Shop, null=True, on_delete=models.PROTECT, related_name='notifications')
-
-    dttm_added = models.DateTimeField(auto_now_add=True)
-    to_worker = models.ForeignKey(User, on_delete=models.PROTECT)
-
-    was_read = models.BooleanField(default=False)
-    event = models.ForeignKey(Event, on_delete=models.PROTECT, null=True)
-
-    # text = models.CharField(max_length=512)
-    # type = models.CharField(max_length=1, choices=TYPES, default=TYPE_SUCCESS)
-
-    # content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE, blank=True, null=True)
-    # object_id = models.PositiveIntegerField(blank=True, null=True)
-    # object = GenericForeignKey(ct_field='content_type', fk_field='object_id')
-    objects = NotificationManager()
 
 
 class ShopMonthStat(AbstractModel):
@@ -2441,25 +2301,26 @@ class WorkerDayPermission(AbstractModel):
     FACT = 'F'
 
     GRAPH_TYPES = (
-        (PLAN, 'План'),
-        (FACT, 'Факт'),
+        (PLAN, _('Plan')),
+        (FACT, _('Fact')),
     )
 
-    CREATE_OR_UPDATE = 'CU'
-    CREATE = 'C'
-    UPDATE = 'U'
-    DELETE = 'D'
+    # изменение типа дня в существующем дне считается как 2 действия: создание нового типа и удаление старого типа.
+    CREATE = 'C'  # создание нового дня с каким-то типом
+    UPDATE = 'U'  # изменение каких-то значений дня без изменения его типа
+    DELETE = 'D'  # удаление какого-то типа дня
     APPROVE = 'A'
 
     ACTIONS = (
-        (CREATE_OR_UPDATE, _('Create/update')),
+        (CREATE, _('Create')),
+        (UPDATE, _('Change')),
         # Remove, т.к. Delete почему-то переводится в "Удалено", даже если в django.py "Удаление".
         (DELETE, _('Remove')),
         (APPROVE, _('Approve')),
     )
     ACTIONS_DICT = dict(ACTIONS)
 
-    action = models.CharField(choices=ACTIONS, max_length=2, verbose_name='Действие')
+    action = models.CharField(choices=ACTIONS, max_length=4, verbose_name='Действие')
     graph_type = models.CharField(choices=GRAPH_TYPES, max_length=1, verbose_name='Тип графика')
     wd_type = models.ForeignKey('timetable.WorkerDayType', verbose_name='Тип дня', on_delete=models.CASCADE)
 
@@ -2474,6 +2335,32 @@ class WorkerDayPermission(AbstractModel):
 
 
 class GroupWorkerDayPermission(AbstractModel):
+    MY_SHOPS_ANY_EMPLOYEE = 1
+    SUBORDINATE_EMPLOYEE = 2
+    OUTSOURCE_NETWORK_EMPLOYEE = 3
+    MY_NETWORK_EMPLOYEE = 4
+
+    EMPLOYEE_TYPE_CHOICES = (
+        (MY_SHOPS_ANY_EMPLOYEE, _('My shops employees')),  # с трудоустройством в моем магазине
+        (SUBORDINATE_EMPLOYEE, _('Subordinate employees')),  # с трудоустройством в моем магазине
+        (OUTSOURCE_NETWORK_EMPLOYEE, _('Outsource network employees')),  # без трудоустройства в моем магазине и из сети, аутсорсящей сеть пользователя, соверщающего действие
+        (MY_NETWORK_EMPLOYEE, _('My network employees')),
+    )
+    EMPLOYEE_TYPE_CHOICES_REVERSED_DICT = {v: k for k, v in dict(EMPLOYEE_TYPE_CHOICES).items()}
+
+    MY_SHOPS = 1
+    MY_NETWORK_SHOPS = 2
+    OUTSOURCE_NETWORK_SHOPS = 3
+    CLIENT_NETWORK_SHOPS = 4
+
+    SHOP_TYPE_CHOICES = (
+        (MY_SHOPS, _('My shops')),
+        (MY_NETWORK_SHOPS, _('My network shops')),
+        (OUTSOURCE_NETWORK_SHOPS, _('Outsource network shops')),
+        (CLIENT_NETWORK_SHOPS, _('Client network shops')),
+    )
+    SHOP_TYPE_CHOICES_REVERSED_DICT = {v: k for k, v in dict(SHOP_TYPE_CHOICES).items()}
+
     group = models.ForeignKey('base.Group', on_delete=models.CASCADE, verbose_name='Группа доступа')
     worker_day_permission = models.ForeignKey(
         'timetable.WorkerDayPermission', on_delete=models.CASCADE, verbose_name='Разрешение для рабочего дня')
@@ -2485,29 +2372,44 @@ class GroupWorkerDayPermission(AbstractModel):
         null=True, blank=True, verbose_name='Ограничение на дни в будущем',
         help_text='Если null - нет ограничений, если n - можно выполнять действие только n будущих дней',
     )
+    allow_actions_on_vacancies = models.BooleanField(
+        verbose_name=_('Allow actions on vacancies'),
+        default=True,
+        help_text=_('Вакансией в данном случае является день, если он был явно создан как вакансия, '
+                  'либо если магазин в трудоустройстве не совпадает с магазином выхода '
+                  '(актуально для рабочий типов дней)'),
+    )
+    # need_closest_plan_approved = models.BooleanField(  # TODO: нужно?
+    #     verbose_name='Нужен ближайший план',
+    #     default=False, help_text='Актуально для создания, *изменения??? фактических записей')
+    employee_type = models.PositiveSmallIntegerField(
+        verbose_name='Тип сотрудника', default=SUBORDINATE_EMPLOYEE, choices=EMPLOYEE_TYPE_CHOICES)
+    shop_type = models.PositiveSmallIntegerField(
+        verbose_name='Тип магазина', help_text='Актуально только для рабочих типов дней',
+        default=MY_NETWORK_SHOPS, choices=SHOP_TYPE_CHOICES,
+    )
 
     class Meta:
         verbose_name = 'Разрешение группы для рабочего дня'
         verbose_name_plural = 'Разрешения группы для рабочего дня'
-        unique_together = ('group', 'worker_day_permission',)
+        unique_together = ('group', 'worker_day_permission', 'employee_type', 'shop_type')
 
     def __str__(self):
         return f'{self.group.name} {self.worker_day_permission}'
 
     @classmethod
-    def has_permission(cls, user, action, graph_type, wd_type, wd_dt):
-        if isinstance(wd_dt, str):
-            wd_dt = datetime.datetime.strptime(wd_dt, settings.QOS_DATE_FORMAT).date()
-        # FIXME-devx: будет временной лаг из-за того, что USE_TZ=False, откуда брать таймзону? - из shop?
-        today = (datetime.datetime.now() + datetime.timedelta(hours=3)).date()
+    def get_perms_qs(cls, user, action, graph_type, wd_type_id, wd_dt, shop_id=None, is_vacancy=None):
+        kwargs = {}
+        if is_vacancy:
+            kwargs['allow_actions_on_vacancies'] = True
         return cls.objects.filter(
-            Q(limit_days_in_past__isnull=True) | Q(limit_days_in_past__gte=(today - wd_dt).days),
-            Q(limit_days_in_future__isnull=True) | Q(limit_days_in_future__gte=(wd_dt - today).days),
-            group__in=user.get_group_ids(),  # добавить shop ?
+            group__in=user.get_group_ids(shop_id=shop_id),
             worker_day_permission__action=action,
             worker_day_permission__graph_type=graph_type,
-            worker_day_permission__wd_type=wd_type,
-        ).exists()
+            worker_day_permission__wd_type_id=wd_type_id,
+            **kwargs,
+        )
+
 
 class PlanAndFactHoursAbstract(models.Model):
     id = models.CharField(max_length=256, primary_key=True)

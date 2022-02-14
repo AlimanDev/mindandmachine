@@ -11,7 +11,7 @@ from dateutil.relativedelta import relativedelta
 from django.conf import settings
 from django.db import transaction
 from django.db.models import Q, F, Count, Sum
-from django.db.models.expressions import OuterRef, Subquery
+from django.db.models.expressions import OuterRef, Subquery, RawSQL
 from django.db.models.functions import Coalesce
 from django.http.response import HttpResponse
 from django.utils.encoding import escape_uri_path
@@ -521,7 +521,14 @@ class UploadDownloadTimetableCells(BaseUploadDownloadTimeTable):
                             dttm_work_start=dttm_work_start,
                             dttm_work_end=dttm_work_end,
                             delta_in_secs=self.user.network.set_closest_plan_approved_delta_for_manual_fact,
-                        ).first() if (is_fact and not wd_type_obj.is_dayoff) else None,
+                        ).annotate(
+                            order_by_val=RawSQL("""LEAST(
+                                ABS(EXTRACT(EPOCH FROM (U0."dttm_work_start" - "timetable_workerday"."dttm_work_start"))),
+                                ABS(EXTRACT(EPOCH FROM (U0."dttm_work_end" - "timetable_workerday"."dttm_work_end")))
+                            )""", [])
+                        ).order_by(
+                            'order_by_val',
+                        ).values('id').first() if (is_fact and not wd_type_obj.is_dayoff) else None,
                         source=WorkerDay.SOURCE_UPLOAD,
                     )
                     if wd_type_id == WorkerDay.TYPE_WORKDAY:
@@ -532,8 +539,14 @@ class UploadDownloadTimetableCells(BaseUploadDownloadTimeTable):
                         ]
                     new_wdays_data.append(new_wd_dict)
 
-        WorkerDay.batch_update_or_create(new_wdays_data, user=self.user)
-        return Response()
+        objs, stats = WorkerDay.batch_update_or_create(
+            data=new_wdays_data, user=self.user,
+            check_perms_extra_kwargs=dict(
+                check_active_empl=False,
+                grouped_checks=True,
+            ),
+        )
+        return Response(stats)
 
     def _download(self, workbook, form):
         ws = workbook.add_worksheet(_('Timetable for signature.'))
@@ -596,13 +609,13 @@ class UploadDownloadTimetableCells(BaseUploadDownloadTimeTable):
         # construct user info
         timetable.construnts_users_info(employments, 9, 0, ['code', 'fio', 'position'])
 
-        groupped_days = self._group_worker_days(workdays)
+        grouped_days = self._group_worker_days(workdays)
 
         # fill page 1
-        timetable.fill_table(groupped_days, employments, stat, 9, 3, stat_type=stat_type, norm_type=norm_type, mapping=self.wd_type_mapping)
+        timetable.fill_table(grouped_days, employments, stat, 9, 3, stat_type=stat_type, norm_type=norm_type, mapping=self.wd_type_mapping)
 
         # fill page 2
-        timetable.fill_table2(shop, timetable.prod_days[-1].dt, groupped_days)
+        timetable.fill_table2(shop, timetable.prod_days[-1].dt, grouped_days)
 
         timetable.fill_description_table(self.wd_types_dict)
 
@@ -800,7 +813,8 @@ class UploadDownloadTimetableRows(BaseUploadDownloadTimeTable):
 
         for data in users:
             employees[data[0].tabel_code] = data
-        
+
+        stats = {}
         employment_work_types = self._get_employment_work_types(users, shop_id)
         with transaction.atomic():
             new_wdays_data = []
@@ -881,9 +895,15 @@ class UploadDownloadTimetableRows(BaseUploadDownloadTimeTable):
                     ]
                 new_wdays_data.append(new_wd_data)
 
-            WorkerDay.batch_update_or_create(new_wdays_data, user=self.user)
+            objs, stats = WorkerDay.batch_update_or_create(
+                data=new_wdays_data, user=self.user,
+                check_perms_extra_kwargs=dict(
+                    check_active_empl=False,
+                    grouped_checks=True,
+                ),
+            )
 
-        return Response()      
+        return Response(stats)
 
     def _generate_upload_example(self, wrtier, shop_id, dt_from, dt_to, is_fact, is_approved, employee_id__in):
         workbook = wrtier.book

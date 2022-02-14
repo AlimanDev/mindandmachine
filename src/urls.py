@@ -1,48 +1,26 @@
 from django.conf import settings
-from django.conf.urls import include, url
+from django.conf.urls import include
 from django.conf.urls.static import static
 from django.contrib import admin
-from django.urls import path
-from rest_framework import permissions
-from drf_yasg.views import get_schema_view
+from django.urls import path, re_path
 from drf_yasg import openapi
-from src.util.openapi.auto_schema import WFMOpenAPISchemaGenerator, WFMIntegrationAPISchemaGenerator
+from drf_yasg.views import get_schema_view
+from rest_framework import permissions
 
 from src.base import urls as base_api
 from src.conf.djconfig import DEBUG
 from src.forecast import urls as forecast_api
-from src.main.auth import urls as auth_urls
-from src.main.cashbox import urls as cashbox_urls
-from src.main.demand import urls as demand_urls
-from src.main.download import urls as download_urls
-from src.main.operation_template import urls as operation_template_urls
-from src.main.other import urls as other_urls
-from src.main.shop import urls as shop_urls
-from src.main.tablet import urls as tablet_urls
-from src.main.timetable import urls as timetable_urls
-from src.main.upload import urls as upload_urls
-from src.main.urv import urls as urv_urls
+from src.forecast.views import RecalcLoadAdminView, UploadDemandAdminView
 from src.misc import urls as misc_api
 from src.recognition.urls import router as recognition_router
+from src.recognition.views import DownloadViolatorsReportAdminView
+from src.reports import urls as reports_urls
+from src.tasks import urls as task_urls
 from src.timetable import urls as timetable_api
 from src.timetable.views import RecalcWhAdminView
-from src.forecast.views import RecalcLoadAdminView, UploadDemandAdminView
-from src.recognition.views import DownloadViolatorsReportAdminView
-from src.tasks import urls as task_urls
-from src.reports import urls as reports_urls
+from src.util.openapi.auto_schema import WFMOpenAPISchemaGenerator, WFMIntegrationAPISchemaGenerator
 
 api_urlpatterns = [
-    path('auth/', include(auth_urls)),
-    path('cashbox/', include(cashbox_urls)),
-    path('demand/', include(demand_urls)),
-    path('download/', include(download_urls)),
-    path('other/', include(other_urls)),
-    path('operation_template/', include(operation_template_urls)),
-    path('shop/', include(shop_urls)),
-    path('tablet/', include(tablet_urls)),
-    path('timetable/', include(timetable_urls)),
-    path('upload/', include(upload_urls)),
-    path('urv/', include(urv_urls)),
     path('v1/', include('src.recognition.urls')),  # time attendance api urls
 ]
 
@@ -55,6 +33,7 @@ urlpatterns = [
     path('admin/recognition/ticks/download_violators/', DownloadViolatorsReportAdminView.as_view(), name='download_violators'),
     path('admin/', admin.site.urls),
     path('rest_api/recognition/', include(recognition_router.get_urls())),
+    path('rest_api/pbi/', include('src.pbi.urls')),
     path('rest_api/integration/mda/', include('src.integration.mda.urls')),
     path('rest_api/', include(
         base_api.urlpatterns +
@@ -121,8 +100,8 @@ integration_schema_view = get_schema_view(
 )
 
 urlpatterns += [
-   url(r'^swagger(?P<format>\.json|\.yaml)$', schema_view.without_ui(cache_timeout=0), name='schema-json'),
-   url(r'^swagger/$', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),
-   url(r'^redoc/$', schema_view.with_ui('redoc', cache_timeout=0), name='schema-redoc'),
-   url(r'^rest_api/integration_docs/$', integration_schema_view.with_ui('redoc', cache_timeout=0), name='schema-redoc-integration'),
+   re_path(r'^swagger(?P<format>\.json|\.yaml)$', schema_view.without_ui(cache_timeout=0), name='schema-json'),
+   re_path(r'^swagger/$', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),
+   re_path(r'^redoc/$', schema_view.with_ui('redoc', cache_timeout=0), name='schema-redoc'),
+   re_path(r'^rest_api/integration_docs/$', integration_schema_view.with_ui('redoc', cache_timeout=0), name='schema-redoc-integration'),
 ]

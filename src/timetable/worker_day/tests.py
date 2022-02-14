@@ -732,9 +732,9 @@ class TestUploadDownload(TestsHelperMixin, APITestCase):
         file.close()
         self.assertEqual(response.status_code, 200)
         self.assertEqual(WorkerDay.objects.filter(is_approved=False).count(), 181)
-        self.assertEquals(User.objects.filter(last_name='Смешнов').count(), 1)
+        self.assertEqual(User.objects.filter(last_name='Смешнов').count(), 1)
         user = User.objects.filter(last_name='Смешнов').first()
-        self.assertEquals(Employee.objects.filter(user=user).count(), 2)
+        self.assertEqual(Employee.objects.filter(user=user).count(), 2)
         self.assertTrue(Employee.objects.filter(tabel_code='A23739').exists())
 
     def test_upload_timetable(self):
@@ -750,9 +750,9 @@ class TestUploadDownload(TestsHelperMixin, APITestCase):
         self.assertEqual(WorkerDay.objects.filter(
             employee__user__last_name='Сидоров', dt='2020-04-02',
             type_id=WorkerDay.TYPE_BUSINESS_TRIP, is_fact=False, is_approved=False).count(), 1)
-        self.assertEquals(User.objects.filter(last_name='Смешнов').count(), 1)
+        self.assertEqual(User.objects.filter(last_name='Смешнов').count(), 1)
         user = User.objects.filter(last_name='Смешнов').first()
-        self.assertEquals(Employee.objects.filter(user=user).count(), 2)
+        self.assertEqual(Employee.objects.filter(user=user).count(), 2)
 
     def test_upload_timetable_leading_zeros(self):
         file = open('etc/scripts/timetable_leading_zeros.xlsx', 'rb')
@@ -778,12 +778,12 @@ class TestUploadDownload(TestsHelperMixin, APITestCase):
         file.close()
         self.assertEqual(response.status_code, 200)
         self.assertEqual(WorkerDay.objects.filter(is_approved=False).count(), 181)
-        self.assertEquals(User.objects.filter(last_name='Смешнов').count(), 2)
+        self.assertEqual(User.objects.filter(last_name='Смешнов').count(), 2)
         user1 = User.objects.filter(last_name='Смешнов').first()
         user2 = User.objects.filter(last_name='Смешнов').last()
-        self.assertNotEquals(user1.id, user2.id)
-        self.assertEquals(Employee.objects.filter(user=user1).count(), 1)
-        self.assertEquals(Employee.objects.filter(user=user2).count(), 1)
+        self.assertNotEqual(user1.id, user2.id)
+        self.assertEqual(Employee.objects.filter(user=user1).count(), 1)
+        self.assertEqual(Employee.objects.filter(user=user2).count(), 1)
 
     def test_upload_timetable_many_users_match_tabel_code(self):
         file = open('etc/scripts/timetable.xlsx', 'rb')
@@ -792,12 +792,12 @@ class TestUploadDownload(TestsHelperMixin, APITestCase):
         file.close()
         self.assertEqual(response.status_code, 200)
         self.assertEqual(WorkerDay.objects.filter(is_approved=False).count(), 181)
-        self.assertEquals(User.objects.filter(last_name='Смешнов').count(), 2)
+        self.assertEqual(User.objects.filter(last_name='Смешнов').count(), 2)
         user1 = User.objects.filter(last_name='Смешнов').first()
         user2 = User.objects.filter(last_name='Смешнов').last()
-        self.assertNotEquals(user1.id, user2.id)
-        self.assertEquals(Employee.objects.filter(user=user1).count(), 1)
-        self.assertEquals(Employee.objects.filter(user=user2).count(), 1)
+        self.assertNotEqual(user1.id, user2.id)
+        self.assertEqual(Employee.objects.filter(user=user1).count(), 1)
+        self.assertEqual(Employee.objects.filter(user=user2).count(), 1)
 
     @skip('Сервер не доступен')
     def test_download_tabel(self):
@@ -975,9 +975,9 @@ class TestUploadDownload(TestsHelperMixin, APITestCase):
         file.close()
         self.assertEqual(response.status_code, 200)
         self.assertEqual(WorkerDay.objects.filter(is_approved=False, source=WorkerDay.SOURCE_UPLOAD).count(), 180)
-        self.assertEquals(User.objects.filter(last_name='Смешнов').count(), 1)
+        self.assertEqual(User.objects.filter(last_name='Смешнов').count(), 1)
         user = User.objects.filter(last_name='Смешнов').first()
-        self.assertEquals(Employee.objects.filter(user=user).count(), 2)
+        self.assertEqual(Employee.objects.filter(user=user).count(), 2)
         self.assertTrue(Employee.objects.filter(tabel_code='A23739').exists())
 
     def test_upload_timetable_not_change_or_create_users(self):
@@ -1024,7 +1024,7 @@ class TestUploadDownload(TestsHelperMixin, APITestCase):
         self.assertEqual(WorkerDay.objects.filter(is_approved=False).count(), 60)
         user1.refresh_from_db()
         self.assertIsNone(user1.middle_name)
-        self.assertEquals(user1.last_name, 'Сидоров')
+        self.assertEqual(user1.last_name, 'Сидоров')
         employment1.refresh_from_db()
         employment2.refresh_from_db()
         self.assertIsNone(employment1.position_id)

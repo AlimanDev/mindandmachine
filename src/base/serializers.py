@@ -23,9 +23,6 @@ from src.base.models import (
     User,
     FunctionGroup,
     WorkerPosition,
-    Notification,
-    Subscribe,
-    Event,
     ShopSettings,
     Shop,
     Group,
@@ -156,6 +153,7 @@ class NetworkSerializer(serializers.ModelSerializer):
             'show_employee_shift_schedule_tab',
             'rebuild_timetable_min_delta',
             'analytics_iframe',
+            'analytics_type',
         ]
 
 class NetworkListSerializer(serializers.Serializer):
@@ -290,7 +288,7 @@ class AuthUserSerializer(UserSerializer):
         return list(set(allowed_tabs))
     
     def get_subordinate_employee_ids(self, obj: User):
-        return list(Employee.get_subordinates(obj, dt=now().date(), dt_to_shift=relativedelta(months=6)).values_list('id', flat=True))
+        return list(obj.get_subordinates(dt=now().date(), dt_to_shift=relativedelta(months=6)).values_list('id', flat=True))
     
     def get_self_employee_ids(self, obj: User):
         dt = now().date()
@@ -584,36 +582,6 @@ class WorkerPositionSerializer(BaseNetworkSerializer):
         return super().update(instance, validated_data, *args, **kwargs)
 
 
-class EventSerializer(serializers.ModelSerializer):
-    shop_id = serializers.IntegerField()
-
-    class Meta:
-        model = Event
-        fields = ['type', 'shop_id']
-
-
-class NotificationSerializer(serializers.ModelSerializer):
-    event = EventSerializer(read_only=True)
-    message = serializers.SerializerMethodField()
-
-    class Meta:
-        model = Notification
-        fields = ['id','worker_id', 'is_read', 'event', 'message']
-        read_only_fields = ['worker_id', 'event']
-
-    def get_message(self, instance) -> str:
-        lang = self.context['request'].user.lang
-
-        event = instance.event
-        message = Message(lang=lang)
-        if event.type == 'vacancy':
-            details = event.worker_day
-            params = {'details': details, 'dt': details.dt, 'shop': event.shop, 'domain': settings.EXTERNAL_HOST}
-        else:
-            params = event.params
-        return message.get_message(event.type, params)
-
-
 class ShopSettingsSerializer(serializers.ModelSerializer):
     network_id = serializers.IntegerField(default=CurrentUserNetwork(), write_only=True)
 
@@ -634,14 +602,6 @@ class ShopSettingsSerializer(serializers.ModelSerializer):
                   'network_id',
                   'breaks_id',
                   ]
-
-
-class SubscribeSerializer(serializers.ModelSerializer):
-    shop_id = serializers.IntegerField(required=True)
-
-    class Meta:
-        model = Subscribe
-        fields = ['id','shop_id', 'type']
 
 
 class GroupSerializer(serializers.ModelSerializer):

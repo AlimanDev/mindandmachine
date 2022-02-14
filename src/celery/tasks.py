@@ -8,24 +8,18 @@ import requests
 from dateutil.relativedelta import relativedelta
 from django.conf import settings
 from django.core.mail import EmailMultiAlternatives
-from django.db.models import Q
 from django.utils.timezone import now
 from requests.auth import HTTPBasicAuth
-from src.main.operation_template.utils import build_period_clients
-from src.main.upload.utils import upload_demand_util, upload_employees_util, upload_vacation_util, sftp_download
 
 from src.base.models import (
+    Network,
     Shop,
     User,
-    Notification,
-    Subscribe,
-    Event,
     Employment,
 )
 from src.celery.celery import app
 from src.conf.djconfig import EMAIL_HOST_USER, URV_DELETE_BIOMETRICS_DAYS_AFTER_FIRED
 from src.events.signals import event_signal
-from src.forecast.models import OperationTemplate
 from src.recognition.events import EMPLOYEE_NOT_CHECKED_IN, EMPLOYEE_NOT_CHECKED_OUT
 from src.recognition.utils import get_worker_days_with_no_ticks
 from src.timetable.models import (
@@ -33,135 +27,7 @@ from src.timetable.models import (
     WorkerDayCashboxDetails,
     EmploymentWorkType,
 )
-
-
-@app.task
-def create_notifications_for_event(event_id):
-    event = Event.objects.get(id=event_id)
-    subscribes = Subscribe.objects.filter(type=event.type, shop=event.shop)
-    notification_list = []
-    for subscribe in subscribes:
-        notification_list.append(
-            Notification(
-                worker=subscribe.user,
-                event=event
-            )
-        )
-        print(f"Create notification for {subscribe.user}, {event}")
-    Notification.objects.bulk_create(notification_list)
-
-@app.task
-def create_notifications_for_subscribe(subscribe_id):
-    subscribe = Subscribe.objects.get(id=subscribe_id)
-    events = Event.objects.filter(shop=subscribe.shop, type=subscribe.type, dttm_valid_to__gte=now())
-    notification_list = []
-    for event in events:
-        notification_list.append(
-            Notification(
-                worker=subscribe.user,
-                event=event
-            )
-        )
-        print(f"Create notification for {subscribe.user}, {event}")
-        Notification.objects.bulk_create(notification_list)
-
-
-@app.task
-def delete_notifications():
-    Event.objects.filter(
-        dttm_valid_to__lte=now()
-    ).delete()
-
-
-@app.task
-def op_type_build_period_clients():
-    dt_from = now().date() + timedelta(days = 2)
-    dt_to = dt_from + timedelta(days=62)
-
-    oper_templates = OperationTemplate.objects.filter(
-        Q(dt_built_to__isnull=True) | Q(dt_built_to__lt=dt_to),
-        dttm_deleted__isnull=True,
-    )
-
-    for ot in oper_templates:
-        build_period_clients(ot, dt_to=dt_to)
-
-
-
-# @app.task
-# def notify_cashiers_lack():
-#     """
-#     Создает уведомления на неделю вперед, если в магазине будет нехватка кассиров
-#
-#     Note:
-#         Выполняется каждую ночь
-#     """
-#     for shop in Shop.objects.all():
-#         dttm_now = now()
-#         notify_days = 7
-#         dttm = dttm_now.replace(minute=0, second=0, microsecond=0)
-#         init_params_dict = get_init_params(dttm_now, shop.id)
-#         work_types = init_params_dict['work_types_dict']
-#         mean_bills_per_step = init_params_dict['mean_bills_per_step']
-#         period_demands = []
-#         for i in range(notify_days):
-#             period_demands += get_init_params(dttm_now + datetime.timedelta(days=i), shop.id)['predict_demand']
-#
-#         managers_dir_list = []
-#         users_with_such_notes = []
-#         # пока что есть магазы в которых нет касс с ForecastHard
-#         if work_types and period_demands:
-#             return_dict = has_deficiency(
-#                 period_demands,
-#                 mean_bills_per_step,
-#                 work_types,
-#                 dttm,
-#                 dttm_now + datetime.timedelta(days=notify_days)
-#             )
-#             notifications_list = []
-#             for dttm_converted in return_dict.keys():
-#                 to_notify = False  # есть ли вообще нехватка
-#                 hrs, minutes, other = dttm_converted.split(':')  # дропаем секунды
-#                 if not shop.super_shop.is_supershop_open_at(datetime.time(hour=int(hrs), minute=int(minutes), second=0)):
-#                     continue
-#                 if sum(return_dict[dttm_converted].values()) > 0:
-#                     to_notify = True
-#                     notification_text = '{}:{} {}:\n'.format(hrs, minutes, other[3:])
-#                     for work_type in return_dict[dttm_converted].keys():
-#                         if return_dict[dttm_converted][work_type]:
-#                             notification_text += '{} будет не хватать сотрудников: {}. '.format(
-#                                 WorkType.objects.get(id=work_type).name,
-#                                 return_dict[dttm_converted][work_type]
-#                             )
-#                     managers_dir_list = User.objects.filter(
-#                         function_group__allowed_functions__func='get_workers_to_exchange',
-#                         dt_fired__isnull=True,
-#                         shop_id=shop.id
-#                     )
-#                     users_with_such_notes = []
-#
-# # TODO: REWRITE WITH EVENT
-# # FIXME: REWRITE WITH EVENT
-#                     # notes = Notifications.objects.filter(
-#                     #     type=Notifications.TYPE_INFO,
-#                     #     text=notification_text,
-#                     #     dttm_added__lt=now() + datetime.timedelta(hours=2)
-#                     # )
-#                     # for note in notes:
-#                     #     users_with_such_notes.append(note.to_worker_id)
-#
-#             #     if to_notify:
-#             #         for recipient in managers_dir_list:
-#             #             if recipient.id not in users_with_such_notes:
-#             #                 notifications_list.append(
-#             #                     Notifications(
-#             #                         type=Notifications.TYPE_INFO,
-#             #                         to_worker=recipient,
-#             #                         text=notification_text,
-#             #                     )
-#             #                 )
-#             #
-#             # Notifications.objects.bulk_create(notifications_list)
+from src.timetable.worker_day.stat import WorkersStatsGetter
 
 
 @app.task
@@ -248,40 +114,6 @@ def send_notify_email(message, send2user_ids, title=None, file=None, html_conten
         msg.attach_alternative(html_content, "text/html")
     result = msg.send()
     return 'Отправлено {} сообщений из {}'.format(result, len(send2user_ids))
-
-
-@app.task
-def upload_demand_task():
-    localpaths = [
-        'bills_{}.csv'.format(str(time_in_secs.time()).replace('.', '_')),
-        'incoming_{}.csv'.format(str(time_in_secs.time()).replace('.', '_'))
-    ]
-    for localpath in localpaths:
-        sftp_download(localpath)
-        file = open(localpath, 'r')
-        upload_demand_util(file)
-        file.close()
-        os.remove(localpath)
-
-
-@app.task
-def upload_employees_task():
-    localpath = 'employees_{}.csv'.format(str(time_in_secs.time()).replace('.', '_'))
-    sftp_download(localpath)
-    file = open(localpath, 'r')
-    upload_employees_util(file)
-    file.close()
-    os.remove(localpath)
-
-
-@app.task
-def upload_vacation_task():
-    localpath = 'holidays_{}.csv'.format(str(time_in_secs.time()).replace('.', '_'))
-    sftp_download(localpath)
-    file = open(localpath, 'r')
-    upload_vacation_util(file)
-    file.close()
-    os.remove(localpath)
 
 
 @app.task
@@ -442,3 +274,25 @@ def auto_delete_biometrics():
         except HTTPError:
             return
     UserConnecter.objects.filter(user_id__in=deleted_uc).delete()
+
+@app.task
+def set_prod_cal_cache(dt_from):
+    if isinstance(dt_from, str):
+        dt_from = datetime.strptime(dt_from, settings.QOS_DATETIME_FORMAT).date()
+    dt_from = dt_from.replace(day=1)
+    dt_to = dt_from + relativedelta(day=31)
+
+    for network in Network.objects.all():
+        active_employees = Employment.objects.get_active(
+            network_id=network.id,
+            dt_from=dt_from, 
+            dt_to=dt_to,
+        ).values_list('employee_id', flat=True)
+        ws_getter = WorkersStatsGetter(dt_from, dt_to, employee_id__in=active_employees, network=network)
+        ws_getter._get_prod_cal_cached()
+
+@app.task
+def set_prod_cal_cache_cur_and_next_month():
+    dt = date.today()
+    set_prod_cal_cache.delay(dt)
+    set_prod_cal_cache.delay(dt + relativedelta(months=1))

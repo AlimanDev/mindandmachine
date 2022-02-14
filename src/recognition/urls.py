@@ -1,4 +1,5 @@
-from django.conf.urls import url, include
+from django.conf.urls import include
+from django.urls import re_path
 from rest_framework import routers
 
 from src.recognition.views import (
@@ -17,7 +18,7 @@ router.register(r'tick_photos', TickPhotoViewSet, basename='TickPhoto')
 router.register(r'tick_points', TickPointViewSet, basename='TickPoint')
 
 urlpatterns = [
-    url(r'^', include(router.urls)),
-    url(r'^token-auth/', TickPointAuthToken.as_view()),
-    url(r'^auth/', HashSigninAuthToken.as_view(), name='time_attendance_auth')
+    re_path(r'^', include(router.urls)),
+    re_path(r'^token-auth/', TickPointAuthToken.as_view()),
+    re_path(r'^auth/', HashSigninAuthToken.as_view(), name='time_attendance_auth')
 ]

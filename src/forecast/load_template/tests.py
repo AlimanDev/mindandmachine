@@ -532,7 +532,7 @@ class TestLoadTemplate(APITestCase):
                 'Время окончания': '', 
             }
         ]
-        self.assertEquals(df.to_dict('records'), data)
+        self.assertEqual(df.to_dict('records'), data)
         response = self.client.post(
             '/rest_api/load_template/upload/',
             {
@@ -540,7 +540,7 @@ class TestLoadTemplate(APITestCase):
                 'file': SimpleUploadedFile('template.xlsx', response.content)
             }
         )
-        self.assertEquals(response.status_code, 200)
+        self.assertEqual(response.status_code, 200)
         lt = LoadTemplate.objects.get(name='Test2')
         self.assertEquals(OperationTypeTemplate.objects.filter(load_template=lt).count(), 4)
         self.assertEquals(OperationTypeRelation.objects.filter(base__load_template=lt).count(), 3)
@@ -576,8 +576,8 @@ class TestLoadTemplate(APITestCase):
                 'file': SimpleUploadedFile('template.xlsx', output.read())
             }
         )
-        self.assertEquals(response.status_code, 400)
-        self.assertEquals(response.json(), error_msg)
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json(), error_msg)
         self.assertIsNone(LoadTemplate.objects.filter(name='Test2').first())
 
     def test_upload_errors(self):
