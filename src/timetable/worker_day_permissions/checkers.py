@@ -1,7 +1,7 @@
 import datetime
 
 from django.conf import settings
-from django.db.models import Q
+from django.db.models import Q, F
 from django.utils.translation import gettext as _
 
 from django.utils.encoding import force_str
@@ -43,7 +43,7 @@ class BaseWdPermissionChecker:
             'wd_types_dict', {}) or WorkerDayType.get_wd_types_dict()).get(wd_type_id).name
         action_str = force_str(WorkerDayPermission.ACTIONS_DICT.get(action)).lower()
         if dt_interval:
-            err_msg = WorkerDayViewSet.error_messages['approve_days_interval_restriction'].format(
+            err_msg = WorkerDayViewSet.error_messages['wd_interval_restriction'].format(
                 wd_type_str=wd_type_display_str,
                 action_str=action_str,
                 dt_interval=dt_interval,
@@ -99,7 +99,15 @@ class BaseSingleWdPermissionChecker(BaseWdPermissionChecker):
             wd_type_id=wd_type_id,
             wd_dt=wd_dt,
             is_vacancy=is_vacancy,
-        ).values_list('employee_type', 'shop_type', 'limit_days_in_past', 'limit_days_in_future').distinct()
+        ).order_by(
+            F('limit_days_in_past').desc(nulls_first=True),
+            F('limit_days_in_future').desc(nulls_first=True),
+        ).values_list(
+            'employee_type',
+            'shop_type',
+            'limit_days_in_past',
+            'limit_days_in_future',
+        ).distinct()
         if not gwdp:
             self.err_message = self._get_err_msg(action, wd_type_id)
             return False
@@ -174,8 +182,6 @@ class BaseSingleWdPermissionChecker(BaseWdPermissionChecker):
                     ).exists())
 
                     if has_perm:
-                        # FIXME: с допущением, что удовл. только 1 пермишну, проверим интервал, если неудовлетворяет,
-                        #  то кидаем ошибку.
                         if isinstance(wd_dt, str):
                             wd_dt = datetime.datetime.strptime(wd_dt, settings.QOS_DATE_FORMAT).date()
                         today = (datetime.datetime.now() + datetime.timedelta(
