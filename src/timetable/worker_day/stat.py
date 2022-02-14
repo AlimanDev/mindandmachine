@@ -239,7 +239,7 @@ class WorkersStatsGetter:
         self.dt_from = Converter.parse_date(dt_from) if isinstance(dt_from, str) else dt_from
         self.dt_to = Converter.parse_date(dt_to) if isinstance(dt_to, str) else dt_to
         self.employee_id = employee_id
-        self.employee_id__in = employee_id__in.split(',') if isinstance(employee_id__in, str) else employee_id__in
+        self.employee_id__in = employee_id__in.split(',') if isinstance(employee_id__in, str) and employee_id__in else employee_id__in
         self.year = self.dt_from.year
         self.month = self.dt_from.month
         self.hours_by_types = hours_by_types or list(WorkerDayType.objects.filter(

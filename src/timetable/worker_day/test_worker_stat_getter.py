@@ -573,3 +573,14 @@ class TestWorkersStatsGetter(TestsHelperMixin, APITestCase):
             self.employment2.delete()
             self._test_cache(0, resp_count=1)
             self.assertIsNone(cache.get(f'prod_cal_{self.dt_from}_{self.dt_to}_{self.employee2.id}'))
+
+    def test_get_worker_stat_with_empty_employee_id__in(self):
+        self.add_group_perm(
+            self.group,
+            'WorkerDay_worker_stat',
+            'GET',
+        )
+        response = self.client.get(
+            f'/rest_api/worker_day/worker_stat/?shop_id={self.shop.id}&dt_from={self.dt_from}&dt_to={self.dt_to}&employee_id__in=',
+        )
+        self.assertEqual(response.status_code, 200)
