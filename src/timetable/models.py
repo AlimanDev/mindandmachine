@@ -2490,6 +2490,7 @@ class PlanAndFactHours(PlanAndFactHoursAbstract):
         managed = False
         db_table = 'timetable_plan_and_fact_hours'
 
+
 class ProdCal(models.Model):
     id = models.CharField(max_length=256, primary_key=True)
     dt = models.DateField()
