@@ -12,6 +12,7 @@ from django.db.models import Q
 from django.test import override_settings
 from django.urls import reverse
 from django.utils.timezone import now
+from freezegun import freeze_time
 from rest_framework import status
 from rest_framework.test import APITestCase
 
@@ -1325,7 +1326,8 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
             'fill_empty_days': 'true',
             'hours_details': 'true',
         }
-        response = self.client.get('/rest_api/worker_day/', data=get_params)
+        with freeze_time(datetime.now() + timedelta(hours=self.shop.get_tz_offset())):
+            response = self.client.get('/rest_api/worker_day/', data=get_params)
         self.assertEqual(response.status_code, 200)
         resp_data = response.json()
         self.assertEqual(len(resp_data), 1)
