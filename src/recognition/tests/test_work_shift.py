@@ -108,17 +108,17 @@ class TestWorkShiftViewSet(TestsHelperMixin, APITestCase):
         self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_no_active_employee(self):
-        with freeze_time(datetime.now() - timedelta(hours=self.shop.get_tz_offset())):
-            self._authorize_tick_point()
-            resp = self.client.get(
-                self.get_url('TimeAttendanceWorkerDay-list'),
-            )
-            self.assertEqual(len(resp.json()), 5)
-            Employment.objects.all().update(dt_hired=date.today() + timedelta(1), dt_fired=None)
-            resp = self.client.get(
-                self.get_url('TimeAttendanceWorkerDay-list'),
-            )
-            self.assertEqual(len(resp.json()), 0)
+        self._authorize_tick_point()
+        resp = self.client.get(
+            self.get_url('TimeAttendanceWorkerDay-list'),
+        )
+        self.assertEqual(len(resp.json()), 5)
+        dt_hired = (datetime.now() + timedelta(hours=self.shop.get_tz_offset())).date() + timedelta(1)
+        Employment.objects.all().update(dt_hired=dt_hired, dt_fired=None)
+        resp = self.client.get(
+            self.get_url('TimeAttendanceWorkerDay-list'),
+        )
+        self.assertEqual(len(resp.json()), 0)
 
     def test_get_worker_days(self):
         self._authorize_tick_point()
