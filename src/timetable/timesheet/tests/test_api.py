@@ -46,7 +46,8 @@ class TestTimesheetApiView(TestTimesheetMixin, APITestCase):
             "main_night_hours_sum": None,
             "additional_hours_sum": None,
             "norm_hours": 167.0,
-            "sawh_hours": 167.0
+            "sawh_hours": 167.0,
+            "sawh_hours_without_reduce": 167.0
         })
 
     def test_get_timesheet_stats_with_additional_types(self):
@@ -85,6 +86,7 @@ class TestTimesheetApiView(TestTimesheetMixin, APITestCase):
             "additional_hours_sum": None,
             "norm_hours": 167.0,
             "sawh_hours": 167.0,
+            "sawh_hours_without_reduce": 167.0,
             "hours_by_type": {
                 "SD": 9.0,
             }
