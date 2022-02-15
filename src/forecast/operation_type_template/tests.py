@@ -156,7 +156,7 @@ class TestOperationTypeTemplate(APITestCase):
         OperationTypeRelation.objects.create(
             base=op_temp1,
             depended=op_temp2,
-            formula='lambda a: a * 2 + a',
+            formula='a * 2 + a',
         )
         data = {
             'load_template_id': load_template.id,
@@ -189,7 +189,7 @@ class TestOperationTypeTemplate(APITestCase):
         OperationTypeRelation.objects.create(
             base=op_temp1,
             depended=op_temp2,
-            formula='lambda a: a * 2 + a',
+            formula='a * 2 + a',
         )
         data = {
             'load_template_id': load_template.id,
