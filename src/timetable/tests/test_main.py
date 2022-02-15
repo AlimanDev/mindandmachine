@@ -12,6 +12,7 @@ from django.db.models import Q
 from django.test import override_settings
 from django.urls import reverse
 from django.utils.timezone import now
+from freezegun import freeze_time
 from rest_framework import status
 from rest_framework.test import APITestCase
 
@@ -334,8 +335,8 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
             response.json(),
             {
                 'detail': 'У вас нет прав на подтверждение типа дня "Выходной" в выбранные '
-                          'даты. Необходимо изменить интервал для подтверждения. '
-                          'Разрешенный интевал для подтверждения: '
+                          'даты. Необходимо изменить даты. '
+                          'Разрешенный интервал: '
                           f'с {Converter.convert_date(self.dt - timedelta(days=gwdp.limit_days_in_past))} '
                           f'по {Converter.convert_date(self.dt + timedelta(days=gwdp.limit_days_in_future))}'
             }
@@ -1325,7 +1326,8 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
             'fill_empty_days': 'true',
             'hours_details': 'true',
         }
-        response = self.client.get('/rest_api/worker_day/', data=get_params)
+        with freeze_time(datetime.now() + timedelta(hours=self.shop.get_tz_offset())):
+            response = self.client.get('/rest_api/worker_day/', data=get_params)
         self.assertEqual(response.status_code, 200)
         resp_data = response.json()
         self.assertEqual(len(resp_data), 1)
@@ -2922,14 +2924,14 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
         wd_data['dttm_work_end'] = datetime.combine(self.dt - timedelta(days=2), time(15))
         resp = self.client.post(
             self.get_url('WorkerDay-batch-update-or-create'), self.dump_data(data), content_type='application/json')
-        self.assertContains(resp, 'Необходимо изменить интервал для подтверждения', status_code=403)
+        self.assertContains(resp, 'Необходимо изменить даты', status_code=403)
 
         wd_data['dt'] = self.dt + timedelta(days=2)
         wd_data['dttm_work_start'] = datetime.combine(self.dt + timedelta(days=2), time(11))
         wd_data['dttm_work_end'] = datetime.combine(self.dt + timedelta(days=2), time(15))
         resp = self.client.post(
             self.get_url('WorkerDay-batch-update-or-create'), self.dump_data(data), content_type='application/json')
-        self.assertContains(resp, 'Необходимо изменить интервал для подтверждения', status_code=403)
+        self.assertContains(resp, 'Необходимо изменить даты', status_code=403)
 
         gwdp_create.limit_days_in_past = None
         gwdp_create.limit_days_in_future = None

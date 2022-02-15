@@ -1,15 +1,15 @@
+from datetime import date, timedelta, datetime, time
+from unittest import mock
+
 from django.test import override_settings
+from freezegun import freeze_time
 from rest_framework import status
 from rest_framework.exceptions import ValidationError
 from rest_framework.test import APITestCase
-from unittest import mock
-
-from rest_framework.utils.serializer_helpers import NestedBoundField
 
 from src.recognition.models import ShopIpAddress, Tick, TickPoint
-from src.util.mixins.tests import TestsHelperMixin
 from src.timetable.models import WorkerDay, AttendanceRecords
-from datetime import date, timedelta, datetime, time
+from src.util.mixins.tests import TestsHelperMixin
 
 
 class TestTicksViewSet(TestsHelperMixin, APITestCase):
@@ -107,12 +107,13 @@ class TestTicksViewSet(TestsHelperMixin, APITestCase):
         self.employment2.dt_fired = None
         self.employment2.dt_hired = date.today() + timedelta(1)
         self.employment2.save()
-        with override_settings(USERS_WITH_ACTIVE_EMPLOYEE_OR_VACANCY_ONLY=True):
-            resp_coming = self.client.post(
-                self.get_url('Tick-list'),
-                data=self.dump_data({'type': Tick.TYPE_COMING, 'shop_code': self.shop.code, 'employee_id': self.employee2.id}),
-                content_type='application/json',
-            )
+        with freeze_time(datetime.now() - timedelta(hours=self.shop.get_tz_offset())):
+            with override_settings(USERS_WITH_ACTIVE_EMPLOYEE_OR_VACANCY_ONLY=True):
+                resp_coming = self.client.post(
+                    self.get_url('Tick-list'),
+                    data=self.dump_data({'type': Tick.TYPE_COMING, 'shop_code': self.shop.code, 'employee_id': self.employee2.id}),
+                    content_type='application/json',
+                )
         self.assertEqual(resp_coming.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(
             resp_coming.json(), 

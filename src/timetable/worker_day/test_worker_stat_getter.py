@@ -240,9 +240,7 @@ class TestWorkersStatsGetter(TestsHelperMixin, APITestCase):
             1,
         )
 
-    @expectedFailure
     def test_days_count_by_type_for_multiple_wdays_on_one_date(self):
-        dt = date(2021, 6, 1)
         WorkerDayFactory(
             is_approved=True,
             is_fact=True,
@@ -268,7 +266,7 @@ class TestWorkersStatsGetter(TestsHelperMixin, APITestCase):
         stats = self._get_worker_stats()
         self.assertEqual(
             stats[self.employee.id]['fact']['approved']['day_type'][WorkerDay.TYPE_WORKDAY],
-            1,  # TODO: логичней ведь, чтобы была 1 если 2 дня на 1 дату?
+            1,
         )
 
     def test_wd_types_with_is_work_hours_false_not_counted_in_work_hours_sum(self):
@@ -573,3 +571,14 @@ class TestWorkersStatsGetter(TestsHelperMixin, APITestCase):
             self.employment2.delete()
             self._test_cache(0, resp_count=1)
             self.assertIsNone(cache.get(f'prod_cal_{self.dt_from}_{self.dt_to}_{self.employee2.id}'))
+
+    def test_get_worker_stat_with_empty_employee_id__in(self):
+        self.add_group_perm(
+            self.group,
+            'WorkerDay_worker_stat',
+            'GET',
+        )
+        response = self.client.get(
+            f'/rest_api/worker_day/worker_stat/?shop_id={self.shop.id}&dt_from={self.dt_from}&dt_to={self.dt_to}&employee_id__in=',
+        )
+        self.assertEqual(response.status_code, 200)

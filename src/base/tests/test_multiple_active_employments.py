@@ -1,10 +1,10 @@
 from datetime import date, time, datetime, timedelta
-from unittest import mock
 
 import pandas as pd
 from dateutil.relativedelta import relativedelta
 from django.test import override_settings
 from django.utils import timezone
+from freezegun import freeze_time
 from rest_framework import status
 from rest_framework.test import APITestCase
 
@@ -130,9 +130,7 @@ class TestURVTicks(MultipleActiveEmploymentsSupportMixin, APITestCase):
         # TODO: разобраться с таймзонами
         self.client.force_authenticate(user=user)
 
-        with mock.patch('src.recognition.views.now') as _now_mock:
-            _now_mock.return_value = (
-                        dttm_coming - timedelta(hours=shop.get_tz_offset())) if dttm_coming else timezone.now()
+        with freeze_time((dttm_coming if dttm_coming else datetime.now()) - timedelta(hours=shop.get_tz_offset())):
             resp_coming = self.client.post(
                 self.get_url('Tick-list'),
                 data=self.dump_data({
@@ -143,9 +141,7 @@ class TestURVTicks(MultipleActiveEmploymentsSupportMixin, APITestCase):
             )
         self.assertEqual(resp_coming.status_code, status.HTTP_200_OK)
 
-        with mock.patch('src.recognition.views.now') as _now_mock:
-            _now_mock.return_value = (
-                        dttm_leaving - timedelta(hours=shop.get_tz_offset())) if dttm_leaving else timezone.now()
+        with freeze_time((dttm_leaving if dttm_leaving else timezone.now()) - timedelta(hours=shop.get_tz_offset())):
             resp_leaving = self.client.post(
                 self.get_url('Tick-list'),
                 data=self.dump_data({
