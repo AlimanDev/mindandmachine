@@ -240,9 +240,7 @@ class TestWorkersStatsGetter(TestsHelperMixin, APITestCase):
             1,
         )
 
-    @expectedFailure
     def test_days_count_by_type_for_multiple_wdays_on_one_date(self):
-        dt = date(2021, 6, 1)
         WorkerDayFactory(
             is_approved=True,
             is_fact=True,
@@ -268,7 +266,7 @@ class TestWorkersStatsGetter(TestsHelperMixin, APITestCase):
         stats = self._get_worker_stats()
         self.assertEqual(
             stats[self.employee.id]['fact']['approved']['day_type'][WorkerDay.TYPE_WORKDAY],
-            1,  # TODO: логичней ведь, чтобы была 1 если 2 дня на 1 дату?
+            1,
         )
 
     def test_wd_types_with_is_work_hours_false_not_counted_in_work_hours_sum(self):
