@@ -251,29 +251,15 @@ class TestSendUnaccountedReport(TestsHelperMixin, APITestCase):
         
         cls.cron = CrontabSchedule.objects.create()
         cls.dt = datetime.now().date() - timedelta(1)
-        cls.plan_approved = cls._create_worker_day(cls, cls.employment_worker, datetime.combine(cls.dt, time(8)), datetime.combine(cls.dt, time(14)), shop_id=cls.shop.id)
-        cls.plan_approved_dir = cls._create_worker_day(cls, cls.employment_dir, datetime.combine(cls.dt, time(8)), datetime.combine(cls.dt, time(16)), shop_id=cls.shop.id)
-        cls.plan_approved2 = cls._create_worker_day(cls, cls.employment_worker2, datetime.combine(cls.dt, time(15)), datetime.combine(cls.dt, time(20)), shop_id=cls.shop2.id)
-        cls.fact_approved = cls._create_worker_day(cls, cls.employment_worker, datetime.combine(cls.dt, time(7)), datetime.combine(cls.dt, time(13)), is_fact=True, shop_id=cls.shop.id, closest_plan_approved_id=cls.plan_approved.id)
-        cls.fact_approved_dir = cls._create_worker_day(cls, cls.employment_dir, datetime.combine(cls.dt, time(7)), datetime.combine(cls.dt, time(19)), is_fact=True, shop_id=cls.shop.id, closest_plan_approved_id=cls.plan_approved_dir.id)
-        cls.fact_approved2 = cls._create_worker_day(cls, cls.employment_worker2, datetime.combine(cls.dt, time(14)), datetime.combine(cls.dt, time(20)), is_fact=True, shop_id=cls.shop2.id, closest_plan_approved_id=cls.plan_approved2.id)
+        cls.plan_approved = cls._create_worker_day(cls.employment_worker, datetime.combine(cls.dt, time(8)), datetime.combine(cls.dt, time(14)), shop_id=cls.shop.id)
+        cls.plan_approved_dir = cls._create_worker_day(cls.employment_dir, datetime.combine(cls.dt, time(8)), datetime.combine(cls.dt, time(16)), shop_id=cls.shop.id)
+        cls.plan_approved2 = cls._create_worker_day(cls.employment_worker2, datetime.combine(cls.dt, time(15)), datetime.combine(cls.dt, time(20)), shop_id=cls.shop2.id)
+        cls.fact_approved = cls._create_worker_day(cls.employment_worker, datetime.combine(cls.dt, time(7)), datetime.combine(cls.dt, time(13)), is_fact=True, shop_id=cls.shop.id, closest_plan_approved_id=cls.plan_approved.id)
+        cls.fact_approved_dir = cls._create_worker_day(cls.employment_dir, datetime.combine(cls.dt, time(7)), datetime.combine(cls.dt, time(19)), is_fact=True, shop_id=cls.shop.id, closest_plan_approved_id=cls.plan_approved_dir.id)
+        cls.fact_approved2 = cls._create_worker_day(cls.employment_worker2, datetime.combine(cls.dt, time(14)), datetime.combine(cls.dt, time(20)), is_fact=True, shop_id=cls.shop2.id, closest_plan_approved_id=cls.plan_approved2.id)
 
     def setUp(self):
         self.client.force_authenticate(user=self.user_dir)
-
-    def _create_worker_day(self, employment, dttm_work_start, dttm_work_end, is_fact=False, is_approved=True, shop_id=None, closest_plan_approved_id=None):
-        return WorkerDayFactory(
-            is_approved=is_approved,
-            is_fact=is_fact,
-            shop_id=shop_id or employment.shop_id,
-            employment=employment,
-            employee_id=employment.employee_id,
-            dt=dttm_work_start.date(),
-            type_id=WorkerDay.TYPE_WORKDAY,
-            dttm_work_start=dttm_work_start,
-            dttm_work_end=dttm_work_end,
-            closest_plan_approved_id=closest_plan_approved_id,
-        )
 
     def test_unaccounted_overtime_email_notification_sent(self):
         with self.settings(CELERY_TASK_ALWAYS_EAGER=True):
@@ -522,29 +508,16 @@ class TestOvertimesUndertimesReport(TestsHelperMixin, APITestCase):
         
         cls.cron = CrontabSchedule.objects.create()
         cls.dt = datetime.now().date() - timedelta(1)
-        cls.plan_approved = cls._create_worker_day(cls, cls.employment_worker, datetime.combine(cls.dt, time(8)), datetime.combine(cls.dt, time(14)), shop_id=cls.shop.id)
-        cls.plan_approved_dir = cls._create_worker_day(cls, cls.employment_dir, datetime.combine(cls.dt, time(8)), datetime.combine(cls.dt, time(16)), shop_id=cls.shop.id)
-        cls.plan_approved2 = cls._create_worker_day(cls, cls.employment_worker2, datetime.combine(cls.dt, time(15)), datetime.combine(cls.dt, time(20)), shop_id=cls.shop2.id)
-        cls.fact_approved = cls._create_worker_day(cls, cls.employment_worker, datetime.combine(cls.dt, time(7)), datetime.combine(cls.dt, time(13)), is_fact=True, shop_id=cls.shop.id)
-        cls.fact_approved_dir = cls._create_worker_day(cls, cls.employment_dir, datetime.combine(cls.dt, time(7)), datetime.combine(cls.dt, time(19)), is_fact=True, shop_id=cls.shop.id)
-        cls.fact_approved2 = cls._create_worker_day(cls, cls.employment_worker2, datetime.combine(cls.dt, time(14)), datetime.combine(cls.dt, time(20)), is_fact=True, shop_id=cls.shop2.id)
+        cls.plan_approved = cls._create_worker_day(cls.employment_worker, datetime.combine(cls.dt, time(8)), datetime.combine(cls.dt, time(14)), shop_id=cls.shop.id)
+        cls.plan_approved_dir = cls._create_worker_day(cls.employment_dir, datetime.combine(cls.dt, time(8)), datetime.combine(cls.dt, time(16)), shop_id=cls.shop.id)
+        cls.plan_approved2 = cls._create_worker_day(cls.employment_worker2, datetime.combine(cls.dt, time(15)), datetime.combine(cls.dt, time(20)), shop_id=cls.shop2.id)
+        cls.fact_approved = cls._create_worker_day(cls.employment_worker, datetime.combine(cls.dt, time(7)), datetime.combine(cls.dt, time(13)), is_fact=True, shop_id=cls.shop.id)
+        cls.fact_approved_dir = cls._create_worker_day(cls.employment_dir, datetime.combine(cls.dt, time(7)), datetime.combine(cls.dt, time(19)), is_fact=True, shop_id=cls.shop.id)
+        cls.fact_approved2 = cls._create_worker_day(cls.employment_worker2, datetime.combine(cls.dt, time(14)), datetime.combine(cls.dt, time(20)), is_fact=True, shop_id=cls.shop2.id)
 
 
     def setUp(self):
         self.client.force_authenticate(user=self.user_dir)
-
-    def _create_worker_day(self, employment, dttm_work_start, dttm_work_end, is_fact=False, is_approved=True, shop_id=None):
-        return WorkerDayFactory(
-            is_approved=is_approved,
-            is_fact=is_fact,
-            shop_id=shop_id or employment.shop_id,
-            employment=employment,
-            employee_id=employment.employee_id,
-            dt=dttm_work_start.date(),
-            type_id=WorkerDay.TYPE_WORKDAY,
-            dttm_work_start=dttm_work_start,
-            dttm_work_end=dttm_work_end,
-        )
 
     def test_overtimes_undertimes_email_notification_sent(self):
         with self.settings(CELERY_TASK_ALWAYS_EAGER=True):
@@ -646,33 +619,18 @@ class TestVacancyCreatedNotification(TestsHelperMixin, APITestCase):
             ),
         )
         cls.dt = datetime.now().date()
+        cls.not_approved_plan = cls._create_worker_day(cls.employment_worker, datetime.combine(cls.dt, time(8)), datetime.combine(cls.dt, time(14)), shop_id=cls.shop.id, is_approved=False)
+        cls.not_approved_vacancy = cls._create_worker_day(
+            None,
+            datetime.combine(cls.dt, time(8)), datetime.combine(cls.dt, time(14)), shop_id=cls.shop.id, is_approved=False, outsources=[cls.outsource_network], is_vacancy=True,
+        )
+        cls.not_approved_vacancy_with_employee = cls._create_worker_day(
+            cls.employment_dir,
+            datetime.combine(cls.dt, time(8)), datetime.combine(cls.dt, time(14)), shop_id=cls.shop.id, is_approved=False, outsources=[cls.outsource_network], is_vacancy=True,
+        )
 
     def setUp(self):
         self.client.force_authenticate(user=self.user_dir)
-        self.not_approved_plan = self._create_worker_day(datetime.combine(self.dt, time(8)), datetime.combine(self.dt, time(14)), self.shop.id, employment=self.employment_worker, is_approved=False)
-        self.not_approved_vacancy = self._create_worker_day(
-            datetime.combine(self.dt, time(8)), datetime.combine(self.dt, time(14)), self.shop.id, is_approved=False, outsources=[self.outsource_network], is_vacancy=True,
-        )
-        self.not_approved_vacancy_with_employee = self._create_worker_day(
-            datetime.combine(self.dt, time(8)), datetime.combine(self.dt, time(14)), self.shop.id, is_approved=False, outsources=[self.outsource_network], is_vacancy=True, employment=self.employment_dir,
-        )
-    
-    def _create_worker_day(self, dttm_work_start, dttm_work_end, shop_id, employment=None, is_fact=False, is_approved=True, is_vacancy=False, outsources=[]):
-        wd = WorkerDayFactory(
-            is_approved=is_approved,
-            is_fact=is_fact,
-            shop_id=shop_id,
-            employment=employment,
-            employee_id=employment.employee_id if employment else None,
-            dt=dttm_work_start.date(),
-            type_id=WorkerDay.TYPE_WORKDAY,
-            dttm_work_start=dttm_work_start,
-            dttm_work_end=dttm_work_end,
-            is_vacancy=is_vacancy,
-            cashbox_details__work_type__work_type_name__name='Работа',
-        )
-        wd.outsources.add(*outsources)
-        return wd
 
     def test_vacancy_created_notification_sent_on_approve(self):
         with self.settings(CELERY_TASK_ALWAYS_EAGER=True):

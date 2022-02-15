@@ -707,9 +707,9 @@ class TestUploadDownload(TestsHelperMixin, APITestCase):
     USER_EMAIL = "q@q.q"
     USER_PASSWORD = "4242"
 
-    def setUp(self):
-        super().setUp()
-        create_departments_and_users(self)
+    @classmethod
+    def setUpTestData(cls):
+        cls.create_departments_and_users()
         WorkerPosition.objects.bulk_create(
             [
                 WorkerPosition(
@@ -719,11 +719,13 @@ class TestUploadDownload(TestsHelperMixin, APITestCase):
             ]
         )
 
-        WorkType.objects.create(work_type_name=WorkTypeName.objects.create(name='Кассы'), shop_id=self.shop.id)
-        self.url = '/rest_api/worker_day/'
-        self.network.add_users_from_excel = True
-        self.network.allow_creation_several_wdays_for_one_employee_for_one_date = True
-        self.network.save()
+        WorkType.objects.create(work_type_name=WorkTypeName.objects.create(name='Кассы'), shop_id=cls.shop.id)
+        cls.url = '/rest_api/worker_day/'
+        cls.network.add_users_from_excel = True
+        cls.network.allow_creation_several_wdays_for_one_employee_for_one_date = True
+        cls.network.save()
+
+    def setUp(self):
         self.client.force_authenticate(user=self.user1)
 
     def test_upload_timetable_match_tabel_code(self):

@@ -2,8 +2,7 @@ from datetime import timedelta
 
 from rest_framework import status
 from rest_framework.test import APITestCase
-
-from src.util.test import create_departments_and_users
+from src.util.mixins.tests import TestsHelperMixin
 
 from src.forecast.models import (
     OperationTypeName, 
@@ -15,73 +14,72 @@ from src.forecast.models import (
 from src.timetable.models import WorkTypeName
 
 
-class TestOperationTypeRelation(APITestCase):
+class TestOperationTypeRelation(APITestCase, TestsHelperMixin):
     USER_USERNAME = "user1"
     USER_EMAIL = "q@q.q"
     USER_PASSWORD = "4242"
 
-    def setUp(self):
-        super().setUp()
+    @classmethod
+    def setUpTestData(cls):
+        cls.url = '/rest_api/operation_type_relation/'
 
-        self.url = '/rest_api/operation_type_relation/'
-
-        create_departments_and_users(self)
-        self.work_type_name1 = WorkTypeName.objects.create(
+        cls.create_departments_and_users()
+        cls.work_type_name1 = WorkTypeName.objects.create(
             name='Кассы',
-            network=self.network,
+            network=cls.network,
         )
-        self.work_type_name2 = WorkTypeName.objects.create(
+        cls.work_type_name2 = WorkTypeName.objects.create(
             name='Кассы2',
-            network=self.network,
+            network=cls.network,
         )
-        self.operation_type_name1 = self.work_type_name1.operation_type_name
-        self.operation_type_name2 = OperationTypeName.objects.create(
+        cls.operation_type_name1 = cls.work_type_name1.operation_type_name
+        cls.operation_type_name2 = OperationTypeName.objects.create(
             name='Строительные работы',
             do_forecast=OperationTypeName.FORECAST,
-            network=self.network,
+            network=cls.network,
         )
-        self.operation_type_name3 = self.work_type_name2.operation_type_name
-        self.operation_type_name4 = OperationTypeName.objects.create(
+        cls.operation_type_name3 = cls.work_type_name2.operation_type_name
+        cls.operation_type_name4 = OperationTypeName.objects.create(
             name='Продажи',
             do_forecast=OperationTypeName.FORECAST,
-            network=self.network,
+            network=cls.network,
         )
 
-        self.load_template = LoadTemplate.objects.create(
+        cls.load_template = LoadTemplate.objects.create(
             name='Test1',
-            network=self.network,
+            network=cls.network,
         )
-        self.root_shop.load_template = self.load_template
-        self.root_shop.save()
+        cls.root_shop.load_template = cls.load_template
+        cls.root_shop.save()
         OperationType.objects.create(
-            operation_type_name=self.operation_type_name1,
-            shop=self.root_shop,
+            operation_type_name=cls.operation_type_name1,
+            shop=cls.root_shop,
         )
-        self.operation_type_template1 = OperationTypeTemplate.objects.create(
-            load_template=self.load_template,
-            operation_type_name=self.operation_type_name1,           
+        cls.operation_type_template1 = OperationTypeTemplate.objects.create(
+            load_template=cls.load_template,
+            operation_type_name=cls.operation_type_name1,           
         )
-        self.operation_type_template2 = OperationTypeTemplate.objects.create(
-            load_template=self.load_template,
-            operation_type_name=self.operation_type_name2,
+        cls.operation_type_template2 = OperationTypeTemplate.objects.create(
+            load_template=cls.load_template,
+            operation_type_name=cls.operation_type_name2,
         )
-        self.operation_type_template3 = OperationTypeTemplate.objects.create(
-            load_template=self.load_template,
-            operation_type_name=self.operation_type_name3,
+        cls.operation_type_template3 = OperationTypeTemplate.objects.create(
+            load_template=cls.load_template,
+            operation_type_name=cls.operation_type_name3,
         )
 
-        self.operation_type_relation1 = OperationTypeRelation.objects.create(
-            base=self.operation_type_template1,
-            depended=self.operation_type_template2,
+        cls.operation_type_relation1 = OperationTypeRelation.objects.create(
+            base=cls.operation_type_template1,
+            depended=cls.operation_type_template2,
             formula='a * 2',
         )
-
-        self.operation_type_relation2 = OperationTypeRelation.objects.create(
-            base=self.operation_type_template3,
-            depended=self.operation_type_template2,
+        cls.operation_type_relation2 = OperationTypeRelation.objects.create(
+            base=cls.operation_type_template3,
+            depended=cls.operation_type_template2,
             formula='a + 2',
         )
 
+    def setUp(self):
         self.client.force_authenticate(user=self.user1)
 
     def test_get_list(self):
