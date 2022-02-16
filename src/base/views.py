@@ -279,10 +279,7 @@ class EmployeeViewSet(UpdateorCreateViewSet):
         filtered_qs = super(EmployeeViewSet, self).filter_queryset(queryset=queryset)
         if self.request.query_params.get('include_employments'):
             employments_qs = Employment.objects.all().prefetch_related(Prefetch('work_types', to_attr='work_types_list')).select_related(
-                'position',
-                'shop',
                 'employee',
-                'employee__user',
             )
             if self.request.query_params.get('shop_network__in'):
                 employments_qs = employments_qs.filter(shop__network_id__in=self.request.query_params.get('shop_network__in').split(','))
