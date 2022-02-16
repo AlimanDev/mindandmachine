@@ -158,48 +158,58 @@ def fill_user_subordinates(dt=None, dt_to_shift_days=None, use_user_shop_groups=
 
 
 @app.task
-def fill_employments_stats():
+def fill_employments_stats(prev_acc_period=False, curr_acc_period=True, next_acc_period=False):
     for network in Network.objects.all():
-        acc_period_start, acc_period_end = network.get_acc_period_range(datetime.today())
-        shop_ids = list(Employment.objects.get_active(
-            employee__user__network=network,
-            dt_from=acc_period_start,
-            dt_to=acc_period_end,
-        ).values_list('employee_id', flat=True).values_list('shop_id', flat=True).distinct())
-        for shop_id in shop_ids:
-            employment_stats_to_create = []
-            stats = WorkersStatsGetter(
+        curr_acc_period_start, curr_acc_period_end = network.get_acc_period_range(datetime.today())
+        periods = []
+        if curr_acc_period:
+            periods.append((curr_acc_period_start, curr_acc_period_end))
+        if prev_acc_period:
+            prev_acc_period_start, prev_acc_period_end = network.get_acc_period_range(curr_acc_period_start - timedelta(1))
+            periods.append((prev_acc_period_start, prev_acc_period_end))
+        if next_acc_period:
+            next_acc_period_start, next_acc_period_end = network.get_acc_period_range(curr_acc_period_end + timedelta(1))
+            periods.append((next_acc_period_start, next_acc_period_end))
+        for acc_period_start, acc_period_end in periods:
+            shop_ids = list(Employment.objects.get_active(
+                employee__user__network=network,
                 dt_from=acc_period_start,
                 dt_to=acc_period_end,
-                shop_id=shop_id,
-            ).run()
-            for employee_id, employee_stats in stats.items():
-                for employment_id, employment_stats in employee_stats['employments'].items():
-                    for month_num, dates in employment_stats.get('pa_reduce_norm_days', {}).items():
-                        for dt in dates:
-                            employment_stats_to_create.append(EmploymentStats(
-                                employee_id=employee_id,
-                                employment_id=employment_id,
-                                shop_id=shop_id,
-                                sawh_hours=employment_stats.get('one_day_value', {}).get(month_num, 0),
-                                reduce_norm=True,
-                                dt=dt,
-                            ))
-                    for month_num, dates in employment_stats.get('pa_not_reduce_norm_days', {}).items():
-                        for dt in dates:
-                            employment_stats_to_create.append(EmploymentStats(
-                                employee_id=employee_id,
-                                employment_id=employment_id,
-                                shop_id=shop_id,
-                                sawh_hours=employment_stats.get('one_day_value', {}).get(month_num, 0),
-                                reduce_norm=False,
-                                dt=dt,
-                            ))
+            ).values_list('employee_id', flat=True).values_list('shop_id', flat=True).distinct())
+            for shop_id in shop_ids:
+                employment_stats_to_create = []
+                stats = WorkersStatsGetter(
+                    dt_from=acc_period_start,
+                    dt_to=acc_period_end,
+                    shop_id=shop_id,
+                ).run()
+                for employee_id, employee_stats in stats.items():
+                    for employment_id, employment_stats in employee_stats['employments'].items():
+                        for month_num, dates in employment_stats.get('pa_reduce_norm_days', {}).items():
+                            for dt in dates:
+                                employment_stats_to_create.append(EmploymentStats(
+                                    employee_id=employee_id,
+                                    employment_id=employment_id,
+                                    shop_id=shop_id,
+                                    sawh_hours=employment_stats.get('one_day_value', {}).get(month_num, 0),
+                                    reduce_norm=True,
+                                    dt=dt,
+                                ))
+                        for month_num, dates in employment_stats.get('pa_not_reduce_norm_days', {}).items():
+                            for dt in dates:
+                                employment_stats_to_create.append(EmploymentStats(
+                                    employee_id=employee_id,
+                                    employment_id=employment_id,
+                                    shop_id=shop_id,
+                                    sawh_hours=employment_stats.get('one_day_value', {}).get(month_num, 0),
+                                    reduce_norm=False,
+                                    dt=dt,
+                                ))
 
-            EmploymentStats.objects.filter(
-                shop_id=shop_id,
-                dt__gte=acc_period_start,
-                dt__lte=acc_period_end,
-            ).delete()
-            if employment_stats_to_create:
-                EmploymentStats.objects.bulk_create(employment_stats_to_create, batch_size=1000)
+                EmploymentStats.objects.filter(
+                    shop_id=shop_id,
+                    dt__gte=acc_period_start,
+                    dt__lte=acc_period_end,
+                ).delete()
+                if employment_stats_to_create:
+                    EmploymentStats.objects.bulk_create(employment_stats_to_create, batch_size=1000)
