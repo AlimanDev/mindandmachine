@@ -952,3 +952,17 @@ class TestDepartment(TestsHelperMixin, APITestCase):
             self.assertEqual(e.detail, ['Шаг прогноза не может быть 0.'])
 
         self.assertFalse(saved)
+
+    def test_set_bad_parent(self):
+        response = self.client.put(
+            self.get_url('Shop-detail', pk=self.root_shop.id), 
+            {
+                'name': 'Root Shop',
+                'parent_id': self.shop.id,
+                'region_id': self.region.id,
+                'network_id': self.network.id,
+            }
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json(), [f'Магазин с id {self.shop.id} не может быть родителем для магазина с id {self.root_shop.id}, так как он явлется его потомком.'])

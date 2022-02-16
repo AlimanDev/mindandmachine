@@ -4,6 +4,7 @@ import json
 import geopy.distance
 import pytz
 import six
+from mptt.exceptions import InvalidMove
 from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
@@ -221,7 +222,15 @@ class ShopSerializer(serializers.ModelSerializer):
         if getattr(self.context['request'], 'by_code',
                    False) and instance.network.ignore_parent_code_when_updating_department_via_api:
             validated_data.pop('parent_code', None)
-        shop = super(ShopSerializer, self).update(instance, validated_data)
+        try:
+            shop = super(ShopSerializer, self).update(instance, validated_data)
+        except InvalidMove:
+            raise serializers.ValidationError(
+                _('Shop with id {} may not be parent of shop with id {} because it is his descendant.').format(
+                    validated_data.get('parent_id'),
+                    instance.id,
+                )
+            )
         self._update_or_create_nested_data(shop, nonstandard_schedule)
         return shop
 
