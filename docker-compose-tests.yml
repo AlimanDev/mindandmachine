@@ -39,7 +39,7 @@ services:
       - ./etc/compose/tests_mounts/logs:/webapp/logs
       - ./etc/compose/tests_mounts/media:/webapp/media
       - ./etc/compose/tests_mounts/static:/webapp/static
-      - ./local_settings_web.py:/webapp/src/conf/djconfig_local.py
+      - ./etc/compose/tests_settings.py:/webapp/src/conf/djconfig_local.py
       - ./etc/compose/tests_mounts/ipython_data:/root/.ipython/profile_default
     environment:
       REDIS_HOST: redis
