@@ -269,7 +269,7 @@ class EmployeeSerializer(BaseNetworkSerializer):
         request = self.context.get('request')
         self.fields['user'] = UserSerializer(read_only=True, source=user_source)
         if request and request.query_params.get('include_employments'):
-            self.fields['employments'] = EmploymentSerializer(
+            self.fields['employments'] = EmploymentListSerializer(
                 required=False, many=True, read_only=True, context=self.context, source='employments_list')
 
 
@@ -359,8 +359,12 @@ class EmploymentListSerializer(serializers.Serializer):
     is_ready_for_overworkings = serializers.BooleanField()
     dt_new_week_availability_from = serializers.DateField()
     is_visible = serializers.BooleanField()
-    worker_constraints = WorkerConstraintListSerializer(many=True)
-    work_types = EmploymentWorkTypeListSerializer(many=True)
+    worker_constraints = WorkerConstraintListSerializer(many=True, source='worker_constraints_list')
+    work_types = EmploymentWorkTypeListSerializer(many=True, source='work_types_list')
+    function_group_id = serializers.IntegerField()
+    dt_to_function_group = serializers.DateField()
+    is_active = serializers.BooleanField()
+    code = serializers.CharField()
 
     def __init__(self, *args, **kwargs):
         super(EmploymentListSerializer, self).__init__(*args, **kwargs)
@@ -368,6 +372,13 @@ class EmploymentListSerializer(serializers.Serializer):
         request = self.context.get('request')
         if request and request.query_params.get('include_employee'):
             self.fields['employee'] = EmployeeSerializer(required=False, read_only=True)
+        
+        show_constraints = None
+        if request:
+            show_constraints = request.query_params.get('show_constraints')
+
+        if not show_constraints:
+            self.fields.pop('worker_constraints')
 
 
 class EmploymentSerializer(serializers.ModelSerializer):
@@ -503,7 +514,7 @@ class EmploymentSerializer(serializers.ModelSerializer):
             self.fields.pop('worker_constraints')
 
         if self.context.get('view') and self.context['view'].action in ['list', 'retrieve']:
-            self.fields['work_types'].source = 'work_types_list'
+            self.fields['work_types'] = EmploymentWorkTypeSerializer(many=True, read_only=True, source='work_types_list')
         
         if self.context.get('view') and self.context['view'].action == 'timetable':
             exclude_fields = set(self.Meta.fields).difference(set(self.Meta.timetable_fields))
