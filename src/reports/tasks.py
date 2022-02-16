@@ -175,7 +175,7 @@ def fill_employments_stats(prev_acc_period=False, curr_acc_period=True, next_acc
                 employee__user__network=network,
                 dt_from=acc_period_start,
                 dt_to=acc_period_end,
-            ).values_list('employee_id', flat=True).values_list('shop_id', flat=True).distinct())
+            ).values_list('shop_id', flat=True).distinct())
             for shop_id in shop_ids:
                 employment_stats_to_create = []
                 stats = WorkersStatsGetter(
@@ -184,7 +184,7 @@ def fill_employments_stats(prev_acc_period=False, curr_acc_period=True, next_acc
                     shop_id=shop_id,
                 ).run()
                 for employee_id, employee_stats in stats.items():
-                    for employment_id, employment_stats in employee_stats['employments'].items():
+                    for employment_id, employment_stats in employee_stats.get('employments', {}).items():
                         for month_num, dates in employment_stats.get('pa_reduce_norm_days', {}).items():
                             for dt in dates:
                                 employment_stats_to_create.append(EmploymentStats(
