@@ -1,6 +1,8 @@
+from datetime import datetime, timedelta
 import json
 import os
 
+from unittest import mock
 from django.conf import settings
 from django.db.models import Sum
 from django.test import TestCase
@@ -16,6 +18,7 @@ from src.exchange.models import (
     ImportJob,
     LocalFilesystemConnector,
 )
+from src.exchange.tasks import run_import_job
 from src.forecast.models import (
     Receipt,
     PeriodClients,
@@ -410,3 +413,44 @@ class TestAmbarImportData(TestsHelperMixin, TestCase):
         self.assertEqual(len(import_open_orders_results.get('errors')), 0)
         self.assertEqual(Receipt.objects.filter(data_type='OpenOrders').count(), 1)
         self.assertEqual(Receipt.objects.filter(shop_id=self.shop3.id, data_type='OpenOrders').count(), 1)
+
+class TestImportRetry(TestCase):
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.local_fs_connector = LocalFilesystemConnector.objects.create(
+            name='local',
+        )
+        cls.import_shop_mapping_strategy = ImportShopMappingStrategy.objects.create(
+            system_code='',
+            filename='',
+            file_format='xlsx',
+            wfm_shop_name_field_name='',
+            external_shop_code_field_name='',
+        )
+        cls.import_job = ImportJob.objects.create(
+            fs_connector=cls.local_fs_connector,
+            import_strategy=cls.import_shop_mapping_strategy,
+            retry_attempts=json.dumps({1: 8600, 3: 45}),
+        )
+    
+    @freeze_time('2022-02-16')
+    def test_retry(self):
+        def _patch_apply_async(args=[], kwargs={}, eta=None):
+            run_import_job(*args,**kwargs)
+        dttm = datetime(2022, 2, 16)
+        with mock.patch.object(ImportJob, 'run', side_effect=Exception()):
+            with mock.patch.object(run_import_job, 'apply_async', side_effect=_patch_apply_async) as mock_apply_async:
+                try:
+                    run_import_job(self.import_job.id)
+                except:
+                    pass
+                self.assertEqual(mock_apply_async.call_count, 3)
+                self.assertListEqual(
+                    mock_apply_async.call_args_list,
+                    [
+                        mock.call(args=[self.import_job.id], kwargs={'attempt': 2}, eta=dttm + timedelta(seconds=8600)),
+                        mock.call(args=[self.import_job.id], kwargs={'attempt': 3}, eta=dttm + timedelta(seconds=3600)),
+                        mock.call(args=[self.import_job.id], kwargs={'attempt': 4}, eta=dttm + timedelta(seconds=45)),
+                    ]
+                )
