@@ -3,12 +3,13 @@ from datetime import datetime, timedelta
 from django.db.models import Q
 from django_celery_beat.models import CrontabSchedule
 
-from src.base.models import Employment, Shop, User, Employee
+from src.base.models import Employment, Shop, User, Network
 from src.celery.celery import app
 from src.notifications.helpers import send_mass_html_mail
 from src.reports.helpers import get_datatuple
 from src.reports.models import ReportConfig
-from .models import UserShopGroups, UserSubordinates
+from src.timetable.worker_day.stat import WorkersStatsGetter
+from .models import UserShopGroups, UserSubordinates, EmploymentStats
 
 
 @app.task
@@ -154,3 +155,51 @@ def fill_user_subordinates(dt=None, dt_to_shift_days=None, use_user_shop_groups=
         objs=objs,
         batch_size=10000,
     )
+
+
+@app.task
+def fill_employments_stats():
+    for network in Network.objects.all():
+        acc_period_start, acc_period_end = network.get_acc_period_range(datetime.today())
+        shop_ids = list(Employment.objects.get_active(
+            employee__user__network=network,
+            dt_from=acc_period_start,
+            dt_to=acc_period_end,
+        ).values_list('employee_id', flat=True).values_list('shop_id', flat=True).distinct())
+        for shop_id in shop_ids:
+            employment_stats_to_create = []
+            stats = WorkersStatsGetter(
+                dt_from=acc_period_start,
+                dt_to=acc_period_end,
+                shop_id=shop_id,
+            ).run()
+            for employee_id, employee_stats in stats.items():
+                for employment_id, employment_stats in employee_stats['employments'].items():
+                    for month_num, dates in employment_stats.get('pa_reduce_norm_days', {}).items():
+                        for dt in dates:
+                            employment_stats_to_create.append(EmploymentStats(
+                                employee_id=employee_id,
+                                employment_id=employment_id,
+                                shop_id=shop_id,
+                                sawh_hours=employment_stats.get('one_day_value', {}).get(month_num, 0),
+                                reduce_norm=True,
+                                dt=dt,
+                            ))
+                    for month_num, dates in employment_stats.get('pa_not_reduce_norm_days', {}).items():
+                        for dt in dates:
+                            employment_stats_to_create.append(EmploymentStats(
+                                employee_id=employee_id,
+                                employment_id=employment_id,
+                                shop_id=shop_id,
+                                sawh_hours=employment_stats.get('one_day_value', {}).get(month_num, 0),
+                                reduce_norm=False,
+                                dt=dt,
+                            ))
+
+            EmploymentStats.objects.filter(
+                shop_id=shop_id,
+                dt__gte=acc_period_start,
+                dt__lte=acc_period_end,
+            ).delete()
+            if employment_stats_to_create:
+                EmploymentStats.objects.bulk_create(employment_stats_to_create, batch_size=1000)

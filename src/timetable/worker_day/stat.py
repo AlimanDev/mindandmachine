@@ -6,6 +6,7 @@ from functools import lru_cache
 import pandas as pd
 from dateutil.relativedelta import relativedelta
 from django.conf import settings
+from django.contrib.postgres.aggregates import ArrayAgg
 from django.core.cache import cache
 from django.db.models import (
     Case, When, BooleanField, )
@@ -17,7 +18,7 @@ from django.db.models import (
     FloatField,
 )
 from django.db.models.functions import Cast, TruncDate
-from django.db.models.functions import Extract, Coalesce, Greatest, Least
+from django.db.models.functions import Extract, Coalesce
 from django.utils.functional import cached_property
 
 from src.base.models import Employment, Shop, ProductionDay, SAWHSettings, Network, SAWHSettingsMapping, NetworkConnect
@@ -488,6 +489,7 @@ class WorkersStatsGetter:
             empl_days_count=Count('dt'),
             empl_days_count_selected_period=Count('dt', filter=selected_period_q),
             empl_days_count_outside_of_selected_period=Count('dt', filter=outside_of_selected_period_q),
+            dts=ArrayAgg('dt'),
         )
 
     def _get_prod_cal_for_employee(self, employee_id):
@@ -801,6 +803,14 @@ class WorkersStatsGetter:
                                                                                  {})[
                                                                 pc_dict['dt__month']] - empl_dict.setdefault(
                                 'vacation_or_sick_plan_approved_count_selected_period', {})[pc_dict['dt__month']])
+
+                            pa_reduce_norm_days = empl_dict.setdefault('pa_reduce_norm_days', {}).setdefault(pc_dict['dt__month'], [])
+                            pa_not_reduce_norm_days = empl_dict.setdefault('pa_not_reduce_norm_days', {}).setdefault(pc_dict['dt__month'], [])
+                            for dt in pc_dict['dts']:
+                                if pc_dict['has_vacation_or_sick_plan_approved']:
+                                    pa_reduce_norm_days.append(dt)
+                                else:
+                                    pa_not_reduce_norm_days.append(dt)
 
                     if is_fact_key == 'plan' and is_approved_key == 'approved':  # считаем только 1 раз
                         norm_hours_by_months = empl_dict.setdefault('norm_hours_by_months', {})
