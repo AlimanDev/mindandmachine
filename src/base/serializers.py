@@ -1,12 +1,12 @@
+import distutils.util
 import json
 from datetime import timedelta
-from dateutil.relativedelta import relativedelta
 
-from django.conf import settings
-from django.utils.timezone import now
+from dateutil.relativedelta import relativedelta
 from django.contrib.auth.forms import SetPasswordForm
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.core.validators import EmailValidator
+from django.utils.timezone import now
 from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
@@ -14,7 +14,6 @@ from rest_framework.fields import empty
 from rest_framework.validators import UniqueValidator, UniqueTogetherValidator
 
 from src.base.fields import CurrentUserNetwork, UserworkShop
-from src.base.message import Message
 from src.base.models import (
     ContentBlock,
     Employment,
@@ -268,9 +267,11 @@ class EmployeeSerializer(BaseNetworkSerializer):
         super(EmployeeSerializer, self).__init__(*args, **kwargs)
         request = self.context.get('request')
         self.fields['user'] = UserSerializer(read_only=True, source=user_source)
-        if request and request.query_params.get('include_employments'):
-            self.fields['employments'] = EmploymentListSerializer(
-                required=False, many=True, read_only=True, context=self.context, source='employments_list')
+        if request:
+            include_employments = request.query_params.get('include_employments')
+            if include_employments and bool(distutils.util.strtobool(include_employments)):
+                self.fields['employments'] = EmploymentListSerializer(
+                    required=False, many=True, read_only=True, context=self.context, source='employments_list')
 
 
 class AuthUserSerializer(UserSerializer):
@@ -370,14 +371,16 @@ class EmploymentListSerializer(serializers.Serializer):
         super(EmploymentListSerializer, self).__init__(*args, **kwargs)
 
         request = self.context.get('request')
-        if request and request.query_params.get('include_employee'):
-            self.fields['employee'] = EmployeeSerializer(required=False, read_only=True)
-        
+        include_employee = None
         show_constraints = None
         if request:
+            include_employee = request.query_params.get('include_employee')
             show_constraints = request.query_params.get('show_constraints')
 
-        if not show_constraints:
+        if (include_employee and bool(distutils.util.strtobool(include_employee))):
+            self.fields['employee'] = EmployeeSerializer(required=False, read_only=True)
+
+        if not(show_constraints and bool(distutils.util.strtobool(show_constraints))):
             self.fields.pop('worker_constraints')
 
 
@@ -503,14 +506,16 @@ class EmploymentSerializer(serializers.ModelSerializer):
         super(EmploymentSerializer, self).__init__(*args, **kwargs)
 
         request = self.context.get('request')
-        if request and request.query_params.get('include_employee'):
+        include_employee = None
+        show_constraints = None
+        if request:
+            include_employee = request.query_params.get('include_employee')
+            show_constraints = request.query_params.get('show_constraints')
+
+        if (include_employee and bool(distutils.util.strtobool(include_employee))):
             self.fields['employee'] = EmployeeSerializer(required=False, read_only=True)
 
-        show_constraints = None
-        if self.context.get('request'):
-            show_constraints = self.context['request'].query_params.get('show_constraints')
-
-        if not show_constraints:
+        if not (show_constraints and bool(distutils.util.strtobool(show_constraints))):
             self.fields.pop('worker_constraints')
 
         if self.context.get('view') and self.context['view'].action in ['list', 'retrieve']:
