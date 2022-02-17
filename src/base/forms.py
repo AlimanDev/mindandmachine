@@ -1,5 +1,4 @@
 from django_json_widget.widgets import JSONEditorWidget
-from django.utils.translation import gettext_lazy as _
 from django import forms
 from import_export.forms import ImportForm, ConfirmImportForm
 from src.base.models import Group
