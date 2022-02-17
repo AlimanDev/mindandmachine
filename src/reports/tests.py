@@ -4,15 +4,18 @@ from datetime import date, datetime, time, timedelta
 import pandas as pd
 from dateutil.relativedelta import relativedelta
 from django.core import mail
+from django.core.cache import cache
 from django.test import TestCase
 from django_celery_beat.models import CrontabSchedule
 from rest_framework.test import APITestCase
+
+from etc.scripts import fill_calendar
 from src.base.models import FunctionGroup, Network, WorkerPosition
 from src.base.tests.factories import EmployeeFactory, EmploymentFactory, GroupFactory, NetworkFactory, ShopFactory, \
     UserFactory
-from src.reports.models import ReportConfig, ReportType, Period, UserShopGroups, UserSubordinates
+from src.reports.models import ReportConfig, ReportType, Period, UserShopGroups, UserSubordinates, EmploymentStats
 from src.reports.reports import PIVOT_TABEL
-from src.reports.tasks import cron_report, fill_user_shop_groups, fill_user_subordinates
+from src.reports.tasks import cron_report, fill_user_shop_groups, fill_user_subordinates, fill_employments_stats
 from src.timetable.models import ScheduleDeviations, WorkerDay, WorkerDayOutsourceNetwork, WorkerDayType
 from src.timetable.tests.factories import WorkerDayFactory
 from src.util.mixins.tests import TestsHelperMixin
@@ -781,6 +784,15 @@ class TestFillReportsData(TestsHelperMixin, TestCase):
             employee__user__network=cls.network,
             shop=cls.shop1, position=cls.position_seller,
         )
+        dt_now = datetime.today()
+        fill_calendar.fill_days(
+            dt_now.replace(day=1, month=1).strftime('%Y.%m.%d'),
+            dt_now.replace(day=31, month=12).strftime('%Y.%m.%d'),
+            cls.base_shop.region_id,
+        )
+
+    def setUp(self) -> None:
+        cache.clear()
 
     def test_fill_user_shop_groups(self):
         fill_user_shop_groups()
@@ -795,3 +807,8 @@ class TestFillReportsData(TestsHelperMixin, TestCase):
         self.assertEqual(UserSubordinates.objects.filter(user=self.employment_urs.employee.user).count(), 2)
         self.assertEqual(UserSubordinates.objects.filter(user=self.employment_dir.employee.user).count(), 1)
         self.assertEqual(UserSubordinates.objects.filter(user=self.employment_worker.employee.user).count(), 0)
+
+    def test_fill_employments_stats(self):
+        fill_employments_stats()
+        self.assertEqual(EmploymentStats.objects.filter(
+            employment=self.employment_admin).count(), monthrange(self.dt_now.year, self.dt_now.month)[1])
