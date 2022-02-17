@@ -1,6 +1,8 @@
+import json
 import os
 import tempfile
-from datetime import datetime, time, date
+from datetime import datetime, time, date, timedelta
+from unittest import mock
 
 from django.test import TestCase
 from freezegun import freeze_time
@@ -11,6 +13,7 @@ from src.base.tests.factories import (
     EmploymentFactory,
 )
 from src.exchange.models import SystemExportStrategy, ExportJob, LocalFilesystemConnector
+from src.exchange.tasks import run_export_job
 from src.forecast.models import (
     OperationTypeName,
     OperationType,
@@ -110,3 +113,46 @@ class TestExportData(TestsHelperMixin, TestCase):
             filepath = os.path.join(tmp_dir, 'plan_and_fact_hours_2021-09-01-2021-09-30.xlsx')
             self.assertTrue(os.path.exists(filepath))
             self.assertTrue(os.path.getsize(filepath) > 0)
+
+class TestExportRetry(TestCase):
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.local_fs_connector = LocalFilesystemConnector.objects.create(
+            name='local',
+        )
+        cls.system_export_strategy = SystemExportStrategy.objects.create(
+                strategy_type=SystemExportStrategy.PLAN_AND_FACT_HOURS_TABLE,
+                period=Period.objects.create(
+                    count_of_periods=1,
+                    period=Period.ACC_PERIOD_MONTH,
+                    period_start=Period.PERIOD_START_CURRENT_MONTH,
+                )
+            )
+        cls.export_job = ExportJob.objects.create(
+            fs_connector=cls.local_fs_connector,
+            export_strategy=cls.system_export_strategy,
+            retry_attempts=json.dumps({1: 8600, 3: 45}),
+        )
+    
+    @freeze_time('2022-02-16')
+    def test_retry(self):
+        def _patch_apply_async(args=[], kwargs={}, eta=None):
+            run_export_job(*args,**kwargs)
+        dttm = datetime(2022, 2, 16)
+        with mock.patch.object(ExportJob, 'run', side_effect=Exception()):
+            with mock.patch.object(run_export_job, 'apply_async', side_effect=_patch_apply_async) as mock_apply_async:
+                try:
+                    run_export_job(self.export_job.id)
+                except:
+                    pass
+                self.assertEqual(mock_apply_async.call_count, 3)
+                self.assertListEqual(
+                    mock_apply_async.call_args_list,
+                    [
+                        mock.call(args=[self.export_job.id], kwargs={'attempt': 2}, eta=dttm + timedelta(seconds=8600)),
+                        mock.call(args=[self.export_job.id], kwargs={'attempt': 3}, eta=dttm + timedelta(seconds=3600)),
+                        mock.call(args=[self.export_job.id], kwargs={'attempt': 4}, eta=dttm + timedelta(seconds=45)),
+                    ]
+                )
+

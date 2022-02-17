@@ -320,6 +320,7 @@ class TestWorkersStatsGetter(TestsHelperMixin, APITestCase):
                     'empl_days_count': 20,
                     'empl_days_count_selected_period': 20,
                     'empl_days_count_outside_of_selected_period': 20,
+                    'dts': [],
                 }
             ]
         
