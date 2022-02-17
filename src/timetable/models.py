@@ -2134,7 +2134,7 @@ class AttendanceRecords(AbstractModel):
                 employee_id=self.employee_id,
                 is_fact=True,
                 is_approved=True,
-            ).order_by('-is_equal_shops', '-is_closest_plan_approved_equal').first()
+            ).select_related('type').order_by('-is_equal_shops', '-is_closest_plan_approved_equal').first()
 
             if fact_approved:
                 self.fact_wd = fact_approved
@@ -2158,7 +2158,7 @@ class AttendanceRecords(AbstractModel):
                 setattr(fact_approved, 'created_by', None)
                 if closest_plan_approved and not fact_approved.closest_plan_approved_id:
                     fact_approved.closest_plan_approved = closest_plan_approved
-                if not fact_approved.worker_day_details.exists() and fact_approved.type.has_details:
+                if fact_approved.type.has_details and not fact_approved.worker_day_details.exists():
                     self._create_wd_details(self.dt, fact_approved, active_user_empl, closest_plan_approved)
                 fact_approved.save()
                 self._create_or_update_not_approved_fact(fact_approved)
@@ -2212,7 +2212,7 @@ class AttendanceRecords(AbstractModel):
                     }
                 )
                 self.fact_wd = fact_approved
-                if (_wd_created or not fact_approved.worker_day_details.exists()) and fact_approved.type.has_details:
+                if fact_approved.type.has_details and (_wd_created or not fact_approved.worker_day_details.exists()):
                     self._create_wd_details(self.dt, fact_approved, active_user_empl, closest_plan_approved)
                 if _wd_created:
                     if not closest_plan_approved:
