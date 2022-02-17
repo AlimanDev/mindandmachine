@@ -529,6 +529,7 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
         self.assertEqual(WorkerDay.objects.filter(is_fact=False, is_approved=True).count(), 2)
         self.assertEqual(WorkerDay.objects.filter(is_fact=True, is_approved=True).count(), 2)
         wd_night_shift = WorkerDay.objects.get(employee=self.employee2, is_fact=True, is_approved=True)
+        self.assertEqual(wd_night_shift.source, WorkerDay.RECALC_FACT_FROM_ATT_RECORDS)
         self.assertEqual(wd_night_shift.dttm_work_start, datetime.combine(dt, time(17, 49)))
         self.assertEqual(wd_night_shift.dttm_work_end, datetime.combine(dt + timedelta(1), time(1, 5)))
         self.assertEqual(AttendanceRecords.objects.filter(type=AttendanceRecords.TYPE_COMING).count(), 2)
