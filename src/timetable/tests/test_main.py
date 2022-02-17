@@ -4991,6 +4991,36 @@ class TestAttendanceRecords(TestsHelperMixin, APITestCase):
             wt_not_deleted.id,
         )
 
+    def test_details_not_created_for_worker_day_type_without_details(self):
+        WorkerDay.objects.filter(employee=self.employee4).delete()
+        dt = date.today()
+        wd_plan = WorkerDayFactory(
+            type_id=WorkerDay.TYPE_QUALIFICATION,
+            dttm_work_start=datetime.combine(dt, time(12)),
+            dttm_work_end=datetime.combine(dt, time(20)),
+            employee=self.employee4,
+            employment=self.employment4,
+            shop=self.shop,
+            dt=dt,
+            is_approved=True,
+            is_fact=False,
+        )
+        self.assertEqual(wd_plan.worker_day_details.count(), 0)
+        record = AttendanceRecords.objects.create(
+            dt=dt,
+            dttm=datetime.combine(dt, time(11, 55)),
+            shop=self.shop,
+            user=self.user4,
+            employee=self.employee4,
+            type=AttendanceRecords.TYPE_COMING,
+        )
+        fact_wd = getattr(record, 'fact_wd', None)
+        self.assertIsNotNone(fact_wd)
+        self.assertEqual(fact_wd.closest_plan_approved_id, wd_plan.id)
+        self.assertEqual(fact_wd.type_id, WorkerDay.TYPE_QUALIFICATION)
+        self.assertEqual(fact_wd.worker_day_details.count(), 0)
+        self.assertEqual(WorkerDayCashboxDetails.objects.filter(worker_day__employee=self.employee4).count(), 0)
+
 
 class TestVacancy(TestsHelperMixin, APITestCase):
     @classmethod

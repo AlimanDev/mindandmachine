@@ -118,6 +118,7 @@ class BaseTimesheetDivider:
             logger.debug(f'start week with start_of_week: {start_of_week}')
 
             if self._need_to_skip_week(week_dates):
+                logger.debug(f'skip week: {start_of_week}-{start_of_week + datetime.timedelta(days=7)}')
                 start_of_week += datetime.timedelta(days=7)
                 continue
 
@@ -405,6 +406,9 @@ class PobedaTimesheetDivider(BaseTimesheetDivider):
         for main_timesheet_item in self.fiscal_timesheet.main_timesheet.get_items(
                 filter_func=lambda i: i.day_type.code == WorkerDay.TYPE_SICK):
             main_timesheet_item.day_type = self.fiscal_timesheet.wd_types_dict.get(WorkerDay.TYPE_ABSENSE)
+        for add_timesheet_item in self.fiscal_timesheet.additional_timesheet.get_items(
+                filter_func=lambda i: i.day_type.code == WorkerDay.TYPE_SICK):
+            add_timesheet_item.day_type = self.fiscal_timesheet.wd_types_dict.get(WorkerDay.TYPE_ABSENSE)
 
     def _remove_absence_from_additional_timesheet(self):
         for additional_timesheet_item in self.fiscal_timesheet.additional_timesheet.get_items(
@@ -415,8 +419,8 @@ class PobedaTimesheetDivider(BaseTimesheetDivider):
         logger.info(f'start pobeda fiscal sheet divide')
         self._init_main_and_additional_timesheets()
         self._move_other_shop_or_position_work_to_additional_timesheet()
-        self._replace_sick_with_absence_type()
         self._check_weekly_continuous_holidays()
+        self._replace_sick_with_absence_type()
         self._remove_absence_from_additional_timesheet()
         self._check_not_more_than_threshold_hours()
         self._redistribute_vacations_from_additional_timesheet_to_main_timesheet()
