@@ -89,6 +89,7 @@ INSTALLED_APPS = [
     'polymorphic',
     'src.exchange',
     'src.pbi',
+    'mptt',
 ]
 
 REST_FRAMEWORK = {

@@ -965,4 +965,4 @@ class TestDepartment(TestsHelperMixin, APITestCase):
         )
 
         self.assertEqual(response.status_code, 400)
-        self.assertEqual(response.json(), [f'Магазин с id {self.shop.id} не может быть родителем для магазина с id {self.root_shop.id}, так как он явлется его потомком.'])
+        self.assertEqual(response.json(), ['Элемент не может быть потомком своего наследника.'])

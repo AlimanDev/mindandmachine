@@ -224,13 +224,8 @@ class ShopSerializer(serializers.ModelSerializer):
             validated_data.pop('parent_code', None)
         try:
             shop = super(ShopSerializer, self).update(instance, validated_data)
-        except InvalidMove:
-            raise serializers.ValidationError(
-                _('Shop with id {} may not be parent of shop with id {} because it is his descendant.').format(
-                    validated_data.get('parent_id'),
-                    instance.id,
-                )
-            )
+        except InvalidMove as e:
+            raise serializers.ValidationError(str(e))
         self._update_or_create_nested_data(shop, nonstandard_schedule)
         return shop
 

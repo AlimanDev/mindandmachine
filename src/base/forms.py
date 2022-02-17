@@ -31,23 +31,6 @@ class ShopAdminForm(DefaultOverrideAdminWidgetsForm):
         'load_template_settings',
     ]
 
-    def clean_parent(self):
-        parent = self.cleaned_data.get('parent')
-        raise_exc_cond = (
-            'parent' in self.changed_data and 
-            parent and 
-            self.instance and
-            parent.get_ancestors().filter(pk=self.instance.id).exists()
-        )
-        if raise_exc_cond:
-            self.add_error(
-                'parent', 
-                _('Shop with id {} may not be parent of shop with id {} because it is his descendant.').format(
-                    parent.id,
-                    self.instance.id,
-                )
-            )
-        return parent
 
 class ShopSettingsAdminForm(DefaultOverrideAdminWidgetsForm):
     json_fields = [
