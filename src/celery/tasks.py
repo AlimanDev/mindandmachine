@@ -166,7 +166,7 @@ def employee_not_checked():
                 'dttm': no_leaving_record.dttm_work_end_plan.strftime('%Y-%m-%d %H:%M:%S'),
                 'type': 'уход',
                 'shop_id': no_leaving_record.shop_id,
-                'employment_shop_id': no_comming_record.employment_shop_id,
+                'employment_shop_id': no_leaving_record.employment_shop_id,
                 'networks': [no_leaving_record.shop.network_id, no_leaving_record.worker.network_id],
             },
         )
