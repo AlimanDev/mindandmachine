@@ -589,6 +589,7 @@ class WorkerDay(AbstractModel):
     SOURCE_COPY_APPROVED_PLAN_TO_FACT = 18
     SOURCE_COPY_APPROVED_FACT_TO_FACT = 19
     SOURCE_AUTO_FACT = 20
+    RECALC_FACT_FROM_ATT_RECORDS = 21
 
     SOURCES = [
         (SOURCE_FAST_EDITOR, 'Создание рабочего дня через быстрый редактор'),
@@ -612,6 +613,7 @@ class WorkerDay(AbstractModel):
         (SOURCE_COPY_APPROVED_PLAN_TO_FACT, 'Создание смен через copy_approved (Копирование из плана в факт)'),
         (SOURCE_COPY_APPROVED_FACT_TO_FACT, 'Создание смен через copy_approved (Копирование из факта в факт)'),
         (SOURCE_AUTO_FACT, 'Создание смен во время отметок'),
+        (RECALC_FACT_FROM_ATT_RECORDS, 'Пересчет факта на основе отметок'),
     ]
 
     def __str__(self):
@@ -2205,7 +2207,7 @@ class AttendanceRecords(AbstractModel):
                         'type_id': closest_plan_approved.type_id if closest_plan_approved else WorkerDay.TYPE_WORKDAY,
                         self.TYPE_2_DTTM_FIELD[self.type]: self.dttm,
                         'is_vacancy': active_user_empl.shop_id != self.shop_id if active_user_empl else False,
-                        'source': WorkerDay.SOURCE_AUTO_FACT,
+                        'source': WorkerDay.RECALC_FACT_FROM_ATT_RECORDS if recalc_fact_from_att_records else WorkerDay.SOURCE_AUTO_FACT,
                         # TODO: пока не стал проставлять is_outsource, т.к. придется делать доп. действие в интерфейсе,
                         # чтобы посмотреть что за сотрудник при правке факта из отдела аутсорс-клиента
                         #'is_outsource': active_user_empl.shop.network_id != self.shop.network_id,

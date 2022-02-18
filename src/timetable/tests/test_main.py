@@ -529,6 +529,7 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
         self.assertEqual(WorkerDay.objects.filter(is_fact=False, is_approved=True).count(), 2)
         self.assertEqual(WorkerDay.objects.filter(is_fact=True, is_approved=True).count(), 2)
         wd_night_shift = WorkerDay.objects.get(employee=self.employee2, is_fact=True, is_approved=True)
+        self.assertEqual(wd_night_shift.source, WorkerDay.RECALC_FACT_FROM_ATT_RECORDS)
         self.assertEqual(wd_night_shift.dttm_work_start, datetime.combine(dt, time(17, 49)))
         self.assertEqual(wd_night_shift.dttm_work_end, datetime.combine(dt + timedelta(1), time(1, 5)))
         self.assertEqual(AttendanceRecords.objects.filter(type=AttendanceRecords.TYPE_COMING).count(), 2)
@@ -5402,7 +5403,11 @@ class TestVacancy(TestsHelperMixin, APITestCase):
         self.assertContains(
             response, text='Операция не может быть выполнена. Недопустимое пересечение времени', status_code=400)
 
+    @override_settings(CELERY_TASK_ALWAYS_EAGER=True)
     def test_approve_vacancy(self):
+        self.shop.network.only_fact_hours_that_in_approved_plan = True
+        self.shop.network.run_recalc_fact_from_att_records_on_plan_approve = True
+        self.shop.network.save()
         WorkerDay.objects.filter(id=self.vacancy.id).update(employee_id=None, is_approved=False)
         wd = WorkerDay.objects.create(
             shop=self.shop,
@@ -5421,16 +5426,33 @@ class TestVacancy(TestsHelperMixin, APITestCase):
 
         WorkerDay.objects.filter(id=self.vacancy.id).update(employee=wd.employee, is_approved=False)
 
-        resp = self.client.post(f'/rest_api/worker_day/{self.vacancy.id}/approve_vacancy/')
+        wd_fact = WorkerDayFactory(
+            shop=self.shop,
+            employee=self.employee2,
+            employment=self.employment2,
+            type_id=WorkerDay.TYPE_WORKDAY,
+            dt=self.dt_now,
+            is_approved=True,
+            is_fact=True,
+            created_by=self.user2,
+            last_edited_by=self.user2,
+        )
+        self.assertEqual(wd_fact.work_hours, timedelta(0))
+        with self.captureOnCommitCallbacks(execute=True) as callbacks:
+            resp = self.client.post(f'/rest_api/worker_day/{self.vacancy.id}/approve_vacancy/')
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
-        self.assertFalse(WorkerDay.objects.filter(id=wd.id).exists())
-        self.assertTrue(WorkerDay.objects.filter(id=self.vacancy.id, is_approved=True).exists())
+        wd = WorkerDay.objects.filter(id=self.vacancy.id).first()
+        self.assertIsNotNone(wd)
+        self.assertTrue(wd.is_approved)
         self.assertTrue(WorkerDay.objects.filter(
-            dt=self.vacancy.dt,
-            employee_id=self.vacancy.employee_id,
-            is_fact=self.vacancy.is_fact,
+            dt=wd.dt,
+            employee_id=wd.employee_id,
+            is_fact=wd.is_fact,
             is_approved=True,
         ).exists())
+        wd_fact.refresh_from_db()
+        self.assertEqual(wd_fact.closest_plan_approved_id, wd.id)
+        self.assertEqual(wd_fact.work_hours, timedelta(seconds=31500))
 
     def test_get_only_available(self):
         '''
