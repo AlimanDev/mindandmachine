@@ -628,7 +628,6 @@ def confirm_vacancy(vacancy_id, user=None, employee_id=None, exchange=False, rec
                 res['text'] = messages['vacancy_refused']
                 return res
 
-
             vacancy_shop = vacancy.shop
 
             if user.black_list_symbol is None and vacancy_shop.network.need_symbol_for_vacancy:

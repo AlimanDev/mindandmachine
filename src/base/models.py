@@ -249,7 +249,7 @@ class Network(AbstractActiveModel):
     allow_creation_several_wdays_for_one_employee_for_one_date = models.BooleanField(
         default=False, verbose_name='Разрешить создание нескольких рабочих дней для 1 сотрудника на 1 дату')
     run_recalc_fact_from_att_records_on_plan_approve = models.BooleanField(
-        default=False, verbose_name='Запускать пересчет факта на основе отметок при подтверждении плана',
+        default=True, verbose_name='Запускать пересчет факта на основе отметок при подтверждении плана',
     )
     edit_manual_fact_on_recalc_fact_from_att_records = models.BooleanField(
         default=False,

@@ -976,6 +976,13 @@ class WorkerDayViewSet(BaseModelViewSet):
                         work_part=details['work_part'],
                     ) for details in vacancy_details
                 )
+
+                WorkerDay.set_closest_plan_approved(
+                    q_obj=Q(employee_id=vacancy.employee_id, dt=vacancy.dt),
+                    delta_in_secs=vacancy.shop.network.set_closest_plan_approved_delta_for_manual_fact,
+                )
+                transaction.on_commit(lambda: recalc_wdays.delay(
+                    id__in=list(WorkerDay.objects.filter(closest_plan_approved=parent_id).values_list('id', flat=True))))
             else:
                 transaction.on_commit(lambda: notify_vacancy_created(vacancy, is_auto=False))
                 vacancy.is_approved = True
