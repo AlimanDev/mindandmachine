@@ -876,7 +876,7 @@ class WorkersStatsGetter:
                 else:
                     empl_dict['sawh_hours_by_months'] = norm_hours_by_months
 
-                for month_num in [m for m in months_until_acc_period_end if m in empl_dict['sawh_hours_by_months']]:
+                for month_num in [m for m in months_until_acc_period_end if m in empl_dict.get('sawh_hours_by_months', {})]:
                     if self.network.consider_remaining_hours_in_prev_months_when_calc_norm_hours:
                         sawh_settings_empl_sum = sum(
                             v for k, v in empl_dict['sawh_hours_by_months'].items() if k in months_until_acc_period_end)

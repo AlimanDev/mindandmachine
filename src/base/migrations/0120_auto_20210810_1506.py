@@ -23,7 +23,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='network',
             name='run_recalc_fact_from_att_records_on_plan_approve',
-            field=models.BooleanField(default=False, verbose_name='Запускать пересчет факта на основе отметок при подтверждении плана'),
+            field=models.BooleanField(default=True, verbose_name='Запускать пересчет факта на основе отметок при подтверждении плана'),
         ),
         migrations.AddField(
             model_name='network',
