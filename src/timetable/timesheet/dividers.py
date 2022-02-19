@@ -165,6 +165,7 @@ class BaseTimesheetDivider:
                 logger.debug(f'continuous_holidays_count == 0, make last 2 days of week as holidays')
                 for dt in [week_dates[5], week_dates[6]]:
                     self._make_holiday(dt)
+                start_of_week += datetime.timedelta(days=7)
 
         logger.info(f'finish weekly continuous holidays check')
 
