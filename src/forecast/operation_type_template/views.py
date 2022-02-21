@@ -1,7 +1,8 @@
-from rest_framework import serializers, status
+from rest_framework import serializers
 from rest_framework.response import Response
 from django_filters.rest_framework import FilterSet
-from src.forecast.models import OperationTypeTemplate, LoadTemplate
+from src.base.serializers import BaseModelSerializer
+from src.forecast.models import OperationTypeTemplate
 from src.forecast.operation_type_name.views import OperationTypeNameSerializer
 from rest_framework.validators import UniqueTogetherValidator
 from src.base.permissions import Permission
@@ -14,7 +15,7 @@ from src.base.views_abstract import BaseModelViewSet
 from drf_yasg.utils import swagger_auto_schema
 
 # Serializers define the API representation.
-class OperationTypeTemplateSerializer(serializers.ModelSerializer):
+class OperationTypeTemplateSerializer(BaseModelSerializer):
     default_error_messages = {
         "bad_steps_base": _("This operation type depends on operations with less forecast steps."),
         "bad_steps_depended": _("This operation type is dependency of operations with bigger forecast steps."),

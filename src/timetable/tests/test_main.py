@@ -5815,6 +5815,29 @@ class TestVacancy(TestsHelperMixin, APITestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertFalse(WorkerDay.objects.filter(id=vacancy.id).exists())
 
+    def test_get_and_create_vacancy_with_shop_name(self):
+        response = self.client.get(f"{self.get_url('WorkerDay-vacancy')}?extra_fields=shop__name,shop__code&limit=100&offset=0&is_vacant=true")
+        self.assertEqual(response.status_code, 200)
+        response_data = response.json()
+        self.assertEqual(len(response_data['results']), 1)
+        self.assertEqual(response_data['results'][0].get('shop__name'), self.shop.name)
+        self.assertFalse('shop__code' in response_data['results'][0])
+        self.assertFalse('shop__name' in response_data['results'][0]['worker_day_details'][0])
+
+        create_data = response_data['results'][0]
+
+        create_data['is_approved'] = False
+        create_data['extra_fields'] = 'shop__name,shop__code'
+
+        response = self.client.post(self.get_url('WorkerDay-list'), data=self.dump_data(create_data), content_type='application/json')
+        response_data = response.json()
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response_data.get('shop__name'), self.shop.name)
+        self.assertFalse('shop__code' in response_data)
+        self.assertFalse('shop__name' in response_data['worker_day_details'][0])
+
+
 
 class TestAditionalFunctions(TestsHelperMixin, APITestCase):
     USER_USERNAME = "user1"

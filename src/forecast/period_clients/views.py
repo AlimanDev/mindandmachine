@@ -3,6 +3,7 @@ from rest_framework import serializers, status
 from rest_framework.response import Response
 from django_filters.rest_framework import FilterSet
 from django_filters import DateFilter, NumberFilter
+from src.base.serializers import BaseModelSerializer
 from src.util.utils import JsonResponse
 from src.base.permissions import FilteredListPermission
 from src.forecast.models import OperationType, OperationTypeName, PeriodClients
@@ -43,7 +44,7 @@ class PeriodClientsUpdateSerializer(PeriodClientsDeleteSerializer):
             raise serializers.ValidationError('Нельзя изменить прогноз спроса за прошлый период')
 
 
-class PeriodClientsSerializer(serializers.ModelSerializer):
+class PeriodClientsSerializer(BaseModelSerializer):
     dttm_forecast = serializers.DateTimeField(format=QOS_DATETIME_FORMAT, read_only=True)
     class Meta:
         model = PeriodClients
