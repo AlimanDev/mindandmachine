@@ -2,6 +2,7 @@ import datetime
 from rest_framework import serializers, viewsets, mixins
 from src.base.permissions import FilteredListPermission
 from rest_framework.response import Response
+from src.base.serializers import BaseModelSerializer
 from src.conf.djconfig import QOS_DATE_FORMAT
 from src.timetable.models import ShopMonthStat
 from django_filters.rest_framework import FilterSet
@@ -11,7 +12,7 @@ from drf_yasg.utils import swagger_auto_schema
 
 
 # Serializers define the API representation.
-class ShopMonthStatSerializer(serializers.ModelSerializer):
+class ShopMonthStatSerializer(BaseModelSerializer):
     dt = serializers.DateField(format=QOS_DATE_FORMAT, read_only=True)
     class Meta:
         model = ShopMonthStat
