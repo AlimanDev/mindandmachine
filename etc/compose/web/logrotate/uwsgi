@@ -1,4 +1,4 @@
-/webapp/logs/*.log {
+/webapp/logs/uwsgi/*.log {
     size 10M
     rotate 100000
     maxage 90
