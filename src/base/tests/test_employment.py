@@ -9,7 +9,6 @@ from django.db import transaction
 from django.utils import timezone
 from freezegun import freeze_time
 from rest_framework.test import APITestCase
-from xlrd import open_workbook
 
 from src.base.models import Group, WorkerPosition, Employment, Break, ApiLog
 from src.celery.tasks import delete_inactive_employment_groups
@@ -470,14 +469,14 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
         self.assertIsNone(self.employment3.position_id)
         self.assertIsNone(self.employment3.dt_fired)
 
-    def test_descrease_employment_dt_hired_if_setting_is_enabled(self):
+    def test_not_descreased_employment_dt_hired_if_setting_is_enabled_and_not_by_code(self):
         self.user1.network.descrease_employment_dt_fired_in_api = True
         self.user1.network.save()
 
         put_data = {
             'position_id': self.worker_position.id,
-            'dt_hired': date(2021, 1, 1).strftime('%Y-%m-%d'),
-            'dt_fired': date(2021, 5, 25).strftime('%Y-%m-%d'),
+            'dt_hired': date(2021, 1, 1),
+            'dt_fired': date(2021, 5, 25),
             'shop_id': self.shop2.id,
             'employee_id': self.employee2.id,
         }
@@ -494,13 +493,34 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
             dt_fired=put_data['dt_fired'],
             employee_id=put_data['employee_id'],
             position_id=put_data['position_id'],
-        ).count() == 0)
+        ).count() == 1)
+
+    def test_descrease_employment_dt_hired_if_setting_is_enabled_and_by_code(self):
+        self.user1.network.descrease_employment_dt_fired_in_api = True
+        self.user1.network.save()
+
+        put_data = {
+            'by_code': True,
+            'position_code': self.worker_position.code,
+            'dt_hired': date(2021, 1, 1),
+            'dt_fired': date(2021, 5, 25),
+            'shop_code': self.shop2.code,
+            'username': self.employee2.user.username,
+            'tabel_code': self.employee2.tabel_code,
+        }
+
+        resp = self.client.put(
+            path=self.get_url('Employment-detail', pk='not_used'),
+            data=self.dump_data(put_data),
+            content_type='application/json',
+        )
+        self.assertEqual(resp.status_code, 201)
         self.assertTrue(Employment.objects.filter(
-            shop_id=put_data['shop_id'],
-            dt_hired=put_data['dt_hired'],
-            dt_fired=date(2021, 5, 24).strftime('%Y-%m-%d'),
-            employee_id=put_data['employee_id'],
-            position_id=put_data['position_id'],
+            shop_id=self.shop2.id,
+            dt_hired=date(2021, 1, 1),
+            dt_fired=date(2021, 5, 24),
+            employee_id=self.employee2.id,
+            position_id=self.worker_position.id,
         ).count() == 1)
 
     def test_delete_employment_by_code(self):
@@ -737,9 +757,9 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
             ),
             content_type='application/json',
         )
-        self.assertEquals(response.status_code, status_code)
+        self.assertEqual(response.status_code, status_code)
         self.employment3.refresh_from_db()
-        self.assertEquals(self.employment3.position_id, assert_position_id)
+        self.assertEqual(self.employment3.position_id, assert_position_id)
 
     def test_update_worker_position_permissions(self):
         self.admin_group.subordinates.clear()
@@ -786,9 +806,9 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
             ),
             content_type='application/json',
         )
-        self.assertEquals(response.status_code, status_code)
+        self.assertEqual(response.status_code, status_code)
         self.employment3.refresh_from_db()
-        self.assertEquals(self.employment3.function_group_id, assert_group_id)
+        self.assertEqual(self.employment3.function_group_id, assert_group_id)
 
     def test_update_group_permissions(self):
         self.admin_group.subordinates.clear()
@@ -1122,3 +1142,28 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
         self.employment1.save()
         response = self.client.get('/rest_api/department/')
         self.assertEqual(response.status_code, 200)
+
+    def test_worker_day_restored_after_employment_creation(self):
+        self.network.clean_wdays_on_employment_dt_change = True
+        self.network.save()
+        with self.settings(CELERY_TASK_ALWAYS_EAGER=True):
+            wd = WorkerDayFactory(
+                dt=date(2021, 1, 1),
+                employee=self.employee2,
+                employment=self.employment2,
+                shop=self.shop2,
+                type_id=WorkerDay.TYPE_WORKDAY,
+                is_fact=False,
+                is_approved=True,
+            )
+            Employment.objects.delete()
+            wd.refresh_from_db()
+            self.assertIsNone(wd.employment_id)
+            with self.captureOnCommitCallbacks(execute=True) as callbacks:
+                e = Employment.objects.create(
+                    shop=self.shop,
+                    employee=self.employee2,
+                    function_group=self.employee_group,
+                )
+            wd.refresh_from_db()
+            self.assertEqual(wd.employment_id, e.id)

@@ -1,7 +1,7 @@
-from django.conf.urls import url
+from django.urls import re_path
 
 from .views import GetEmbedInfoAPIView
 
 urlpatterns = [
-    url(r'^get_embed_info/$', GetEmbedInfoAPIView.as_view(), name='get_embed_info'),
+    re_path(r'^get_embed_info/$', GetEmbedInfoAPIView.as_view(), name='get_embed_info'),
 ]

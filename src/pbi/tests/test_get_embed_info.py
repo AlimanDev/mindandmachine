@@ -60,6 +60,7 @@ class TestGetEmbedInfo(TestsHelperMixin, APITestCase):
             client_secret='client secret',
             workspace_id=str(uuid4()),
             report_id=str(uuid4()),
+            use_rls=True,
         )
         cls.report_urs = Report.objects.create(
             name='Urs report',
@@ -68,6 +69,7 @@ class TestGetEmbedInfo(TestsHelperMixin, APITestCase):
             client_secret='client secret',
             workspace_id=str(uuid4()),
             report_id=str(uuid4()),
+            use_rls=True,
         )
         ReportPermission.objects.create(
             report=cls.report_dir,
@@ -128,7 +130,7 @@ class TestGetEmbedInfo(TestsHelperMixin, APITestCase):
                     )
                     requests_post.assert_called_once_with(
                         'https://api.powerbi.com/v1.0/myorg/GenerateToken',
-                        data='{"datasets": [{"id": "' + dataset_id + '"}], "reports": [{"id": "' + self.report_urs.report_id + '"}], "targetWorkspaces": []}',
+                        data='{"datasets": [{"id": "' + dataset_id + '"}], "reports": [{"id": "' + self.report_urs.report_id + '"}], "targetWorkspaces": [], "identities": [{"username": "' + str(self.user_urs.id) + '", "roles": ["DynamicRlsRole"], "datasets": ["' + dataset_id + '"]}]}',
                         headers={
                             'Content-Type': 'application/json',
                             'Authorization': f'Bearer {access_token}'

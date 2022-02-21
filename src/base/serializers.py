@@ -1,19 +1,19 @@
+import distutils.util
 import json
 from datetime import timedelta
-from dateutil.relativedelta import relativedelta
 
-from django.conf import settings
-from django.utils.timezone import now
+from dateutil.relativedelta import relativedelta
 from django.contrib.auth.forms import SetPasswordForm
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.core.validators import EmailValidator
+from django.utils.timezone import now
 from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
+from rest_framework.fields import empty
 from rest_framework.validators import UniqueValidator, UniqueTogetherValidator
 
 from src.base.fields import CurrentUserNetwork, UserworkShop
-from src.base.message import Message
 from src.base.models import (
     ContentBlock,
     Employment,
@@ -22,9 +22,6 @@ from src.base.models import (
     User,
     FunctionGroup,
     WorkerPosition,
-    Notification,
-    Subscribe,
-    Event,
     ShopSettings,
     Shop,
     Group,
@@ -35,6 +32,24 @@ from src.base.models import (
 from src.timetable.serializers import EmploymentWorkTypeSerializer, EmploymentWorkTypeListSerializer
 from src.timetable.worker_constraint.serializers import WorkerConstraintSerializer, WorkerConstraintListSerializer
 
+
+class ModelSerializerWithCreateOnlyFields(serializers.ModelSerializer):
+    class Meta:
+        create_only_fields = []
+
+    def to_internal_value(self, data):
+        data = super().to_internal_value(data)
+        create_only_fields = getattr(self.Meta, 'create_only_fields', [])
+        if self.instance:
+            # update
+            for field in create_only_fields:
+                data.pop(field, None)
+        else:
+            for field in create_only_fields:
+                seralizer_field = self.fields.get(field)
+                if seralizer_field and seralizer_field.default is empty and field not in data:
+                    raise serializers.ValidationError({field: self.error_messages['required']})
+        return data
 
 class BaseNetworkSerializer(serializers.ModelSerializer):
     network_id = serializers.HiddenField(default=CurrentUserNetwork())
@@ -252,9 +267,11 @@ class EmployeeSerializer(BaseNetworkSerializer):
         super(EmployeeSerializer, self).__init__(*args, **kwargs)
         request = self.context.get('request')
         self.fields['user'] = UserSerializer(read_only=True, source=user_source)
-        if request and request.query_params.get('include_employments'):
-            self.fields['employments'] = EmploymentSerializer(
-                required=False, many=True, read_only=True, context=self.context, source='employments_list')
+        if request:
+            include_employments = request.query_params.get('include_employments')
+            if include_employments and bool(distutils.util.strtobool(include_employments)):
+                self.fields['employments'] = EmploymentListSerializer(
+                    required=False, many=True, read_only=True, context=self.context, source='employments_list')
 
 
 class AuthUserSerializer(UserSerializer):
@@ -272,7 +289,7 @@ class AuthUserSerializer(UserSerializer):
         return list(set(allowed_tabs))
     
     def get_subordinate_employee_ids(self, obj: User):
-        return list(Employee.get_subordinates(obj, dt=now().date(), dt_to_shift=relativedelta(months=6)).values_list('id', flat=True))
+        return list(obj.get_subordinates(dt=now().date(), dt_to_shift=relativedelta(months=6)).values_list('id', flat=True))
     
     def get_self_employee_ids(self, obj: User):
         dt = now().date()
@@ -343,15 +360,28 @@ class EmploymentListSerializer(serializers.Serializer):
     is_ready_for_overworkings = serializers.BooleanField()
     dt_new_week_availability_from = serializers.DateField()
     is_visible = serializers.BooleanField()
-    worker_constraints = WorkerConstraintListSerializer(many=True)
-    work_types = EmploymentWorkTypeListSerializer(many=True)
+    worker_constraints = WorkerConstraintListSerializer(many=True, source='worker_constraints_list')
+    work_types = EmploymentWorkTypeListSerializer(many=True, source='work_types_list')
+    function_group_id = serializers.IntegerField()
+    dt_to_function_group = serializers.DateField()
+    is_active = serializers.BooleanField()
+    code = serializers.CharField()
 
     def __init__(self, *args, **kwargs):
         super(EmploymentListSerializer, self).__init__(*args, **kwargs)
 
         request = self.context.get('request')
-        if request and request.query_params.get('include_employee'):
+        include_employee = None
+        show_constraints = None
+        if request:
+            include_employee = request.query_params.get('include_employee')
+            show_constraints = request.query_params.get('show_constraints')
+
+        if (include_employee and bool(distutils.util.strtobool(include_employee))):
             self.fields['employee'] = EmployeeSerializer(required=False, read_only=True)
+
+        if not(show_constraints and bool(distutils.util.strtobool(show_constraints))):
+            self.fields.pop('worker_constraints')
 
 
 class EmploymentSerializer(serializers.ModelSerializer):
@@ -465,9 +495,10 @@ class EmploymentSerializer(serializers.ModelSerializer):
             if shop.network_id != position.network_id:
                 raise serializers.ValidationError(self.error_messages['bad_network_shop_position'])
 
-        if self.context['request'].user.network.descrease_employment_dt_fired_in_api:
-            if 'dt_hired' in attrs and attrs['dt_fired']:
-                attrs['dt_fired'] = attrs['dt_fired'] - timedelta(1)
+        descrease_dt_fired_cond = getattr(self.context['request'], 'by_code', False) and self.context[
+            'request'].user.network.descrease_employment_dt_fired_in_api and 'dt_hired' in attrs and attrs['dt_fired']
+        if descrease_dt_fired_cond:
+            attrs['dt_fired'] = attrs['dt_fired'] - timedelta(1)
 
         return attrs
 
@@ -475,18 +506,20 @@ class EmploymentSerializer(serializers.ModelSerializer):
         super(EmploymentSerializer, self).__init__(*args, **kwargs)
 
         request = self.context.get('request')
-        if request and request.query_params.get('include_employee'):
+        include_employee = None
+        show_constraints = None
+        if request:
+            include_employee = request.query_params.get('include_employee')
+            show_constraints = request.query_params.get('show_constraints')
+
+        if (include_employee and bool(distutils.util.strtobool(include_employee))):
             self.fields['employee'] = EmployeeSerializer(required=False, read_only=True)
 
-        show_constraints = None
-        if self.context.get('request'):
-            show_constraints = self.context['request'].query_params.get('show_constraints')
-
-        if not show_constraints:
+        if not (show_constraints and bool(distutils.util.strtobool(show_constraints))):
             self.fields.pop('worker_constraints')
 
         if self.context.get('view') and self.context['view'].action in ['list', 'retrieve']:
-            self.fields['work_types'].source = 'work_types_list'
+            self.fields['work_types'] = EmploymentWorkTypeSerializer(many=True, read_only=True, source='work_types_list')
         
         if self.context.get('view') and self.context['view'].action == 'timetable':
             exclude_fields = set(self.Meta.fields).difference(set(self.Meta.timetable_fields))
@@ -565,36 +598,6 @@ class WorkerPositionSerializer(BaseNetworkSerializer):
         return super().update(instance, validated_data, *args, **kwargs)
 
 
-class EventSerializer(serializers.ModelSerializer):
-    shop_id = serializers.IntegerField()
-
-    class Meta:
-        model = Event
-        fields = ['type', 'shop_id']
-
-
-class NotificationSerializer(serializers.ModelSerializer):
-    event = EventSerializer(read_only=True)
-    message = serializers.SerializerMethodField()
-
-    class Meta:
-        model = Notification
-        fields = ['id','worker_id', 'is_read', 'event', 'message']
-        read_only_fields = ['worker_id', 'event']
-
-    def get_message(self, instance) -> str:
-        lang = self.context['request'].user.lang
-
-        event = instance.event
-        message = Message(lang=lang)
-        if event.type == 'vacancy':
-            details = event.worker_day
-            params = {'details': details, 'dt': details.dt, 'shop': event.shop, 'domain': settings.EXTERNAL_HOST}
-        else:
-            params = event.params
-        return message.get_message(event.type, params)
-
-
 class ShopSettingsSerializer(serializers.ModelSerializer):
     network_id = serializers.IntegerField(default=CurrentUserNetwork(), write_only=True)
 
@@ -615,14 +618,6 @@ class ShopSettingsSerializer(serializers.ModelSerializer):
                   'network_id',
                   'breaks_id',
                   ]
-
-
-class SubscribeSerializer(serializers.ModelSerializer):
-    shop_id = serializers.IntegerField(required=True)
-
-    class Meta:
-        model = Subscribe
-        fields = ['id','shop_id', 'type']
 
 
 class GroupSerializer(serializers.ModelSerializer):

@@ -59,6 +59,8 @@ def get_timesheet_stats(filtered_qs, dt_from, dt_to, user):
                 employee_id, {}).get('plan', {}).get('approved', {}).get('norm_hours', {}).get('curr_month', None)
             data['sawh_hours'] = worker_stats.get(
                 employee_id, {}).get('plan', {}).get('approved', {}).get('sawh_hours', {}).get('curr_month', None)
+            data['sawh_hours_without_reduce'] = worker_stats.get(
+                employee_id, {}).get('plan', {}).get('approved', {}).get('sawh_hours', {}).get('curr_month_without_reduce_norm', None)
 
     return timesheet_stats
 

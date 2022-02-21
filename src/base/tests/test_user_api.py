@@ -363,7 +363,7 @@ class TestUserViewSet(TestsHelperMixin, APITestCase):
         resp = self.client.post('/rest_api/auth/login/', data=self.dump_data({'username': self.USER_USERNAME, 'password': self.USER_PASSWORD}), content_type='application/json')
         token = resp.client.cookies.get('csrftoken')
         resp = self.client.get('/rest_api/auth/user/')
-        self.assertEquals(resp.client.cookies.get('csrftoken'), token)
+        self.assertEqual(resp.client.cookies.get('csrftoken'), token)
 
     def test_change_password_self(self):
         response = self.client.post(f'/rest_api/user/{self.user1.id}/change_password/', 
@@ -373,7 +373,7 @@ class TestUserViewSet(TestsHelperMixin, APITestCase):
                 'new_password2': 'test_password_1234',
             }
         )
-        self.assertEquals(response.status_code, 200)
+        self.assertEqual(response.status_code, 200)
         self.user1.refresh_from_db()
         self.assertTrue(self.user1.check_password('test_password_1234'))
         self.user1.set_password(self.USER_PASSWORD)
@@ -389,7 +389,7 @@ class TestUserViewSet(TestsHelperMixin, APITestCase):
                 'new_password2': 'test_password_1234',
             }
         )
-        self.assertEquals(response.status_code, status_code)
+        self.assertEqual(response.status_code, status_code)
         self.user4.refresh_from_db()
         if changed:
             self.assertTrue(self.user4.check_password('test_password_1234'))

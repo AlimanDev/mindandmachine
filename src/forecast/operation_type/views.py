@@ -6,21 +6,23 @@ from django.db.models import Q
 from datetime import datetime
 
 from src.base.permissions import FilteredListPermission
+from src.base.serializers import ModelSerializerWithCreateOnlyFields
 from src.base.views_abstract import BaseModelViewSet
 from src.forecast.models import OperationType, OperationTypeName
 from src.forecast.operation_type_name.views import OperationTypeNameSerializer
 
 
-class OperationTypeSerializer(serializers.ModelSerializer):
-    operation_type_name = OperationTypeNameSerializer(required=False)
-    work_type_id = serializers.IntegerField(required=False)
+class OperationTypeSerializer(ModelSerializerWithCreateOnlyFields):
+    operation_type_name = OperationTypeNameSerializer(read_only=True)
+    work_type_id = serializers.IntegerField(read_only=True) # создается только при создании work_type
     code = serializers.CharField(required=False, write_only=True)
     operation_type_name_id = serializers.IntegerField(write_only=True, required=False)
-    shop_id = serializers.IntegerField(required=False)
+    shop_id = serializers.IntegerField()
 
     class Meta:
         model = OperationType
         fields = ['id', 'work_type_id', 'operation_type_name', 'code', 'operation_type_name_id', 'shop_id']
+        create_only_fields = ['operation_type_name_id']
         validators = [
             UniqueTogetherValidator(
                 queryset=OperationType.objects.all(),
@@ -28,10 +30,11 @@ class OperationTypeSerializer(serializers.ModelSerializer):
             ),
         ]
 
-    def is_valid(self, *args, **kwargs):
-        if self.initial_data.get('code', False):
+    def to_internal_value(self, data):
+        if data.get('code', False) and not self.instance:
             self.initial_data['operation_type_name_id'] = OperationTypeName.objects.get(code=self.initial_data.get('code')).id
-        super().is_valid(*args, **kwargs)
+        return super().to_internal_value(data)
+
 
 
 class OperationTypeFilter(FilterSet):

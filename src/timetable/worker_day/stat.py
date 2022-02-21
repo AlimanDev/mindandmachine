@@ -5,6 +5,9 @@ from functools import lru_cache
 
 import pandas as pd
 from dateutil.relativedelta import relativedelta
+from django.conf import settings
+from django.contrib.postgres.aggregates import ArrayAgg
+from django.core.cache import cache
 from django.db.models import (
     Case, When, BooleanField, )
 from django.db.models import (
@@ -15,7 +18,7 @@ from django.db.models import (
     FloatField,
 )
 from django.db.models.functions import Cast, TruncDate
-from django.db.models.functions import Extract, Coalesce, Greatest, Least
+from django.db.models.functions import Extract, Coalesce
 from django.utils.functional import cached_property
 
 from src.base.models import Employment, Shop, ProductionDay, SAWHSettings, Network, SAWHSettingsMapping, NetworkConnect
@@ -237,7 +240,7 @@ class WorkersStatsGetter:
         self.dt_from = Converter.parse_date(dt_from) if isinstance(dt_from, str) else dt_from
         self.dt_to = Converter.parse_date(dt_to) if isinstance(dt_to, str) else dt_to
         self.employee_id = employee_id
-        self.employee_id__in = employee_id__in.split(',') if isinstance(employee_id__in, str) else employee_id__in
+        self.employee_id__in = employee_id__in.split(',') if isinstance(employee_id__in, str) and employee_id__in else employee_id__in
         self.year = self.dt_from.year
         self.month = self.dt_from.month
         self.hours_by_types = hours_by_types or list(WorkerDayType.objects.filter(
@@ -402,8 +405,8 @@ class WorkersStatsGetter:
 
         return result
 
-    def run(self):
-        res = {}
+    @cached_property
+    def prod_cal_qs(self):
         acc_period_dt_from, acc_period_dt_to = self.acc_period_range
         selected_period_q = Q(dt__gte=self.dt_from, dt__lte=self.dt_to)
         prev_months_dt_from, prev_months_dt_to = self.prev_months_range
@@ -412,6 +415,105 @@ class WorkersStatsGetter:
         curr_month_q = Q(dt__gte=curr_month_dt_from, dt__lte=curr_month_dt_to)
         curr_month_end_dt_from, curr_month_end_dt_to = self.curr_month_end_range
         curr_month_end_q = Q(dt__gte=curr_month_end_dt_from, dt__lte=curr_month_end_dt_to)
+        outside_of_selected_period_q = Q(Q(dt__lt=self.dt_from) | Q(dt__gt=self.dt_to))
+        reduce_norm_types = list(WorkerDayType.objects.filter(is_reduce_norm=True).values_list('code', flat=True))
+
+        return ProdCal.objects.filter(
+            dt__gte=acc_period_dt_from,
+            dt__lte=acc_period_dt_to,
+        ).values(
+            'employee_id',
+            'employment_id',
+            'dt__month',
+        ).annotate(
+            has_vacation_or_sick_plan_approved=Exists(WorkerDay.objects.filter(
+                employee_id=OuterRef('employee_id'),
+                employment_id=OuterRef('employment_id'),
+                dt=OuterRef('dt'),
+                is_fact=False,
+                is_approved=True,
+                type_id__in=reduce_norm_types,
+            )),
+            vacation_or_sick_plan_approved_count=Count(Subquery(WorkerDay.objects.filter(
+                employee_id=OuterRef('employee_id'),
+                employment_id=OuterRef('employment_id'),
+                dt=OuterRef('dt'),
+                is_fact=False,
+                is_approved=True,
+                type_id__in=reduce_norm_types,
+            ).values('id')[:1])),
+            vacation_or_sick_plan_approved_count_selected_period=Count(Subquery(WorkerDay.objects.filter(
+                selected_period_q,
+                employee_id=OuterRef('employee_id'),
+                employment_id=OuterRef('employment_id'),
+                dt=OuterRef('dt'),
+                is_fact=False,
+                is_approved=True,
+                type_id__in=reduce_norm_types,
+            ).values('id')[:1])),
+            has_vacation_or_sick_plan_not_approved=Exists(WorkerDay.objects.filter(
+                employee_id=OuterRef('employee_id'),
+                employment_id=OuterRef('employment_id'),
+                dt=OuterRef('dt'),
+                is_fact=False,
+                is_approved=False,
+                type_id__in=reduce_norm_types,
+            )),
+            vacation_or_sick_plan_not_approved_count=Count(Subquery(WorkerDay.objects.filter(
+                employee_id=OuterRef('employee_id'),
+                employment_id=OuterRef('employment_id'),
+                dt=OuterRef('dt'),
+                is_fact=False,
+                is_approved=False,
+                type_id__in=reduce_norm_types,
+            ).values('id')[:1])),
+            vacation_or_sick_plan_not_approved_count_selected_period=Count(Subquery(WorkerDay.objects.filter(
+                selected_period_q,
+                employee_id=OuterRef('employee_id'),
+                employment_id=OuterRef('employment_id'),
+                dt=OuterRef('dt'),
+                is_fact=False,
+                is_approved=False,
+                type_id__in=reduce_norm_types,
+            ).values('id')[:1])),
+            norm_hours_acc_period=Coalesce(
+                Sum('norm_hours'), 0.0),
+            norm_hours_prev_months=Coalesce(
+                Sum('norm_hours', filter=prev_months_q), 0.0),
+            norm_hours_curr_month=Coalesce(
+                Sum('norm_hours', filter=curr_month_q), 0.0),
+            norm_hours_curr_month_end=Coalesce(
+                Sum('norm_hours', filter=curr_month_end_q), 0.0),
+            norm_hours_selected_period=Coalesce(
+                Sum('norm_hours', filter=selected_period_q), 0.0),
+            empl_days_count=Count('dt'),
+            empl_days_count_selected_period=Count('dt', filter=selected_period_q),
+            empl_days_count_outside_of_selected_period=Count('dt', filter=outside_of_selected_period_q),
+            dts=ArrayAgg('dt'),
+        )
+
+    def _get_prod_cal_for_employee(self, employee_id):
+        return list(self.prod_cal_qs.filter(employee_id=employee_id))
+
+    def _get_prod_cal_cached(self):
+        cached_data = []
+
+        for e in self.employees_dict.keys():
+            key = f'prod_cal_{self.dt_from}_{self.dt_to}_{e}'
+            cached = cache.get(key)
+            if not cached:
+                cached = self._get_prod_cal_for_employee(e)
+                cache.set(key, cached, timeout=settings.CACHE_TTL.get('prod_cal', 86400))
+            cached_data.extend(cached)
+        
+        return cached_data
+
+    def run(self):
+        res = {}
+        acc_period_dt_from, acc_period_dt_to = self.acc_period_range
+        selected_period_q = Q(dt__gte=self.dt_from, dt__lte=self.dt_to)
+        prev_months_dt_from, prev_months_dt_to = self.prev_months_range
+        prev_months_q = Q(dt__gte=prev_months_dt_from, dt__lte=prev_months_dt_to)
         until_acc_period_end_dt_from, until_acc_period_end_dt_to = self.until_acc_period_end_range
         until_acc_period_end_q = Q(dt__gte=until_acc_period_end_dt_from, dt__lte=until_acc_period_end_dt_to)
         outside_of_selected_period_q = Q(Q(dt__lt=self.dt_from) | Q(dt__gt=self.dt_to))
@@ -432,14 +534,14 @@ class WorkersStatsGetter:
             'is_approved',
             'dt__month',
         ).annotate(
-            work_days_selected_shop=Coalesce(Count('id', filter=Q(selected_period_q, shop_id=self.shop_id,
+            work_days_selected_shop=Coalesce(Count('dt', filter=Q(selected_period_q, shop_id=self.shop_id,
                                                                   work_hours__gte=timedelta(0),
-                                                                  type__is_work_hours=True)), 0),
-            work_days_other_shops=Coalesce(Count('id', filter=Q(selected_period_q, ~Q(shop_id=self.shop_id),
+                                                                  type__is_work_hours=True), distinct=True), 0),
+            work_days_other_shops=Coalesce(Count('dt', filter=Q(selected_period_q, ~Q(shop_id=self.shop_id),
                                                                 work_hours__gte=timedelta(0),
-                                                                type__is_work_hours=True)), 0),
-            work_days_selected_period=Coalesce(Count('id', filter=Q(selected_period_q, work_hours__gte=timedelta(0),
-                                                          type__is_work_hours=True)), 0),
+                                                                type__is_work_hours=True), distinct=True), 0),
+            work_days_selected_period=Coalesce(Count('dt', filter=Q(selected_period_q, work_hours__gte=timedelta(0),
+                                                          type__is_work_hours=True), distinct=True), 0),
             work_hours_selected_shop=Coalesce(Sum(Extract(F('work_hours'), 'epoch') / 3600,
                                                   filter=Q(selected_period_q, shop_id=self.shop_id,
                                                            work_hours__gte=timedelta(0),
@@ -601,12 +703,12 @@ class WorkersStatsGetter:
             'type_id',
             'dt__month',
         ).annotate(
-            day_type_count=Count('type_id', filter=selected_period_q),
+            day_type_count=Count('dt', filter=selected_period_q, distinct=True),
             any_day_count_outside_of_selected_period=Count(
-                'type_id', filter=outside_of_selected_period_q),
+                'dt', filter=outside_of_selected_period_q, distinct=True),
             workdays_count_outside_of_selected_period=Count(
-                'type_id', filter=Q(outside_of_selected_period_q, Q(
-                    Q(type__is_dayoff=False, type__is_work_hours=True) | Q(type_id=WorkerDay.TYPE_HOLIDAY)))),
+                'dt', filter=Q(outside_of_selected_period_q, Q(
+                    Q(type__is_dayoff=False, type__is_work_hours=True) | Q(type_id=WorkerDay.TYPE_HOLIDAY))), distinct=True),
         )
         for wd_dict in work_days:
             data = res.setdefault(
@@ -629,83 +731,9 @@ class WorkersStatsGetter:
                 any_day_count_outside_of_selected_period[wd_dict['dt__month']] = any_day_count_outside_of_selected_period.get(
                     wd_dict['dt__month'], 0) + wd_dict['any_day_count_outside_of_selected_period']
 
-        prod_cal_qs = ProdCal.objects.filter(
-            dt__gte=acc_period_dt_from,
-            dt__lte=acc_period_dt_to,
-            employee_id__in=self.employees_dict.keys(),
-        ).values(
-            'employee_id',
-            'employment_id',
-            'dt__month',
-        ).annotate(
-            period_start=Greatest('employment__dt_hired', Value(acc_period_dt_from)),
-            period_end=Least('employment__dt_fired', Value(acc_period_dt_to)),
-            has_vacation_or_sick_plan_approved=Exists(WorkerDay.objects.filter(
-                employee_id=OuterRef('employee_id'),
-                employment_id=OuterRef('employment_id'),
-                dt=OuterRef('dt'),
-                is_fact=False,
-                is_approved=True,
-                type__is_reduce_norm=True,
-            )),
-            vacation_or_sick_plan_approved_count=Count(Subquery(WorkerDay.objects.filter(
-                employee_id=OuterRef('employee_id'),
-                employment_id=OuterRef('employment_id'),
-                dt=OuterRef('dt'),
-                is_fact=False,
-                is_approved=True,
-                type__is_reduce_norm=True,
-            ).values('id')[:1])),
-            vacation_or_sick_plan_approved_count_selected_period=Count(Subquery(WorkerDay.objects.filter(
-                selected_period_q,
-                employee_id=OuterRef('employee_id'),
-                employment_id=OuterRef('employment_id'),
-                dt=OuterRef('dt'),
-                is_fact=False,
-                is_approved=True,
-                type__is_reduce_norm=True,
-            ).values('id')[:1])),
-            has_vacation_or_sick_plan_not_approved=Exists(WorkerDay.objects.filter(
-                employee_id=OuterRef('employee_id'),
-                employment_id=OuterRef('employment_id'),
-                dt=OuterRef('dt'),
-                is_fact=False,
-                is_approved=False,
-                type__is_reduce_norm=True,
-            )),
-            vacation_or_sick_plan_not_approved_count=Count(Subquery(WorkerDay.objects.filter(
-                employee_id=OuterRef('employee_id'),
-                employment_id=OuterRef('employment_id'),
-                dt=OuterRef('dt'),
-                is_fact=False,
-                is_approved=False,
-                type__is_reduce_norm=True,
-            ).values('id')[:1])),
-            vacation_or_sick_plan_not_approved_count_selected_period=Count(Subquery(WorkerDay.objects.filter(
-                selected_period_q,
-                employee_id=OuterRef('employee_id'),
-                employment_id=OuterRef('employment_id'),
-                dt=OuterRef('dt'),
-                is_fact=False,
-                is_approved=False,
-                type__is_reduce_norm=True,
-            ).values('id')[:1])),
-            norm_hours_acc_period=Coalesce(
-                Sum('norm_hours'), 0.0),
-            norm_hours_prev_months=Coalesce(
-                Sum('norm_hours', filter=prev_months_q), 0.0),
-            norm_hours_curr_month=Coalesce(
-                Sum('norm_hours', filter=curr_month_q), 0.0),
-            norm_hours_curr_month_end=Coalesce(
-                Sum('norm_hours', filter=curr_month_end_q), 0.0),
-            norm_hours_selected_period=Coalesce(
-                Sum('norm_hours', filter=selected_period_q), 0.0),
-            empl_days_count=Count('dt'),
-            empl_days_count_selected_period=Count('dt', filter=selected_period_q),
-            empl_days_count_outside_of_selected_period=Count('dt', filter=outside_of_selected_period_q),
-        )
+        prod_cal_cached = self._get_prod_cal_cached()
 
-        for pc_dict in prod_cal_qs:
+        for pc_dict in prod_cal_cached:
             for is_fact_key in ['plan', 'fact']:
                 for is_approved_key in ['approved', 'not_approved']:
                     data = res.setdefault(
@@ -733,17 +761,18 @@ class WorkersStatsGetter:
                                     'norm_hours_curr_month']
                                 norm_hours['curr_month_end'] = norm_hours.get('curr_month_end', 0) + pc_dict[
                                     'norm_hours_prev_months'] + pc_dict['norm_hours_curr_month']
-
-                        empl_dict.setdefault('vacation_or_sick_plan_not_approved_count', {})[pc_dict['dt__month']] = \
-                            worker_norm_hours.get('vacation_or_sick_plan_not_approved_count', 0) + \
-                            pc_dict['vacation_or_sick_plan_not_approved_count']
-                        empl_dict.setdefault('vacation_or_sick_plan_not_approved_count_selected_period', {})[pc_dict['dt__month']] = \
-                            worker_norm_hours.get('vacation_or_sick_plan_not_approved_count_selected_period', 0) + \
-                            pc_dict['vacation_or_sick_plan_not_approved_count_selected_period']
-                        empl_dict.setdefault('vacation_or_sick_plan_not_approved_count_outside_of_selected_period', {})[
-                            pc_dict['dt__month']] = empl_dict.setdefault('vacation_or_sick_plan_not_approved_count', {})[
-                                                        pc_dict['dt__month']] - empl_dict.setdefault(
-                            'vacation_or_sick_plan_not_approved_count_selected_period', {})[pc_dict['dt__month']]
+                        else:
+                            empl_dict.setdefault('vacation_or_sick_plan_not_approved_count', {})[pc_dict['dt__month']] = \
+                                empl_dict.setdefault('vacation_or_sick_plan_not_approved_count', {}).get(pc_dict['dt__month'], 0) + \
+                                pc_dict['vacation_or_sick_plan_not_approved_count']
+                            empl_dict.setdefault('vacation_or_sick_plan_not_approved_count_selected_period', {})[pc_dict['dt__month']] = \
+                                empl_dict.setdefault('vacation_or_sick_plan_not_approved_count_selected_period', {}).get(pc_dict['dt__month'], 0) + \
+                                pc_dict['vacation_or_sick_plan_not_approved_count_selected_period']
+                            empl_dict.setdefault('vacation_or_sick_plan_not_approved_count_outside_of_selected_period', {})[
+                                pc_dict['dt__month']] = empl_dict.setdefault('vacation_or_sick_plan_not_approved_count_outside_of_selected_period', {}).get(
+                                pc_dict['dt__month'], 0) + (empl_dict.setdefault('vacation_or_sick_plan_not_approved_count', {})[
+                                                            pc_dict['dt__month']] - empl_dict.setdefault(
+                                'vacation_or_sick_plan_not_approved_count_selected_period', {})[pc_dict['dt__month']])
                     else:
                         if pc_dict['has_vacation_or_sick_plan_approved'] is False:
                             for norm_hours in [worker_norm_hours]:
@@ -758,16 +787,30 @@ class WorkersStatsGetter:
                                 norm_hours['curr_month_end'] = norm_hours.get('curr_month_end', 0) + pc_dict[
                                     'norm_hours_prev_months'] + pc_dict['norm_hours_curr_month']
 
-                        empl_dict.setdefault('vacation_or_sick_plan_approved_count', {})[pc_dict['dt__month']] = \
-                            worker_norm_hours.get('vacation_or_sick_plan_approved_count', 0) + \
-                            pc_dict['vacation_or_sick_plan_approved_count']
-                        empl_dict.setdefault('vacation_or_sick_plan_approved_count_selected_period', {})[pc_dict['dt__month']] = \
-                            worker_norm_hours.get('vacation_or_sick_plan_approved_count_selected_period', 0) + \
-                            pc_dict['vacation_or_sick_plan_approved_count_selected_period']
-                        empl_dict.setdefault('vacation_or_sick_plan_approved_count_outside_of_selected_period', {})[
-                            pc_dict['dt__month']] = empl_dict.setdefault('vacation_or_sick_plan_approved_count', {})[
-                                                        pc_dict['dt__month']] - empl_dict.setdefault(
-                            'vacation_or_sick_plan_approved_count_selected_period', {})[pc_dict['dt__month']]
+                        if is_fact_key == 'plan' and is_approved_key == 'approved':
+                            empl_dict.setdefault('vacation_or_sick_plan_approved_count', {})[pc_dict['dt__month']] = \
+                                empl_dict.setdefault('vacation_or_sick_plan_approved_count', {}).get(
+                                    pc_dict['dt__month'], 0) + \
+                                pc_dict['vacation_or_sick_plan_approved_count']
+                            empl_dict.setdefault('vacation_or_sick_plan_approved_count_selected_period', {})[
+                                pc_dict['dt__month']] = \
+                                empl_dict.setdefault('vacation_or_sick_plan_approved_count_selected_period', {}).get(pc_dict['dt__month'], 0) + \
+                                pc_dict['vacation_or_sick_plan_approved_count_selected_period']
+                            empl_dict.setdefault('vacation_or_sick_plan_approved_count_outside_of_selected_period', {})[
+                                pc_dict['dt__month']] = empl_dict.setdefault(
+                                'vacation_or_sick_plan_approved_count_outside_of_selected_period', {}).get(
+                                pc_dict['dt__month'], 0) + (empl_dict.setdefault('vacation_or_sick_plan_approved_count',
+                                                                                 {})[
+                                                                pc_dict['dt__month']] - empl_dict.setdefault(
+                                'vacation_or_sick_plan_approved_count_selected_period', {})[pc_dict['dt__month']])
+
+                            pa_reduce_norm_days = empl_dict.setdefault('pa_reduce_norm_days', {}).setdefault(pc_dict['dt__month'], [])
+                            pa_not_reduce_norm_days = empl_dict.setdefault('pa_not_reduce_norm_days', {}).setdefault(pc_dict['dt__month'], [])
+                            for dt in pc_dict['dts']:
+                                if pc_dict['has_vacation_or_sick_plan_approved']:
+                                    pa_reduce_norm_days.append(dt)
+                                else:
+                                    pa_not_reduce_norm_days.append(dt)
 
                     if is_fact_key == 'plan' and is_approved_key == 'approved':  # считаем только 1 раз
                         norm_hours_by_months = empl_dict.setdefault('norm_hours_by_months', {})
@@ -785,8 +828,6 @@ class WorkersStatsGetter:
                             pc_dict['dt__month'], 0) + pc_dict['empl_days_count_selected_period']
                         empl_days_count_outside_of_selected_period[pc_dict['dt__month']] = empl_days_count_outside_of_selected_period.get(
                             pc_dict['dt__month'], 0) + pc_dict['empl_days_count_outside_of_selected_period']
-                        empl_dict['period_start'] = pc_dict['period_start']
-                        empl_dict['period_end'] = pc_dict['period_end']
                         empl_dict['norm_hours_until_acc_period_end'] = empl_dict[
                            'norm_hours_total'] - empl_dict.get('work_hours_prev_months', 0)
 
@@ -835,7 +876,7 @@ class WorkersStatsGetter:
                 else:
                     empl_dict['sawh_hours_by_months'] = norm_hours_by_months
 
-                for month_num in [m for m in months_until_acc_period_end if m in empl_dict['sawh_hours_by_months']]:
+                for month_num in [m for m in months_until_acc_period_end if m in empl_dict.get('sawh_hours_by_months', {})]:
                     if self.network.consider_remaining_hours_in_prev_months_when_calc_norm_hours:
                         sawh_settings_empl_sum = sum(
                             v for k, v in empl_dict['sawh_hours_by_months'].items() if k in months_until_acc_period_end)

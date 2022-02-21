@@ -76,7 +76,6 @@ INSTALLED_APPS = [
     'src.base',
     'src.forecast',
     'src.timetable',
-    'src.main',
     'django_celery_beat',
     'src.celery',
     'fcm_django',
@@ -471,6 +470,10 @@ USERS_WITH_ACTIVE_EMPLOYEE_OR_VACANCY_ONLY = False
 
 CALCULATE_LOAD_TEMPLATE = False  # параметр отключающий автоматический расчет нагрузки
 
+CACHE_TTL = {
+    'prod_cal': 604800, # время жизни кэша в статистике, по умолчанию 7 дней == 604800 сек.
+}
+
 CLIENT_TIMEZONE = 3
 
 DADATA_TOKEN = None
@@ -517,6 +520,16 @@ DOWNLOAD_TIMETABLE_GET_CODE_FUNC = lambda e: e.employee.tabel_code or ''
 DEFAULT_AUTO_FIELD = 'django.db.models.AutoField'
 
 X_FRAME_OPTIONS = 'SAMEORIGIN'
+
+CACHES = {
+    'default': {
+        "BACKEND": "django_redis.cache.RedisCache",
+        'LOCATION': 'redis://' + REDIS_HOST + ':6379/1',
+        "OPTIONS": {
+            "CLIENT_CLASS": "django_redis.client.DefaultClient",
+        }
+    },
+}
 
 if is_config_exists('djconfig_local.py'):
     from .djconfig_local import *
@@ -655,6 +668,11 @@ BEAT_SCHEDULE = {
         'schedule': crontab(hour=0, minute=0),
         'options': {'queue': BACKEND_QUEUE},
         'enabled': ZKTECO_INTEGRATION,
+    },
+    'task-set-prod-cal-cache-cur-and-next-month': {
+        'task': 'src.celery.tasks.set_prod_cal_cache_cur_and_next_month',
+        'schedule': crontab(hour=0, minute=0),
+        'options': {'queue': BACKEND_QUEUE},
     },
 }
 

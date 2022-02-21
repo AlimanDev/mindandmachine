@@ -223,13 +223,18 @@ def delete_workers_zkteco():
                 attendance_area__external_system=ext_system,
             ).select_related('attendance_area')
             if shop_codes:
+                succesfully_deleted = True
                 for shop_code in shop_codes:
                     res = zkteco.delete_personarea(user_code, shop_code.attendance_area)
                     if 'code' in res and res['code'] == 0:
-                        user_code.delete()
-                        print(f"Delete area and userexternalcode for fired user {user} {e}")
+                        print(f"Delete area {shop_code.attendance_area} for fired user {e}")
                     else:
-                        print(f"Failed delete area and userexternalcode for fired user {e}: {res}")
+                        succesfully_deleted = False
+                        print(f"Failed delete area {shop_code.attendance_area} for fired user {e}: {res}")
+                        break
+                if succesfully_deleted and not len(active_external_codes):
+                    user_code.delete()
+                    print(f"Delete userexternalcode for fired user {user} {e}")
 
 
 @app.task

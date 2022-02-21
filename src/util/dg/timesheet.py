@@ -183,9 +183,9 @@ class T13TimesheetDataGetter(BaseTimesheetDataGetter):
 
         for grouped_attrs, wds in grouped_worker_days.items():
             employee_id = grouped_attrs[0]
-            first_half_month_wdays = 0
+            first_half_month_wdays = set()
             first_half_month_whours = 0
-            second_half_month_wdays = 0
+            second_half_month_wdays = set()
             second_half_month_whours = 0
             days = {}
             for wd in wds:
@@ -195,10 +195,10 @@ class T13TimesheetDataGetter(BaseTimesheetDataGetter):
                 days[day_key] = day_data
                 if not wd.day_type.is_dayoff or (wd.day_type.is_dayoff and wd.day_type.is_work_hours):
                     if wd.dt.day <= 15:  # первая половина месяца
-                        first_half_month_wdays += 1
+                        first_half_month_wdays.add(wd.dt)
                         first_half_month_whours += wd.day_hours + wd.night_hours
                     else:
-                        second_half_month_wdays += 1
+                        second_half_month_wdays.add(wd.dt)
                         second_half_month_whours += wd.day_hours + wd.night_hours
             e = sorted(empls.get(employee_id), key=lambda x: x.dt_fired or datetime.max.date(), reverse=True)[0]
             user_data = {
@@ -210,11 +210,11 @@ class T13TimesheetDataGetter(BaseTimesheetDataGetter):
                 'position': self.get_position_name(e, wds),
                 'shop': self.get_shop_name(e, wds),
                 'days': days,
-                'first_half_month_wdays': first_half_month_wdays,
+                'first_half_month_wdays': len(first_half_month_wdays),
                 'first_half_month_whours': first_half_month_whours,
-                'second_half_month_wdays': second_half_month_wdays,
+                'second_half_month_wdays': len(second_half_month_wdays),
                 'second_half_month_whours': second_half_month_whours,
-                'full_month_wdays': first_half_month_wdays + second_half_month_wdays,
+                'full_month_wdays': len(first_half_month_wdays) + len(second_half_month_wdays),
                 'full_month_whours': first_half_month_whours + second_half_month_whours,
             }
             users.append(user_data)
@@ -264,13 +264,13 @@ class MtsTimesheetDataGetter(BaseTimesheetDataGetter):
         }
 
 
-class AigulTimesheetDataGetter(T13TimesheetDataGetter):
+class DefaultTimesheetDataGetter(T13TimesheetDataGetter):
     def set_day_data(self, day_data, wday):
         day_data['value'] = (wday.day_hours + wday.night_hours) if (
                     wday and not wday.day_type.is_dayoff) else self._get_tabel_type(wday.day_type) if wday else ''
 
 
-class TimesheetLinesDataGetter(AigulTimesheetDataGetter):
+class TimesheetLinesDataGetter(DefaultTimesheetDataGetter):
     def set_day_data(self, day_data, wday):
         if not wday:
             day_data['value'] = ''
@@ -419,15 +419,16 @@ class MTSTimesheetGenerator(BaseTimesheetGenerator):
         return os.path.join(settings.BASE_DIR, 'src/util/dg/templates/t_mts.ods')
 
 
-class AigulTimesheetGenerator(BaseTimesheetGenerator):
+class DefaultTimesheetGenerator(BaseTimesheetGenerator):
     """
-    Шаблон табеля для Айгуль
+    Шаблон табеля по умолчанию
     """
 
-    tabel_data_getter_cls = AigulTimesheetDataGetter
+    tabel_data_getter_cls = DefaultTimesheetDataGetter
 
     def get_template_path(self):
-        return os.path.join(settings.BASE_DIR, 'src/util/dg/templates/t_aigul.ods')
+        filename = 't_default' if self.network.settings_values_prop.get('exclude_tabel_code_from_default_tabel', False) else 't_default_with_tabel'
+        return os.path.join(settings.BASE_DIR, f'src/util/dg/templates/{filename}.ods')
 
 
 class TimesheetLinesGenerator(BaseTimesheetGenerator):
@@ -442,11 +443,10 @@ class TimesheetLinesGenerator(BaseTimesheetGenerator):
 
 
 tabel_formats = {  # TODO: поменять имена клиентов на какие-то общие названия
-    'default': MTSTimesheetGenerator,
     'mts': MTSTimesheetGenerator,
     't13': T13TimesheetGenerator,
     't13_custom': CustomT13TimesheetGenerator,
-    'aigul': AigulTimesheetGenerator,
+    'default': DefaultTimesheetGenerator,
     'lines': TimesheetLinesGenerator,
 }
 

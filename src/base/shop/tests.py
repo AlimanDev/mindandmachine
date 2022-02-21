@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, time, timedelta
 from decimal import Decimal
 from unittest import mock
 
@@ -7,6 +7,7 @@ from dateutil.relativedelta import relativedelta
 from django.db import transaction
 from django.utils import timezone
 from rest_framework import status
+from rest_framework.serializers import ValidationError
 from rest_framework.test import APITestCase
 
 from src.base.models import Shop, ShopSchedule, NetworkConnect, Network, Employment, Group, User
@@ -128,13 +129,13 @@ class TestDepartment(TestsHelperMixin, APITestCase):
     
     def test_get_list_is_active_field(self):
         response = self.client.get(self.url)
-        self.assertEquals(len(response.json()), 6)
+        self.assertEqual(len(response.json()), 6)
         shop_info = list(filter(lambda x: x['id'] == self.shop.id,response.json()))[0]
         self.assertTrue(shop_info['is_active'])
         self.shop.dttm_deleted = datetime.now() - timedelta(hours=2)
         self.shop.save()
         response = self.client.get(self.url)
-        self.assertEquals(len(response.json()), 6)
+        self.assertEqual(len(response.json()), 6)
         shop_info = list(filter(lambda x: x['id'] == self.shop.id,response.json()))[0]
         self.assertFalse(shop_info['is_active'])
         self.shop.dttm_deleted = None
@@ -875,18 +876,18 @@ class TestDepartment(TestsHelperMixin, APITestCase):
                 'name': "Shop3",
             }
         )
-        self.assertEquals(response.status_code, 200)
+        self.assertEqual(response.status_code, 200)
         self.shop3.refresh_from_db()
-        self.assertEquals(self.shop3.load_template_id, self.load_template.id)
+        self.assertEqual(self.shop3.load_template_id, self.load_template.id)
         response = self.client.put(
             self.get_url('Shop-load-template', self.shop3.id),
             {
                 'load_template_id': lt2.id,
             }
         )
-        self.assertEquals(response.status_code, 200)
+        self.assertEqual(response.status_code, 200)
         self.shop3.refresh_from_db()
-        self.assertEquals(self.shop3.load_template_id, lt2.id)
+        self.assertEqual(self.shop3.load_template_id, lt2.id)
 
     def test_set_load_template_from_shop_default_values(self):
         load_template = LoadTemplateFactory(name='lt', code='lt_code')
@@ -904,7 +905,7 @@ class TestDepartment(TestsHelperMixin, APITestCase):
             region=self.region,
             network=self.network,
         )
-        self.assertEquals(shop.load_template_id, load_template.id)
+        self.assertEqual(shop.load_template_id, load_template.id)
 
     def test_set_load_template_from_shop_default_values_bad_code(self):
         self.network.shop_default_values = self.dump_data({
@@ -924,19 +925,30 @@ class TestDepartment(TestsHelperMixin, APITestCase):
                 'network_id': self.network.id,
             }
         )
-        self.assertEquals(response.status_code, 400)
-        self.assertEquals(response.json(), ['Шаблон нагрузки с кодом lt_code не найден.'])
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json(), ['Шаблон нагрузки с кодом lt_code не найден.'])
 
     def test_get_internal_tree(self):
         self.employment1.shop = self.shop2
         self.employment1.save()
         response = self.client.get(self.url + 'internal_tree/')
-        self.assertEquals(response.status_code, 200)
+        self.assertEqual(response.status_code, 200)
         response = response.json()
-        self.assertEquals(len(response), 1)
-        self.assertEquals(response[0]['label'], self.root_shop.name)
-        self.assertEquals(len(response[0]['children']), 2)
-        self.assertEquals(response[0]['children'][0]['label'], self.reg_shop1.name)
-        self.assertEquals(response[0]['children'][1]['label'], self.reg_shop2.name)
-        self.assertEquals(len(response[0]['children'][0]['children']), 2)
-        self.assertEquals(len(response[0]['children'][1]['children']), 1)
+        self.assertEqual(len(response), 1)
+        self.assertEqual(response[0]['label'], self.root_shop.name)
+        self.assertEqual(len(response[0]['children']), 2)
+        self.assertEqual(response[0]['children'][0]['label'], self.reg_shop1.name)
+        self.assertEqual(response[0]['children'][1]['label'], self.reg_shop2.name)
+        self.assertEqual(len(response[0]['children'][0]['children']), 2)
+        self.assertEqual(len(response[0]['children'][1]['children']), 1)
+
+    def test_cant_set_forecast_step_to_zero(self):
+        self.shop.forecast_step_minutes = time(0)
+        saved = False
+        try:
+            self.shop.save()
+            saved = True
+        except ValidationError as e:
+            self.assertEqual(e.detail, ['Шаг прогноза не может быть 0.'])
+
+        self.assertFalse(saved)

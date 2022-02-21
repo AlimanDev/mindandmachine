@@ -1,13 +1,12 @@
 from datetime import timedelta, time, date, datetime
-from django.http import response
 
 from django.utils import timezone
+from freezegun import freeze_time
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from src.timetable.models import WorkerDay, WorkTypeName, WorkType
 from src.base.models import Employment, Employee, WorkerPosition
-from src.recognition.models import TickPoint
+from src.timetable.models import WorkerDay, WorkTypeName, WorkType
 from src.util.mixins.tests import TestsHelperMixin
 from src.util.models_converter import Converter
 
@@ -27,24 +26,6 @@ class TestWorkShiftViewSet(TestsHelperMixin, APITestCase):
 
     def setUp(self):
         self._set_authorization_token(self.user2.username)
-
-    def _authorize_tick_point(self):
-        t = TickPoint.objects.create(
-            network=self.network,
-            name='test',
-            shop=self.shop,
-        )
-
-        response = self.client.post(
-            path='/api/v1/token-auth/',
-            data={
-                'key': t.key,
-            }
-        )
-
-        token = response.json()['token']
-        self.client.defaults['HTTP_AUTHORIZATION'] = 'Token %s' % token
-        return response
 
     def _test_work_shift(self, dt, username, expected_start=None, expected_end=None, expected_shop_code=None):
         resp = self.client.get(
@@ -126,14 +107,14 @@ class TestWorkShiftViewSet(TestsHelperMixin, APITestCase):
         )
         self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
 
-
     def test_no_active_employee(self):
         self._authorize_tick_point()
         resp = self.client.get(
             self.get_url('TimeAttendanceWorkerDay-list'),
         )
         self.assertEqual(len(resp.json()), 5)
-        Employment.objects.all().update(dt_hired=date.today() + timedelta(1), dt_fired=None)
+        dt_hired = (datetime.now() + timedelta(hours=self.shop.get_tz_offset())).date() + timedelta(1)
+        Employment.objects.all().update(dt_hired=dt_hired, dt_fired=None)
         resp = self.client.get(
             self.get_url('TimeAttendanceWorkerDay-list'),
         )
@@ -186,9 +167,10 @@ class TestWorkShiftViewSet(TestsHelperMixin, APITestCase):
             shop=self.shop,
             is_approved=True,
         )
-        resp = self.client.get(
-            self.get_url('TimeAttendanceWorkerDay-list'),
-        )
+        with freeze_time(datetime.now() - timedelta(hours=self.shop.get_tz_offset())):
+            resp = self.client.get(
+                self.get_url('TimeAttendanceWorkerDay-list'),
+            )
         user2 = list(filter(lambda x: x['user_id'] == self.user2.id, resp.json()))[0]
         user2['employees'] = sorted(user2['employees'], key=lambda i: i['id'])
         user2_data = {

@@ -7,25 +7,30 @@ from decimal import Decimal
 import pandas as pd
 from celery import chain
 from dateutil.relativedelta import relativedelta
+from dateutil.parser import parse
 from django.conf import settings
 from django.contrib.auth.models import (
     AbstractUser as DjangoAbstractUser,
 )
+from django.core.cache import cache
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.core.serializers.json import DjangoJSONEncoder
+from django.core.cache import cache
 from django.db import models
 from django.db import transaction
 from django.db.models import Case, When, Sum, Value, IntegerField, Subquery, OuterRef, Q
 from django.db.models.query import QuerySet
+from django.template import Template, Context
 from django.utils import timezone
 from django.utils.functional import cached_property
 from django.utils.translation import gettext_lazy as _
-from django.template import Template, Context
 from model_utils import FieldTracker
 from mptt.models import MPTTModel, TreeForeignKey
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.serializers import ValidationError
 from timezone_field import TimeZoneField
-from django.core.exceptions import ValidationError as DjangoValidationError
+
+from src.base.fields import MultipleChoiceField
 from src.base.models_abstract import (
     AbstractActiveModel,
     AbstractModel,
@@ -35,7 +40,6 @@ from src.base.models_abstract import (
 )
 from src.conf.djconfig import QOS_TIME_FORMAT
 from src.util.mixins.qs import AnnotateValueEqualityQSMixin
-from src.base.fields import MultipleChoiceField
 
 
 class Network(AbstractActiveModel):
@@ -74,7 +78,7 @@ class Network(AbstractActiveModel):
     TABEL_FORMAT_CHOICES = (
         ('mts', 'MTSTimesheetGenerator'),
         ('t13_custom', 'CustomT13TimesheetGenerator'),
-        ('aigul', 'AigulTimesheetGenerator'),
+        ('default', 'DefaultTimesheetGenerator'),
         ('lines', 'TimesheetLinesGenerator'),
     )
 
@@ -147,7 +151,7 @@ class Network(AbstractActiveModel):
         verbose_name=_("Copy plan to fact crossing"), default=False)
     download_tabel_template = models.CharField(
         max_length=64, verbose_name=_('Download tabel template'),
-        choices=TABEL_FORMAT_CHOICES, default='mts',
+        choices=TABEL_FORMAT_CHOICES, default='default',
     )
     timetable_format = models.CharField(
         max_length=64, verbose_name=_('Timetable format'),
@@ -245,7 +249,7 @@ class Network(AbstractActiveModel):
     allow_creation_several_wdays_for_one_employee_for_one_date = models.BooleanField(
         default=False, verbose_name='Разрешить создание нескольких рабочих дней для 1 сотрудника на 1 дату')
     run_recalc_fact_from_att_records_on_plan_approve = models.BooleanField(
-        default=False, verbose_name='Запускать пересчет факта на основе отметок при подтверждении плана',
+        default=True, verbose_name='Запускать пересчет факта на основе отметок при подтверждении плана',
     )
     edit_manual_fact_on_recalc_fact_from_att_records = models.BooleanField(
         default=False,
@@ -283,6 +287,8 @@ class Network(AbstractActiveModel):
     analytics_type = models.CharField(
         verbose_name='Вид аналитики', max_length=32, choices=ANALYTICS_TYPE_CHOICES, default=ANALYTICS_TYPE_METABASE)
 
+    tracker = FieldTracker(fields=('accounting_period_length',))
+
     DEFAULT_NIGHT_EDGES = (
         '22:00:00',
         '06:00:00',
@@ -291,6 +297,12 @@ class Network(AbstractActiveModel):
     @property
     def settings_values_prop(self):
         return json.loads(self.settings_values)
+
+    @tracker
+    def save(self, *args, **kwargs):
+        if self.id and self.tracker.has_changed('accounting_period_length'):
+            cache.delete_pattern("prod_cal_*_*_*")
+        return super().save(*args, **kwargs)
 
     def set_settings_value(self, k, v):
         settings_values = json.loads(self.settings_values)
@@ -532,7 +544,8 @@ class Shop(MPTTModel, AbstractActiveNetworkSpecificCodeNamedModel):
     city = models.CharField(max_length=128, null=True, blank=True, verbose_name='Город')
 
     tracker = FieldTracker(
-        fields=['tm_open_dict', 'tm_close_dict', 'load_template', 'latitude', 'longitude', 'fias_code', 'director_id'])
+        fields=['tm_open_dict', 'tm_close_dict', 'load_template', 'latitude', 'longitude', 'fias_code', 'director_id',
+                'region_id', 'timezone'])
 
     def __str__(self):
         return '{}, {}, {}'.format(
@@ -729,6 +742,14 @@ class Shop(MPTTModel, AbstractActiveNetworkSpecificCodeNamedModel):
     @tracker
     def save(self, *args, force_create_director_employment=False, force_set_defaults=False, **kwargs):
         is_new = self.id is None
+
+        forecast_step = self.forecast_step_minutes
+        if isinstance(forecast_step, str):
+            forecast_step = parse(forecast_step)
+        
+        if forecast_step.hour == 0 and forecast_step.minute == 0:
+            raise ValidationError(_("Forecast step can't be 0."))
+
         if self.open_times.keys() != self.close_times.keys():
             raise ValidationError(_('Keys of open times and close times are different.'))
         if self.open_times.get('all') and len(self.open_times) != 1:
@@ -744,6 +765,10 @@ class Shop(MPTTModel, AbstractActiveNetworkSpecificCodeNamedModel):
         if hasattr(self, 'parent_code'):
             self.parent = self._get_parent_or_400(self.parent_code)
         load_template_changed = self.tracker.has_changed('load_template')
+        timezone_changed = self.tracker.has_changed('timezone')
+        if not is_new and timezone_changed:
+            transaction.on_commit(lambda: cache.delete(f'shop_tz_offset:{self.id}'))
+
         if load_template_changed and self.load_template_status == self.LOAD_TEMPLATE_PROCESS:
             raise ValidationError(_('It is not possible to change the load template as it is in the calculation process.'))
 
@@ -808,6 +833,9 @@ class Shop(MPTTModel, AbstractActiveNetworkSpecificCodeNamedModel):
         if is_new or force_set_defaults:
             self._set_shop_defaults()
 
+        if not is_new and self.tracker.has_changed('region_id'):
+            transaction.on_commit(lambda: cache.delete_pattern("prod_cal_*_*_*"))
+
         return res
 
     def get_exchange_settings(self):
@@ -816,6 +844,24 @@ class Shop(MPTTModel, AbstractActiveNetworkSpecificCodeNamedModel):
     def get_tz_offset(self):
         if self.timezone:
             offset = int(self.timezone.utcoffset(datetime.datetime.now()).seconds / 3600)
+        else:
+            offset = settings.CLIENT_TIMEZONE
+
+        return offset
+
+    @classmethod
+    def get_cached_tz_offset_by_shop_id(cls, shop_id):
+        # ключ shop_tz_offset:{shop_id}, значение Moscow/Europe
+        k = f'shop_tz_offset:{shop_id}'
+        cached_timezone = cache.get(k)
+        if not cached_timezone:
+            timezone = Shop.objects.filter(id=shop_id).values_list('timezone', flat=True).first()
+            if timezone:
+                cache.set(k, timezone)
+        else:
+            timezone = cached_timezone
+        if timezone:
+            offset = int(timezone.utcoffset(datetime.datetime.now()).seconds / 3600)
         else:
             offset = settings.CLIENT_TIMEZONE
 
@@ -1009,7 +1055,7 @@ class Group(AbstractActiveNetworkSpecificCodeNamedModel):
         return group_perm
     
     @classmethod
-    def get_subordinate_ids(cls, user):
+    def get_subordinated_group_ids(cls, user):
         return list(cls.objects.filter(id__in=user.get_group_ids()).values_list('subordinates__id', flat=True).distinct())
 
     @classmethod
@@ -1121,6 +1167,10 @@ class ProductionDay(AbstractModel):
         ).values_list('dt__month', 'norm_work_hours')
         return dict(norm_work_hours)
 
+    def save(self, *args, **kwargs):
+        cache.delete_pattern("prod_cal_*_*_*")
+        return super().save(*args, **kwargs)
+
 
 class User(DjangoAbstractUser, AbstractModel):
     class Meta:
@@ -1203,20 +1253,27 @@ class User(DjangoAbstractUser, AbstractModel):
     def fio(self):
         return self.get_fio()
 
-    def get_active_employments(self, shop=None, dt_from=None, dt_to=None):
-        kwargs = {
-            'employee__user__network_id': self.network_id,
-            'shop__network_id': self.network_id,
-        }
-        if shop:
-            kwargs['shop__in'] = shop.get_ancestors(include_self=True)
+    def get_active_employments(self, shop_id=None, dt_from=None, dt_to=None):
+        q = Q(
+            Q(employee__user__network_id=self.network_id) |
+            Q(shop__network_id=self.network_id)
+        )
+        if shop_id:
+            q &= Q(
+                shop__in=Shop.objects.get_queryset_ancestors(
+                    queryset=Shop.objects.filter(id=shop_id),
+                    include_self=True,
+                )
+            )
+        kwargs = {}
         if dt_from:
             kwargs['dt_from'] = dt_from
         if dt_to:
             kwargs['dt_to'] = dt_to
         return Employment.objects.get_active(
             employee__user=self,
-            **kwargs,
+            extra_q=q,
+            **kwargs
         )
     
     def get_shops(self, include_descendants=False):
@@ -1225,8 +1282,8 @@ class User(DjangoAbstractUser, AbstractModel):
             shops = Shop.objects.get_queryset_descendants(shops, include_self=True)
         return shops
 
-    def get_group_ids(self, shop=None):
-        groups = self.get_active_employments(shop=shop).values_list('position__group_id', 'function_group_id')
+    def get_group_ids(self, shop_id=None):
+        groups = self.get_active_employments(shop_id=shop_id).values_list('position__group_id', 'function_group_id')
         return list(set(list(map(lambda x: x[0], groups)) + list(map(lambda x: x[1], groups))))
 
     def save(self, *args, **kwargs):
@@ -1234,6 +1291,31 @@ class User(DjangoAbstractUser, AbstractModel):
             self.set_password(self.username)
 
         return super(User, self).save(*args, **kwargs)
+
+    def get_subordinates(self, dt=None, user_shops=None, user_subordinated_group_ids=None, dt_to_shift=None):
+        if not user_shops:
+            user_shops = self.get_shops(include_descendants=True).values_list('id', flat=True)
+        if not user_subordinated_group_ids:
+            user_subordinated_group_ids = Group.get_subordinated_group_ids(self)
+        dt_to = dt
+        if dt_to_shift and dt_to:
+            dt_to += dt_to_shift
+
+        return Employee.objects.annotate(
+            is_subordinate=models.Exists(
+                Employment.objects.get_active(
+                    extra_q=models.Q(position__group_id__in=user_subordinated_group_ids) |
+                            models.Q(function_group_id__in=user_subordinated_group_ids) |
+                            (models.Q(function_group_id__isnull=True) & models.Q(position__group__isnull=True)),
+                    dt_from=dt,
+                    dt_to=dt_to,
+                    employee_id=OuterRef('id'),
+                    shop_id__in=user_shops,
+                )
+            )
+        ).filter(
+            is_subordinate=True,
+        )
 
 
 class WorkerPosition(AbstractActiveNetworkSpecificCodeNamedModel):
@@ -1255,6 +1337,7 @@ class WorkerPosition(AbstractActiveNetworkSpecificCodeNamedModel):
     breaks = models.ForeignKey(Break, on_delete=models.PROTECT, null=True, blank=True)
     hours_in_a_week = models.PositiveSmallIntegerField(default=40, verbose_name='Часов в рабочей неделе')
     ordering = models.PositiveSmallIntegerField(default=9999, verbose_name='Индекс должности для сортировки')
+    tracker = FieldTracker(fields=['hours_in_a_week'])
 
     def __str__(self):
         return '{}, {}'.format(self.name, self.id)
@@ -1295,6 +1378,7 @@ class WorkerPosition(AbstractActiveNetworkSpecificCodeNamedModel):
                 self.default_work_type_names.set(
                     WorkTypeName.objects.filter(network=self.network, code__in=default_work_type_names_codes))
 
+    @tracker
     def save(self, *args, force_set_defaults=False, **kwargs):
         is_new = self.id is None
         if is_new or force_set_defaults:
@@ -1302,6 +1386,8 @@ class WorkerPosition(AbstractActiveNetworkSpecificCodeNamedModel):
         res = super(WorkerPosition, self).save(*args, **kwargs)
         if is_new or force_set_defaults:
             self._set_m2m_defaults()
+        if not is_new and self.tracker.has_changed('hours_in_a_week'):
+            cache.delete_pattern("prod_cal_*_*_*")
         return res
 
     def get_department(self):
@@ -1343,32 +1429,6 @@ class Employee(AbstractModel):
         if self.tabel_code:
             s += f' ({self.tabel_code})'
         return s
-    
-    @classmethod
-    def get_subordinates(cls, user, dt=None, user_shops=None, user_subordinates=None, dt_to_shift=None):
-        if not user_shops:
-            user_shops = user.get_shops(include_descendants=True).values_list('id', flat=True)
-        if not user_subordinates:
-            user_subordinates = Group.get_subordinate_ids(user)
-        dt_to = dt
-        if dt_to_shift and dt_to:
-            dt_to += dt_to_shift
-            
-        return Employee.objects.annotate(
-            is_subordinate=models.Exists(
-                Employment.objects.get_active(
-                    extra_q=models.Q(position__group_id__in=user_subordinates) | 
-                    models.Q(function_group_id__in=user_subordinates) |
-                    (models.Q(function_group_id__isnull=True) & models.Q(position__group__isnull=True)),
-                    dt_from=dt,
-                    dt_to=dt_to,
-                    employee_id=OuterRef('id'),
-                    shop_id__in=user_shops,
-                )
-            )
-        ).filter(
-            is_subordinate=True,
-        )
 
 
 class Employment(AbstractActiveModel):
@@ -1409,7 +1469,7 @@ class Employment(AbstractActiveModel):
     dt_new_week_availability_from = models.DateField(null=True, blank=True)
     is_visible = models.BooleanField(default=True)
 
-    tracker = FieldTracker(fields=['position', 'dt_hired', 'dt_fired', 'shop_id'])
+    tracker = FieldTracker(fields=['position', 'dt_hired', 'dt_fired', 'norm_work_hours', 'shop_id'])
 
     objects = EmploymentManager.from_queryset(EmploymentQuerySet)()
     objects_with_excluded = models.Manager.from_queryset(EmploymentQuerySet)()
@@ -1444,6 +1504,7 @@ class Employment(AbstractActiveModel):
             if self.employee.user.network.clean_wdays_on_employment_dt_change:
                 transaction.on_commit(lambda: clean_wdays.delay(id__in=wdays_ids))
             transaction.on_commit(lambda: export_or_delete_employment_zkteco.delay(self.id))
+            transaction.on_commit(lambda: cache.delete_pattern(f"prod_cal_*_*_{self.employee_id}"))
             return super(Employment, self).delete(**kwargs)
 
     def __init__(self, *args, **kwargs):
@@ -1539,10 +1600,13 @@ class Employment(AbstractActiveModel):
                     'dt__gte': Converter.convert_date(dt__gte),
                 }
 
-            transaction.on_commit(lambda: clean_wdays.apply_async(**kwargs))
+            transaction.on_commit(lambda: clean_wdays.delay(**kwargs))
 
         if (is_new or self.tracker.has_changed('dt_hired') or self.tracker.has_changed('dt_fired') or self.tracker.has_changed('shop_id')) and settings.ZKTECO_INTEGRATION:
             transaction.on_commit(lambda: export_or_delete_employment_zkteco.delay(self.id, prev_shop_id=(self.tracker.previous('shop_id') if self.tracker.has_changed('shop_id') else None)))
+
+        if (is_new or self.tracker.has_changed('dt_hired') or self.tracker.has_changed('dt_fired') or position_has_changed or self.tracker.has_changed('norm_work_hours')):
+            transaction.on_commit(lambda: cache.delete_pattern(f"prod_cal_*_*_{self.employee_id}"))
 
         return res
 
@@ -1630,8 +1694,6 @@ class FunctionGroup(AbstractModel):
         ('LoadTemplate_download', 'Скачать шаблон нагрузки (Получить) (load_template/download/)'),
         ('LoadTemplate_upload', 'Загрузить шаблон нагрузки (Создать) (load_template/upload/)'),
         ('Network', 'Сеть (network)'),
-        ('Notification', 'Уведомление (notification)'),
-        ('OperationTemplate', 'Шаблон операции (operation_template)'),
         ('OperationTypeName', 'Название типа операции (operation_type_name)'),
         ('OperationType', 'Тип операции (operation_type)'),
         ('OperationTypeRelation', 'Отношение типов операций (operation_type_relation)'),
@@ -1653,7 +1715,6 @@ class FunctionGroup(AbstractModel):
         ('Shop_internal_tree', 'Дерево отделов сети пользователя (Получить) (department/internal_tree/)'),
         ('Shop_load_template', 'Изменить шаблон нагрузки магазина (Обновить) (department/{pk}/load_template/)'),
         ('Shop_outsource_tree', 'Дерево отделов клиентов (для аутсорс компаний) (Получить) (department/outsource_tree/)'),
-        ('Subscribe', 'Subscribe (subscribe)'),
         ('TickPoint', 'Точка отметки (tick_points)'),
         ('Timesheet', 'Табель (timesheet)'),
         ('Timesheet_stats', 'Статистика табеля (Получить) (timesheet/stats/)'),
@@ -1733,54 +1794,6 @@ class FunctionGroup(AbstractModel):
             self.access_type,
             self.func,
         )
-
-
-EVENT_TYPES = [
-    ('vacancy', 'Вакансия'),
-    ('timetable', 'Изменения в расписании'),
-    ('load_template_err', 'Ошибка применения шаблона нагрузки'),
-    ('load_template_apply', 'Шаблон нагрузки применён'),
-    ('shift_elongation', 'Расширение смены'),
-    ('holiday_exchange', 'Вывод с выходного'),
-    ('auto_vacancy', 'Автоматическая биржа смен'),
-    ('vacancy_canceled', 'Вакансия отменена'),
-]
-
-
-class Event(AbstractModel):
-    dttm_added = models.DateTimeField(auto_now_add=True)
-    dttm_valid_to = models.DateTimeField(auto_now_add=True)
-    worker_day = models.ForeignKey('timetable.WorkerDay', null=True, blank=True, on_delete=models.CASCADE)
-
-    type = models.CharField(choices=EVENT_TYPES, max_length=20)
-    shop = models.ForeignKey(Shop, null=True, blank=True, on_delete=models.PROTECT, related_name="events")
-    params = models.CharField(default='{}', max_length=512)
-
-
-class Subscribe(AbstractActiveModel):
-    type = models.CharField(choices=EVENT_TYPES, max_length=20)
-    user = models.ForeignKey(User, null=False, on_delete=models.PROTECT)
-    shop = models.ForeignKey(Shop, null=False, on_delete=models.PROTECT)
-
-
-class Notification(AbstractModel):
-    class Meta(object):
-        verbose_name = 'Уведомления'
-
-    def __str__(self):
-        return '{}, {}, {}, id: {}'.format(
-            self.worker,
-            self.event,
-            self.dttm_added,
-            # self.text[:60],
-            self.id
-        )
-
-    dttm_added = models.DateTimeField(auto_now_add=True)
-    worker = models.ForeignKey(User, on_delete=models.PROTECT)
-
-    is_read = models.BooleanField(default=False)
-    event = models.ForeignKey(Event, on_delete=models.CASCADE, null=True)
 
 
 def current_year():

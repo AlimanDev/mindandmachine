@@ -360,11 +360,6 @@ class TestPobedaDivider(TestTimesheetMixin, TestCase):
             get_work_hours_method=WorkerDayType.GET_WORK_HOURS_METHOD_TYPE_MONTH_AVERAGE_SAWH_HOURS,
         )
         WorkerDayType.objects.filter(
-            code__in=[WorkerDay.TYPE_ABSENSE],
-        ).update(
-            is_work_hours=True,
-        )
-        WorkerDayType.objects.filter(
             code__in=[WorkerDay.TYPE_SICK],
         ).update(
             is_work_hours=True,
@@ -524,8 +519,82 @@ class TestPobedaDivider(TestTimesheetMixin, TestCase):
             timesheet_type=TimesheetItem.TIMESHEET_TYPE_MAIN, dt='2021-06-18').day_hours, 12)
         self.assertEqual(TimesheetItem.objects.get(
             timesheet_type=TimesheetItem.TIMESHEET_TYPE_MAIN, dt='2021-06-19').day_type_id, WorkerDay.TYPE_HOLIDAY)
+        self.assertEqual(TimesheetItem.objects.get(
+            timesheet_type=TimesheetItem.TIMESHEET_TYPE_MAIN, dt='2021-06-20').day_type_id, WorkerDay.TYPE_HOLIDAY)
+        self.assertEqual(TimesheetItem.objects.filter(
+            timesheet_type=TimesheetItem.TIMESHEET_TYPE_ADDITIONAL, dt='2021-06-18').first(), None)
         self.assertEqual(TimesheetItem.objects.filter(
             timesheet_type=TimesheetItem.TIMESHEET_TYPE_ADDITIONAL, dt='2021-06-19').first(), None)
+
+    def test_continious_holidays_for_long_sick_days_divide(self):
+        WorkerDay.objects.all().delete()
+        wdays = (
+            ((WorkerDay.TYPE_SICK, None, None, timedelta(hours=12)), (
+                date(2021, 6, 1),
+                date(2021, 6, 2),
+                date(2021, 6, 3),
+                date(2021, 6, 4),
+                date(2021, 6, 5),
+                date(2021, 6, 6),
+                date(2021, 6, 7),
+                date(2021, 6, 8),
+                date(2021, 6, 9),
+                date(2021, 6, 10),
+                date(2021, 6, 11),
+                date(2021, 6, 12),
+                date(2021, 6, 13),
+                date(2021, 6, 14),
+                date(2021, 6, 15),
+                date(2021, 6, 16),
+                date(2021, 6, 17),
+                date(2021, 6, 18),
+                date(2021, 6, 19),
+                date(2021, 6, 20),
+                date(2021, 6, 21),
+                date(2021, 6, 22),
+                date(2021, 6, 23),
+                date(2021, 6, 24),
+                date(2021, 6, 25),
+                date(2021, 6, 26),
+                date(2021, 6, 27),
+                date(2021, 6, 28),
+                date(2021, 6, 29),
+                date(2021, 6, 30),
+            )),
+        )
+        for (wd_type_id, tm_start, tm_end, work_hours), dates in wdays:
+            for dt in dates:
+                is_night_work = False
+                if tm_start and tm_end and tm_end < tm_start:
+                    is_night_work = True
+
+                is_work_day = wd_type_id == WorkerDay.TYPE_WORKDAY
+                WorkerDayFactory(
+                    type_id=wd_type_id,
+                    dt=dt,
+                    shop=self.shop,
+                    employee=self.employee_worker,
+                    employment=self.employment_worker,
+                    dttm_work_start=datetime.combine(dt, tm_start) if is_work_day else None,
+                    dttm_work_end=datetime.combine(dt + timedelta(days=1) if is_night_work else dt,
+                                                   tm_end) if is_work_day else None,
+                    is_fact=is_work_day,
+                    is_approved=True,
+                    work_hours=work_hours,
+                )
+        self._calc_timesheets(reraise_exc=True)
+        self.assertEqual(TimesheetItem.objects.get(
+            timesheet_type=TimesheetItem.TIMESHEET_TYPE_MAIN, dt='2021-06-11').day_type_id, WorkerDay.TYPE_ABSENSE)
+        self.assertEqual(TimesheetItem.objects.filter(
+            timesheet_type=TimesheetItem.TIMESHEET_TYPE_ADDITIONAL, dt='2021-06-11').first(), None)
+        self.assertEqual(TimesheetItem.objects.get(
+            timesheet_type=TimesheetItem.TIMESHEET_TYPE_MAIN, dt='2021-06-12').day_type_id, WorkerDay.TYPE_HOLIDAY)
+        self.assertEqual(TimesheetItem.objects.filter(
+            timesheet_type=TimesheetItem.TIMESHEET_TYPE_ADDITIONAL, dt='2021-06-12').first(), None)
+        self.assertEqual(TimesheetItem.objects.get(
+            timesheet_type=TimesheetItem.TIMESHEET_TYPE_MAIN, dt='2021-06-13').day_type_id, WorkerDay.TYPE_HOLIDAY)
+        self.assertEqual(TimesheetItem.objects.filter(
+            timesheet_type=TimesheetItem.TIMESHEET_TYPE_ADDITIONAL, dt='2021-06-13').first(), None)
 
     def test_divide_workday_and_vacation(self):
         workday_type = WorkerDayType.objects.filter(

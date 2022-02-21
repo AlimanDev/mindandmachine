@@ -144,3 +144,26 @@ class TestCleanWdays(TestsHelperMixin, TestCase):
         self.assertTrue(WorkerDay.objects_with_excluded.filter(id=wd.id).exists())
         wd.refresh_from_db()
         self.assertIsNone(wd.employment_id)
+
+    def test_clean_wdays_with_kwargs(self):
+        empl = EmploymentFactory(
+            employee=self.employee, shop=self.shop,
+            dt_hired=self.dt_now - timedelta(days=30), dt_fired=self.dt_now - timedelta(days=1),
+        )
+        wd = WorkerDayFactory(
+            is_fact=True,
+            is_approved=True,
+            dt=self.dt_now,
+            employee=self.employee,
+            shop=self.shop,
+            employment=empl,
+            type_id=WorkerDay.TYPE_WORKDAY,
+        )
+
+        clean_wdays_helper = CleanWdaysHelper(id__in=[wd.id])
+        with mock.patch.object(transaction, 'on_commit', lambda t: t()):
+            clean_wdays_helper.run()
+
+        self.assertTrue(WorkerDay.objects_with_excluded.filter(id=wd.id).exists())
+        wd.refresh_from_db()
+        self.assertIsNone(wd.employment_id)

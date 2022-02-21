@@ -3,7 +3,7 @@ from math import ceil
 
 from dateutil.relativedelta import relativedelta
 from django.utils.translation import gettext as _
-from django.utils.encoding import force_text
+from django.utils.encoding import force_str
 from src.base.models import (
     Employment,
     User,
@@ -125,11 +125,11 @@ class Timetable_xlsx(Tabel_xlsx):
             fmt(font_size=self._font_size(12, 12), bold=True, text_wrap=True))
         self.worksheet.merge_range(
             1, 4, 1, 3 + len(self.prod_days),
-                 force_text(_('Employee work timetable for')) +
+                 force_str(_('Employee work timetable for')) +
                  ' ' +
-                 force_text(MONTH_NAMES.get(self.dt.month)).lower() +
+                 force_str(MONTH_NAMES.get(self.dt.month)).lower() +
                  ' ' +
-                 force_text(self.dt.year),
+                 force_str(self.dt.year),
             h1_merge_format,
         )
         shop_name_format = self.shop.network.settings_values_prop.get('shop_name_form', {})

@@ -41,12 +41,10 @@ from src.base.models import (
     Employment,
     User,
     Shop,
-    Event,
-    Notification,
     Employee,
 )
 from src.events.signals import event_signal
-from src.timetable.events import EMPLOYEE_VACANCY_DELETED, VACANCY_CREATED, VACANCY_DELETED
+from src.timetable.events import EMPLOYEE_VACANCY_DELETED, VACANCY_CONFIRMED_TYPE, VACANCY_CREATED, VACANCY_DELETED, VACANCY_RECONFIRMED_TYPE, VACANCY_REFUSED
 from src.conf.djconfig import (
     QOS_DATETIME_FORMAT,
     EMAIL_HOST_USER,
@@ -62,23 +60,6 @@ from src.timetable.models import (
     VacancyBlackList,
 )
 from src.timetable.work_type.utils import ShopEfficiencyGetter
-
-
-def create_event_and_notify(workers, **kwargs):
-    notification_list = []
-    event = Event.objects.create(
-        **kwargs,
-    )
-    for worker in workers:
-        notification_list.append(
-            Notification(
-                worker=worker,
-                event=event
-            )
-        )
-        print(f"Create notification for {worker}, {event}")
-    Notification.objects.bulk_create(notification_list)
-
 
 def search_candidates(vacancy, **kwargs):
     """
@@ -387,12 +368,6 @@ def do_shift_elongation(vacancy, max_working_hours):
             f'new {wd.dttm_work_start}-{wd.dttm_work_end}, '
             f'worker {candidate.user.first_name} {candidate.user.last_name} '
         )
-        create_event_and_notify(
-            [candidate.user], 
-            shop=shop,
-            type='shift_elongation',
-            params={'worker_day':wd},
-        )
         if (worker_day.shop.email):
             message = f'Это автоматическое уведомление для {worker_day.shop.name} об изменениях в графике:\n\n' + \
                     f'У сотрудника {candidate.user.last_name} {candidate.user.first_name} изменено время работы. ' +\
@@ -407,18 +382,20 @@ def do_shift_elongation(vacancy, max_working_hours):
             msg.send()
 
 
-def cancel_vacancy(vacancy_id, auto=True, delete=True):
+def cancel_vacancy(vacancy_id, auto=True, delete=True, refuse=False):
     vacancy = WorkerDay.objects.filter(id=vacancy_id, is_vacancy=True).select_related(
         'shop', 
-        'shop__director', 
         'employee', 
         'employee__user',
+        'employment',
     ).first()
     if vacancy:
         shop = vacancy.shop
+        networks = [shop.network_id,]
         employee = vacancy.employee
         vac_employment_id = vacancy.employment_id
         child = vacancy.child.first()
+        employment_shop_id = vacancy.employment.shop_id if vacancy.employment else None
         if delete:
             if auto or vacancy.created_by_id:
                 vacancy.delete()
@@ -440,6 +417,7 @@ def cancel_vacancy(vacancy_id, auto=True, delete=True):
                 'last_name': employee.user.last_name,
                 'tabel_code': employee.tabel_code or '',
             }
+            networks.append(employee_obj.user.network_id)
             wd_exists = WorkerDay.objects.filter(
                 dt=vacancy.dt,
                 employee=employee_obj,
@@ -505,26 +483,27 @@ def cancel_vacancy(vacancy_id, auto=True, delete=True):
                     'auto': auto,
                 },
             )
+
+        event_code_type = VACANCY_REFUSED if refuse else VACANCY_DELETED
+        event_context = {
+            'dt': vacancy.dt.strftime('%Y-%m-%d'),
+            'dttm_from': vacancy.dttm_work_start.strftime('%Y-%m-%d %H:%M:%S'),
+            'dttm_to': vacancy.dttm_work_end.strftime('%Y-%m-%d %H:%M:%S'),
+            'employment_shop_id': employment_shop_id,
+            'shop_name': shop.name,
+            'employee': employee,
+            'networks': networks,
+        }
         if auto:
-            event_signal.send(
-                sender=None,
-                network_id=shop.network_id,
-                event_code=VACANCY_DELETED,
-                user_author_id=None,
-                shop_id=shop.id,
-                context={
-                    'director': {
-                        'email': shop.director.email if shop.director else shop.email,
-                        'name': shop.director.first_name if shop.director else shop.name,
-                    },
-                    'dt': vacancy.dt.strftime('%Y-%m-%d'),
-                    'dttm_from': vacancy.dttm_work_start.strftime('%Y-%m-%d %H:%M:%S'),
-                    'dttm_to': vacancy.dttm_work_end.strftime('%Y-%m-%d %H:%M:%S'),
-                    'shop_id': shop.id,
-                    'shop_name': shop.name,
-                    'employee': employee,
-                },
-            )
+            event_context['shop_id'] = shop.id
+        event_signal.send(
+            sender=None,
+            network_id=shop.network_id,
+            event_code=event_code_type,
+            user_author_id=None,
+            shop_id=shop.id,
+            context=event_context,
+        )
 
 
 def create_vacancy(dttm_from, dttm_to, shop_id, work_type_id, outsources=[]):
@@ -549,14 +528,8 @@ def create_vacancy(dttm_from, dttm_to, shop_id, work_type_id, outsources=[]):
 
 def notify_vacancy_created(worker_day, work_type_id=None, is_auto=True):
     shop = worker_day.shop
-    director = {}
     networks = list(worker_day.outsources.all().values_list('id', flat=True)) + [worker_day.shop.network_id]
     work_types = []
-    if is_auto:
-        director = {
-            'email': shop.director.email if shop.director else shop.email,
-            'name': shop.director.first_name if shop.director else shop.name,
-        }
     
     if work_type_id:
         work_types = list(WorkType.objects.select_related('work_type_name').filter(id=work_type_id).values_list('work_type_name__name', flat=True))
@@ -570,7 +543,6 @@ def notify_vacancy_created(worker_day, work_type_id=None, is_auto=True):
         user_author_id=None,
         shop_id=shop.id,
         context={
-            'director': director,
             'networks': networks,
             'dt': worker_day.dt.strftime('%Y-%m-%d'),
             'dttm_from': worker_day.dttm_work_start.strftime('%Y-%m-%d %H:%M:%S'),
@@ -652,10 +624,9 @@ def confirm_vacancy(vacancy_id, user=None, employee_id=None, exchange=False, rec
                     return res
             
             if refuse:
-                cancel_vacancy(vacancy.id, delete=False)
+                cancel_vacancy(vacancy.id, auto=False, delete=False, refuse=True)
                 res['text'] = messages['vacancy_refused']
                 return res
-
 
             vacancy_shop = vacancy.shop
 
@@ -750,8 +721,7 @@ def confirm_vacancy(vacancy_id, user=None, employee_id=None, exchange=False, rec
                     # проставлять сотруднику, у которого отменили вакансию, выходной,
                     # если нет других вакансий и не аутсорс?
                     # вызывать cancel_vacancy + поправить внутри логику?
-                    cancel_vacancy(vacancy.id, delete=False)
-
+                    cancel_vacancy(vacancy.id, auto=False, delete=False)
 
                 vacancy.employee = active_employment.employee
                 vacancy.employment = active_employment
@@ -770,8 +740,10 @@ def confirm_vacancy(vacancy_id, user=None, employee_id=None, exchange=False, rec
                     is_approved=False,
                 ).delete()
 
-                vacancy_details = WorkerDayCashboxDetails.objects.filter(
-                    worker_day=vacancy).values('work_type_id', 'work_part')
+                vacancy_details_qs = WorkerDayCashboxDetails.objects.filter(
+                    worker_day=vacancy)
+
+                vacancy_details = vacancy_details_qs.values('work_type_id', 'work_part')
 
                 vacancy.outsources.clear()
 
@@ -801,13 +773,44 @@ def confirm_vacancy(vacancy_id, user=None, employee_id=None, exchange=False, rec
                 except WorkTimeOverlap:
                     pass
 
-                # TODO: создать событие об отклике на вакансию
-
-                Event.objects.filter(worker_day=vacancy).delete()
                 res['text'] = messages['vacancy_success']
 
                 WorkerDay.check_work_time_overlap(
                     employee_id=vacancy.employee_id, dt=vacancy.dt, is_fact=False, is_approved=True)
+                
+                work_types = list(vacancy_details_qs.values_list('work_type__work_type_name__name', flat=True))
+                event_code = VACANCY_RECONFIRMED_TYPE if reconfirm else VACANCY_CONFIRMED_TYPE
+                event_context = {
+                    'user': {
+                        'last_name': user.last_name,
+                        'first_name': user.first_name,
+                        'is_outsource': user.network_id != vacancy_shop.network_id,
+                    },
+                    'from_user': {
+                        'last_name': '',
+                        'first_name': '',
+                    },
+                    'dt': str(vacancy.dt),
+                    'work_types': work_types,
+                    'shop_id': vacancy.shop_id,
+                }
+                if reconfirm and prev_employee_id:
+                    from_user = Employee.objects.select_related('user').get(pk=prev_employee_id).user
+                    event_context['from_user'] = {
+                        'last_name': from_user.last_name,
+                        'first_name': from_user.first_name,
+                        'is_outsource': from_user.network_id != vacancy_shop.network_id,
+                    }
+
+                event_signal.send(
+                    sender=None,
+                    network_id=vacancy.shop.network_id,
+                    event_code=event_code,
+                    user_author_id=None,
+                    shop_id=vacancy.shop_id,
+                    context=event_context,
+                )
+                
                 WorkerDay.set_closest_plan_approved(
                     q_obj=Q(employee_id=vacancy.employee_id, dt=vacancy.dt),
                     delta_in_secs=vacancy_shop.network.set_closest_plan_approved_delta_for_manual_fact if (
@@ -1070,12 +1073,6 @@ def holiday_workers_exchange():
                     f'worker {candidate.user.first_name} {candidate.user.last_name}, '
                 )
                 confirm_vacancy(vacancy.id, candidate.user, employee_id=candidate.id)
-                create_event_and_notify(
-                    [candidate.user], 
-                    type='holiday_exchange', 
-                    shop=shop, 
-                    params={'worker_day': vacancy, 'shop': shop}
-                )
 
 
 def worker_shift_elongation():
@@ -1219,12 +1216,6 @@ def workers_exchange():
                         }
                         #не удаляем candidate_to_change потому что создаем неподтвержденную вакансию
                         print(confirm_vacancy(vacancy.id, user, employee_id=candidate_to_change.worker_day.employee_id, exchange=True))
-                        create_event_and_notify(
-                            [user],
-                            type='auto_vacancy', 
-                            shop=shop_to, 
-                            params={'shop': shop_to, 'vacancy': vacancy}
-                        )
 
                         if shop_to.email:
                             message = f'Это автоматическое уведомление для {shop_to.name} об изменениях в графике:\n\n' + \

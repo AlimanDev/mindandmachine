@@ -1,15 +1,17 @@
 from datetime import date, datetime
-from django.db.models.expressions import Exists, OuterRef
-from pytz import timezone
+from decimal import Decimal
 
-from django.db.models import Q
-from src.base.models import Employment, User
-from src.reports.registry import ReportRegistryHolder
-from src.base.models_abstract import AbstractActiveNetworkSpecificCodeNamedModel, AbstractModel
 from dateutil.relativedelta import relativedelta
 from django.db import models
+from django.db.models import Q
+from django.db.models.expressions import Exists, OuterRef
 from django.utils.translation import gettext_lazy as _
 from django_celery_beat.models import CrontabSchedule
+from pytz import timezone
+
+from src.base.models import Employment, User
+from src.base.models_abstract import AbstractActiveNetworkSpecificCodeNamedModel, AbstractModel
+from src.reports.registry import ReportRegistryHolder
 
 
 class ReportType(AbstractActiveNetworkSpecificCodeNamedModel):
@@ -217,3 +219,23 @@ class ReportConfig(models.Model):
             )
     
         return recipients
+
+
+class UserShopGroups(models.Model):
+    user = models.ForeignKey('base.User', on_delete=models.CASCADE)
+    shop = models.ForeignKey('base.Shop', on_delete=models.CASCADE)
+    group_name = models.CharField(max_length=128, blank=False, null=True)
+
+
+class UserSubordinates(models.Model):
+    user = models.ForeignKey('base.User', on_delete=models.CASCADE)
+    employee = models.ForeignKey('base.Employee', on_delete=models.CASCADE)
+
+
+class EmploymentStats(models.Model):
+    employee = models.ForeignKey('base.Employee', on_delete=models.CASCADE)
+    employment = models.ForeignKey('base.Employment', on_delete=models.CASCADE)
+    shop = models.ForeignKey('base.Shop', on_delete=models.CASCADE)
+    dt = models.DateField()
+    sawh_hours = models.DecimalField(default=Decimal('0'), max_digits=16, decimal_places=14)
+    reduce_norm = models.BooleanField()

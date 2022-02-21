@@ -39,12 +39,7 @@ class TestOperationTypeTemplate(APITestCase):
             name='Test1',
             network=self.network,
         )
-        self.operation_type_name1 = OperationTypeName.objects.create(
-            name='Кассы',
-            work_type_name=self.work_type_name1,
-            do_forecast=OperationTypeName.FORECAST_FORMULA,
-            network=self.network,
-        )
+        self.operation_type_name1 = self.work_type_name1.operation_type_name
         self.operation_type_name2 = OperationTypeName.objects.create(
             name='Строительные работы',
             do_forecast=OperationTypeName.FORECAST,
@@ -161,7 +156,7 @@ class TestOperationTypeTemplate(APITestCase):
         OperationTypeRelation.objects.create(
             base=op_temp1,
             depended=op_temp2,
-            formula='lambda a: a * 2 + a',
+            formula='a * 2 + a',
         )
         data = {
             'load_template_id': load_template.id,
@@ -194,7 +189,7 @@ class TestOperationTypeTemplate(APITestCase):
         OperationTypeRelation.objects.create(
             base=op_temp1,
             depended=op_temp2,
-            formula='lambda a: a * 2 + a',
+            formula='a * 2 + a',
         )
         data = {
             'load_template_id': load_template.id,

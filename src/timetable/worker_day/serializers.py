@@ -12,7 +12,7 @@ from rest_framework.exceptions import PermissionDenied, ValidationError, NotFoun
 from src.base.exceptions import FieldError
 from src.base.models import Employment, User, Shop, Employee, Network
 from src.base.models import NetworkConnect
-from src.base.serializers import NetworkListSerializer, UserShorSerializer, NetworkSerializer
+from src.base.serializers import ModelSerializerWithCreateOnlyFields, NetworkListSerializer, UserShorSerializer, NetworkSerializer
 from src.base.shop.serializers import ShopListSerializer
 from src.conf.djconfig import QOS_DATE_FORMAT
 from src.timetable.models import (
@@ -79,6 +79,11 @@ class WorkerDayCashboxDetailsSerializer(serializers.ModelSerializer):
         model = WorkerDayCashboxDetails
         fields = ['id', 'work_type_id', 'work_part']
 
+    def __init__(self, *args, **kwargs):
+        super(WorkerDayCashboxDetailsSerializer, self).__init__(*args, **kwargs)
+        if self.context.get('batch'):
+            self.fields['id'].read_only = False
+
 
 class WorkerDayCashboxDetailsListSerializer(serializers.Serializer):
     id = serializers.IntegerField()
@@ -126,7 +131,7 @@ class WorkerDayListSerializer(serializers.Serializer, UnaccountedOvertimeMixin):
         return obj.work_hours
 
 
-class WorkerDaySerializer(serializers.ModelSerializer, UnaccountedOvertimeMixin):
+class WorkerDaySerializer(ModelSerializerWithCreateOnlyFields, UnaccountedOvertimeMixin):
     default_error_messages = {
         'check_dates': _('Date start should be less then date end'),
         'worker_day_exist': _("Worker day already exist."),
@@ -141,7 +146,6 @@ class WorkerDaySerializer(serializers.ModelSerializer, UnaccountedOvertimeMixin)
         "no_such_shop_in_network": _("There is no such shop in your network."),
     }
 
-    worker_day_details = WorkerDayCashboxDetailsSerializer(many=True, required=False)
     employee_id = serializers.IntegerField(required=False, allow_null=True)
     employment_id = serializers.IntegerField(required=False, allow_null=True)
     shop_id = serializers.IntegerField(required=False)
@@ -186,6 +190,11 @@ class WorkerDaySerializer(serializers.ModelSerializer, UnaccountedOvertimeMixin)
             },
         }
 
+    def get_fields(self, *args, **kwargs):
+        fields = super(WorkerDaySerializer, self).get_fields(*args, **kwargs)
+        fields['worker_day_details'] = WorkerDayCashboxDetailsSerializer(many=True, required=False, context=self.context)
+        return fields
+
     @cached_property
     def wd_types_dict(self):
         """
@@ -222,6 +231,10 @@ class WorkerDaySerializer(serializers.ModelSerializer, UnaccountedOvertimeMixin)
 
         if not wd_type_obj.is_work_hours:
             attrs['is_vacancy'] = False
+
+        # рефакторинг
+        if not (wd_type_obj.is_work_hours and wd_type_obj.is_dayoff):
+            attrs.pop('work_hours', None)
 
         shop_id = attrs.get('shop_id')
         if wd_type_obj.is_dayoff:
@@ -422,20 +435,6 @@ class WorkerDaySerializer(serializers.ModelSerializer, UnaccountedOvertimeMixin)
             )
 
             return res
-
-    def to_internal_value(self, data):
-        data = super(WorkerDaySerializer, self).to_internal_value(data)
-        if self.instance:
-            # update
-            for field in self.Meta.create_only_fields:
-                if field in data:
-                    data.pop(field)
-        else:
-            # shop_id is required for create
-            for field in self.Meta.create_only_fields:
-                if field not in data:
-                    raise serializers.ValidationError({field: self.error_messages['required']})
-        return data
 
     def get_unaccounted_overtime(self, obj):
         return self.unaccounted_overtime_getter(obj)
@@ -750,6 +749,7 @@ class OvertimesUndertimesReportSerializer(serializers.Serializer):
             raise ValidationError(_('Shop or employees should be defined.'))
         if self.validated_data.get('employee_id__in'):
             self.validated_data['employee_id__in'] = self.validated_data['employee_id__in'].split(',')
+
 
 class ConfirmVacancyToWorkerSerializer(serializers.Serializer):
     default_error_messages = {

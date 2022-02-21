@@ -135,6 +135,13 @@ class TestIntegration(TestsHelperMixin, APITestCase):
                 'name': 'Тестовая зона',
             }
         )
+        self.att_area2, _ = AttendanceArea.objects.update_or_create(
+            code='2',
+            external_system=self.ext_system,
+            defaults={
+                'name': 'Тестовая зона 2',
+            }
+        )
 
         Employment.objects.filter(
             shop=self.shop,
@@ -175,6 +182,28 @@ class TestIntegration(TestsHelperMixin, APITestCase):
         )
         ShopExternalCode.objects.create(
             attendance_area=self.att_area,
+            shop=self.shop2,
+        )
+        with patch('src.integration.zkteco.requests', new_callable=TestRequestMock) as mock_request:
+            export_workers_zkteco()
+            self.assertEqual(UserExternalCode.objects.count(), 5)
+            self.employment2.dt_fired = date.today() - timedelta(days=2)
+            self.employment2.save()
+            Employment.objects.create(
+                employee_id=self.employment2.employee_id,
+                shop_id=self.shop2.id,
+                position=self.position,
+            )
+            delete_workers_zkteco()
+        self.assertEqual(UserExternalCode.objects.count(), 5)
+    
+    def test_delete_workers_many_shops_to_one_user(self):
+        ShopExternalCode.objects.create(
+            attendance_area=self.att_area,
+            shop=self.shop,
+        )
+        ShopExternalCode.objects.create(
+            attendance_area=self.att_area2,
             shop=self.shop2,
         )
         with patch('src.integration.zkteco.requests', new_callable=TestRequestMock) as mock_request:
@@ -1165,7 +1194,7 @@ class TestIntegration(TestsHelperMixin, APITestCase):
                     shop=self.shop,
                     position=self.position, 
                 )
-                self.assertEquals(
+                self.assertEqual(
                     mock_request.request.call_args_list, 
                     [
                         call(
@@ -1207,7 +1236,7 @@ class TestIntegration(TestsHelperMixin, APITestCase):
                 mock_request.request.return_value = mock_request
                 self.employment1.dt_fired = date(2019, 1, 1)
                 self.employment1.save()
-                self.assertEquals(
+                self.assertEqual(
                     mock_request.request.call_args_list, 
                     [
                         call(
@@ -1242,7 +1271,7 @@ class TestIntegration(TestsHelperMixin, APITestCase):
                 mock_request.request.return_value = mock_request
                 self.employment1.dt_fired = date(2019, 1, 1)
                 self.employment1.save()
-                self.assertEquals(
+                self.assertEqual(
                     mock_request.request.call_args_list, 
                     [
                         call(
@@ -1271,7 +1300,7 @@ class TestIntegration(TestsHelperMixin, APITestCase):
                 mock_request.json.return_value = {"code": 0}
                 mock_request.request.return_value = mock_request
                 self.employment1.delete()
-                self.assertEquals(
+                self.assertEqual(
                     mock_request.request.call_args_list, 
                     [
                         call(
@@ -1399,7 +1428,7 @@ class TestIntegration(TestsHelperMixin, APITestCase):
                 mock_request.request.call_args_list.clear()
                 self.employment1.dt_fired = date(2019, 1, 1)
                 self.employment1.save()
-                self.assertEquals(mock_request.request.call_args_list, [])
+                self.assertEqual(mock_request.request.call_args_list, [])
                 self.assertTrue(UserExternalCode.objects.filter(external_system=self.ext_system, user=self.user1).exists())
 
 
@@ -1416,7 +1445,7 @@ class TestIntegration(TestsHelperMixin, APITestCase):
                 mock_request.request.return_value = mock_request
                 self.employment1.dt_hired = date(2018, 11, 1)
                 self.employment1.save()
-                self.assertEquals(mock_request.request.call_args_list, [])
+                self.assertEqual(mock_request.request.call_args_list, [])
                 self.assertFalse(UserExternalCode.objects.filter(external_system=self.ext_system, user=self.user1).exists())
 
     def test_fact_not_duplicated_on_approve(self):

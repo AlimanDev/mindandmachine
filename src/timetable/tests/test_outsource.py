@@ -65,7 +65,7 @@ class TestOutsource(TestsHelperMixin, APITestCase):
             parent=cls.client_root_shop,
             code='client',
         )
-        cls.cleint_admin_group = Group.objects.create(name='Администратор client', code='client admin', network=cls.client_network)
+        cls.client_admin_group = Group.objects.create(name='Администратор client', code='client admin', network=cls.client_network)
         cls.outsource_admin_group = Group.objects.create(name='Администратор outsource', code='outsource admin', network=cls.outsource_network2)
         FunctionGroup.objects.bulk_create([
             FunctionGroup(
@@ -75,7 +75,7 @@ class TestOutsource(TestsHelperMixin, APITestCase):
                 level_up=1,
                 level_down=99,
             ) 
-            for g in [cls.cleint_admin_group, cls.outsource_admin_group]
+            for g in [cls.client_admin_group, cls.outsource_admin_group]
             for func, _ in FunctionGroup.FUNCS_TUPLE 
             for method, _ in FunctionGroup.METHODS_TUPLE
         ])
@@ -84,7 +84,7 @@ class TestOutsource(TestsHelperMixin, APITestCase):
                 group=g,
                 worker_day_permission=wdp,
             ) 
-            for g in [cls.cleint_admin_group, cls.outsource_admin_group]
+            for g in [cls.client_admin_group, cls.outsource_admin_group]
             for wdp in WorkerDayPermission.objects.all()
         )
         cls.outsource_user = User.objects.create(
@@ -115,7 +115,7 @@ class TestOutsource(TestsHelperMixin, APITestCase):
         cls.client_employment = Employment.objects.create(
             employee=cls.client_employee,
             shop=cls.client_root_shop,
-            function_group=cls.cleint_admin_group,
+            function_group=cls.client_admin_group,
         )
         cls.client_work_type_name = WorkTypeName.objects.create(
             network=cls.client_network,
@@ -168,23 +168,6 @@ class TestOutsource(TestsHelperMixin, APITestCase):
         self.assertEqual(response.status_code, 200)
         return vacancy
 
-    def _authorize_tick_point(self):
-        t = TickPoint.objects.create(
-            network=self.client_network,
-            name='test',
-            shop=self.client_shop,
-        )
-
-        response = self.client.post(
-            path='/api/v1/token-auth/',
-            data={
-                'key': t.key,
-            }
-        )
-
-        token = response.json()['token']
-        self.client.defaults['HTTP_AUTHORIZATION'] = 'Token %s' % token
-
     def test_vacancy_creation(self):
         dt_now = self.dt_now
         not_created = self._create_vacancy(dt_now, datetime.combine(dt_now, time(8)), datetime.combine(dt_now, time(20)), is_vacancy=False)
@@ -203,13 +186,26 @@ class TestOutsource(TestsHelperMixin, APITestCase):
         NetworkConnect.objects.filter(id=self.network_connect.id).delete()
         dt_now = self.dt_now
         self.client.force_authenticate(user=self.user1)
-        not_created = self._create_vacancy(dt_now, datetime.combine(dt_now, time(8)), datetime.combine(dt_now, time(20)), is_outsource=False)
-        self.assertEqual(not_created.json(), {'non_field_errors': ['В вашей сети нет такого магазина.']})
+        not_created = self._create_vacancy(
+            dt_now, datetime.combine(dt_now, time(8)), datetime.combine(dt_now, time(20)), is_outsource=False)
+        self.assertEqual(not_created.json(),
+                         {'detail': 'У вас нет прав на создание типа дня "Рабочий день" в подразделении Магазин'})
 
     def test_can_create_vacancy_with_shop_from_other_network_but_from_outsource_client(self):
         dt_now = self.dt_now
         self.client.force_authenticate(user=self.user1)
-        resp = self._create_vacancy(dt_now, datetime.combine(dt_now, time(8)), datetime.combine(dt_now, time(20)), is_outsource=False)
+        GroupWorkerDayPermission.objects.create(
+            group=self.admin_group,
+            worker_day_permission=WorkerDayPermission.objects.get(
+                action=WorkerDayPermission.CREATE,
+                graph_type=WorkerDayPermission.PLAN,
+                wd_type_id=WorkerDay.TYPE_WORKDAY,
+            ),
+            employee_type=GroupWorkerDayPermission.SUBORDINATE_EMPLOYEE,
+            shop_type=GroupWorkerDayPermission.CLIENT_NETWORK_SHOPS,
+        )
+        resp = self._create_vacancy(
+            dt_now, datetime.combine(dt_now, time(8)), datetime.combine(dt_now, time(20)), is_outsource=False)
         self.assertEqual(resp.status_code, 201)
 
     def test_vacancy_creation_with_null_or_empty_outsourcings_ids(self):
@@ -222,22 +218,63 @@ class TestOutsource(TestsHelperMixin, APITestCase):
     def test_vacancy_get(self):
         dt_now = self.dt_now
         self._create_vacancy(dt_now, datetime.combine(dt_now, time(8)), datetime.combine(dt_now, time(20)), outsources=[self.outsource_network.id,])
+        self._create_vacancy(dt_now + timedelta(1), datetime.combine(dt_now + timedelta(1), time(16)), datetime.combine(dt_now + timedelta(1), time(20)), outsources=[self.outsource_network.id,])
+        self._create_vacancy(dt_now + timedelta(1), datetime.combine(dt_now + timedelta(1), time(10)), datetime.combine(dt_now + timedelta(1), time(20)), outsources=[self.outsource_network.id,])
         self._create_vacancy(dt_now, datetime.combine(dt_now, time(8)), datetime.combine(dt_now, time(20)), outsources=[self.outsource_network.id, self.outsource_network2.id])
         self._create_vacancy(dt_now, datetime.combine(dt_now, time(8)), datetime.combine(dt_now, time(20)), outsources=[self.outsource_network2.id,])
         self._create_vacancy(dt_now, datetime.combine(dt_now, time(8)), datetime.combine(dt_now, time(20)), is_outsource=False)
-        self.client.force_authenticate(user=self.user1)
+        self._create_vacancy(dt_now + timedelta(1), datetime.combine(dt_now + timedelta(1), time(16)), datetime.combine(dt_now + timedelta(1), time(20)), is_outsource=False)
+        self._create_vacancy(dt_now + timedelta(1), datetime.combine(dt_now + timedelta(1), time(10)), datetime.combine(dt_now + timedelta(1), time(20)), is_outsource=False)
         WorkerDay.objects.all().update(is_approved=True)
+        WorkerDay.objects.create(
+            employee=self.client_employee,
+            employment=self.client_employment,
+            type_id=WorkerDay.TYPE_HOLIDAY,
+            dt=dt_now,
+            is_approved=True,
+        )
+        WorkerDay.objects.create(
+            employee=self.client_employee,
+            employment=self.client_employment,
+            type_id=WorkerDay.TYPE_WORKDAY,
+            dt=dt_now + timedelta(1),
+            is_approved=True,
+            dttm_work_start=datetime.combine(dt_now + timedelta(1), time(10)),
+            dttm_work_end=datetime.combine(dt_now + timedelta(1), time(15)),
+            shop=self.client_shop,
+            is_vacancy=True,
+        )
+        WorkerDay.objects.create(
+            employee=self.employee1,
+            employment=self.employment1,
+            type_id=WorkerDay.TYPE_WORKDAY,
+            dt=dt_now + timedelta(1),
+            is_approved=True,
+            dttm_work_start=datetime.combine(dt_now + timedelta(1), time(10)),
+            dttm_work_end=datetime.combine(dt_now + timedelta(1), time(15)),
+            shop=self.client_shop,
+            is_vacancy=True,
+        )
+        self.client_network.allow_workers_confirm_outsource_vacancy = True
+        self.client_network.save()
+        response = self.client.get('/rest_api/worker_day/vacancy/?only_available=True&limit=10&offset=0')
+        self.assertEqual(response.json()['count'], 6)
+        self.client_network.allow_workers_confirm_outsource_vacancy = False
+        self.client_network.save()
         response = self.client.get('/rest_api/worker_day/vacancy/?only_available=True&limit=10&offset=0')
         self.assertEqual(response.json()['count'], 2)
+        self.client.force_authenticate(user=self.user1)
+        response = self.client.get('/rest_api/worker_day/vacancy/?only_available=True&limit=10&offset=0')
+        self.assertEqual(response.json()['count'], 3)
         resp_data = sorted(response.json()['results'], key=lambda i: i['id'])
         self.assertEqual(len(resp_data[0]['outsources']), 1)
         response = self.client.get('/rest_api/worker_day/vacancy/?limit=10&offset=0')
-        self.assertEqual(response.json()['count'], 2)
+        self.assertEqual(response.json()['count'], 4)
         self.client.force_authenticate(user=self.client_user)
         self._create_vacancy(dt_now, datetime.combine(dt_now, time(8)), datetime.combine(dt_now, time(20)), outsources=[self.outsource_network.id, self.outsource_network2.id])
         self.client.force_authenticate(user=self.user1)
         response = self.client.get('/rest_api/worker_day/vacancy/?limit=10&offset=0')
-        self.assertEqual(response.json()['count'], 2)
+        self.assertEqual(response.json()['count'], 4)
 
     @override_settings(CELERY_TASK_ALWAYS_EAGER=True)
     def test_confirm_vacancy(self):
@@ -271,7 +308,7 @@ class TestOutsource(TestsHelperMixin, APITestCase):
         self.assertEqual(mail.outbox[0].to[0], self.client_user.email)
         self.assertEqual(
             mail.outbox[0].body, 
-            f'Здравствуйте, {self.client_user.first_name}!\n\n\n\n\n\n\nСотрудник {self.user1.last_name} {self.user1.first_name} откликнулся на вакансию с типом работ {self.client_work_type_name.name}\n'
+            f'Здравствуйте, {self.client_user.first_name}!\n\n\n\n\n\n\nАутсорс сотрудник {self.user1.last_name} {self.user1.first_name} откликнулся на вакансию с типом работ {self.client_work_type_name.name}\n'
             f'Дата: {vacancy["dt"]}\nПодразделение: {self.client_shop.name}\n\n\n\n\n\nПисьмо отправлено роботом. Подробности можно узнать по ссылке'
         )
         vacancy = WorkerDay.objects.get(id=vacancy['id'])
@@ -279,8 +316,8 @@ class TestOutsource(TestsHelperMixin, APITestCase):
         self.assertEqual(vacancy.employment_id, self.employment1.id)
         not_approved_vacancy = WorkerDay.objects.filter(parent_worker_day_id=vacancy.id).first()
         self.assertIsNotNone(not_approved_vacancy)
-        self.assertEquals(list(not_approved_vacancy.outsources.all()), [self.outsource_network,])
-        self.assertEquals(list(vacancy.outsources.all()), [self.outsource_network,])
+        self.assertEqual(list(not_approved_vacancy.outsources.all()), [self.outsource_network,])
+        self.assertEqual(list(vacancy.outsources.all()), [self.outsource_network,])
 
     def test_confirm_vacancy_to_worker(self):
         dt_now = self.dt_now
@@ -313,15 +350,18 @@ class TestOutsource(TestsHelperMixin, APITestCase):
         vacancy = self._create_vacancy(dt_now, datetime.combine(dt_now, time(8)), datetime.combine(dt_now, time(20)), outsources=[self.outsource_network.id,]).json()
         WorkerDay.objects.all().update(is_approved=True)
         self.client.force_authenticate(user=self.user1)
-        response = self.client.post(
+        resp = self.client.post(
             f'/rest_api/worker_day/{vacancy["id"]}/confirm_vacancy_to_worker/',
             data={
                 'user_id': self.user2.id,
                 'employee_id': self.employee2.id,
             }
         )
-        self.assertContains(
-            response, f'Сотрудник {self.user2.fio} не является Вашим подчиненным.', status_code=403)
+        self.assertEqual(resp.status_code, 403)
+        self.assertDictEqual(
+            resp.json(),
+            {'detail': f'Сотрудник {self.user2.fio} не является Вашим подчиненным.'}
+        )
         self.admin_group.subordinates.add(self.employment2.function_group)
         Employment.objects.filter(employee=self.employee1).update(shop=self.shop2)
         response = self.client.post(
@@ -331,8 +371,11 @@ class TestOutsource(TestsHelperMixin, APITestCase):
                 'employee_id': self.employee2.id,
             }
         )
-        self.assertContains(
-            response, f'Сотрудник {self.user2.fio} не является Вашим подчиненным.', status_code=403)
+        self.assertEqual(resp.status_code, 403)
+        self.assertDictEqual(
+            resp.json(),
+            {'detail': f'Сотрудник {self.user2.fio} не является Вашим подчиненным.'}
+        )
         Employment.objects.filter(employee=self.employee1).update(shop=self.shop)
         response = self.client.post(
             f'/rest_api/worker_day/{vacancy["id"]}/confirm_vacancy_to_worker/',
@@ -405,26 +448,32 @@ class TestOutsource(TestsHelperMixin, APITestCase):
         )
         self.assertEqual(response.json(), {'result': 'Вакансия успешно принята.'})
         self.admin_group.subordinates.clear()
-        response = self.client.post(
+        resp = self.client.post(
             f'/rest_api/worker_day/{vacancy["id"]}/reconfirm_vacancy_to_worker/',
             data={
                 'user_id': self.user2.id,
                 'employee_id': self.employee2.id,
             }
         )
-        self.assertContains(
-            response, f'Сотрудник {self.user2.fio} не является Вашим подчиненным.', status_code=403)
+        self.assertEqual(resp.status_code, 403)
+        self.assertDictEqual(
+            resp.json(),
+            {'detail': f'Сотрудник {self.user2.fio} не является Вашим подчиненным.'}
+        )
         self.admin_group.subordinates.add(self.employment2.function_group)
         Employment.objects.filter(employee=self.employee1).update(shop=self.shop2)
-        response = self.client.post(
+        resp = self.client.post(
             f'/rest_api/worker_day/{vacancy["id"]}/reconfirm_vacancy_to_worker/',
             data={
                 'user_id': self.user2.id,
                 'employee_id': self.employee2.id,
             }
         )
-        self.assertContains(
-            response, f'Сотрудник {self.user2.fio} не является Вашим подчиненным.', status_code=403)
+        self.assertEqual(resp.status_code, 403)
+        self.assertDictEqual(
+            resp.json(),
+            {'detail': f'Сотрудник {self.user2.fio} не является Вашим подчиненным.'}
+        )
         Employment.objects.filter(employee=self.employee1).update(shop=self.shop)
         response = self.client.post(
             f'/rest_api/worker_day/{vacancy["id"]}/reconfirm_vacancy_to_worker/',
@@ -492,7 +541,7 @@ class TestOutsource(TestsHelperMixin, APITestCase):
     def test_get_worker_days_for_urv(self):
         vacancy = self._create_and_apply_vacancy(night_shift=True)
         self.client.logout()
-        self._authorize_tick_point()
+        self._authorize_tick_point(shop=self.client_shop)
         response = self.client.get(self.get_url('TimeAttendanceWorkerDay-list'))
         data = [
             {
@@ -640,7 +689,7 @@ class TestOutsource(TestsHelperMixin, APITestCase):
         self.assertTrue(wd.is_approved)
         nawd = WorkerDay.objects.filter(parent_worker_day=wd).first()
         self.assertIsNotNone(nawd)
-        self.assertEquals(list(nawd.outsources.all()), [self.outsource_network,])
+        self.assertEqual(list(nawd.outsources.all()), [self.outsource_network,])
 
     def test_client_can_get_and_approve_wd_for_employee_from_other_network_emploeed_in_own_shop(self):
         self.employment2.shop = self.client_shop
@@ -652,14 +701,14 @@ class TestOutsource(TestsHelperMixin, APITestCase):
             dt=date.today(),
         )
         response = self.client.get(f'/rest_api/worker_day/?employee_id__in={self.employee2.id}')
-        self.assertEquals(len(response.json()), 1)
-        self.assertEquals(len(list(filter(lambda x: x['id'] == wd.id, response.json()))), 1)
+        self.assertEqual(len(response.json()), 1)
+        self.assertEqual(len(list(filter(lambda x: x['id'] == wd.id, response.json()))), 1)
         response = self.client.post('/rest_api/worker_day/approve/', {
             'shop_id': self.client_shop.id,
             'dt_from': date.today(),
             'dt_to': date.today(),
         })
-        self.assertEquals(response.status_code, 200)
+        self.assertEqual(response.status_code, 200)
         wd.refresh_from_db()
         self.assertTrue(wd.is_approved)
 
@@ -669,14 +718,14 @@ class TestOutsource(TestsHelperMixin, APITestCase):
         WorkerDay.objects.all().update(is_approved=True)
         self.client.force_authenticate(user=self.user1)
         response = self.client.get('/rest_api/worker_day/vacancy/?limit=10&offset=0')
-        self.assertEquals(len(response.json()['results']), 1)
-        self.assertEquals(len(list(filter(lambda x: x["id"] == vacancy["id"], response.json()['results']))), 1)
+        self.assertEqual(len(response.json()['results']), 1)
+        self.assertEqual(len(list(filter(lambda x: x["id"] == vacancy["id"], response.json()['results']))), 1)
         self.client.force_authenticate(user=self.outsource_user)
         response = self.client.post(f'/rest_api/worker_day/{vacancy["id"]}/confirm_vacancy/')
         self.assertEqual(response.status_code, 200)
         self.client.force_authenticate(user=self.user1)
         response = self.client.get('/rest_api/worker_day/vacancy/?limit=10&offset=0')
-        self.assertEquals(len(response.json()['results']), 0)
+        self.assertEqual(len(response.json()['results']), 0)
 
     def test_outource_cant_reconfirm_vacancy_applied_by_worker_from_other_network(self):
         dt_now = self.dt_now
@@ -684,8 +733,8 @@ class TestOutsource(TestsHelperMixin, APITestCase):
         WorkerDay.objects.all().update(is_approved=True)
         self.client.force_authenticate(user=self.user1)
         response = self.client.get('/rest_api/worker_day/vacancy/?limit=10&offset=0')
-        self.assertEquals(len(response.json()['results']), 1)
-        self.assertEquals(len(list(filter(lambda x: x["id"] == vacancy["id"], response.json()['results']))), 1)
+        self.assertEqual(len(response.json()['results']), 1)
+        self.assertEqual(len(list(filter(lambda x: x["id"] == vacancy["id"], response.json()['results']))), 1)
         self.client.force_authenticate(user=self.outsource_user)
         response = self.client.post(f'/rest_api/worker_day/{vacancy["id"]}/confirm_vacancy/')
         self.assertEqual(response.status_code, 200)
@@ -706,7 +755,7 @@ class TestOutsource(TestsHelperMixin, APITestCase):
         self.assertTrue(wd.is_approved)
         nawd = WorkerDay.objects.filter(parent_worker_day=wd).first()
         self.assertIsNotNone(nawd)
-        self.assertEquals(list(nawd.outsources.all()), [self.outsource_network,])
+        self.assertEqual(list(nawd.outsources.all()), [self.outsource_network,])
 
     def test_copy_plan_to_plan_copy_outsources(self):
         dt_now = self.dt_now
@@ -716,6 +765,16 @@ class TestOutsource(TestsHelperMixin, APITestCase):
         wd.employee = self.employee1
         wd.employment = self.employment1
         wd.save()
+        GroupWorkerDayPermission.objects.create(
+            group=self.client_admin_group,
+            worker_day_permission=WorkerDayPermission.objects.get(
+                action=WorkerDayPermission.CREATE,
+                graph_type=WorkerDayPermission.PLAN,
+                wd_type_id=WorkerDay.TYPE_WORKDAY,
+            ),
+            employee_type=GroupWorkerDayPermission.OUTSOURCE_NETWORK_EMPLOYEE,
+            shop_type=GroupWorkerDayPermission.MY_NETWORK_SHOPS,
+        )
         response = self.client.post(
             f"/rest_api/worker_day/copy_approved/", 
             self.dump_data({"employee_ids": [self.employee1.id,], "dates": [dt_now,], "type": CopyApprovedSerializer.TYPE_PLAN_TO_PLAN}),
@@ -724,7 +783,7 @@ class TestOutsource(TestsHelperMixin, APITestCase):
         self.assertEqual(response.status_code, 200)
         copied = WorkerDay.objects.filter(parent_worker_day=wd).first()
         self.assertIsNotNone(copied)
-        self.assertEquals(list(copied.outsources.all()), [self.outsource_network,])
+        self.assertEqual(list(copied.outsources.all()), [self.outsource_network,])
 
     def test_copy_plan_to_fact_copy_outsources(self):
         dt_now = self.dt_now
@@ -734,6 +793,16 @@ class TestOutsource(TestsHelperMixin, APITestCase):
         wd.employee = self.employee1
         wd.employment = self.employment1
         wd.save()
+        GroupWorkerDayPermission.objects.create(
+            group=self.client_admin_group,
+            worker_day_permission=WorkerDayPermission.objects.get(
+                action=WorkerDayPermission.CREATE,
+                graph_type=WorkerDayPermission.FACT,
+                wd_type_id=WorkerDay.TYPE_WORKDAY,
+            ),
+            employee_type=GroupWorkerDayPermission.OUTSOURCE_NETWORK_EMPLOYEE,
+            shop_type=GroupWorkerDayPermission.MY_NETWORK_SHOPS,
+        )
         response = self.client.post(
             f"/rest_api/worker_day/copy_approved/", 
             self.dump_data({"employee_ids": [self.employee1.id,], "dates": [dt_now,], "type": CopyApprovedSerializer.TYPE_PLAN_TO_FACT}),
@@ -742,7 +811,7 @@ class TestOutsource(TestsHelperMixin, APITestCase):
         self.assertEqual(response.status_code, 200)
         copied = WorkerDay.objects.filter(parent_worker_day=wd).first()
         self.assertIsNotNone(copied)
-        self.assertEquals(list(copied.outsources.all()), [])
+        self.assertEqual(list(copied.outsources.all()), [])
 
     def test_copy_range_copy_outsources(self):
         dt_now = self.dt_now
@@ -751,6 +820,16 @@ class TestOutsource(TestsHelperMixin, APITestCase):
         wd.employee = self.employee1
         wd.employment = self.employment1
         wd.save()
+        GroupWorkerDayPermission.objects.create(
+            group=self.client_admin_group,
+            worker_day_permission=WorkerDayPermission.objects.get(
+                action=WorkerDayPermission.CREATE,
+                graph_type=WorkerDayPermission.PLAN,
+                wd_type_id=WorkerDay.TYPE_WORKDAY,
+            ),
+            employee_type=GroupWorkerDayPermission.OUTSOURCE_NETWORK_EMPLOYEE,
+            shop_type=GroupWorkerDayPermission.MY_NETWORK_SHOPS,
+        )
         response = self.client.post(
             f"/rest_api/worker_day/copy_range/", 
             self.dump_data({
@@ -765,7 +844,7 @@ class TestOutsource(TestsHelperMixin, APITestCase):
         self.assertEqual(response.status_code, 200)
         nawd = WorkerDay.objects.filter(dt=dt_now + timedelta(1), employee=self.employee1.id).first()
         self.assertIsNotNone(nawd)
-        self.assertEquals(list(nawd.outsources.all()), [self.outsource_network,])
+        self.assertEqual(list(nawd.outsources.all()), [self.outsource_network,])
 
     def test_exhange_copy_outsources(self):
         dt_now = self.dt_now
@@ -780,6 +859,18 @@ class TestOutsource(TestsHelperMixin, APITestCase):
             employee=self.employee2,
             employment=self.employment2,
         )
+        for wd_type_id in [WorkerDay.TYPE_WORKDAY, WorkerDay.TYPE_HOLIDAY]:
+            for action in [WorkerDayPermission.CREATE, WorkerDayPermission.DELETE]:
+                GroupWorkerDayPermission.objects.create(
+                    group=self.client_admin_group,
+                    worker_day_permission=WorkerDayPermission.objects.get(
+                        action=action,
+                        graph_type=WorkerDayPermission.PLAN,
+                        wd_type_id=wd_type_id,
+                    ),
+                    employee_type=GroupWorkerDayPermission.OUTSOURCE_NETWORK_EMPLOYEE,
+                    shop_type=GroupWorkerDayPermission.MY_NETWORK_SHOPS,
+                )
         response = self.client.post(
             f"/rest_api/worker_day/exchange/", 
             self.dump_data({
@@ -794,7 +885,7 @@ class TestOutsource(TestsHelperMixin, APITestCase):
         employee2_wd = WorkerDay.objects.filter(employee=self.employee2, dt=dt_now).first()
         self.assertIsNotNone(employee1_wd)
         self.assertIsNotNone(employee2_wd)
-        self.assertEquals(list(employee2_wd.outsources.all()), [self.outsource_network,])
+        self.assertEqual(list(employee2_wd.outsources.all()), [self.outsource_network,])
 
     def test_outsourcing_network_id__in_filter(self):
         dt_now = self.dt_now
@@ -804,14 +895,14 @@ class TestOutsource(TestsHelperMixin, APITestCase):
         vacancy4 = self._create_vacancy(dt_now, datetime.combine(dt_now, time(8)), datetime.combine(dt_now, time(20)), outsources=[self.outsource_network2.id]).json()
         WorkerDay.objects.all().update(is_approved=True)
         response = self.client.get('/rest_api/worker_day/vacancy/?limit=10&offset=0')
-        self.assertEquals(len(response.json()['results']), 4)
+        self.assertEqual(len(response.json()['results']), 4)
         response = self.client.get(f'/rest_api/worker_day/vacancy/?limit=10&offset=0&outsourcing_network_id__in={self.outsource_network.id}')
-        self.assertEquals(len(response.json()['results']), 3)
+        self.assertEqual(len(response.json()['results']), 3)
         vac_ids = list(map(lambda x: x['id'], response.json()['results']))
         self.assertCountEqual(vac_ids, [vacancy['id'], vacancy2['id'], vacancy3['id']])
         response = self.client.get(f'/rest_api/worker_day/vacancy/?limit=10&offset=0&outsourcing_network_id__in={self.outsource_network2.id}')
-        self.assertEquals(len(response.json()['results']), 2)
+        self.assertEqual(len(response.json()['results']), 2)
         vac_ids = list(map(lambda x: x['id'], response.json()['results']))
         self.assertCountEqual(vac_ids, [vacancy3['id'], vacancy4['id']])
         response = self.client.get(f'/rest_api/worker_day/vacancy/?limit=10&offset=0&outsourcing_network_id__in={self.outsource_network.id},{self.outsource_network2.id}')
-        self.assertEquals(len(response.json()['results']), 4)
+        self.assertEqual(len(response.json()['results']), 4)

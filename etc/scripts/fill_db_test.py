@@ -14,7 +14,6 @@ from src.base.models import (
     FunctionGroup,
 )
 from src.forecast.models import (
-    OperationTemplate,
     OperationType,
     PeriodClients,
     OperationTypeName,
@@ -22,17 +21,14 @@ from src.forecast.models import (
 )
 from src.timetable.models import (
     ExchangeSettings,
-    Event,
     WorkerDay,
     WorkerConstraint,
     WorkerDayCashboxDetails,
     EmploymentWorkType,
     WorkType,
     WorkTypeName,
-    Cashbox,
     AttendanceRecords,
     ShopMonthStat,
-    Notifications,
     Employment,
 )
 
@@ -85,9 +81,6 @@ def create_work_types(work_types, shop, operation_names, work_type_names):
             work_type=wt_m
         )
         wt_dict[wt_m.work_type_name.name] = wt_m
-        Cashbox.objects.create(type=wt_m, name=1)
-        Cashbox.objects.create(type=wt_m, name=2)
-        Cashbox.objects.create(type=wt_m, name=3)
     return wt_dict
 
 
@@ -380,21 +373,6 @@ def create_users_workdays(workers, work_types_dict, start_dt, days, shop, shop_s
 
     #  че то как-то не отнормированно получилось все
     EmploymentWorkType.objects.all().update(mean_speed=F('mean_speed'))
-
-
-def create_notifications():
-    list_notifications = []
-    list_event = []
-    for user in User.objects.all():
-        list_event.append(Event(
-            text='Test notifications',
-        ))
-        list_notifications.append(Notifications(
-            to_worker=user,
-            event=list_event[-1],
-        ))
-    Notifications.objects.bulk_create(list_notifications)
-    Event.objects.bulk_create(list_event)
 
 
 def main(date=None, shops=None, lang='ru', count_of_month=None):

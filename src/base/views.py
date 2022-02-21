@@ -10,19 +10,15 @@ from django.utils.translation import gettext as _
 from drf_yasg.utils import swagger_auto_schema
 from requests.exceptions import HTTPError
 from rest_auth.views import UserDetailsView
-from rest_framework import mixins
 from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.pagination import LimitOffsetPagination
 from rest_framework.parsers import MultiPartParser
-from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from rest_framework.viewsets import GenericViewSet, ReadOnlyModelViewSet
+from rest_framework.viewsets import ReadOnlyModelViewSet
 
 from src.base.filters import (
-    NotificationFilter,
-    SubscribeFilter,
     EmploymentFilter,
     BaseActiveNamedModelFilter,
     ShopScheduleFilter,
@@ -34,9 +30,6 @@ from src.base.models import (
     FunctionGroup,
     Network,
     NetworkConnect,
-    Notification,
-    Shop,
-    Subscribe,
     ShopSettings,
     WorkerPosition,
     User,
@@ -52,8 +45,6 @@ from src.base.serializers import (
     UserSerializer,
     FunctionGroupSerializer,
     WorkerPositionSerializer,
-    NotificationSerializer,
-    SubscribeSerializer,
     PasswordSerializer,
     ShopSettingsSerializer,
     NetworkSerializer,
@@ -147,9 +138,12 @@ class UserViewSet(UpdateorCreateViewSet):
 
     def get_queryset(self):
         user = self.request.user
+        additional_networks_filter = Q(allow_assign_employements_from_outsource=True)\
+            | Q(allow_choose_shop_from_client_for_employement=True)
+        if self.action in ['add_biometrics', 'delete_biometrics'] and user.network.settings_values_prop.get('allow_change_outsource_biometrics', True):
+            additional_networks_filter = Q()
         allowed_networks = list(NetworkConnect.objects.filter(
-            Q(allow_assign_employements_from_outsource=True) | 
-            Q(allow_choose_shop_from_client_for_employement=True),
+            additional_networks_filter,
             client_id=user.network_id,
         ).values_list('outsourcing_id', flat=True)) + [user.network_id]
         return User.objects.filter(
@@ -283,16 +277,15 @@ class EmployeeViewSet(UpdateorCreateViewSet):
 
     def filter_queryset(self, queryset):
         filtered_qs = super(EmployeeViewSet, self).filter_queryset(queryset=queryset)
-        if self.request.query_params.get('include_employments'):
+        include_employments = self.request.query_params.get('include_employments')
+        if include_employments and bool(distutils.util.strtobool(include_employments)):
             employments_qs = Employment.objects.all().prefetch_related(Prefetch('work_types', to_attr='work_types_list')).select_related(
-                'position',
-                'shop',
                 'employee',
-                'employee__user',
             )
             if self.request.query_params.get('shop_network__in'):
                 employments_qs = employments_qs.filter(shop__network_id__in=self.request.query_params.get('shop_network__in').split(','))
-            if self.request.query_params.get('show_constraints'):
+            show_constraints = self.request.query_params.get('show_constraints')
+            if show_constraints and bool(distutils.util.strtobool(show_constraints)):
                 employments_qs = employments_qs.prefetch_related(Prefetch('worker_constraints', to_attr='worker_constraints_list'))
             filtered_qs = filtered_qs.prefetch_related(Prefetch('employments', queryset=employments_qs, to_attr='employments_list'))
         return filtered_qs
@@ -379,38 +372,6 @@ class WorkerPositionViewSet(UpdateorCreateViewSet):
         ).filter(
             network_filter,
         )
-
-
-class SubscribeViewSet(BaseModelViewSet):
-    permission_classes = [IsAuthenticated]
-    serializer_class = SubscribeSerializer
-    filterset_class = SubscribeFilter
-    openapi_tags = ['Subscribe',]
-
-    def get_queryset(self):
-        user = self.request.user
-        return Subscribe.objects.filter(user=user)
-
-    def perform_create(self, serializer):
-        serializer.save(user=self.request.user)
-
-
-class NotificationViewSet(
-                   mixins.RetrieveModelMixin,
-                   mixins.UpdateModelMixin,
-                   mixins.ListModelMixin,
-                   GenericViewSet
-):
-    permission_classes = [IsAuthenticated]
-    serializer_class = NotificationSerializer
-    filterset_class = NotificationFilter
-    http_method_names = ['get', 'put']
-    openapi_tags = ['Notification',]
-
-    def get_queryset(self):
-        user = self.request.user
-        return Notification.objects.filter(worker=user).select_related('event', 'event__worker_day_details', 'event__shop')
-
 
 class ShopSettingsViewSet(BaseActiveNamedModelViewSet):
     pagination_class = LimitOffsetPagination
