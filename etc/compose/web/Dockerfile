@@ -75,6 +75,10 @@ RUN chmod +x -R /commands
 
 COPY ./etc/compose/web/uwsgi.ini /webapp/uwsgi.ini
 
+COPY ./etc/compose/web/logrotate/uwsgi /etc/logrotate.d/uwsgi
+COPY ./etc/compose/web/logrotate/django /etc/logrotate.d/django
+COPY ./etc/compose/web/logrotate/cron /etc/crontab
+
 ENV UWSGI_WORKERS 4
 ENV UWSGI_THREADS 1
 
