@@ -566,7 +566,7 @@ class SAWHSettingsMappingInline(admin.StackedInline):
     model = SAWHSettingsMapping
     extra = 0
 
-    filter_horizontal = ('shops', 'positions', 'exclude_positions')
+    filter_horizontal = ('shops', 'positions', 'employees', 'exclude_positions')
 
 
 @admin.register(SAWHSettings)
@@ -577,6 +577,7 @@ class SAWHSettingsAdmin(admin.ModelAdmin):
         'type',
     )
 
+    save_as = True
     inlines = (
         SAWHSettingsMappingInline,
     )
