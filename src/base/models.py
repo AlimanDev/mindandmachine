@@ -1837,6 +1837,7 @@ class SAWHSettingsMapping(AbstractModel):
     year = models.PositiveSmallIntegerField(verbose_name='Год учетного периода', default=current_year)
     shops = models.ManyToManyField('base.Shop', blank=True)
     positions = models.ManyToManyField('base.WorkerPosition', blank=True, related_name='+')
+    employees = models.ManyToManyField('base.Employee', blank=True, related_name='+')
     exclude_positions = models.ManyToManyField('base.WorkerPosition', blank=True, related_name='+')
     priority = models.PositiveSmallIntegerField(default=0)
 
