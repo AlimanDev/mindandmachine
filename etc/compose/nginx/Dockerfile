@@ -12,7 +12,8 @@ COPY ./etc/compose/nginx/logrotate/cron /cron.txt
 
 RUN echo "" >> /cron.txt
 RUN crontab /cron.txt
-RUN cron
+RUN touch /var/log/cron.log
 
+CMD cron && tail -f /var/log/cron.log
 
 ENV TZ=Europe/Moscow
