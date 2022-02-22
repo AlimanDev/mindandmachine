@@ -12,8 +12,7 @@ COPY ./etc/compose/nginx/logrotate/cron /cron.txt
 
 RUN echo "" >> /cron.txt
 RUN crontab /cron.txt
-RUN touch /var/log/cron.log
 
-CMD cron && tail -f /var/log/cron.log
+CMD cron && /usr/local/openresty/bin/openresty -g daemon off
 
 ENV TZ=Europe/Moscow
