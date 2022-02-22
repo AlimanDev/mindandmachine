@@ -1,5 +1,6 @@
 FROM openresty/openresty:latest
 
+ENV TZ=Europe/Moscow
 RUN apt-get update && apt-get install --no-install-recommends -y \
   cron logrotate \
   && apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false \
@@ -13,6 +14,7 @@ COPY ./etc/compose/nginx/logrotate/cron /cron.txt
 RUN echo "" >> /cron.txt
 RUN crontab /cron.txt
 
-CMD cron && /usr/local/openresty/bin/openresty -g daemon off
+COPY ./etc/compose/nginx/docker-entrypoint.sh .
+RUN chmod +x /docker-entrypoint.sh
 
-ENV TZ=Europe/Moscow
+ENTRYPOINT ["/docker-entrypoint.sh"]
