@@ -10,6 +10,10 @@ COPY ./etc/compose/nginx/qos.conf /etc/nginx/conf.d/qos.conf
 COPY ./etc/compose/nginx/logrotate/nginx /etc/logrotate.d/nginx
 COPY ./etc/compose/nginx/logrotate/cron /cron.txt
 
+RUN touch /var/logs/nginx/cron.log
+RUN echo "" >> /cron.txt
 RUN crontab /cron.txt
+RUN cron && tail -f /var/logs/nginx/cron.log
+
 
 ENV TZ=Europe/Moscow
