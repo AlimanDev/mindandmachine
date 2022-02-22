@@ -2,4 +2,4 @@
 
 cron
 
-nginx -g "daemon off;"
+/usr/local/openresty/bin/openresty -g "daemon off;"
