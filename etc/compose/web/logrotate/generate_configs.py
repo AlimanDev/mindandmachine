@@ -2,8 +2,7 @@ import os
 
 LOG_DIRS = {
     '/webapp/logs/uwsgi/': 
-'''
- {
+''' {
     size 10M
     rotate 100000
     maxage 90
@@ -16,8 +15,7 @@ LOG_DIRS = {
 }
 ''',
     '/webapp/logs/':
-'''
- {
+''' {
     size 100M
     rotate 100000
     maxage 90
@@ -31,7 +29,7 @@ LOG_DIRS = {
 }
 
 for dir, config in LOG_DIRS.items():
-    log_files = os.listdir(dir)
+    log_files = filter(lambda x: x.endswith('.log'), os.listdir(dir))
     for log_file in log_files:
         config_path = os.path.join('/etc/logrotate.d/', log_file.replace('.log', ''))
         if not os.path.exists(config_path):
