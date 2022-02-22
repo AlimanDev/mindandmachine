@@ -294,6 +294,11 @@ class EmployeeSerializer(BaseNetworkSerializer):
             if include_employments and bool(distutils.util.strtobool(include_employments)):
                 self.fields['employments'] = EmploymentListSerializer(
                     required=False, many=True, read_only=True, context=self.context, source='employments_list')
+            include_medical_documents = request.query_params.get('include_medical_documents')
+            if include_medical_documents and bool(distutils.util.strtobool(include_medical_documents)):
+                from src.med_docs.serializers import MedicalDocumentSerializer
+                self.fields['medical_documents'] = MedicalDocumentSerializer(
+                    required=False, many=True, read_only=True, context=self.context, source='medical_documents_list')
 
 
 class AuthUserSerializer(UserSerializer):

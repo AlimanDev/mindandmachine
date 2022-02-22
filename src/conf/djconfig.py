@@ -90,6 +90,7 @@ INSTALLED_APPS = [
     'src.exchange',
     'src.pbi',
     'mptt',
+    'src.med_docs',
 ]
 
 REST_FRAMEWORK = {
