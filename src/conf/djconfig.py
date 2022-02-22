@@ -89,6 +89,7 @@ INSTALLED_APPS = [
     'polymorphic',
     'src.exchange',
     'src.pbi',
+    'src.med_docs',
 ]
 
 REST_FRAMEWORK = {
