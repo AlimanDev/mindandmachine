@@ -78,8 +78,8 @@ RUN chmod +x -R /commands
 
 COPY ./etc/compose/web/uwsgi.ini /webapp/uwsgi.ini
 
-COPY ./etc/compose/web/logrotate/logrotate.conf /etc/logrotate.conf
 COPY ./etc/compose/web/logrotate/cron /cron.txt
+COPY ./etc/compose/web/logrotate/generate_configs.py /generate_configs.py
 
 ENV UWSGI_WORKERS 4
 ENV UWSGI_THREADS 1
