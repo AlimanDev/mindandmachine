@@ -5,8 +5,10 @@ from django.db import migrations
 
 def add_permissions(apps, schema_editor):
     permissions = [
-        ('MedicalDocumentType', 'GET', ('admin', 'admin_outsource', 'admin_client', 'urs', 'director', 'worker')),
-        ('MedicalDocument', 'GET', ('admin', 'admin_outsource', 'admin_client', 'urs', 'director', 'worker')),
+        ('MedicalDocumentType', 'GET', (
+            'admin', 'admin_outsource', 'admin_client', 'urs', 'urs_managers', 'controller', 'director', 'worker')),
+        ('MedicalDocument', 'GET', (
+            'admin', 'admin_outsource', 'admin_client', 'urs', 'urs_managers', 'controller', 'director', 'worker')),
         ('MedicalDocument', 'POST', ('admin', 'admin_outsource', 'admin_client')),
         ('MedicalDocument', 'PUT', ('admin', 'admin_outsource', 'admin_client')),
         ('MedicalDocument', 'DELETE', ('admin', 'admin_outsource', 'admin_client')),
