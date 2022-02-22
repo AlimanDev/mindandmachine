@@ -35,6 +35,6 @@ for dir, config in LOG_DIRS.items():
     for log_file in log_files:
         config_path = os.path.join('/etc/logrotate.d/', log_file.replace('.log', ''))
         if not os.path.exists(config_path):
-            with open(config_path, 'r') as f:
+            with open(config_path, 'w') as f:
                 f.write(os.path.join(dir, log_file) + config)
 
