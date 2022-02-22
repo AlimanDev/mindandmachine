@@ -1769,6 +1769,8 @@ class FunctionGroup(AbstractModel):
         ('Task', 'Задача (task)'),
         ('ShiftSchedule_batch_update_or_create', 'Массовое создание/обновление графиков работ (Создать/Обновить) (shift_schedule/batch_update_or_create/)'),
         ('ShiftScheduleInterval_batch_update_or_create', 'Массовое создание/обновление интервалов графиков работ сотрудников (Создать/Обновить) (shift_schedule/batch_update_or_create/)'),
+        ('MedicalDocumentType', 'Тип медицинского документа (medical_document_type)'),
+        ('MedicalDocument', 'Период актуальности медицинского документа (medical_document)'),
     )
 
     METHODS_TUPLE = (
