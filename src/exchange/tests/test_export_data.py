@@ -1,8 +1,11 @@
+import json
 import os
 import tempfile
-from datetime import datetime, time, date
+from datetime import datetime, time, date, timedelta
+from unittest import mock
+from celery.app.task import Task
 
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from freezegun import freeze_time
 
 from src.base.tests.factories import (
@@ -11,6 +14,7 @@ from src.base.tests.factories import (
     EmploymentFactory,
 )
 from src.exchange.models import SystemExportStrategy, ExportJob, LocalFilesystemConnector
+from src.exchange.tasks import run_export_job
 from src.forecast.models import (
     OperationTypeName,
     OperationType,
@@ -110,3 +114,47 @@ class TestExportData(TestsHelperMixin, TestCase):
             filepath = os.path.join(tmp_dir, 'plan_and_fact_hours_2021-09-01-2021-09-30.xlsx')
             self.assertTrue(os.path.exists(filepath))
             self.assertTrue(os.path.getsize(filepath) > 0)
+
+class TestExportRetry(TestCase):
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.local_fs_connector = LocalFilesystemConnector.objects.create(
+            name='local',
+        )
+        cls.system_export_strategy = SystemExportStrategy.objects.create(
+                strategy_type=SystemExportStrategy.PLAN_AND_FACT_HOURS_TABLE,
+                period=Period.objects.create(
+                    count_of_periods=1,
+                    period=Period.ACC_PERIOD_MONTH,
+                    period_start=Period.PERIOD_START_CURRENT_MONTH,
+                )
+            )
+        cls.export_job = ExportJob.objects.create(
+            fs_connector=cls.local_fs_connector,
+            export_strategy=cls.system_export_strategy,
+            retry_attempts=json.dumps({1: 8600, 3: 45}),
+        )
+    
+    @freeze_time('2022-02-16')
+    @override_settings(CELERY_TASK_ALWAYS_EAGER=True)
+    @mock.patch.object(Task, 'retry', side_effect=Task.retry, autospec=Task.retry) # чтобы отследить вызовы, не трогая функционал
+    @mock.patch.object(ExportJob, 'run', side_effect=Exception())
+    @mock.patch('celery.app.task.Context.called_directly', new_callable=mock.PropertyMock)
+    def test_retry(self, called_directly, mock_run, mock_retry):
+        dttm = datetime(2022, 2, 16)
+        called_directly.return_value = False
+        run_export_job.delay(self.export_job.id)
+        self.assertEqual(mock_retry.call_count, 4)
+        mock_retry.assert_has_calls(
+            [
+                mock.call(mock.ANY, max_retries=3, eta=dttm + timedelta(seconds=8600), exc=mock.ANY),
+                mock.call(mock.ANY, max_retries=3, eta=dttm + timedelta(seconds=3600), exc=mock.ANY),
+                mock.call(mock.ANY, max_retries=3, eta=dttm + timedelta(seconds=45), exc=mock.ANY),
+                mock.call(mock.ANY, max_retries=3, eta=dttm + timedelta(seconds=3600), exc=mock.ANY),
+            ]
+        )
+        mock_retry.reset_mock()
+        mock_run.side_effect = [Exception(), 'OK']
+        run_export_job.delay(self.export_job.id)
+        self.assertEqual(mock_retry.call_count, 1)

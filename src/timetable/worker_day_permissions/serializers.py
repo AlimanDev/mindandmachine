@@ -1,10 +1,11 @@
 from rest_framework import serializers
 
 from src.base.models import Shop
+from src.base.serializers import BaseModelSerializer
 from src.timetable.models import WorkerDayPermission, GroupWorkerDayPermission, WorkerDay
 
 
-class WorkerDayPermissionSerializer(serializers.ModelSerializer):
+class WorkerDayPermissionSerializer(BaseModelSerializer):
     class Meta:
         model = WorkerDayPermission
         fields = (
@@ -14,7 +15,7 @@ class WorkerDayPermissionSerializer(serializers.ModelSerializer):
         )
 
 
-class GroupWorkerDayPermissionSerializer(serializers.ModelSerializer):
+class GroupWorkerDayPermissionSerializer(BaseModelSerializer):
     worker_day_permission = WorkerDayPermissionSerializer()
 
     class Meta:
@@ -42,7 +43,7 @@ class WorkerDayPermissionQueryStringSerializer(serializers.Serializer):
         )
 
 
-class WsPermissionDataSerializer(serializers.ModelSerializer):
+class WsPermissionDataSerializer(BaseModelSerializer):
     class Meta:
         model = WorkerDay
         fields = (
