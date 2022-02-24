@@ -175,14 +175,17 @@ class VacancyFilter(FilterSetWithInitial):
 
     def filter_only_available(self, queryset, name, value):
         if value:
-            approved_subq = WorkerDay.objects.filter(
-                dt=OuterRef('dt'),
-                employee__user_id=self.request.user.id,
-                is_approved=True,
-                is_fact=False,
-            ).exclude(
-                type__is_work_hours=True,
-                is_vacancy=False,
+            approved_dates = list(
+                WorkerDay.objects.filter(
+                    dt__gte=self.form.data['dt_from'],
+                    dt__lte=self.form.data['dt_to'],
+                    employee__user_id=self.request.user.id,
+                    is_approved=True,
+                    is_fact=False,
+                ).exclude(
+                    type__is_work_hours=True,
+                    is_vacancy=False,
+                ).values_list('dt', flat=True)
             )
             active_employment_subq = Employment.objects.filter(
                 Q(dt_hired__lte=OuterRef('dt')) | Q(dt_hired__isnull=True),
@@ -190,11 +193,10 @@ class VacancyFilter(FilterSetWithInitial):
                 employee__user_id=self.request.user.id,
                 employee__user__network_id=self.request.user.network_id,
             )
-            current_network_filter = Q(shop__network_id=self.request.user.network_id, approved_exists=True)
+            current_network_filter = Q(shop__network_id=self.request.user.network_id, dt__in=approved_dates)
             if not self.request.user.network.allow_workers_confirm_outsource_vacancy:
                 current_network_filter &= ~Q(is_outsource=True)
             return queryset.annotate(
-                approved_exists=Exists(approved_subq),
                 active_employment_exists=Exists(active_employment_subq),
                 has_overlap=Exists(WorkerDay.get_overlap_qs(self.request.user.id)),
             ).filter(
