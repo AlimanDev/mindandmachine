@@ -5836,7 +5836,24 @@ class TestVacancy(TestsHelperMixin, APITestCase):
         self.assertEqual(response_data.get('shop__name'), self.shop.name)
         self.assertFalse('shop__code' in response_data)
         self.assertFalse('shop__name' in response_data['worker_day_details'][0])
-
+    
+    def test_pagination(self):
+        for i in range(10):
+            WorkerDayFactory(
+                shop=self.shop,
+                is_approved=True,
+                is_vacancy=True,
+                dt=self.dt_now,
+                dttm_work_start=datetime.combine(self.dt_now, time(10)),
+                dttm_work_end=datetime.combine(self.dt_now, time(20)),
+                employee=None,
+                employment=None,
+                type_id=WorkerDay.TYPE_WORKDAY,
+            )
+        response = self.client.get(f"{self.get_url('WorkerDay-vacancy')}?limit=100&offset=0&is_vacant=true")
+        self.assertEqual(response.json()['count'], 11)
+        response = self.client.get(f"{self.get_url('WorkerDay-vacancy')}?limit=5&offset=0&is_vacant=true&return_total_count=false")
+        self.assertEqual(response.json()['count'], 5)
 
 
 class TestAditionalFunctions(TestsHelperMixin, APITestCase):

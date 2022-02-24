@@ -21,13 +21,13 @@ from django_filters import utils
 from drf_yasg.utils import swagger_auto_schema
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied
-from rest_framework.pagination import LimitOffsetPagination
 from rest_framework.response import Response
 from rest_framework.serializers import ValidationError
 
 from src.base.exceptions import FieldError
 from src.base.models import Employment, Shop, Group, User, Employee
 from src.base.permissions import WdPermission
+from src.base.pagination import LimitOffsetPaginationWithOptionalCount
 from src.base.views_abstract import BaseModelViewSet
 from src.events.signals import event_signal
 from src.reports.utils.overtimes_undertimes import overtimes_undertimes_xlsx
@@ -815,7 +815,7 @@ class WorkerDayViewSet(BaseModelViewSet):
         if not filterset_class.form.is_valid():
             raise utils.translate_validation(filterset_class.errors)
         
-        paginator = LimitOffsetPagination()
+        paginator = LimitOffsetPaginationWithOptionalCount()
         allowed_outsource_network_subq = WorkerDayOutsourceNetwork.objects.filter(
             workerday_id=OuterRef('id'),
             network_id=self.request.user.network_id,
