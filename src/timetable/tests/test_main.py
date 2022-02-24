@@ -7372,6 +7372,45 @@ class TestFineLogic(APITestCase):
         fact_wd_dir_bad = self._create_or_update_worker_day(self.dir[2], datetime.combine(dt, time(9, 56)), datetime.combine(dt, time(20)), is_fact=True, closest_plan_approved_id=plan_wd_dir.id)
         self.assertEqual(fact_wd_dir_bad.work_hours, timedelta(hours=7, minutes=30))
 
+    def _test_fine_case(self, tm_work_start_paln, tm_work_end_plan, tm_work_start_fact, tm_work_end_fact, work_hours):
+        WorkerDay.objects.all().delete()
+        dt = date.today()
+        plan_wd = self._create_or_update_worker_day(
+            self.cashier[2], 
+            datetime.combine(dt, tm_work_start_paln), 
+            datetime.combine(dt, tm_work_end_plan), 
+        )
+        fact_wd = self._create_or_update_worker_day(
+            self.cashier[2], 
+            datetime.combine(dt, tm_work_start_fact), 
+            datetime.combine(dt, tm_work_end_fact), 
+            is_fact=True,
+            closest_plan_approved_id=plan_wd.id,
+        )
+        self.assertEqual(fact_wd.work_hours, work_hours)
+
+    def test_fine_settings_round(self):
+        self.network.fines_settings = json.dumps(
+           {
+                r'.*': {
+                    'arrive_step': 30,
+                    'departure_step': 30,
+                },
+            }
+        )
+        self.network.only_fact_hours_that_in_approved_plan = True
+        self.network.save()
+
+        self._test_fine_case(time(8), time(20), time(7, 55), time(20, 1), timedelta(hours=11, minutes=30))
+        self._test_fine_case(time(8), time(20), time(8), time(20), timedelta(hours=11, minutes=30))
+        self._test_fine_case(time(8), time(20), time(10), time(19), timedelta(hours=8, minutes=30))
+        self._test_fine_case(time(8), time(20), time(10), time(23), timedelta(hours=9, minutes=30))
+        self._test_fine_case(time(15), time(22), time(8), time(15), timedelta(0))
+        self._test_fine_case(time(8), time(20), time(8, 3), time(20, 23), timedelta(hours=11))
+        self._test_fine_case(time(8), time(20), time(8, 3), time(19, 23), timedelta(hours=10))
+        self._test_fine_case(time(8), time(20), time(8, 50), time(19, 23), timedelta(hours=9, minutes=30))
+        self._test_fine_case(time(8), time(20), time(8, 50), time(19, 37), timedelta(hours=10))
+
 
 class TestUnaccountedOvertimesAPI(APITestCase, TestsHelperMixin):
     USER_USERNAME = "user1"
