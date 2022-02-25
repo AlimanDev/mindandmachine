@@ -566,14 +566,17 @@ class TestOperationTypeRelation(APITestCase, TestsHelperMixin):
         operation_type1 = OperationTypeName.objects.create(
             name='Formula 1',
             do_forecast=OperationTypeName.FORECAST_FORMULA,
+            network=self.network,
         )
         operation_type2 = OperationTypeName.objects.create(
             name='Formula 2',
             do_forecast=OperationTypeName.FORECAST_FORMULA,
+            network=self.network,
         )
         feature_serie_name = OperationTypeName.objects.create(
             name='Feature serie',
             do_forecast=OperationTypeName.FEATURE_SERIE,
+            network=self.network,
         )
         def _create_operation_type_template(o_name):
             return OperationTypeTemplate.objects.create(

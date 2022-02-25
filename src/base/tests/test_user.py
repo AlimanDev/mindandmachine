@@ -11,8 +11,8 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
     @classmethod
     def setUpTestData(cls):
         cls.create_departments_and_users()
-        cls.wt_name = WorkTypeName.objects.create(name='test_name', code='test_code')
-        cls.wt_name2 = WorkTypeName.objects.create(name='test_name2', code='test_code2')
+        cls.wt_name = WorkTypeName.objects.create(name='test_name', code='test_code', network=cls.network)
+        cls.wt_name2 = WorkTypeName.objects.create(name='test_name2', code='test_code2', network=cls.network)
         cls.work_type1 = WorkType.objects.create(work_type_name=cls.wt_name, shop=cls.shop)
         cls.work_type2 = WorkType.objects.create(work_type_name=cls.wt_name2, shop=cls.shop)
         cls.work_type3 = WorkType.objects.create(work_type_name=cls.wt_name, shop=cls.shop2)
