@@ -19,17 +19,16 @@ from src.reports.tasks import cron_report, fill_user_shop_groups, fill_user_subo
 from src.timetable.models import ScheduleDeviations, WorkerDay, WorkerDayOutsourceNetwork, WorkerDayType
 from src.timetable.tests.factories import WorkerDayFactory
 from src.util.mixins.tests import TestsHelperMixin
-from src.util.test import create_departments_and_users
 
 
-class TestReportConfig(APITestCase):
+class TestReportConfig(APITestCase, TestsHelperMixin):
     USER_USERNAME = "user1"
     USER_EMAIL = "q@q.q"
     USER_PASSWORD = "4242"
 
-    def setUp(self):
-        super().setUp()
-        create_departments_and_users(self)
+    @classmethod
+    def setUpTestData(cls):
+        cls.create_departments_and_users()
 
     def _create_config(self, count_of_periods, period, period_start=Period.PERIOD_START_YESTERDAY):
         period, _period_created = Period.objects.get_or_create(
@@ -416,20 +415,22 @@ class TestReportsViewSet(TestsHelperMixin, APITestCase):
         self.assertEqual(list(df.iloc[2, 5:].values), [10.75, 21.50, 32.25])
 
 
-class TestScheduleDeviation(APITestCase):
+class TestScheduleDeviation(APITestCase, TestsHelperMixin):
     USER_USERNAME = "user1"
     USER_EMAIL = "q@q.q"
     USER_PASSWORD = "4242"
 
-    def setUp(self):
-        super().setUp()
-        create_departments_and_users(self)
-        self.position = WorkerPosition.objects.create(
+    @classmethod
+    def setUpTestData(cls):
+        cls.create_departments_and_users()
+        cls.position = WorkerPosition.objects.create(
             name='Должность сотрудника',
-            network=self.network,
+            network=cls.network,
         )
-        self.employment1.position = self.position
-        self.employment1.save()
+        cls.employment1.position = cls.position
+        cls.employment1.save()
+
+    def setUp(self):
         self.client.force_authenticate(self.user1)
 
     def assertHours(self, 

@@ -11,6 +11,7 @@ from src.base import urls as base_api
 from src.conf.djconfig import DEBUG
 from src.forecast import urls as forecast_api
 from src.forecast.views import RecalcLoadAdminView, UploadDemandAdminView
+from src.med_docs import urls as med_docs_urls
 from src.misc import urls as misc_api
 from src.recognition.urls import router as recognition_router
 from src.recognition.views import DownloadViolatorsReportAdminView
@@ -41,7 +42,8 @@ urlpatterns = [
         forecast_api.urlpatterns +
         misc_api.urlpatterns +
         task_urls.urlpatterns +
-        reports_urls.urlpatterns,
+        reports_urls.urlpatterns +
+        med_docs_urls.urlpatterns,
     )),
 ]
 

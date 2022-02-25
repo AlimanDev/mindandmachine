@@ -1,40 +1,36 @@
 from datetime import datetime, date, time
-from dateutil.relativedelta import relativedelta
 
 from rest_framework import status
 from rest_framework.test import APITestCase
-
-from src.util.test import create_departments_and_users
+from src.util.mixins.tests import TestsHelperMixin
 
 from src.timetable.models import VacancyBlackList, WorkerDay, WorkerDayCashboxDetails, WorkType, WorkTypeName
-from src.util.models_converter import Converter
 from src.timetable.vacancy.utils import confirm_vacancy
 
 
 
-class TestVacancyBlackList(APITestCase):
+class TestVacancyBlackList(APITestCase, TestsHelperMixin):
     USER_USERNAME = "user1"
     USER_EMAIL = "q@q.q"
     USER_PASSWORD = "4242"
 
-    def setUp(self):
-        super().setUp()
+    @classmethod
+    def setUpTestData(cls):
+        cls.url = '/rest_api/vacancy_black_list/'
 
-        self.url = '/rest_api/vacancy_black_list/'
-
-        create_departments_and_users(self)
+        cls.create_departments_and_users()
         
-        
-        self.black_list = VacancyBlackList.objects.create(
-            shop_id=self.shop.id,
+        cls.black_list = VacancyBlackList.objects.create(
+            shop_id=cls.shop.id,
             symbol='1234',
         )
 
-        self.black_list2 = VacancyBlackList.objects.create(
-            shop_id=self.shop.id,
+        cls.black_list2 = VacancyBlackList.objects.create(
+            shop_id=cls.shop.id,
             symbol='4321',
         )
 
+    def setUp(self):
         self.client.force_authenticate(user=self.user1)
 
     def test_get_list(self):

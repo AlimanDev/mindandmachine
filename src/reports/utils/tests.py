@@ -12,22 +12,21 @@ from rest_framework.test import APITestCase
 from src.reports.utils.create_urv_stat import urv_stat_v1
 from src.reports.utils.urv_violators import urv_violators_report, urv_violators_report_xlsx, urv_violators_report_xlsx_v2
 from src.reports.utils.unaccounted_overtime import get_unaccounted_overtimes, unaccounted_overtimes_xlsx
-from src.util.test import create_departments_and_users
+from src.util.mixins.tests import TestsHelperMixin
 import pandas as pd
 from datetime import date, datetime, time, timedelta
-from src.timetable.models import PlanAndFactHours, ProdCal, WorkerDay, AttendanceRecords
-from django.test import override_settings
+from src.timetable.models import ProdCal, WorkerDay, AttendanceRecords
 
 
-class TestUrvFiles(APITestCase):
+class TestUrvFiles(APITestCase, TestsHelperMixin):
     USER_USERNAME = "user1"
     USER_EMAIL = "q@q.q"
     USER_PASSWORD = "4242"
 
-    def setUp(self):
-        super().setUp()
-        create_departments_and_users(self)
-        self.network.set_settings_value(
+    @classmethod
+    def setUpTestData(cls):
+        cls.create_departments_and_users()
+        cls.network.set_settings_value(
             'shop_name_form', 
             {
                 'singular': {
@@ -37,60 +36,45 @@ class TestUrvFiles(APITestCase):
                 }
             }
         )
-        self.network.save()
-        self.dt = date.today()
-        self._create_worker_day(
-            self.employment2,
-            dttm_work_start=datetime.combine(self.dt, time(13)),
-            dttm_work_end=datetime.combine(self.dt + timedelta(1), time(1)),
+        cls.network.save()
+        cls.dt = date.today()
+        cls._create_worker_day(
+            cls.employment2,
+            dttm_work_start=datetime.combine(cls.dt, time(13)),
+            dttm_work_end=datetime.combine(cls.dt + timedelta(1), time(1)),
             is_approved=True,
         )
-        self._create_worker_day(
-            self.employment3,
-            dttm_work_start=datetime.combine(self.dt, time(8)),
-            dttm_work_end=datetime.combine(self.dt, time(20)),
+        cls._create_worker_day(
+            cls.employment3,
+            dttm_work_start=datetime.combine(cls.dt, time(8)),
+            dttm_work_end=datetime.combine(cls.dt, time(20)),
             is_approved=True,
         )
-        self._create_att_record(
-            self.employment2,
-            datetime.combine(self.dt, time(12, 54)),
+        cls._create_att_record(
+            cls.employment2,
+            datetime.combine(cls.dt, time(12, 54)),
             AttendanceRecords.TYPE_COMING,
         )
-        self._create_att_record(
-            self.employment2,
-            datetime.combine(self.dt + timedelta(1), time(0, 13)),
+        cls._create_att_record(
+            cls.employment2,
+            datetime.combine(cls.dt + timedelta(1), time(0, 13)),
             AttendanceRecords.TYPE_LEAVING,
         )
-        self._create_att_record(
-            self.employment2,
-            datetime.combine(self.dt + timedelta(1), time(0, 14)),
+        cls._create_att_record(
+            cls.employment2,
+            datetime.combine(cls.dt + timedelta(1), time(0, 14)),
             AttendanceRecords.TYPE_LEAVING,
         )
-        self._create_att_record(
-            self.employment3,
-            datetime.combine(self.dt, time(8, 54)),
+        cls._create_att_record(
+            cls.employment3,
+            datetime.combine(cls.dt, time(8, 54)),
             AttendanceRecords.TYPE_COMING,
         )
-        self.network.skip_leaving_tick = True
-        self.network.save()
+        cls.network.skip_leaving_tick = True
+        cls.network.save()
 
-    def _create_worker_day(self, employment, dt=None, is_fact=False, is_approved=False, dttm_work_start=None, dttm_work_end=None, type_id=WorkerDay.TYPE_WORKDAY):
-        if not dt:
-            dt = self.dt
-        return WorkerDay.objects.create(
-            shop_id=employment.shop_id,
-            type_id=type_id,
-            employment=employment,
-            employee=employment.employee,
-            dt=dt,
-            dttm_work_start=dttm_work_start,
-            dttm_work_end=dttm_work_end,
-            is_fact=is_fact,
-            is_approved=is_approved,
-            created_by=self.user1,
-        )
-
-    def _create_att_record(self, employment, dttm, type):
+    @classmethod
+    def _create_att_record(cls, employment, dttm, type):
         return AttendanceRecords.objects.create(
             shop_id=employment.shop_id,
             user_id=employment.employee.user_id,
@@ -304,17 +288,17 @@ class TestUrvFiles(APITestCase):
         self.assertEqual(dict(df.iloc[0, :6]), data)
 
 
-class TestUnaccountedOvertime(APITestCase):
+class TestUnaccountedOvertime(APITestCase, TestsHelperMixin):
     USER_USERNAME = "user1"
     USER_EMAIL = "q@q.q"
     USER_PASSWORD = "4242"
 
-    def setUp(self):
-        super().setUp()
-        create_departments_and_users(self)
-        self.dt = date.today()
-        self.network.only_fact_hours_that_in_approved_plan = True
-        self.network.set_settings_value(
+    @classmethod
+    def setUpTestData(cls):
+        cls.create_departments_and_users()
+        cls.dt = date.today()
+        cls.network.only_fact_hours_that_in_approved_plan = True
+        cls.network.set_settings_value(
             'shop_name_form', 
             {
                 'singular': {
@@ -324,85 +308,66 @@ class TestUnaccountedOvertime(APITestCase):
                 }
             }
         )
-        self.network.save()
-        pa1 = self._create_worker_day(
-            self.employment1,
-            dttm_work_start=datetime.combine(self.dt, time(14)),
-            dttm_work_end=datetime.combine(self.dt, time(20)),
+        cls.network.save()
+        pa1 = cls._create_worker_day(
+            cls.employment1,
+            dttm_work_start=datetime.combine(cls.dt, time(14)),
+            dttm_work_end=datetime.combine(cls.dt, time(20)),
             is_approved=True,
         )
-        pa2 = self._create_worker_day(
-            self.employment2,
-            dttm_work_start=datetime.combine(self.dt, time(13)),
-            dttm_work_end=datetime.combine(self.dt + timedelta(1), time(1)),
+        pa2 = cls._create_worker_day(
+            cls.employment2,
+            dttm_work_start=datetime.combine(cls.dt, time(13)),
+            dttm_work_end=datetime.combine(cls.dt + timedelta(1), time(1)),
             is_approved=True,
         )
-        pa3 = self._create_worker_day(
-            self.employment3,
-            dttm_work_start=datetime.combine(self.dt, time(8)),
-            dttm_work_end=datetime.combine(self.dt, time(20)),
+        pa3 = cls._create_worker_day(
+            cls.employment3,
+            dttm_work_start=datetime.combine(cls.dt, time(8)),
+            dttm_work_end=datetime.combine(cls.dt, time(20)),
             is_approved=True,
         )
-        pa4 = self._create_worker_day(
-            self.employment4,
-            dttm_work_start=datetime.combine(self.dt, time(8)),
-            dttm_work_end=datetime.combine(self.dt, time(20)),
+        pa4 = cls._create_worker_day(
+            cls.employment4,
+            dttm_work_start=datetime.combine(cls.dt, time(8)),
+            dttm_work_end=datetime.combine(cls.dt, time(20)),
             is_approved=True,
         )
         # меньше часа переработка
-        self._create_worker_day(
-            self.employment1,
-            dttm_work_start=datetime.combine(self.dt, time(13, 45)),
-            dttm_work_end=datetime.combine(self.dt, time(20, 15)),
+        cls._create_worker_day(
+            cls.employment1,
+            dttm_work_start=datetime.combine(cls.dt, time(13, 45)),
+            dttm_work_end=datetime.combine(cls.dt, time(20, 15)),
             is_approved=True,
             is_fact=True,
             closest_plan_approved_id=pa1.id,
         )
         # переработка 3 часа
-        self._create_worker_day(
-            self.employment2,
-            dttm_work_start=datetime.combine(self.dt, time(12)),
-            dttm_work_end=datetime.combine(self.dt + timedelta(1), time(3)),
+        cls._create_worker_day(
+            cls.employment2,
+            dttm_work_start=datetime.combine(cls.dt, time(12)),
+            dttm_work_end=datetime.combine(cls.dt + timedelta(1), time(3)),
             is_approved=True,
             is_fact=True,
             closest_plan_approved_id=pa2.id,
         )
         # нет переработки
-        self._create_worker_day(
-            self.employment3,
-            dttm_work_start=datetime.combine(self.dt, time(8)),
-            dttm_work_end=datetime.combine(self.dt, time(20)),
+        cls._create_worker_day(
+            cls.employment3,
+            dttm_work_start=datetime.combine(cls.dt, time(8)),
+            dttm_work_end=datetime.combine(cls.dt, time(20)),
             is_approved=True,
             is_fact=True,
             closest_plan_approved_id=pa3.id,
         )
         # переработка 1 час
-        self._create_worker_day(
-            self.employment4,
-            dttm_work_start=datetime.combine(self.dt, time(7)),
-            dttm_work_end=datetime.combine(self.dt, time(20, 30)),
+        cls._create_worker_day(
+            cls.employment4,
+            dttm_work_start=datetime.combine(cls.dt, time(7)),
+            dttm_work_end=datetime.combine(cls.dt, time(20, 30)),
             is_approved=True,
             is_fact=True,
             closest_plan_approved_id=pa4.id,
-        )
-
-
-    def _create_worker_day(
-            self, employment, dt=None, is_fact=False, is_approved=False, dttm_work_start=None, dttm_work_end=None, type_id=WorkerDay.TYPE_WORKDAY, closest_plan_approved_id=None):
-        if not dt:
-            dt = self.dt
-        return WorkerDay.objects.create(
-            shop_id=employment.shop_id,
-            type_id=type_id,
-            employment=employment,
-            employee=employment.employee,
-            dt=dt,
-            dttm_work_start=dttm_work_start,
-            dttm_work_end=dttm_work_end,
-            is_fact=is_fact,
-            is_approved=is_approved,
-            created_by=self.user1,
-            closest_plan_approved_id=closest_plan_approved_id,
         )
 
     def test_unaccounted_overtimes(self):
@@ -445,83 +410,66 @@ class TestUnaccountedOvertime(APITestCase):
         self.assertEqual(dict(df.iloc[1]), data2)
 
 
-class TestOvertimesUndertimes(APITestCase):
+class TestOvertimesUndertimes(APITestCase, TestsHelperMixin):
     USER_USERNAME = "user1"
     USER_EMAIL = "q@q.q"
     USER_PASSWORD = "4242"
-
-    def setUp(self):
-        super().setUp()
-        create_departments_and_users(self)
-        self.dt = date.today()
-        self._create_worker_day(
-            self.employment1,
-            dttm_work_start=datetime.combine(self.dt, time(14)),
-            dttm_work_end=datetime.combine(self.dt, time(20)),
+    
+    @classmethod
+    def setUpTestData(cls):
+        cls.create_departments_and_users()
+        cls.dt = date.today()
+        cls._create_worker_day(
+            cls.employment1,
+            dttm_work_start=datetime.combine(cls.dt, time(14)),
+            dttm_work_end=datetime.combine(cls.dt, time(20)),
             is_approved=True,
         )
-        self._create_worker_day(
-            self.employment2,
-            dttm_work_start=datetime.combine(self.dt, time(13)),
-            dttm_work_end=datetime.combine(self.dt + timedelta(1), time(1)),
+        cls._create_worker_day(
+            cls.employment2,
+            dttm_work_start=datetime.combine(cls.dt, time(13)),
+            dttm_work_end=datetime.combine(cls.dt + timedelta(1), time(1)),
             is_approved=True,
         )
-        self._create_worker_day(
-            self.employment3,
-            dttm_work_start=datetime.combine(self.dt, time(8)),
-            dttm_work_end=datetime.combine(self.dt, time(20)),
+        cls._create_worker_day(
+            cls.employment3,
+            dttm_work_start=datetime.combine(cls.dt, time(8)),
+            dttm_work_end=datetime.combine(cls.dt, time(20)),
             is_approved=True,
         )
-        self._create_worker_day(
-            self.employment4,
-            dttm_work_start=datetime.combine(self.dt, time(8)),
-            dttm_work_end=datetime.combine(self.dt, time(20)),
+        cls._create_worker_day(
+            cls.employment4,
+            dttm_work_start=datetime.combine(cls.dt, time(8)),
+            dttm_work_end=datetime.combine(cls.dt, time(20)),
             is_approved=True,
         )
-        self._create_worker_day(
-            self.employment1,
-            dttm_work_start=datetime.combine(self.dt, time(13, 45)),
-            dttm_work_end=datetime.combine(self.dt, time(20, 15)),
-            is_approved=True,
-            is_fact=True,
-        )
-        self._create_worker_day(
-            self.employment2,
-            dttm_work_start=datetime.combine(self.dt, time(12)),
-            dttm_work_end=datetime.combine(self.dt + timedelta(1), time(3)),
+        cls._create_worker_day(
+            cls.employment1,
+            dttm_work_start=datetime.combine(cls.dt, time(13, 45)),
+            dttm_work_end=datetime.combine(cls.dt, time(20, 15)),
             is_approved=True,
             is_fact=True,
         )
-        self._create_worker_day(
-            self.employment3,
-            dttm_work_start=datetime.combine(self.dt, time(8)),
-            dttm_work_end=datetime.combine(self.dt, time(20)),
+        cls._create_worker_day(
+            cls.employment2,
+            dttm_work_start=datetime.combine(cls.dt, time(12)),
+            dttm_work_end=datetime.combine(cls.dt + timedelta(1), time(3)),
             is_approved=True,
             is_fact=True,
         )
-        self._create_worker_day(
-            self.employment4,
-            dttm_work_start=datetime.combine(self.dt, time(7)),
-            dttm_work_end=datetime.combine(self.dt, time(20, 30)),
+        cls._create_worker_day(
+            cls.employment3,
+            dttm_work_start=datetime.combine(cls.dt, time(8)),
+            dttm_work_end=datetime.combine(cls.dt, time(20)),
             is_approved=True,
             is_fact=True,
         )
-
-
-    def _create_worker_day(self, employment, dt=None, is_fact=False, is_approved=False, dttm_work_start=None, dttm_work_end=None, type_id=WorkerDay.TYPE_WORKDAY):
-        if not dt:
-            dt = self.dt
-        return WorkerDay.objects.create(
-            shop_id=employment.shop_id,
-            type_id=type_id,
-            employment=employment,
-            employee=employment.employee,
-            dt=dt,
-            dttm_work_start=dttm_work_start,
-            dttm_work_end=dttm_work_end,
-            is_fact=is_fact,
-            is_approved=is_approved,
-            created_by=self.user1,
+        cls._create_worker_day(
+            cls.employment4,
+            dttm_work_start=datetime.combine(cls.dt, time(7)),
+            dttm_work_end=datetime.combine(cls.dt, time(20, 30)),
+            is_approved=True,
+            is_fact=True,
         )
 
     def _test_accounting_period(self, period_step):
@@ -613,9 +561,10 @@ class TestOvertimesUndertimes(APITestCase):
             is_approved=True,
             is_fact=True,
         )
+        ProductionDay.objects.filter(dt=self.dt - timedelta(1)).update(is_celebration=False)
         data = self._test_accounting_period(12)
         self.assertEqual(data['data'][self.employee1.id]['plan_sum'], 5.5)
-        self.assertEqual(data['data'][self.employee1.id]['fact_sum'], 10.4) # может падать 1 января
+        self.assertEqual(data['data'][self.employee1.id]['fact_sum'], 10.4)
         ProductionDay.objects.filter(dt=self.dt - timedelta(1)).update(is_celebration=True)
         data = self._test_accounting_period(12)
         self.assertEqual(data['data'][self.employee1.id]['plan_sum'], 5.5)
@@ -707,67 +656,55 @@ class TestOvertimesUndertimes(APITestCase):
         self._test_accounting_period_xlsx(12)
 
 
-class TestPivotTabel(APITestCase):
+class TestPivotTabel(APITestCase, TestsHelperMixin):
     USER_USERNAME = "user1"
     USER_EMAIL = "q@q.q"
     USER_PASSWORD = "4242"
 
-    def setUp(self):
-        super().setUp()
-        create_departments_and_users(self)
-        self.dt = date.today()
+    @classmethod
+    def setUpTestData(cls):
+        cls.create_departments_and_users()
+        cls.dt = date.today()
 
-        self.employee1.tabel_code = 'employee1_tabel_code'
-        self.employee3.tabel_code = 'employee3_tabel_code'
-        self.employee4.tabel_code = 'employee4_tabel_code'
-        self.employee1.save()
-        self.employee3.save()
-        self.employee4.save()   
+        cls.employee1.tabel_code = 'employee1_tabel_code'
+        cls.employee3.tabel_code = 'employee3_tabel_code'
+        cls.employee4.tabel_code = 'employee4_tabel_code'
+        cls.employee1.save()
+        cls.employee3.save()
+        cls.employee4.save()   
 
-        self._create_worker_day(
-            self.employment1,
-            dttm_work_start=datetime.combine(self.dt, time(13, 45)),
-            dttm_work_end=datetime.combine(self.dt, time(20, 15)),
+        cls._create_worker_day(
+            cls.employment1,
+            dttm_work_start=datetime.combine(cls.dt, time(13, 45)),
+            dttm_work_end=datetime.combine(cls.dt, time(20, 15)),
             is_approved=True,
             is_fact=True,
+            created_by=cls.user1,
         )
-        self._create_worker_day(
-            self.employment2,
-            dttm_work_start=datetime.combine(self.dt, time(12)),
-            dttm_work_end=datetime.combine(self.dt + timedelta(1), time(3)),
+        cls._create_worker_day(
+            cls.employment2,
+            dttm_work_start=datetime.combine(cls.dt, time(12)),
+            dttm_work_end=datetime.combine(cls.dt + timedelta(1), time(3)),
             is_approved=True,
             is_fact=True,
+            created_by=cls.user1,
         )
-        self._create_worker_day(
-            self.employment3,
-            dttm_work_start=datetime.combine(self.dt, time(8)),
-            dttm_work_end=datetime.combine(self.dt, time(20)),
+        cls._create_worker_day(
+            cls.employment3,
+            dttm_work_start=datetime.combine(cls.dt, time(8)),
+            dttm_work_end=datetime.combine(cls.dt, time(20)),
             is_approved=True,
             is_fact=True,
+            created_by=cls.user1,
         )
-        self._create_worker_day(
-            self.employment4,
-            dt=self.dt + timedelta(1),
-            dttm_work_start=datetime.combine(self.dt + timedelta(1), time(7)),
-            dttm_work_end=datetime.combine(self.dt + timedelta(1), time(20, 30)),
+        cls._create_worker_day(
+            cls.employment4,
+            dttm_work_start=datetime.combine(cls.dt + timedelta(1), time(7)),
+            dttm_work_end=datetime.combine(cls.dt + timedelta(1), time(20, 30)),
+            dt=cls.dt + timedelta(1),
             is_approved=True,
             is_fact=True,
-        )
-
-    def _create_worker_day(self, employment, dt=None, is_fact=False, is_approved=False, dttm_work_start=None, dttm_work_end=None, type_id=WorkerDay.TYPE_WORKDAY):
-        if not dt:
-            dt = self.dt
-        return WorkerDay.objects.create(
-            shop_id=employment.shop_id,
-            type_id=type_id,
-            employment=employment,
-            employee=employment.employee,
-            dt=dt,
-            dttm_work_start=dttm_work_start,
-            dttm_work_end=dttm_work_end,
-            is_fact=is_fact,
-            is_approved=is_approved,
-            created_by=self.user1,
+            created_by=cls.user1,
         )
 
     def test_pivot_tabel(self):
@@ -776,8 +713,14 @@ class TestPivotTabel(APITestCase):
         df = pd.read_excel(table)
         self.assertEqual(len(df.columns), 8)
         self.assertEqual(len(df.values), 5)
-        self.assertEqual(list(df.iloc[0, 5:].values), [13.75, 0.00, 13.75])
-        self.assertEqual(list(df.iloc[1, 5:].values), [10.75, 0.00, 10.75])
-        self.assertEqual(list(df.iloc[2, 5:].values), [0.00, 12.25, 12.25])
-        self.assertEqual(list(df.iloc[3, 5:].values), [5.50, 0.00, 5.50])
+        data = tuple(map(lambda x: tuple(x), df.iloc[:4, 3:].values))
+        self.assertCountEqual(
+            data,
+            (
+                (self.employee1.tabel_code, self.user1.fio + ' ', 5.5, 0.0, 5.5),
+                (self.employee2.tabel_code, self.user2.fio + ' ', 13.75, 0.0, 13.75),
+                (self.employee3.tabel_code, self.user3.fio + ' ', 10.75, 0.0, 10.75),
+                (self.employee4.tabel_code, self.user4.fio + ' ', 0.0, 12.25, 12.25),
+            )
+        )
         self.assertEqual(list(df.iloc[4, 5:].values), [30.00, 12.25, 42.25])
