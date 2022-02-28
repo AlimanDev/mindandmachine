@@ -84,6 +84,7 @@ class TestVacancyBlackList(APITestCase, TestsHelperMixin):
         self.work_type_name = WorkTypeName.objects.create(
             name='Кассы',
             code='',
+            network=self.network,
         )
 
         self.work_type1 = WorkType.objects.create(

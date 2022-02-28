@@ -42,8 +42,8 @@ class TestWorkerPositionAPI(TestsHelperMixin, APITestCase):
         )
         cls.worker_position = WorkerPosition.objects.last()
         cls.worker_positions_count = 4
-        cls.wt_name = WorkTypeName.objects.create(name='test_name', code='test_code')
-        cls.wt_name2 = WorkTypeName.objects.create(name='test_name2', code='test_code2')
+        cls.wt_name = WorkTypeName.objects.create(name='test_name', code='test_code', network=cls.network)
+        cls.wt_name2 = WorkTypeName.objects.create(name='test_name2', code='test_code2', network=cls.network)
 
     def setUp(self):
         self.client.force_authenticate(user=self.user1)

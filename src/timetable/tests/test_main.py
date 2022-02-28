@@ -3671,7 +3671,7 @@ class TestWorkerDayCreateFact(TestsHelperMixin, APITestCase):
         cls.url = '/rest_api/worker_day/'
         cls.url_approve = '/rest_api/worker_day/approve/'
         cls.dt = now().date()
-        cls.work_type_name = WorkTypeName.objects.create(name='Магазин')
+        cls.work_type_name = WorkTypeName.objects.create(name='Магазин', network=cls.network)
         cls.work_type = WorkType.objects.create(
             work_type_name=cls.work_type_name,
             shop=cls.shop,
@@ -4215,9 +4215,11 @@ class TestAttendanceRecords(TestsHelperMixin, APITestCase):
     def test_fact_work_type_received_from_employment_if_there_is_no_plan(self):
         work_type_name = WorkTypeName.objects.create(
             name='Повар',
+            network=self.network,
         )
         work_type_name2 = WorkTypeName.objects.create(
             name='Продавец',
+            network=self.network,
         )
         work_type = WorkType.objects.create(
             shop=self.shop2,
@@ -4259,6 +4261,7 @@ class TestAttendanceRecords(TestsHelperMixin, APITestCase):
     def test_work_type_created_for_holiday(self):
         work_type_name = WorkTypeName.objects.create(
             name='Повар',
+            network=self.network,
         )
         work_type = WorkType.objects.create(
             shop=self.shop2,
@@ -5042,6 +5045,7 @@ class TestVacancy(TestsHelperMixin, APITestCase):
         cls.dt_now = date.today()
         cls.work_type_name1 = WorkTypeName.objects.create(
             name='Кассы',
+            network=cls.network,
         )
         cls.work_type1 = WorkType.objects.create(shop=cls.shop, work_type_name=cls.work_type_name1)
         cls.vacancy = WorkerDay.objects.create(
@@ -7231,7 +7235,7 @@ class TestFineLogic(APITestCase):
         cls.shop = Shop.objects.create(
             name='Shop',
             network=cls.network,
-            region=Region.objects.create(name='Def'),
+            region=Region.objects.create(name='Def', network=cls.network),
         )
         cls.network.fines_settings = json.dumps(
            {
@@ -7253,6 +7257,7 @@ class TestFineLogic(APITestCase):
         cls.breaks = Break.objects.create(
             name='brk',
             value='[[0, 3600, [30]]]',
+            network=cls.network,
         )
         cls.cashier = cls._create_user(cls, WorkerPosition.objects.create(network=cls.network, name='Продавец-кассир', breaks=cls.breaks), 'Cashier', 'cashier')
         cls.dir = cls._create_user(cls, WorkerPosition.objects.create(network=cls.network, name='Директор Магазина', breaks=cls.breaks), 'Dir', 'dir')

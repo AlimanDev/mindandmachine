@@ -23,8 +23,8 @@ class TestUserViewSet(TestsHelperMixin, APITestCase):
             code='director',
             network=cls.network,
         )
-        cls.wt_name = WorkTypeName.objects.create(name='test_name', code='test_code')
-        cls.wt_name2 = WorkTypeName.objects.create(name='test_name2', code='test_code2')
+        cls.wt_name = WorkTypeName.objects.create(name='test_name', code='test_code', network=cls.network)
+        cls.wt_name2 = WorkTypeName.objects.create(name='test_name2', code='test_code2', network=cls.network)
         cls.worker_position.default_work_type_names.set([cls.wt_name, cls.wt_name2])
         cls.dt_now = timezone.now().today()
 

@@ -34,8 +34,8 @@ class TestAutoSettings(APITestCase, TestsHelperMixin):
         cls.dt = now().date()
 
         cls.create_departments_and_users(dt=date(2021, 1, 1))
-        cls.work_type_name = WorkTypeName.objects.create(name='Магазин')
-        cls.work_type_name2 = WorkTypeName.objects.create(name='Ломбард')
+        cls.work_type_name = WorkTypeName.objects.create(name='Магазин', network=cls.network)
+        cls.work_type_name2 = WorkTypeName.objects.create(name='Ломбард', network=cls.network)
         cls.operation_type_name = cls.work_type_name.operation_type_name
         cls.operation_type_name2 = cls.work_type_name2.operation_type_name
         cls.work_type = WorkType.objects.create(

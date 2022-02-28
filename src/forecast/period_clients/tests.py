@@ -35,22 +35,27 @@ class TestDemand(APITestCase, TestsHelperMixin):
         cls.work_type_name1 = WorkTypeName.objects.create(
             name='Кассы',
             code="Cashbox",
+            network=cls.network,
         )
         cls.work_type_name2 = WorkTypeName.objects.create(
             name='Торговый зал',
             code="Trade hall",
+            network=cls.network,
         )
         cls.work_type_name3 = WorkTypeName.objects.create(
             name='Кассы3',
             code="Cashbox3",
+            network=cls.network,
         )
         cls.work_type_name4 = WorkTypeName.objects.create(
             name='Кассы4',
             code="Cashbox4",
+            network=cls.network,
         )
         cls.work_type_name5 = WorkTypeName.objects.create(
             name='Кассы5',
             code="clients",
+            network=cls.network,
         )
         cls.work_type1 = WorkType.objects.create(shop=cls.shop, work_type_name=cls.work_type_name1)
         cls.work_type2 = WorkType.objects.create(shop=cls.shop, work_type_name=cls.work_type_name2)
