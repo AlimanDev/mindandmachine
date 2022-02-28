@@ -4,12 +4,14 @@ import json
 import geopy.distance
 import pytz
 import six
+from mptt.exceptions import InvalidMove
 from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
 
 from src.base.fields import CurrentUserNetwork
 from src.base.models import Shop, ShopSchedule
+from src.base.serializers import BaseModelSerializer, BaseSerializer
 from src.conf.djconfig import QOS_TIME_FORMAT
 from src.util.drf.fields import RoundingDecimalField
 from src.util.models_converter import Converter
@@ -44,7 +46,7 @@ class RestrictedTimeValidator:
                 raise serializers.ValidationError(self.error_messages['invalid_time_format'].format(format=self.format))
 
 
-class NonstandardShopScheduleSerializer(serializers.ModelSerializer):
+class NonstandardShopScheduleSerializer(BaseModelSerializer):
     class Meta:
         model = ShopSchedule
         fields = (
@@ -86,7 +88,7 @@ class SetLoadTemplateSerializer(serializers.Serializer):
     load_template_id = serializers.IntegerField()
 
 
-class ShopSerializer(serializers.ModelSerializer):
+class ShopSerializer(BaseModelSerializer):
     parent_id = serializers.IntegerField(required=False)
     parent_code = serializers.CharField(required=False)
     region_id = serializers.IntegerField(required=False)
@@ -221,12 +223,15 @@ class ShopSerializer(serializers.ModelSerializer):
         if getattr(self.context['request'], 'by_code',
                    False) and instance.network.ignore_parent_code_when_updating_department_via_api:
             validated_data.pop('parent_code', None)
-        shop = super(ShopSerializer, self).update(instance, validated_data)
+        try:
+            shop = super(ShopSerializer, self).update(instance, validated_data)
+        except InvalidMove as e:
+            raise serializers.ValidationError(str(e))
         self._update_or_create_nested_data(shop, nonstandard_schedule)
         return shop
 
 
-class ShopListSerializer(serializers.Serializer):
+class ShopListSerializer(BaseSerializer):
     id = serializers.IntegerField()
     name = serializers.CharField()
 

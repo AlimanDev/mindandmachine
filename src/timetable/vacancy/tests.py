@@ -66,18 +66,19 @@ class TestAutoWorkerExchange(APITestCase):
     @classmethod
     def setUpTestData(cls):
         cls.dt_now = now().date()
+        cls.network = Network.objects.create(
+            primary_color='#BDF82',
+            secondary_color='#390AC',
+        )
         cls.region = Region.objects.create(
             name='Москва',
             code=77,
+            network=cls.network,
         )
 
         fill_calendar.main('2018.1.1', (datetime.datetime.now() + datetime.timedelta(days=365)).strftime('%Y.%m.%d'),
                            region_id=1)
 
-        cls.network = Network.objects.create(
-            primary_color='#BDF82',
-            secondary_color='#390AC',
-        )
         cls.network.set_settings_value(
             'shop_name_form', 
             {
@@ -90,11 +91,11 @@ class TestAutoWorkerExchange(APITestCase):
         )
         cls.network.save()
         cls.breaks = Break.objects.create(network=cls.network, name='Default')
-        cls.shop_settings = ShopSettings.objects.create(breaks=cls.breaks)
+        cls.shop_settings = ShopSettings.objects.create(breaks=cls.breaks, network=cls.network)
         Shop.objects.all().update(network=cls.network)
 
-        cls.director_group = Group.objects.create(name='Director')
-        cls.admin_group = Group.objects.create(name='ADMIN')
+        cls.director_group = Group.objects.create(name='Director', network=cls.network)
+        cls.admin_group = Group.objects.create(name='ADMIN', network=cls.network)
         FunctionGroup.objects.bulk_create([
             FunctionGroup(
                 group=cls.admin_group,

@@ -90,15 +90,15 @@ class SawhSettingsHelperMixin(TestsHelperMixin):
 
     def _test_hours_for_period(
             self, dt_from, dt_to, expected_norm_hours, hours_k='sawh_hours', plan_fact_k='plan',
-            approved_k='approved', period_k='selected_period'):
+            approved_k='approved', period_k='selected_period', employee_id=None):
         workers_stats_getter = WorkersStatsGetter(
-            employee_id=self.employee.id,
+            employee_id=employee_id or self.employee.id,
             shop_id=self.shop.id,
             dt_from=dt_from,
             dt_to=dt_to,
         )
         workers_stats = workers_stats_getter.run()
-        norm_hours = workers_stats[self.employee.id][plan_fact_k][approved_k][hours_k][period_k]
+        norm_hours = workers_stats[employee_id or self.employee.id][plan_fact_k][approved_k][hours_k][period_k]
         self.assertEqual(norm_hours, expected_norm_hours)
         return norm_hours
 
@@ -367,6 +367,66 @@ class TestSAWHSettingsQuarterAccPeriod(SawhSettingsHelperMixin, TestCase):
             expected_norm_hours=176,  # по умолчанию часы из произв. календаря
         )
         self.assertEqual(res + res2 + res3, 526)
+
+    def test_fixed_sawh_settings_type_by_employee(self):
+        employment1 = EmploymentFactory(
+            employee__user__network=self.network,
+            dt_hired='2001-01-01', dt_fired='3999-12-12',
+            shop=self.shop, position=self.worker_position,
+        )
+        employment2 = EmploymentFactory(
+            employee__user__network=self.network,
+            dt_hired='2001-01-01', dt_fired='3999-12-12',
+            shop=self.shop, position=self.worker_position,
+        )
+
+        sawh_settings1 = SAWHSettings.objects.create(
+            network=self.network,
+            name='1',
+            work_hours_by_months={
+                'm1': 100,
+                'm2': 100,
+            },
+            type=SAWHSettings.FIXED_HOURS,
+        )
+        sawh_settings_mapping = SAWHSettingsMapping.objects.create(
+            year=2021,
+            sawh_settings=sawh_settings1,
+        )
+        sawh_settings_mapping.employees.add(employment1.employee)
+
+        sawh_settings2 = SAWHSettings.objects.create(
+            network=self.network,
+            name='2',
+            work_hours_by_months={
+                'm1': 200,
+                'm2': 200,
+            },
+            type=SAWHSettings.FIXED_HOURS,
+        )
+        sawh_settings_mapping = SAWHSettingsMapping.objects.create(
+            year=2021,
+            sawh_settings=sawh_settings2,
+        )
+        sawh_settings_mapping.employees.add(employment2.employee)
+        sawh_settings_mapping = SAWHSettingsMapping.objects.create(
+            year=2021,
+            sawh_settings=sawh_settings2,
+        )
+        sawh_settings_mapping.employees.add(employment2.employee)
+
+        self._test_hours_for_period(
+            dt_from=date(2021, 2, 1),
+            dt_to=date(2021, 2, 28),
+            expected_norm_hours=100,
+            employee_id=employment1.employee_id,
+        )
+        self._test_hours_for_period(
+            dt_from=date(2021, 2, 1),
+            dt_to=date(2021, 2, 28),
+            expected_norm_hours=200,
+            employee_id=employment2.employee_id,
+        )
 
     def test_override_region_prod_cal(self):
         self.sawh_settings_mapping.shops.remove(self.shop)

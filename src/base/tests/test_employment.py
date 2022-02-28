@@ -27,8 +27,8 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
             code='director',
             network=cls.network,
         )
-        cls.wt_name = WorkTypeName.objects.create(name='test_name', code='test_code')
-        cls.wt_name2 = WorkTypeName.objects.create(name='test_name2', code='test_code2')
+        cls.wt_name = WorkTypeName.objects.create(name='test_name', code='test_code', network=cls.network)
+        cls.wt_name2 = WorkTypeName.objects.create(name='test_name2', code='test_code2', network=cls.network)
         cls.worker_position.default_work_type_names.set([cls.wt_name, cls.wt_name2])
         cls.dt_now = timezone.now().date()
 
@@ -65,7 +65,11 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
             name='Заместитель директора магазина',
             network=self.network,
         )
-        another_wt_name = WorkTypeName.objects.create(name='test_another_name', code='test_another_code')
+        another_wt_name = WorkTypeName.objects.create(
+            name='test_another_name', 
+            code='test_another_code', 
+            network=self.network,
+        )
         another_worker_position.default_work_type_names.add(another_wt_name)
         put_data = {
             'position_id': another_worker_position.id,
@@ -1132,6 +1136,7 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
         )
         group_without_perms = Group.objects.create(
             name='group_without_perms',
+            network=self.network,
         )
         self.employment1.function_group = group_without_perms
         self.employment1.position = None
