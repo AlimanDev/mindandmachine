@@ -381,6 +381,25 @@ class ShopAdmin(ImportMixin, admin.ModelAdmin):
     @staticmethod
     def parent_title(instance: Shop):
         return instance.parent_title()
+    
+    def get_import_form(self):
+        return CustomImportShopForm
+
+    def get_confirm_import_form(self):
+        return CustomConfirmImportShopForm
+
+    def get_form_kwargs(self, form, *args, **kwargs):
+        if isinstance(form, Form) and form.is_valid():
+            network = form.cleaned_data['network']
+            kwargs.update({'network': getattr(network, 'id', None)})
+        return kwargs
+
+    def get_import_data_kwargs(self, request, *args, **kwargs):
+        form = kwargs.get('form')
+        if form and form.is_valid():
+            network = form.cleaned_data['network']
+            kwargs.update({'network': getattr(network, 'id', None)})
+        return super().get_import_data_kwargs(request, *args, **kwargs)
 
     def _changeform_view(self, request, object_id, form_url, extra_context):
         to_field = request.POST.get(TO_FIELD_VAR, request.GET.get(TO_FIELD_VAR))
