@@ -290,9 +290,12 @@ class Timetable_xlsx(Tabel_xlsx):
                 )
                 n += 1
 
+            timetable_set_date_as_n_months_ago = self.shop.network.settings_values_prop.get(
+                'timetable_set_date_as_n_months_ago')
             self.worksheet.write_string(
                 row_s + row_shift, col_s + day + n,
-                (self.dt - relativedelta(months=2)).replace(day=1).strftime('%d.%m.%Y') if self.shop.network.settings_values_prop.get('timetable_set_date_as_2_months_ago', False) else '',
+                (self.dt - relativedelta(months=timetable_set_date_as_n_months_ago)).replace(day=1).strftime(
+                    '%d.%m.%Y') if timetable_set_date_as_n_months_ago is not None else '',
                 format_text
             )
             n += 1
