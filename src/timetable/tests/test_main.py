@@ -5840,7 +5840,7 @@ class TestVacancy(TestsHelperMixin, APITestCase):
         self.assertEqual(response_data.get('shop__name'), self.shop.name)
         self.assertFalse('shop__code' in response_data)
         self.assertFalse('shop__name' in response_data['worker_day_details'][0])
-    
+
     def test_pagination(self):
         for i in range(10):
             WorkerDayFactory(
@@ -7381,14 +7381,14 @@ class TestFineLogic(APITestCase):
         WorkerDay.objects.all().delete()
         dt = date.today()
         plan_wd = self._create_or_update_worker_day(
-            self.cashier[2], 
-            datetime.combine(dt, tm_work_start_paln), 
-            datetime.combine(dt, tm_work_end_plan), 
+            self.cashier[2],
+            datetime.combine(dt, tm_work_start_paln),
+            datetime.combine(dt, tm_work_end_plan),
         )
         fact_wd = self._create_or_update_worker_day(
-            self.cashier[2], 
-            datetime.combine(dt, tm_work_start_fact), 
-            datetime.combine(dt, tm_work_end_fact), 
+            self.cashier[2],
+            datetime.combine(dt, tm_work_start_fact),
+            datetime.combine(dt, tm_work_end_fact),
             is_fact=True,
             closest_plan_approved_id=plan_wd.id,
         )
