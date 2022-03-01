@@ -33,12 +33,12 @@ class EmploymentWorkTypeSerializer(serializers.ModelSerializer):
         attrs = super().validate(attrs)
         check_priority_qs = EmploymentWorkType.objects.filter(
             employment_id=attrs['employment_id'],
-            priority=attrs.get('priority', 1),
+            priority=1,
         )
         if self.instance:
             check_priority_qs = check_priority_qs.exclude(id=self.instance.id)
         
-        if 'priority' in attrs and check_priority_qs.exists():
+        if attrs.get('priority', 0) == 1 and check_priority_qs.exists():
             raise serializers.ValidationError(_('Employment can have only one main type of work.'))
 
         return attrs
