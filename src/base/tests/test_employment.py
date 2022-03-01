@@ -54,11 +54,14 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
         resp = self._create_employment()
         self.assertEqual(resp.status_code, 201)
         resp_data = resp.json()
+        empl_qs = EmploymentWorkType.objects.filter(employment_id=resp_data['id'])
         for wtn in [self.wt_name, self.wt_name2]:
-            self.assertTrue(EmploymentWorkType.objects.filter(
-                employment_id=resp_data['id'],
+            self.assertTrue(empl_qs.filter(
                 work_type__work_type_name=wtn,
             ).exists())
+        
+        self.assertEqual(empl_qs.filter(priority=1).count(), 1)
+        self.assertEqual(empl_qs.filter(priority=0).count(), 1)
 
     def test_work_types_updated_on_position_change(self):
         another_worker_position = WorkerPosition.objects.create(
@@ -699,7 +702,8 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
         resp = self._create_employment()
         self.assertEqual(resp.status_code, 201)
         employment_id = resp.json()['id']
-        work_type_id = EmploymentWorkType.objects.filter(employment_id=employment_id).first().work_type_id
+        employment_work_type = EmploymentWorkType.objects.filter(employment_id=employment_id).first()
+        work_type_id = employment_work_type.work_type_id
         data = {
             'employment_id': employment_id,
             'work_type_id': work_type_id,
@@ -710,6 +714,39 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
             content_type='application/json',
         )
         self.assertEqual(response.json(), {'non_field_errors': ['Поля work_type_id, employment_id должны производить массив с уникальными значениями.']})
+        EmploymentWorkType.objects.filter(employment_id=employment_id, work_type_id=work_type_id).update(priority=1)
+        empl_work_type_to_create = EmploymentWorkType.objects.filter(employment_id=employment_id).exclude(work_type_id=work_type_id).first()
+        empl_work_type_to_create.delete()
+        data['work_type_id'] = empl_work_type_to_create.work_type_id
+        data['priority'] = 1
+        response = self.client.post(
+            '/rest_api/employment_work_type/', 
+            data=self.dump_data(data),
+            content_type='application/json',
+        )
+        self.assertEqual(response.json(), {'non_field_errors': ['У трудойстройства может быть только один основной тип работ.']})
+        data['priority'] = 0
+        response = self.client.post(
+            '/rest_api/employment_work_type/', 
+            data=self.dump_data(data),
+            content_type='application/json',
+        )
+        self.assertEqual(response.status_code, 201)
+        item_id = response.json()['id']
+        data['priority'] = 1
+        response = self.client.put(
+            f'/rest_api/employment_work_type/{item_id}/', 
+            data=self.dump_data(data),
+            content_type='application/json',
+        )
+        self.assertEqual(response.json(), {'non_field_errors': ['У трудойстройства может быть только один основной тип работ.']})
+        data['work_type_id'] = work_type_id
+        response = self.client.put(
+            f'/rest_api/employment_work_type/{employment_work_type.id}/', 
+            data=self.dump_data(data),
+            content_type='application/json',
+        )
+        self.assertEqual(response.status_code, 200)
 
     def test_ignore_shop_code_when_updating_employment_via_api(self):
         self.network.ignore_shop_code_when_updating_employment_via_api = True
