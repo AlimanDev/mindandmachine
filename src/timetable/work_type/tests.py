@@ -33,20 +33,24 @@ class TestWorkType(APITestCase, TestsHelperMixin):
         cls.shop.save()
         cls.work_type_name1 = WorkTypeName.objects.create(
             name='Кассы',
+            network=cls.network,
         )
         cls.work_type1 = WorkType.objects.create(shop=cls.shop, work_type_name=cls.work_type_name1)
         cls.work_type2 = WorkType.objects.create(shop=cls.shop2, work_type_name=cls.work_type_name1)
         cls.work_type_name2 = WorkTypeName.objects.create(
             name='Тип_кассы_2',
+            network=cls.network,
         )
         cls.work_type3 = WorkType.objects.create(shop=cls.shop, work_type_name=cls.work_type_name2)
         cls.work_type4 = WorkType.objects.create(shop=cls.root_shop, work_type_name=cls.work_type_name1)
         cls.work_type_name3 = WorkTypeName.objects.create(
             name='Тип_кассы_3',
             code='25',
+            network=cls.network,
         )
         cls.work_type_name4 = WorkTypeName.objects.create(
             name='тип_кассы_4',
+            network=cls.network,
         )
 
     def setUp(self) -> None:
@@ -194,6 +198,7 @@ class TestWorkType(APITestCase, TestsHelperMixin):
         op_name_income = OperationTypeName.objects.create(
             name='Income',
             code='income',
+            network=self.network,
         )
         op_type = self.work_type1.operation_type
         op_type3 = self.work_type3.operation_type

@@ -1,30 +1,25 @@
-from datetime import datetime, timedelta, time
-from dateutil.relativedelta import relativedelta
-
 from rest_framework import status
 from rest_framework.test import APITestCase
+from src.util.mixins.tests import TestsHelperMixin
 
 from src.util.test import create_departments_and_users
 
 from src.timetable.models import ExchangeSettings
-from src.forecast.models import OperationType, PeriodClients, OperationTypeName
-from etc.scripts.fill_calendar import main
 
 
-class TestExchangeSettings(APITestCase):
+class TestExchangeSettings(APITestCase, TestsHelperMixin):
     USER_USERNAME = "user1"
     USER_EMAIL = "q@q.q"
     USER_PASSWORD = "4242"
 
+    @classmethod
+    def setUpTestData(cls):
+        cls.url = '/rest_api/exchange_settings/'
+        cls.create_departments_and_users()
+        cls.exchange_serttings1 = ExchangeSettings.objects.create(network=cls.network)
+        cls.exchange_serttings2 = ExchangeSettings.objects.create(network=cls.network)
+
     def setUp(self):
-        super().setUp()
-
-        self.url = '/rest_api/exchange_settings/'
-
-        create_departments_and_users(self)
-        self.exchange_serttings1 = ExchangeSettings.objects.create(network=self.network)
-        self.exchange_serttings2 = ExchangeSettings.objects.create(network=self.network)
-
         self.client.force_authenticate(user=self.user1)
 
     def test_get_list(self):

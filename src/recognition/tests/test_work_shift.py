@@ -19,6 +19,7 @@ class TestWorkShiftViewSet(TestsHelperMixin, APITestCase):
         cls.create_departments_and_users()
         cls.work_type_name1 = WorkTypeName.objects.create(
             name='Кассы',
+            network=cls.network,
         )
         cls.work_type1 = WorkType.objects.create(shop=cls.shop2, work_type_name=cls.work_type_name1)
         cls.today = timezone.now().today()

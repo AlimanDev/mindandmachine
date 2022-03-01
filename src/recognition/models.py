@@ -237,5 +237,9 @@ class ShopIpAddress(models.Model):
             shop_id = self.shop_id
             tick_point = TickPoint.objects.filter(shop_id=shop_id, dttm_deleted__isnull=True).first()
             if tick_point is None:
-                tick_point = TickPoint.objects.create(name=f'autocreate tickpoint {shop_id}', shop_id=shop_id)
+                tick_point = TickPoint.objects.create(
+                    name=f'autocreate tickpoint {shop_id}', 
+                    shop_id=shop_id, 
+                    network_id=self.network_id,
+                )
         return tick_point

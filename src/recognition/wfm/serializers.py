@@ -5,10 +5,10 @@ import six
 
 
 from src.timetable.models import WorkerDay, WorkerDayCashboxDetails, Shop, User
-from src.base.serializers import NetworkSerializer
+from src.base.serializers import BaseModelSerializer, BaseSerializer, NetworkSerializer
 
 
-class WorkerDayCashboxDetailsSerializer(serializers.ModelSerializer):
+class WorkerDayCashboxDetailsSerializer(BaseModelSerializer):
     name = serializers.SerializerMethodField()
 
     class Meta:
@@ -19,7 +19,7 @@ class WorkerDayCashboxDetailsSerializer(serializers.ModelSerializer):
         if obj.work_type and obj.work_type.work_type_name:
             return obj.work_type.work_type_name.name
 
-class ShopSerializer(serializers.ModelSerializer):
+class ShopSerializer(BaseModelSerializer):
     timezone = serializers.SerializerMethodField()
 
     def get_timezone(self, obj):
@@ -30,13 +30,13 @@ class ShopSerializer(serializers.ModelSerializer):
         fields = ['id', 'name', 'timezone']
 
 
-class WorkerDayListSerializer(serializers.Serializer):
+class WorkerDayListSerializer(BaseSerializer):
     id = serializers.IntegerField()
     dttm_work_start = serializers.DateTimeField()
     dttm_work_end = serializers.DateTimeField()
 
 
-class WfmEmployeeSerializer(serializers.Serializer):
+class WfmEmployeeSerializer(BaseSerializer):
     id = serializers.IntegerField()
     tabel_code = serializers.CharField()
     worker_days = WorkerDayListSerializer(many=True)
@@ -52,7 +52,7 @@ class WfmEmployeeSerializer(serializers.Serializer):
         return ShopSerializer(employment.shop).data if employment else {}
 
 
-class WfmWorkerDaySerializer(serializers.ModelSerializer):
+class WfmWorkerDaySerializer(BaseModelSerializer):
     user_id = serializers.SerializerMethodField()
     avatar = serializers.SerializerMethodField()
     employees = WfmEmployeeSerializer(many=True)
@@ -71,7 +71,7 @@ class WfmWorkerDaySerializer(serializers.ModelSerializer):
         return None
 
 
-class WorkShiftSerializer(serializers.ModelSerializer):
+class WorkShiftSerializer(BaseModelSerializer):
     dt = serializers.DateField()
     worker = serializers.CharField(source='employee.user.username')
     shop = serializers.CharField(source='shop.code')

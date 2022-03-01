@@ -1,6 +1,6 @@
 from requests import Session
 from requests.adapters import HTTPAdapter
-from requests.packages.urllib3.util.retry import Retry
+from urllib3.util.retry import Retry
 
 
 def make_retry_session(total_retires=5, backoff_factor=0.1, status_forcelist=None):

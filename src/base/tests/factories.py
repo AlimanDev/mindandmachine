@@ -127,6 +127,7 @@ class UserFactory(factory.django.DjangoModelFactory):
 
 class ShopSettingsFactory(factory.django.DjangoModelFactory):
     breaks = factory.SubFactory('src.base.tests.factories.BreakFactory')
+    network = factory.SubFactory('src.base.tests.factories.NetworkFactory')
 
     class Meta:
         model = ShopSettings

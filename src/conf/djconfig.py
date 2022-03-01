@@ -90,6 +90,7 @@ INSTALLED_APPS = [
     'polymorphic',
     'src.exchange',
     'src.pbi',
+    'mptt',
     'src.med_docs',
 ]
 
