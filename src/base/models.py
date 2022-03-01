@@ -555,7 +555,7 @@ class Shop(MPTTModel, AbstractActiveNetworkSpecificCodeNamedModel):
     city = models.CharField(max_length=128, null=True, blank=True, verbose_name='Город')
 
     objects = ShopManager.from_queryset(ShopQuerySet)()
-    objects_with_excluded = models.Manager.from_queryset(ShopQuerySet)()
+    objects_with_excluded = TreeManager.from_queryset(ShopQuerySet)()
 
     tracker = FieldTracker(
         fields=['tm_open_dict', 'tm_close_dict', 'load_template', 'latitude', 'longitude', 'fias_code', 'director_id',
