@@ -25,7 +25,7 @@ from django.utils import timezone
 from django.utils.functional import cached_property
 from django.utils.translation import gettext_lazy as _
 from model_utils import FieldTracker
-from mptt.models import MPTTModel, TreeForeignKey
+from mptt.models import MPTTModel, TreeForeignKey, TreeManager
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.serializers import ValidationError
 from timezone_field import TimeZoneField
@@ -463,6 +463,17 @@ class ShopSettings(AbstractActiveNetworkSpecificCodeNamedModel):
         return None
 
 
+class ShopQuerySet(QuerySet):
+    def delete(self):
+        Shop.check_related_objects_before_deletion(self.values_list('id', flat=True))
+        self.update(dttm_deleted=timezone.now())
+
+class ShopManager(TreeManager):
+    def get_queryset(self):
+        return super().get_queryset().filter(
+            models.Q(dttm_deleted__date__gt=timezone.now().date()) | models.Q(dttm_deleted__isnull=True)
+        )
+
 # на самом деле это отдел
 class Shop(MPTTModel, AbstractActiveNetworkSpecificCodeNamedModel):
     class Meta:
@@ -542,6 +553,9 @@ class Shop(MPTTModel, AbstractActiveNetworkSpecificCodeNamedModel):
     longitude = models.DecimalField(max_digits=12, decimal_places=8, null=True, blank=True, verbose_name='Долгота')
     director = models.ForeignKey('base.User', null=True, blank=True, verbose_name='Директор', on_delete=models.SET_NULL)
     city = models.CharField(max_length=128, null=True, blank=True, verbose_name='Город')
+
+    objects = ShopManager.from_queryset(ShopQuerySet)()
+    objects_with_excluded = models.Manager.from_queryset(ShopQuerySet)()
 
     tracker = FieldTracker(
         fields=['tm_open_dict', 'tm_close_dict', 'load_template', 'latitude', 'longitude', 'fias_code', 'director_id',
@@ -936,6 +950,26 @@ class Shop(MPTTModel, AbstractActiveNetworkSpecificCodeNamedModel):
             shop_24h_open = open_at_0 and close_at_0
             return shop_24h_open
 
+    @staticmethod
+    def check_related_objects_before_deletion(shop_ids):
+        from src.timetable.models import WorkerDay, AttendanceRecords
+        error = ''
+        if WorkerDay.objects.filter(shop_id__in=shop_ids).exists():
+            error = _('worker days')
+        elif AttendanceRecords.objects.filter(shop_id__in=shop_ids).exists():
+            error = _('attendance records')
+        elif Employment.objects.filter(shop_id__in=shop_ids).exists():
+            error = _('employments')
+        
+        if error:
+            raise ValidationError(_('Cannot delete shop because it has related {}.').format(error))
+        
+
+    def delete(self, **kwargs):
+        self.check_related_objects_before_deletion([self.id])
+        self.dttm_deleted = timezone.now()
+        self.save()
+        return self
 
 class EmploymentManager(models.Manager):
     def get_queryset(self):

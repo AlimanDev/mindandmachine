@@ -29,6 +29,8 @@ class ShopAdminForm(DefaultOverrideAdminWidgetsForm):
         'tm_close_dict',
         'load_template_settings',
     ]
+    class Meta:
+        exclude = ['dttm_deleted']
 
 
 class ShopSettingsAdminForm(DefaultOverrideAdminWidgetsForm):

@@ -108,15 +108,15 @@ class WorkerDayViewSet(BaseModelViewSet):
     filterset_class = WorkerDayFilter
     filter_backends = [MultiShopsFilterBackend]
     openapi_tags = ['WorkerDay',]
-    queryset = WorkerDay.objects.filter(
-        canceled=False,
-    ).select_related(
-        'last_edited_by',
-    ).prefetch_related(Prefetch('outsources', to_attr='outsources_list'))
+    queryset = WorkerDay.objects.all()
     available_extra_fields = ['shop__name']
 
     def get_queryset(self):
-        queryset = super().get_queryset()
+        queryset = super().get_queryset().filter(
+            canceled=False,
+        ).select_related(
+            'last_edited_by',
+        ).prefetch_related(Prefetch('outsources', to_attr='outsources_list'))
 
         if self.request.query_params.get('by_code', False):
             return queryset.annotate(

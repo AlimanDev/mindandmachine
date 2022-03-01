@@ -1,4 +1,4 @@
-from datetime import datetime, time, timedelta
+from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 from unittest import mock
 
@@ -14,7 +14,7 @@ from src.base.models import Shop, ShopSchedule, NetworkConnect, Network, Employm
 from src.base.tests.factories import UserFactory, ShopFactory
 from src.forecast.models import OperationTypeName, OperationType
 from src.forecast.tests.factories import LoadTemplateFactory
-from src.timetable.models import ShopMonthStat
+from src.timetable.models import AttendanceRecords, ShopMonthStat, WorkerDay
 from src.timetable.models import WorkTypeName, WorkType
 from src.util.mixins.tests import TestsHelperMixin
 
@@ -132,13 +132,13 @@ class TestDepartment(TestsHelperMixin, APITestCase):
         self.assertEqual(len(response.json()), 6)
         shop_info = list(filter(lambda x: x['id'] == self.shop.id,response.json()))[0]
         self.assertTrue(shop_info['is_active'])
-        self.shop.dttm_deleted = datetime.now() - timedelta(hours=2)
+        self.shop.dt_closed = (datetime.now() - timedelta(1)).date()
         self.shop.save()
         response = self.client.get(self.url)
         self.assertEqual(len(response.json()), 6)
         shop_info = list(filter(lambda x: x['id'] == self.shop.id,response.json()))[0]
         self.assertFalse(shop_info['is_active'])
-        self.shop.dttm_deleted = None
+        self.shop.dt_closed = None
         self.shop.save()
 
     def test_get(self):
@@ -288,7 +288,7 @@ class TestDepartment(TestsHelperMixin, APITestCase):
         data.pop('nonstandard_schedule')
         data.pop('director_code')
         self.assertEqual(shop, data)
-        self.assertIsNotNone(Shop.objects.get(id=shop['id']).dttm_deleted)
+        self.assertIsNotNone(Shop.objects_with_excluded.get(id=shop['id']).dttm_deleted)
 
     def test_400_resp_for_unexistent_parent_code(self):
         data = {
@@ -966,3 +966,34 @@ class TestDepartment(TestsHelperMixin, APITestCase):
 
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.json(), ['Элемент не может быть потомком своего наследника.'])
+
+    def _test_delete_shop(self, exception_raised=True, exception_reason=None):
+        _exception_raised = False
+        try:
+            self.shop.delete()
+        except ValidationError as e:
+            _exception_raised = True
+            self.assertEqual(e.detail, [f'Невозможно удалить магазин, так как с ним связаны {exception_reason}.'])
+        
+        self.assertEqual(_exception_raised, exception_raised)
+
+    def test_delete_shop(self):
+        response = self.client.get(self.get_url('Shop-list'))
+        self.assertEqual(len(response.json()), 6)
+        AttendanceRecords.objects.create(
+            shop=self.shop,
+            dt=date(2022, 2, 1),
+            employee=self.employee1,
+            user=self.user1,
+            dttm=datetime(2022, 2, 1, 10),
+        )
+        self._test_delete_shop(exception_reason='рабочие дни')
+        WorkerDay.objects.all().delete()
+        self._test_delete_shop(exception_reason='отметки сотрудников')
+        AttendanceRecords.objects.all().delete()
+        self._test_delete_shop(exception_reason='трудоустройства')
+        Employment.objects.filter(shop=self.shop).delete()
+        self._test_delete_shop(exception_raised=False)
+
+        response = self.client.get(self.get_url('Shop-list'))
+        self.assertEqual(len(response.json()), 5)
