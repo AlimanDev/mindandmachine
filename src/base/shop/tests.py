@@ -5,6 +5,7 @@ from unittest import mock
 from dadata import Dadata
 from dateutil.relativedelta import relativedelta
 from django.db import transaction
+from django.db.models.deletion import ProtectedError
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.serializers import ValidationError
@@ -967,14 +968,15 @@ class TestDepartment(TestsHelperMixin, APITestCase):
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.json(), ['Элемент не может быть потомком своего наследника.'])
 
-    def _test_delete_shop(self, exception_raised=True, exception_reason=None):
+    def _test_delete_shop(self, exception_raised=True):
         _exception_raised = False
         try:
             self.shop.delete()
-        except ValidationError as e:
+        except ProtectedError as e:
             _exception_raised = True
-            self.assertEqual(e.detail, [f'Невозможно удалить магазин, так как с ним связаны {exception_reason}.'])
         
+        self.assertIsNone(Employment._meta.base_manager_name)
+        self.assertTrue(Employment._meta.base_manager.auto_created)
         self.assertEqual(_exception_raised, exception_raised)
 
     def test_delete_shop(self):
@@ -987,13 +989,15 @@ class TestDepartment(TestsHelperMixin, APITestCase):
             user=self.user1,
             dttm=datetime(2022, 2, 1, 10),
         )
-        self._test_delete_shop(exception_reason='рабочие дни')
+        self._test_delete_shop()
         WorkerDay.objects.all().delete()
-        self._test_delete_shop(exception_reason='отметки сотрудников')
+        self._test_delete_shop()
         AttendanceRecords.objects.all().delete()
-        self._test_delete_shop(exception_reason='трудоустройства')
+        self._test_delete_shop()
         Employment.objects.filter(shop=self.shop).delete()
         self._test_delete_shop(exception_raised=False)
+        self.assertFalse(Shop.objects.filter(id=self.shop.id).exists())
+        self.assertTrue(Shop.objects_with_excluded.filter(id=self.shop.id).exists())
 
         response = self.client.get(self.get_url('Shop-list'))
         self.assertEqual(len(response.json()), 5)

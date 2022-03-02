@@ -387,6 +387,10 @@ class ShopAdmin(ImportMixin, admin.ModelAdmin):
 
     def get_confirm_import_form(self):
         return CustomConfirmImportShopForm
+    
+    def get_deleted_objects(self, *args, **kwargs):
+        with Shop._deletion_context():
+            return super().get_deleted_objects(*args, **kwargs)
 
     def get_form_kwargs(self, form, *args, **kwargs):
         if isinstance(form, Form) and form.is_valid():

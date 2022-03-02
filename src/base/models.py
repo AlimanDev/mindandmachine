@@ -16,9 +16,10 @@ from django.core.cache import cache
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.core.serializers.json import DjangoJSONEncoder
 from django.core.cache import cache
-from django.db import models
+from django.db import models, router
 from django.db import transaction
 from django.db.models import Case, When, Sum, Value, IntegerField, Subquery, OuterRef, Q
+from django.db.models.deletion import Collector
 from django.db.models.query import QuerySet
 from django.template import Template, Context
 from django.utils import timezone
@@ -38,6 +39,7 @@ from src.base.models_abstract import (
     NetworkSpecificModel,
     AbstractCodeNamedModel,
 )
+from src.base.models_utils import OverrideBaseManager
 from src.conf.djconfig import QOS_TIME_FORMAT
 from src.util.mixins.qs import AnnotateValueEqualityQSMixin
 
@@ -465,8 +467,27 @@ class ShopSettings(AbstractActiveNetworkSpecificCodeNamedModel):
 
 class ShopQuerySet(QuerySet):
     def delete(self):
-        Shop.check_related_objects_before_deletion(self.values_list('id', flat=True))
-        self.update(dttm_deleted=timezone.now())
+        with Shop._deletion_context():
+            self._not_support_combined_queries('delete')
+            assert not self.query.is_sliced, \
+                "Cannot use 'limit' or 'offset' with delete."
+
+            if self.query.distinct or self.query.distinct_fields:
+                raise TypeError('Cannot call delete() after .distinct().')
+            if self._fields is not None:
+                raise TypeError("Cannot call delete() after .values() or .values_list()")
+
+            del_query = self._chain()
+            del_query._for_write = True
+
+            # Disable non-supported fields.
+            del_query.query.select_for_update = False
+            del_query.query.select_related = False
+            del_query.query.clear_ordering(force_empty=True)
+
+            collector = Collector(using=del_query.db)
+            collector.collect(del_query)
+            self.update(dttm_deleted=timezone.now())
 
 class ShopManager(TreeManager):
     def get_queryset(self):
@@ -949,26 +970,24 @@ class Shop(MPTTModel, AbstractActiveNetworkSpecificCodeNamedModel):
             close_at_0 = all(getattr(d, a) == 0 for a in ['hour', 'second', 'minute'] for d in self.close_times.values())
             shop_24h_open = open_at_0 and close_at_0
             return shop_24h_open
-
+    
     @staticmethod
-    def check_related_objects_before_deletion(shop_ids):
-        from src.timetable.models import WorkerDay, AttendanceRecords
-        error = ''
-        if WorkerDay.objects.filter(shop_id__in=shop_ids).exists():
-            error = _('worker days')
-        elif AttendanceRecords.objects.filter(shop_id__in=shop_ids).exists():
-            error = _('attendance records')
-        elif Employment.objects.filter(shop_id__in=shop_ids).exists():
-            error = _('employments')
-        
-        if error:
-            raise ValidationError(_('Cannot delete shop because it has related {}.').format(error))
-        
+    def _deletion_context():
+        from src.timetable.models import WorkerDay
+        return OverrideBaseManager([Employment, WorkerDay])
 
-    def delete(self, **kwargs):
-        self.check_related_objects_before_deletion([self.id])
-        self.dttm_deleted = timezone.now()
-        self.save()
+    def delete(self, using=None, keep_parents=False):
+        with self._deletion_context():
+            using = using or router.db_for_write(self.__class__, instance=self)
+            assert self.pk is not None, (
+                "%s object can't be deleted because its %s attribute is set to None." %
+                (self._meta.object_name, self._meta.pk.attname)
+            )
+
+            collector = Collector(using=using)
+            collector.collect([self], keep_parents=keep_parents)
+            self.dttm_deleted = timezone.now()
+            self.save()
         return self
 
 class EmploymentManager(models.Manager):
