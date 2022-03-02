@@ -12,7 +12,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Django REST framework\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2022-03-01 15:19+0000\n"
+"POT-Creation-Date: 2022-03-02 09:45+0000\n"
 "PO-Revision-Date: 2017-08-03 14:58+0000\n"
 "Last-Translator: Grigory Mishchenko <grishkokot@gmail.com>\n"
 "Language-Team: Russian (http://www.transifex.com/django-rest-framework-1/"
@@ -84,17 +84,17 @@ msgstr "Важные даты"
 msgid "%(name)s object with primary key %(key)r does not exist."
 msgstr ""
 
-#: src/base/admin.py:491
+#: src/base/admin.py:495
 #, python-format
 msgid "Add %s"
 msgstr "Добавить %s"
 
-#: src/base/admin.py:493
+#: src/base/admin.py:497
 #, python-format
 msgid "Change %s"
 msgstr "Измененить %s"
 
-#: src/base/admin.py:495
+#: src/base/admin.py:499
 #, python-format
 msgid "View %s"
 msgstr "Посмотреть %s"
@@ -108,99 +108,99 @@ msgstr "Нет такого пользователя"
 msgid "Unable to log in with provided credentials."
 msgstr "Невозможно войти с предоставленными учетными данными."
 
-#: src/base/models.py:52 src/reports/models.py:48
+#: src/base/models.py:54 src/reports/models.py:48
 msgid "Month"
 msgstr "Месяц"
 
-#: src/base/models.py:53 src/reports/models.py:49
+#: src/base/models.py:55 src/reports/models.py:49
 msgid "Quarter"
 msgstr "Квартал"
 
-#: src/base/models.py:54 src/reports/models.py:50
+#: src/base/models.py:56 src/reports/models.py:50
 msgid "Half a year"
 msgstr "Пол года"
 
-#: src/base/models.py:55 src/reports/models.py:51
+#: src/base/models.py:57 src/reports/models.py:51
 msgid "Year"
 msgstr "Год"
 
-#: src/base/models.py:86
+#: src/base/models.py:88
 msgid "Cells"
 msgstr "Ячейки"
 
-#: src/base/models.py:87
+#: src/base/models.py:89
 msgid "Rows"
 msgstr "Строки"
 
-#: src/base/models.py:107
+#: src/base/models.py:109
 msgid "Logo"
 msgstr "Лого"
 
-#: src/base/models.py:109
+#: src/base/models.py:111
 msgid "Primary color"
 msgstr "Основной цвет"
 
-#: src/base/models.py:110
+#: src/base/models.py:112
 msgid "Secondary color"
 msgstr "Вторичный цвет"
 
-#: src/base/models.py:111
+#: src/base/models.py:113
 msgid "Name"
 msgstr "Название"
 
-#: src/base/models.py:112
+#: src/base/models.py:114
 msgid "Code"
 msgstr "Код"
 
-#: src/base/models.py:114
+#: src/base/models.py:116
 msgid "Need symbol for vacancy"
 msgstr "Нужен ли идентификатор сотруднка чтобы откликнуться на вакансию"
 
-#: src/base/models.py:115
+#: src/base/models.py:117
 msgid "Settings values"
 msgstr "Значения настроек"
 
-#: src/base/models.py:117
+#: src/base/models.py:119
 msgid "Allowed interval for late_arrival"
 msgstr "Допустимый интервал для опоздания"
 
-#: src/base/models.py:119
+#: src/base/models.py:121
 msgid "Allowed interval for early departure"
 msgstr "Допустимый интервал для раннего ухода"
 
-#: src/base/models.py:121
+#: src/base/models.py:123
 #, fuzzy
 #| msgid "Allowed interval for late_arrival"
 msgid "Allowed interval for early arrival"
 msgstr "Допустимый интервал для опоздания"
 
-#: src/base/models.py:123
+#: src/base/models.py:125
 #, fuzzy
 #| msgid "Allowed interval for early departure"
 msgid "Allowed interval for late departure"
 msgstr "Допустимый интервал для раннего ухода"
 
-#: src/base/models.py:125
+#: src/base/models.py:127
 msgid "Allow workers confirm outsource vacancy"
 msgstr "Разрешать работникам сети откликаться на аутсорс вакансии"
 
-#: src/base/models.py:126
+#: src/base/models.py:128
 msgid "OKPO code"
 msgstr "Код по ОКПО"
 
-#: src/base/models.py:129
+#: src/base/models.py:131
 msgid "Allowed geo distance (km)"
 msgstr "Разрешенная дистанция до магазина при создании отметок (км)"
 
-#: src/base/models.py:132
+#: src/base/models.py:134
 msgid "Enable camera ticks"
 msgstr "Включить отметки по камере в мобильной версии"
 
-#: src/base/models.py:134
+#: src/base/models.py:136
 msgid "Show worker day additional info"
 msgstr "Отображать доп. информацию в подтвержденных факте и плане"
 
-#: src/base/models.py:135
+#: src/base/models.py:137
 msgid ""
 "Displaying information about who last edited a worker day and when, when "
 "hovering over the corner"
@@ -208,117 +208,117 @@ msgstr ""
 "Отображение при наведении на уголок информации о том, кто и когда последний "
 "раз редактировал рабочий день"
 
-#: src/base/models.py:137
+#: src/base/models.py:139
 msgid "Show worker day tasks"
 msgstr "Отображать задачи в доп. информацию по рабочему дню"
 
-#: src/base/models.py:139
+#: src/base/models.py:141
 msgid "Crop work hours by shop schedule"
 msgstr "Обрезать рабочие часы по времени работы магазина"
 
-#: src/base/models.py:142
+#: src/base/models.py:144
 msgid "Clean worker days on employment date change"
 msgstr "Запускать скрипт очистки дней при изменении дат трудойстройства"
 
-#: src/base/models.py:145
+#: src/base/models.py:147
 msgid "Accounting period length"
 msgstr "Длина учетного периода"
 
-#: src/base/models.py:148
+#: src/base/models.py:150
 msgid "Count only fact hours that in approved plan"
 msgstr ""
 "Считать только те фактические часы, которые есть в подтвержденном плановом "
 "графике"
 
-#: src/base/models.py:151
+#: src/base/models.py:153
 msgid "Copy plan to fact crossing"
 msgstr "Копировать план в факт без перезаписи факта"
 
-#: src/base/models.py:153
+#: src/base/models.py:155
 msgid "Download tabel template"
 msgstr "Шаблон для табеля"
 
-#: src/base/models.py:157
+#: src/base/models.py:159
 msgid "Timetable format"
 msgstr "Формат загрузки/выгрузки расписания"
 
-#: src/base/models.py:160
+#: src/base/models.py:162
 msgid "Upload employments from excel"
 msgstr "Добавлять сотрудников из Excel"
 
-#: src/base/models.py:162
+#: src/base/models.py:164
 msgid "Convert tabel to"
 msgstr "Конвертировать табель в"
 
-#: src/base/models.py:172
+#: src/base/models.py:174
 msgid "Default breaks"
 msgstr "Перерывы по умолчанию"
 
-#: src/base/models.py:180
+#: src/base/models.py:182
 msgid "Default load template"
 msgstr "Шаблон нагрузки по умолчанию"
 
-#: src/base/models.py:188
+#: src/base/models.py:190
 msgid "Default exchange settings"
 msgstr "Настройки биржи смен по умолчанию"
 
-#: src/base/models.py:193
+#: src/base/models.py:195
 msgid "Worker position default values"
 msgstr "Параметры должностей по умолчанию"
 
-#: src/base/models.py:194
+#: src/base/models.py:196
 msgid "Shop default values"
 msgstr "Параметры магазина по умолчанию"
 
-#: src/base/models.py:196
+#: src/base/models.py:198
 msgid "Descrease employment date fired in api"
 msgstr "Уменьшать дату окончания трудоустройства"
 
-#: src/base/models.py:197
+#: src/base/models.py:199
 msgid "Relevant for data received via the api"
 msgstr "Актуально для данных, получаемых через api"
 
-#: src/base/models.py:200
+#: src/base/models.py:202
 msgid "Consider remaining hours in previous months when calculating norm hours"
 msgstr ""
 "Учитывать неотработанные часы за предыдущие месяца при расчете нормы часов"
 
-#: src/base/models.py:203
+#: src/base/models.py:205
 msgid ""
 "Корректировать норму часов для последнего месяца уч. периода (если уч. "
 "период != 1 мес)"
 msgstr ""
 
-#: src/base/models.py:212
+#: src/base/models.py:214
 msgid "Ignore parent code when updating department via api"
 msgstr "Не учитывать parent_code при изменении подразделения через api"
 
-#: src/base/models.py:213
+#: src/base/models.py:215
 msgid ""
 "It must be enabled for cases when the organizational structure is maintained "
 "manually"
 msgstr ""
 "Необходимо включить для случаев, когда оргструктура поддерживается вручную"
 
-#: src/base/models.py:217
+#: src/base/models.py:219
 msgid "Create employment on set or update director code"
 msgstr ""
 "Создавать скрытое трудоустройство при проставлении/изменении director_code в "
 "подразделении"
 
-#: src/base/models.py:221
+#: src/base/models.py:223
 msgid "Show user biometrics block"
 msgstr "Отображать блок биометрии в деталях сотрудника"
 
-#: src/base/models.py:225
+#: src/base/models.py:227
 msgid "Fines settings"
 msgstr "Настройки штрафов"
 
-#: src/base/models.py:235
+#: src/base/models.py:237
 msgid "Maximum shift length (in seconds)"
 msgstr "Максимальная длительность смены (в секундах)"
 
-#: src/base/models.py:237
+#: src/base/models.py:239
 msgid ""
 "Skip the creation of a departure mark if more than the Maximum shift length "
 "has passed since the opening of the previous shift"
@@ -326,11 +326,11 @@ msgstr ""
 "Пропускать создание отметки об уходе, если с момента открытия предыдущей "
 "смены прошло больше, чем максимальная длительность смены."
 
-#: src/base/models.py:242
+#: src/base/models.py:244
 msgid "Create attendance record without check photo."
 msgstr "Создавать отметки без проверки биометрии."
 
-#: src/base/models.py:246
+#: src/base/models.py:248
 msgid ""
 "Max difference between the start or end time to \"pull\" to the planned work "
 "day"
@@ -338,7 +338,7 @@ msgstr ""
 "Максимальная разность между временем начала или окончания для \"притягивания"
 "\" к рабочему дню"
 
-#: src/base/models.py:408 src/base/models.py:414
+#: src/base/models.py:410 src/base/models.py:416
 #, python-brace-format
 msgid ""
 "Bad break triplet format {triplet}, should be [[int, int, [int, int,]],]."
@@ -346,62 +346,46 @@ msgstr ""
 "Некорректный формат перерыва {triplet}, должно быть [[int, int, [int, "
 "int,]],]."
 
-#: src/base/models.py:411
+#: src/base/models.py:413
 #, python-brace-format
 msgid "First value of period can not be greater then second value: {triplet}"
 msgstr ""
 "Первое значение периода не может быть больше второго значения: {triplet}"
 
-#: src/base/models.py:417
+#: src/base/models.py:419
 #, python-brace-format
 msgid "Value of break can not be greater than value of period: {triplet}"
 msgstr "Значение перерыва не может быть больше значения периода: {triplet}"
 
-#: src/base/models.py:616
+#: src/base/models.py:637
 #, python-brace-format
 msgid "Shop with parent_code={code} not found"
 msgstr "Подразделение с parent_code={code} не найдено"
 
-#: src/base/models.py:765
+#: src/base/models.py:786
 msgid "Forecast step can't be 0."
 msgstr "Шаг прогноза не может быть 0."
 
-#: src/base/models.py:768
+#: src/base/models.py:789
 msgid "Keys of open times and close times are different."
 msgstr "Ключи в времени открытия и времени закрытия различаются."
 
-#: src/base/models.py:770
+#: src/base/models.py:791
 msgid "'All' and individual days cannot be specified."
 msgstr "Нельзя указывать all и отдельные дни."
 
-#: src/base/models.py:787
+#: src/base/models.py:808
 msgid ""
 "It is not possible to change the load template as it is in the calculation "
 "process."
 msgstr ""
 "Невозможно изменить шаблон нагрузки, так как он находится в процессе расчета."
 
-#: src/base/models.py:801
+#: src/base/models.py:822
 msgid "There is not load template with code {}."
 msgstr "Шаблон нагрузки с кодом {} не найден."
 
-#: src/base/models.py:958
-msgid "worker days"
-msgstr "рабочие дни"
-
-#: src/base/models.py:960
-msgid "attendance records"
-msgstr "отметки сотрудников"
-
-#: src/base/models.py:962
-msgid "employments"
-msgstr "трудоустройства"
-
-#: src/base/models.py:965
-msgid "Cannot delete shop because it has related {}."
-msgstr "Невозможно удалить магазин, так как с ним связаны {}."
-
-#: src/base/models.py:1514
+#: src/base/models.py:1533
 msgid ""
 "Unable to define worker access group. Assign an access group to him or a "
 "position associated with an access group."
