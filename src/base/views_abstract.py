@@ -103,10 +103,19 @@ class BaseModelViewSet(ApiLogMixin, BatchUpdateOrCreateViewMixin, ModelViewSet):
         available_extra_fields = set(self.available_extra_fields).intersection(extra_fields)
         return list(available_extra_fields)
 
+    def get_manager(self):
+        model = self.queryset.model
+        manager = model.objects
+        if self.action in ['update'] and hasattr(model, 'objects_with_excluded'):
+            manager = model.objects_with_excluded
+        
+        return manager
+
     def get_queryset(self):
+        manager = self.get_manager()
         available_extra_fields = self._get_available_extra_fields(self.request)
 
-        return self.queryset.annotate(
+        return manager.annotate(
             **{
                 extra_field: F(extra_field) for extra_field in available_extra_fields
             }
