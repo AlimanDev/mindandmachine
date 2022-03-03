@@ -119,8 +119,24 @@ class T13TimesheetDataGetter(BaseTimesheetDataGetter):
 
     def set_day_data(self, day_data, wday):
         day_data['code'] = self._get_tabel_type(wday.day_type) if wday else ''
-        day_data['value'] = (wday.day_hours + wday.night_hours) if \
-            (wday and not wday.day_type.is_dayoff) else ''
+        day_data['value'] = self.get_work_hours(day_data, wday)
+        
+    def get_work_hours(self, day_data, wday):
+        if not wday:
+            return ''
+
+        # TODO: отображать более информативно, чем просто сумму часов?
+        if not wday.day_type.is_dayoff or (wday.day_type.is_dayoff and wday.day_type.is_work_hours):
+            curr_value = day_data.get('value', Decimal('0.0'))
+            if isinstance(curr_value, str):
+                return wday.day_hours + wday.night_hours
+            else:
+                return curr_value + wday.day_hours + wday.night_hours
+        else:
+            curr_value = day_data.get('value', None)
+            if isinstance(curr_value, Decimal):
+                return curr_value
+        return ''
 
     def get_extra_grouping_attrs(self):
         pass
@@ -266,29 +282,11 @@ class MtsTimesheetDataGetter(BaseTimesheetDataGetter):
 
 class DefaultTimesheetDataGetter(T13TimesheetDataGetter):
     def set_day_data(self, day_data, wday):
-        day_data['value'] = (wday.day_hours + wday.night_hours) if (
-                    wday and not wday.day_type.is_dayoff) else self._get_tabel_type(wday.day_type) if wday else ''
+        day_data['value'] = self.get_work_hours(day_data, wday) or (
+                    self._get_tabel_type(wday.day_type) if wday else '')
 
 
 class TimesheetLinesDataGetter(DefaultTimesheetDataGetter):
-    def set_day_data(self, day_data, wday):
-        if not wday:
-            day_data['value'] = ''
-            return
-
-        # TODO: отображать более информативно, чем просто сумму часов?
-        if not wday.day_type.is_dayoff or (wday.day_type.is_dayoff and wday.day_type.is_work_hours):
-            curr_value = day_data.get('value', Decimal('0.0'))
-            if isinstance(curr_value, str):
-                day_data['value'] = wday.day_hours + wday.night_hours
-            else:
-                day_data['value'] = curr_value + wday.day_hours + wday.night_hours
-        else:
-            curr_value = day_data.get('value', None)
-            if isinstance(curr_value, Decimal):
-                return
-            day_data['value'] = self._get_tabel_type(wday.day_type)
-
     def get_extra_grouping_attrs(self):
         return [
             'position_id',
