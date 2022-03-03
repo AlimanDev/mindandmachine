@@ -10,7 +10,7 @@ from src.base.tests.factories import NetworkFactory, ShopFactory, UserFactory, E
 from src.timetable.models import TimesheetItem, WorkTypeName, WorkType, WorkerDay, WorkerDayType
 from src.timetable.tests.factories import WorkerDayFactory
 from src.timetable.timesheet.tasks import calc_timesheets
-from src.util.dg.timesheet import T13TimesheetDataGetter, MtsTimesheetDataGetter, TimesheetLinesDataGetter
+from src.util.dg.timesheet import DefaultTimesheetDataGetter, T13TimesheetDataGetter, MtsTimesheetDataGetter, TimesheetLinesDataGetter
 from src.util.mixins.tests import TestsHelperMixin
 
 
@@ -477,3 +477,36 @@ class TestGenerateTabel(TestsHelperMixin, TestCase):
         data = g.get_data()
         d = list(filter(lambda i: i['fio'] == self.employee2.user.fio, data['users']))[0]["days"]
         self.assertDictEqual(d[f'd{self.dt_now.day}'], {'value': Decimal('8.75')})
+
+    def test_generate_tabel_for_many_timesheets_on_one_day(self):
+        WorkerDay.objects.all().delete()
+        TimesheetItem.objects.all().delete()
+        WorkerDayFactory(
+            is_fact=True,
+            is_approved=True,
+            dt=self.dt_now,
+            employee=self.employee2,
+            dttm_work_start=datetime.combine(self.dt_now, time(3)),
+            dttm_work_end=datetime.combine(self.dt_now, time(16)),
+            shop=self.shop,
+            employment=self.employment2,
+            type_id=WorkerDay.TYPE_WORKDAY,
+            cashbox_details__work_type=self.work_type,
+        )
+        WorkerDayFactory(
+            is_fact=True,
+            is_approved=True,
+            dt=self.dt_now,
+            employee=self.employee2,
+            dttm_work_start=datetime.combine(self.dt_now, time(16)),
+            dttm_work_end=datetime.combine(self.dt_now, time(23)),
+            shop=self.shop,
+            employment=self.employment2,
+            type_id=WorkerDay.TYPE_WORKDAY,
+            cashbox_details__work_type=self.work_type,
+        )
+        calc_timesheets()
+        g = DefaultTimesheetDataGetter(shop=self.shop, dt_from=self.dt_from, dt_to=self.dt_to)
+        data = g.get_data()
+        d = list(filter(lambda i: i['fio'] == self.employee2.user.fio, data['users']))[0]["days"]
+        self.assertDictEqual(d[f'd{self.dt_now.day}'], {'value': Decimal('17.75')})
