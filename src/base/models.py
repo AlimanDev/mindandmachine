@@ -16,16 +16,17 @@ from django.core.cache import cache
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.core.serializers.json import DjangoJSONEncoder
 from django.core.cache import cache
-from django.db import models
+from django.db import models, router
 from django.db import transaction
 from django.db.models import Case, When, Sum, Value, IntegerField, Subquery, OuterRef, Q
+from django.db.models.deletion import Collector
 from django.db.models.query import QuerySet
 from django.template import Template, Context
 from django.utils import timezone
 from django.utils.functional import cached_property
 from django.utils.translation import gettext_lazy as _
 from model_utils import FieldTracker
-from mptt.models import MPTTModel, TreeForeignKey
+from mptt.models import MPTTModel, TreeForeignKey, TreeManager
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.serializers import ValidationError
 from timezone_field import TimeZoneField
@@ -38,6 +39,7 @@ from src.base.models_abstract import (
     NetworkSpecificModel,
     AbstractCodeNamedModel,
 )
+from src.base.models_utils import OverrideBaseManager
 from src.conf.djconfig import QOS_TIME_FORMAT
 from src.util.mixins.qs import AnnotateValueEqualityQSMixin
 
@@ -463,6 +465,36 @@ class ShopSettings(AbstractActiveNetworkSpecificCodeNamedModel):
         return None
 
 
+class ShopQuerySet(QuerySet):
+    def delete(self):
+        with Shop._deletion_context():
+            self._not_support_combined_queries('delete')
+            assert not self.query.is_sliced, \
+                "Cannot use 'limit' or 'offset' with delete."
+
+            if self.query.distinct or self.query.distinct_fields:
+                raise TypeError('Cannot call delete() after .distinct().')
+            if self._fields is not None:
+                raise TypeError("Cannot call delete() after .values() or .values_list()")
+
+            del_query = self._chain()
+            del_query._for_write = True
+
+            # Disable non-supported fields.
+            del_query.query.select_for_update = False
+            del_query.query.select_related = False
+            del_query.query.clear_ordering(force_empty=True)
+
+            collector = Collector(using=del_query.db)
+            collector.collect(del_query)
+            self.update(dttm_deleted=timezone.now())
+
+class ShopManager(TreeManager):
+    def get_queryset(self):
+        return super().get_queryset().filter(
+            models.Q(dttm_deleted__date__gt=timezone.now().date()) | models.Q(dttm_deleted__isnull=True)
+        )
+
 # на самом деле это отдел
 class Shop(MPTTModel, AbstractActiveNetworkSpecificCodeNamedModel):
     class Meta:
@@ -542,6 +574,9 @@ class Shop(MPTTModel, AbstractActiveNetworkSpecificCodeNamedModel):
     longitude = models.DecimalField(max_digits=12, decimal_places=8, null=True, blank=True, verbose_name='Долгота')
     director = models.ForeignKey('base.User', null=True, blank=True, verbose_name='Директор', on_delete=models.SET_NULL)
     city = models.CharField(max_length=128, null=True, blank=True, verbose_name='Город')
+
+    objects = ShopManager.from_queryset(ShopQuerySet)()
+    objects_with_excluded = TreeManager.from_queryset(ShopQuerySet)()
 
     tracker = FieldTracker(
         fields=['tm_open_dict', 'tm_close_dict', 'load_template', 'latitude', 'longitude', 'fias_code', 'director_id',
@@ -935,7 +970,25 @@ class Shop(MPTTModel, AbstractActiveNetworkSpecificCodeNamedModel):
             close_at_0 = all(getattr(d, a) == 0 for a in ['hour', 'second', 'minute'] for d in self.close_times.values())
             shop_24h_open = open_at_0 and close_at_0
             return shop_24h_open
+    
+    @staticmethod
+    def _deletion_context():
+        from src.timetable.models import WorkerDay
+        return OverrideBaseManager([Employment, WorkerDay])
 
+    def delete(self, using=None, keep_parents=False):
+        with self._deletion_context():
+            using = using or router.db_for_write(self.__class__, instance=self)
+            assert self.pk is not None, (
+                "%s object can't be deleted because its %s attribute is set to None." %
+                (self._meta.object_name, self._meta.pk.attname)
+            )
+
+            collector = Collector(using=using)
+            collector.collect([self], keep_parents=keep_parents)
+            self.dttm_deleted = timezone.now()
+            self.save()
+        return self
 
 class EmploymentManager(models.Manager):
     def get_queryset(self):
@@ -1769,6 +1822,8 @@ class FunctionGroup(AbstractModel):
         ('Task', 'Задача (task)'),
         ('ShiftSchedule_batch_update_or_create', 'Массовое создание/обновление графиков работ (Создать/Обновить) (shift_schedule/batch_update_or_create/)'),
         ('ShiftScheduleInterval_batch_update_or_create', 'Массовое создание/обновление интервалов графиков работ сотрудников (Создать/Обновить) (shift_schedule/batch_update_or_create/)'),
+        ('MedicalDocumentType', 'Тип медицинского документа (medical_document_type)'),
+        ('MedicalDocument', 'Период актуальности медицинского документа (medical_document)'),
     )
 
     METHODS_TUPLE = (
@@ -1837,6 +1892,7 @@ class SAWHSettingsMapping(AbstractModel):
     year = models.PositiveSmallIntegerField(verbose_name='Год учетного периода', default=current_year)
     shops = models.ManyToManyField('base.Shop', blank=True)
     positions = models.ManyToManyField('base.WorkerPosition', blank=True, related_name='+')
+    employees = models.ManyToManyField('base.Employee', blank=True, related_name='+')
     exclude_positions = models.ManyToManyField('base.WorkerPosition', blank=True, related_name='+')
     priority = models.PositiveSmallIntegerField(default=0)
 

@@ -1,14 +1,21 @@
+import json
 import urllib.parse
+from mptt.exceptions import InvalidMove
 
+from diff_match_patch import diff_match_patch
+from dateutil.parser import parse
 from django import forms
 from django.conf import settings
 from django.contrib import admin, messages
-from django.contrib.admin.options import IS_POPUP_VAR
-from django.contrib.admin.utils import unquote
+from django.contrib.admin import helpers
+from django.contrib.admin.options import IS_POPUP_VAR, TO_FIELD_VAR
+from django.contrib.admin.exceptions import DisallowedModelAdminToField
+from django.contrib.admin.utils import unquote, flatten_fieldsets
 from django.contrib.auth.admin import UserAdmin
 from django.contrib.auth.forms import UserChangeForm
 from django.core.exceptions import PermissionDenied
 from django.db import models
+from django.forms.formsets import all_valid
 from django.forms import Form
 from django.http import Http404, HttpResponseRedirect
 from django.template.response import TemplateResponse
@@ -19,10 +26,13 @@ from django.utils.translation import gettext_lazy as _
 from import_export import resources
 from import_export.admin import ExportActionMixin, ImportMixin
 from import_export.fields import Field
+from import_export.widgets import ForeignKeyWidget
 from sesame.utils import get_token
 from src.base.admin_filters import CustomChoiceDropdownFilter, RelatedOnlyDropdownLastNameOrderedFilter, RelatedOnlyDropdownNameOrderedFilter
 
 from src.base.forms import (
+    CustomConfirmImportShopForm,
+    CustomImportShopForm,
     FunctionGroupAdminForm,
     NetworkAdminForm,
     ShopAdminForm,
@@ -54,6 +64,7 @@ from src.base.models import (
     ShiftScheduleInterval,
     ContentBlock,
 )
+from src.base.shop.utils import get_offset_timezone_dict, get_shop_name
 from src.timetable.models import GroupWorkerDayPermission
 
 
@@ -88,6 +99,63 @@ class FunctionGroupResource(resources.ModelResource):
                 row['group'] = gid
                 new_data.append(row)
         dataset.dict = new_data
+
+
+class ShopResource(resources.ModelResource):
+    parent = Field(attribute='parent_id')
+    parent_name = Field(
+        attribute='parent',
+        column_name='Parent Name',
+        widget=ForeignKeyWidget(Shop, 'name'),
+        readonly=True,
+    )
+
+    class Meta:
+        model = Shop
+        import_id_fields = ('name',)
+        fields = ('name', 'parent', 'tm_open_dict', 'tm_close_dict', 'timezone')
+
+    def get_import_fields(self):
+        return [self.fields[f] for f in self.Meta.fields]
+    
+    def get_export_fields(self):
+        return [self.fields[f] for f in self.Meta.fields]
+
+    def before_import(self, dataset, using_transactions, dry_run, **kwargs):
+        network = kwargs.get('network', None)
+        shops = Shop.objects.all()
+        tz_info = get_offset_timezone_dict()
+        if network:
+            shops = shops.filter(network_id=network)
+        shops_dict = {s.name: s.id for s in shops}
+        shops = list(shops_dict.keys())
+        data = dataset.dict
+        for row in data:
+            tm_open, tm_close = row['times'].split('-')
+            row['name_in_file'] = row['name']
+            row['name'] = get_shop_name(row['name'], shops)
+            row['parent_name_in_file'] = row['parent']
+            row['parent_name'] = get_shop_name(row['parent'], shops)
+            row['parent'] = shops_dict.get(row['parent_name'])
+            row['timezone'] = tz_info.get(float(row['timezone'].split()[-1]), 'Europe/Moscow')
+            row['tm_open_dict'] = json.dumps({'all': parse(tm_open).strftime('%H:%M:%S')})
+            row['tm_close_dict'] = json.dumps({'all': parse(tm_close).strftime('%H:%M:%S')})
+        dataset.dict = data
+
+    def after_import_row(self, row, row_result, row_number=None, **kwargs):
+        row_result.diff.insert(2, row['parent_name_in_file'])
+        dmp = diff_match_patch()
+        diff = dmp.diff_main(row['name_in_file'], row['name'])
+        dmp.diff_cleanupSemantic(diff)
+        html = dmp.diff_prettyHtml(diff)
+        html = mark_safe(html)
+        row_result.diff.insert(4, html)
+
+    def get_diff_headers(self):
+        headers = super().get_diff_headers()
+        headers.insert(2, 'parent in file')
+        headers.insert(4, 'name in file')
+        return headers
 
 
 @admin.register(Network)
@@ -303,15 +371,177 @@ class EmployeeAdmin(admin.ModelAdmin):
 
 
 @admin.register(Shop)
-class ShopAdmin(admin.ModelAdmin):
+class ShopAdmin(ImportMixin, admin.ModelAdmin):
     list_display = ('name', 'parent_title', 'id', 'code')
     search_fields = ('name', 'parent__name', 'id', 'code')
     raw_id_fields = ('director',)
     form = ShopAdminForm
+    resource_class = ShopResource
 
     @staticmethod
     def parent_title(instance: Shop):
         return instance.parent_title()
+    
+    def get_import_form(self):
+        return CustomImportShopForm
+
+    def get_confirm_import_form(self):
+        return CustomConfirmImportShopForm
+    
+    def get_deleted_objects(self, *args, **kwargs):
+        with Shop._deletion_context():
+            return super().get_deleted_objects(*args, **kwargs)
+
+    def get_form_kwargs(self, form, *args, **kwargs):
+        if isinstance(form, Form) and form.is_valid():
+            network = form.cleaned_data['network']
+            kwargs.update({'network': getattr(network, 'id', None)})
+        return kwargs
+
+    def get_import_data_kwargs(self, request, *args, **kwargs):
+        form = kwargs.get('form')
+        if form and form.is_valid():
+            network = form.cleaned_data['network']
+            kwargs.update({'network': getattr(network, 'id', None)})
+        return super().get_import_data_kwargs(request, *args, **kwargs)
+
+    def _changeform_view(self, request, object_id, form_url, extra_context):
+        to_field = request.POST.get(TO_FIELD_VAR, request.GET.get(TO_FIELD_VAR))
+        if to_field and not self.to_field_allowed(request, to_field):
+            raise DisallowedModelAdminToField("The field %s cannot be referenced." % to_field)
+
+        model = self.model
+        opts = model._meta
+
+        if request.method == 'POST' and '_saveasnew' in request.POST:
+            object_id = None
+
+        add = object_id is None
+
+        if add:
+            if not self.has_add_permission(request):
+                raise PermissionDenied
+            obj = None
+
+        else:
+            obj = self.get_object(request, unquote(object_id), to_field)
+
+            if request.method == 'POST':
+                if not self.has_change_permission(request, obj):
+                    raise PermissionDenied
+            else:
+                if not self.has_view_or_change_permission(request, obj):
+                    raise PermissionDenied
+
+            if obj is None:
+                return self._get_obj_does_not_exist_redirect(request, opts, object_id)
+
+        fieldsets = self.get_fieldsets(request, obj)
+        ModelForm = self.get_form(
+            request, obj, change=not add, fields=flatten_fieldsets(fieldsets)
+        )
+        if request.method == 'POST':
+            form = ModelForm(request.POST, request.FILES, instance=obj)
+            form_validated = form.is_valid()
+            if form_validated:
+                new_object = self.save_form(request, form, change=not add)
+            else:
+                new_object = form.instance
+            formsets, inline_instances = self._create_formsets(request, new_object, change=not add)
+            if all_valid(formsets) and form_validated:
+                try:
+                    self.save_model(request, new_object, form, not add)
+                except InvalidMove as e:
+                    form.add_error('parent', str(e))
+                    form_validated = False
+                if form_validated:
+                    self.save_related(request, form, formsets, not add)
+                    change_message = self.construct_change_message(request, form, formsets, add)
+                    if add:
+                        self.log_addition(request, new_object, change_message)
+                        return self.response_add(request, new_object)
+                    else:
+                        self.log_change(request, new_object, change_message)
+                        return self.response_change(request, new_object)
+            else:
+                form_validated = False
+        else:
+            if add:
+                initial = self.get_changeform_initial_data(request)
+                form = ModelForm(initial=initial)
+                formsets, inline_instances = self._create_formsets(request, form.instance, change=False)
+            else:
+                form = ModelForm(instance=obj)
+                formsets, inline_instances = self._create_formsets(request, obj, change=True)
+
+        if not add and not self.has_change_permission(request, obj):
+            readonly_fields = flatten_fieldsets(fieldsets)
+        else:
+            readonly_fields = self.get_readonly_fields(request, obj)
+        adminForm = helpers.AdminForm(
+            form,
+            list(fieldsets),
+            # Clear prepopulated fields on a view-only form to avoid a crash.
+            self.get_prepopulated_fields(request, obj) if add or self.has_change_permission(request, obj) else {},
+            readonly_fields,
+            model_admin=self)
+        media = self.media + adminForm.media
+
+        inline_formsets = self.get_inline_formsets(request, formsets, inline_instances, obj)
+        for inline_formset in inline_formsets:
+            media = media + inline_formset.media
+
+        if add:
+            title = _('Add %s')
+        elif self.has_change_permission(request, obj):
+            title = _('Change %s')
+        else:
+            title = _('View %s')
+        context = {
+            **self.admin_site.each_context(request),
+            'title': title % opts.verbose_name,
+            'subtitle': str(obj) if obj else None,
+            'adminform': adminForm,
+            'object_id': object_id,
+            'original': obj,
+            'is_popup': IS_POPUP_VAR in request.POST or IS_POPUP_VAR in request.GET,
+            'to_field': to_field,
+            'media': media,
+            'inline_admin_formsets': inline_formsets,
+            'errors': helpers.AdminErrorList(form, formsets),
+            'preserved_filters': self.get_preserved_filters(request),
+        }
+
+        # Hide the "Save" and "Save and continue" buttons if "Save as New" was
+        # previously chosen to prevent the interface from getting confusing.
+        if request.method == 'POST' and not form_validated and "_saveasnew" in request.POST:
+            context['show_save'] = False
+            context['show_save_and_continue'] = False
+            # Use the change template instead of the add template.
+            add = False
+
+        context.update(extra_context or {})
+
+        return self.render_change_form(request, context, add=add, change=not add, obj=obj, form_url=form_url)
+    
+    def get_import_form(self):
+        return CustomImportShopForm
+
+    def get_confirm_import_form(self):
+        return CustomConfirmImportShopForm
+
+    def get_form_kwargs(self, form, *args, **kwargs):
+        if isinstance(form, Form) and form.is_valid():
+            network = form.cleaned_data['network']
+            kwargs.update({'network': getattr(network, 'id', None)})
+        return kwargs
+
+    def get_import_data_kwargs(self, request, *args, **kwargs):
+        form = kwargs.get('form')
+        if form and form.is_valid():
+            network = form.cleaned_data['network']
+            kwargs.update({'network': getattr(network, 'id', None)})
+        return super().get_import_data_kwargs(request, *args, **kwargs)
 
 
 @admin.register(ShopSettings)
@@ -443,7 +673,7 @@ class SAWHSettingsMappingInline(admin.StackedInline):
     model = SAWHSettingsMapping
     extra = 0
 
-    filter_horizontal = ('shops', 'positions', 'exclude_positions')
+    filter_horizontal = ('shops', 'positions', 'employees', 'exclude_positions')
 
 
 @admin.register(SAWHSettings)
@@ -454,6 +684,7 @@ class SAWHSettingsAdmin(admin.ModelAdmin):
         'type',
     )
 
+    save_as = True
     inlines = (
         SAWHSettingsMappingInline,
     )

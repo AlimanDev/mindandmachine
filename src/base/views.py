@@ -87,16 +87,13 @@ class EmploymentViewSet(UpdateorCreateViewSet):
     serializer_class = EmploymentSerializer
     filterset_class = EmploymentFilter
     openapi_tags = ['Employment', 'Integration',]
+    queryset = Employment.objects.all()
 
     def perform_update(self, serializer):
         serializer.save(dttm_deleted=None)
 
     def get_queryset(self):
-        manager = Employment.objects
-        if self.action in ['update']:
-            manager = Employment.objects_with_excluded
-
-        qs = manager.filter(
+        qs = super().get_queryset().filter(
             Q(shop__network_id=self.request.user.network_id) | 
             Q(employee__user__network_id=self.request.user.network_id), # чтобы можно было аутсорсу редактировать трудоустройтсва своих сотрудников
         ).order_by('-dt_hired')
@@ -288,6 +285,10 @@ class EmployeeViewSet(UpdateorCreateViewSet):
             if show_constraints and bool(distutils.util.strtobool(show_constraints)):
                 employments_qs = employments_qs.prefetch_related(Prefetch('worker_constraints', to_attr='worker_constraints_list'))
             filtered_qs = filtered_qs.prefetch_related(Prefetch('employments', queryset=employments_qs, to_attr='employments_list'))
+        include_medical_documents = self.request.query_params.get('include_medical_documents')
+        if include_medical_documents and bool(distutils.util.strtobool(include_medical_documents)):
+            filtered_qs = filtered_qs.prefetch_related(
+                Prefetch('medical_documents', to_attr='medical_documents_list'))
         return filtered_qs
 
     @action(detail=False, methods=['get'])

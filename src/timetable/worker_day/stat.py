@@ -337,7 +337,7 @@ class WorkersStatsGetter:
     def employments_list(self):
         dt_from, dt_to = self.acc_period_range
         sawh_settings_subq = SAWHSettingsMapping.objects.filter(
-            Q(positions__id=OuterRef('position_id')) | Q(shops__id=OuterRef('shop_id')),
+            Q(positions__id=OuterRef('position_id')) | Q(shops__id=OuterRef('shop_id')) | Q(employees__id=OuterRef('employee_id')),
             ~Q(exclude_positions__id=OuterRef('position_id')),
             year=self.year,
         ).order_by('-priority')

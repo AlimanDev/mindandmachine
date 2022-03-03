@@ -12,12 +12,12 @@ https://docs.facecloud.tevian.ru/#/user/post_api_v1_users
 """
 import logging
 
-import requests
 from django.conf import settings
 from django.utils.translation import gettext as _
 from requests.exceptions import HTTPError
 
 from src.base.exceptions import EnvLvlViolation
+from src.util.http import make_retry_session
 
 logger = logging.getLogger('django')
 
@@ -280,7 +280,7 @@ class Tevian:
             if self.token:
                 headers['Authorization'] = f"Bearer {self.token}"
 
-        response = requests.request(
+        response = make_retry_session().request(
             method,
             url,
             data=data,

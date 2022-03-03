@@ -3,6 +3,7 @@
 {% block object-tools-items %}
     <li>
         <a href="{% url 'recalc_wh' %}" class="btn btn-high btn-success">Пересчитать рабочие часы</a>
+        <a href="{% url 'recalc_timesheet' %}" class="btn btn-high btn-success">Пересчитать табель</a>
     </li>
     {{ block.super }}
 {% endblock %}

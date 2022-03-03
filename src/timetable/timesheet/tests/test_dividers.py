@@ -1321,3 +1321,42 @@ class TestShiftScheduleDivider(TestTimesheetMixin, TestCase):
             donor_additional_ts_item = TimesheetItem.objects.filter(
                 employee=employee, dt=dt_donor, timesheet_type=TimesheetItem.TIMESHEET_TYPE_ADDITIONAL).first()
             self.assertIsNone(donor_additional_ts_item)
+
+    def test_check_weekly_continuous_holidays_logic(self):
+        wd_holidays = WorkerDay.objects.filter(
+            dt__in=[
+                date(2021, 6, 7),
+                date(2021, 6, 9),
+                date(2021, 6, 13),
+            ],
+        )
+        wd_holidays.filter(is_fact=True).delete()
+        for wd in wd_holidays:
+            wd.type_id = WorkerDay.TYPE_HOLIDAY
+            wd.dttm_work_start = None
+            wd.dttm_work_end = None
+            wd.shop = None
+            wd.save()
+        worker_days_data = [
+            (date(2021, 6, 8), time(8), time(20)),
+            (date(2021, 6, 10), time(8), time(20)),
+            (date(2021, 6, 11), time(8), time(18)),
+            (date(2021, 6, 12), time(8), time(15)),
+        ]
+        for dt, tm_start, tm_end in worker_days_data:
+            wdays = WorkerDay.objects.filter(dt=dt)
+            for wd in wdays:
+                wd.dttm_work_start = datetime.combine(dt, tm_start)
+                wd.dttm_work_end = datetime.combine(dt, tm_end)
+                wd.save()
+
+        self._calc_timesheets(reraise_exc=True)
+
+        ts_items = {
+            ts.dt: ts for ts in TimesheetItem.objects.filter(employee=self.employee_worker, timesheet_type=TimesheetItem.TIMESHEET_TYPE_MAIN)
+        }
+
+        self.assertEqual(ts_items[date(2021, 6, 8)].day_type_id, WorkerDay.TYPE_WORKDAY)
+        self.assertEqual(ts_items[date(2021, 6, 10)].day_type_id, WorkerDay.TYPE_WORKDAY)
+        self.assertEqual(ts_items[date(2021, 6, 11)].day_type_id, WorkerDay.TYPE_WORKDAY)
+        self.assertEqual(ts_items[date(2021, 6, 12)].day_type_id, WorkerDay.TYPE_HOLIDAY)

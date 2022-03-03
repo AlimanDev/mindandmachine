@@ -8,6 +8,7 @@ from src.base.models import (
     ShiftScheduleInterval,
     Employee,
 )
+from src.base.serializers import BaseModelSerializer
 
 
 # class ShiftScheduleDayItemSerializer(serializers.ModelSerializer):
@@ -21,7 +22,7 @@ from src.base.models import (
 #         )
 
 
-class ShiftScheduleDaySerializer(serializers.ModelSerializer):
+class ShiftScheduleDaySerializer(BaseModelSerializer):
     day_type = serializers.CharField(source='day_type_id')
 
     class Meta:
@@ -37,7 +38,7 @@ class ShiftScheduleDaySerializer(serializers.ModelSerializer):
         )
 
 
-class ShiftScheduleSerializer(serializers.ModelSerializer):
+class ShiftScheduleSerializer(BaseModelSerializer):
     default_error_messages = {
         "no_employee_with_tabel_code": _("There are {amount} models of employee with tabel_code: {tabel_code}."),
     }
@@ -74,7 +75,7 @@ class ShiftScheduleSerializer(serializers.ModelSerializer):
         return attrs
 
 
-class ShiftScheduleIntervalSerializer(serializers.ModelSerializer):
+class ShiftScheduleIntervalSerializer(BaseModelSerializer):
     default_error_messages = {
         "no_employee_with_tabel_code": _("There are {amount} models of employee with tabel_code: {tabel_code}."),
         "no_shift_schedule_with_code": _("There are {amount} models of shift_schedule with code: {code}."),

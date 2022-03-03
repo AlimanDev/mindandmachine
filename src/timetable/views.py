@@ -1,4 +1,6 @@
+from dateutil.relativedelta import relativedelta
 from django.views.generic.edit import FormView
+from src.base.models import Employee
 from src.base.permissions import FilteredListPermission
 from src.timetable.filters import EmploymentWorkTypeFilter
 from src.timetable.models import (
@@ -8,7 +10,7 @@ from src.timetable.serializers import (
     EmploymentWorkTypeSerializer,
 )
 from src.base.views_abstract import BaseModelViewSet
-from src.timetable.forms import RecalsWhForm
+from src.timetable.forms import RecalsTimesheetForm, RecalsWhForm
 from src.timetable.mixins import SuperuserRequiredMixin
 
 
@@ -53,3 +55,39 @@ class RecalcWhAdminView(SuperuserRequiredMixin, FormView):
         context['has_permission'] = True
 
         return context
+
+class RecalcTimesheetAdminView(SuperuserRequiredMixin, FormView):
+    form_class = RecalsTimesheetForm
+    template_name = 'recalc_timesheet.html'
+    success_url = '/admin/timetable/workerday/'
+
+    def form_valid(self, form):
+        users = form.cleaned_data['users']
+        shops = form.cleaned_data['shops']
+        dt_from = form.cleaned_data['dt_from']
+
+        kwargs = {
+            'dt_from': dt_from.replace(day=1).strftime('%Y-%m-%d'),
+            'dt_to': (dt_from + relativedelta(day=31)).strftime('%Y-%m-%d'),
+        }
+
+        employee_qs = Employee.objects.all()
+
+        if users:
+            employee_qs = employee_qs.filter(user__in=users)
+        if shops:
+            employee_qs = employee_qs.filter(employments__shop__in=shops).distinct('id')
+        
+        kwargs['employee_id__in'] = list(employee_qs.values_list('id', flat=True))
+        
+        form.recalc_timesheet(**kwargs)
+        return super().form_valid(form)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+
+        context['title'] = 'Пересчет табеля'
+        context['has_permission'] = True
+
+        return context
+

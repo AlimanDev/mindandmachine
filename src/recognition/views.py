@@ -133,7 +133,11 @@ class UserAuthTickViewStrategy(TickViewStrategy):
         shop = data['shop_code']
         tick_point = TickPoint.objects.filter(shop=shop, dttm_deleted__isnull=True).first()
         if tick_point is None:
-            tick_point = TickPoint.objects.create(name=f'autocreate tickpoint {shop.id}', shop=shop)
+            tick_point = TickPoint.objects.create(
+                name=f'autocreate tickpoint {shop.id}', 
+                shop=shop, 
+                network_id=self.view.request.user.network_id,
+            )
 
         return user_id, data.get('employee_id'), tick_point
 

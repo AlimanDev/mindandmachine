@@ -35,7 +35,7 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
         cls.worker_stat_url = '/rest_api/worker_day/worker_stat/'
         cls.url_approve = '/rest_api/worker_day/approve/'
         cls.daily_stat_url = '/rest_api/worker_day/daily_stat/'
-        cls.work_type_name = WorkTypeName.objects.create(name='Магазин')
+        cls.work_type_name = WorkTypeName.objects.create(name='Магазин', network=cls.network)
         cls.work_type = WorkType.objects.create(
             work_type_name=cls.work_type_name,
             shop=cls.shop,
@@ -138,7 +138,8 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
 
         otn1 = OperationTypeName.objects.create(
             is_special=True,
-            name='special'
+            name='special',
+            network=self.network,
         )
         ot1 = OperationType.objects.create(
             operation_type_name=otn1,
@@ -612,7 +613,8 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
     def _create_wd_and_task(self, wd_type_id, start_timedelta, end_timedelta):
         wd = self.create_worker_day(type_id=wd_type_id, shop=self.shop, dt=self.dt, is_approved=False, is_fact=False)
         otn = OperationTypeName.objects.create(
-            name='Приём врача'
+            name='Приём врача',
+            network=self.network,
         )
         ot = OperationType.objects.create(
             operation_type_name=otn,
@@ -707,23 +709,26 @@ class TestUploadDownload(TestsHelperMixin, APITestCase):
     USER_EMAIL = "q@q.q"
     USER_PASSWORD = "4242"
 
-    def setUp(self):
-        super().setUp()
-        create_departments_and_users(self)
+    @classmethod
+    def setUpTestData(cls):
+        cls.create_departments_and_users()
         WorkerPosition.objects.bulk_create(
             [
                 WorkerPosition(
                     name=name,
+                    network=cls.network,
                 )
                 for name in ['Директор магазина', 'Продавец', 'Продавец-кассир', 'ЗДМ']
             ]
         )
 
-        WorkType.objects.create(work_type_name=WorkTypeName.objects.create(name='Кассы'), shop_id=self.shop.id)
-        self.url = '/rest_api/worker_day/'
-        self.network.add_users_from_excel = True
-        self.network.allow_creation_several_wdays_for_one_employee_for_one_date = True
-        self.network.save()
+        WorkType.objects.create(work_type_name=WorkTypeName.objects.create(name='Кассы', network=cls.network), shop_id=cls.shop.id)
+        cls.url = '/rest_api/worker_day/'
+        cls.network.add_users_from_excel = True
+        cls.network.allow_creation_several_wdays_for_one_employee_for_one_date = True
+        cls.network.save()
+
+    def setUp(self):
         self.client.force_authenticate(user=self.user1)
 
     def test_upload_timetable_match_tabel_code(self):
@@ -920,6 +925,7 @@ class TestUploadDownload(TestsHelperMixin, APITestCase):
             name='Child',
             parent=self.region,
             code='child',
+            network=self.network,
         )
         ProductionDay.objects.create(
             dt='2020-04-04',
