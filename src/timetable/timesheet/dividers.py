@@ -365,10 +365,20 @@ class PobedaTimesheetDivider(BaseTimesheetDivider):
             active_employment = self.fiscal_timesheet._get_active_employment(dt)
             if active_employment:
                 for main_timesheet_item in self.fiscal_timesheet.main_timesheet.get_items(dt=dt):
-                    if main_timesheet_item.position != active_employment.position \
-                            or main_timesheet_item.shop != active_employment.shop:
+                    work_type_name_differs = \
+                        main_timesheet_item.work_type_name and \
+                        active_employment.main_work_type_name_id and \
+                        main_timesheet_item.work_type_name.id != active_employment.main_work_type_name_id
+                    position_differs = main_timesheet_item.position != active_employment.position
+                    shop_differs = main_timesheet_item.shop != active_employment.shop
+                    move_cond = (self.fiscal_timesheet.employee.user.network.settings_values_prop.get(
+                        'move_to_add_timesheet_if_work_type_name_differs') and work_type_name_differs) \
+                                or position_differs \
+                                or shop_differs
+                    if move_cond:
                         self.fiscal_timesheet.main_timesheet.remove(dt, main_timesheet_item)
-                        self.fiscal_timesheet.additional_timesheet.add(dt, main_timesheet_item)
+                        self.fiscal_timesheet.additional_timesheet.add(
+                            dt, main_timesheet_item.copy(overrides={'freezed': True}))
 
     def _fill_empty_dates_as_holidays_in_main_timesheet(self):
         for dt in pd.date_range(self.fiscal_timesheet.dt_from, self.fiscal_timesheet.dt_to).date:
