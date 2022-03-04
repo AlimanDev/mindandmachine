@@ -1,6 +1,7 @@
 from django.db import models, transaction
 from src.base.models import Network, User
 from src.timetable.models import WorkerDay, WorkerDayCashboxDetails
+from src.timetable.worker_day.tasks import recalc_wdays
 
 
 def copy_approved(dt_from, dt_to=None):
@@ -190,3 +191,5 @@ def copy_plan_to_fact(network_id, override_auto_start=False, override_auto_end=F
             ]
         )
         WorkerDay.objects.bulk_update(wdays_to_update, fields=['dttm_work_start', 'dttm_work_end', 'closest_plan_approved', 'last_edited_by'])
+
+        recalc_wdays.delay(id__in=list(map(lambda x: x.id, created_wdays)) + list(map(lambda x: x.id, wdays_to_update)))
