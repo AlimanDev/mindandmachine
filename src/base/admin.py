@@ -197,6 +197,10 @@ class NetworkAdmin(admin.ModelAdmin):
             'consider_remaining_hours_in_prev_months_when_calc_norm_hours',
             'correct_norm_hours_last_month_acc_period',
             'get_position_from_work_type_name_in_calc_timesheet',
+            'fiscal_sheet_divider_alias',
+            'timesheet_max_hours_threshold',
+            'timesheet_min_hours_threshold',
+            'timesheet_divider_sawh_hours_key',
         )}),
         (_('Integration settings'), {'fields': (
             'api_timesheet_lines_group_by',

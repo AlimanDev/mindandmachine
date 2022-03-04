@@ -42,6 +42,7 @@ from src.base.models_abstract import (
 from src.base.models_utils import OverrideBaseManager
 from src.conf.djconfig import QOS_TIME_FORMAT
 from src.util.mixins.qs import AnnotateValueEqualityQSMixin
+from src.timetable.timesheet import min_threshold_funcs
 
 
 class Network(AbstractActiveModel):
@@ -75,6 +76,12 @@ class Network(AbstractActiveModel):
         (TIMESHEET_LINES_GROUP_BY_EMPLOYEE, 'Сотруднику'),
         (TIMESHEET_LINES_GROUP_BY_EMPLOYEE_POSITION, 'Сотруднику и должности'),
         (TIMESHEET_LINES_GROUP_BY_EMPLOYEE_POSITION_SHOP, 'Сотруднику, должности и подразделению выхода'),
+    )
+
+    FISCAL_SHEET_DIVIDERS_ALIAS_CHOICES = (
+        ('nahodka', 'Находка'),
+        ('pobeda', 'Победа'),
+        ('shift_schedule', 'По расписанию смен'),
     )
 
     TABEL_FORMAT_CHOICES = (
@@ -276,6 +283,16 @@ class Network(AbstractActiveModel):
         choices=TIMESHEET_LINES_GROUP_BY_CHOICES, default=TIMESHEET_LINES_GROUP_BY_EMPLOYEE_POSITION_SHOP)
     show_cost_for_inner_vacancies = models.BooleanField('Отображать поле "стоимость работ" для внутренних вакансий', default=False)
     rebuild_timetable_min_delta = models.IntegerField(default=2, verbose_name='Минимальное время для составления графика')
+    fiscal_sheet_divider_alias = models.CharField(
+        max_length=64, choices=FISCAL_SHEET_DIVIDERS_ALIAS_CHOICES, null=True, blank=True,
+        verbose_name='Алгоритм разделения табеля', 
+        help_text='Если не указано, то при расчете табеля разделение на осн. и доп. не производится')
+    timesheet_max_hours_threshold = models.DecimalField(
+        verbose_name='Максимальное количество часов в белом табеле', default=Decimal('12.00'), max_digits=5, decimal_places=2)
+    timesheet_min_hours_threshold = models.CharField(
+        verbose_name='Минимальное количество часов в белом табеле', max_length=64, default='4.00', 
+        help_text='Может принимать либо числовое значение, либо название функции')
+    timesheet_divider_sawh_hours_key = models.CharField(max_length=128, default='curr_month')
 
     ANALYTICS_TYPE_METABASE = 'metabase'
     ANALYTICS_TYPE_CUSTOM_IFRAME = 'custom_iframe'
@@ -289,7 +306,7 @@ class Network(AbstractActiveModel):
     analytics_type = models.CharField(
         verbose_name='Вид аналитики', max_length=32, choices=ANALYTICS_TYPE_CHOICES, default=ANALYTICS_TYPE_METABASE)
 
-    tracker = FieldTracker(fields=('accounting_period_length',))
+    tracker = FieldTracker(fields=('accounting_period_length', 'timesheet_min_hours_threshold'))
 
     DEFAULT_NIGHT_EDGES = (
         '22:00:00',
@@ -304,7 +321,22 @@ class Network(AbstractActiveModel):
     def save(self, *args, **kwargs):
         if self.id and self.tracker.has_changed('accounting_period_length'):
             cache.delete_pattern("prod_cal_*_*_*")
+        if self.tracker.has_changed('timesheet_min_hours_threshold'):
+            self.get_timesheet_min_hours_threshold(100)
         return super().save(*args, **kwargs)
+
+
+    def get_timesheet_min_hours_threshold(self, work_hours):
+        try:
+            min_hours_threshold_func = getattr(min_threshold_funcs, self.timesheet_min_hours_threshold, None)
+            if min_hours_threshold_func:
+                return min_hours_threshold_func(work_hours)
+            else:
+                return Decimal(self.timesheet_min_hours_threshold)
+        except:
+            raise ValueError(
+                'timesheet_min_hours_threshold может принимать либо численное значение, либо название функции'
+            )
 
     def set_settings_value(self, k, v):
         settings_values = json.loads(self.settings_values)

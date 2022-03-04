@@ -14,11 +14,10 @@ from src.util.dg.timesheet import DefaultTimesheetDataGetter, T13TimesheetDataGe
 from src.util.mixins.tests import TestsHelperMixin
 
 
-@override_settings(FISCAL_SHEET_DIVIDER_ALIAS='nahodka')
 class TestGenerateTabel(TestsHelperMixin, TestCase):
     @classmethod
     def setUpTestData(cls):
-        cls.network = NetworkFactory()
+        cls.network = NetworkFactory(fiscal_sheet_divider_alias='nahodka')
         cls.create_departments_and_users()
         cls.dttm_now = datetime.now()
         cls.dt_now = cls.dttm_now.date()
@@ -53,7 +52,7 @@ class TestGenerateTabel(TestsHelperMixin, TestCase):
         cls._generate_plan_and_fact_worker_days_for_shop_employments(
             shop=cls.shop, work_type=cls.work_type, dt_from=cls.dt_from, dt_to=cls.dt_to)
         cls.network.okpo = '44412749'
-        cls.outsource_network = NetworkFactory(name='Аутсорс сеть', code='outsource')
+        cls.outsource_network = NetworkFactory(name='Аутсорс сеть', code='outsource', fiscal_sheet_divider_alias='nahodka')
         cls.outsource_shop = ShopFactory(network=cls.outsource_network)
         cls.outsource_user = UserFactory(network=cls.outsource_network)
         cls.outsource_employee = EmployeeFactory(user=cls.outsource_user)

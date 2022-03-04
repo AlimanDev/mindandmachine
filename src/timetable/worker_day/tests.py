@@ -853,7 +853,6 @@ class TestUploadDownload(TestsHelperMixin, APITestCase):
         self.assertEqual(tabel[tabel.columns[1]][11], 'Иванов Иван Иванович')
         self.assertEqual(tabel[tabel.columns[26]][14], 'В')
 
-    @override_settings(FISCAL_SHEET_DIVIDER_ALIAS='nahodka')
     def test_download_timetable_for_inspection(self):
         fill_calendar('2020.4.1', '2021.12.31', self.region.id)
         WorkerDayType.objects.filter(code=WorkerDay.TYPE_VACATION).update(is_dayoff=True, is_work_hours=True)
@@ -862,6 +861,7 @@ class TestUploadDownload(TestsHelperMixin, APITestCase):
         file.close()
         self.network.set_settings_value('timetable_add_holiday_count_field', True)
         self.network.set_settings_value('timetable_add_vacation_count_field', True)
+        self.network.fiscal_sheet_divider_alias = 'nahodka'
         self.network.save()
         WorkerDay.objects.update(is_approved=True)
         calc_timesheets(dt_from=date(2020, 4, 1), dt_to=date(2020, 4, 30))

@@ -500,10 +500,6 @@ SESAME_ONE_TIME = True
 SESAME_MAX_AGE = 60 * 60  # время жизни временного токена 1 час
 SESAME_TOKEN_NAME = 'otp_token'
 
-# Возможные вариант можно найти по FISCAL_SHEET_DIVIDERS_MAPPING
-# Если == None, то при расчете табеля разделение на осн. и доп. не производится
-FISCAL_SHEET_DIVIDER_ALIAS = None
-
 ENV_LVL_PROD = 'prod'
 ENV_LVL_TEST = 'test'
 ENV_LVL_LOCAL = 'local'
@@ -514,9 +510,6 @@ API_LOG_DELETE_GAP = 90
 # если текущий день месяца > {CALC_TIMESHEET_PREV_MONTH_THRESHOLD_DAYS},
 # то за прошлый месяца автоматически пересчет не запускается
 CALC_TIMESHEET_PREV_MONTH_THRESHOLD_DAYS = 4
-
-TIMESHEET_MAX_HOURS_THRESHOLD = Decimal('12.00')
-TIMESHEET_MIN_HOURS_THRESHOLD = Decimal('4.00')
 
 DOWNLOAD_TIMETABLE_GET_CODE_FUNC = lambda e: e.employee.tabel_code or ''
 
