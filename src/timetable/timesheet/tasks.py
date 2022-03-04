@@ -25,13 +25,13 @@ def calc_timesheets(employee_id__in: list = None, dt_from=None, dt_to=None, rera
     calc_periods = _get_calc_periods(dt_from=dt_from, dt_to=dt_to)
 
     if employee_id__in:
-        qs = Employee.objects.filter(id__in=employee_id__in)
+        qs = Employee.objects.filter(id__in=employee_id__in).select_related('user__network')
     else:
         qs = Employee.objects.filter(
             employments__in=Employment.objects.get_active(
                 dt_from=calc_periods[0][0], dt_to=calc_periods[-1][1],
             )
-        ).distinct()
+        ).select_related('user__network').distinct()
 
     # TODO: переделать
     # qs = qs.annotate(

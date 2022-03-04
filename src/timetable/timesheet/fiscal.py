@@ -4,10 +4,12 @@ from decimal import Decimal
 
 import pandas as pd
 from django.db import transaction
+from django.db.models import Prefetch, Subquery, OuterRef
 
 from src.timetable.models import (
     Employment as EmploymentModel,
     TimesheetItem as TimesheetItemModel,
+    EmploymentWorkType,
 )
 
 
@@ -242,6 +244,13 @@ class FiscalTimesheet:
             'shop',
             'employee__user',
             'position',
+        ).annotate(
+            main_work_type_name_id=Subquery(
+                EmploymentWorkType.objects.filter(
+                    employment_id=OuterRef('id'),
+                    priority=1,
+                ).values('work_type__work_type_name_id')[:1]
+            )
         ))
         self.dt_from = dt_from
         self.dt_to = dt_to

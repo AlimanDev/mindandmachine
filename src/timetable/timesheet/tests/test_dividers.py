@@ -930,6 +930,77 @@ class TestPobedaDivider(TestTimesheetMixin, TestCase):
         self.assertEqual(TimesheetItem.objects.get(
             timesheet_type=TimesheetItem.TIMESHEET_TYPE_MAIN, dt='2021-06-20').day_type_id, WorkerDay.TYPE_HOLIDAY)
 
+    def test_work_days_moved_to_additional_timesheet_by_work_type(self):
+        self.employee_worker.user.network.set_settings_value('move_to_add_timesheet_if_work_type_name_differs', True)
+        self.employee_worker.user.network.save()
+        work_type_name_worker2 = WorkTypeName.objects.create(
+            network=self.network,
+            name='worker2',
+            code='worker2',
+        )
+        work_type_worker2 = WorkType.objects.create(
+            work_type_name=work_type_name_worker2,
+            shop=self.shop,
+        )
+
+        WorkerDay.objects.all().delete()
+        wdays = (
+            ((WorkerDay.TYPE_WORKDAY, time(8), time(16), None, self.work_type_worker), (
+                date(2021, 6, 1),
+                date(2021, 6, 2),
+            )),
+            ((WorkerDay.TYPE_WORKDAY, time(16), time(20), None, work_type_worker2), (
+                date(2021, 6, 1),
+                date(2021, 6, 2),
+            )),
+            ((WorkerDay.TYPE_WORKDAY, time(8), time(20), None, self.work_type_worker), (
+                date(2021, 6, 3),
+            )),
+            ((WorkerDay.TYPE_WORKDAY, time(8), time(20), None, work_type_worker2), (
+                date(2021, 6, 4),
+            )),
+        )
+        for (wd_type_id, tm_start, tm_end, work_hours, work_type), dates in wdays:
+            for dt in dates:
+                is_night_work = False
+                if tm_start and tm_end and tm_end < tm_start:
+                    is_night_work = True
+
+                is_work_day = wd_type_id == WorkerDay.TYPE_WORKDAY
+                WorkerDayFactory(
+                    type_id=wd_type_id,
+                    dt=dt,
+                    shop=self.shop,
+                    employee=self.employee_worker,
+                    employment=self.employment_worker,
+                    dttm_work_start=datetime.combine(dt, tm_start) if is_work_day else None,
+                    dttm_work_end=datetime.combine(dt + timedelta(days=1) if is_night_work else dt,
+                                                   tm_end) if is_work_day else None,
+                    is_fact=is_work_day,
+                    is_approved=True,
+                    work_hours=work_hours,
+                    cashbox_details__work_type=work_type,
+                )
+        self._calc_timesheets(reraise_exc=True)
+        self.assertEqual(TimesheetItem.objects.get(
+            work_type_name=self.work_type_name_worker,
+            timesheet_type=TimesheetItem.TIMESHEET_TYPE_MAIN, dt='2021-06-01').day_hours, 7)
+        self.assertEqual(TimesheetItem.objects.get(
+            work_type_name=work_type_name_worker2,
+            timesheet_type=TimesheetItem.TIMESHEET_TYPE_ADDITIONAL, dt='2021-06-01').day_hours, 3)
+        self.assertEqual(TimesheetItem.objects.get(
+            work_type_name=self.work_type_name_worker,
+            timesheet_type=TimesheetItem.TIMESHEET_TYPE_MAIN, dt='2021-06-02').day_hours, 7)
+        self.assertEqual(TimesheetItem.objects.get(
+            work_type_name=work_type_name_worker2,
+            timesheet_type=TimesheetItem.TIMESHEET_TYPE_ADDITIONAL, dt='2021-06-02').day_hours, 3)
+        self.assertEqual(TimesheetItem.objects.get(
+            work_type_name=self.work_type_name_worker,
+            timesheet_type=TimesheetItem.TIMESHEET_TYPE_MAIN, dt='2021-06-03').day_hours, 11)
+        self.assertEqual(TimesheetItem.objects.get(
+            work_type_name=work_type_name_worker2,
+            timesheet_type=TimesheetItem.TIMESHEET_TYPE_ADDITIONAL, dt='2021-06-04').day_hours, 11)
+
 
 @override_settings(FISCAL_SHEET_DIVIDER_ALIAS='shift_schedule')
 class TestShiftScheduleDivider(TestTimesheetMixin, TestCase):
