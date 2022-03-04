@@ -76,7 +76,7 @@ def copy_approved(dt_from, dt_to=None):
         )
 
 
-def copy_plan_to_fact(network_id, override_manual_changes_start=False, override_manual_changes_end=False, set_start=True, set_end=True, create_fact=True, extra_q=models.Q(), **kwargs):
+def copy_plan_to_fact(network_id, override_auto_start=False, override_auto_end=False, override_manual_changes_start=False, override_manual_changes_end=False, set_start=True, set_end=True, create_fact=True, extra_q=models.Q(), **kwargs):
     assert set_start or set_end
     network = Network.objects.get(id=network_id)
     last_edited_by = User.objects.get(username='qadmin')
@@ -151,12 +151,22 @@ def copy_plan_to_fact(network_id, override_manual_changes_start=False, override_
                     _extend_worker_days_to_create(wdays_to_create, wdays['plan'])
                     continue
                 for fact in wdays['fact']:
-                    if (not fact.dttm_work_start or (fact.created_by_id and override_manual_changes_start)) and set_start:
+                    start_change_cond = (
+                        not fact.dttm_work_start or 
+                        (fact.created_by_id and override_manual_changes_start) or
+                        (not fact.created_by_id and override_auto_start)
+                    ) and set_start
+                    end_change_cond = (
+                        not fact.dttm_work_end or 
+                        (fact.created_by_id and override_manual_changes_end) or
+                        (not fact.created_by_id and override_auto_end)
+                    ) and set_end
+                    if start_change_cond:
                         fact.closest_plan_approved = _get_closest_plan(fact, wdays['plan'])
                         if fact.closest_plan_approved:
                             fact.dttm_work_start = fact.closest_plan_approved.dttm_work_start
                             fact.last_edited_by = last_edited_by
-                    if (not fact.dttm_work_end or (fact.created_by_id and override_manual_changes_end)) and set_end:
+                    if end_change_cond:
                         fact.closest_plan_approved = _get_closest_plan(fact, wdays['plan'])
                         if fact.closest_plan_approved:
                             fact.dttm_work_end = fact.closest_plan_approved.dttm_work_end
