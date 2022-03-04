@@ -150,11 +150,11 @@ def copy_plan_to_fact(network_id, override_manual_changes_start=False, override_
                     _extend_worker_days_to_create(wdays_to_create, wdays['plan'])
                     continue
                 for fact in wdays['fact']:
-                    if (not fact.dttm_work_start or override_manual_changes_start) and set_start:
+                    if (not fact.dttm_work_start or (fact.created_by_id and override_manual_changes_start)) and set_start:
                         fact.closest_plan_approved = _get_closest_plan(fact, wdays['plan'])
                         if fact.closest_plan_approved:
                             fact.dttm_work_start = fact.closest_plan_approved.dttm_work_start
-                    if (not fact.dttm_work_end or override_manual_changes_end) and set_end:
+                    if (not fact.dttm_work_end or (fact.created_by_id and override_manual_changes_end)) and set_end:
                         fact.closest_plan_approved = _get_closest_plan(fact, wdays['plan'])
                         if fact.closest_plan_approved:
                             fact.dttm_work_end = fact.closest_plan_approved.dttm_work_end
