@@ -1,5 +1,5 @@
 from django.db import models, transaction
-from src.base.models import Network
+from src.base.models import Network, User
 from src.timetable.models import WorkerDay, WorkerDayCashboxDetails
 
 
@@ -79,6 +79,7 @@ def copy_approved(dt_from, dt_to=None):
 def copy_plan_to_fact(network_id, override_manual_changes_start=False, override_manual_changes_end=False, set_start=True, set_end=True, create_fact=True, extra_q=models.Q(), **kwargs):
     assert set_start or set_end
     network = Network.objects.get(id=network_id)
+    last_edited_by = User.objects.get(username='qadmin')
     def _get_closest_plan(fact, plans):
         if fact.closest_plan_approved_id:
             return fact.closest_plan_approved
@@ -111,7 +112,7 @@ def copy_plan_to_fact(network_id, override_manual_changes_start=False, override_
                     is_approved=approved,
                     type=approved_wd.type,
                     created_by_id=approved_wd.created_by_id,
-                    last_edited_by_id=approved_wd.last_edited_by_id,
+                    last_edited_by=last_edited_by,
                     is_vacancy=approved_wd.is_vacancy,
                     is_outsource=approved_wd.is_outsource,
                     need_count_wh=True,
@@ -154,10 +155,12 @@ def copy_plan_to_fact(network_id, override_manual_changes_start=False, override_
                         fact.closest_plan_approved = _get_closest_plan(fact, wdays['plan'])
                         if fact.closest_plan_approved:
                             fact.dttm_work_start = fact.closest_plan_approved.dttm_work_start
+                            fact.last_edited_by = last_edited_by
                     if (not fact.dttm_work_end or (fact.created_by_id and override_manual_changes_end)) and set_end:
                         fact.closest_plan_approved = _get_closest_plan(fact, wdays['plan'])
                         if fact.closest_plan_approved:
                             fact.dttm_work_end = fact.closest_plan_approved.dttm_work_end
+                            fact.last_edited_by = last_edited_by
                     wdays_to_update.append(fact)
                 if len(wdays['plan']) > len(list(filter(lambda x: x.is_approved, wdays['fact']))) and create_fact:
                     copied_plans_ids = list(map(lambda x: x.closest_plan_approved_id, wdays['fact']))
@@ -176,4 +179,4 @@ def copy_plan_to_fact(network_id, override_manual_changes_start=False, override_
                 for detail in details[wd.closest_plan_approved_id]
             ]
         )
-        WorkerDay.objects.bulk_update(wdays_to_update, fields=['dttm_work_start', 'dttm_work_end', 'closest_plan_approved'])
+        WorkerDay.objects.bulk_update(wdays_to_update, fields=['dttm_work_start', 'dttm_work_end', 'closest_plan_approved', 'last_edited_by'])
