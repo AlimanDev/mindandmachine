@@ -276,6 +276,7 @@ class TimesheetCalculator:
             dt_from=dt_start,
             dt_to=dt_end,
             wd_types_dict=self.wd_types_dict,
+            work_type_names_dict=self.work_type_names_dict,
         )
         fact_timesheet_data = self._get_fact_timesheet_data(dt_start, dt_end)
         fiscal_timesheet.init_fact_timesheet(fact_timesheet_data)
