@@ -121,6 +121,10 @@ class WorkTypeName(AbstractActiveNetworkSpecificCodeNamedModel):
             defaults=defaults,
         )
 
+    @classmethod
+    def get_work_type_names_dict(cls):
+        return {wtn.id: wtn for wtn in cls.objects.all()}
+
 
 class WorkType(AbstractActiveModel):
     class Meta:

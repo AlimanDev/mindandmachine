@@ -275,6 +275,7 @@ def auto_delete_biometrics():
             return
     UserConnecter.objects.filter(user_id__in=deleted_uc).delete()
 
+
 @app.task
 def set_prod_cal_cache(dt_from):
     if isinstance(dt_from, str):
@@ -290,6 +291,7 @@ def set_prod_cal_cache(dt_from):
         ).values_list('employee_id', flat=True)
         ws_getter = WorkersStatsGetter(dt_from, dt_to, employee_id__in=active_employees, network=network)
         ws_getter._get_prod_cal_cached()
+
 
 @app.task
 def set_prod_cal_cache_cur_and_next_month():

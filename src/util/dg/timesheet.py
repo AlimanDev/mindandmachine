@@ -3,12 +3,14 @@ from datetime import datetime
 from decimal import Decimal
 
 from django.conf import settings
-from django.db.models import Q
+from django.db.models import (
+    Subquery, OuterRef, Q,
+)
 from django.utils.functional import cached_property
 from django.utils.translation import gettext as _
 
 from src.base.models import Employment
-from src.timetable.models import TimesheetItem, WorkerDay, PlanAndFactHours, WorkerDayType
+from src.timetable.models import TimesheetItem, WorkerDay, PlanAndFactHours, WorkerDayType, EmploymentWorkType
 from src.util.dg.helpers import MONTH_NAMES
 from .base import BaseDocGenerator
 
@@ -178,6 +180,13 @@ class T13TimesheetDataGetter(BaseTimesheetDataGetter):
             employee__id__in=timesheet_qs.values_list('employee', flat=True),
         ).annotate_value_equality(
             'is_equal_shops', 'shop_id', self.shop.id,
+        ).annotate(
+            main_work_type_name__name=Subquery(
+                EmploymentWorkType.objects.filter(
+                    employment_id=OuterRef('id'),
+                    priority=1,
+                ).values('work_type__work_type_name__name')[:1]
+            )
         ).select_related(
             'employee',
             'employee__user',
@@ -289,7 +298,8 @@ class DefaultTimesheetDataGetter(T13TimesheetDataGetter):
 class TimesheetLinesDataGetter(DefaultTimesheetDataGetter):
     def get_extra_grouping_attrs(self):
         return [
-            'position_id',
+            'work_type_name_id' if self.network.settings_values_prop.get(
+                'move_to_add_timesheet_if_work_type_name_differs') else 'position_id',
             'shop_id',
         ]
 
@@ -297,7 +307,11 @@ class TimesheetLinesDataGetter(DefaultTimesheetDataGetter):
         return ts_items[0].shop.name if ts_items and ts_items[0].shop_id else ''
 
     def get_position_name(self, e, ts_items):
-        return ts_items[0].position.name if ts_items and ts_items[0].position_id else ''
+        if self.network.settings_values_prop.get(
+                'move_to_add_timesheet_if_work_type_name_differs'):
+            return ts_items[0].work_type_name.name if ts_items and ts_items[0].work_type_name_id else ''
+        else:
+            return ts_items[0].position.name if ts_items and ts_items[0].position_id else ''
 
 
 class BaseTimesheetGenerator(BaseDocGenerator):
