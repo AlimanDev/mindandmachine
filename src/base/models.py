@@ -1284,7 +1284,7 @@ class User(DjangoAbstractUser, AbstractModel):
         """
         :return: Фамилия Имя Отчество (если есть)
         """
-        fio = f'{self.last_name} {self.first_name}'
+        fio = f'{self.last_name} {self.first_name or ""}'
         if self.middle_name:
             fio += f' {self.middle_name}'
         return fio
@@ -1293,7 +1293,9 @@ class User(DjangoAbstractUser, AbstractModel):
         """
         :return: Фамилия с инициалами
         """
-        short_fio = f'{self.last_name} {self.first_name[0].upper()}.'
+        short_fio = f'{self.last_name}'
+        if self.first_name:
+            short_fio += f' {self.first_name[0].upper()}.'
         if self.middle_name:
             short_fio += f'{self.middle_name[0].upper()}.'
         return short_fio
