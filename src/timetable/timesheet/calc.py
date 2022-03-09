@@ -4,6 +4,7 @@ import logging
 import pandas as pd
 from dateutil.relativedelta import relativedelta
 from django.conf import settings
+from django.db.models import Subquery, OuterRef
 from django.db.models.query import Prefetch
 from django.utils import timezone
 from django.utils.functional import cached_property
@@ -11,7 +12,7 @@ from django.utils.functional import cached_property
 from src.base.models import Employee, Employment
 from .dividers import FISCAL_SHEET_DIVIDERS_MAPPING
 from .fiscal import FiscalTimesheet
-from ..models import WorkerDay, TimesheetItem, WorkerDayType, WorkType
+from ..models import WorkerDay, TimesheetItem, WorkerDayType, WorkType, WorkTypeName, EmploymentWorkType
 
 logger = logging.getLogger('calc_timesheets')
 
@@ -49,12 +50,15 @@ def _get_calc_periods(dt_hired=None, dt_fired=None, dt_from=None, dt_to=None):
 
 
 class TimesheetCalculator:
-    def __init__(self, employee: Employee, dt_from=None, dt_to=None, wd_types_dict=None):
+    def __init__(self, employee: Employee, dt_from=None, dt_to=None, wd_types_dict=None, work_type_names_dict=None,
+                 calc_periods=None):
         self.employee = employee
         self.dt_from = dt_from
         self.dt_to = dt_to
         self.wd_types_dict = wd_types_dict or WorkerDayType.get_wd_types_dict()
+        self.work_type_names_dict = work_type_names_dict or WorkTypeName.get_work_type_names_dict()
         self.dt_now = timezone.now().date()
+        self._calc_periods = calc_periods
 
     def _get_timesheet_wdays_qs(self, employee, dt_start, dt_end):
         return WorkerDay.objects.get_tabel(
@@ -96,15 +100,34 @@ class TimesheetCalculator:
             return work_type_name.position
         return worker_day.employment.position
 
+    def _get_work_type_name(self, worker_day=None, dt=None, active_employment=None):
+        work_type_name = None
+        if worker_day:
+            work_type_name = worker_day.work_types_list[0].work_type_name if \
+            (worker_day.type_id == WorkerDay.TYPE_WORKDAY and worker_day.work_types_list) else None
+
+        if not work_type_name:
+            active_employment = active_employment or (self.get_active_employment(dt or worker_day.dt))
+            work_type_name = self.work_type_names_dict.get(active_employment.main_work_type_name_id)
+
+        return work_type_name
+
     @cached_property
     def active_employments(self):
-        return list(Employment.objects.get_active(
+        return list(Employment.objects.get_active_empl_by_priority(
             employee=self.employee,
-            dt_from=self.dt_from,
-            dt_to=self.dt_to,
+            dt_from=self.calc_periods[0][0],
+            dt_to=self.calc_periods[-1][1],
         ).select_related(
             'shop',
             'position',
+        ).annotate(
+            main_work_type_name_id=Subquery(
+                EmploymentWorkType.objects.filter(
+                    employment_id=OuterRef('id'),
+                    priority=1,
+                ).values('work_type__work_type_name_id')[:1]
+            )
         ))
 
     def get_active_employment(self, dt):
@@ -116,8 +139,7 @@ class TimesheetCalculator:
         day_in_past = dt < self.dt_now
         if self.employee.user.network.settings_values_prop.get('timesheet_only_day_in_past', False) and not day_in_past:
             return
-        work_type_name = plan_wd.work_types_list[0].work_type_name if \
-            (plan_wd.type_id == WorkerDay.TYPE_WORKDAY and plan_wd.work_types_list) else None
+        work_type_name = self._get_work_type_name(worker_day=plan_wd)
         is_absent = day_in_past and not plan_wd.type.is_dayoff
         d = {
             'employee_id': self.employee.id,
@@ -151,8 +173,7 @@ class TimesheetCalculator:
             if self.employee.user.network.settings_values_prop.get('timesheet_only_day_in_past', False) and not day_in_past:
                 continue
             # TODO: нужна поддержка нескольких типов работ?
-            work_type_name = worker_day.work_types_list[0].work_type_name if \
-                (worker_day.type_id == WorkerDay.TYPE_WORKDAY and worker_day.work_types_list) else None
+            work_type_name = self._get_work_type_name(worker_day=worker_day)
             wd_dict = {
                 'employee_id': self.employee.id,
                 'dt': worker_day.dt,
@@ -233,6 +254,7 @@ class TimesheetCalculator:
                     'dt': dt,
                     'shop': active_employment.shop,
                     'position': active_employment.position,
+                    'work_type_name': self._get_work_type_name(active_employment=active_employment),
                     'fact_timesheet_type_id': WorkerDay.TYPE_HOLIDAY,
                     'fact_timesheet_source': TimesheetItem.SOURCE_TYPE_SYSTEM,
                 }
@@ -254,6 +276,7 @@ class TimesheetCalculator:
             dt_from=dt_start,
             dt_to=dt_end,
             wd_types_dict=self.wd_types_dict,
+            work_type_names_dict=self.work_type_names_dict,
         )
         fact_timesheet_data = self._get_fact_timesheet_data(dt_start, dt_end)
         fiscal_timesheet.init_fact_timesheet(fact_timesheet_data)
@@ -267,18 +290,21 @@ class TimesheetCalculator:
 
         fiscal_timesheet.save()
 
-    def calc(self):
-        logger.info(
-            f'start timesheet calc for employee with id={self.employee.id} tabel_code={self.employee.tabel_code}')
-
-        periods = _get_calc_periods(
+    @cached_property
+    def calc_periods(self):
+        return self._calc_periods or _get_calc_periods(
             # dt_hired=getattr(self.employee, 'dt_hired', None),
             # dt_fired=getattr(self.employee, 'dt_fired', None),
             dt_from=self.dt_from,
             dt_to=self.dt_to,
         )
-        logger.info(f'timesheet calc periods: {periods}')
-        for period in periods:
+
+    def calc(self):
+        logger.info(
+            f'start timesheet calc for employee with id={self.employee.id} tabel_code={self.employee.tabel_code}')
+
+        logger.info(f'timesheet calc periods: {self.calc_periods}')
+        for period in self.calc_periods:
             logger.debug(f'start period: {period}')
             self._calc(dt_start=period[0], dt_end=period[1])
             logger.debug(f'end period: {period}')
