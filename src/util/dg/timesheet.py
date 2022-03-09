@@ -180,13 +180,6 @@ class T13TimesheetDataGetter(BaseTimesheetDataGetter):
             employee__id__in=timesheet_qs.values_list('employee', flat=True),
         ).annotate_value_equality(
             'is_equal_shops', 'shop_id', self.shop.id,
-        ).annotate(
-            main_work_type_name__name=Subquery(
-                EmploymentWorkType.objects.filter(
-                    employment_id=OuterRef('id'),
-                    priority=1,
-                ).values('work_type__work_type_name__name')[:1]
-            )
         ).select_related(
             'employee',
             'employee__user',
