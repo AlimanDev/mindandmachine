@@ -75,11 +75,7 @@ class TestWorkType(APITestCase, TestsHelperMixin):
             'preliminary_cost_per_hour': None,
             'prior_weight': 1.0, 
             'shop_id': self.shop.id, 
-            'work_type_name': {
-                'id': self.work_type_name1.id,
-                'name': self.work_type_name1.name,
-                'code': self.work_type_name1.code,
-            },
+            'work_type_name_id': self.work_type_name1.id,
         }
         self.assertEqual(response.json(), data)
 
@@ -99,11 +95,7 @@ class TestWorkType(APITestCase, TestsHelperMixin):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         work_type = response.json()
         data['id'] = work_type['id']
-        data['work_type_name'] = {
-            'id': self.work_type_name3.id,
-            'code': self.work_type_name3.code,
-            'name': self.work_type_name3.name,
-        }
+        data['work_type_name_id'] = self.work_type_name3.id
         data.pop('code')
         self.assertEqual(work_type, data)
 
@@ -123,12 +115,6 @@ class TestWorkType(APITestCase, TestsHelperMixin):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         work_type = response.json()
         data['id'] = work_type['id']
-        data['work_type_name'] = {
-            'id': self.work_type_name3.id,
-            'code': self.work_type_name3.code,
-            'name': self.work_type_name3.name,
-        }
-        data.pop('work_type_name_id')
         self.assertEqual(work_type, data)
 
     @skip('Пока что не используем')
@@ -149,11 +135,7 @@ class TestWorkType(APITestCase, TestsHelperMixin):
             'probability': 1.0, 
             'prior_weight': 1.0, 
             'shop_id': self.shop.id, 
-            'work_type_name': {
-                'id': self.work_type_name3.id,
-                'code': self.work_type_name3.code,
-                'name': self.work_type_name3.name,
-            }
+            'work_type_name_id': self.work_type_name3.id,
         }
         self.assertEqual(work_type, data)
 
@@ -175,11 +157,7 @@ class TestWorkType(APITestCase, TestsHelperMixin):
             'probability': 1.0, 
             'prior_weight': 1.0, 
             'shop_id': self.shop.id, 
-            'work_type_name': {
-                'id': self.work_type_name3.id,
-                'code': self.work_type_name3.code,
-                'name': self.work_type_name3.name,
-            }
+            'work_type_name_id': self.work_type_name3.id,
         }
         self.assertEqual(work_type, data)
 

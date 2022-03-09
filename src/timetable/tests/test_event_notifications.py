@@ -23,7 +23,7 @@ from src.reports.models import ReportConfig, ReportType, Period
 from src.notifications.models import EventEmailNotification
 from src.timetable.events import REQUEST_APPROVE_EVENT_TYPE, APPROVE_EVENT_TYPE, VACANCY_CREATED
 from src.reports.reports import OVERTIMES_UNDERTIMES, UNACCOUNTED_OVERTIME
-from src.timetable.models import WorkerDay, WorkerDayPermission, GroupWorkerDayPermission
+from src.timetable.models import WorkerDay, WorkerDayCashboxDetails, WorkerDayPermission, GroupWorkerDayPermission
 from src.timetable.tests.factories import WorkerDayCashboxDetailsFactory, WorkerDayFactory
 from src.util.mixins.tests import TestsHelperMixin
 from src.util.models_converter import Converter
@@ -712,9 +712,17 @@ class TestVacancyCreatedNotification(TestsHelperMixin, APITestCase):
             self.assertEqual(mail.outbox[0].to[0], self.user_outsource.email)
             dttm_from = self.not_approved_vacancy.dttm_work_start.strftime('%Y-%m-%d %H:%M:%S')
             dttm_to = self.not_approved_vacancy.dttm_work_end.strftime('%Y-%m-%d %H:%M:%S')
+            work_types = ', '.join(
+                WorkerDayCashboxDetails.objects.filter(
+                    worker_day=self.not_approved_vacancy,
+                ).select_related(
+                    'work_type__work_type_name',
+                ).values_list('work_type__work_type_name__name', flat=True)
+            )
+            
             self.assertEqual(
                 mail.outbox[0].body, 
-                f'Здравствуйте, {self.user_outsource.first_name}!\n\n\n\n\n\n\nВ подразделении {self.shop.name} создана вакансия для типов работ Работа, Касса\n'
+                f'Здравствуйте, {self.user_outsource.first_name}!\n\n\n\n\n\n\nВ подразделении {self.shop.name} создана вакансия для типов работ {work_types}\n'
                 f'Дата: {self.dt}\nВремя с {dttm_from} по {dttm_to}\n\n\n\n\n\nПисьмо отправлено роботом. Подробности можно узнать по ссылке'
             )
 
