@@ -1231,7 +1231,7 @@ class User(DjangoAbstractUser, AbstractModel):
         """
         :return: Фамилия Имя Отчество (если есть)
         """
-        fio = f'{self.last_name} {self.first_name}'
+        fio = f'{self.last_name} {self.first_name or ""}'
         if self.middle_name:
             fio += f' {self.middle_name}'
         return fio
@@ -1240,7 +1240,9 @@ class User(DjangoAbstractUser, AbstractModel):
         """
         :return: Фамилия с инициалами
         """
-        short_fio = f'{self.last_name} {self.first_name[0].upper()}.'
+        short_fio = f'{self.last_name}'
+        if self.first_name:
+            short_fio += f' {self.first_name[0].upper()}.'
         if self.middle_name:
             short_fio += f'{self.middle_name[0].upper()}.'
         return short_fio
@@ -1560,8 +1562,8 @@ class Employment(AbstractActiveModel):
                     EmploymentWorkType(
                         employment_id=self.id,
                         work_type=work_type,
-                        priority=1,
-                    ) for work_type in work_types
+                        priority=1 if i == 0 else 0,
+                    ) for i, work_type in enumerate(work_types)
                 )
         # при смене должности пересчитываем рабочие часы в будущем
         if not is_new and position_has_changed:

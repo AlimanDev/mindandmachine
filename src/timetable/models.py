@@ -121,6 +121,10 @@ class WorkTypeName(AbstractActiveNetworkSpecificCodeNamedModel):
             defaults=defaults,
         )
 
+    @classmethod
+    def get_work_type_names_dict(cls):
+        return {wtn.id: wtn for wtn in cls.objects.all()}
+
 
 class WorkType(AbstractActiveModel):
     class Meta:
@@ -1166,19 +1170,26 @@ class WorkerDay(AbstractModel):
     @staticmethod
     def get_fine(dttm_work_start, dttm_work_end, dttm_work_start_plan, dttm_work_end_plan, fines):
         fine = 0
+        def _get_fine_from_range(delta, fines_range):
+            for min_threshold, max_threshold, fine in fines_range:
+                if delta >= min_threshold and delta <= max_threshold:
+                    return fine
+            return 0
         if dttm_work_start_plan and dttm_work_end_plan and fines:
-            arrive_fines = fines.get('arrive_fines', [])
-            departure_fines = fines.get('departure_fines', [])
             arrive_timedelta = (dttm_work_start - dttm_work_start_plan).total_seconds() / 60
             departure_timedelta = (dttm_work_end_plan - dttm_work_end).total_seconds() / 60
-            for arrive_fine in arrive_fines:
-                if arrive_timedelta >= arrive_fine[0] and arrive_timedelta <= arrive_fine[1]:
-                    fine += arrive_fine[2]
-                    break
-            for departure_fine in departure_fines:
-                if departure_timedelta >= departure_fine[0] and departure_timedelta <= departure_fine[1]:
-                    fine += departure_fine[2]
-                    break
+            arrive_step = fines.get('arrive_step')
+            departure_step = fines.get('departure_step')
+            arrive_fines = fines.get('arrive_fines', [])
+            departure_fines = fines.get('departure_fines', [])
+            if arrive_timedelta > 0 and arrive_step:
+                fine += arrive_step - (int(arrive_timedelta) % arrive_step or arrive_step)
+            else:
+                fine += _get_fine_from_range(arrive_timedelta, arrive_fines)
+            if departure_timedelta > 0 and departure_step:
+                fine += departure_step - (int(departure_timedelta) % departure_step or departure_step)
+            else:
+                fine += _get_fine_from_range(departure_timedelta, departure_fines)
         return fine
 
     def get_department(self):

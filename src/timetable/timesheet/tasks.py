@@ -4,7 +4,7 @@ from django.db.models import Max, Min
 
 from src.base.models import Employee, Employment
 from src.celery.celery import app
-from src.timetable.models import WorkerDayType
+from src.timetable.models import WorkerDayType, WorkTypeName
 from src.util.models_converter import Converter
 from .calc import TimesheetCalculator, _get_calc_periods
 
@@ -25,13 +25,13 @@ def calc_timesheets(employee_id__in: list = None, dt_from=None, dt_to=None, rera
     calc_periods = _get_calc_periods(dt_from=dt_from, dt_to=dt_to)
 
     if employee_id__in:
-        qs = Employee.objects.filter(id__in=employee_id__in)
+        qs = Employee.objects.filter(id__in=employee_id__in).select_related('user__network')
     else:
         qs = Employee.objects.filter(
             employments__in=Employment.objects.get_active(
                 dt_from=calc_periods[0][0], dt_to=calc_periods[-1][1],
             )
-        ).distinct()
+        ).select_related('user__network').distinct()
 
     # TODO: переделать
     # qs = qs.annotate(
@@ -39,9 +39,12 @@ def calc_timesheets(employee_id__in: list = None, dt_from=None, dt_to=None, rera
     #     dt_fired=Max('employments__dt_fired'),
     # )
     wd_types_dict = WorkerDayType.get_wd_types_dict()
+    work_type_names_dict = WorkTypeName.get_work_type_names_dict()
     for employee in qs:
         try:
-            TimesheetCalculator(employee=employee, dt_from=dt_from, dt_to=dt_to, wd_types_dict=wd_types_dict).calc()
+            TimesheetCalculator(
+                employee=employee, dt_from=dt_from, dt_to=dt_to, wd_types_dict=wd_types_dict,
+                work_type_names_dict=work_type_names_dict, calc_periods=calc_periods).calc()
         except Exception as e:
             logger.exception(e)
             if reraise_exc:
