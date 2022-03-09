@@ -513,6 +513,14 @@ class TestGenerateTabel(TestsHelperMixin, TestCase):
         d = list(filter(lambda i: i['fio'] == self.employee2.user.fio, data['users']))[0]["days"]
         self.assertDictEqual(d[f'd{self.dt_now.day}'], {'value': Decimal('17.75')})
 
+    def test_generate_tabel_when_user_has_no_name(self):
+        self.user2.first_name = ''
+        self.user2.save()
+        g = DefaultTimesheetDataGetter(shop=self.shop, dt_from=self.dt_from, dt_to=self.dt_to)
+        data = g.get_data()
+        d = list(filter(lambda i: i['fio'] == self.employee2.user.fio, data['users']))
+        self.assertNotEqual(len(d), 0)
+
     def test_group_by_work_type(self):
         WorkerDay.objects.all().delete()
         TimesheetItem.objects.all().delete()
