@@ -474,17 +474,6 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
         self.assertEqual(WorkerDay.objects.get(id=self.worker_day_fact_not_approved.id).is_approved, True)
         self.assertFalse(WorkerDay.objects.filter(id=self.worker_day_fact_approved.id).exists())
 
-    @staticmethod
-    def _create_att_record(type, dttm, user_id, employee_id, shop_id, terminal=True):
-        return AttendanceRecords.objects.create(
-            dttm=dttm,
-            shop_id=shop_id,
-            user_id=user_id,
-            employee_id=employee_id,
-            type=type,
-            terminal=terminal,
-        )
-
     @override_settings(CELERY_TASK_ALWAYS_EAGER=True)
     def test_recalc_fact_from_records_after_approve(self):
         self.network.run_recalc_fact_from_att_records_on_plan_approve = True
@@ -3844,7 +3833,6 @@ class TestAttendanceRecords(TestsHelperMixin, APITestCase):
         self.dt = now().date()
 
         create_departments_and_users(self)
-
         self.worker_day_plan_approved = WorkerDayFactory(
             shop=self.shop,
             employee=self.employee2,
@@ -5019,6 +5007,77 @@ class TestAttendanceRecords(TestsHelperMixin, APITestCase):
         self.assertEqual(fact_wd.type_id, WorkerDay.TYPE_QUALIFICATION)
         self.assertEqual(fact_wd.worker_day_details.count(), 0)
         self.assertEqual(WorkerDayCashboxDetails.objects.filter(worker_day__employee=self.employee4).count(), 0)
+
+    def test_one_arrival_and_departure_for_associated_wdays(self):
+        san_day_type = self._create_san_day()
+        WorkerDay.objects.all().delete()
+        dt = date.today()
+        self.user2.network.set_settings_value('one_arrival_and_departure_for_associated_wdays', True, save=True)  # TODO: перенсти в модель
+        for is_approved in [False, True]:
+            san_day_pa = WorkerDayFactory(
+                employee=self.employee2,
+                employment=self.employment2,
+                dt=dt,
+                dttm_work_start=datetime.combine(dt, time(8)),
+                dttm_work_end=datetime.combine(dt, time(10)),
+                type_id=san_day_type.code,
+                shop=self.shop,
+                is_approved=is_approved,
+                is_fact=False,
+            )
+            main_shift_pa = WorkerDayFactory(
+                dt=self.dt,
+                employee_id=self.employment2.employee_id,
+                employment=self.employment2,
+                is_approved=is_approved,
+                is_fact=False,
+                type_id=WorkerDay.TYPE_WORKDAY,
+                shop=self.shop,
+                dttm_work_start=datetime.combine(dt, time(10)),
+                dttm_work_end=datetime.combine(dt, time(20)),
+                cashbox_details__work_type__work_type_name__name='Продавец',
+            )
+            additional_shift_pa = WorkerDayFactory(
+                dt=dt,
+                employee_id=self.employment2.employee_id,
+                employment=self.employment2,
+                is_approved=is_approved,
+                is_fact=False,
+                type_id=WorkerDay.TYPE_WORKDAY,
+                shop=self.shop,
+                dttm_work_start=datetime.combine(dt, time(20)),
+                dttm_work_end=datetime.combine(dt, time(22)),
+                cashbox_details__work_type__work_type_name__name='Грузчик',
+            )
+        EmploymentWorkType.objects.create(
+            work_type_id=main_shift_pa.worker_day_details.first().work_type_id,
+            employment=self.employment2,
+        )
+
+        self._create_att_record(
+            AttendanceRecords.TYPE_COMING, datetime.combine(dt, time(8, 2)), self.user2.id, self.employee2.id,
+            self.shop.id, terminal=False)
+        self.assertEqual(WorkerDay.objects.filter(is_fact=True).count(), 2)
+
+        self._create_att_record(
+            AttendanceRecords.TYPE_LEAVING, datetime.combine(dt, time(21, 55)), self.user2.id, self.employee2.id,
+            self.shop.id, terminal=False)
+
+        compares = [
+            (san_day_pa, datetime.combine(dt, time(8, 2)), datetime.combine(dt, time(10))),
+            (main_shift_pa, datetime.combine(dt, time(10)), datetime.combine(dt, time(20))),
+            (additional_shift_pa, datetime.combine(dt, time(20)), datetime.combine(dt, time(21, 55))),
+        ]
+        for plan_approved, dttm_work_start, dttm_work_end in compares:
+            for is_approved in [False, True]:
+                wd_fact = WorkerDay.objects.filter(
+                    closest_plan_approved=plan_approved, is_fact=True, is_approved=is_approved).first()
+                self.assertIsNotNone(wd_fact)
+                self.assertEqual(wd_fact.dttm_work_start, dttm_work_start)
+                self.assertEqual(wd_fact.dttm_work_end, dttm_work_end)
+
+    def test_one_arrival_and_departure_for_multiple_24h_shifts(self):
+        pass
 
 
 class TestVacancy(TestsHelperMixin, APITestCase):

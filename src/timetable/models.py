@@ -2088,7 +2088,7 @@ class AttendanceRecords(AbstractModel):
                         source=WorkerDay.SOURCE_AUTO_FACT,
                     )
                     WorkerDay.check_work_time_overlap(
-                        employee_id=fact_approved.employee_id, dt=fact_approved.dt, is_fact=True)
+                        employee_id=fact_approved.employee_id, dt=fact_approved.dt, is_fact=True, is_approved=False)
             except WorkTimeOverlap as e:
                 pass
                 # TODO: запись в debug лог + тест
@@ -2116,17 +2116,93 @@ class AttendanceRecords(AbstractModel):
 
     def _get_fact_approved_extra_q(self, closest_plan_approved):
         fact_approved_extra_q = Q(closest_plan_approved=closest_plan_approved) if closest_plan_approved else Q()
-        if self.type == self.TYPE_LEAVING:
+        if self.type == self.TYPE_LEAVING and \
+                not (closest_plan_approved and self._is_one_arrival_and_departure_for_associated_wdays()):  # ???
             fact_approved_extra_q |= Q(
                 dttm_work_start__isnull=False,
                 diff_between_tick_and_work_start_seconds__lte=F('shop__network__max_work_shift_seconds'),
             )
         return fact_approved_extra_q
 
+    def _is_one_arrival_and_departure_for_associated_wdays(self):
+        return self.user.network.settings_values_prop.get('one_arrival_and_departure_for_associated_wdays')
+
+    def _search_associated_wday(self, plan_approved):
+        return WorkerDay.objects.filter(
+            is_fact=False,
+            is_approved=True,
+            employee_id=plan_approved.employee_id,
+            shop_id=plan_approved.shop_id,
+            dttm_work_end=plan_approved.dttm_work_start,
+        ).select_related(
+            'employment',
+        ).first()
+
+    def _handle_one_arrival_and_departure_for_associated_wdays(
+            self, plan_approved, recalc_fact_from_att_records=False):
+        associated_wdays_chain = [plan_approved]
+        associated_wday = self._search_associated_wday(plan_approved)
+        if not associated_wday:
+            return
+        else:
+            associated_wdays_chain.append(associated_wday)
+
+        while associated_wday:
+            associated_wday = self._search_associated_wday(associated_wday)
+            if associated_wday:
+                associated_wdays_chain.append(associated_wday)
+
+        associated_wdays_chain.reverse()
+        facts = []
+        for associated_wday in associated_wdays_chain:
+            fact_approved = WorkerDay.objects.filter(
+                is_fact=True,
+                is_approved=True,
+                employee_id=associated_wday.employee_id,
+                shop_id=associated_wday.shop_id,
+                closest_plan_approved=associated_wday,
+            ).first()
+
+            if fact_approved:
+                update_fields = []
+                copy_fields = ['dttm_work_start', 'dttm_work_end']
+                for field_name in copy_fields:
+                    fact_approved_field_value = getattr(fact_approved, field_name)
+                    if not fact_approved_field_value:
+                        setattr(fact_approved, field_name, getattr(associated_wday, field_name))
+                        update_fields.append(field_name)
+                if update_fields:
+                    fact_approved.save(update_fields=update_fields)
+            else:
+                fact_approved, _wd_created = WorkerDay.objects.update_or_create(
+                    dt=self.dt,
+                    employee_id=self.employee_id,
+                    is_fact=True,
+                    is_approved=True,
+                    closest_plan_approved=associated_wday,
+                    defaults={
+                        'shop_id': self.shop_id,
+                        'employment': associated_wday.employment,
+                        'type_id': associated_wday.type_id,
+                        'dttm_work_start': associated_wday.dttm_work_start,
+                        'dttm_work_end': associated_wday.dttm_work_end,
+                        'is_vacancy': associated_wday.employment.shop_id != self.shop_id,
+                        'source': WorkerDay.RECALC_FACT_FROM_ATT_RECORDS if recalc_fact_from_att_records else WorkerDay.SOURCE_AUTO_FACT,
+                    }
+                )
+                if fact_approved.type.has_details and (_wd_created or not fact_approved.worker_day_details.exists()):
+                    self._create_wd_details(self.dt, fact_approved, associated_wday.employment, associated_wday)
+
+            facts.append(fact_approved)
+
+        for fact_approved in facts:
+            self._create_or_update_not_approved_fact(fact_approved)
+
     def save(self, *args, recalc_fact_from_att_records=False, **kwargs):
         """
         Создание WorkerDay при занесении отметок.
         """
+        # рефакторинг
         employee_id, active_user_empl, dt, record_type, closest_plan_approved = self.get_day_data(
             self.dttm, self.user, self.shop, self.type)
         self.dt = dt
@@ -2175,6 +2251,9 @@ class AttendanceRecords(AbstractModel):
                     self._create_wd_details(self.dt, fact_approved, active_user_empl, closest_plan_approved)
                 fact_approved.save()
                 self._create_or_update_not_approved_fact(fact_approved)
+                if self.type == self.TYPE_LEAVING \
+                        and closest_plan_approved and self._is_one_arrival_and_departure_for_associated_wdays():
+                    self._handle_one_arrival_and_departure_for_associated_wdays(closest_plan_approved)
             else:
                 if self.type == self.TYPE_LEAVING:
                     prev_fa_wd = base_fact_approved_qs.filter(
@@ -2201,6 +2280,8 @@ class AttendanceRecords(AbstractModel):
                         self.dt = prev_fa_wd.dt
                         super(AttendanceRecords, self).save(update_fields=['dt',])
                         self._create_or_update_not_approved_fact(prev_fa_wd)
+                        if closest_plan_approved and self._is_one_arrival_and_departure_for_associated_wdays():
+                            self._handle_one_arrival_and_departure_for_associated_wdays(closest_plan_approved)
                         return
 
                     if self.shop.network.skip_leaving_tick:
@@ -2242,7 +2323,12 @@ class AttendanceRecords(AbstractModel):
                                 'shop_id': self.shop_id,
                             },
                         ))
-                self._create_or_update_not_approved_fact(fact_approved)
+
+                if self.type == self.TYPE_LEAVING and \
+                        closest_plan_approved and self._is_one_arrival_and_departure_for_associated_wdays():
+                    self._handle_one_arrival_and_departure_for_associated_wdays(closest_plan_approved)
+                else:
+                    self._create_or_update_not_approved_fact(fact_approved)
 
         return res
 
