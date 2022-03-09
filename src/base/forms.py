@@ -22,6 +22,17 @@ class NetworkAdminForm(DefaultOverrideAdminWidgetsForm):
         'fines_settings',
     ]
 
+    def clean_timesheet_min_hours_threshold(self):
+        timesheet_min_hours_threshold = self.data['timesheet_min_hours_threshold']
+        if 'timesheet_min_hours_threshold' in self.changed_data:
+            timesheet_min_hours_threshold = timesheet_min_hours_threshold.replace(',', '.')
+            try:
+                self.instance.timesheet_min_hours_threshold = timesheet_min_hours_threshold
+                self.instance.get_timesheet_min_hours_threshold(100)
+            except Exception as e:
+                self.add_error('timesheet_min_hours_threshold', str(e))
+        return timesheet_min_hours_threshold
+
 
 class ShopAdminForm(DefaultOverrideAdminWidgetsForm):
     json_fields = [
