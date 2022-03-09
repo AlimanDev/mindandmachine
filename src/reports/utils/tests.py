@@ -613,6 +613,7 @@ class TestOvertimesUndertimes(APITestCase):
             is_approved=True,
             is_fact=True,
         )
+        ProductionDay.objects.filter(dt=self.dt - timedelta(1)).update(is_celebration=False)
         data = self._test_accounting_period(12)
         self.assertEqual(data['data'][self.employee1.id]['plan_sum'], 5.5)
         self.assertEqual(data['data'][self.employee1.id]['fact_sum'], 10.4) # может падать 1 января
