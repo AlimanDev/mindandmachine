@@ -232,8 +232,9 @@ class Timesheet:
 
 
 class FiscalTimesheet:
-    def __init__(self, employee, dt_from, dt_to, wd_types_dict):
+    def __init__(self, employee, dt_from, dt_to, wd_types_dict, work_type_names_dict):
         self.wd_types_dict = wd_types_dict
+        self.work_type_names_dict = work_type_names_dict
         self.employee = employee
         self.active_employments = list(EmploymentModel.objects.get_active_empl_by_priority(
             dt_from=dt_from,

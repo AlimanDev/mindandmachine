@@ -89,6 +89,7 @@ class BaseTimesheetDivider:
                 dt=dt,
                 shop=active_employment.shop,
                 position=active_employment.position,
+                work_type_name=self.fiscal_timesheet.work_type_names_dict.get(active_employment.main_work_type_name_id),
                 day_type=self.fiscal_timesheet.wd_types_dict.get(WorkerDay.TYPE_HOLIDAY),
             ))
             self.fiscal_timesheet.additional_timesheet.add(dt, main_timesheet_items)
@@ -352,6 +353,7 @@ class BaseTimesheetDivider:
                         dt=dt,
                         shop=active_employment.shop,
                         position=active_employment.position,
+                        work_type_name=self.fiscal_timesheet.work_type_names_dict.get(active_employment.main_work_type_name_id),
                         day_type=self.fiscal_timesheet.wd_types_dict.get(WorkerDay.TYPE_HOLIDAY),
                     ))
 
@@ -391,6 +393,7 @@ class PobedaTimesheetDivider(BaseTimesheetDivider):
                         dt=dt,
                         shop=active_employment.shop,
                         position=active_employment.position,
+                        work_type_name=self.fiscal_timesheet.work_type_names_dict.get(active_employment.main_work_type_name_id),
                         day_type=self.fiscal_timesheet.wd_types_dict.get(WorkerDay.TYPE_HOLIDAY),
                     ))
 
@@ -579,6 +582,7 @@ class ShiftScheduleDivider(BaseTimesheetDivider):
                                         dt=dt,
                                         shop=active_employment.shop,
                                         position=active_employment.position,
+                                        work_type_name=self.fiscal_timesheet.work_type_names_dict.get(active_employment.main_work_type_name_id),
                                         day_type=shift_schedule_day_type_obj,
                                     ))
                             else:
@@ -593,6 +597,7 @@ class ShiftScheduleDivider(BaseTimesheetDivider):
                         dt=dt,
                         shop=active_employment.shop,
                         position=active_employment.position,
+                        work_type_name=self.fiscal_timesheet.work_type_names_dict.get(active_employment.main_work_type_name_id),
                         day_type=self.fiscal_timesheet.wd_types_dict.get(WorkerDay.TYPE_HOLIDAY),
                     ))
 

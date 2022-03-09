@@ -7,10 +7,12 @@ from django.test import TestCase, override_settings
 
 from src.base.models import Employment, Employee, NetworkConnect
 from src.base.tests.factories import NetworkFactory, ShopFactory, UserFactory, EmployeeFactory, EmploymentFactory
-from src.timetable.models import TimesheetItem, WorkTypeName, WorkType, WorkerDay, WorkerDayType
+from src.timetable.models import TimesheetItem, WorkTypeName, WorkType, WorkerDay, WorkerDayType, EmploymentWorkType
 from src.timetable.tests.factories import WorkerDayFactory
 from src.timetable.timesheet.tasks import calc_timesheets
-from src.util.dg.timesheet import DefaultTimesheetDataGetter, T13TimesheetDataGetter, MtsTimesheetDataGetter, TimesheetLinesDataGetter
+from src.util.dg.timesheet import (
+    DefaultTimesheetDataGetter, T13TimesheetDataGetter, MtsTimesheetDataGetter, TimesheetLinesDataGetter
+)
 from src.util.mixins.tests import TestsHelperMixin
 
 
@@ -509,7 +511,7 @@ class TestGenerateTabel(TestsHelperMixin, TestCase):
         data = g.get_data()
         d = list(filter(lambda i: i['fio'] == self.employee2.user.fio, data['users']))[0]["days"]
         self.assertDictEqual(d[f'd{self.dt_now.day}'], {'value': Decimal('17.75')})
-    
+
     def test_generate_tabel_when_user_has_no_name(self):
         self.user2.first_name = ''
         self.user2.save()
@@ -517,3 +519,48 @@ class TestGenerateTabel(TestsHelperMixin, TestCase):
         data = g.get_data()
         d = list(filter(lambda i: i['fio'] == self.employee2.user.fio, data['users']))
         self.assertNotEqual(len(d), 0)
+
+    def test_group_by_work_type(self):
+        WorkerDay.objects.all().delete()
+        TimesheetItem.objects.all().delete()
+        Employment.objects.exclude(id=self.employment2.id).delete()
+        self.shop.network.set_settings_value('move_to_add_timesheet_if_work_type_name_differs', True)
+        self.shop.network.save()
+        EmploymentWorkType.objects.create(
+            employment=self.employment2,
+            work_type=self.work_type,
+            priority=1,
+        )
+        dt = self.dt_now.replace(day=1)
+        WorkerDayFactory(
+            is_fact=True,
+            is_approved=True,
+            dt=dt,
+            employee=self.employee2,
+            dttm_work_start=datetime.combine(dt, time(8)),
+            dttm_work_end=datetime.combine(dt, time(20)),
+            shop=self.shop,
+            employment=self.employment2,
+            type_id=WorkerDay.TYPE_WORKDAY,
+            cashbox_details__work_type=self.work_type,
+        )
+        WorkerDayFactory(
+            is_fact=True,
+            is_approved=True,
+            dt=dt + timedelta(days=1),
+            employee=self.employee2,
+            dttm_work_start=datetime.combine(dt + timedelta(days=1), time(8)),
+            dttm_work_end=datetime.combine(dt + timedelta(days=1), time(20)),
+            shop=self.shop,
+            employment=self.employment2,
+            type_id=WorkerDay.TYPE_WORKDAY,
+            cashbox_details__work_type=self.work_type2,
+        )
+        calc_timesheets()
+        g = TimesheetLinesDataGetter(shop=self.shop, dt_from=self.dt_from, dt_to=self.dt_to)
+        data = g.get_data()
+        lines = list(filter(lambda i: i['fio'] == self.employee2.user.fio, data['users']))
+        self.assertEqual(len(lines), 2)
+        lines.sort(key=lambda i: i['position'])
+        self.assertEqual(lines[0]['position'], 'Кассир')
+        self.assertEqual(lines[1]['position'], 'Консультант')
