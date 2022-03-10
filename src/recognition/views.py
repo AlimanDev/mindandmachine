@@ -434,9 +434,9 @@ class TickPhotoViewSet(BaseModelViewSet):
                 try:
                     tick.user.avatar = image
                     tick.user.save()
-                    check_duplicate_biometrics(image, tick.user, tick.tick_point.shop_id)
+                    check_duplicate_biometrics(tick_photo.image, tick.user, tick.tick_point.shop_id)
                     partner_id = recognition.create_person({"id": tick.user_id})
-                    photo_id = recognition.upload_photo(partner_id, image)
+                    photo_id = recognition.upload_photo(partner_id, tick_photo.image)
                 except HTTPError as e:
                     return Response({"error": str(e)}, e.response.status_code)
 
@@ -447,7 +447,7 @@ class TickPhotoViewSet(BaseModelViewSet):
 
         if user_connecter:
             try:
-                res = recognition.detect_and_match(user_connecter.partner_id, image)
+                res = recognition.detect_and_match(user_connecter.partner_id, tick_photo.image)
             except HTTPError as e:
                 r = Response({"error": str(e)})
                 r.status_code = e.response.status_code
