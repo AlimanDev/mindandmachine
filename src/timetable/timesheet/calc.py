@@ -280,10 +280,11 @@ class TimesheetCalculator:
         )
         fact_timesheet_data = self._get_fact_timesheet_data(dt_start, dt_end)
         fiscal_timesheet.init_fact_timesheet(fact_timesheet_data)
+        network = self.employee.user.network
 
         logger.info(f'fact timesheet received')
-        if settings.FISCAL_SHEET_DIVIDER_ALIAS:
-            fiscal_timesheet_divider_cls = FISCAL_SHEET_DIVIDERS_MAPPING.get(settings.FISCAL_SHEET_DIVIDER_ALIAS)
+        if network.fiscal_sheet_divider_alias:
+            fiscal_timesheet_divider_cls = FISCAL_SHEET_DIVIDERS_MAPPING.get(network.fiscal_sheet_divider_alias)
             if fiscal_timesheet_divider_cls:
                 fiscal_timesheet_divider = fiscal_timesheet_divider_cls(fiscal_timesheet=fiscal_timesheet)
                 fiscal_timesheet_divider.divide()

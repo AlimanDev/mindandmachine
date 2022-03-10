@@ -18,7 +18,7 @@ from src.recognition.views import DownloadViolatorsReportAdminView
 from src.reports import urls as reports_urls
 from src.tasks import urls as task_urls
 from src.timetable import urls as timetable_api
-from src.timetable.views import RecalcWhAdminView
+from src.timetable.views import RecalcTimesheetAdminView, RecalcWhAdminView
 from src.util.openapi.auto_schema import WFMOpenAPISchemaGenerator, WFMIntegrationAPISchemaGenerator
 
 api_urlpatterns = [
@@ -29,6 +29,7 @@ api_urlpatterns = [
 urlpatterns = [
     path('api/', include(api_urlpatterns)),
     path('admin/timetable/workerday/recalc_wh/', RecalcWhAdminView.as_view(), name='recalc_wh'),
+    path('admin/timetable/workerday/recalc_timesheet/', RecalcTimesheetAdminView.as_view(), name='recalc_timesheet'),
     path('admin/forecast/loadtemplate/recalc_load/', RecalcLoadAdminView.as_view(), name='recalc_load'),
     path('admin/forecast/periodclients/upload_demand/', UploadDemandAdminView.as_view(), name='upload_demand'),
     path('admin/recognition/ticks/download_violators/', DownloadViolatorsReportAdminView.as_view(), name='download_violators'),

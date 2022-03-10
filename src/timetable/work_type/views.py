@@ -14,20 +14,18 @@ from src.base.views_abstract import BaseModelViewSet
 from src.conf.djconfig import QOS_DATE_FORMAT
 from src.timetable.models import WorkType, WorkTypeName
 from src.timetable.work_type.utils import ShopEfficiencyGetter
-from src.timetable.work_type_name.views import WorkTypeNameSerializer
 from src.util.openapi.responses import efficieny_response_schema_dict as response_schema_dict
 
 
 # Serializers define the API representation.
 class WorkTypeSerializer(ModelSerializerWithCreateOnlyFields):
-    work_type_name = WorkTypeNameSerializer(read_only=True)
     code = serializers.CharField(required=False, write_only=True)
     shop_id = serializers.IntegerField(required=False)
-    work_type_name_id = serializers.IntegerField(required=False, write_only=True)
+    work_type_name_id = serializers.IntegerField(required=False)
     class Meta:
         model = WorkType
         fields = ['id', 'priority', 'dttm_last_update_queue', 'min_workers_amount', 'max_workers_amount',\
-             'probability', 'prior_weight', 'shop_id', 'code', 'work_type_name_id', 'work_type_name', 'preliminary_cost_per_hour']
+             'probability', 'prior_weight', 'shop_id', 'code', 'work_type_name_id', 'preliminary_cost_per_hour']
         create_only_fields = ['work_type_name_id']
         validators = [
             UniqueTogetherValidator(
@@ -40,7 +38,6 @@ class WorkTypeSerializer(ModelSerializerWithCreateOnlyFields):
         if data.get('code', False) and not self.instance:
             data['work_type_name_id'] = WorkTypeName.objects.get(code=data.get('code')).id   
         return super().to_internal_value(data)
-
 
 
 class EfficiencySerializer(serializers.Serializer):
@@ -191,7 +188,7 @@ class WorkTypeViewSet(BaseModelViewSet):
 
     def get_queryset(self):
         return self.filter_queryset(
-            WorkType.objects.select_related('work_type_name').filter(
+            WorkType.objects.filter(
                 Q(dttm_deleted__isnull=True) | Q(dttm_deleted__gte=datetime.now()),
             )
         )
