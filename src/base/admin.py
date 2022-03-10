@@ -1,5 +1,8 @@
+import json
 import urllib.parse
 
+from diff_match_patch import diff_match_patch
+from dateutil.parser import parse
 from django import forms
 from django.conf import settings
 from django.contrib import admin, messages
@@ -19,10 +22,13 @@ from django.utils.translation import gettext_lazy as _
 from import_export import resources
 from import_export.admin import ExportActionMixin, ImportMixin
 from import_export.fields import Field
+from import_export.widgets import ForeignKeyWidget
 from sesame.utils import get_token
 from src.base.admin_filters import CustomChoiceDropdownFilter, RelatedOnlyDropdownLastNameOrderedFilter, RelatedOnlyDropdownNameOrderedFilter
 
 from src.base.forms import (
+    CustomConfirmImportShopForm,
+    CustomImportShopForm,
     FunctionGroupAdminForm,
     NetworkAdminForm,
     ShopAdminForm,
@@ -54,6 +60,7 @@ from src.base.models import (
     ShiftScheduleInterval,
     ContentBlock,
 )
+from src.base.shop.utils import get_offset_timezone_dict, get_shop_name
 from src.timetable.models import GroupWorkerDayPermission
 
 
@@ -88,6 +95,63 @@ class FunctionGroupResource(resources.ModelResource):
                 row['group'] = gid
                 new_data.append(row)
         dataset.dict = new_data
+
+
+class ShopResource(resources.ModelResource):
+    parent = Field(attribute='parent_id')
+    parent_name = Field(
+        attribute='parent',
+        column_name='Parent Name',
+        widget=ForeignKeyWidget(Shop, 'name'),
+        readonly=True,
+    )
+
+    class Meta:
+        model = Shop
+        import_id_fields = ('name',)
+        fields = ('name', 'parent', 'tm_open_dict', 'tm_close_dict', 'timezone')
+
+    def get_import_fields(self):
+        return [self.fields[f] for f in self.Meta.fields]
+    
+    def get_export_fields(self):
+        return [self.fields[f] for f in self.Meta.fields]
+
+    def before_import(self, dataset, using_transactions, dry_run, **kwargs):
+        network = kwargs.get('network', None)
+        shops = Shop.objects.all()
+        tz_info = get_offset_timezone_dict()
+        if network:
+            shops = shops.filter(network_id=network)
+        shops_dict = {s.name: s.id for s in shops}
+        shops = list(shops_dict.keys())
+        data = dataset.dict
+        for row in data:
+            tm_open, tm_close = row['times'].split('-')
+            row['name_in_file'] = row['name']
+            row['name'] = get_shop_name(row['name'], shops)
+            row['parent_name_in_file'] = row['parent']
+            row['parent_name'] = get_shop_name(row['parent'], shops)
+            row['parent'] = shops_dict.get(row['parent_name'])
+            row['timezone'] = tz_info.get(float(row['timezone'].split()[-1]), 'Europe/Moscow')
+            row['tm_open_dict'] = json.dumps({'all': parse(tm_open).strftime('%H:%M:%S')})
+            row['tm_close_dict'] = json.dumps({'all': parse(tm_close).strftime('%H:%M:%S')})
+        dataset.dict = data
+
+    def after_import_row(self, row, row_result, row_number=None, **kwargs):
+        row_result.diff.insert(2, row['parent_name_in_file'])
+        dmp = diff_match_patch()
+        diff = dmp.diff_main(row['name_in_file'], row['name'])
+        dmp.diff_cleanupSemantic(diff)
+        html = dmp.diff_prettyHtml(diff)
+        html = mark_safe(html)
+        row_result.diff.insert(4, html)
+
+    def get_diff_headers(self):
+        headers = super().get_diff_headers()
+        headers.insert(2, 'parent in file')
+        headers.insert(4, 'name in file')
+        return headers
 
 
 @admin.register(Network)
@@ -303,15 +367,35 @@ class EmployeeAdmin(admin.ModelAdmin):
 
 
 @admin.register(Shop)
-class ShopAdmin(admin.ModelAdmin):
+class ShopAdmin(ImportMixin, admin.ModelAdmin):
     list_display = ('name', 'parent_title', 'id', 'code')
     search_fields = ('name', 'parent__name', 'id', 'code')
     raw_id_fields = ('director',)
     form = ShopAdminForm
+    resource_class = ShopResource
 
     @staticmethod
     def parent_title(instance: Shop):
         return instance.parent_title()
+    
+    def get_import_form(self):
+        return CustomImportShopForm
+
+    def get_confirm_import_form(self):
+        return CustomConfirmImportShopForm
+
+    def get_form_kwargs(self, form, *args, **kwargs):
+        if isinstance(form, Form) and form.is_valid():
+            network = form.cleaned_data['network']
+            kwargs.update({'network': getattr(network, 'id', None)})
+        return kwargs
+
+    def get_import_data_kwargs(self, request, *args, **kwargs):
+        form = kwargs.get('form')
+        if form and form.is_valid():
+            network = form.cleaned_data['network']
+            kwargs.update({'network': getattr(network, 'id', None)})
+        return super().get_import_data_kwargs(request, *args, **kwargs)
 
 
 @admin.register(ShopSettings)
@@ -443,7 +527,7 @@ class SAWHSettingsMappingInline(admin.StackedInline):
     model = SAWHSettingsMapping
     extra = 0
 
-    filter_horizontal = ('shops', 'positions', 'exclude_positions')
+    filter_horizontal = ('shops', 'positions', 'employees', 'exclude_positions')
 
 
 @admin.register(SAWHSettings)
@@ -454,6 +538,7 @@ class SAWHSettingsAdmin(admin.ModelAdmin):
         'type',
     )
 
+    save_as = True
     inlines = (
         SAWHSettingsMappingInline,
     )

@@ -56,6 +56,7 @@ DEBUG = env.bool('DJANGO_DEBUG', default=True)
 ALLOWED_HOSTS = ['*']
 
 INSTALLED_APPS = [
+    'django_light',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -89,6 +90,7 @@ INSTALLED_APPS = [
     'polymorphic',
     'src.exchange',
     'src.pbi',
+    'src.med_docs',
 ]
 
 REST_FRAMEWORK = {

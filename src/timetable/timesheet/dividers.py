@@ -113,7 +113,7 @@ class BaseTimesheetDivider:
         logger.debug(f'stop dt: {dt_stop}')
         while start_of_week <= dt_stop:
             continuous_holidays_count = 0
-            first_holiday_found_dt = None
+            holidays_found_dates = []
             week_dates = pd.date_range(start_of_week, start_of_week + datetime.timedelta(days=6)).date
             prev_day_is_holiday = False
             logger.debug(f'start week with start_of_week: {start_of_week}')
@@ -136,13 +136,13 @@ class BaseTimesheetDivider:
                     logger.debug(f'prev_day_is_holiday and current_day_is_holiday, break')
                     break
 
-                if current_day_is_holiday and not first_holiday_found_dt:
+                if current_day_is_holiday:
                     continuous_holidays_count = 1
-                    first_holiday_found_dt = dt
+                    holidays_found_dates.append(dt)
 
                 prev_day_is_holiday = current_day_is_holiday
             logger.debug(f'end week continuous_holidays_count: {continuous_holidays_count}, '
-                         f'first_holiday_found_dt:{first_holiday_found_dt}')
+                         f'holidays_found:{holidays_found_dates}')
 
             if continuous_holidays_count == 2:
                 start_of_week += datetime.timedelta(days=7)
@@ -150,16 +150,29 @@ class BaseTimesheetDivider:
                 continue
 
             if continuous_holidays_count == 1:
-                first_holiday_found_weekday = first_holiday_found_dt.weekday()
+                def _get_min_work_hours_and_dt(dt, prev_dt, min_wh):
+                    work_hours = self.fiscal_timesheet.main_timesheet.get_total_hours_sum(dt=dt)
+                    return (dt, work_hours) if work_hours < min_wh else (prev_dt, min_wh)
+
+                min_work_hours = 24.0
+                holiday_dt = None
+                for dt in holidays_found_dates:
+                    if dt.weekday() != 0:
+                        holiday_dt, min_work_hours = _get_min_work_hours_and_dt(
+                            dt - datetime.timedelta(1),
+                            holiday_dt,
+                            min_work_hours,
+                        )
+                    if dt.weekday() != 6:
+                        holiday_dt, min_work_hours = _get_min_work_hours_and_dt(
+                            dt + datetime.timedelta(1),
+                            holiday_dt,
+                            min_work_hours,
+                        )
+                
                 logger.debug(
-                    f'continuous_holidays_count == 1, first_holiday_found_weekday={first_holiday_found_weekday}')
-                if first_holiday_found_weekday == 6:  # sunday
-                    dt = first_holiday_found_dt - datetime.timedelta(days=1)
-                else:
-                    dt = first_holiday_found_dt + datetime.timedelta(days=1)
-                logger.debug(
-                    f'second found holiday {dt}')
-                self._make_holiday(dt)
+                    f'continuous_holidays_count == 1, second found holiday {holiday_dt}')
+                self._make_holiday(holiday_dt)
                 start_of_week += datetime.timedelta(days=7)
 
             if continuous_holidays_count == 0:
