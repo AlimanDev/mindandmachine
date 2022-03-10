@@ -389,7 +389,8 @@ class WorkerDayViewSet(BaseModelViewSet):
                 'dttm_work_start',
                 'dttm_work_end',
                 'shop_id',
-                'work_type_ids'
+                'work_type_ids',
+                'is_vacancy',
             ]
             draft_wdays = list(WorkerDay.objects.filter(
                 approve_condition,
