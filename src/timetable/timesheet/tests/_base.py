@@ -37,7 +37,7 @@ class TestTimesheetMixin(TestsHelperMixin):
             settings__breaks=breaks,
         )
         cls.user_worker = UserFactory(email='worker@example.com', network=cls.network)
-        cls.employee_worker = EmployeeFactory(user=cls.user_worker)
+        cls.employee_worker = EmployeeFactory(user=cls.user_worker, tabel_code='employee_worker')
         cls.group_worker = GroupFactory(name='Сотрудник', network=cls.network)
         cls.position_worker = WorkerPositionFactory(
             name='Работник', group=cls.group_worker,
