@@ -361,7 +361,7 @@ class BaseTimesheetDivider:
                     ))
 
 
-class PobedaTimesheetDivider(BaseTimesheetDivider):
+class BasePobedaTimesheetDivider(BaseTimesheetDivider):
     def _move_other_shop_or_position_work_to_additional_timesheet(self):
         for dt in pd.date_range(self.fiscal_timesheet.dt_from, self.fiscal_timesheet.dt_to).date:
             active_employment = self.fiscal_timesheet._get_active_employment(dt)
@@ -442,6 +442,8 @@ class PobedaTimesheetDivider(BaseTimesheetDivider):
                 filter_func=lambda i: i.day_type.code == WorkerDay.TYPE_ABSENSE):
             self.fiscal_timesheet.additional_timesheet.remove(additional_timesheet_item.dt, additional_timesheet_item)
 
+
+class PobedaTimesheetDivider(BasePobedaTimesheetDivider):
     def divide(self):
         logger.info(f'start pobeda fiscal sheet divide')
         self._init_main_and_additional_timesheets()
@@ -454,6 +456,29 @@ class PobedaTimesheetDivider(BaseTimesheetDivider):
         self._check_overtimes()
         self._fill_empty_dates_as_holidays_in_main_timesheet()
         logger.info(f'finish pobeda fiscal sheet divide')
+
+
+class PobedaManualTimesheetDivider(BasePobedaTimesheetDivider):
+    def _move_vacancies_to_additional_timesheet(self):
+        for dt in pd.date_range(self.fiscal_timesheet.dt_from, self.fiscal_timesheet.dt_to).date:
+            active_employment = self.fiscal_timesheet._get_active_employment(dt)
+            if active_employment:
+                for main_timesheet_item in self.fiscal_timesheet.main_timesheet.get_items(dt=dt):
+                    if main_timesheet_item.is_vacancy:
+                        self.fiscal_timesheet.main_timesheet.remove(dt, main_timesheet_item)
+                        self.fiscal_timesheet.additional_timesheet.add(
+                            dt, main_timesheet_item.copy(overrides={'freezed': True}))
+
+    def divide(self):
+        logger.info(f'start pobeda_manual fiscal sheet divide')
+        self._init_main_and_additional_timesheets()
+        self._move_vacancies_to_additional_timesheet()
+        # self._check_weekly_continuous_holidays()  # TODO: только для нерабочих дней?
+        self._replace_sick_with_absence_type()
+        self._remove_absence_from_additional_timesheet()
+        self._redistribute_vacations_from_additional_timesheet_to_main_timesheet()
+        self._fill_empty_dates_as_holidays_in_main_timesheet()
+        logger.info(f'finish pobeda_manual fiscal sheet divide')
 
 
 class NahodkaTimesheetDivider(BaseTimesheetDivider):
@@ -617,5 +642,6 @@ class ShiftScheduleDivider(BaseTimesheetDivider):
 FISCAL_SHEET_DIVIDERS_MAPPING = {
     'nahodka': NahodkaTimesheetDivider,
     'pobeda': PobedaTimesheetDivider,
+    'pobeda_manual': PobedaManualTimesheetDivider,
     'shift_schedule': ShiftScheduleDivider,
 }

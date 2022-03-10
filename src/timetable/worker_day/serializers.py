@@ -2,7 +2,7 @@ from datetime import timedelta
 
 import pandas as pd
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import Q, Subquery, OuterRef
 from django.db.models.expressions import RawSQL
 from django.utils.functional import cached_property
 from django.utils.translation import gettext_lazy as _
@@ -21,6 +21,7 @@ from src.timetable.models import (
     WorkType,
     WorkerDayType,
     TimesheetItem,
+    EmploymentWorkType,
 )
 
 
@@ -319,6 +320,13 @@ class WorkerDaySerializer(ModelSerializerWithCreateOnlyFields, UnaccountedOverti
                 dt=attrs.get('dt'),
                 priority_shop_id=shop_id,
                 priority_employment_id=attrs.get('employment_id'),
+            ).annotate(
+                main_work_type_id=Subquery(
+                    EmploymentWorkType.objects.filter(
+                        employment_id=OuterRef('id'),
+                        priority=1,
+                    ).values('work_type_id')[:1]
+                )
             ).first()
             if not employee_active_empl:
                 raise self.fail('no_active_employments')
@@ -364,8 +372,14 @@ class WorkerDaySerializer(ModelSerializerWithCreateOnlyFields, UnaccountedOverti
     def _create_update_clean(self, validated_data, instance=None):
         employee_id = validated_data.get('employee_id', instance.employee_id if instance else None)
         if employee_id:
+            work_type_differs = False
+            main_work_type_id = getattr(self._employee_active_empl, 'main_work_type_id', None)
+            if validated_data.get('worker_day_details') and main_work_type_id:
+                work_type_differs = validated_data['worker_day_details'][0]['work_type_id'] != main_work_type_id
+
             validated_data['is_vacancy'] = validated_data.get('is_vacancy') \
-                or not getattr(self._employee_active_empl, 'is_equal_shops', True)
+                or not getattr(self._employee_active_empl, 'is_equal_shops', True) \
+                or work_type_differs
 
     def _run_transaction_checks(self, employee_id, dt, is_fact, is_approved):
         WorkerDay.check_work_time_overlap(

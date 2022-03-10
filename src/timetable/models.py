@@ -1819,6 +1819,7 @@ class TimesheetItem(AbstractModel):
             self.day_hours + self.night_hours,
         )
 
+
 class WorkerDayCashboxDetailsManager(models.Manager):
     def qos_current_version(self):
         return super().get_queryset().select_related('worker_day').filter(worker_day__child__id__isnull=True)
