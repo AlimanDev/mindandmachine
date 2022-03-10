@@ -124,7 +124,7 @@ class NetworkSerializer(serializers.ModelSerializer):
     def get_show_employee_shift_schedule_tab(self, obj:Network):
         return obj.settings_values_prop.get('show_employee_shift_schedule_tab', False)
 
-    def allow_to_manually_set_is_vacancy(self, obj: Network):
+    def get_allow_to_manually_set_is_vacancy(self, obj: Network):
         return obj.settings_values_prop.get('allow_to_manually_set_is_vacancy', False)
 
     class Meta:
