@@ -2153,7 +2153,64 @@ class AttendanceRecords(AbstractModel):
                 associated_wdays_chain.append(associated_wday)
 
         associated_wdays_chain.reverse()
+
+        dttm_from = associated_wdays_chain[0].dttm_work_start - datetime.timedelta(hours=6)
+        dttm_to = associated_wdays_chain[-1].dttm_work_end + datetime.timedelta(hours=6)
+        att_record_coming = AttendanceRecords.objects.filter(
+            employee_id=self.employee_id,
+            shop_id=self.shop_id,
+            type=AttendanceRecords.TYPE_COMING,
+            dttm__gte=dttm_from,
+            dttm__lte=dttm_to,
+        ).order_by('dttm').first()
+        att_record_leaving = AttendanceRecords.objects.filter(
+            employee_id=self.employee_id,
+            shop_id=self.shop_id,
+            type=AttendanceRecords.TYPE_LEAVING,
+            dttm__gte=dttm_from,
+            dttm__lte=dttm_to,
+        ).order_by('dttm').last()
+
+        if not (att_record_coming and att_record_leaving):
+            return
+
+        wdays_to_clean_qs = WorkerDay.objects.filter(
+            Q(last_edited_by__isnull=True) | Q(type_id=WorkerDay.TYPE_EMPTY),
+            dttm_work_start__gte=dttm_from,
+            dttm_work_end__lte=dttm_to,
+            employee_id=self.employee_id,
+            shop_id=self.shop_id,
+            is_fact=True,
+            closest_plan_approved__in=associated_wdays_chain,
+        )
+        for wd in wdays_to_clean_qs.filter(dttm_work_start=att_record_coming.dttm):
+            wd.dttm_work_end = None
+            wd.save(
+                update_fields=[
+                    'work_hours',
+                    'dttm_work_start',
+                    'dttm_work_start_tabel',
+                    'dttm_work_end',
+                    'dttm_work_end_tabel',
+                ],
+            )
+        for wd in wdays_to_clean_qs.filter(dttm_work_end=att_record_leaving.dttm):
+            wd.dttm_work_start = None
+            wd.save(
+                update_fields=[
+                    'work_hours',
+                    'dttm_work_start',
+                    'dttm_work_start_tabel',
+                    'dttm_work_end',
+                    'dttm_work_end_tabel',
+                ],
+            )
+        wdays_to_clean_qs.exclude(
+            Q(dttm_work_start=att_record_coming.dttm) |
+            Q(dttm_work_end=att_record_leaving.dttm),
+        ).delete()
         facts = []
+
         for associated_wday in associated_wdays_chain:
             fact_approved = WorkerDay.objects.filter(
                 is_fact=True,

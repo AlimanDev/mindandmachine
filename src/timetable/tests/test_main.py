@@ -5,6 +5,7 @@ from datetime import timedelta, time, datetime, date
 from decimal import Decimal
 from unittest import mock
 
+import pandas as pd
 from dateutil.relativedelta import relativedelta
 from django.core import mail
 from django.db import transaction, IntegrityError
@@ -5077,7 +5078,57 @@ class TestAttendanceRecords(TestsHelperMixin, APITestCase):
                 self.assertEqual(wd_fact.dttm_work_end, dttm_work_end)
 
     def test_one_arrival_and_departure_for_multiple_24h_shifts(self):
-        pass
+        WorkerDay.objects.all().delete()
+        self.user2.network.set_settings_value('one_arrival_and_departure_for_associated_wdays', True, save=True)
+        plans = {}
+        dt_start = date.today()
+        dt_end = dt_start + timedelta(days=3)
+        for dt in pd.date_range(dt_start, dt_end).date:
+            for is_approved in [False, True]:
+                wd = WorkerDayFactory(
+                    dt=dt,
+                    employee_id=self.employment2.employee_id,
+                    employment=self.employment2,
+                    is_approved=is_approved,
+                    is_fact=False,
+                    type_id=WorkerDay.TYPE_WORKDAY,
+                    shop=self.shop,
+                    dttm_work_start=datetime.combine(dt, time(10)),
+                    dttm_work_end=datetime.combine(dt + timedelta(days=1), time(10)),
+                    cashbox_details__work_type__work_type_name__name='Продавец',
+                )
+                if is_approved:
+                    plans[dt] = wd
+
+        self._create_att_record(
+            AttendanceRecords.TYPE_COMING, datetime.combine(dt_start, time(10, 2)), self.user2.id, self.employee2.id,
+            self.shop.id, terminal=False)
+        self.assertEqual(WorkerDay.objects.filter(is_fact=True).count(), 2)
+
+        self._create_att_record(
+            AttendanceRecords.TYPE_LEAVING, datetime.combine(dt_start + timedelta(days=2), time(9, 53)), self.user2.id,
+            self.employee2.id,
+            self.shop.id, terminal=False)
+        self.assertEqual(WorkerDay.objects.filter(is_fact=True).count(), 4)
+
+        self._create_att_record(
+            AttendanceRecords.TYPE_LEAVING, datetime.combine(dt_end + timedelta(days=1), time(9, 53)), self.user2.id, self.employee2.id,
+            self.shop.id, terminal=False)
+        self.assertEqual(WorkerDay.objects.filter(is_fact=True).count(), 8)
+
+        compares = [
+            (plans[dt_start], datetime.combine(dt_start, time(10, 2)), datetime.combine(dt_start + timedelta(days=1), time(10))),
+            (plans[dt_start + timedelta(days=1)], datetime.combine(dt_start + timedelta(days=1), time(10)), datetime.combine(dt_start + timedelta(days=2), time(10))),
+            (plans[dt_start + timedelta(days=2)], datetime.combine(dt_start + timedelta(days=2), time(10)), datetime.combine(dt_start + timedelta(days=3), time(10))),
+            (plans[dt_end], datetime.combine(dt_end, time(10)), datetime.combine(dt_end + timedelta(days=1), time(9, 53))),
+        ]
+        for plan_approved, dttm_work_start, dttm_work_end in compares:
+            for is_approved in [False, True]:
+                wd_fact = WorkerDay.objects.filter(
+                    closest_plan_approved=plan_approved, is_fact=True, is_approved=is_approved).first()
+                self.assertIsNotNone(wd_fact)
+                self.assertEqual(wd_fact.dttm_work_start, dttm_work_start)
+                self.assertEqual(wd_fact.dttm_work_end, dttm_work_end)
 
 
 class TestVacancy(TestsHelperMixin, APITestCase):
