@@ -21,13 +21,13 @@ from django_filters import utils
 from drf_yasg.utils import swagger_auto_schema
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied
-from rest_framework.pagination import LimitOffsetPagination
 from rest_framework.response import Response
 from rest_framework.serializers import ValidationError
 
 from src.base.exceptions import FieldError
 from src.base.models import Employment, Shop, Group, User, Employee
 from src.base.permissions import WdPermission
+from src.base.pagination import LimitOffsetPaginationWithOptionalCount
 from src.base.views_abstract import BaseModelViewSet
 from src.events.signals import event_signal
 from src.reports.utils.overtimes_undertimes import overtimes_undertimes_xlsx
@@ -53,7 +53,6 @@ from src.timetable.worker_day.serializers import (
     WorkerDaySerializer,
     WorkerDayApproveSerializer,
     WorkerDayWithParentSerializer,
-    VacancySerializer,
     DuplicateSrializer,
     DeleteWorkerDaysSerializer,
     ExchangeSerializer,
@@ -108,9 +107,15 @@ class WorkerDayViewSet(BaseModelViewSet):
     filterset_class = WorkerDayFilter
     filter_backends = [MultiShopsFilterBackend]
     openapi_tags = ['WorkerDay',]
+    queryset = WorkerDay.objects.all()
+    available_extra_fields = ['shop__name']
 
     def get_queryset(self):
-        queryset = WorkerDay.objects.filter(canceled=False).prefetch_related(Prefetch('outsources', to_attr='outsources_list'))
+        queryset = super().get_queryset().filter(
+            canceled=False,
+        ).select_related(
+            'last_edited_by',
+        ).prefetch_related(Prefetch('outsources', to_attr='outsources_list'))
 
         if self.request.query_params.get('by_code', False):
             return queryset.annotate(
@@ -790,7 +795,7 @@ class WorkerDayViewSet(BaseModelViewSet):
         if not filterset_class.form.is_valid():
             raise utils.translate_validation(filterset_class.errors)
         
-        paginator = LimitOffsetPagination()
+        paginator = LimitOffsetPaginationWithOptionalCount()
         allowed_outsource_network_subq = WorkerDayOutsourceNetwork.objects.filter(
             workerday_id=OuterRef('id'),
             network_id=self.request.user.network_id,
@@ -828,26 +833,12 @@ class WorkerDayViewSet(BaseModelViewSet):
                     Q(is_outsource=True, outsource_network_allowed=True, is_approved=True) &
                     (Q(employee__isnull=True) | Q(employee__user__network_id=request.user.network_id)) # чтобы не попадали вакансии с сотрудниками другой аутсорс сети
                 ), # аутсорс фильтр
-            ).select_related(
-                'shop',
-                'employee__user',
             ).prefetch_related(
-                'worker_day_details',
-                'outsources',
-            ).annotate(
-                first_name=F('employee__user__first_name'),
-                last_name=F('employee__user__last_name'),
-                worker_shop=Subquery(
-                    Employment.objects.get_active(
-                        OuterRef('employee__user__network_id'),
-                        employee_id=OuterRef('employee_id')
-                    ).values('shop_id')[:1]
-                ),
-                user_network_id=F('employee__user__network_id'),
+                Prefetch('worker_day_details', to_attr='worker_day_details_list'),
             ),
         )
         data = paginator.paginate_queryset(queryset, request)
-        data = VacancySerializer(data, many=True, context=self.get_serializer_context())
+        data = WorkerDayListSerializer(data, many=True, context=self.get_serializer_context())
 
         return paginator.get_paginated_response(data.data)
 

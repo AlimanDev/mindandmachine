@@ -440,8 +440,9 @@ class TestSAWHSettingsQuarterAccPeriod(SawhSettingsHelperMixin, TestCase):
             expected_norm_hours=143,
         )
 
-    @override_settings(FISCAL_SHEET_DIVIDER_ALIAS='nahodka')
     def test_correct_norm_hours_last_month_acc_period(self):
+        self.network.fiscal_sheet_divider_alias = 'nahodka'
+        self.network.save()
         self.sawh_settings_mapping.shops.remove(self.shop)
         self._test_hours_for_period(
             dt_from=date(2021, 7, 1),
@@ -693,8 +694,9 @@ class TestSAWHSettingsQuarterAccPeriod(SawhSettingsHelperMixin, TestCase):
         self.assertEqual(timesheet_stats[self.employee.id]['main_total_hours_sum'], Decimal('162.87'))
         self.assertEqual(timesheet_stats[self.employee.id]['sawh_hours'], 162.87)
 
-    @override_settings(FISCAL_SHEET_DIVIDER_ALIAS='nahodka')
     def test_corrected_last_month_sawh_hours_not_more_than_norm_hours(self):
+        self.network.fiscal_sheet_divider_alias = 'nahodka'
+        self.network.save()
         self.sawh_settings_mapping.shops.remove(self.shop)
         self._test_hours_for_period(
             dt_from=date(2021, 7, 1),
