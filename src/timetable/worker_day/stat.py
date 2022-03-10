@@ -567,7 +567,17 @@ class WorkersStatsGetter:
             work_hours_outside_of_selected_period=Coalesce(Sum(Extract(F('work_hours'), 'epoch') / 3600,
                                                          filter=Q(outside_of_selected_period_q, work_hours__gte=timedelta(0),
                                                                   type__is_work_hours=True),
-                                                         output_field=FloatField()), 0.0)
+                                                         output_field=FloatField()), 0.0),
+            work_hours_all_shops_main=Coalesce(Sum(Extract(F('work_hours'), 'epoch') / 3600,
+                                                filter=Q(selected_period_q, Q(is_vacancy=False),
+                                                         work_hours__gte=timedelta(0),
+                                                         type__is_work_hours=True),
+                                                output_field=FloatField()), 0.0),
+            work_hours_all_shops_additional=Coalesce(Sum(Extract(F('work_hours'), 'epoch') / 3600,
+                                                filter=Q(selected_period_q, Q(is_vacancy=True),
+                                                         work_hours__gte=timedelta(0),
+                                                         type__is_work_hours=True),
+                                                output_field=FloatField()), 0.0)
         ).order_by('employee_id', '-is_fact', '-is_approved')  # такая сортировка нужна для work_hours_prev_months
         if self.hours_by_types:
             work_days = work_days.annotate(**{
@@ -597,6 +607,8 @@ class WorkersStatsGetter:
             for work_hours in work_hours_dicts:
                 work_hours['selected_shop'] = work_hours.get('selected_shop', 0) + wd_dict['work_hours_selected_shop']
                 work_hours['other_shops'] = work_hours.get('other_shops', 0) + wd_dict['work_hours_other_shops']
+                work_hours['all_shops_main'] = work_hours.get('all_shops_main', 0) + wd_dict['work_hours_all_shops_main']
+                work_hours['all_shops_additional'] = work_hours.get('all_shops_additional', 0) + wd_dict['work_hours_all_shops_additional']
                 work_hours['total'] = work_hours.get('total', 0) + wd_dict['work_hours_selected_period']
                 work_hours['until_acc_period_end'] = work_hours.get(
                     'until_acc_period_end', 0) + wd_dict['work_hours_until_acc_period_end']
