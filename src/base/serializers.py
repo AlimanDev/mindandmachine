@@ -70,6 +70,7 @@ class NetworkSerializer(serializers.ModelSerializer):
     shop_name_form = serializers.SerializerMethodField()
     analytics_iframe = serializers.SerializerMethodField()
     show_employee_shift_schedule_tab = serializers.SerializerMethodField()
+    allow_to_manually_set_is_vacancy = serializers.SerializerMethodField()
 
     def get_default_stats(self, obj: Network):
         default_stats = json.loads(obj.settings_values).get('default_stats', {})
@@ -123,6 +124,9 @@ class NetworkSerializer(serializers.ModelSerializer):
     def get_show_employee_shift_schedule_tab(self, obj:Network):
         return obj.settings_values_prop.get('show_employee_shift_schedule_tab', False)
 
+    def allow_to_manually_set_is_vacancy(self, obj: Network):
+        return obj.settings_values_prop.get('allow_to_manually_set_is_vacancy', False)
+
     class Meta:
         model = Network
         fields = [
@@ -153,7 +157,9 @@ class NetworkSerializer(serializers.ModelSerializer):
             'rebuild_timetable_min_delta',
             'analytics_iframe',
             'analytics_type',
+            'allow_to_manually_set_is_vacancy',
         ]
+
 
 class NetworkListSerializer(serializers.Serializer):
     id = serializers.IntegerField()
