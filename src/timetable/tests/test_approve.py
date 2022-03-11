@@ -554,3 +554,14 @@ class TestWorkerDayApprove(TestsHelperMixin, APITestCase):
         )
 
         self.assertFalse(WorkerDay.objects.filter(is_approved=True).exists())
+
+        WorkerDay.objects.update(is_vacancy=True)
+        response = self._approve(
+            self.shop.id,
+            False,
+            date(2022, 1, 1),
+            date(2022, 2, 28),
+            wd_types=[WorkerDay.TYPE_WORKDAY],
+        )
+
+        self.assertEqual(response.status_code, 200)
