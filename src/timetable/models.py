@@ -890,8 +890,12 @@ class WorkerDay(AbstractModel):
         return True
 
     @classmethod
-    def _get_skip_update_equality_fields(cls):
-        return ['created_by', 'last_edited_by', 'source']
+    def _get_skip_update_equality_fields(cls, existing_obj):
+        skip_fields_list = ['created_by', 'last_edited_by', 'source']
+        if not (existing_obj.type.is_dayoff and existing_obj.type.is_work_hours and
+                existing_obj.type.get_work_hours_method == WorkerDayType.GET_WORK_HOURS_METHOD_TYPE_MANUAL):
+            skip_fields_list.append('work_hours')
+        return skip_fields_list
 
     def calc_day_and_night_work_hours(self, work_hours=None, work_start=None, work_end=None):
         from src.util.models_converter import Converter

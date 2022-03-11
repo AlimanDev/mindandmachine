@@ -143,7 +143,7 @@ class BatchUpdateOrCreateModelMixin:
         pass
 
     @classmethod
-    def _get_skip_update_equality_fields(cls):
+    def _get_skip_update_equality_fields(cls, existing_obj):
         return []
 
     @classmethod
@@ -299,7 +299,6 @@ class BatchUpdateOrCreateModelMixin:
                 existing_objs = {
                     getattr(obj, update_key_field): obj for obj in update_qs
                 }
-                skip_update_equality_fields = cls._get_skip_update_equality_fields()
                 for update_key in update_keys:
                     update_obj_dict = to_update_dict[update_key]
                     if update_key not in existing_objs:
@@ -310,6 +309,7 @@ class BatchUpdateOrCreateModelMixin:
                             cls._check_create_single_obj_perm(user, obj_dict, **check_perms_extra_kwargs)
                     else:
                         existing_obj = existing_objs.get(update_key)
+                        skip_update_equality_fields = cls._get_skip_update_equality_fields(existing_obj)
                         need_to_skip = True
                         for k, v in update_obj_dict.items():
                             if k not in rel_objs_mapping and k not in skip_update_equality_fields:
