@@ -436,7 +436,7 @@ def create_worker_days_range(dates, type_id=WorkerDay.TYPE_WORKDAY, shop_id=None
                 getattr(employment, 'shop_id', None),
                 shop_id,
                 getattr(employment, 'main_work_type_id', None),
-                [{'work_type_id': priority_work_type_id}],
+                [{'work_type_id': priority_work_type_id}] if priority_work_type_id else [],
                 is_vacacny=is_vacancy,
             )
             wdays.append(wd_data)
