@@ -795,11 +795,21 @@ class WorkerDay(AbstractModel):
 
     @classmethod
     def _check_update_single_obj_perm(cls, user, existing_obj, obj_data, check_active_empl=True, **extra_kwargs):
-        from src.timetable.worker_day_permissions.checkers import UpdateSingleWdPermissionChecker
-        # TODO: сравнение сущ. объекта и новых данных
-        perm_checker = UpdateSingleWdPermissionChecker(user=user, wd_data=obj_data, check_active_empl=check_active_empl)
-        if not perm_checker.has_permission():
-            raise PermissionDenied(perm_checker.err_message)
+        from src.timetable.worker_day_permissions.checkers import (
+            UpdateSingleWdPermissionChecker, CreateSingleWdPermissionChecker, DeleteSingleWdPermissionChecker
+        )
+        if existing_obj.type != obj_data['type'] or existing_obj.shop_id != obj_data['shop_id'] \
+                or existing_obj.dt != obj_data['dt']:
+            perm_checker = DeleteSingleWdPermissionChecker(user=user, wd_obj=existing_obj)
+            if not perm_checker.has_permission():
+                raise PermissionDenied(perm_checker.err_message)
+            perm_checker = CreateSingleWdPermissionChecker(user=user, wd_data=obj_data, check_active_empl=check_active_empl)
+            if not perm_checker.has_permission():
+                raise PermissionDenied(perm_checker.err_message)
+        else:
+            perm_checker = UpdateSingleWdPermissionChecker(user=user, wd_data=obj_data, check_active_empl=check_active_empl)
+            if not perm_checker.has_permission():
+                raise PermissionDenied(perm_checker.err_message)
 
     @classmethod
     def _check_delete_single_obj_perm(cls, user, existing_obj=None, obj_id=None, check_active_empl=False, **extra_kwargs):
