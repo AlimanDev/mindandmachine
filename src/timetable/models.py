@@ -1,6 +1,8 @@
 import datetime
 import json
+import pandas as pd
 from decimal import Decimal
+from dateutil.relativedelta import relativedelta
 
 from django.conf import settings
 from django.contrib.auth.models import (
@@ -11,11 +13,11 @@ from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models
 from django.db import transaction
 from django.db.models import (
-    Subquery, OuterRef, Max, Q, Case, When, Value, FloatField, F, IntegerField, Exists, BooleanField, Count, Prefetch,
+    Subquery, OuterRef, Max, Q, Case, When, Value, FloatField, F, IntegerField, Exists, BooleanField, Count, Sum, Prefetch,
 )
 from django.db.models.expressions import RawSQL
 from django.db.models.fields import PositiveSmallIntegerField
-from django.db.models.functions import Abs, Cast, Extract, Least
+from django.db.models.functions import Abs, Cast, Extract, Least, Coalesce
 from django.db.models.query import QuerySet
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
@@ -30,6 +32,7 @@ from src.recognition.events import EMPLOYEE_WORKING_NOT_ACCORDING_TO_PLAN
 from src.tasks.models import Task
 from src.timetable.break_time_subtractor import break_time_subtractor_map
 from src.timetable.exceptions import (
+    MainWorkHoursGreaterThanNorm,
     WorkTimeOverlap,
     WorkDayTaskViolation,
     MultipleWDTypesOnOneDateForOneEmployee,
@@ -1431,6 +1434,99 @@ class WorkerDay(AbstractModel):
             raise original_exc
 
         return overlaps
+
+    @classmethod
+    def check_main_work_hours_norm(cls, dt_from, dt_to, shop_id, employee_id=None, employee_id__in=None, raise_exc=True, exc_cls=None):
+        """
+        Проверка, что в основном графике количество часов не может быть больше, чем по норме часов
+        """
+        from src.timetable.worker_day.stat import WorkersStatsGetter
+        if not (employee_id or employee_id__in):
+            return
+
+        networks = list(filter(lambda x: x.settings_values_prop.get('check_main_work_hours_norm', False), Network.objects.all()))
+
+        employee_filter = {
+            'user__network__in': networks,
+        }
+
+        if employee_id:
+            employee_filter['id'] = employee_id
+        
+        if employee_id__in:
+            employee_filter['id__in'] = employee_id__in
+
+        employees = {e.id: e for e in Employee.objects.filter(**employee_filter)}
+
+        date_ranges = map(lambda x: (x.replace(day=1), x), pd.date_range(dt_from.replace(day=1), dt_to + relativedelta(day=31), freq='1M').date)
+
+        lookup = {
+            'type__is_dayoff': False,
+            'is_approved': True,
+            'employee__user__employees__id__in': employees.keys(),
+        }
+
+        data_greater_norm = []
+        norm_key = getattr(settings, 'TIMESHEET_DIVIDER_SAWH_HOURS_KEY', 'curr_month')
+
+        for dt_from, dt_to in date_ranges:
+            lookup['dt__gte'] = dt_from
+            lookup['dt__lte'] = dt_to
+            total_work_hours_qs = cls.objects.filter(**lookup).values(
+                'employee_id',
+                'employee__user__last_name', 
+                'employee__user__first_name',
+            ).annotate(
+                total_work_hours=Coalesce(
+                    Sum(
+                        Extract(F('work_hours'), 'epoch') / 3600,
+                        output_field=FloatField()
+                    ), 
+                    0.0
+                ),
+            ).distinct()
+
+            total_work_hours_df = pd.DataFrame(
+                columns=['employee_id', 'employee__user__last_name', 'employee__user__first_name', 'total_work_hours'], 
+                data=list(total_work_hours_qs),
+            )
+
+            stats = WorkersStatsGetter(
+                dt_from=dt_from, 
+                dt_to=dt_to, 
+                employee_id__in=employees.keys(),
+                shop_id=shop_id,
+                use_cache=False,
+            ).run()
+            
+            stats_df = pd.DataFrame(
+                columns=['employee_id', 'norm'], 
+                data=list(
+                    map(
+                        lambda x: (
+                            x[0], 
+                            x[1].get("plan", {}).get("approved", {}).get("sawh_hours", {}).get(norm_key, 0)
+                        ),
+                        stats.items(),
+                    )
+                )
+            )
+
+            check_df = pd.merge(total_work_hours_df, stats_df, how='left', on='employee_id').fillna(0)
+
+            check_df['difference'] = check_df.total_work_hours - check_df.norm
+            check_df['dt_from'] = dt_from
+            check_df['dt_to'] = dt_to
+
+            data_greater_norm.extend(check_df[check_df['difference'] > 0].to_dict('records'))
+
+        if data_greater_norm and raise_exc:
+            original_exc = MainWorkHoursGreaterThanNorm(exc_data=data_greater_norm)
+            if exc_cls:
+                raise exc_cls(str(original_exc))
+            raise original_exc
+
+        return data_greater_norm
 
     @classmethod
     def check_multiple_workday_types(cls, employee_days_q=None, employee_id=None, employee_id__in=None, user_id=None,
