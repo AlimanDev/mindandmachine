@@ -762,7 +762,7 @@ class WorkerDay(AbstractModel):
                 if deleted:
                     grouped_wd_perm_check_data = cls._get_grouped_perm_check_data(deleted)
                     for wd_data in grouped_wd_perm_check_data:
-                        cls._check_create_single_obj_perm(user, wd_data)
+                        cls._check_delete_single_wd_data_perm(user, wd_data)
 
     @classmethod
     def _post_batch(cls, **kwargs):
