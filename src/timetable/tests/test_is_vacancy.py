@@ -1,5 +1,5 @@
 from copy import deepcopy
-from datetime import date, datetime, time
+from datetime import date, datetime, time, timedelta
 from src.base.tests.factories import EmployeeFactory, EmploymentFactory, GroupFactory, NetworkFactory, ShopFactory, UserFactory
 from src.timetable.models import AttendanceRecords, GroupWorkerDayPermission, WorkerDay, WorkerDayCashboxDetails, WorkerDayPermission
 from src.timetable.tests.factories import WorkTypeFactory, WorkerDayFactory
@@ -302,3 +302,12 @@ class TestIsVacancySetting(TestsHelperMixin, APITestCase):
         )
         worker_day = WorkerDay.objects.get(id=created_wdays[0].id)
         self.assertTrue(worker_day.is_vacancy)
+
+        created_wdays = create_worker_days_range(
+            [self.dt_now + timedelta(1)], 
+            type_id=WorkerDay.TYPE_HOLIDAY,
+            employee_id=self.employee_worker.id,
+            created_by=self.user_worker,
+        )
+        worker_day = WorkerDay.objects.get(id=created_wdays[0].id)
+        self.assertFalse(worker_day.is_vacancy)
