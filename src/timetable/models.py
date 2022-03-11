@@ -2233,7 +2233,8 @@ class AttendanceRecords(AbstractModel):
                     if self.shop.network.skip_leaving_tick:
                         return
 
-                is_vacancy = active_user_empl.shop_id != self.shop_id
+                is_vacancy = (closest_plan_approved and closest_plan_approved.is_vacancy) \
+                             or active_user_empl.shop_id != self.shop_id
                 if closest_plan_approved and closest_plan_approved.worker_day_details_list:
                     # TODO: тест + настройка?
                     is_vacancy = is_vacancy or active_user_empl.main_work_type_id != \
