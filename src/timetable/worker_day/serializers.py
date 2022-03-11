@@ -551,6 +551,7 @@ class ChangeListSerializer(serializers.Serializer):
 class ChangeRangeSerializer(serializers.Serializer):
     #is_fact = serializers.BooleanField()
     is_approved = serializers.BooleanField()
+    is_blocked = serializers.BooleanField(required=False)
     dt_from = serializers.DateField()
     dt_to = serializers.DateField()
     worker = serializers.CharField(allow_null=False, allow_blank=False)  # табельный номер
