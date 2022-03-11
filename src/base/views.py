@@ -87,16 +87,13 @@ class EmploymentViewSet(UpdateorCreateViewSet):
     serializer_class = EmploymentSerializer
     filterset_class = EmploymentFilter
     openapi_tags = ['Employment', 'Integration',]
+    queryset = Employment.objects.all()
 
     def perform_update(self, serializer):
         serializer.save(dttm_deleted=None)
 
     def get_queryset(self):
-        manager = Employment.objects
-        if self.action in ['update']:
-            manager = Employment.objects_with_excluded
-
-        qs = manager.filter(
+        qs = super().get_queryset().filter(
             Q(shop__network_id=self.request.user.network_id) | 
             Q(employee__user__network_id=self.request.user.network_id), # чтобы можно было аутсорсу редактировать трудоустройтсва своих сотрудников
         ).order_by('-dt_hired')

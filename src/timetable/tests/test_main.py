@@ -43,6 +43,7 @@ from src.timetable.models import (
     GroupWorkerDayPermission,
     EmploymentWorkType,
     WorkerDayType,
+    ExchangeSettings,
 )
 from src.timetable.tests.factories import WorkTypeFactory, WorkerDayFactory, WorkerDayTypeFactory
 from src.timetable.vacancy.utils import (
@@ -50,7 +51,6 @@ from src.timetable.vacancy.utils import (
 )
 from src.util.mixins.tests import TestsHelperMixin
 from src.util.models_converter import Converter
-from src.util.test import create_departments_and_users
 
 
 class TestWorkerDay(TestsHelperMixin, APITestCase):
@@ -60,82 +60,82 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
 
     maxDiff = None
 
+    @classmethod
+    def setUpTestData(cls):
+        cls.url = '/rest_api/worker_day/'
+        cls.url_approve = '/rest_api/worker_day/approve/'
+        cls.dt = (now() + timedelta(hours=3)).date()
+
+        cls.create_departments_and_users()
+        cls.work_type_name = WorkTypeName.objects.create(name='Магазин', network=cls.network)
+        cls.work_type = WorkType.objects.create(
+            work_type_name=cls.work_type_name,
+            shop=cls.shop)
+        cls.work_type2 = WorkType.objects.create(
+            work_type_name=cls.work_type_name,
+            shop=cls.shop2)
+
+        cls.worker_day_plan_approved = WorkerDay.objects.create(
+            shop=cls.shop,
+            employee=cls.employee2,
+            employment=cls.employment2,
+            dt=cls.dt,
+            is_fact=False,
+            type_id=WorkerDay.TYPE_WORKDAY,
+            dttm_work_start=datetime.combine(cls.dt, time(8, 0, 0)),
+            dttm_work_end=datetime.combine(cls.dt, time(20, 0, 0)),
+            is_approved=True,
+        )
+        cls.worker_day_plan_not_approved = WorkerDay.objects.create(
+            shop=cls.shop,
+            employee=cls.employee2,
+            employment=cls.employment2,
+            dt=cls.dt,
+            is_fact=False,
+            type_id=WorkerDay.TYPE_WORKDAY,
+            dttm_work_start=datetime.combine(cls.dt, time(8, 0, 0)),
+            dttm_work_end=datetime.combine(cls.dt, time(20, 0, 0)),
+            parent_worker_day=cls.worker_day_plan_approved
+        )
+        cls.worker_day_fact_approved = WorkerDay.objects.create(
+            shop=cls.shop,
+            employee=cls.employee2,
+            employment=cls.employment2,
+            dt=cls.dt,
+            is_fact=True,
+            type_id=WorkerDay.TYPE_WORKDAY,
+            dttm_work_start=datetime.combine(cls.dt, time(8, 0, 0)),
+            dttm_work_end=datetime.combine(cls.dt, time(20, 30, 0)),
+            is_approved=True,
+            parent_worker_day=cls.worker_day_plan_approved,
+            closest_plan_approved=cls.worker_day_plan_approved,
+            last_edited_by=cls.user1,
+        )
+        cls.worker_day_fact_not_approved = WorkerDay.objects.create(
+            shop=cls.shop,
+            employee=cls.employee2,
+            employment=cls.employment2,
+            dt=cls.dt,
+            is_fact=True,
+            type_id=WorkerDay.TYPE_WORKDAY,
+            dttm_work_start=datetime.combine(cls.dt, time(7, 58, 0)),
+            dttm_work_end=datetime.combine(cls.dt, time(19, 59, 1)),
+            parent_worker_day=cls.worker_day_fact_approved,
+            closest_plan_approved=cls.worker_day_plan_approved,
+            last_edited_by=cls.user1,
+        )
+        cls.network.allowed_interval_for_late_arrival = timedelta(minutes=15)
+        cls.network.allowed_interval_for_early_departure = timedelta(minutes=15)
+        cls.network.crop_work_hours_by_shop_schedule = False
+        cls.network.only_fact_hours_that_in_approved_plan = True
+        cls.network.save()
+
+        cls.shop.tm_open_dict = f'{{"all":"00:00:00"}}'
+        cls.shop.tm_close_dict = f'{{"all":"00:00:00"}}'
+        cls.shop.save()
+
     def setUp(self):
-        super().setUp()
-
-        self.url = '/rest_api/worker_day/'
-        self.url_approve = '/rest_api/worker_day/approve/'
-        self.dt = (now() + timedelta(hours=3)).date()
-
-        create_departments_and_users(self)
-        self.work_type_name = WorkTypeName.objects.create(name='Магазин', network=self.network)
-        self.work_type = WorkType.objects.create(
-            work_type_name=self.work_type_name,
-            shop=self.shop)
-        self.work_type2 = WorkType.objects.create(
-            work_type_name=self.work_type_name,
-            shop=self.shop2)
-
-        self.worker_day_plan_approved = WorkerDay.objects.create(
-            shop=self.shop,
-            employee=self.employee2,
-            employment=self.employment2,
-            dt=self.dt,
-            is_fact=False,
-            type_id=WorkerDay.TYPE_WORKDAY,
-            dttm_work_start=datetime.combine(self.dt, time(8, 0, 0)),
-            dttm_work_end=datetime.combine(self.dt, time(20, 0, 0)),
-            is_approved=True,
-        )
-        self.worker_day_plan_not_approved = WorkerDay.objects.create(
-            shop=self.shop,
-            employee=self.employee2,
-            employment=self.employment2,
-            dt=self.dt,
-            is_fact=False,
-            type_id=WorkerDay.TYPE_WORKDAY,
-            dttm_work_start=datetime.combine(self.dt, time(8, 0, 0)),
-            dttm_work_end=datetime.combine(self.dt, time(20, 0, 0)),
-            parent_worker_day=self.worker_day_plan_approved
-        )
-        self.worker_day_fact_approved = WorkerDay.objects.create(
-            shop=self.shop,
-            employee=self.employee2,
-            employment=self.employment2,
-            dt=self.dt,
-            is_fact=True,
-            type_id=WorkerDay.TYPE_WORKDAY,
-            dttm_work_start=datetime.combine(self.dt, time(8, 0, 0)),
-            dttm_work_end=datetime.combine(self.dt, time(20, 30, 0)),
-            is_approved=True,
-            parent_worker_day=self.worker_day_plan_approved,
-            closest_plan_approved=self.worker_day_plan_approved,
-            last_edited_by=self.user1,
-        )
-        self.worker_day_fact_not_approved = WorkerDay.objects.create(
-            shop=self.shop,
-            employee=self.employee2,
-            employment=self.employment2,
-            dt=self.dt,
-            is_fact=True,
-            type_id=WorkerDay.TYPE_WORKDAY,
-            dttm_work_start=datetime.combine(self.dt, time(7, 58, 0)),
-            dttm_work_end=datetime.combine(self.dt, time(19, 59, 1)),
-            parent_worker_day=self.worker_day_fact_approved,
-            closest_plan_approved=self.worker_day_plan_approved,
-            last_edited_by=self.user1,
-        )
-
         self.client.force_authenticate(user=self.user1)
-        self.network.allowed_interval_for_late_arrival = timedelta(minutes=15)
-        self.network.allowed_interval_for_early_departure = timedelta(minutes=15)
-        self.network.crop_work_hours_by_shop_schedule = False
-        self.network.only_fact_hours_that_in_approved_plan = True
-        self.network.save()
-
-        self.shop.tm_open_dict = f'{{"all":"00:00:00"}}'
-        self.shop.tm_close_dict = f'{{"all":"00:00:00"}}'
-        self.shop.save()
 
     def test_get_list(self):
         dt = Converter.convert_date(self.dt)
@@ -3728,19 +3728,19 @@ class TestWorkerDayCreateFact(TestsHelperMixin, APITestCase):
     USER_EMAIL = "q@q.q"
     USER_PASSWORD = "4242"
 
+    @classmethod
+    def setUpTestData(cls):
+        cls.create_departments_and_users()
+        cls.url = '/rest_api/worker_day/'
+        cls.url_approve = '/rest_api/worker_day/approve/'
+        cls.dt = now().date()
+        cls.work_type_name = WorkTypeName.objects.create(name='Магазин', network=cls.network)
+        cls.work_type = WorkType.objects.create(
+            work_type_name=cls.work_type_name,
+            shop=cls.shop,
+        )
+
     def setUp(self):
-        super().setUp()
-
-        create_departments_and_users(self)
-
-        self.url = '/rest_api/worker_day/'
-        self.url_approve = '/rest_api/worker_day/approve/'
-        self.dt = now().date()
-        self.work_type_name = WorkTypeName.objects.create(name='Магазин')
-        self.work_type = WorkType.objects.create(
-            work_type_name=self.work_type_name,
-            shop=self.shop)
-
         self.client.force_authenticate(user=self.user1)
 
     def test_create_fact(self):
@@ -3901,62 +3901,64 @@ class TestWorkerDayCreateFact(TestsHelperMixin, APITestCase):
 
 
 class TestAttendanceRecords(TestsHelperMixin, APITestCase):
-    def setUp(self):
-        self.url = '/rest_api/worker_day/'
-        self.url_approve = '/rest_api/worker_day/approve/'
-        self.dt = now().date()
 
-        create_departments_and_users(self)
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.url = '/rest_api/worker_day/'
+        cls.url_approve = '/rest_api/worker_day/approve/'
+        cls.dt = now().date()
 
-        self.worker_day_plan_approved = WorkerDayFactory(
-            shop=self.shop,
-            employee=self.employee2,
-            employment=self.employment2,
-            dt=self.dt,
+        cls.create_departments_and_users()
+
+        cls.worker_day_plan_approved = WorkerDayFactory(
+            shop=cls.shop,
+            employee=cls.employee2,
+            employment=cls.employment2,
+            dt=cls.dt,
             is_fact=False,
             is_approved=True,
             type_id=WorkerDay.TYPE_WORKDAY,
-            dttm_work_start=datetime.combine(self.dt, time(8, 0, 0)),
-            dttm_work_end=datetime.combine(self.dt, time(20, 0, 0)),
+            dttm_work_start=datetime.combine(cls.dt, time(8, 0, 0)),
+            dttm_work_end=datetime.combine(cls.dt, time(20, 0, 0)),
         )
-        self.worker_day_plan_not_approved = WorkerDayFactory(
-            shop=self.shop,
-            employee=self.employee2,
-            employment=self.employment2,
-            dt=self.dt,
+        cls.worker_day_plan_not_approved = WorkerDayFactory(
+            shop=cls.shop,
+            employee=cls.employee2,
+            employment=cls.employment2,
+            dt=cls.dt,
             is_fact=False,
             is_approved=False,
             type_id=WorkerDay.TYPE_WORKDAY,
-            dttm_work_start=datetime.combine(self.dt, time(8, 0, 0)),
-            dttm_work_end=datetime.combine(self.dt, time(20, 0, 0)),
+            dttm_work_start=datetime.combine(cls.dt, time(8, 0, 0)),
+            dttm_work_end=datetime.combine(cls.dt, time(20, 0, 0)),
         )
-        self.worker_day_fact_approved = WorkerDayFactory(
-            shop=self.shop,
-            employee=self.employee2,
-            employment=self.employment2,
-            dt=self.dt,
+        cls.worker_day_fact_approved = WorkerDayFactory(
+            shop=cls.shop,
+            employee=cls.employee2,
+            employment=cls.employment2,
+            dt=cls.dt,
             is_fact=True,
             is_approved=True,
             type_id=WorkerDay.TYPE_WORKDAY,
-            dttm_work_start=datetime.combine(self.dt, time(8, 12, 23)),
-            dttm_work_end=datetime.combine(self.dt, time(20, 2, 1)),
-            parent_worker_day=self.worker_day_plan_approved,
-            closest_plan_approved=self.worker_day_plan_approved,
+            dttm_work_start=datetime.combine(cls.dt, time(8, 12, 23)),
+            dttm_work_end=datetime.combine(cls.dt, time(20, 2, 1)),
+            parent_worker_day=cls.worker_day_plan_approved,
+            closest_plan_approved=cls.worker_day_plan_approved,
         )
-        self.worker_day_fact_not_approved = WorkerDayFactory(
-            shop=self.shop,
-            employee=self.employee2,
-            employment=self.employment2,
-            dt=self.dt,
+        cls.worker_day_fact_not_approved = WorkerDayFactory(
+            shop=cls.shop,
+            employee=cls.employee2,
+            employment=cls.employment2,
+            dt=cls.dt,
             is_fact=True,
             is_approved=False,
             type_id=WorkerDay.TYPE_WORKDAY,
-            dttm_work_start=datetime.combine(self.dt, time(7, 58, 0)),
-            dttm_work_end=datetime.combine(self.dt, time(19, 59, 1)),
-            closest_plan_approved=self.worker_day_plan_approved,
+            dttm_work_start=datetime.combine(cls.dt, time(7, 58, 0)),
+            dttm_work_end=datetime.combine(cls.dt, time(19, 59, 1)),
+            closest_plan_approved=cls.worker_day_plan_approved,
         )
-        self.network.trust_tick_request = True
-        self.network.save()
+        cls.network.trust_tick_request = True
+        cls.network.save()
 
     def test_attendancerecords_update(self):
         tm_start = datetime.combine(self.dt, time(6, 0, 0))
@@ -4276,9 +4278,11 @@ class TestAttendanceRecords(TestsHelperMixin, APITestCase):
     def test_fact_work_type_received_from_employment_if_there_is_no_plan(self):
         work_type_name = WorkTypeName.objects.create(
             name='Повар',
+            network=self.network,
         )
         work_type_name2 = WorkTypeName.objects.create(
             name='Продавец',
+            network=self.network,
         )
         work_type = WorkType.objects.create(
             shop=self.shop2,
@@ -4320,6 +4324,7 @@ class TestAttendanceRecords(TestsHelperMixin, APITestCase):
     def test_work_type_created_for_holiday(self):
         work_type_name = WorkTypeName.objects.create(
             name='Повар',
+            network=self.network,
         )
         work_type = WorkType.objects.create(
             shop=self.shop2,
@@ -5103,6 +5108,7 @@ class TestVacancy(TestsHelperMixin, APITestCase):
         cls.dt_now = date.today()
         cls.work_type_name1 = WorkTypeName.objects.create(
             name='Кассы',
+            network=cls.network,
         )
         cls.work_type1 = WorkType.objects.create(shop=cls.shop, work_type_name=cls.work_type_name1)
         cls.vacancy = WorkerDay.objects.create(
@@ -5876,6 +5882,46 @@ class TestVacancy(TestsHelperMixin, APITestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertFalse(WorkerDay.objects.filter(id=vacancy.id).exists())
 
+    def test_get_and_create_vacancy_with_shop_name(self):
+        response = self.client.get(f"{self.get_url('WorkerDay-vacancy')}?extra_fields=shop__name,shop__code&limit=100&offset=0&is_vacant=true")
+        self.assertEqual(response.status_code, 200)
+        response_data = response.json()
+        self.assertEqual(len(response_data['results']), 1)
+        self.assertEqual(response_data['results'][0].get('shop__name'), self.shop.name)
+        self.assertFalse('shop__code' in response_data['results'][0])
+        self.assertFalse('shop__name' in response_data['results'][0]['worker_day_details'][0])
+
+        create_data = response_data['results'][0]
+
+        create_data['is_approved'] = False
+        create_data['extra_fields'] = 'shop__name,shop__code'
+
+        response = self.client.post(self.get_url('WorkerDay-list'), data=self.dump_data(create_data), content_type='application/json')
+        response_data = response.json()
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response_data.get('shop__name'), self.shop.name)
+        self.assertFalse('shop__code' in response_data)
+        self.assertFalse('shop__name' in response_data['worker_day_details'][0])
+
+    def test_pagination(self):
+        for i in range(10):
+            WorkerDayFactory(
+                shop=self.shop,
+                is_approved=True,
+                is_vacancy=True,
+                dt=self.dt_now,
+                dttm_work_start=datetime.combine(self.dt_now, time(10)),
+                dttm_work_end=datetime.combine(self.dt_now, time(20)),
+                employee=None,
+                employment=None,
+                type_id=WorkerDay.TYPE_WORKDAY,
+            )
+        response = self.client.get(f"{self.get_url('WorkerDay-vacancy')}?limit=100&offset=0&is_vacant=true")
+        self.assertEqual(response.json()['count'], 11)
+        response = self.client.get(f"{self.get_url('WorkerDay-vacancy')}?limit=5&offset=0&is_vacant=true&return_total_count=false")
+        self.assertEqual(response.json()['count'], 5)
+
 
 class TestAditionalFunctions(TestsHelperMixin, APITestCase):
     USER_USERNAME = "user1"
@@ -5884,17 +5930,17 @@ class TestAditionalFunctions(TestsHelperMixin, APITestCase):
 
     maxDiff = None
 
-    def setUp(self):
-        from src.timetable.models import ExchangeSettings
-        super().setUp()
+    @classmethod
+    def setUpTestData(cls):
+        cls.url = '/rest_api/worker_day/'
+        cls.create_departments_and_users()
+        cls.work_type_name = WorkTypeName.objects.create(name='Магазин', network=cls.network)
+        cls.work_type = WorkType.objects.create(
+            work_type_name=cls.work_type_name,
+            shop=cls.shop)
+        ExchangeSettings.objects.create(network=cls.network)
 
-        self.url = '/rest_api/worker_day/'
-        create_departments_and_users(self)
-        self.work_type_name = WorkTypeName.objects.create(name='Магазин', network=self.network)
-        self.work_type = WorkType.objects.create(
-            work_type_name=self.work_type_name,
-            shop=self.shop)
-        ExchangeSettings.objects.create(network=self.network)
+    def setUp(self):
         self.client.force_authenticate(user=self.user1)
 
     def update_or_create_holidays(self, employment, dt_from, count, approved, wds={}):
@@ -7252,7 +7298,7 @@ class TestFineLogic(APITestCase):
         cls.shop = Shop.objects.create(
             name='Shop',
             network=cls.network,
-            region=Region.objects.create(name='Def'),
+            region=Region.objects.create(name='Def', network=cls.network),
         )
         cls.network.fines_settings = json.dumps(
            {
@@ -7274,6 +7320,7 @@ class TestFineLogic(APITestCase):
         cls.breaks = Break.objects.create(
             name='brk',
             value='[[0, 3600, [30]]]',
+            network=cls.network,
         )
         cls.cashier = cls._create_user(cls, WorkerPosition.objects.create(network=cls.network, name='Продавец-кассир', breaks=cls.breaks), 'Cashier', 'cashier')
         cls.dir = cls._create_user(cls, WorkerPosition.objects.create(network=cls.network, name='Директор Магазина', breaks=cls.breaks), 'Dir', 'dir')
@@ -7397,14 +7444,14 @@ class TestFineLogic(APITestCase):
         WorkerDay.objects.all().delete()
         dt = date.today()
         plan_wd = self._create_or_update_worker_day(
-            self.cashier[2], 
-            datetime.combine(dt, tm_work_start_paln), 
-            datetime.combine(dt, tm_work_end_plan), 
+            self.cashier[2],
+            datetime.combine(dt, tm_work_start_paln),
+            datetime.combine(dt, tm_work_end_plan),
         )
         fact_wd = self._create_or_update_worker_day(
-            self.cashier[2], 
-            datetime.combine(dt, tm_work_start_fact), 
-            datetime.combine(dt, tm_work_end_fact), 
+            self.cashier[2],
+            datetime.combine(dt, tm_work_start_fact),
+            datetime.combine(dt, tm_work_end_fact),
             is_fact=True,
             closest_plan_approved_id=plan_wd.id,
         )
@@ -7433,80 +7480,65 @@ class TestFineLogic(APITestCase):
         self._test_fine_case(time(8), time(20), time(8, 50), time(19, 37), timedelta(hours=10))
 
 
-class TestUnaccountedOvertimesAPI(APITestCase):
+class TestUnaccountedOvertimesAPI(APITestCase, TestsHelperMixin):
     USER_USERNAME = "user1"
     USER_EMAIL = "q@q.q"
     USER_PASSWORD = "4242"
 
-    def setUp(self):
-        super().setUp()
-        create_departments_and_users(self)
-        self.dt = date.today()
-        self.network.only_fact_hours_that_in_approved_plan = True
-        self.network.save()
-        pa1 = self._create_worker_day(
-            self.employment2,
-            dttm_work_start=datetime.combine(self.dt, time(13)),
-            dttm_work_end=datetime.combine(self.dt + timedelta(1), time(1)),
+    @classmethod
+    def setUpTestData(cls):
+        cls.create_departments_and_users()
+        cls.dt = date.today()
+        cls.network.only_fact_hours_that_in_approved_plan = True
+        cls.network.save()
+        pa1 = cls._create_worker_day(
+            cls.employment2,
+            dttm_work_start=datetime.combine(cls.dt, time(13)),
+            dttm_work_end=datetime.combine(cls.dt + timedelta(1), time(1)),
             is_approved=True,
         )
-        pa2 = self._create_worker_day(
-            self.employment3,
-            dttm_work_start=datetime.combine(self.dt, time(8)),
-            dttm_work_end=datetime.combine(self.dt, time(20)),
+        pa2 = cls._create_worker_day(
+            cls.employment3,
+            dttm_work_start=datetime.combine(cls.dt, time(8)),
+            dttm_work_end=datetime.combine(cls.dt, time(20)),
             is_approved=True,
         )
-        pa3 = self._create_worker_day(
-            self.employment4,
-            dttm_work_start=datetime.combine(self.dt, time(8)),
-            dttm_work_end=datetime.combine(self.dt, time(20)),
+        pa3 = cls._create_worker_day(
+            cls.employment4,
+            dttm_work_start=datetime.combine(cls.dt, time(8)),
+            dttm_work_end=datetime.combine(cls.dt, time(20)),
             is_approved=True,
         )
         # переработка 3 часа
-        self._create_worker_day(
-            self.employment2,
-            dttm_work_start=datetime.combine(self.dt, time(12)),
-            dttm_work_end=datetime.combine(self.dt + timedelta(1), time(3)),
+        cls._create_worker_day(
+            cls.employment2,
+            dttm_work_start=datetime.combine(cls.dt, time(12)),
+            dttm_work_end=datetime.combine(cls.dt + timedelta(1), time(3)),
             is_approved=True,
             is_fact=True,
             closest_plan_approved_id=pa1.id,
         )
         # нет переработки
-        self._create_worker_day(
-            self.employment3,
-            dttm_work_start=datetime.combine(self.dt, time(8)),
-            dttm_work_end=datetime.combine(self.dt, time(20)),
+        cls._create_worker_day(
+            cls.employment3,
+            dttm_work_start=datetime.combine(cls.dt, time(8)),
+            dttm_work_end=datetime.combine(cls.dt, time(20)),
             is_approved=True,
             is_fact=True,
             closest_plan_approved_id=pa2.id,
         )
         # переработка 1 час
-        self.wd = self._create_worker_day(
-            self.employment4,
-            dttm_work_start=datetime.combine(self.dt, time(7)),
-            dttm_work_end=datetime.combine(self.dt, time(20, 30)),
+        cls.wd = cls._create_worker_day(
+            cls.employment4,
+            dttm_work_start=datetime.combine(cls.dt, time(7)),
+            dttm_work_end=datetime.combine(cls.dt, time(20, 30)),
             is_approved=True,
             is_fact=True,
             closest_plan_approved_id=pa3.id,
         )
-        self.client.force_authenticate(self.user1)
 
-    def _create_worker_day(self, employment, dt=None, is_fact=False, is_approved=False, dttm_work_start=None, dttm_work_end=None, type_id=WorkerDay.TYPE_WORKDAY, closest_plan_approved_id=None):
-        if not dt:
-            dt = self.dt
-        return WorkerDay.objects.create(
-            shop_id=self.shop.id,
-            type_id=type_id,
-            employment=employment,
-            employee=employment.employee,
-            dt=dt,
-            dttm_work_start=dttm_work_start,
-            dttm_work_end=dttm_work_end,
-            is_fact=is_fact,
-            is_approved=is_approved,
-            created_by=self.user1,
-            closest_plan_approved_id=closest_plan_approved_id,
-        )
+    def setUp(self):
+        self.client.force_authenticate(self.user1)
 
     def test_get_list(self):
         dt = Converter.convert_date(self.dt)

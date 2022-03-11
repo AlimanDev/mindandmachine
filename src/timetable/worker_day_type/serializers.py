@@ -1,9 +1,10 @@
 from rest_framework import serializers
+from src.base.serializers import BaseModelSerializer
 
 from src.timetable.models import WorkerDayType
 
 
-class WorkerDayTypeSerializer(serializers.ModelSerializer):
+class WorkerDayTypeSerializer(BaseModelSerializer):
     allowed_additional_types = serializers.SerializerMethodField()
 
     def get_allowed_additional_types(self, obj):
