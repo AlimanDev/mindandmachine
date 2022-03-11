@@ -11,7 +11,7 @@ from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models
 from django.db import transaction
 from django.db.models import (
-    Subquery, OuterRef, Max, Q, Case, When, Value, FloatField, F, IntegerField, Exists, BooleanField, Count,
+    Subquery, OuterRef, Max, Q, Case, When, Value, FloatField, F, IntegerField, Exists, BooleanField, Count, Prefetch,
 )
 from django.db.models.expressions import RawSQL
 from django.db.models.fields import PositiveSmallIntegerField
@@ -1350,6 +1350,12 @@ class WorkerDay(AbstractModel):
             ),
         ).filter(
             dttm_diff_min__lt=F('shop__network__max_plan_diff_in_seconds')
+        ).prefetch_related(
+            Prefetch(
+                'worker_day_details',
+                queryset=WorkerDayCashboxDetails.objects.select_related('work_type'),
+                to_attr='worker_day_details_list',
+            )
         )
 
         order_by = ['-is_equal_shops']
@@ -1956,6 +1962,13 @@ class AttendanceRecords(AbstractModel):
             network_id=user.network_id, employee__user=user,
             dt=dt,
             priority_shop_id=shop.id,
+        ).annotate(
+            main_work_type_id=Subquery(
+                EmploymentWorkType.objects.filter(
+                    employment_id=OuterRef('id'),
+                    priority=1,
+                ).values('work_type_id')[:1]
+            )
         ).first()
         if not employment:
             raise ValidationError(_('You have no active employment'))
@@ -1984,7 +1997,16 @@ class AttendanceRecords(AbstractModel):
         else:
             record_type = initial_record_type or calculated_record_type
             employee_id = closest_plan_approved.employee_id
-            employment = closest_plan_approved.employment
+            employment = Employment.objects.filter(
+                id=closest_plan_approved.employment_id,
+            ).annotate(
+                main_work_type_id=Subquery(
+                    EmploymentWorkType.objects.filter(
+                        employment_id=OuterRef('id'),
+                        priority=1,
+                    ).values('work_type_id')[:1]
+                )
+            ).first()
             if not employment:
                 raise ValidationError(_('You have no active employment'))
             dt = closest_plan_approved.dt
@@ -1994,7 +2016,7 @@ class AttendanceRecords(AbstractModel):
     def _create_wd_details(self, dt, fact_approved, active_user_empl, closest_plan_approved):
         if closest_plan_approved:
             fact_shop_details_list = []
-            for plan_details in closest_plan_approved.worker_day_details.select_related('work_type'):
+            for plan_details in closest_plan_approved.worker_day_details_list:
                 work_type = plan_details.work_type if (
                             fact_approved.shop_id == closest_plan_approved.shop_id) else WorkType.objects.filter(
                     shop_id=fact_approved.shop_id,
@@ -2170,6 +2192,8 @@ class AttendanceRecords(AbstractModel):
                 setattr(fact_approved, 'shop_id', self.shop_id)
                 setattr(fact_approved, 'last_edited_by', None)
                 setattr(fact_approved, 'created_by', None)
+                if not fact_approved.is_vacancy and closest_plan_approved:
+                    setattr(fact_approved, 'is_vacancy', closest_plan_approved.is_vacancy)
                 if closest_plan_approved and not fact_approved.closest_plan_approved_id:
                     fact_approved.closest_plan_approved = closest_plan_approved
                 if fact_approved.type.has_details and not fact_approved.worker_day_details.exists():
@@ -2195,6 +2219,8 @@ class AttendanceRecords(AbstractModel):
                         setattr(prev_fa_wd, 'shop_id', self.shop_id)
                         setattr(prev_fa_wd, 'last_edited_by', None)
                         setattr(prev_fa_wd, 'created_by', None)
+                        if not prev_fa_wd.is_vacancy and closest_plan_approved:
+                            setattr(prev_fa_wd, 'is_vacancy', closest_plan_approved.is_vacancy)
                         if closest_plan_approved and not prev_fa_wd.closest_plan_approved_id:
                             prev_fa_wd.closest_plan_approved = closest_plan_approved
                         prev_fa_wd.save()
@@ -2207,6 +2233,11 @@ class AttendanceRecords(AbstractModel):
                     if self.shop.network.skip_leaving_tick:
                         return
 
+                is_vacancy = active_user_empl.shop_id != self.shop_id
+                if closest_plan_approved and closest_plan_approved.worker_day_details_list:
+                    # TODO: тест + настройка?
+                    is_vacancy = is_vacancy or active_user_empl.main_work_type_id != \
+                                 closest_plan_approved.worker_day_details_list[0].work_type_id
                 fact_approved, _wd_created = WorkerDay.objects.update_or_create(
                     dt=self.dt,
                     employee_id=self.employee_id,
@@ -2218,7 +2249,7 @@ class AttendanceRecords(AbstractModel):
                         'employment': active_user_empl,
                         'type_id': closest_plan_approved.type_id if closest_plan_approved else WorkerDay.TYPE_WORKDAY,
                         self.TYPE_2_DTTM_FIELD[self.type]: self.dttm,
-                        'is_vacancy': active_user_empl.shop_id != self.shop_id if active_user_empl else False,
+                        'is_vacancy': is_vacancy,
                         'source': WorkerDay.RECALC_FACT_FROM_ATT_RECORDS if recalc_fact_from_att_records else WorkerDay.SOURCE_AUTO_FACT,
                         # TODO: пока не стал проставлять is_outsource, т.к. придется делать доп. действие в интерфейсе,
                         # чтобы посмотреть что за сотрудник при правке факта из отдела аутсорс-клиента
