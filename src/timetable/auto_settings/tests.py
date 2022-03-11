@@ -10,66 +10,66 @@ import requests
 from dateutil.relativedelta import relativedelta
 from django.db import transaction
 from django.test import override_settings
+from django.core.cache import cache
 from django.utils.timezone import now
 from rest_framework.test import APITestCase
 
 from src.base.models import Break, WorkerPosition, Employment
-from src.forecast.models import OperationType, OperationTypeName
 from src.timetable.models import ShopMonthStat, WorkerDay, WorkerDayCashboxDetails, WorkType, WorkTypeName, \
     EmploymentWorkType, WorkerDayType
 from src.timetable.tests.factories import WorkerDayFactory
+from src.util.mixins.tests import TestsHelperMixin
 from src.util.models_converter import Converter
-from src.util.test import create_departments_and_users
 
 
 @override_settings(CELERY_TASK_ALWAYS_EAGER=True)
-class TestAutoSettings(APITestCase):
+class TestAutoSettings(APITestCase, TestsHelperMixin):
     USER_USERNAME = "user1"
     USER_EMAIL = "q@q.q"
     USER_PASSWORD = "4242"
 
-    def setUp(self):
-        super().setUp()
+    @classmethod
+    def setUpTestData(cls):
+        cls.url = '/rest_api/auto_settings/set_timetable/'
+        cls.dt = now().date()
 
-        self.url = '/rest_api/auto_settings/set_timetable/'
-        self.dt = now().date()
+        cls.create_departments_and_users(dt=date(2021, 1, 1))
+        cls.work_type_name = WorkTypeName.objects.create(name='Магазин', network=cls.network)
+        cls.work_type_name2 = WorkTypeName.objects.create(name='Ломбард', network=cls.network)
+        cls.operation_type_name = cls.work_type_name.operation_type_name
+        cls.operation_type_name2 = cls.work_type_name2.operation_type_name
+        cls.work_type = WorkType.objects.create(
+            work_type_name=cls.work_type_name,
+            shop=cls.shop)
+        cls.work_type2 = WorkType.objects.create(
+            work_type_name=cls.work_type_name2,
+            shop=cls.shop)
 
-        create_departments_and_users(self, dt=date(2021, 1, 1))
-        self.work_type_name = WorkTypeName.objects.create(name='Магазин')
-        self.work_type_name2 = WorkTypeName.objects.create(name='Ломбард')
-        self.operation_type_name = self.work_type_name.operation_type_name
-        self.operation_type_name2 = self.work_type_name2.operation_type_name
-        self.work_type = WorkType.objects.create(
-            work_type_name=self.work_type_name,
-            shop=self.shop)
-        self.work_type2 = WorkType.objects.create(
-            work_type_name=self.work_type_name2,
-            shop=self.shop)
+        cls.operation_type = cls.work_type.operation_type
+        cls.operation_type2 = cls.work_type2.operation_type
 
-        self.operation_type = self.work_type.operation_type
-        self.operation_type2 = self.work_type2.operation_type
-
-        self.breaks = Break.objects.create(
-            network=self.network,
+        cls.breaks = Break.objects.create(
+            network=cls.network,
             name='Перерывы для должности',
             value='[[0, 540, [30]]]'
         )
 
-        self.position = WorkerPosition.objects.create(
+        cls.position = WorkerPosition.objects.create(
             name='Должность',
-            network=self.network,
-            breaks=self.breaks,
+            network=cls.network,
+            breaks=cls.breaks,
         )
 
-        self.unused_position = WorkerPosition.objects.create(
+        cls.unused_position = WorkerPosition.objects.create(
             name='Не используемая должность',
-            network=self.network,
-            breaks=self.breaks,
+            network=cls.network,
+            breaks=cls.breaks,
         )
+        cls._create_empls_work_types()
 
+    def setUp(self):
+        cache.clear()
         self.client.force_authenticate(user=self.user1)
-
-        self._create_empls_work_types()
 
     def test_set_timetable_new(self):
         timetable = ShopMonthStat.objects.create(
@@ -402,14 +402,15 @@ class TestAutoSettings(APITestCase):
         )
         self.assertEqual(response.json(), ['Необходимо выбрать шаблон смен.'])
 
-    def _create_empls_work_types(self):
-        EmploymentWorkType.objects.create(employment=self.employment2, work_type=self.work_type)
-        EmploymentWorkType.objects.create(employment=self.employment3, work_type=self.work_type)
-        EmploymentWorkType.objects.create(employment=self.employment4, work_type=self.work_type)
-        EmploymentWorkType.objects.create(employment=self.employment6, work_type=self.work_type)
-        EmploymentWorkType.objects.create(employment=self.employment7, work_type=self.work_type)
-        EmploymentWorkType.objects.create(employment=self.employment8_old, work_type=self.work_type)
-        EmploymentWorkType.objects.create(employment=self.employment8, work_type=self.work_type)
+    @classmethod
+    def _create_empls_work_types(cls):
+        EmploymentWorkType.objects.create(employment=cls.employment2, work_type=cls.work_type)
+        EmploymentWorkType.objects.create(employment=cls.employment3, work_type=cls.work_type)
+        EmploymentWorkType.objects.create(employment=cls.employment4, work_type=cls.work_type)
+        EmploymentWorkType.objects.create(employment=cls.employment6, work_type=cls.work_type)
+        EmploymentWorkType.objects.create(employment=cls.employment7, work_type=cls.work_type)
+        EmploymentWorkType.objects.create(employment=cls.employment8_old, work_type=cls.work_type)
+        EmploymentWorkType.objects.create(employment=cls.employment8, work_type=cls.work_type)
 
     def _test_create_tt(self, dt_from, dt_to, use_not_approved=True, shop_id=None):
         ShopMonthStat.objects.filter(shop_id=shop_id or self.employment2.shop_id).update(status=ShopMonthStat.NOT_DONE)

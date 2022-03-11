@@ -5,6 +5,7 @@ from src.base.models import (
     Shop,
     Employee,
 )
+from src.base.serializers import BaseModelSerializer
 from src.forecast.models import (
     OperationType,
     OperationTypeName,
@@ -14,7 +15,7 @@ from src.forecast.operation_type.views import OperationTypeSerializer
 from .models import Task
 
 
-class TaskSerializer(serializers.ModelSerializer):
+class TaskSerializer(BaseModelSerializer):
     default_error_messages = {
         "no_shop": _("There is {amount} models of shop with code: {code}."),
         "no_operation_type_name": _("There is {amount} models of shop with code: {code}."),

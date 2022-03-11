@@ -1456,7 +1456,10 @@ class WorkerDay(AbstractModel):
         if employee_id__in:
             employee_filter['id__in'] = employee_id__in
 
-        employees = {e.id: e for e in Employee.objects.filter(**employee_filter)}
+        employees = {e.id: e for e in Employee.objects.filter(**employee_filter).select_related('user__network')}
+
+        if not employees:
+            return
 
         date_ranges = map(lambda x: (x.replace(day=1), x), pd.date_range(dt_from.replace(day=1), dt_to + relativedelta(day=31), freq='1M').date)
 
@@ -1467,7 +1470,6 @@ class WorkerDay(AbstractModel):
         }
 
         data_greater_norm = []
-        norm_key = getattr(settings, 'TIMESHEET_DIVIDER_SAWH_HOURS_KEY', 'curr_month')
 
         for dt_from, dt_to in date_ranges:
             lookup['dt__gte'] = dt_from
@@ -1505,7 +1507,10 @@ class WorkerDay(AbstractModel):
                     map(
                         lambda x: (
                             x[0], 
-                            x[1].get("plan", {}).get("approved", {}).get("sawh_hours", {}).get(norm_key, 0)
+                            x[1].get("plan", {}).get("approved", {}).get("sawh_hours", {}).get(
+                                employees[x[0]].user.network.timesheet_divider_sawh_hours_key, 
+                                0
+                            )
                         ),
                         stats.items(),
                     )
