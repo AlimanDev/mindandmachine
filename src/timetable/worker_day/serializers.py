@@ -373,14 +373,13 @@ class WorkerDaySerializer(ModelSerializerWithCreateOnlyFields, UnaccountedOverti
     def _create_update_clean(self, validated_data, instance=None):
         employee_id = validated_data.get('employee_id', instance.employee_id if instance else None)
         if employee_id:
-            work_type_differs = False
-            main_work_type_id = getattr(self._employee_active_empl, 'main_work_type_id', None)
-            if validated_data.get('worker_day_details') and main_work_type_id:
-                work_type_differs = validated_data['worker_day_details'][0]['work_type_id'] != main_work_type_id
-
-            validated_data['is_vacancy'] = validated_data.get('is_vacancy') \
-                or not getattr(self._employee_active_empl, 'is_equal_shops', True) \
-                or work_type_differs
+            validated_data['is_vacancy'] = WorkerDay.is_worker_day_vacancy(
+                getattr(self._employee_active_empl, 'shop_id', None),
+                validated_data['shop_id'],
+                getattr(self._employee_active_empl, 'main_work_type_id', None),
+                validated_data.get('worker_day_details', []),
+                is_vacacny=validated_data.get('is_vacancy', False),
+            )
 
     def _run_transaction_checks(self, employee_id, dt, is_fact, is_approved):
         WorkerDay.check_work_time_overlap(
