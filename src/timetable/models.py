@@ -1481,41 +1481,17 @@ class WorkerDay(AbstractModel):
         if employee_id__in:
             employee_filter['id__in'] = employee_id__in
 
-        employees = {e.id: e for e in Employee.objects.filter(**employee_filter)}
+        employees = {e.id: e for e in Employee.objects.filter(**employee_filter).select_related('user__network')}
+
+        if not employees:
+            return
 
         date_ranges = map(lambda x: (x.replace(day=1), x), pd.date_range(dt_from.replace(day=1), dt_to + relativedelta(day=31), freq='1M').date)
-
-        lookup = {
-            'type__is_dayoff': False,
-            'is_approved': True,
-            'employee__user__employees__id__in': employees.keys(),
-        }
 
         data_greater_norm = []
         norm_key = getattr(settings, 'TIMESHEET_DIVIDER_SAWH_HOURS_KEY', 'curr_month')
 
         for dt_from, dt_to in date_ranges:
-            lookup['dt__gte'] = dt_from
-            lookup['dt__lte'] = dt_to
-            total_work_hours_qs = cls.objects.filter(**lookup).values(
-                'employee_id',
-                'employee__user__last_name', 
-                'employee__user__first_name',
-            ).annotate(
-                total_work_hours=Coalesce(
-                    Sum(
-                        Extract(F('work_hours'), 'epoch') / 3600,
-                        output_field=FloatField()
-                    ), 
-                    0.0
-                ),
-            ).distinct()
-
-            total_work_hours_df = pd.DataFrame(
-                columns=['employee_id', 'employee__user__last_name', 'employee__user__first_name', 'total_work_hours'], 
-                data=list(total_work_hours_qs),
-            )
-
             stats = WorkersStatsGetter(
                 dt_from=dt_from, 
                 dt_to=dt_to, 
@@ -1525,25 +1501,26 @@ class WorkerDay(AbstractModel):
             ).run()
             
             stats_df = pd.DataFrame(
-                columns=['employee_id', 'norm'], 
+                columns=['employee_id', 'last_name', 'first_name', 'norm', 'total_work_hours'], 
                 data=list(
                     map(
                         lambda x: (
                             x[0], 
-                            x[1].get("plan", {}).get("approved", {}).get("sawh_hours", {}).get(norm_key, 0)
+                            employees[x[0]].user.last_name,
+                            employees[x[0]].user.first_name,
+                            x[1].get("plan", {}).get("approved", {}).get("sawh_hours", {}).get(norm_key, 0),
+                            x[1].get("plan", {}).get("approved", {}).get("work_hours", {}).get("all_shops_main", 0),
                         ),
                         stats.items(),
                     )
                 )
             )
 
-            check_df = pd.merge(total_work_hours_df, stats_df, how='left', on='employee_id').fillna(0)
+            stats_df['difference'] = stats_df.total_work_hours - stats_df.norm
+            stats_df['dt_from'] = dt_from
+            stats_df['dt_to'] = dt_to
 
-            check_df['difference'] = check_df.total_work_hours - check_df.norm
-            check_df['dt_from'] = dt_from
-            check_df['dt_to'] = dt_to
-
-            data_greater_norm.extend(check_df[check_df['difference'] > 0].to_dict('records'))
+            data_greater_norm.extend(stats_df[stats_df['difference'] > 0].to_dict('records'))
 
         if data_greater_norm and raise_exc:
             original_exc = MainWorkHoursGreaterThanNorm(exc_data=data_greater_norm)
