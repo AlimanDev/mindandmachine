@@ -894,6 +894,7 @@ class WorkerDay(AbstractModel):
         skip_fields_list = ['created_by', 'last_edited_by', 'source']
         if not (existing_obj.type.is_dayoff and existing_obj.type.is_work_hours and
                 existing_obj.type.get_work_hours_method == WorkerDayType.GET_WORK_HOURS_METHOD_TYPE_MANUAL):
+            # TODO: тест
             skip_fields_list.append('work_hours')
         return skip_fields_list
 
