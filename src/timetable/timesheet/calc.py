@@ -71,6 +71,7 @@ class TimesheetCalculator:
             'employment__shop',
             'employment__position',
             'type',
+            'closest_plan_approved',
         ).prefetch_related(
             Prefetch('work_types',
                      queryset=WorkType.objects.all().select_related('work_type_name', 'work_type_name__position'),
@@ -191,7 +192,8 @@ class TimesheetCalculator:
                 wd_dict['fact_timesheet_total_hours'] = total_hours
                 wd_dict['fact_timesheet_day_hours'] = day_hours
                 wd_dict['fact_timesheet_night_hours'] = night_hours
-                wd_dict['is_vacancy'] = worker_day.is_vacancy
+                wd_dict['is_vacancy'] = worker_day.is_vacancy or \
+                    (worker_day.closest_plan_approved_id and worker_day.closest_plan_approved.is_vacancy)
             if (worker_day.type.is_dayoff and worker_day.type.is_work_hours):
                 dayoff_work_hours = worker_day.work_hours.total_seconds() / 3600
                 wd_dict['fact_timesheet_total_hours'] = dayoff_work_hours
