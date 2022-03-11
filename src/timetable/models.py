@@ -800,6 +800,7 @@ class WorkerDay(AbstractModel):
         )
         if existing_obj.type != obj_data['type'] or existing_obj.shop_id != obj_data['shop_id'] \
                 or existing_obj.dt != obj_data['dt']:
+            # TODO: тест
             perm_checker = DeleteSingleWdPermissionChecker(user=user, wd_obj=existing_obj)
             if not perm_checker.has_permission():
                 raise PermissionDenied(perm_checker.err_message)
