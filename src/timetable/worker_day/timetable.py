@@ -78,7 +78,7 @@ class BaseUploadDownloadTimeTable:
         priority_subq = EmploymentWorkType.objects.filter(
             employment_id=OuterRef('employment_id'),
             is_active=True,
-        ).order_by('priority')
+        ).order_by('-priority')
         work_types = EmploymentWorkType.objects.filter(
             employment_id__in=employments,
             is_active=True,
