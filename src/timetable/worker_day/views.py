@@ -710,7 +710,13 @@ class WorkerDayViewSet(BaseModelViewSet):
                             is_approved=True,
                         )
                     )
-
+                    WorkerDay.check_main_work_hours_norm(
+                        dt_from=serializer.validated_data['dt_from'],
+                        dt_to=serializer.validated_data['dt_to'],
+                        employee_id__in=employee_ids,
+                        shop_id=serializer.validated_data['shop_id'],
+                        exc_cls=ValidationError,
+                    )
                     if shop.network.run_recalc_fact_from_att_records_on_plan_approve:
                         transaction.on_commit(lambda: recalc_fact_from_records(employee_days_list=list(employee_days_set)))
 

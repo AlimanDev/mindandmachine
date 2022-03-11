@@ -225,7 +225,7 @@ def get_month_range(year, month_num, return_days_in_month=False):
 
 class WorkersStatsGetter:
     def __init__(self, dt_from, dt_to, employee_id=None, employee_id__in=None, network=None, shop_id=None,
-                 hours_by_types: list = None):
+                 hours_by_types: list = None, use_cache=True):
         """
         :param dt_from:
         :param dt_to:
@@ -248,6 +248,7 @@ class WorkersStatsGetter:
             show_stat_in_hours=True,
         ).values_list('code', flat=True))
         self._network = network
+        self.use_cache = use_cache
 
     @cached_property
     def shift_schedule_data(self):
@@ -498,14 +499,17 @@ class WorkersStatsGetter:
     def _get_prod_cal_cached(self):
         cached_data = []
 
-        for e in self.employees_dict.keys():
-            key = f'prod_cal_{self.dt_from}_{self.dt_to}_{e}'
-            cached = cache.get(key)
-            if not cached:
-                cached = self._get_prod_cal_for_employee(e)
-                cache.set(key, cached, timeout=settings.CACHE_TTL.get('prod_cal', 86400))
-            cached_data.extend(cached)
-        
+        if self.use_cache:
+            for e in self.employees_dict.keys():
+                key = f'prod_cal_{self.dt_from}_{self.dt_to}_{e}'
+                cached = cache.get(key)
+                if not cached:
+                    cached = self._get_prod_cal_for_employee(e)
+                    cache.set(key, cached, timeout=settings.CACHE_TTL.get('prod_cal', 86400))
+                cached_data.extend(cached)
+        else:
+            cached_data = list(self.prod_cal_qs.filter(employee_id__in=self.employees_dict.keys()))
+
         return cached_data
 
     def run(self):
