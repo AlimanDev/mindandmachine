@@ -567,6 +567,8 @@ class TestGetWorkersStatAndTabel(MultipleActiveEmploymentsSupportMixin, APITestC
                         "work_hours": {
                             "selected_shop": 43.75,
                             "other_shops": 0.0,
+                            "all_shops_main": 43.75,
+                            "all_shops_additional": 0.0,
                             "total": 43.75,
                             "until_acc_period_end": 43.75,
                             "acc_period": 43.75
@@ -634,6 +636,8 @@ class TestGetWorkersStatAndTabel(MultipleActiveEmploymentsSupportMixin, APITestC
                         "work_hours": {
                             "selected_shop": 0.0,
                             "other_shops": 0.0,
+                            "all_shops_main": 0.0,
+                            "all_shops_additional": 0.0,
                             "total": 0.0,
                             "until_acc_period_end": 0.0,
                             "prev_months": 0,
@@ -716,6 +720,8 @@ class TestGetWorkersStatAndTabel(MultipleActiveEmploymentsSupportMixin, APITestC
                         "work_hours": {
                             "selected_shop": 87.5,
                             "other_shops": 0.0,
+                            "all_shops_main": 87.5,
+                            "all_shops_additional": 0.0,
                             "total": 87.5,
                             "until_acc_period_end": 87.5,
                             "acc_period": 87.5
@@ -784,6 +790,8 @@ class TestGetWorkersStatAndTabel(MultipleActiveEmploymentsSupportMixin, APITestC
                         "work_hours": {
                             "selected_shop": 0.0,
                             "other_shops": 0.0,
+                            "all_shops_main": 0.0,
+                            "all_shops_additional": 0.0,
                             "total": 0.0,
                             "until_acc_period_end": 0.0,
                             "prev_months": 0,

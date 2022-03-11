@@ -389,7 +389,8 @@ class WorkerDayViewSet(BaseModelViewSet):
                 'dttm_work_start',
                 'dttm_work_end',
                 'shop_id',
-                'work_type_ids'
+                'work_type_ids',
+                'is_vacancy',
             ]
             draft_wdays = list(WorkerDay.objects.filter(
                 approve_condition,
@@ -1015,12 +1016,13 @@ class WorkerDayViewSet(BaseModelViewSet):
         vacancy.save()
         return Response(WorkerDaySerializer(vacancy).data)
 
-    def _change_range(self, is_fact, is_approved, dt_from, dt_to, wd_type, employee_tabel_code, res=None):
+    def _change_range(self, is_fact, is_approved, is_blocked, dt_from, dt_to, wd_type, employee_tabel_code, res=None):
         employee_dt_pairs_list = list(WorkerDay.objects.filter(
             employee__tabel_code=employee_tabel_code,
             dt__gte=dt_from,
             dt__lte=dt_to,
             is_approved=is_approved,
+            is_blocked=is_blocked,
             is_fact=is_fact,
             type=wd_type,
         ).values_list('employee_id', 'dt').distinct())
@@ -1060,6 +1062,7 @@ class WorkerDayViewSet(BaseModelViewSet):
                             employee_id=employment.employee_id,
                             dt=dt,
                             is_approved=is_approved,
+                            is_blocked=is_blocked,
                             is_fact=is_fact,
                             type=wd_type,
                             created_by=self.request.user,
@@ -1095,6 +1098,7 @@ class WorkerDayViewSet(BaseModelViewSet):
                 self._change_range(
                     is_fact=False,  # всегда в план
                     is_approved=range['is_approved'],
+                    is_blocked=range.get('is_blocked', False),
                     dt_from=range['dt_from'],
                     dt_to=range['dt_to'],
                     wd_type=range['type'],
@@ -1105,6 +1109,7 @@ class WorkerDayViewSet(BaseModelViewSet):
                     self._change_range(
                         is_fact=False,  # всегда в план
                         is_approved=False,
+                        is_blocked=range.get('is_blocked', False),
                         dt_from=range['dt_from'],
                         dt_to=range['dt_to'],
                         wd_type=range['type'],
