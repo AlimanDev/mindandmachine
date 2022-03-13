@@ -300,6 +300,9 @@ class DeleteSingleWdPermissionChecker(BaseSingleWdPermissionChecker):
         if not self.wd_obj:
             self.wd_obj = WorkerDay.objects.filter(id=self.wd_id).first()
 
+        if not self.wd_obj:
+            return True
+
         return self._has_single_permission(
             employee_id=self.wd_obj.employee_id,
             shop_id=self.wd_obj.shop_id,
