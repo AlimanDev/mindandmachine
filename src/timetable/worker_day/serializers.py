@@ -378,7 +378,7 @@ class WorkerDaySerializer(ModelSerializerWithCreateOnlyFields, UnaccountedOverti
                 validated_data['shop_id'],
                 getattr(self._employee_active_empl, 'main_work_type_id', None),
                 validated_data.get('worker_day_details', []),
-                is_vacacny=validated_data.get('is_vacancy', False),
+                is_vacancy=validated_data.get('is_vacancy', False),
             )
 
     def _run_transaction_checks(self, employee_id, dt, is_fact, is_approved):

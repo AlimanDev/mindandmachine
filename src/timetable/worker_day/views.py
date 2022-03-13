@@ -1415,8 +1415,8 @@ class WorkerDayViewSet(BaseModelViewSet):
         data.validated_data['network_id'] = request.user.network_id
         shop = Shop.objects.get(id=data.validated_data.get('shop_id'))
         timetable_generator_cls = get_timetable_generator_cls(timetable_format=shop.network.timetable_format)
-        timetable_generator = timetable_generator_cls(user=self.request.user)
-        return timetable_generator.upload(data.validated_data, file)
+        timetable_generator = timetable_generator_cls(user=self.request.user, form=data.validated_data)
+        return timetable_generator.upload(file)
 
     @swagger_auto_schema(
         query_serializer=GenerateUploadTimetableExampleSerializer,
@@ -1443,7 +1443,7 @@ class WorkerDayViewSet(BaseModelViewSet):
 
         shop = Shop.objects.get(id=shop_id)
         timetable_generator_cls = get_timetable_generator_cls(timetable_format=shop.network.timetable_format)
-        timetable_generator = timetable_generator_cls(user=self.request.user)
+        timetable_generator = timetable_generator_cls(user=self.request.user, form=serializer.validated_data)
         return timetable_generator.generate_upload_example(shop_id, dt_from, dt_to, is_fact, is_approved, employee_id__in)
 
     @swagger_auto_schema(
@@ -1462,8 +1462,8 @@ class WorkerDayViewSet(BaseModelViewSet):
         data.validated_data['network_id'] = request.user.network_id
         shop = Shop.objects.get(id=data.validated_data.get('shop_id'))
         timetable_generator_cls = get_timetable_generator_cls(timetable_format=shop.network.timetable_format)
-        timetable_generator = timetable_generator_cls(user=self.request.user)
-        return timetable_generator.upload(data.validated_data, file, is_fact=True)
+        timetable_generator = timetable_generator_cls(user=self.request.user, form=data.validated_data)
+        return timetable_generator.upload(file, is_fact=True)
 
     @swagger_auto_schema(
         query_serializer=DownloadSerializer,
@@ -1478,8 +1478,8 @@ class WorkerDayViewSet(BaseModelViewSet):
         data.is_valid(raise_exception=True)
         shop = Shop.objects.get(id=data.validated_data.get('shop_id'))
         timetable_generator_cls = get_timetable_generator_cls(timetable_format=shop.network.timetable_format)
-        timetable_generator = timetable_generator_cls(user=self.request.user)
-        return timetable_generator.download(data.validated_data)
+        timetable_generator = timetable_generator_cls(user=self.request.user, form=data.validated_data)
+        return timetable_generator.download()
 
     @swagger_auto_schema(
         query_serializer=DownloadSerializer,

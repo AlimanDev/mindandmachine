@@ -10,7 +10,7 @@ from dateutil.parser import parse
 from dateutil.relativedelta import relativedelta
 from django.conf import settings
 from django.db import transaction
-from django.db.models import Q, F, Count, Sum
+from django.db.models import Q, F, Count, Sum, Prefetch
 from django.db.models.expressions import OuterRef, Subquery, RawSQL
 from django.db.models.functions import Coalesce
 from django.http.response import HttpResponse
@@ -34,6 +34,7 @@ from src.timetable.models import (
     WorkerDay,
     WorkType,
     WorkerDayType,
+    WorkerDayCashboxDetails,
 )
 from src.timetable.worker_day.stat import WorkersStatsGetter
 from src.timetable.worker_day.xlsx_utils.timetable import Timetable_xlsx
@@ -42,12 +43,19 @@ SKIP_SYMBOLS = ['NAN', '']
 DIVIDERS = ['-', '.', ',', '\n', '\r', ' ']
 MULTIPLE_WDAYS_DIVIDER = '/'
 PARSE_CELL_STR_PATTERN = re.compile(
-    r'(?P<excel_code>[а-яА-ЯA-Za-z]+)?(?P<time_str>\d{1,2}:\d{1,2}\s*[' + r'\\'.join(DIVIDERS) + r']\s*\d{1,2}:\d{1,2})?(?P<work_hours>\d*[.,]\d+|\d+)?')
+    r'(?P<excel_code>[а-яА-ЯA-Za-z]+)?(?P<time_str>~?\d{1,2}:\d{1,2}\s*[' + r'\\'.join(DIVIDERS) + r']\s*\d{1,2}:\d{1,2})?(?P<work_type_name>\(\w+( +\w+)*\))?(?P<work_hours>\d*[.,]\d+|\d+)?')
 
 
 class BaseUploadDownloadTimeTable:
-    def __init__(self, user):
+    def __init__(self, user, form):
         self.user = user
+        self.form = form
+        self.shop_id = form['shop_id']
+        self.shop = Shop.objects.get(pk=form['shop_id'])
+        self.shop_work_type_id_by_name = {
+            wt_tuple[0]: wt_tuple[1] for wt_tuple in WorkType.objects.filter(
+                shop_id=self.shop_id).values_list('work_type_name__name', 'id')
+        }
         self.wd_types_dict = WorkerDayType.get_wd_types_dict()
         self.wd_type_mapping = {
             wd_type_code: wd_type.excel_load_code for wd_type_code, wd_type in self.wd_types_dict.items()}
@@ -68,20 +76,31 @@ class BaseUploadDownloadTimeTable:
             if excel_code:
                 wd_type_id = self.wd_type_mapping_reversed.get(excel_code)
                 if wd_type_id is None:
-                    return None, None, None, None
+                    return None, None, None, None, None, None
 
             time_str = m.group('time_str')
             if time_str:
+                is_vacancy = False
+                if time_str.startswith('~'):
+                    is_vacancy = True
+                    time_str = time_str.lstrip('~')
                 for divider in DIVIDERS:
                     if divider in time_str:
                         times = time_str.split(divider)
-                        return wd_type_id, parse(times[0]).time(), parse(times[1]).time(), None
+                        work_type_name = m.group('work_type_name')
+                        work_type_id = None
+                        if work_type_name:  # TODO: тест
+                            work_type_name = work_type_name.strip('()')
+                            work_type_id = self.shop_work_type_id_by_name.get(work_type_name)
+                        return wd_type_id, work_type_id, is_vacancy, parse(times[0]).time(), parse(
+                            times[1]).time(), None
+
             else:
                 work_hours = m.group('work_hours')
                 if work_hours:
-                    return wd_type_id, None, None, work_hours
+                    return wd_type_id, None, None, None, None, work_hours
 
-        return None, None, None, None
+        return None, None, None, None, None, None
 
     @staticmethod
     def _get_employment(employments_dict, employee_id, dt):
@@ -192,7 +211,13 @@ class BaseUploadDownloadTimeTable:
                 dt__lte=dt_to,
                 is_fact=is_fact,
                 is_approved=is_approved,
-        ).select_related('type')
+        ).select_related(
+            'type',
+        ).prefetch_related(
+            Prefetch('worker_day_details',
+                     queryset=WorkerDayCashboxDetails.objects.select_related('work_type__work_type_name'),
+                     to_attr='worker_day_details_list'),
+        )
         for wd in wdays_qs:
             wdays_dict.setdefault(f'{wd.employee_id}_{wd.dt}', []).append(wd)
         return wdays_dict
@@ -377,12 +402,12 @@ class BaseUploadDownloadTimeTable:
 
         return users
 
-    def upload(self, form, timetable_file, is_fact=False):
+    def upload(self, timetable_file, is_fact=False):
         """
         Принимает от клиента экселевский файл и создает расписание (на месяц)
         """
         with transaction.atomic():
-            shop_id = form['shop_id']
+            shop_id = self.form['shop_id']
 
             try:
                 df = pd.read_excel(timetable_file, dtype=str)
@@ -398,9 +423,9 @@ class BaseUploadDownloadTimeTable:
             users_df[name_column] = users_df[name_column].astype(str)
             users_df[position_column] = users_df[position_column].astype(str)
 
-            users = self._get_users(users_df, number_column, name_column, position_column, shop_id, form['network_id'])
+            users = self._get_users(users_df, number_column, name_column, position_column, shop_id, self.form['network_id'])
 
-            res = self._upload(df, users, form, is_fact)
+            res = self._upload(df, users, is_fact)
 
             employee_id__in = [u[0].id for u in users]
             WorkerDay.check_work_time_overlap(
@@ -408,10 +433,10 @@ class BaseUploadDownloadTimeTable:
 
         return res
 
-    def download(self, form):
+    def download(self):
         output = io.BytesIO()
         workbook = xlsxwriter.Workbook(output, {'in_memory': True})
-        workbook, name = self._download(workbook, form)
+        workbook, name = self._download(workbook)
         workbook.close()
         output.seek(0)
 
@@ -422,10 +447,10 @@ class BaseUploadDownloadTimeTable:
         response['Content-Disposition'] = 'attachment; filename="{}.xlsx"'.format(escape_uri_path(name))
         return response
         
-    def _download(self, workbook, form):
+    def _download(self, workbook):
         raise NotImplementedError()
 
-    def _upload(self, df, users, form, is_fact):
+    def _upload(self, df, users, is_fact):
         raise NotImplementedError()
 
     def generate_upload_example(self, *args):
@@ -454,11 +479,11 @@ class BaseUploadDownloadTimeTable:
 
 
 class UploadDownloadTimetableCells(BaseUploadDownloadTimeTable):
-    def _upload(self, df, users, form, is_fact):
+    def _upload(self, df, users, is_fact):
         number_column = df.columns[0]
         name_column = df.columns[1]
         position_column = df.columns[2]
-        shop_id = form['shop_id']
+        shop_id = self.shop_id
         dates = []
         for dt in df.columns[3:]:
             if not isinstance(dt, datetime.datetime):
@@ -497,11 +522,14 @@ class UploadDownloadTimetableCells(BaseUploadDownloadTimeTable):
                     dttm_work_end = None
                     work_hours = None
                     wd_type_obj = None
+                    work_type_id = None
+                    is_vacancy = None
                     try:
                         if cell_data.replace(' ', '').replace('\n', '') in SKIP_SYMBOLS:
                             continue
                         if not (cell_data in self.wd_type_mapping_reversed):
-                            wd_type_id, tm_work_start, tm_work_end, work_hours = self._parse_cell_data(cell_data)
+                            wd_type_id, work_type_id, is_vacancy, tm_work_start, tm_work_end, work_hours = self._parse_cell_data(
+                                cell_data)
                             wd_type_obj = self.wd_types_dict.get(wd_type_id)
                             if not (wd_type_obj.is_dayoff and wd_type_obj.is_work_hours and
                                     wd_type_obj.get_work_hours_method == WorkerDayType.GET_WORK_HOURS_METHOD_TYPE_MANUAL):
@@ -564,9 +592,16 @@ class UploadDownloadTimetableCells(BaseUploadDownloadTimeTable):
                     if wd_type_id == WorkerDay.TYPE_WORKDAY:
                         new_wd_dict['worker_day_details'] = [
                             dict(
-                                work_type_id=employment.work_type_id or default_work_type.id,
+                                work_type_id=work_type_id or employment.work_type_id or default_work_type.id,
                             )
                         ]
+                    new_wd_dict['is_vacancy'] = WorkerDay.is_worker_day_vacancy(  # TODO: тест
+                        employment.shop_id,
+                        shop_id,
+                        employment.work_type_id,
+                        new_wd_dict.get('worker_day_details', []),
+                        is_vacancy=is_vacancy,
+                    )
                     new_wdays_data.append(new_wd_dict)
 
         objs, stats = WorkerDay.batch_update_or_create(
@@ -578,35 +613,34 @@ class UploadDownloadTimetableCells(BaseUploadDownloadTimeTable):
         )
         return Response(stats)
 
-    def _download(self, workbook, form):
+    def _download(self, workbook):
         ws = workbook.add_worksheet(_('Timetable for signature.'))
-        shop = Shop.objects.get(pk=form['shop_id'])
         timetable = Timetable_xlsx(
             workbook,
-            shop,
-            form['dt_from'],
+            self.shop,
+            self.form['dt_from'],
             worksheet=ws,
             prod_days=None,
-            on_print=form['on_print'],
-            for_inspection=form.get('inspection_version', False),
+            on_print=self.form['on_print'],
+            for_inspection=self.form.get('inspection_version', False),
         )
 
-        employments = self._get_employment_qs(shop.network, shop.id, dt_from=timetable.prod_days[0].dt, dt_to=timetable.prod_days[-1].dt)
+        employments = self._get_employment_qs(self.shop.network, self.shop_id, dt_from=timetable.prod_days[0].dt, dt_to=timetable.prod_days[-1].dt)
         employee_ids = employments.values_list('employee_id', flat=True)
         stat = WorkersStatsGetter(
             dt_from=timetable.prod_days[0].dt,
             dt_to=timetable.prod_days[-1].dt,
-            shop_id=shop.id,
+            shop_id=self.shop.id,
             employee_id__in=employee_ids,
         ).run()
-        stat_type = 'approved' if form['is_approved'] else 'not_approved'
-        norm_type = shop.network.settings_values_prop.get('download_timetable_norm_field', 'norm_work_hours')
-        if form.get('inspection_version', False):
+        stat_type = 'approved' if self.form['is_approved'] else 'not_approved'
+        norm_type = self.shop.network.settings_values_prop.get('download_timetable_norm_field', 'norm_work_hours')
+        if self.form.get('inspection_version', False):
             main_stat = { 
                 s['employee_id'] : s 
                 for s in TimesheetItem.objects.filter(
                     employee_id__in=employee_ids,
-                    shop_id=shop.id,
+                    shop_id=self.shop.id,
                     dt__gte=timetable.prod_days[0].dt,
                     dt__lte=timetable.prod_days[-1].dt,
                     timesheet_type=TimesheetItem.TIMESHEET_TYPE_MAIN,
@@ -625,7 +659,7 @@ class UploadDownloadTimetableCells(BaseUploadDownloadTimeTable):
                 stat.setdefault(e, {}).setdefault('plan', {}).setdefault(stat_type, {}).setdefault('day_type', {})['H'] = main_stat.get(e, {}).get('holidays', 0)
                 stat.setdefault(e, {}).setdefault('plan', {}).setdefault(stat_type, {}).setdefault('day_type', {})['V'] = main_stat.get(e, {}).get('vacations', 0)
 
-        workdays = self._get_worker_day_qs(employee_ids=employee_ids, dt_from=timetable.prod_days[0].dt, dt_to=timetable.prod_days[-1].dt, is_approved=form['is_approved'], for_inspection=form.get('inspection_version', False))
+        workdays = self._get_worker_day_qs(employee_ids=employee_ids, dt_from=timetable.prod_days[0].dt, dt_to=timetable.prod_days[-1].dt, is_approved=self.form['is_approved'], for_inspection=self.form.get('inspection_version', False))
 
         timetable.format_cells(len(employments))
 
@@ -645,7 +679,7 @@ class UploadDownloadTimetableCells(BaseUploadDownloadTimeTable):
         timetable.fill_table(grouped_days, employments, stat, 9, 3, stat_type=stat_type, norm_type=norm_type, mapping=self.wd_type_mapping)
 
         # fill page 2
-        timetable.fill_table2(shop, timetable.prod_days[-1].dt, grouped_days)
+        timetable.fill_table2(self.shop, timetable.prod_days[-1].dt, grouped_days)
 
         timetable.fill_description_table(self.wd_types_dict)
 
@@ -663,7 +697,7 @@ class UploadDownloadTimetableCells(BaseUploadDownloadTimeTable):
             timetable.description_sheet.fit_to_pages(1, 0)
             timetable.description_sheet.set_margins(left=0.25, right=0.25)
 
-        return workbook, _('Timetable_for_shop_{}_from_{}.xlsx').format(shop.name, form['dt_from'])
+        return workbook, _('Timetable_for_shop_{}_from_{}.xlsx').format(self.shop.name, self.form['dt_from'])
 
     def _generate_upload_example(self, writer, shop_id, dt_from, dt_to, is_fact, is_approved, employee_id__in):
         shop = Shop.objects.get(id=shop_id)
@@ -694,6 +728,11 @@ class UploadDownloadTimetableCells(BaseUploadDownloadTimeTable):
                             _cell_value = f'{tm_start}-{tm_end}'
                             if not wd.type_id == WorkerDay.TYPE_WORKDAY:
                                 _cell_value = excel_code + _cell_value
+                            if wd.type.has_details and wd.worker_day_details_list:
+                                _cell_value += '({})'.format(
+                                    wd.worker_day_details_list[0].work_type.work_type_name.name)
+                            if wd.is_vacancy:
+                                _cell_value = '~' + _cell_value
                             cell_values.append(_cell_value)
                         else:
                             cell_values.append(excel_code)
@@ -778,7 +817,7 @@ class UploadDownloadTimetableRows(BaseUploadDownloadTimeTable):
 
         return workbook, _('Timetable_for_shop_{}_from_{}.xlsx').format(data['shop'].name, data['dt_from'])
 
-    def _download(self, workbook, form):
+    def _download(self, workbook):
         def _get_active_empl(wd, empls):
             if wd.employment:
                 return wd.employment
@@ -788,17 +827,18 @@ class UploadDownloadTimetableRows(BaseUploadDownloadTimeTable):
                 empls.get(wd.employee_id, []),
             ))[0]
 
-        shop = Shop.objects.get(pk=form['shop_id'])
-        dt_from = form['dt_from']
+        dt_from = self.form['dt_from']
         dt_to = dt_from + relativedelta(day=31)
 
         empls = {}
-        employments = self._get_employment_qs(shop.network, shop.id, dt_from=dt_from, dt_to=dt_to)
+        employments = self._get_employment_qs(self.shop.network, self.shop.id, dt_from=dt_from, dt_to=dt_to)
         employee_ids = employments.values_list('employee_id', flat=True)
         for e in employments:
             empls.setdefault(e.employee_id, []).append(e)
         
-        workdays = self._get_worker_day_qs(employee_ids=employee_ids, dt_from=dt_from, dt_to=dt_to, is_approved=form['is_approved']).select_related('employment', 'employment__position')
+        workdays = self._get_worker_day_qs(
+            employee_ids=employee_ids, dt_from=dt_from, dt_to=dt_to, is_approved=self.form['is_approved']
+        ).select_related('employment', 'employment__position')
 
         rows = []
 
@@ -818,7 +858,7 @@ class UploadDownloadTimetableRows(BaseUploadDownloadTimeTable):
             )
         
         data = {
-            'shop': shop,
+            'shop': self.shop,
             'dt_from': dt_from,
             'dt_to': dt_to,
             'sheet_name': _('Timetable for signature.'),
@@ -827,7 +867,7 @@ class UploadDownloadTimetableRows(BaseUploadDownloadTimeTable):
 
         return self._generate_workbook(workbook, data)
 
-    def _upload(self, df, users, form, is_fact):
+    def _upload(self, df, users, is_fact):
         def _get_str_data(row):
             return str(row).strip().upper().replace(' ', '').replace('\n', '')
 
@@ -837,7 +877,7 @@ class UploadDownloadTimetableRows(BaseUploadDownloadTimeTable):
         dt_column = df.columns[3]
         start_column = df.columns[4]
         end_column = df.columns[5]
-        shop_id = form['shop_id']
+        shop_id = self.shop_id
         df[number_column] = df[number_column].astype(str)
         df[name_column] = df[name_column].astype(str)
         df[position_column] = df[position_column].astype(str)

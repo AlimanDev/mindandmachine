@@ -1274,13 +1274,13 @@ class WorkerDay(AbstractModel):
         return breaktime
 
     @staticmethod
-    def is_worker_day_vacancy(active_empl_shop_id, worker_day_shop_id, main_work_type_id, worker_day_details_list, is_vacacny=False):
+    def is_worker_day_vacancy(active_empl_shop_id, worker_day_shop_id, main_work_type_id, worker_day_details_list, is_vacancy=False):
         if active_empl_shop_id and worker_day_shop_id:
-            is_vacacny = is_vacacny or active_empl_shop_id != worker_day_shop_id
+            is_vacancy = is_vacancy or active_empl_shop_id != worker_day_shop_id
         if main_work_type_id and worker_day_details_list:
             details_work_type_id = worker_day_details_list[0]['work_type_id'] if isinstance(worker_day_details_list[0], dict) else worker_day_details_list[0].work_type_id
-            is_vacacny = is_vacacny or main_work_type_id != details_work_type_id
-        return is_vacacny
+            is_vacancy = is_vacancy or main_work_type_id != details_work_type_id
+        return is_vacancy
 
     @property
     def dt_as_str(self):
@@ -2468,7 +2468,7 @@ class AttendanceRecords(AbstractModel):
                         self.shop_id,
                         active_user_empl.main_work_type_id,
                         getattr(closest_plan_approved, 'worker_day_details_list', []),
-                        is_vacacny=getattr(closest_plan_approved, 'is_vacancy', False),
+                        is_vacancy=getattr(closest_plan_approved, 'is_vacancy', False),
                     )
                     fact_approved, _wd_created = WorkerDay.objects.update_or_create(
                         dt=self.dt,
