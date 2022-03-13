@@ -304,10 +304,12 @@ class Network(AbstractActiveModel):
             cache.delete_pattern("prod_cal_*_*_*")
         return super().save(*args, **kwargs)
 
-    def set_settings_value(self, k, v):
+    def set_settings_value(self, k, v, save=False):
         settings_values = json.loads(self.settings_values)
         settings_values[k] = v
         self.settings_values = json.dumps(settings_values)
+        if save:
+            self.save()
 
     def get_department(self):
         return None
