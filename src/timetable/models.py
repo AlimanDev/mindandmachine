@@ -2284,22 +2284,40 @@ class AttendanceRecords(AbstractModel):
         max_plan_diff_in_seconds = datetime.timedelta(seconds=self.shop.network.max_plan_diff_in_seconds)
         dttm_from = associated_wdays_chain[0].dttm_work_start - max_plan_diff_in_seconds
         dttm_to = associated_wdays_chain[-1].dttm_work_end + max_plan_diff_in_seconds
-        att_record_coming = AttendanceRecords.objects.filter(
+        dttm_coming = AttendanceRecords.objects.filter(
             employee_id=self.employee_id,
             shop_id=self.shop_id,
             type=AttendanceRecords.TYPE_COMING,
             dttm__gte=dttm_from,
             dttm__lte=associated_wdays_chain[-1].dttm_work_end,
-        ).order_by('dttm').first()
-        att_record_leaving = AttendanceRecords.objects.filter(
+        ).order_by('dttm').values_list('dttm', flat=True).first() or WorkerDay.objects.filter(
+            last_edited_by__isnull=False,
+            is_fact=True,
+            is_approved=True,
+            employee_id=plan_approved.employee_id,
+            shop_id=plan_approved.shop_id,
+            dttm_work_start__gte=dttm_from,
+            dttm_work_start__lte=associated_wdays_chain[-1].dttm_work_end,
+            type__is_dayoff=False,
+        ).order_by('dttm_work_start').values_list('dttm_work_start', flat=True).first()
+        dttm_leaving = AttendanceRecords.objects.filter(
             employee_id=self.employee_id,
             shop_id=self.shop_id,
             type=AttendanceRecords.TYPE_LEAVING,
             dttm__gte=associated_wdays_chain[0].dttm_work_start,
             dttm__lte=dttm_to,
-        ).order_by('dttm').last()
+        ).order_by('dttm').values_list('dttm', flat=True).last() or WorkerDay.objects.filter(
+            last_edited_by__isnull=False,
+            is_fact=True,
+            is_approved=True,
+            employee_id=plan_approved.employee_id,
+            shop_id=plan_approved.shop_id,
+            dttm_work_end__gte=associated_wdays_chain[0].dttm_work_start,
+            dttm_work_end__lte=dttm_to,
+            type__is_dayoff=False,
+        ).order_by('dttm_work_end').values_list('dttm_work_end', flat=True).last()
 
-        if not (att_record_coming and att_record_leaving):
+        if not (dttm_coming and dttm_leaving):
             return
 
         wdays_to_clean_qs = WorkerDay.objects.filter(
@@ -2326,8 +2344,8 @@ class AttendanceRecords(AbstractModel):
                         shop_id=associated_wday.shop_id,
                         employment=associated_wday.employment,
                         type_id=associated_wday.type_id,
-                        dttm_work_start=att_record_coming.dttm if is_first else associated_wday.dttm_work_start,
-                        dttm_work_end=att_record_leaving.dttm if is_last else associated_wday.dttm_work_end,
+                        dttm_work_start=dttm_coming if is_first else associated_wday.dttm_work_start,
+                        dttm_work_end=dttm_leaving if is_last else associated_wday.dttm_work_end,
                         is_vacancy=associated_wday.is_vacancy,
                         source=WorkerDay.RECALC_FACT_FROM_ATT_RECORDS if recalc_fact_from_att_records else WorkerDay.SOURCE_AUTO_FACT,
                     )
