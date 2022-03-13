@@ -16,7 +16,7 @@ from src.timetable.models import (
 class TimesheetItem:
     def __init__(self, dt, shop, position, day_type,
                  day_hours=None, night_hours=None,
-                 work_type_name=None, dttm_work_start=None, dttm_work_end=None, source=None, freezed=False):
+                 work_type_name=None, dttm_work_start=None, dttm_work_end=None, source=None, freezed=False, is_vacancy=False):
         self.dt = dt
         self.shop = shop
         self.position = position
@@ -28,6 +28,7 @@ class TimesheetItem:
         self.dttm_work_end = dttm_work_end
         self.source = source
         self.freezed = freezed
+        self.is_vacancy = is_vacancy
 
     @property
     def total_hours(self):
@@ -44,6 +45,7 @@ class TimesheetItem:
             night_hours=self.night_hours,
             dttm_work_start=self.dttm_work_start,
             dttm_work_end=self.dttm_work_end,
+            is_vacancy=self.is_vacancy,
         )
         if overrides:
             kwargs.update(overrides)
@@ -284,6 +286,7 @@ class FiscalTimesheet:
                     dttm_work_start=fact_timesheet_item_dict.get('fact_timesheet_dttm_work_start'),
                     dttm_work_end=fact_timesheet_item_dict.get('fact_timesheet_dttm_work_end'),
                     source=fact_timesheet_item_dict.get('fact_timesheet_source'),
+                    is_vacancy=fact_timesheet_item_dict.get('is_vacancy'),
                 ))
 
     def save(self):
