@@ -2281,20 +2281,21 @@ class AttendanceRecords(AbstractModel):
 
         associated_wdays_chain.reverse()
 
-        dttm_from = associated_wdays_chain[0].dttm_work_start - datetime.timedelta(hours=6)
-        dttm_to = associated_wdays_chain[-1].dttm_work_end + datetime.timedelta(hours=6)
+        max_plan_diff_in_seconds = datetime.timedelta(seconds=self.shop.network.max_plan_diff_in_seconds)
+        dttm_from = associated_wdays_chain[0].dttm_work_start - max_plan_diff_in_seconds
+        dttm_to = associated_wdays_chain[-1].dttm_work_end + max_plan_diff_in_seconds
         att_record_coming = AttendanceRecords.objects.filter(
             employee_id=self.employee_id,
             shop_id=self.shop_id,
             type=AttendanceRecords.TYPE_COMING,
             dttm__gte=dttm_from,
-            dttm__lte=dttm_to,
+            dttm__lte=associated_wdays_chain[-1].dttm_work_end,
         ).order_by('dttm').first()
         att_record_leaving = AttendanceRecords.objects.filter(
             employee_id=self.employee_id,
             shop_id=self.shop_id,
             type=AttendanceRecords.TYPE_LEAVING,
-            dttm__gte=dttm_from,
+            dttm__gte=associated_wdays_chain[0].dttm_work_start,
             dttm__lte=dttm_to,
         ).order_by('dttm').last()
 
@@ -2330,13 +2331,13 @@ class AttendanceRecords(AbstractModel):
                         is_vacancy=associated_wday.is_vacancy,
                         source=WorkerDay.RECALC_FACT_FROM_ATT_RECORDS if recalc_fact_from_att_records else WorkerDay.SOURCE_AUTO_FACT,
                     )
-                    if fact_approved.type.has_details:
-                        self._create_wd_details(associated_wday.dt, fact_approved, associated_wday.employment, associated_wday)
                     WorkerDay.check_work_time_overlap(
                             employee_id=associated_wday.employee_id, dt=associated_wday.dt, is_fact=True, is_approved=True)
             except WorkTimeOverlap:
                 pass
             else:
+                if fact_approved.type.has_details:
+                    self._create_wd_details(associated_wday.dt, fact_approved, associated_wday.employment, associated_wday)
                 self._create_or_update_not_approved_fact(fact_approved)
 
     def save(self, *args, recalc_fact_from_att_records=False, **kwargs):
