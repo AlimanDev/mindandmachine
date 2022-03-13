@@ -2237,8 +2237,7 @@ class AttendanceRecords(AbstractModel):
 
     def _get_fact_approved_extra_q(self, closest_plan_approved):
         fact_approved_extra_q = Q(closest_plan_approved=closest_plan_approved) if closest_plan_approved else Q()
-        if self.type == self.TYPE_LEAVING and \
-                not (closest_plan_approved and self._is_one_arrival_and_departure_for_associated_wdays()):  # ???
+        if self.type == self.TYPE_LEAVING:
             fact_approved_extra_q |= Q(
                 dttm_work_start__isnull=False,
                 diff_between_tick_and_work_start_seconds__lte=F('shop__network__max_work_shift_seconds'),
@@ -2356,85 +2355,86 @@ class AttendanceRecords(AbstractModel):
             return res
 
         with transaction.atomic():
-            base_fact_approved_qs = self._get_base_fact_approved_qs(closest_plan_approved, shop_id=self.shop_id)
-            fact_approved_extra_q = self._get_fact_approved_extra_q(closest_plan_approved)
-            fact_approved = base_fact_approved_qs.filter(
-                fact_approved_extra_q,
-                dt=self.dt,
-                employee_id=self.employee_id,
-                is_fact=True,
-                is_approved=True,
-            ).select_related('type').order_by('-is_equal_shops', '-is_closest_plan_approved_equal').first()
-
-            if fact_approved:
-                self.fact_wd = fact_approved
-                if fact_approved.last_edited_by_id:
-                    return
-
-                # если это отметка о приходе, то не перезаписываем время начала работы в графике
-                # если время отметки больше, чем время начала работы в существующем графике
-                skip_condition = (self.type == self.TYPE_COMING) and \
-                                 fact_approved.dttm_work_start and self.dttm > fact_approved.dttm_work_start
-                if skip_condition:
-                    return
-
-                setattr(fact_approved, self.TYPE_2_DTTM_FIELD[self.type], self.dttm)
-                # TODO: проставление такого же типа как в плане? (тест + проверить)
-                setattr(fact_approved, 'type_id',
-                        closest_plan_approved.type_id if closest_plan_approved else WorkerDay.TYPE_WORKDAY)
-                setattr(fact_approved, 'shop_id', self.shop_id)
-                setattr(fact_approved, 'last_edited_by', None)
-                setattr(fact_approved, 'created_by', None)
-                if not fact_approved.is_vacancy and closest_plan_approved:
-                    setattr(fact_approved, 'is_vacancy', closest_plan_approved.is_vacancy)
-                if closest_plan_approved and not fact_approved.closest_plan_approved_id:
-                    fact_approved.closest_plan_approved = closest_plan_approved
-                if fact_approved.type.has_details and not fact_approved.worker_day_details.exists():
-                    self._create_wd_details(self.dt, fact_approved, active_user_empl, closest_plan_approved)
-                fact_approved.save()
-                self._create_or_update_not_approved_fact(fact_approved)
-                if self.type == self.TYPE_LEAVING \
-                        and closest_plan_approved and self._is_one_arrival_and_departure_for_associated_wdays():
-                    self._handle_one_arrival_and_departure_for_associated_wdays(closest_plan_approved)
+            if self.type == self.TYPE_LEAVING and \
+                    closest_plan_approved and \
+                    self._is_one_arrival_and_departure_for_associated_wdays() and\
+                    self._search_associated_wday(closest_plan_approved):
+                self._handle_one_arrival_and_departure_for_associated_wdays(closest_plan_approved)
             else:
-                if self.type == self.TYPE_LEAVING:
-                    prev_fa_wd = base_fact_approved_qs.filter(
-                        fact_approved_extra_q,
-                        employee_id=self.employee_id,
-                        dt__lt=self.dt,
-                        is_fact=True,
-                        is_approved=True,
-                    ).order_by('-is_equal_shops', '-is_closest_plan_approved_equal', '-dt').first()
+                base_fact_approved_qs = self._get_base_fact_approved_qs(closest_plan_approved, shop_id=self.shop_id)
+                fact_approved_extra_q = self._get_fact_approved_extra_q(closest_plan_approved)
+                fact_approved = base_fact_approved_qs.filter(
+                    fact_approved_extra_q,
+                    dt=self.dt,
+                    employee_id=self.employee_id,
+                    is_fact=True,
+                    is_approved=True,
+                ).select_related('type').order_by('-is_equal_shops', '-is_closest_plan_approved_equal').first()
 
-                    # Если предыдущая смена начата и с момента открытия предыдущей смены прошло менее макс. длины смены,
-                    # то обновляем время окончания предыдущей смены. (условие в closest_plan_approved_q)
-                    if prev_fa_wd:
-                        setattr(prev_fa_wd, self.TYPE_2_DTTM_FIELD[self.type], self.dttm)
-                        setattr(prev_fa_wd, 'type_id',
-                                closest_plan_approved.type_id if closest_plan_approved else WorkerDay.TYPE_WORKDAY)
-                        setattr(prev_fa_wd, 'shop_id', self.shop_id)
-                        setattr(prev_fa_wd, 'last_edited_by', None)
-                        setattr(prev_fa_wd, 'created_by', None)
-                        if not prev_fa_wd.is_vacancy and closest_plan_approved:
-                            setattr(prev_fa_wd, 'is_vacancy', closest_plan_approved.is_vacancy)
-                        if closest_plan_approved and not prev_fa_wd.closest_plan_approved_id:
-                            prev_fa_wd.closest_plan_approved = closest_plan_approved
-                        prev_fa_wd.save()
-                        # логично дату предыдущую ставить, так как это значение в отчетах используется
-                        self.dt = prev_fa_wd.dt
-                        super(AttendanceRecords, self).save(update_fields=['dt',])
-                        self._create_or_update_not_approved_fact(prev_fa_wd)
-                        if closest_plan_approved and self._is_one_arrival_and_departure_for_associated_wdays():
-                            self._handle_one_arrival_and_departure_for_associated_wdays(closest_plan_approved)
-                        return
+                if fact_approved:
+                    self.fact_wd = fact_approved
+                    if fact_approved.last_edited_by_id:
+                        return res
 
-                    if self.shop.network.skip_leaving_tick:
-                        return
+                    # если это отметка о приходе, то не перезаписываем время начала работы в графике
+                    # если время отметки больше, чем время начала работы в существующем графике
+                    skip_condition = (self.type == self.TYPE_COMING) and \
+                                     fact_approved.dttm_work_start and self.dttm > fact_approved.dttm_work_start
+                    if skip_condition:
+                        return res
 
-                if self.type == self.TYPE_LEAVING and \
-                        closest_plan_approved and self._is_one_arrival_and_departure_for_associated_wdays():
-                    self._handle_one_arrival_and_departure_for_associated_wdays(closest_plan_approved)
+                    setattr(fact_approved, self.TYPE_2_DTTM_FIELD[self.type], self.dttm)
+                    # TODO: проставление такого же типа как в плане? (тест + проверить)
+                    setattr(fact_approved, 'type_id',
+                            closest_plan_approved.type_id if closest_plan_approved else WorkerDay.TYPE_WORKDAY)
+                    setattr(fact_approved, 'shop_id', self.shop_id)
+                    setattr(fact_approved, 'last_edited_by', None)
+                    setattr(fact_approved, 'created_by', None)
+                    if not fact_approved.is_vacancy and closest_plan_approved:
+                        setattr(fact_approved, 'is_vacancy', closest_plan_approved.is_vacancy)
+                    if closest_plan_approved and not fact_approved.closest_plan_approved_id:
+                        fact_approved.closest_plan_approved = closest_plan_approved
+                    if fact_approved.type.has_details and not fact_approved.worker_day_details.exists():
+                        self._create_wd_details(self.dt, fact_approved, active_user_empl, closest_plan_approved)
+                    fact_approved.save()
+                    self._create_or_update_not_approved_fact(fact_approved)
                 else:
+                    if self.type == self.TYPE_LEAVING:
+                        prev_fa_wd = base_fact_approved_qs.filter(
+                            fact_approved_extra_q,
+                            employee_id=self.employee_id,
+                            dt__lt=self.dt,
+                            is_fact=True,
+                            is_approved=True,
+                        ).order_by('-is_equal_shops', '-is_closest_plan_approved_equal', '-dt').first()
+
+                        # Если предыдущая смена начата и с момента открытия предыдущей смены прошло менее макс. длины смены,
+                        # то обновляем время окончания предыдущей смены. (условие в closest_plan_approved_q)
+                        if prev_fa_wd:
+                            self.fact_wd = prev_fa_wd
+                            if prev_fa_wd.last_edited_by_id:
+                                return res
+
+                            setattr(prev_fa_wd, self.TYPE_2_DTTM_FIELD[self.type], self.dttm)
+                            setattr(prev_fa_wd, 'type_id',
+                                    closest_plan_approved.type_id if closest_plan_approved else WorkerDay.TYPE_WORKDAY)
+                            setattr(prev_fa_wd, 'shop_id', self.shop_id)
+                            setattr(prev_fa_wd, 'last_edited_by', None)
+                            setattr(prev_fa_wd, 'created_by', None)
+                            if not prev_fa_wd.is_vacancy and closest_plan_approved:
+                                setattr(prev_fa_wd, 'is_vacancy', closest_plan_approved.is_vacancy)
+                            if closest_plan_approved and not prev_fa_wd.closest_plan_approved_id:
+                                prev_fa_wd.closest_plan_approved = closest_plan_approved
+                            prev_fa_wd.save()
+                            # логично дату предыдущую ставить, так как это значение в отчетах используется
+                            self.dt = prev_fa_wd.dt
+                            super(AttendanceRecords, self).save(update_fields=['dt',])
+                            self._create_or_update_not_approved_fact(prev_fa_wd)
+                            return res
+
+                        if self.shop.network.skip_leaving_tick:
+                            return res
+
                     is_vacancy = WorkerDay.is_worker_day_vacancy(
                         active_user_empl.shop_id,
                         self.shop_id,
@@ -2460,8 +2460,6 @@ class AttendanceRecords(AbstractModel):
                             # 'is_outsource': active_user_empl.shop.network_id != self.shop.network_id,
                         }
                     )
-                    WorkerDay.check_work_time_overlap(
-                        employee_id=fact_approved.employee_id, dt=fact_approved.dt, is_fact=True, is_approved=True)
                     self.fact_wd = fact_approved
                     if fact_approved.type.has_details and (
                             _wd_created or not fact_approved.worker_day_details.exists()):
