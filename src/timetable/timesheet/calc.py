@@ -171,6 +171,9 @@ class TimesheetCalculator:
         wdays_qs = self._get_timesheet_wdays_qs(self.employee, dt_start, dt_end)
         fact_timesheet_dict = {}
         for worker_day in wdays_qs:
+            active_employment = self.get_active_employment(worker_day.dt)
+            if not active_employment:
+                continue
             day_in_past = worker_day.dt < self.dt_now
             if self.employee.user.network.settings_values_prop.get('timesheet_only_day_in_past', False) and not day_in_past:
                 continue
@@ -223,6 +226,9 @@ class TimesheetCalculator:
             plan_wdays_dict.setdefault(self._get_empl_key(wd.employee_id, wd.dt), []).append(wd)
 
         for dt in pd.date_range(dt_start, dt_end).date:
+            active_employment = self.get_active_employment(dt)
+            if not active_employment:
+                continue
             day_in_past = dt < self.dt_now
             if self.employee.user.network.settings_values_prop.get(
                     'timesheet_only_day_in_past', False) and not day_in_past:
@@ -250,9 +256,6 @@ class TimesheetCalculator:
 
             # Если нет ни плана ни факта
             if not plan_wd_list:
-                active_employment = self.get_active_employment(dt)
-                if not active_employment:  # не создаем запись в табеле если нету активного трудоустройства
-                    continue
                 d = {
                     'employee_id': self.employee.id,
                     'dt': dt,
