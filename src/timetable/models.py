@@ -2257,6 +2257,12 @@ class AttendanceRecords(AbstractModel):
             dttm_work_end=plan_approved.dttm_work_start,
         ).select_related(
             'employment',
+        ).prefetch_related(
+            Prefetch(
+                'worker_day_details',
+                queryset=WorkerDayCashboxDetails.objects.select_related('work_type'),
+                to_attr='worker_day_details_list',
+            )
         ).first()
 
     def _handle_one_arrival_and_departure_for_associated_wdays(
