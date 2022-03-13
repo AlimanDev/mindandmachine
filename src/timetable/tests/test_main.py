@@ -5294,7 +5294,7 @@ class TestAttendanceRecords(TestsHelperMixin, APITestCase):
                 self.assertEqual(wd_fact.dttm_work_start, dttm_work_start)
                 self.assertEqual(wd_fact.dttm_work_end, dttm_work_end)
 
-    def test_manual_and_auto_facts_at_the_same_time_without_overlap(self):
+    def test_manual_and_auto_facts_without_overlap(self):
         WorkerDay.objects.all().delete()
         dt = date.today()
         self.user2.network.set_settings_value('one_arrival_and_departure_for_associated_wdays', True, save=True)
@@ -5351,6 +5351,76 @@ class TestAttendanceRecords(TestsHelperMixin, APITestCase):
         compares = [
             (pa1, datetime.combine(dt, time(10)), datetime.combine(dt, time(16)), True),
             (pa2, datetime.combine(dt, time(16)), datetime.combine(dt, time(22, 5)), False),
+        ]
+        for plan_approved, dttm_work_start, dttm_work_end, is_manual in compares:
+            for is_approved in [False, True]:
+                wd_fact = WorkerDay.objects.filter(
+                    closest_plan_approved=plan_approved, is_fact=True, is_approved=is_approved).first()
+                self.assertIsNotNone(wd_fact)
+                if is_manual:
+                    self.assertIsNotNone(wd_fact.last_edited_by_id)
+                else:
+                    self.assertIsNone(wd_fact.last_edited_by_id)
+                self.assertEqual(wd_fact.dttm_work_start, dttm_work_start)
+                self.assertEqual(wd_fact.dttm_work_end, dttm_work_end)
+
+    def test_manual_and_auto_facts_with_overlap(self):
+        WorkerDay.objects.all().delete()
+        dt = date.today()
+        self.user2.network.set_settings_value('one_arrival_and_departure_for_associated_wdays', True, save=True)
+        for is_approved in [False, True]:
+            pa1 = WorkerDayFactory(
+                dt=self.dt,
+                employee_id=self.employment2.employee_id,
+                employment=self.employment2,
+                is_approved=is_approved,
+                is_fact=False,
+                type_id=WorkerDay.TYPE_WORKDAY,
+                shop=self.shop,
+                dttm_work_start=datetime.combine(dt, time(10)),
+                dttm_work_end=datetime.combine(dt, time(16)),
+            )
+            pa2 = WorkerDayFactory(
+                dt=dt,
+                employee_id=self.employment2.employee_id,
+                employment=self.employment2,
+                is_approved=is_approved,
+                is_fact=False,
+                type_id=WorkerDay.TYPE_WORKDAY,
+                shop=self.shop,
+                dttm_work_start=datetime.combine(dt, time(16)),
+                dttm_work_end=datetime.combine(dt, time(22)),
+            )
+
+        for is_approved in [False, True]:
+            WorkerDayFactory(
+                dt=self.dt,
+                employee_id=self.employment2.employee_id,
+                employment=self.employment2,
+                is_approved=is_approved,
+                is_fact=True,
+                type_id=WorkerDay.TYPE_WORKDAY,
+                shop=self.shop,
+                dttm_work_start=datetime.combine(dt, time(10)),
+                dttm_work_end=datetime.combine(dt, time(17)),
+                created_by=self.user2,
+                last_edited_by=self.user2,
+                closest_plan_approved=pa1,
+            )
+
+        self._create_att_record(
+            AttendanceRecords.TYPE_COMING, datetime.combine(dt, time(9, 52)), self.user2.id, self.employee2.id,
+            self.shop.id, terminal=False)
+        self.assertEqual(WorkerDay.objects.filter(is_fact=True).count(), 2)
+
+        self._create_att_record(
+            AttendanceRecords.TYPE_LEAVING, datetime.combine(dt, time(22, 5)), self.user2.id, self.employee2.id,
+            self.shop.id, terminal=False)
+        self.assertEqual(WorkerDay.objects.filter(is_fact=True).count(), 2)
+
+        compares = [
+            (pa1, datetime.combine(dt, time(10)), datetime.combine(dt, time(17)), True),
+            # (pa2, datetime.combine(dt, time(17)), datetime.combine(dt, time(22, 5)), False),  TODO: как обрабатывать?
         ]
         for plan_approved, dttm_work_start, dttm_work_end, is_manual in compares:
             for is_approved in [False, True]:

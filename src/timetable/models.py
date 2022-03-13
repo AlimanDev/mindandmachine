@@ -2254,6 +2254,7 @@ class AttendanceRecords(AbstractModel):
             employee_id=plan_approved.employee_id,
             shop_id=plan_approved.shop_id,
             dttm_work_end=plan_approved.dttm_work_start,
+            type__is_dayoff=False,
         ).select_related(
             'employment',
         ).prefetch_related(
