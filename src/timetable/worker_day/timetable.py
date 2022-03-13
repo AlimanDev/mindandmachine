@@ -728,11 +728,12 @@ class UploadDownloadTimetableCells(BaseUploadDownloadTimeTable):
                             _cell_value = f'{tm_start}-{tm_end}'
                             if not wd.type_id == WorkerDay.TYPE_WORKDAY:
                                 _cell_value = excel_code + _cell_value
-                            if wd.type.has_details and wd.worker_day_details_list:
-                                _cell_value += '({})'.format(
-                                    wd.worker_day_details_list[0].work_type.work_type_name.name)
-                            if wd.is_vacancy:
-                                _cell_value = '~' + _cell_value
+                            if self.shop.network.settings_values_prop.get('allow_to_manually_set_is_vacancy'):
+                                if wd.type.has_details and wd.worker_day_details_list:
+                                    _cell_value += '({})'.format(
+                                        wd.worker_day_details_list[0].work_type.work_type_name.name)
+                                if wd.is_vacancy:
+                                    _cell_value = '~' + _cell_value
                             cell_values.append(_cell_value)
                         else:
                             cell_values.append(excel_code)
