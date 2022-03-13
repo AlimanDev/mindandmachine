@@ -71,6 +71,7 @@ class TimesheetCalculator:
             'employment__shop',
             'employment__position',
             'type',
+            'closest_plan_approved',
         ).prefetch_related(
             Prefetch('work_types',
                      queryset=WorkType.objects.all().select_related('work_type_name', 'work_type_name__position'),
@@ -149,6 +150,7 @@ class TimesheetCalculator:
             'work_type_name': work_type_name,
             'fact_timesheet_type_id': WorkerDay.TYPE_ABSENSE if is_absent else plan_wd.type_id,
             'fact_timesheet_source': TimesheetItem.SOURCE_TYPE_SYSTEM if is_absent else TimesheetItem.SOURCE_TYPE_PLAN,
+            'is_vacancy': plan_wd.is_vacancy,
         }
         if not day_in_past and not plan_wd.type.is_dayoff:
             total_hours, day_hours, night_hours = plan_wd.calc_day_and_night_work_hours()
@@ -190,6 +192,8 @@ class TimesheetCalculator:
                 wd_dict['fact_timesheet_total_hours'] = total_hours
                 wd_dict['fact_timesheet_day_hours'] = day_hours
                 wd_dict['fact_timesheet_night_hours'] = night_hours
+                wd_dict['is_vacancy'] = worker_day.is_vacancy or \
+                    (worker_day.closest_plan_approved_id and worker_day.closest_plan_approved.is_vacancy)
             if (worker_day.type.is_dayoff and worker_day.type.is_work_hours):
                 dayoff_work_hours = worker_day.work_hours.total_seconds() / 3600
                 wd_dict['fact_timesheet_total_hours'] = dayoff_work_hours
