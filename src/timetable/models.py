@@ -2321,12 +2321,20 @@ class AttendanceRecords(AbstractModel):
             return
 
         wdays_to_clean_qs = WorkerDay.objects.filter(
-            Q(last_edited_by__isnull=True) | Q(type_id=WorkerDay.TYPE_EMPTY),
-            Q(dttm_work_start__gte=dttm_from) | Q(dttm_work_start__isnull=True),
-            Q(dttm_work_end__lte=dttm_to) | Q(dttm_work_end__isnull=True),
-            employee_id=self.employee_id,
-            shop_id=self.shop_id,
-            is_fact=True,
+            Q(
+                Q(dttm_work_start__gte=dttm_from) | Q(dttm_work_start__isnull=True),
+                Q(dttm_work_end__lte=dttm_to) | Q(dttm_work_end__isnull=True),
+                employee_id=self.employee_id,
+                shop_id=self.shop_id,
+                is_fact=True,
+                last_edited_by__isnull=True,
+            )
+            | Q(
+                dt__range=[dttm_from.date(), dttm_to.date()],
+                employee_id=self.employee_id,
+                is_fact=True,
+                type_id=WorkerDay.TYPE_EMPTY,
+            )
         )
         wdays_to_clean_qs.delete()
         associated_wdays_count = len(associated_wdays_chain)
