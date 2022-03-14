@@ -280,6 +280,10 @@ class Tevian:
             if self.token:
                 headers['Authorization'] = f"Bearer {self.token}"
 
+        from django.db.models.fields import files as django_fields
+        if isinstance(data, django_fields.ImageFieldFile):
+            data = data.file.file
+            data.seek(0)
         response = make_retry_session().request(
             method,
             url,

@@ -7,7 +7,7 @@ from django.conf import settings
 from django.contrib.postgres.aggregates import StringAgg
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import transaction
-from django.db.models import Q, F, Value, CharField, Prefetch
+from django.db.models import Q, F, Value, CharField, Prefetch, Subquery, OuterRef
 from django.db.models.functions import Concat, Cast
 from django.utils.translation import gettext as _
 from rest_framework.exceptions import ValidationError, PermissionDenied
@@ -20,6 +20,7 @@ from src.base.models import (
 )
 from src.timetable.models import (
     AttendanceRecords,
+    EmploymentWorkType,
     WorkerDayOutsourceNetwork,
     WorkerDayPermission,
     GroupWorkerDayPermission,
@@ -41,16 +42,18 @@ def exchange(data, error_messages):
             ).select_related(
                 'position__breaks',
             ).first()
+        main_work_type_id = None
+        if len(wd_source.worker_day_details_list):
+            main_work_type_id = getattr(EmploymentWorkType.objects.filter(employment_id=employment.id, priority=1).first(), 'work_type_id', None)
         wd_data = dict(
             type_id=wd_source.type_id,
             dttm_work_start=wd_source.dttm_work_start,
             dttm_work_end=wd_source.dttm_work_end,
             employee_id=wd_target.employee_id,
-            employment=employment if wd_source.employment_id else None,
+            employment=employment,
             dt=wd_target.dt,
             created_by=data['user'],
             is_approved=data['is_approved'],
-            is_vacancy=wd_source.is_vacancy,
             shop_id=wd_source.shop_id,
             source=WorkerDay.SOURCE_EXCHANGE_APPROVED if data['is_approved'] else WorkerDay.SOURCE_EXCHANGE,
         )
@@ -60,8 +63,15 @@ def exchange(data, error_messages):
                 work_type_id=wd_cashbox_details_parent.work_type_id,
                 work_part=wd_cashbox_details_parent.work_part,
             )
-            for wd_cashbox_details_parent in wd_source.worker_day_details.all()
+            for wd_cashbox_details_parent in wd_source.worker_day_details_list
         ]
+        wd_data['is_vacancy'] = WorkerDay.is_worker_day_vacancy(
+            employment.shop_id,
+            wd_data['shop_id'],
+            main_work_type_id,
+            wd_source.worker_day_details_list,
+            is_vacacny=wd_source.is_vacancy,
+        )
         return wd_data
 
     days = len(data['dates'])
@@ -72,7 +82,11 @@ def exchange(data, error_messages):
             is_approved=data['is_approved'],
             is_fact=False,
         ).prefetch_related(
-            'worker_day_details__work_type__work_type_name',
+            Prefetch(
+                'worker_day_details',
+                queryset=WorkerDayCashboxDetails.objects.select_related('work_type__work_type_name'),
+                to_attr='worker_day_details_list',
+            ),
             Prefetch(
                 'outsources',
                 to_attr='outsources_list',
@@ -130,10 +144,10 @@ def exchange(data, error_messages):
                 if wd_target.type_id == WorkerDay.TYPE_WORKDAY or wd_source.type_id == WorkerDay.TYPE_WORKDAY:
                     wd_target_has_doctor_work_type = any(
                         wd_detail.work_type.work_type_name.code == 'doctor' for wd_detail in
-                        wd_target.worker_day_details.all())
+                        wd_target.worker_day_details_list)
                     wd_source_has_doctor_work_type = any(
                         wd_detail.work_type.work_type_name.code == 'doctor' for wd_detail in
-                        wd_source.worker_day_details.all())
+                        wd_source.worker_day_details_list)
                     if wd_target.type_id != WorkerDay.TYPE_WORKDAY and wd_source.type_id == WorkerDay.TYPE_WORKDAY and wd_source_has_doctor_work_type:
                         action = 'create'
                     elif wd_target.type_id == WorkerDay.TYPE_WORKDAY and wd_source.type_id != WorkerDay.TYPE_WORKDAY and wd_target_has_doctor_work_type:
@@ -230,6 +244,13 @@ def copy_as_excel_cells(from_employee_id, from_dates, to_employee_id, to_dates, 
                 employee_id=to_employee_id,
                 dt=dt,
                 priority_shop_id=blank_days[0].shop_id,
+            ).annotate(
+                main_work_type_id=Subquery(
+                    EmploymentWorkType.objects.filter(
+                        employment_id=OuterRef('id'),
+                        priority=1,
+                    ).values('work_type_id')[:1]
+                )
             ).select_related(
                 'position__breaks',
                 'employee__user',
@@ -263,7 +284,6 @@ def copy_as_excel_cells(from_employee_id, from_dates, to_employee_id, to_dates, 
                     last_edited_by=user,
                     source=source,
                     work_hours=blank_day.work_hours,
-                    is_vacancy=worker_active_empl.shop_id != blank_day.shop_id if blank_day.shop_id else False,
                 )
                 if blank_day.shop_id:
                     wd_data['is_outsource'] = blank_day.shop.network_id != worker_active_empl.employee.user.network_id
@@ -272,6 +292,13 @@ def copy_as_excel_cells(from_employee_id, from_dates, to_employee_id, to_dates, 
                 new_wdcds = main_worker_days_details.get(blank_day.id, [])
                 wd_data['worker_day_details'] = [
                     dict(work_type_id=new_wdcd.work_type_id, work_part=new_wdcd.work_part, ) for new_wdcd in new_wdcds]
+                wd_data['is_vacancy'] = WorkerDay.is_worker_day_vacancy(
+                    worker_active_empl.shop_id,
+                    blank_day.shop_id,
+                    worker_active_empl.main_work_type_id,
+                    wd_data['worker_day_details'],
+                    is_vacacny=blank_day.is_vacancy,
+                )
                 new_wdays_data.append(wd_data)
 
         created_wds, stats = WorkerDay.batch_update_or_create(
@@ -367,6 +394,13 @@ def create_worker_days_range(dates, type_id=WorkerDay.TYPE_WORKDAY, shop_id=None
                     dt=date,
                     priority_shop_id=shop_id,
                     priority_work_type_id=priority_work_type_id,
+                ).annotate(
+                    main_work_type_id=Subquery(
+                        EmploymentWorkType.objects.filter(
+                            employment_id=OuterRef('id'),
+                            priority=1,
+                        ).values('work_type_id')[:1]
+                    )
                 ).select_related(
                     'position__breaks',
                 ).first()
@@ -385,7 +419,6 @@ def create_worker_days_range(dates, type_id=WorkerDay.TYPE_WORKDAY, shop_id=None
                 shop_id=shop_id,
                 employee_id=employee_id,
                 employment_id=employment.id if employment else None,
-                is_vacancy=is_vacancy,
                 is_approved=is_approved,
                 dttm_work_start=datetime.datetime.combine(date, tm_work_start) if tm_work_start else None,
                 dttm_work_end=datetime.datetime.combine(dt_to, tm_work_end) if tm_work_end else None,
@@ -399,6 +432,13 @@ def create_worker_days_range(dates, type_id=WorkerDay.TYPE_WORKDAY, shop_id=None
                 if outsources and is_vacancy:
                     wd_data['outsources'] = [dict(network_id=network.id) for network in outsources]
                 wd_data['worker_day_details'] = [dict(work_type_id=detail['work_type_id'], work_part=detail['work_part']) for detail in cashbox_details]
+            wd_data['is_vacancy'] = WorkerDay.is_worker_day_vacancy(
+                getattr(employment, 'shop_id', None),
+                shop_id,
+                getattr(employment, 'main_work_type_id', None),
+                [{'work_type_id': priority_work_type_id}] if priority_work_type_id else [],
+                is_vacacny=is_vacancy,
+            )
             wdays.append(wd_data)
 
         if wdays:

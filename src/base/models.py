@@ -1491,11 +1491,19 @@ class EmploymentQuerySet(AnnotateValueEqualityQSMixin, QuerySet):
     def delete(self):
         from src.timetable.models import WorkerDay
         from src.timetable.worker_day.tasks import clean_wdays
+        from src.timetable.timesheet.utils import recalc_timesheet_on_data_change
         with transaction.atomic():
             wdays_ids = list(WorkerDay.objects.filter(employment__in=self).values_list('id', flat=True))
             WorkerDay.objects.filter(employment__in=self).update(employment_id=None)
             deleted_count = self.update(dttm_deleted=timezone.now())
             transaction.on_commit(lambda: clean_wdays.delay(id__in=wdays_ids))
+            dt_now = timezone.now().date()
+            recalc_timesheet_on_data_change(
+                {
+                    e.employee_id: [dt_now.replace(day=1) - datetime.timedelta(1), dt_now] 
+                    for e in self
+                }
+            )
         return deleted_count, {'base.Employment': deleted_count}
 
 
@@ -1585,6 +1593,7 @@ class Employment(AbstractActiveModel):
         from src.timetable.models import WorkerDay
         from src.timetable.worker_day.tasks import clean_wdays
         from src.integration.tasks import export_or_delete_employment_zkteco
+        from src.timetable.timesheet.utils import recalc_timesheet_on_data_change
         with transaction.atomic():
             wdays_ids = list(WorkerDay.objects.filter(employment=self).values_list('id', flat=True))
             WorkerDay.objects.filter(employment=self).update(employment_id=None)
@@ -1592,6 +1601,8 @@ class Employment(AbstractActiveModel):
                 transaction.on_commit(lambda: clean_wdays.delay(id__in=wdays_ids))
             transaction.on_commit(lambda: export_or_delete_employment_zkteco.delay(self.id))
             transaction.on_commit(lambda: cache.delete_pattern(f"prod_cal_*_*_{self.employee_id}"))
+            dt_now = timezone.now().date()
+            recalc_timesheet_on_data_change({self.employee_id: [dt_now.replace(day=1) - datetime.timedelta(1), dt_now]})
             return super(Employment, self).delete(**kwargs)
 
     def __init__(self, *args, **kwargs):
@@ -1694,6 +1705,10 @@ class Employment(AbstractActiveModel):
 
         if (is_new or self.tracker.has_changed('dt_hired') or self.tracker.has_changed('dt_fired') or position_has_changed or self.tracker.has_changed('norm_work_hours')):
             transaction.on_commit(lambda: cache.delete_pattern(f"prod_cal_*_*_{self.employee_id}"))
+            if not is_new:
+                from src.timetable.timesheet.utils import recalc_timesheet_on_data_change
+                dt_now = timezone.now().date()
+                recalc_timesheet_on_data_change({self.employee_id: [dt_now.replace(day=1) - datetime.timedelta(1), dt_now]})
 
         return res
 

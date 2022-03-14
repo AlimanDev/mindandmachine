@@ -1,6 +1,8 @@
 import datetime
 import json
+import pandas as pd
 from decimal import Decimal
+from dateutil.relativedelta import relativedelta
 
 from django.conf import settings
 from django.contrib.auth.models import (
@@ -11,11 +13,11 @@ from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models
 from django.db import transaction
 from django.db.models import (
-    Subquery, OuterRef, Max, Q, Case, When, Value, FloatField, F, IntegerField, Exists, BooleanField, Count,
+    Subquery, OuterRef, Max, Q, Case, When, Value, FloatField, F, IntegerField, Exists, BooleanField, Count, Sum, Prefetch,
 )
 from django.db.models.expressions import RawSQL
 from django.db.models.fields import PositiveSmallIntegerField
-from django.db.models.functions import Abs, Cast, Extract, Least
+from django.db.models.functions import Abs, Cast, Extract, Least, Coalesce
 from django.db.models.query import QuerySet
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
@@ -30,6 +32,7 @@ from src.recognition.events import EMPLOYEE_WORKING_NOT_ACCORDING_TO_PLAN
 from src.tasks.models import Task
 from src.timetable.break_time_subtractor import break_time_subtractor_map
 from src.timetable.exceptions import (
+    MainWorkHoursGreaterThanNorm,
     WorkTimeOverlap,
     WorkDayTaskViolation,
     MultipleWDTypesOnOneDateForOneEmployee,
@@ -1254,6 +1257,15 @@ class WorkerDay(AbstractModel):
 
         return breaktime
 
+    @staticmethod
+    def is_worker_day_vacancy(active_empl_shop_id, worker_day_shop_id, main_work_type_id, worker_day_details_list, is_vacacny=False):
+        if active_empl_shop_id and worker_day_shop_id:
+            is_vacacny = is_vacacny or active_empl_shop_id != worker_day_shop_id
+        if main_work_type_id and worker_day_details_list:
+            details_work_type_id = worker_day_details_list[0]['work_type_id'] if isinstance(worker_day_details_list[0], dict) else worker_day_details_list[0].work_type_id
+            is_vacacny = is_vacacny or main_work_type_id != details_work_type_id
+        return is_vacacny
+
     @property
     def dt_as_str(self):
         from src.util.models_converter import Converter
@@ -1350,6 +1362,12 @@ class WorkerDay(AbstractModel):
             ),
         ).filter(
             dttm_diff_min__lt=F('shop__network__max_plan_diff_in_seconds')
+        ).prefetch_related(
+            Prefetch(
+                'worker_day_details',
+                queryset=WorkerDayCashboxDetails.objects.select_related('work_type'),
+                to_attr='worker_day_details_list',
+            )
         )
 
         order_by = ['-is_equal_shops']
@@ -1425,6 +1443,99 @@ class WorkerDay(AbstractModel):
             raise original_exc
 
         return overlaps
+
+    @classmethod
+    def check_main_work_hours_norm(cls, dt_from, dt_to, shop_id, employee_id=None, employee_id__in=None, raise_exc=True, exc_cls=None):
+        """
+        Проверка, что в основном графике количество часов не может быть больше, чем по норме часов
+        """
+        from src.timetable.worker_day.stat import WorkersStatsGetter
+        if not (employee_id or employee_id__in):
+            return
+
+        networks = list(filter(lambda x: x.settings_values_prop.get('check_main_work_hours_norm', False), Network.objects.all()))
+
+        employee_filter = {
+            'user__network__in': networks,
+        }
+
+        if employee_id:
+            employee_filter['id'] = employee_id
+        
+        if employee_id__in:
+            employee_filter['id__in'] = employee_id__in
+
+        employees = {e.id: e for e in Employee.objects.filter(**employee_filter)}
+
+        date_ranges = map(lambda x: (x.replace(day=1), x), pd.date_range(dt_from.replace(day=1), dt_to + relativedelta(day=31), freq='1M').date)
+
+        lookup = {
+            'type__is_dayoff': False,
+            'is_approved': True,
+            'employee__user__employees__id__in': employees.keys(),
+        }
+
+        data_greater_norm = []
+        norm_key = getattr(settings, 'TIMESHEET_DIVIDER_SAWH_HOURS_KEY', 'curr_month')
+
+        for dt_from, dt_to in date_ranges:
+            lookup['dt__gte'] = dt_from
+            lookup['dt__lte'] = dt_to
+            total_work_hours_qs = cls.objects.filter(**lookup).values(
+                'employee_id',
+                'employee__user__last_name', 
+                'employee__user__first_name',
+            ).annotate(
+                total_work_hours=Coalesce(
+                    Sum(
+                        Extract(F('work_hours'), 'epoch') / 3600,
+                        output_field=FloatField()
+                    ), 
+                    0.0
+                ),
+            ).distinct()
+
+            total_work_hours_df = pd.DataFrame(
+                columns=['employee_id', 'employee__user__last_name', 'employee__user__first_name', 'total_work_hours'], 
+                data=list(total_work_hours_qs),
+            )
+
+            stats = WorkersStatsGetter(
+                dt_from=dt_from, 
+                dt_to=dt_to, 
+                employee_id__in=employees.keys(),
+                shop_id=shop_id,
+                use_cache=False,
+            ).run()
+            
+            stats_df = pd.DataFrame(
+                columns=['employee_id', 'norm'], 
+                data=list(
+                    map(
+                        lambda x: (
+                            x[0], 
+                            x[1].get("plan", {}).get("approved", {}).get("sawh_hours", {}).get(norm_key, 0)
+                        ),
+                        stats.items(),
+                    )
+                )
+            )
+
+            check_df = pd.merge(total_work_hours_df, stats_df, how='left', on='employee_id').fillna(0)
+
+            check_df['difference'] = check_df.total_work_hours - check_df.norm
+            check_df['dt_from'] = dt_from
+            check_df['dt_to'] = dt_to
+
+            data_greater_norm.extend(check_df[check_df['difference'] > 0].to_dict('records'))
+
+        if data_greater_norm and raise_exc:
+            original_exc = MainWorkHoursGreaterThanNorm(exc_data=data_greater_norm)
+            if exc_cls:
+                raise exc_cls(str(original_exc))
+            raise original_exc
+
+        return data_greater_norm
 
     @classmethod
     def check_multiple_workday_types(cls, employee_days_q=None, employee_id=None, employee_id__in=None, user_id=None,
@@ -1819,6 +1930,7 @@ class TimesheetItem(AbstractModel):
             self.day_hours + self.night_hours,
         )
 
+
 class WorkerDayCashboxDetailsManager(models.Manager):
     def qos_current_version(self):
         return super().get_queryset().select_related('worker_day').filter(worker_day__child__id__isnull=True)
@@ -1955,6 +2067,13 @@ class AttendanceRecords(AbstractModel):
             network_id=user.network_id, employee__user=user,
             dt=dt,
             priority_shop_id=shop.id,
+        ).annotate(
+            main_work_type_id=Subquery(
+                EmploymentWorkType.objects.filter(
+                    employment_id=OuterRef('id'),
+                    priority=1,
+                ).values('work_type_id')[:1]
+            )
         ).first()
         if not employment:
             raise ValidationError(_('You have no active employment'))
@@ -1983,7 +2102,16 @@ class AttendanceRecords(AbstractModel):
         else:
             record_type = initial_record_type or calculated_record_type
             employee_id = closest_plan_approved.employee_id
-            employment = closest_plan_approved.employment
+            employment = Employment.objects.filter(
+                id=closest_plan_approved.employment_id,
+            ).annotate(
+                main_work_type_id=Subquery(
+                    EmploymentWorkType.objects.filter(
+                        employment_id=OuterRef('id'),
+                        priority=1,
+                    ).values('work_type_id')[:1]
+                )
+            ).first()
             if not employment:
                 raise ValidationError(_('You have no active employment'))
             dt = closest_plan_approved.dt
@@ -1993,7 +2121,7 @@ class AttendanceRecords(AbstractModel):
     def _create_wd_details(self, dt, fact_approved, active_user_empl, closest_plan_approved):
         if closest_plan_approved:
             fact_shop_details_list = []
-            for plan_details in closest_plan_approved.worker_day_details.select_related('work_type'):
+            for plan_details in closest_plan_approved.worker_day_details_list:
                 work_type = plan_details.work_type if (
                             fact_approved.shop_id == closest_plan_approved.shop_id) else WorkType.objects.filter(
                     shop_id=fact_approved.shop_id,
@@ -2169,6 +2297,8 @@ class AttendanceRecords(AbstractModel):
                 setattr(fact_approved, 'shop_id', self.shop_id)
                 setattr(fact_approved, 'last_edited_by', None)
                 setattr(fact_approved, 'created_by', None)
+                if not fact_approved.is_vacancy and closest_plan_approved:
+                    setattr(fact_approved, 'is_vacancy', closest_plan_approved.is_vacancy)
                 if closest_plan_approved and not fact_approved.closest_plan_approved_id:
                     fact_approved.closest_plan_approved = closest_plan_approved
                 if fact_approved.type.has_details and not fact_approved.worker_day_details.exists():
@@ -2194,6 +2324,8 @@ class AttendanceRecords(AbstractModel):
                         setattr(prev_fa_wd, 'shop_id', self.shop_id)
                         setattr(prev_fa_wd, 'last_edited_by', None)
                         setattr(prev_fa_wd, 'created_by', None)
+                        if not prev_fa_wd.is_vacancy and closest_plan_approved:
+                            setattr(prev_fa_wd, 'is_vacancy', closest_plan_approved.is_vacancy)
                         if closest_plan_approved and not prev_fa_wd.closest_plan_approved_id:
                             prev_fa_wd.closest_plan_approved = closest_plan_approved
                         prev_fa_wd.save()
@@ -2206,6 +2338,13 @@ class AttendanceRecords(AbstractModel):
                     if self.shop.network.skip_leaving_tick:
                         return
 
+                is_vacancy = WorkerDay.is_worker_day_vacancy(
+                    active_user_empl.shop_id, 
+                    self.shop_id, 
+                    active_user_empl.main_work_type_id,
+                    getattr(closest_plan_approved, 'worker_day_details_list', []),
+                    is_vacacny=getattr(closest_plan_approved, 'is_vacancy', False),
+                )
                 fact_approved, _wd_created = WorkerDay.objects.update_or_create(
                     dt=self.dt,
                     employee_id=self.employee_id,
@@ -2217,7 +2356,7 @@ class AttendanceRecords(AbstractModel):
                         'employment': active_user_empl,
                         'type_id': closest_plan_approved.type_id if closest_plan_approved else WorkerDay.TYPE_WORKDAY,
                         self.TYPE_2_DTTM_FIELD[self.type]: self.dttm,
-                        'is_vacancy': active_user_empl.shop_id != self.shop_id if active_user_empl else False,
+                        'is_vacancy': is_vacancy,
                         'source': WorkerDay.RECALC_FACT_FROM_ATT_RECORDS if recalc_fact_from_att_records else WorkerDay.SOURCE_AUTO_FACT,
                         # TODO: пока не стал проставлять is_outsource, т.к. придется делать доп. действие в интерфейсе,
                         # чтобы посмотреть что за сотрудник при правке факта из отдела аутсорс-клиента

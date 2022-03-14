@@ -1891,6 +1891,66 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
                 self.assertIsNone(fact_wd.closest_plan_approved_id)
                 self.assertEqual(fact_wd.work_hours, timedelta(seconds=0))
 
+    def test_change_range_is_blocked(self):	
+        self.employee2.tabel_code = 'empl_2'	
+        self.employee2.save()	
+        data = {	
+          "ranges": [	
+            {	
+              "worker": self.employee2.tabel_code,	
+              "dt_from": self.dt - timedelta(days=10),	
+              "dt_to": self.dt + timedelta(days=10),	
+              "type": WorkerDay.TYPE_MATERNITY,	
+              "is_fact": False,	
+              "is_approved": True,	
+              "is_blocked": True,	
+            }	
+          ]	
+        }	
+        response = self.client.post(reverse('WorkerDay-change-range'), data, format='json')	
+        self.assertEqual(response.status_code, status.HTTP_200_OK)	
+        self.assertDictEqual(	
+            response.json(),	
+            {self.employee2.tabel_code: {'created_count': 21, 'deleted_count': 1, 'existing_count': 0}}	
+        )	
+        self.assertFalse(WorkerDay.objects.filter(id=self.worker_day_plan_approved.id).exists())	
+        self.assertEqual(	
+            WorkerDay.objects.filter(	
+                employee__tabel_code=self.employee2.tabel_code,	
+                type_id=WorkerDay.TYPE_MATERNITY,	
+                is_approved=True,	
+                is_blocked=True,	
+                is_fact=False,	
+            ).count(),	
+            21,	
+        )	
+        self.assertEqual(	
+            WorkerDay.objects.filter(	
+                employee__tabel_code=self.employee2.tabel_code,	
+                type_id=WorkerDay.TYPE_MATERNITY,	
+                is_approved=False,	
+                is_blocked=True,	
+                is_fact=False,	
+            ).count(),	
+            21,	
+        )	
+        response = self.client.post(reverse('WorkerDay-change-range'), data, format='json')	
+        self.assertEqual(response.status_code, status.HTTP_200_OK)	
+        self.assertDictEqual(	
+            response.json(),	
+            {self.employee2.tabel_code: {'created_count': 0, 'deleted_count': 0, 'existing_count': 21}}	
+        )	
+        wd = WorkerDay.objects.filter(	
+            employee=self.employee2,	
+            dt=self.dt,	
+            is_fact=False,	
+            is_approved=True,	
+            is_blocked=True,	
+            type_id=WorkerDay.TYPE_MATERNITY,	
+        ).last()	
+        self.assertIsNotNone(wd.created_by)	
+        self.assertEqual(wd.created_by.id, self.user1.id)
+
     def test_cant_create_workday_if_user_has_no_active_employment(self):
         WorkerDay.objects_with_excluded.filter(employee=self.employee2).delete()
         Employment.objects.filter(employee__user=self.user2).delete()
