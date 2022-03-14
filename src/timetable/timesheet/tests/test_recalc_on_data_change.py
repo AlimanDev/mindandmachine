@@ -7,7 +7,7 @@ from django.db import transaction
 from rest_framework.test import APITestCase
 
 from src.base.tests.factories import EmployeeFactory, EmploymentFactory, UserFactory
-from src.timetable.models import EmploymentWorkType, GroupWorkerDayPermission, ShopMonthStat, TimesheetItem, WorkerDay, WorkerDayPermission
+from src.timetable.models import AttendanceRecords, EmploymentWorkType, GroupWorkerDayPermission, ShopMonthStat, TimesheetItem, WorkerDay, WorkerDayPermission
 from src.timetable.tests.factories import WorkerDayFactory
 from ._base import TestTimesheetMixin
 
@@ -253,3 +253,28 @@ class TestRecalcOnDataChange(TestTimesheetMixin, APITestCase):
 
         self.assertEqual(response.status_code, 200)
         self._test_recalc_called(_calc_timesheets_apply_async.call_args_list, [self.employee_worker.id, self.employee_worker2.id])
+
+    def test_recalc_on_attendance_records(self, _calc_timesheets_apply_async):
+        WorkerDay.objects.all().delete()
+
+        AttendanceRecords.objects.create(
+            dt=date(2021, 6, 14),
+            dttm=datetime(2021, 6, 14, 10, 5),
+            employee=self.employee_worker,
+            user=self.user_worker,
+            shop=self.shop,
+            type=AttendanceRecords.TYPE_COMING,
+        )
+
+        _calc_timesheets_apply_async.assert_not_called()
+
+        AttendanceRecords.objects.create(
+            dt=date(2021, 6, 14),
+            dttm=datetime(2021, 6, 14, 20, 13),
+            employee=self.employee_worker,
+            user=self.user_worker,
+            shop=self.shop,
+            type=AttendanceRecords.TYPE_LEAVING,
+        )
+
+        self._test_recalc_called(_calc_timesheets_apply_async.call_args_list, [self.employee_worker.id])
