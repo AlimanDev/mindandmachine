@@ -321,13 +321,7 @@ class WorkerDaySerializer(ModelSerializerWithCreateOnlyFields, UnaccountedOverti
                 dt=attrs.get('dt'),
                 priority_shop_id=shop_id,
                 priority_employment_id=attrs.get('employment_id'),
-            ).annotate(
-                main_work_type_id=Subquery(
-                    EmploymentWorkType.objects.filter(
-                        employment_id=OuterRef('id'),
-                        priority=1,
-                    ).values('work_type_id')[:1]
-                )
+                annotate_main_work_type_id=True,
             ).first()
             if not employee_active_empl:
                 raise self.fail('no_active_employments')

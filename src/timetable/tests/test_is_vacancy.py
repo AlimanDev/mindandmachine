@@ -1,7 +1,7 @@
 from copy import deepcopy
 from datetime import date, datetime, time, timedelta
 from src.base.tests.factories import EmployeeFactory, EmploymentFactory, GroupFactory, NetworkFactory, ShopFactory, UserFactory
-from src.timetable.models import AttendanceRecords, GroupWorkerDayPermission, WorkerDay, WorkerDayCashboxDetails, WorkerDayPermission
+from src.timetable.models import AttendanceRecords, GroupWorkerDayPermission, ShopMonthStat, WorkerDay, WorkerDayCashboxDetails, WorkerDayPermission
 from src.timetable.tests.factories import WorkTypeFactory, WorkerDayFactory
 from src.timetable.worker_day.utils import copy_as_excel_cells, create_worker_days_range, exchange
 from src.util.mixins.tests import TestsHelperMixin
@@ -71,6 +71,7 @@ class TestIsVacancySetting(TestsHelperMixin, APITestCase):
         cls.add_group_perm(cls.worker_group, 'WorkerDay', 'POST')
         cls.add_group_perm(cls.worker_group, 'WorkerDay', 'PUT')
         cls.add_group_perm(cls.worker_group, 'WorkerDay_batch_update_or_create', 'POST')
+        cls.add_group_perm(cls.worker_group, 'AutoSettings_set_timetable', 'POST')
 
     def setUp(self):
         self.client.force_authenticate(self.user_worker)
@@ -311,3 +312,68 @@ class TestIsVacancySetting(TestsHelperMixin, APITestCase):
         )
         worker_day = WorkerDay.objects.get(id=created_wdays[0].id)
         self.assertFalse(worker_day.is_vacancy)
+
+    def test_is_vacancy_on_set_timetable(self):
+        WorkerDay.objects.all().delete()
+        dt = date.today()
+        timetable = ShopMonthStat.objects.create(
+            shop=self.shop,
+            dt=dt.replace(day=1),
+            status=ShopMonthStat.PROCESSING,
+            dttm_status_change=datetime.now(),
+        )
+
+        tm_from = time(10, 0, 0)
+        tm_to = time(20, 0, 0)
+
+        self.assertEqual(len(WorkerDay.objects.all()), 0)
+        self.assertEqual(len(WorkerDayCashboxDetails.objects.all()), 0)
+
+        tt_data = {
+            'timetable_status': 'R',
+            'users': {
+                self.employee_worker.id: {
+                    'workdays': [
+                        {'dt': dt,
+                            'type': 'W',
+                            'dttm_work_start': datetime.combine(dt, tm_from),
+                            'dttm_work_end': datetime.combine(dt, tm_to),
+                            'details': [{
+                                'work_type_id': self.main_work_type.id,
+                                'percent': 100,
+                            }]
+                            }
+                    ]
+                },
+            }
+        }
+
+        response = self.client.post(
+            self.get_url('AutoSettings-set-timetable'),
+            data=self.dump_data(
+                {
+                    'timetable_id': timetable.id,
+                    'data': self.dump_data(tt_data),
+                }
+            ),
+            content_type='application/json',
+        )
+        self.assertEqual(response.status_code, 200)
+
+        self.assertFalse(WorkerDay.objects.filter(employee_id=self.employee_worker.id, is_vacancy=True).exists())
+        
+        tt_data['users'][self.employee_worker.id]['workdays'][0]['details'][0]['work_type_id'] = self.additional_work_type.id
+
+        response = self.client.post(
+            self.get_url('AutoSettings-set-timetable'),
+            data=self.dump_data(
+                {
+                    'timetable_id': timetable.id,
+                    'data': self.dump_data(tt_data),
+                }
+            ),
+            content_type='application/json',
+        )
+        self.assertEqual(response.status_code, 200)
+
+        self.assertTrue(WorkerDay.objects.filter(employee_id=self.employee_worker.id, is_vacancy=True).exists())

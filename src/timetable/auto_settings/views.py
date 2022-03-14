@@ -859,6 +859,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
                         dt_to=dt_to,
                         shop=shop,
                         is_visible=True,
+                        annotate_main_work_type_id=True,
                     )
                 }
 
@@ -917,6 +918,12 @@ class AutoSettingsViewSet(viewsets.ViewSet):
                                 percent = wdd_data.pop('percent')
                                 wdd_data['work_part'] = percent / 100
                             wd_data['worker_day_details'] = wd_details
+                            wd_data['is_vacancy'] = WorkerDay.is_worker_day_vacancy(
+                                getattr(employment, 'shop_id', None),
+                                wd_data['shop_id'],
+                                getattr(employment, 'main_work_type_id', None),
+                                wd_details,
+                            )
 
                         if wd['type'] not in is_dayoff_types:
                             wd_data['dttm_work_start'] = Converter.parse_datetime(wd['dttm_work_start'])
