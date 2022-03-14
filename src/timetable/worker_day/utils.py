@@ -244,13 +244,7 @@ def copy_as_excel_cells(from_employee_id, from_dates, to_employee_id, to_dates, 
                 employee_id=to_employee_id,
                 dt=dt,
                 priority_shop_id=blank_days[0].shop_id,
-            ).annotate(
-                main_work_type_id=Subquery(
-                    EmploymentWorkType.objects.filter(
-                        employment_id=OuterRef('id'),
-                        priority=1,
-                    ).values('work_type_id')[:1]
-                )
+                annotate_main_work_type_id=True,
             ).select_related(
                 'position__breaks',
                 'employee__user',
@@ -394,13 +388,7 @@ def create_worker_days_range(dates, type_id=WorkerDay.TYPE_WORKDAY, shop_id=None
                     dt=date,
                     priority_shop_id=shop_id,
                     priority_work_type_id=priority_work_type_id,
-                ).annotate(
-                    main_work_type_id=Subquery(
-                        EmploymentWorkType.objects.filter(
-                            employment_id=OuterRef('id'),
-                            priority=1,
-                        ).values('work_type_id')[:1]
-                    )
+                    annotate_main_work_type_id=True,
                 ).select_related(
                     'position__breaks',
                 ).first()

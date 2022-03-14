@@ -2060,13 +2060,7 @@ class AttendanceRecords(AbstractModel):
             network_id=user.network_id, employee__user=user,
             dt=dt,
             priority_shop_id=shop.id,
-        ).annotate(
-            main_work_type_id=Subquery(
-                EmploymentWorkType.objects.filter(
-                    employment_id=OuterRef('id'),
-                    priority=1,
-                ).values('work_type_id')[:1]
-            )
+            annotate_main_work_type_id=True,
         ).first()
         if not employment:
             raise ValidationError(_('You have no active employment'))
@@ -2095,15 +2089,8 @@ class AttendanceRecords(AbstractModel):
         else:
             record_type = initial_record_type or calculated_record_type
             employee_id = closest_plan_approved.employee_id
-            employment = Employment.objects.filter(
+            employment = Employment.objects.annotate_main_work_type_id().filter(
                 id=closest_plan_approved.employment_id,
-            ).annotate(
-                main_work_type_id=Subquery(
-                    EmploymentWorkType.objects.filter(
-                        employment_id=OuterRef('id'),
-                        priority=1,
-                    ).values('work_type_id')[:1]
-                )
             ).first()
             if not employment:
                 raise ValidationError(_('You have no active employment'))
