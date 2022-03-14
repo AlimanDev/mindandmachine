@@ -2403,7 +2403,8 @@ class AttendanceRecords(AbstractModel):
 
                 if fact_approved:
                     self.fact_wd = fact_approved
-                    if fact_approved.last_edited_by_id:
+                    if fact_approved.last_edited_by_id and (
+                            recalc_fact_from_att_records and not self.user.network.edit_manual_fact_on_recalc_fact_from_att_records):
                         return res
 
                     # если это отметка о приходе, то не перезаписываем время начала работы в графике
