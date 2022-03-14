@@ -980,13 +980,13 @@ class WorkerDay(AbstractModel):
                     if self.dttm_work_end > dttm_shop_close:
                         dttm_work_end = dttm_shop_close
             break_time = None
-            fine = 0
+            arrive_fine, departure_fine = 0, 0
             if self.is_fact:
                 plan_approved = None
                 if self.closest_plan_approved_id:
                     plan_approved = WorkerDay.objects.filter(id=self.closest_plan_approved_id).first()
                 if plan_approved:
-                    fine = self.get_fine(
+                    arrive_fine, departure_fine = self.get_fines(
                         _dttm_work_start,
                         _dttm_work_end,
                         plan_approved.dttm_work_start,
@@ -1025,8 +1025,9 @@ class WorkerDay(AbstractModel):
                                     break
                     else:
                         return dttm_work_start, dttm_work_end, datetime.timedelta(0)
+            dttm_work_start, dttm_work_end = dttm_work_start + datetime.timedelta(minutes=arrive_fine), dttm_work_end - datetime.timedelta(minutes=departure_fine)
 
-            return dttm_work_start, dttm_work_end, self.count_work_hours(breaks, dttm_work_start, dttm_work_end, break_time=break_time, fine=fine)
+            return dttm_work_start, dttm_work_end, self.count_work_hours(breaks, dttm_work_start, dttm_work_end, break_time=break_time)
 
         # потенциально только для is_dayoff == true ? -- чтобы было наглядней сколько часов вычитается из нормы?
         # + вычитать из нормы из work_hours в типах is_reduce_norm?
@@ -1171,8 +1172,8 @@ class WorkerDay(AbstractModel):
         return not self.is_approved
 
     @staticmethod
-    def count_work_hours(break_triplets, dttm_work_start, dttm_work_end, break_time=None, fine=0):
-        work_hours = ((dttm_work_end - dttm_work_start).total_seconds() / 60) - fine
+    def count_work_hours(break_triplets, dttm_work_start, dttm_work_end, break_time=None):
+        work_hours = ((dttm_work_end - dttm_work_start).total_seconds() / 60)
         if break_time:
             work_hours = work_hours - break_time
             return datetime.timedelta(minutes=work_hours)
@@ -1187,8 +1188,9 @@ class WorkerDay(AbstractModel):
         return datetime.timedelta(minutes=work_hours)
 
     @staticmethod
-    def get_fine(dttm_work_start, dttm_work_end, dttm_work_start_plan, dttm_work_end_plan, fines):
-        fine = 0
+    def get_fines(dttm_work_start, dttm_work_end, dttm_work_start_plan, dttm_work_end_plan, fines):
+        arrive_fine = 0
+        departure_fine = 0
         def _get_fine_from_range(delta, fines_range):
             for min_threshold, max_threshold, fine in fines_range:
                 if delta >= min_threshold and delta <= max_threshold:
@@ -1202,14 +1204,14 @@ class WorkerDay(AbstractModel):
             arrive_fines = fines.get('arrive_fines', [])
             departure_fines = fines.get('departure_fines', [])
             if arrive_timedelta > 0 and arrive_step:
-                fine += arrive_step - (int(arrive_timedelta) % arrive_step or arrive_step)
+                arrive_fine += arrive_step - (int(arrive_timedelta) % arrive_step or arrive_step)
             else:
-                fine += _get_fine_from_range(arrive_timedelta, arrive_fines)
+                arrive_fine += _get_fine_from_range(arrive_timedelta, arrive_fines)
             if departure_timedelta > 0 and departure_step:
-                fine += departure_step - (int(departure_timedelta) % departure_step or departure_step)
+                departure_fine += departure_step - (int(departure_timedelta) % departure_step or departure_step)
             else:
-                fine += _get_fine_from_range(departure_timedelta, departure_fines)
-        return fine
+                departure_fine += _get_fine_from_range(departure_timedelta, departure_fines)
+        return arrive_fine, departure_fine
 
     def get_department(self):
         return self.shop
