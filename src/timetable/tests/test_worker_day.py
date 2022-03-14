@@ -1907,7 +1907,7 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
             }	
           ]	
         }	
-        response = self.client.post(reverse('WorkerDay-change-range'), data, format='json')	
+        response = self.client.post(self.get_url('WorkerDay-change-range'), data, format='json')	
         self.assertEqual(response.status_code, status.HTTP_200_OK)	
         self.assertDictEqual(	
             response.json(),	
@@ -1934,7 +1934,7 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
             ).count(),	
             21,	
         )	
-        response = self.client.post(reverse('WorkerDay-change-range'), data, format='json')	
+        response = self.client.post(self.get_url('WorkerDay-change-range'), data, format='json')	
         self.assertEqual(response.status_code, status.HTTP_200_OK)	
         self.assertDictEqual(	
             response.json(),	
