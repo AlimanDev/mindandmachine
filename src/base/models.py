@@ -338,10 +338,12 @@ class Network(AbstractActiveModel):
                 'timesheet_min_hours_threshold может принимать либо численное значение, либо название функции'
             )
 
-    def set_settings_value(self, k, v):
+    def set_settings_value(self, k, v, save=False):
         settings_values = json.loads(self.settings_values)
         settings_values[k] = v
         self.settings_values = json.dumps(settings_values)
+        if save:
+            self.save()
 
     def get_department(self):
         return None

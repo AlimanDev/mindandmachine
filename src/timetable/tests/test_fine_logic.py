@@ -210,3 +210,40 @@ class TestFineLogic(APITestCase):
         self._test_fine_case(time(8), time(20), time(8, 3), time(19, 23), timedelta(hours=10))
         self._test_fine_case(time(8), time(20), time(8, 50), time(19, 23), timedelta(hours=9, minutes=30))
         self._test_fine_case(time(8), time(20), time(8, 50), time(19, 37), timedelta(hours=10))
+
+    def test_fine_calc_day_night(self):
+        self.network.fines_settings = json.dumps(
+           {
+                r'.*': {
+                    'arrive_step': 30,
+                    'departure_step': 30,
+                },
+            }
+        )
+        self.network.only_fact_hours_that_in_approved_plan = True
+        self.network.round_work_hours_alg = Network.ROUND_TO_HALF_AN_HOUR
+        self.network.save()
+        self.breaks.value='[[0, 3600, [60]]]'
+        self.breaks.save()
+
+        WorkerDay.objects.all().delete()
+        dt = date.today()
+        plan_wd = self._create_or_update_worker_day(
+            self.cashier[2], 
+            datetime.combine(dt, time(18)), 
+            datetime.combine(dt + timedelta(1), time(1)), 
+        )
+        fact_wd = self._create_or_update_worker_day(
+            self.cashier[2], 
+            datetime.combine(dt, time(17, 50)), 
+            datetime.combine(dt + timedelta(1), time(0, 7)), 
+            is_fact=True,
+            closest_plan_approved_id=plan_wd.id,
+        )
+
+        self.assertEqual(fact_wd.dttm_work_start_tabel, datetime.combine(dt, time(18)))
+        self.assertEqual(fact_wd.dttm_work_end_tabel, datetime.combine(dt + timedelta(1), time(0)))
+        work_hours, work_hours_day, work_hours_night = fact_wd.calc_day_and_night_work_hours()
+        self.assertEqual(work_hours, 5)
+        self.assertEqual(work_hours_day, 3.5)
+        self.assertEqual(work_hours_night, 1.5)

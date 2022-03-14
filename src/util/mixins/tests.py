@@ -262,3 +262,15 @@ class TestsHelperMixin:
         writer = pd.ExcelWriter(filename, engine='xlsxwriter')
         df.to_excel(writer)
         writer.save()
+
+    @staticmethod
+    def _create_att_record(type, dttm, user_id, employee_id, shop_id, terminal=True):
+        from src.timetable.models import AttendanceRecords
+        return AttendanceRecords.objects.create(
+            dttm=dttm,
+            shop_id=shop_id,
+            user_id=user_id,
+            employee_id=employee_id,
+            type=type,
+            terminal=terminal,
+        )

@@ -70,7 +70,7 @@ def exchange(data, error_messages):
             wd_data['shop_id'],
             main_work_type_id,
             wd_source.worker_day_details_list,
-            is_vacacny=wd_source.is_vacancy,
+            is_vacancy=wd_source.is_vacancy,
         )
         return wd_data
 
@@ -297,7 +297,7 @@ def copy_as_excel_cells(from_employee_id, from_dates, to_employee_id, to_dates, 
                     blank_day.shop_id,
                     worker_active_empl.main_work_type_id,
                     wd_data['worker_day_details'],
-                    is_vacacny=blank_day.is_vacancy,
+                    is_vacancy=blank_day.is_vacancy,
                 )
                 new_wdays_data.append(wd_data)
 
@@ -437,7 +437,7 @@ def create_worker_days_range(dates, type_id=WorkerDay.TYPE_WORKDAY, shop_id=None
                 shop_id,
                 getattr(employment, 'main_work_type_id', None),
                 [{'work_type_id': priority_work_type_id}] if priority_work_type_id else [],
-                is_vacacny=is_vacancy,
+                is_vacancy=is_vacancy,
             )
             wdays.append(wd_data)
 
