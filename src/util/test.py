@@ -466,6 +466,7 @@ def create_departments_and_users(self, dt=None):
         first_name='Иван',
         network=self.network,
     )
+
     self.employee1 = Employee.objects.create(user=self.user1)
     self.employment1 = Employment.objects.create(
         code=f'{self.user1.username}:{uuid.uuid4()}:{uuid.uuid4()}',

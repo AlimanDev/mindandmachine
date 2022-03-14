@@ -393,7 +393,8 @@ class WorkerDayViewSet(BaseModelViewSet):
                 'dttm_work_start',
                 'dttm_work_end',
                 'shop_id',
-                'work_type_ids'
+                'work_type_ids',
+                'is_vacancy',
             ]
             draft_wdays = list(WorkerDay.objects.filter(
                 approve_condition,
@@ -714,7 +715,13 @@ class WorkerDayViewSet(BaseModelViewSet):
                             is_approved=True,
                         )
                     )
-
+                    WorkerDay.check_main_work_hours_norm(
+                        dt_from=serializer.validated_data['dt_from'],
+                        dt_to=serializer.validated_data['dt_to'],
+                        employee_id__in=employee_ids,
+                        shop_id=serializer.validated_data['shop_id'],
+                        exc_cls=ValidationError,
+                    )
                     if shop.network.run_recalc_fact_from_att_records_on_plan_approve:
                         transaction.on_commit(lambda: recalc_fact_from_records(employee_days_list=list(employee_days_set)))
 
@@ -985,12 +992,13 @@ class WorkerDayViewSet(BaseModelViewSet):
         vacancy.save()
         return Response(WorkerDaySerializer(vacancy).data)
 
-    def _change_range(self, is_fact, is_approved, dt_from, dt_to, wd_type, employee_tabel_code, res=None):
+    def _change_range(self, is_fact, is_approved, is_blocked, dt_from, dt_to, wd_type, employee_tabel_code, res=None):
         employee_dt_pairs_list = list(WorkerDay.objects.filter(
             employee__tabel_code=employee_tabel_code,
             dt__gte=dt_from,
             dt__lte=dt_to,
             is_approved=is_approved,
+            is_blocked=is_blocked,
             is_fact=is_fact,
             type=wd_type,
         ).values_list('employee_id', 'dt').distinct())
@@ -1031,6 +1039,7 @@ class WorkerDayViewSet(BaseModelViewSet):
                             employee_id=employment.employee_id,
                             dt=dt,
                             is_approved=is_approved,
+                            is_blocked=is_blocked,
                             is_fact=is_fact,
                             type=wd_type,
                             created_by=self.request.user,
@@ -1070,6 +1079,7 @@ class WorkerDayViewSet(BaseModelViewSet):
                 self._change_range(
                     is_fact=False,  # всегда в план
                     is_approved=range['is_approved'],
+                    is_blocked=range.get('is_blocked', False),
                     dt_from=range['dt_from'],
                     dt_to=range['dt_to'],
                     wd_type=range['type'],
@@ -1080,6 +1090,7 @@ class WorkerDayViewSet(BaseModelViewSet):
                     self._change_range(
                         is_fact=False,  # всегда в план
                         is_approved=False,
+                        is_blocked=range.get('is_blocked', False),
                         dt_from=range['dt_from'],
                         dt_to=range['dt_to'],
                         wd_type=range['type'],
@@ -1392,8 +1403,8 @@ class WorkerDayViewSet(BaseModelViewSet):
         data.validated_data['network_id'] = request.user.network_id
         shop = Shop.objects.get(id=data.validated_data.get('shop_id'))
         timetable_generator_cls = get_timetable_generator_cls(timetable_format=shop.network.timetable_format)
-        timetable_generator = timetable_generator_cls(user=self.request.user)
-        return timetable_generator.upload(data.validated_data, file)
+        timetable_generator = timetable_generator_cls(user=self.request.user, form=data.validated_data)
+        return timetable_generator.upload(file)
 
     @swagger_auto_schema(
         query_serializer=GenerateUploadTimetableExampleSerializer,
@@ -1420,7 +1431,7 @@ class WorkerDayViewSet(BaseModelViewSet):
 
         shop = Shop.objects.get(id=shop_id)
         timetable_generator_cls = get_timetable_generator_cls(timetable_format=shop.network.timetable_format)
-        timetable_generator = timetable_generator_cls(user=self.request.user)
+        timetable_generator = timetable_generator_cls(user=self.request.user, form=serializer.validated_data)
         return timetable_generator.generate_upload_example(shop_id, dt_from, dt_to, is_fact, is_approved, employee_id__in)
 
     @swagger_auto_schema(
@@ -1439,8 +1450,8 @@ class WorkerDayViewSet(BaseModelViewSet):
         data.validated_data['network_id'] = request.user.network_id
         shop = Shop.objects.get(id=data.validated_data.get('shop_id'))
         timetable_generator_cls = get_timetable_generator_cls(timetable_format=shop.network.timetable_format)
-        timetable_generator = timetable_generator_cls(user=self.request.user)
-        return timetable_generator.upload(data.validated_data, file, is_fact=True)
+        timetable_generator = timetable_generator_cls(user=self.request.user, form=data.validated_data)
+        return timetable_generator.upload(file, is_fact=True)
 
     @swagger_auto_schema(
         query_serializer=DownloadSerializer,
@@ -1455,8 +1466,8 @@ class WorkerDayViewSet(BaseModelViewSet):
         data.is_valid(raise_exception=True)
         shop = Shop.objects.get(id=data.validated_data.get('shop_id'))
         timetable_generator_cls = get_timetable_generator_cls(timetable_format=shop.network.timetable_format)
-        timetable_generator = timetable_generator_cls(user=self.request.user)
-        return timetable_generator.download(data.validated_data)
+        timetable_generator = timetable_generator_cls(user=self.request.user, form=data.validated_data)
+        return timetable_generator.download()
 
     @swagger_auto_schema(
         query_serializer=DownloadSerializer,

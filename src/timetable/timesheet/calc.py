@@ -71,6 +71,7 @@ class TimesheetCalculator:
             'employment__shop',
             'employment__position',
             'type',
+            'closest_plan_approved',
         ).prefetch_related(
             Prefetch('work_types',
                      queryset=WorkType.objects.all().select_related('work_type_name', 'work_type_name__position'),
@@ -149,6 +150,7 @@ class TimesheetCalculator:
             'work_type_name': work_type_name,
             'fact_timesheet_type_id': WorkerDay.TYPE_ABSENSE if is_absent else plan_wd.type_id,
             'fact_timesheet_source': TimesheetItem.SOURCE_TYPE_SYSTEM if is_absent else TimesheetItem.SOURCE_TYPE_PLAN,
+            'is_vacancy': plan_wd.is_vacancy,
         }
         if not day_in_past and not plan_wd.type.is_dayoff:
             total_hours, day_hours, night_hours = plan_wd.calc_day_and_night_work_hours()
@@ -169,6 +171,9 @@ class TimesheetCalculator:
         wdays_qs = self._get_timesheet_wdays_qs(self.employee, dt_start, dt_end)
         fact_timesheet_dict = {}
         for worker_day in wdays_qs:
+            active_employment = self.get_active_employment(worker_day.dt)
+            if not active_employment:
+                continue
             day_in_past = worker_day.dt < self.dt_now
             if self.employee.user.network.settings_values_prop.get('timesheet_only_day_in_past', False) and not day_in_past:
                 continue
@@ -190,6 +195,8 @@ class TimesheetCalculator:
                 wd_dict['fact_timesheet_total_hours'] = total_hours
                 wd_dict['fact_timesheet_day_hours'] = day_hours
                 wd_dict['fact_timesheet_night_hours'] = night_hours
+                wd_dict['is_vacancy'] = worker_day.is_vacancy or \
+                    (worker_day.closest_plan_approved_id and worker_day.closest_plan_approved.is_vacancy)
             if (worker_day.type.is_dayoff and worker_day.type.is_work_hours):
                 dayoff_work_hours = worker_day.work_hours.total_seconds() / 3600
                 wd_dict['fact_timesheet_total_hours'] = dayoff_work_hours
@@ -219,6 +226,9 @@ class TimesheetCalculator:
             plan_wdays_dict.setdefault(self._get_empl_key(wd.employee_id, wd.dt), []).append(wd)
 
         for dt in pd.date_range(dt_start, dt_end).date:
+            active_employment = self.get_active_employment(dt)
+            if not active_employment:
+                continue
             day_in_past = dt < self.dt_now
             if self.employee.user.network.settings_values_prop.get(
                     'timesheet_only_day_in_past', False) and not day_in_past:
@@ -246,9 +256,6 @@ class TimesheetCalculator:
 
             # Если нет ни плана ни факта
             if not plan_wd_list:
-                active_employment = self.get_active_employment(dt)
-                if not active_employment:  # не создаем запись в табеле если нету активного трудоустройства
-                    continue
                 d = {
                     'employee_id': self.employee.id,
                     'dt': dt,
