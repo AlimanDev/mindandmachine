@@ -295,9 +295,10 @@ class TestOutsource(TestsHelperMixin, APITestCase):
             dttm_work_end=datetime.combine(dt, time(20)),
             is_approved=True,
         )
-        with override_settings(FISCAL_SHEET_DIVIDER_ALIAS='nahodka'):
-            with freeze_time(dt):
-                calc_timesheets(employee_id__in=[self.employee1.id], reraise_exc=True)
+        self.network.fiscal_sheet_divider_alias = 'nahodka'
+        self.network.save()
+        with freeze_time(dt):
+            calc_timesheets(employee_id__in=[self.employee1.id], reraise_exc=True)
         response = self.client.get('/rest_api/timesheet/')
         self.assertTrue(len(response.json()) > 0)
         self.network_connect.allow_assign_employements_from_outsource = False

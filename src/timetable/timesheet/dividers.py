@@ -217,7 +217,7 @@ class BaseTimesheetDivider:
     def _check_not_more_than_threshold_hours(self):
         for dt in pd.date_range(self.fiscal_timesheet.dt_from, self.fiscal_timesheet.dt_to).date:
             main_timesheet_total_hours_sum = self.fiscal_timesheet.main_timesheet.get_total_hours_sum(dt)
-            hours_overflow = main_timesheet_total_hours_sum - settings.TIMESHEET_MAX_HOURS_THRESHOLD
+            hours_overflow = main_timesheet_total_hours_sum - self.fiscal_timesheet.employee.user.network.timesheet_max_hours_threshold
             if hours_overflow > 0:
                 subtracted_items = self.fiscal_timesheet.main_timesheet.subtract_hours(
                     dt=dt, hours_to_subtract=hours_overflow)
@@ -231,14 +231,11 @@ class BaseTimesheetDivider:
         return {}
 
     def _get_sawh_hours_key(self):
-        return getattr(settings, 'TIMESHEET_DIVIDER_SAWH_HOURS_KEY', 'curr_month')
+        return self.fiscal_timesheet.employee.user.network.timesheet_divider_sawh_hours_key
 
     def _get_min_hours_threshold(self, dt):
-        if callable(settings.TIMESHEET_MIN_HOURS_THRESHOLD):
-            active_employment = self.fiscal_timesheet._get_active_employment(dt)
-            return settings.TIMESHEET_MIN_HOURS_THRESHOLD(active_employment.norm_work_hours)
-        else:
-            return settings.TIMESHEET_MIN_HOURS_THRESHOLD
+        active_employment = self.fiscal_timesheet._get_active_employment(dt)
+        return self.fiscal_timesheet.employee.user.network.get_timesheet_min_hours_threshold(active_employment.norm_work_hours)
 
     def _check_overtimes(self):
         logger.info(
@@ -312,7 +309,7 @@ class BaseTimesheetDivider:
                 main_timesheet_night_hours = self.fiscal_timesheet.main_timesheet.get_night_hours_sum(dt=dt)
                 main_timesheet_total_hours = main_timesheet_day_hours + main_timesheet_night_hours
                 if abs(overtime_plan) >= additional_timesheet_hours:
-                    if main_timesheet_total_hours + additional_timesheet_hours <= settings.TIMESHEET_MAX_HOURS_THRESHOLD:
+                    if main_timesheet_total_hours + additional_timesheet_hours <= self.fiscal_timesheet.employee.user.network.timesheet_max_hours_threshold:
                         hours_transfer = additional_timesheet_hours
                         subtracted_items = self.fiscal_timesheet.additional_timesheet.subtract_hours(
                             dt=dt, hours_to_subtract=hours_transfer,
@@ -322,7 +319,7 @@ class BaseTimesheetDivider:
                         overtime_plan += hours_transfer
                         continue
                     else:
-                        threshold_hours = settings.TIMESHEET_MAX_HOURS_THRESHOLD
+                        threshold_hours = self.fiscal_timesheet.employee.user.network.timesheet_max_hours_threshold
                         hours_transfer = threshold_hours - main_timesheet_total_hours
                         subtracted_items = self.fiscal_timesheet.additional_timesheet.subtract_hours(
                             dt=dt, hours_to_subtract=hours_transfer,
@@ -332,7 +329,7 @@ class BaseTimesheetDivider:
                         overtime_plan += hours_transfer
                         continue
                 else:
-                    if main_timesheet_total_hours + abs(overtime_plan) <= settings.TIMESHEET_MAX_HOURS_THRESHOLD:
+                    if main_timesheet_total_hours + abs(overtime_plan) <= self.fiscal_timesheet.employee.user.network.timesheet_max_hours_threshold:
                         hours_transfer = abs(overtime_plan)
                         subtracted_items = self.fiscal_timesheet.additional_timesheet.subtract_hours(
                             dt=dt, hours_to_subtract=hours_transfer,
@@ -342,7 +339,7 @@ class BaseTimesheetDivider:
                         overtime_plan += hours_transfer
                         continue
                     else:
-                        threshold_hours = settings.TIMESHEET_MAX_HOURS_THRESHOLD
+                        threshold_hours = self.fiscal_timesheet.employee.user.network.timesheet_max_hours_threshold
                         hours_transfer = threshold_hours - main_timesheet_total_hours
                         subtracted_items = self.fiscal_timesheet.additional_timesheet.subtract_hours(
                             dt=dt, hours_to_subtract=hours_transfer,
@@ -436,9 +433,6 @@ class BasePobedaTimesheetDivider(BaseTimesheetDivider):
             'position': active_employment.position,
             'shop': active_employment.shop,
         }
-
-    def _get_sawh_hours_key(self):
-        return getattr(settings, 'TIMESHEET_DIVIDER_SAWH_HOURS_KEY', 'curr_month_without_reduce_norm')
 
     def _redistribute_vacations_from_additional_timesheet_to_main_timesheet(self):
         vacation_hours = Decimal('0.00')
