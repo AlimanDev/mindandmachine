@@ -2123,6 +2123,11 @@ class AttendanceRecords(AbstractModel):
             )
         return fact_approved_extra_q
 
+    def _recalc_timesheet(self):
+        if self.fact_wd and self.fact_wd.dttm_work_start and self.fact_wd.dttm_work_end:
+            from src.timetable.timesheet.utils import recalc_timesheet_on_data_change
+            transaction.on_commit(lambda: recalc_timesheet_on_data_change({self.fact_wd.employee_id: [self.fact_wd.dt, self.fact_wd.dt]}))
+
     def save(self, *args, recalc_fact_from_att_records=False, **kwargs):
         """
         Создание WorkerDay при занесении отметок.
@@ -2174,9 +2179,7 @@ class AttendanceRecords(AbstractModel):
                 if fact_approved.type.has_details and not fact_approved.worker_day_details.exists():
                     self._create_wd_details(self.dt, fact_approved, active_user_empl, closest_plan_approved)
                 fact_approved.save()
-                if fact_approved.dttm_work_start and fact_approved.dttm_work_end:
-                    from src.timetable.timesheet.utils import recalc_timesheet_on_data_change
-                    transaction.on_commit(lambda: recalc_timesheet_on_data_change({fact_approved.employee_id: [fact_approved.dt, fact_approved.dt]}))
+                self._recalc_timesheet()
                 self._create_or_update_not_approved_fact(fact_approved)
             else:
                 if self.type == self.TYPE_LEAVING:
@@ -2228,6 +2231,7 @@ class AttendanceRecords(AbstractModel):
                     }
                 )
                 self.fact_wd = fact_approved
+                self._recalc_timesheet()
                 if fact_approved.type.has_details and (_wd_created or not fact_approved.worker_day_details.exists()):
                     self._create_wd_details(self.dt, fact_approved, active_user_empl, closest_plan_approved)
                 if _wd_created:
