@@ -2205,7 +2205,9 @@ class AttendanceRecords(AbstractModel):
                         prev_fa_wd.save()
                         # логично дату предыдущую ставить, так как это значение в отчетах используется
                         self.dt = prev_fa_wd.dt
+                        self.fact_wd = prev_fa_wd
                         super(AttendanceRecords, self).save(update_fields=['dt',])
+                        self._recalc_timesheet()
                         self._create_or_update_not_approved_fact(prev_fa_wd)
                         return
 
