@@ -304,10 +304,12 @@ class Network(AbstractActiveModel):
             cache.delete_pattern("prod_cal_*_*_*")
         return super().save(*args, **kwargs)
 
-    def set_settings_value(self, k, v):
+    def set_settings_value(self, k, v, save=False):
         settings_values = json.loads(self.settings_values)
         settings_values[k] = v
         self.settings_values = json.dumps(settings_values)
+        if save:
+            self.save()
 
     def get_department(self):
         return None
@@ -943,7 +945,18 @@ class EmploymentManager(models.Manager):
             models.Q(dttm_deleted__date__gt=timezone.now().date()) | models.Q(dttm_deleted__isnull=True)
         )
 
-    def get_active(self, network_id=None, dt_from=None, dt_to=None, extra_q=None, **kwargs):
+    def annotate_main_work_type_id(self):
+        from src.timetable.models import EmploymentWorkType
+        return self.annotate(
+            main_work_type_id=Subquery(
+                EmploymentWorkType.objects.filter(
+                    employment_id=OuterRef('id'),
+                    priority=1,
+                ).values('work_type_id')[:1]
+            )
+        )
+
+    def get_active(self, network_id=None, dt_from=None, dt_to=None, extra_q=None, annotate_main_work_type_id=False, **kwargs):
         """
         hired earlier then dt_from, hired later then dt_to
         :param network_id:
@@ -968,7 +981,13 @@ class EmploymentManager(models.Manager):
             )
         if extra_q:
             q &= extra_q
-        return self.filter(q, **kwargs)
+        
+        queryset = self
+
+        if annotate_main_work_type_id:
+            queryset = self.annotate_main_work_type_id()
+
+        return queryset.filter(q, **kwargs)
 
     def get_active_empl_by_priority(  # TODO: переделать, чтобы можно было в 1 запросе получать активные эмплойменты для пар (сотрудник, даты)?
             self, network_id=None, dt=None, dt_from=None, dt_to=None, priority_shop_id=None, priority_employment_id=None,
