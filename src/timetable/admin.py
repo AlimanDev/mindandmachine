@@ -190,7 +190,8 @@ class WorkerDayCashboxDetailsAdmin(admin.ModelAdmin):
 
     @staticmethod
     def worker_last_name(instance: WorkerDayCashboxDetails):
-        return instance.worker_day.employee.user.last_name if instance.worker_day and instance.worker_day.employee.user else ''
+        return instance.worker_day.employee.user.last_name if \
+            instance.worker_day and instance.worker_day.employee_id else ''
 
     @staticmethod
     def shop_title(instance: WorkerDayCashboxDetails):
