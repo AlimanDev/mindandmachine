@@ -126,7 +126,7 @@ class BaseTimesheetDivider:
             vacations_dict = {}
             for dt in week_dates:
                 vacations_dict[dt] = self.fiscal_timesheet.main_timesheet.get_items(
-                    filter_func=lambda i: i.day_type.code == WorkerDay.TYPE_VACATION)
+                    dt=dt, filter_func=lambda i: i.day_type.code == WorkerDay.TYPE_VACATION)
                 if self.fiscal_timesheet.dt_from <= dt <= self.fiscal_timesheet.dt_to:
                     current_day_is_holiday = self.fiscal_timesheet.main_timesheet.is_holiday(
                         dt=dt, consider_dayoff_work_hours=False)

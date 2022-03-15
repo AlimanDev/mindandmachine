@@ -1491,7 +1491,6 @@ class WorkerDay(AbstractModel):
         date_ranges = map(lambda x: (x.replace(day=1), x), pd.date_range(dt_from.replace(day=1), dt_to + relativedelta(day=31), freq='1M').date)
 
         data_greater_norm = []
-        norm_key = getattr(settings, 'TIMESHEET_DIVIDER_SAWH_HOURS_KEY', 'curr_month')
 
         for dt_from, dt_to in date_ranges:
             stats = WorkersStatsGetter(
@@ -1510,7 +1509,10 @@ class WorkerDay(AbstractModel):
                             x[0],
                             employees[x[0]].user.last_name,
                             employees[x[0]].user.first_name,
-                            x[1].get("plan", {}).get("approved", {}).get("sawh_hours", {}).get(norm_key, 0),
+                            x[1].get("plan", {}).get("approved", {}).get("sawh_hours", {}).get(
+                                employees[x[0]].user.network.timesheet_divider_sawh_hours_key, 
+                                0
+                            ),
                             x[1].get("plan", {}).get("approved", {}).get("work_hours", {}).get("all_shops_main", 0),
                         ),
                         stats.items(),
