@@ -383,7 +383,7 @@ class TestWorkersStatsGetter(TestsHelperMixin, APITestCase):
         self._test_cache(2, [self.employee.id, self.employee2.id])
 
         with mock.patch.object(transaction, 'on_commit', lambda t: t()):
-            region2 = Region.objects.create(name='Татарстан')
+            region2 = Region.objects.create(name='Татарстан', network=self.network)
             self.shop.region = region2
             self.shop.save()
             self._test_cache(2, [self.employee.id, self.employee2.id])

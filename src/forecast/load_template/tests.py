@@ -5,8 +5,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 import pandas as pd
 from django.core.files.uploadedfile import SimpleUploadedFile
-
-from src.util.test import create_departments_and_users
+from src.util.mixins.tests import TestsHelperMixin
 
 from src.forecast.models import (
     OperationTypeName, 
@@ -20,73 +19,73 @@ from src.forecast.load_template.utils import prepare_load_template_request
 from src.timetable.models import WorkTypeName, WorkType
 
 
-class TestLoadTemplate(APITestCase):
+class TestLoadTemplate(APITestCase, TestsHelperMixin):
     USER_USERNAME = "user1"
     USER_EMAIL = "q@q.q"
     USER_PASSWORD = "4242"
 
-    def setUp(self):
-        super().setUp()
+    @classmethod
+    def setUpTestData(cls):
+        cls.url = '/rest_api/load_template/'
 
-        self.url = '/rest_api/load_template/'
-
-        create_departments_and_users(self)
-        self.user1.is_superuser = True
-        self.user1.is_staff = True
-        self.user1.save()
-        self.work_type_name1 = WorkTypeName.objects.create(
+        cls.create_departments_and_users()
+        cls.user1.is_superuser = True
+        cls.user1.is_staff = True
+        cls.user1.save()
+        cls.work_type_name1 = WorkTypeName.objects.create(
             name='Кассы',
-            network=self.network,
+            network=cls.network,
         )
-        self.operation_type_name1 = self.work_type_name1.operation_type_name
-        self.operation_type_name2 = OperationTypeName.objects.create(
+        cls.operation_type_name1 = cls.work_type_name1.operation_type_name
+        cls.operation_type_name2 = OperationTypeName.objects.create(
             name='Строительные работы',
             do_forecast=OperationTypeName.FORECAST,
-            network=self.network,
+            network=cls.network,
         )
-        self.work_type_name2 = WorkTypeName.objects.create(
+        cls.work_type_name2 = WorkTypeName.objects.create(
             name='ДМ',
-            network=self.network,
+            network=cls.network,
         )
-        self.operation_type_name3 = self.work_type_name2.operation_type_name
-        self.operation_type_name4 = OperationTypeName.objects.create(
+        cls.operation_type_name3 = cls.work_type_name2.operation_type_name
+        cls.operation_type_name4 = OperationTypeName.objects.create(
             name='Продажи',
             do_forecast=OperationTypeName.FEATURE_SERIE,
-            network=self.network,
+            network=cls.network,
         )
-        self.operation_type_name5 = OperationTypeName.objects.create(
+        cls.operation_type_name5 = OperationTypeName.objects.create(
             name='Входящие',
             do_forecast=OperationTypeName.FORECAST,
-            network=self.network,
+            network=cls.network,
         )
-        self.operation_type_name6 = OperationTypeName.objects.create(
+        cls.operation_type_name6 = OperationTypeName.objects.create(
             name='Пробитие чека',
             do_forecast=OperationTypeName.FORECAST_FORMULA,
-            network=self.network,
+            network=cls.network,
         )
 
-        self.load_template = LoadTemplate.objects.create(
+        cls.load_template = LoadTemplate.objects.create(
             name='Test1',
-            network=self.network,
+            network=cls.network,
         )
         
-        self.operation_type_template1 = OperationTypeTemplate.objects.create(
-            load_template=self.load_template,
-            operation_type_name=self.operation_type_name1,
+        cls.operation_type_template1 = OperationTypeTemplate.objects.create(
+            load_template=cls.load_template,
+            operation_type_name=cls.operation_type_name1,
         )
-        self.operation_type_template2 = OperationTypeTemplate.objects.create(
-            load_template=self.load_template,
-            operation_type_name=self.operation_type_name2,
+        cls.operation_type_template2 = OperationTypeTemplate.objects.create(
+            load_template=cls.load_template,
+            operation_type_name=cls.operation_type_name2,
         )
-        self.operation_type_template3 = OperationTypeTemplate.objects.create(
-            load_template=self.load_template,
-            operation_type_name=self.operation_type_name3,
+        cls.operation_type_template3 = OperationTypeTemplate.objects.create(
+            load_template=cls.load_template,
+            operation_type_name=cls.operation_type_name3,
         )
-        self.operation_type_template4 = OperationTypeTemplate.objects.create(
-            load_template=self.load_template,
-            operation_type_name=self.operation_type_name4,
+        cls.operation_type_template4 = OperationTypeTemplate.objects.create(
+            load_template=cls.load_template,
+            operation_type_name=cls.operation_type_name4,
         )
 
+    def setUp(self):
         self.client.force_authenticate(user=self.user1)
 
     def test_get_list(self):

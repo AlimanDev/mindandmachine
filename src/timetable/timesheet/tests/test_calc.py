@@ -9,7 +9,6 @@ from src.timetable.tests.factories import WorkerDayFactory
 from ._base import TestTimesheetMixin
 
 
-@override_settings(FISCAL_SHEET_DIVIDER_ALIAS=None)
 class TestTimesheetCalc(TestTimesheetMixin, TestCase):
     def test_calc_timesheets(self):
         self._calc_timesheets()

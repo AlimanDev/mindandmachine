@@ -1,6 +1,7 @@
 from django.contrib import admin
 from polymorphic.admin import PolymorphicParentModelAdmin, PolymorphicChildModelAdmin, PolymorphicChildModelFilter
 
+from .forms import ImportJobForm, ExportJobForm
 from .models import (
     ImportJob,
     ExportJob,
@@ -18,11 +19,13 @@ from .models import (
 @admin.register(ImportJob)
 class ImportJobAdmin(admin.ModelAdmin):
     list_display = ('__str__', 'base_path')
+    form = ImportJobForm
 
 
 @admin.register(ExportJob)
 class ExportJobAdmin(admin.ModelAdmin):
     list_display = ('__str__', 'base_path')
+    form = ExportJobForm
 
 
 class FilesystemConfigChildAdmin(PolymorphicChildModelAdmin):
