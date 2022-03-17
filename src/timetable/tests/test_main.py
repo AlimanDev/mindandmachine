@@ -7809,12 +7809,12 @@ class TestFineLogic(APITestCase):
         fact_wd_dir_bad = self._create_or_update_worker_day(self.dir[2], datetime.combine(dt, time(9, 56)), datetime.combine(dt, time(20)), is_fact=True, closest_plan_approved_id=plan_wd_dir.id)
         self.assertEqual(fact_wd_dir_bad.work_hours, timedelta(hours=7, minutes=30))
 
-    def _test_fine_case(self, tm_work_start_paln, tm_work_end_plan, tm_work_start_fact, tm_work_end_fact, work_hours):
+    def _test_fine_case(self, tm_work_start_plan, tm_work_end_plan, tm_work_start_fact, tm_work_end_fact, work_hours):
         WorkerDay.objects.all().delete()
         dt = date.today()
         plan_wd = self._create_or_update_worker_day(
             self.cashier[2], 
-            datetime.combine(dt, tm_work_start_paln), 
+            datetime.combine(dt, tm_work_start_plan), 
             datetime.combine(dt, tm_work_end_plan), 
         )
         fact_wd = self._create_or_update_worker_day(
@@ -7825,6 +7825,7 @@ class TestFineLogic(APITestCase):
             closest_plan_approved_id=plan_wd.id,
         )
         self.assertEqual(fact_wd.work_hours, work_hours)
+        return fact_wd
 
     def test_fine_settings_round(self):
         self.network.fines_settings = json.dumps(
@@ -7884,6 +7885,28 @@ class TestFineLogic(APITestCase):
         self.assertEqual(work_hours, 5)
         self.assertEqual(work_hours_day, 3.5)
         self.assertEqual(work_hours_night, 1.5)
+
+    def test_fine_not_applied_because_of_allowed_interval(self):
+        self.network.fines_settings = json.dumps(
+           {
+                r'.*': {
+                    'arrive_step': 30,
+                    'departure_step': 30,
+                },
+            }
+        )
+        self.network.only_fact_hours_that_in_approved_plan = True
+        self.network.allowed_interval_for_late_arrival = timedelta(minutes=5)
+        self.network.allowed_interval_for_early_departure = timedelta(minutes=5)
+        self.network.save()
+
+        fact_wd = self._test_fine_case(time(8), time(20), time(8, 4), time(19, 56), timedelta(hours=11, minutes=30))
+        self.assertEqual(fact_wd.dttm_work_start_tabel, datetime.combine(fact_wd.dt, time(8)))
+        self.assertEqual(fact_wd.dttm_work_end_tabel, datetime.combine(fact_wd.dt, time(20)))
+
+        fact_wd = self._test_fine_case(time(8), time(20), time(8, 6), time(19, 53), timedelta(hours=10, minutes=30))
+        self.assertEqual(fact_wd.dttm_work_start_tabel, datetime.combine(fact_wd.dt, time(8, 30)))
+        self.assertEqual(fact_wd.dttm_work_end_tabel, datetime.combine(fact_wd.dt, time(19, 30)))
 
 
 
