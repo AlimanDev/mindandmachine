@@ -10,6 +10,7 @@ from .mixins import GetObjectByCodeMixin, ApiLogMixin
 
 class BatchUpdateOrCreateOptionsSerializer(serializers.Serializer):
     by_code = serializers.BooleanField(required=False)
+    update_key_field = serializers.BooleanField(required=False)
     delete_scope_fields_list = serializers.ListField(
         child=serializers.CharField(), required=False, allow_empty=False, allow_null=False)
     delete_scope_values_list = serializers.ListField(
@@ -39,10 +40,11 @@ class BatchUpdateOrCreateViewMixin:
 
             def __init__(self, *args, **kwargs):
                 super(BatchUpdateOrCreateSerializer, self).__init__(*args, **kwargs)
+                update_key_field = this.request.data.get('options', {}).get('update_key_field')
                 by_code = this.request.data.get('options', {}).get('by_code')
                 _patch_obj_serializer(
                     obj_serializer=self.fields['data'],
-                    update_key_field='code' if by_code else 'id'
+                    update_key_field=update_key_field or ('code' if by_code else 'id')
                 )
 
         return BatchUpdateOrCreateSerializer
@@ -71,7 +73,7 @@ class BatchUpdateOrCreateViewMixin:
             delete_scope_filters.update({'code__isnull': False})
         objects, stats = self._get_model_from_serializer(serializer).batch_update_or_create(
             data=serializer.validated_data.get('data'),
-            update_key_field='code' if options.get('by_code') else 'id',
+            update_key_field=options.get('update_key_field') or ('code' if options.get('by_code') else 'id'),
             delete_scope_fields_list=options.get('delete_scope_fields_list'),
             delete_scope_values_list=options.get('delete_scope_values_list'),
             delete_scope_filters=delete_scope_filters,
