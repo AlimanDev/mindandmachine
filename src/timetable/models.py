@@ -282,6 +282,12 @@ class EmploymentWorkType(AbstractModel):
     def get_department(self):
         return self.employment.shop
 
+class WorkerConstraintManager(models.Manager):
+    def get_queryset(self):
+        return super().get_queryset().filter(
+            models.Q(employment__dttm_deleted__date__gt=timezone.now().date()) | models.Q(employment__dttm_deleted__isnull=True)
+        )
+
 
 class WorkerConstraint(AbstractModel):
     class Meta(object):
@@ -298,6 +304,9 @@ class WorkerConstraint(AbstractModel):
     weekday = models.SmallIntegerField()  # 0 - monday, 6 - sunday
     is_lite = models.BooleanField(default=False)  # True -- если сам сотрудник выставил, False -- если менеджер
     tm = models.TimeField()
+
+    objects = WorkerConstraintManager()
+    objects_with_excluded = models.Manager()
 
     def get_department(self):
         return self.employment.shop
