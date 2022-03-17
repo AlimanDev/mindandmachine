@@ -1007,8 +1007,8 @@ class Shop(MPTTModel, AbstractActiveNetworkSpecificCodeNamedModel):
     
     @staticmethod
     def _deletion_context():
-        from src.timetable.models import WorkerDay
-        return OverrideBaseManager([Employment, WorkerDay])
+        from src.timetable.models import WorkerDay, WorkerConstraint
+        return OverrideBaseManager([Employment, WorkerDay, WorkerConstraint])
 
     def delete(self, using=None, keep_parents=False):
         with self._deletion_context():
