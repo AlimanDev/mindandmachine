@@ -968,6 +968,23 @@ class TestAditionalFunctions(TestsHelperMixin, APITestCase):
         self.assertEqual(len(data), 10)
         self.assertEqual(WorkerDay.objects.filter(is_vacancy=True, shop_id=self.shop.id, is_outsource=False, source=WorkerDay.SOURCE_CHANGE_LIST).count(), 10)
 
+    def test_change_list_create_holiday_is_vacancy_setted(self):
+        dt_from = date.today()
+        data = {
+            'type': WorkerDay.TYPE_HOLIDAY,
+            'employee_id': self.employee1.id,
+            'is_vacancy': True,
+            'dt_from': dt_from,
+            'dt_to': dt_from + timedelta(9),
+        }
+        url = f'{self.url}change_list/'
+        response = self.client.post(url, data, format='json')
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(len(data), 10)
+        self.assertEqual(WorkerDay.objects.filter(is_vacancy=False, type_id=WorkerDay.TYPE_HOLIDAY, employee_id=self.employee1.id).count(), 10)
+        self.assertEqual(WorkerDay.objects.filter(is_vacancy=True, employee_id=self.employee1.id).count(), 0)
+
     def test_change_list_create_vacancy_with_employee(self):
         dt_from = date.today()
         data = {
