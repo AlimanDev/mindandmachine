@@ -479,7 +479,7 @@ class ChangeListSerializer(serializers.Serializer):
         super().is_valid(*args, **kwargs)
 
         wd_types_dict = self.context.get('wd_types_dict') or WorkerDayType.get_wd_types_dict()
-        if not wd_types_dict.get(self.validated_data['type_id']).is_work_hours:
+        if not wd_types_dict.get(self.validated_data['type_id']).has_details:
             self.validated_data['is_vacancy'] = False
 
         if self.validated_data['is_vacancy']:
