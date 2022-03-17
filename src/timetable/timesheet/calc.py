@@ -142,13 +142,14 @@ class TimesheetCalculator:
             return
         work_type_name = self._get_work_type_name(worker_day=plan_wd)
         is_absent = day_in_past and not plan_wd.type.is_dayoff
+        is_special = day_in_past and not plan_wd.type.is_dayoff and not plan_wd.type.is_work_hours
         d = {
             'employee_id': self.employee.id,
             'dt': dt,
             'shop': self._get_shop(plan_wd),
             'position': self._get_position(plan_wd, work_type_name=work_type_name),
             'work_type_name': work_type_name,
-            'fact_timesheet_type_id': WorkerDay.TYPE_ABSENSE if is_absent else plan_wd.type_id,
+            'fact_timesheet_type_id': WorkerDay.TYPE_HOLIDAY if is_special else WorkerDay.TYPE_ABSENSE if is_absent else plan_wd.type_id,
             'fact_timesheet_source': TimesheetItem.SOURCE_TYPE_SYSTEM if is_absent else TimesheetItem.SOURCE_TYPE_PLAN,
             'is_vacancy': plan_wd.is_vacancy,
         }

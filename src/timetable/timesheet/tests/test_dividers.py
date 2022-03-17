@@ -1,3 +1,4 @@
+from copy import deepcopy
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 from unittest import expectedFailure
@@ -1000,6 +1001,47 @@ class TestPobedaDivider(TestTimesheetMixin, TestCase):
         self.assertEqual(TimesheetItem.objects.get(
             work_type_name=work_type_name_worker2,
             timesheet_type=TimesheetItem.TIMESHEET_TYPE_ADDITIONAL, dt='2021-06-04').day_hours, 11)
+
+    def test_specific_day_types_replaced_with_holiday(self):
+        dates = [date(2021, 6, 5), date(2021, 6, 6), date(2021, 6, 7)]
+        fact_dates = [date(2021, 6, 5)]
+        WorkerDay.objects.all().delete()
+        for dt in dates:
+            wd_plan = WorkerDayFactory(
+                dt=dt,
+                dttm_work_start=datetime.combine(dt, time(8)),
+                dttm_work_end=datetime.combine(dt, time(12)),
+                employee=self.employee_worker,
+                employment=self.employment_worker,
+                type_id=self.san_day.code,
+                shop=self.shop,
+                is_approved=True,
+                is_fact=False,
+            )
+            if dt in fact_dates:
+                wd_fact = deepcopy(wd_plan)
+                wd_fact.id = None
+                wd_fact.is_fact = True
+                wd_fact.closest_plan_approved_id = wd_plan.id
+                wd_fact.save()
+
+        self._calc_timesheets()
+
+        main_ts_queryset = TimesheetItem.objects.filter(
+            employee=self.employee_worker,
+            timesheet_type=TimesheetItem.TIMESHEET_TYPE_MAIN,
+        )
+        fact_ts_queryset = TimesheetItem.objects.filter(
+            employee=self.employee_worker,
+            timesheet_type=TimesheetItem.TIMESHEET_TYPE_FACT,
+        )
+
+        self.assertEqual(main_ts_queryset.get(dt=date(2021, 6, 5)).day_type_id, WorkerDay.TYPE_HOLIDAY)
+        self.assertEqual(main_ts_queryset.get(dt=date(2021, 6, 6)).day_type_id, WorkerDay.TYPE_HOLIDAY)
+        self.assertEqual(main_ts_queryset.get(dt=date(2021, 6, 7)).day_type_id, WorkerDay.TYPE_HOLIDAY)
+        self.assertEqual(fact_ts_queryset.get(dt=date(2021, 6, 5)).day_type_id, self.san_day.code)
+        self.assertEqual(fact_ts_queryset.get(dt=date(2021, 6, 6)).day_type_id, WorkerDay.TYPE_HOLIDAY)
+        self.assertEqual(fact_ts_queryset.get(dt=date(2021, 6, 7)).day_type_id, self.san_day.code)
 
 
 @override_settings(FISCAL_SHEET_DIVIDER_ALIAS='shift_schedule')
