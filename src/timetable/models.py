@@ -1001,6 +1001,7 @@ class WorkerDay(AbstractModel):
                         plan_approved.dttm_work_start,
                         plan_approved.dttm_work_end,
                         self.employment.position.wp_fines if self.employment and self.employment.position else None,
+                        self.shop.network,
                     )
                 if self.shop.network.only_fact_hours_that_in_approved_plan and not self.type.is_dayoff:
                     if plan_approved:
@@ -1197,7 +1198,7 @@ class WorkerDay(AbstractModel):
         return datetime.timedelta(minutes=work_hours)
 
     @staticmethod
-    def get_fines(dttm_work_start, dttm_work_end, dttm_work_start_plan, dttm_work_end_plan, fines):
+    def get_fines(dttm_work_start, dttm_work_end, dttm_work_start_plan, dttm_work_end_plan, fines, network):
         arrive_fine = 0
         departure_fine = 0
         def _get_fine_from_range(delta, fines_range):
@@ -1206,20 +1207,20 @@ class WorkerDay(AbstractModel):
                     return fine
             return 0
         if dttm_work_start_plan and dttm_work_end_plan and fines:
-            arrive_timedelta = (dttm_work_start - dttm_work_start_plan).total_seconds() / 60
-            departure_timedelta = (dttm_work_end_plan - dttm_work_end).total_seconds() / 60
+            arrive_timedelta = (dttm_work_start - dttm_work_start_plan).total_seconds()
+            departure_timedelta = (dttm_work_end_plan - dttm_work_end).total_seconds()
             arrive_step = fines.get('arrive_step')
             departure_step = fines.get('departure_step')
             arrive_fines = fines.get('arrive_fines', [])
             departure_fines = fines.get('departure_fines', [])
-            if arrive_timedelta > 0 and arrive_step:
-                arrive_fine += arrive_step - (int(arrive_timedelta) % arrive_step or arrive_step)
+            if arrive_timedelta > network.allowed_interval_for_late_arrival.total_seconds() and arrive_step:
+                arrive_fine += arrive_step - (int(arrive_timedelta / 60) % arrive_step or arrive_step)
             else:
-                arrive_fine += _get_fine_from_range(arrive_timedelta, arrive_fines)
-            if departure_timedelta > 0 and departure_step:
-                departure_fine += departure_step - (int(departure_timedelta) % departure_step or departure_step)
+                arrive_fine += _get_fine_from_range(arrive_timedelta / 60, arrive_fines)
+            if departure_timedelta > network.allowed_interval_for_early_departure.total_seconds() and departure_step:
+                departure_fine += departure_step - (int(departure_timedelta / 60) % departure_step or departure_step)
             else:
-                departure_fine += _get_fine_from_range(departure_timedelta, departure_fines)
+                departure_fine += _get_fine_from_range(departure_timedelta / 60, departure_fines)
         return arrive_fine, departure_fine
 
     def get_department(self):
