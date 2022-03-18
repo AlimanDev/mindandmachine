@@ -4536,6 +4536,76 @@ class TestAttendanceRecords(TestsHelperMixin, APITestCase):
         self.assertEqual(day, 5.25)
         self.assertEqual(night, 0.0)
 
+    def test_calc_day_and_night_work_hours_with_round_algo(self):
+        self.network.allowed_interval_for_late_arrival = timedelta(minutes=5)
+        self.network.allowed_interval_for_early_departure = timedelta(minutes=5)
+        self.network.only_fact_hours_that_in_approved_plan = True
+        self.network.round_work_hours_alg = Network.ROUND_TO_HALF_AN_HOUR
+        self.network.set_settings_value("break_time_subtractor",  "in_priority_from_bigger_part")
+        self.network.save()
+        self.breaks.value = '[]'
+        self.breaks.save()
+        self.shop.refresh_from_db()
+
+        revision_type = WorkerDayTypeFactory(
+            code='RV',
+            name='Ревизия',
+            short_name='РЕВ',
+            html_color='#009E9A',
+            use_in_plan=True,
+            use_in_fact=True,
+            excel_load_code='РВ',
+            is_dayoff=False,
+            is_work_hours=False,
+            is_reduce_norm=False,
+            show_stat_in_days=True,
+            show_stat_in_hours=True,
+        )
+
+        plan_worker_day = WorkerDayFactory(
+            employee=self.employee3,
+            employment=self.employment3,
+            shop=self.shop,
+            type_id=revision_type.code,
+            dt=self.dt,
+            dttm_work_start=datetime.combine(self.dt, time(19)),
+            dttm_work_end=datetime.combine(self.dt, time(23)),
+            is_fact=False,
+            is_approved=True,
+        )
+
+        fact_worker_day = WorkerDayFactory(
+            employee=self.employee3,
+            employment=self.employment3,
+            shop=self.shop,
+            type_id=revision_type.code,
+            dt=self.dt,
+            dttm_work_start=datetime.combine(self.dt, time(19)),
+            dttm_work_end=datetime.combine(self.dt, time(22, 54)),
+            is_fact=True,
+            is_approved=True,
+            closest_plan_approved=plan_worker_day,
+        )
+
+        total, day, night = fact_worker_day.calc_day_and_night_work_hours()
+        self.assertEqual(total, 4)
+        self.assertEqual(day, 3)
+        self.assertEqual(night, 1)
+
+        fact_worker_day.dttm_work_end = datetime.combine(self.dt, time(22, 29))
+        fact_worker_day.save()
+        total, day, night = fact_worker_day.calc_day_and_night_work_hours()
+        self.assertEqual(total, 3.5)
+        self.assertEqual(day, 3)
+        self.assertEqual(night, 0.5)
+        
+        fact_worker_day.dttm_work_start = datetime.combine(self.dt, time(19, 20))
+        fact_worker_day.save()
+        total, day, night = fact_worker_day.calc_day_and_night_work_hours()
+        self.assertEqual(total, 3)
+        self.assertEqual(day, 2.5)
+        self.assertEqual(night, 0.5)
+
     def test_two_facts_created_when_there_are_two_plans(self):
         WorkerDay.objects.filter(
             dt=self.dt,

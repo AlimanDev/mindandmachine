@@ -929,6 +929,11 @@ class WorkerDay(AbstractModel):
             work_hours_night = work_hours
             return work_hours, 0.0, work_hours_night
 
+        network = self.shop.network if self.shop_id else None
+        round_wh_alg_func = None
+        if network and network.round_work_hours_alg is not None:
+            round_wh_alg_func = Network.ROUND_WH_ALGS.get(network.round_work_hours_alg)
+
         if work_start.time() > night_edges[0] or work_start.time() < night_edges[1]:
             tm_start = _time_to_float(work_start.time())
         else:
@@ -941,11 +946,15 @@ class WorkerDay(AbstractModel):
         night_seconds = (tm_end - tm_start if tm_end > tm_start else 24 - (tm_start - tm_end)) * 60 * 60
         total_seconds = (work_end - work_start).total_seconds()
 
+        if round_wh_alg_func:
+            total_seconds = round_wh_alg_func(total_seconds / 3600) * 3600
+            night_seconds = round_wh_alg_func(night_seconds / 3600) * 3600
+
         break_time_seconds = total_seconds - work_seconds
 
         break_time_subtractor_alias = None
-        if self.shop_id and self.shop.network_id:
-            break_time_subtractor_alias = self.shop.network.settings_values_prop.get('break_time_subtractor')
+        if network:
+            break_time_subtractor_alias = network.settings_values_prop.get('break_time_subtractor')
         break_time_subtractor_cls = break_time_subtractor_map.get(break_time_subtractor_alias or 'default')
         break_time_subtractor = break_time_subtractor_cls(break_time_seconds, total_seconds, night_seconds)
         work_hours_day, work_hours_night = break_time_subtractor.calc()
