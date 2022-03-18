@@ -35,12 +35,12 @@ class TestWorkersStatsGetter(TestsHelperMixin, APITestCase):
         cls.network = NetworkFactory(crop_work_hours_by_shop_schedule=False)
         cls.shop_settings = ShopSettingsFactory(
             breaks__value='[[0, 2040, [60]]]')
-        cls.shop = ShopFactory(settings=cls.shop_settings)
+        cls.shop = ShopFactory(settings=cls.shop_settings, code='shop')
         cls.shop2 = ShopFactory(settings=cls.shop_settings)
         cls.user = UserFactory()
         cls.employee = EmployeeFactory(user=cls.user)
         cls.group = GroupFactory()
-        cls.position = WorkerPositionFactory(group=cls.group)
+        cls.position = WorkerPositionFactory(group=cls.group, code='position')
         cls.employment = EmploymentFactory(
             shop=cls.shop, employee=cls.employee,
             dt_hired=cls.dt_from - timedelta(days=90), dt_fired=None,
@@ -337,7 +337,7 @@ class TestWorkersStatsGetter(TestsHelperMixin, APITestCase):
     @override_settings(CELERY_TASK_ALWAYS_EAGER=True)
     def test_cache(self):
         self.user2 = UserFactory()
-        self.employee2 = EmployeeFactory(user=self.user2)
+        self.employee2 = EmployeeFactory(user=self.user2, tabel_code='employee2')
         self.employment2 = EmploymentFactory(
             shop=self.shop, employee=self.employee2,
             dt_hired=self.dt_from - timedelta(days=90), dt_fired=None,
@@ -459,6 +459,7 @@ class TestWorkersStatsGetter(TestsHelperMixin, APITestCase):
             )
             self.add_group_perm(self.group, 'WorkerDay_approve', 'POST')
             self.add_group_perm(self.group, 'WorkerDay_delete_worker_days', 'POST')
+            self.add_group_perm(self.group, 'Employment_batch_update_or_create', 'POST')
             self.create_departments_and_users
             response = self.client.post(
                 self.get_url('WorkerDay-approve'), 
@@ -572,6 +573,53 @@ class TestWorkersStatsGetter(TestsHelperMixin, APITestCase):
             self.employment2.delete()
             self._test_cache(0, resp_count=1)
             self.assertIsNone(cache.get(f'prod_cal_{self.dt_from}_{self.dt_to}_{self.employee2.id}'))
+
+            self.employment2.dttm_deleted = None
+            self.employment2.code = 'employment2_code'
+            self.employment2.save()
+
+            self._test_cache(1, [self.employee2.id])
+
+            options = {
+                'by_code': True,
+                'delete_scope_fields_list': [
+                    'employee_id',
+                ],
+                'delete_scope_filters': {
+                    'dt_hired__lte': (self.dt_from + relativedelta(months=1)).replace(day=1) - timedelta(days=1),
+                    'dt_fired__gte_or_isnull': self.dt_from.replace(day=1),
+                }
+            }
+            data = {
+                'data': [
+                    {
+                        'code': 'employment2_code',
+                        'position_code': self.position.code,
+                        'dt_hired': (self.dt_from - timedelta(days=300)).strftime('%Y-%m-%d'),
+                        'dt_fired': self.dt_from.strftime('%Y-%m-%d'),
+                        'shop_code': self.shop.code,
+                        'username': self.user2.username,
+                        'tabel_code': self.employee2.tabel_code,
+                    },
+                ],
+                'options': options,
+            }
+
+            resp = self.client.post(
+                self.get_url('Employment-batch-update-or-create'), self.dump_data(data), content_type='application/json')
+            self.assertEqual(resp.status_code, 200)
+            self.assertDictEqual(
+                resp.json(),
+                {
+                    "stats": {
+                        "Employment": {
+                            "updated": 1
+                        }
+                    }
+                }
+            )
+            self._test_cache(1, [self.employee2.id])
+
 
     def test_get_worker_stat_with_empty_employee_id__in(self):
         self.add_group_perm(
