@@ -18,14 +18,11 @@ class TaskViewSet(UpdateorCreateViewSet):
     permission_classes = [Permission]
     serializer_class = TaskSerializer
     filterset_class = TaskFilter
+    queryset = Task.objects.all()
     openapi_tags = ['Task', ]
 
     def get_queryset(self):
-        manager = Task.objects
-        if self.action in ['update']:
-            manager = Task.objects_with_excluded
-
-        return manager.filter(
+        return super().get_manager().filter(
             operation_type__shop__network_id=self.request.user.network_id,
         ).select_related(
             'operation_type',

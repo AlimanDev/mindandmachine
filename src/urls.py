@@ -11,13 +11,14 @@ from src.base import urls as base_api
 from src.conf.djconfig import DEBUG
 from src.forecast import urls as forecast_api
 from src.forecast.views import RecalcLoadAdminView, UploadDemandAdminView
+from src.med_docs import urls as med_docs_urls
 from src.misc import urls as misc_api
 from src.recognition.urls import router as recognition_router
 from src.recognition.views import DownloadViolatorsReportAdminView
 from src.reports import urls as reports_urls
 from src.tasks import urls as task_urls
 from src.timetable import urls as timetable_api
-from src.timetable.views import RecalcWhAdminView
+from src.timetable.views import RecalcTimesheetAdminView, RecalcWhAdminView
 from src.util.openapi.auto_schema import WFMOpenAPISchemaGenerator, WFMIntegrationAPISchemaGenerator
 
 api_urlpatterns = [
@@ -28,6 +29,7 @@ api_urlpatterns = [
 urlpatterns = [
     path('api/', include(api_urlpatterns)),
     path('admin/timetable/workerday/recalc_wh/', RecalcWhAdminView.as_view(), name='recalc_wh'),
+    path('admin/timetable/workerday/recalc_timesheet/', RecalcTimesheetAdminView.as_view(), name='recalc_timesheet'),
     path('admin/forecast/loadtemplate/recalc_load/', RecalcLoadAdminView.as_view(), name='recalc_load'),
     path('admin/forecast/periodclients/upload_demand/', UploadDemandAdminView.as_view(), name='upload_demand'),
     path('admin/recognition/ticks/download_violators/', DownloadViolatorsReportAdminView.as_view(), name='download_violators'),
@@ -41,7 +43,8 @@ urlpatterns = [
         forecast_api.urlpatterns +
         misc_api.urlpatterns +
         task_urls.urlpatterns +
-        reports_urls.urlpatterns,
+        reports_urls.urlpatterns +
+        med_docs_urls.urlpatterns,
     )),
 ]
 

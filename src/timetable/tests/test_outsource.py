@@ -516,22 +516,14 @@ class TestOutsource(TestsHelperMixin, APITestCase):
         response_data = sorted(response.json()['results'], key=lambda i: i['id'])
         data = {
             'id': vacancy['id'],
-            'first_name': self.user1.first_name,
-            'last_name': self.user1.last_name,
+            'employee_id': self.employee1.id,
             'is_outsource': True,
-            'avatar': None,
-            'worker_shop': self.employment1.shop_id,
-            'user_network_id': self.user1.network_id,
         }
         response = response_data[0]
         assert_response = {
             'id': response['id'],
-            'first_name': response['first_name'],
-            'last_name': response['last_name'],
+            'employee_id': response['employee_id'],
             'is_outsource': response['is_outsource'],
-            'avatar': response['avatar'],
-            'worker_shop': response['worker_shop'],
-            'user_network_id': response['user_network_id'],
         }
         self.assertEqual(assert_response, data)
         # получаем список отделов с аутсорс организациями
@@ -577,6 +569,7 @@ class TestOutsource(TestsHelperMixin, APITestCase):
                     'secondary_color': '', 
                     'allowed_geo_distance_km': None,
                     'allow_creation_several_wdays_for_one_employee_for_one_date': False,
+                    'allow_to_manually_set_is_vacancy': False,
                     'enable_camera_ticks': False,
                     'show_worker_day_additional_info': False,
                     'allowed_interval_for_late_arrival': '00:00:00',

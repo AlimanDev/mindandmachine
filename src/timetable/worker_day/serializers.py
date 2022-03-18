@@ -2,7 +2,7 @@ from datetime import timedelta
 
 import pandas as pd
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import Q, Subquery, OuterRef
 from django.db.models.expressions import RawSQL
 from django.utils.functional import cached_property
 from django.utils.translation import gettext_lazy as _
@@ -12,7 +12,7 @@ from rest_framework.exceptions import PermissionDenied, ValidationError, NotFoun
 from src.base.exceptions import FieldError
 from src.base.models import Employment, User, Shop, Employee, Network
 from src.base.models import NetworkConnect
-from src.base.serializers import ModelSerializerWithCreateOnlyFields, NetworkListSerializer, UserShorSerializer, NetworkSerializer
+from src.base.serializers import BaseModelSerializer, BaseSerializer, ModelSerializerWithCreateOnlyFields, NetworkListSerializer, UserShorSerializer, NetworkSerializer
 from src.base.shop.serializers import ShopListSerializer
 from src.conf.djconfig import QOS_DATE_FORMAT
 from src.timetable.models import (
@@ -21,6 +21,7 @@ from src.timetable.models import (
     WorkType,
     WorkerDayType,
     TimesheetItem,
+    EmploymentWorkType,
 )
 
 
@@ -72,7 +73,7 @@ class WorkerDayApproveSerializer(serializers.Serializer):
     approve_open_vacs = serializers.BooleanField(required=False)
 
 
-class WorkerDayCashboxDetailsSerializer(serializers.ModelSerializer):
+class WorkerDayCashboxDetailsSerializer(BaseModelSerializer):
     work_type_id = serializers.IntegerField(required=True)
 
     class Meta:
@@ -85,15 +86,14 @@ class WorkerDayCashboxDetailsSerializer(serializers.ModelSerializer):
             self.fields['id'].read_only = False
 
 
-class WorkerDayCashboxDetailsListSerializer(serializers.Serializer):
+class WorkerDayCashboxDetailsListSerializer(BaseSerializer):
     id = serializers.IntegerField()
     work_type_id = serializers.IntegerField()
     work_part = serializers.FloatField()
 
 
-class WorkerDayListSerializer(serializers.Serializer, UnaccountedOvertimeMixin):
+class WorkerDayListSerializer(BaseSerializer, UnaccountedOvertimeMixin):
     id = serializers.IntegerField()
-    worker_id = serializers.IntegerField(source='employee.user_id')
     employee_id = serializers.IntegerField()
     shop_id = serializers.IntegerField()
     employment_id = serializers.IntegerField()
@@ -105,9 +105,11 @@ class WorkerDayListSerializer(serializers.Serializer, UnaccountedOvertimeMixin):
     dttm_work_end_tabel = serializers.DateTimeField(default=None)
     comment = serializers.CharField()
     is_approved = serializers.BooleanField()
+    is_vacancy = serializers.BooleanField()
     worker_day_details = WorkerDayCashboxDetailsListSerializer(many=True, source='worker_day_details_list')
     outsources = NetworkListSerializer(many=True, required=False, source='outsources_list')
     is_fact = serializers.BooleanField()
+    is_outsource = serializers.BooleanField()
     work_hours = serializers.SerializerMethodField()
     shop_code = serializers.CharField(required=False)
     user_login = serializers.CharField(required=False)
@@ -129,7 +131,6 @@ class WorkerDayListSerializer(serializers.Serializer, UnaccountedOvertimeMixin):
             return obj.rounded_work_hours
 
         return obj.work_hours
-
 
 class WorkerDaySerializer(ModelSerializerWithCreateOnlyFields, UnaccountedOvertimeMixin):
     default_error_messages = {
@@ -319,6 +320,7 @@ class WorkerDaySerializer(ModelSerializerWithCreateOnlyFields, UnaccountedOverti
                 dt=attrs.get('dt'),
                 priority_shop_id=shop_id,
                 priority_employment_id=attrs.get('employment_id'),
+                annotate_main_work_type_id=True,
             ).first()
             if not employee_active_empl:
                 raise self.fail('no_active_employments')
@@ -364,8 +366,13 @@ class WorkerDaySerializer(ModelSerializerWithCreateOnlyFields, UnaccountedOverti
     def _create_update_clean(self, validated_data, instance=None):
         employee_id = validated_data.get('employee_id', instance.employee_id if instance else None)
         if employee_id:
-            validated_data['is_vacancy'] = validated_data.get('is_vacancy') \
-                or not getattr(self._employee_active_empl, 'is_equal_shops', True)
+            validated_data['is_vacancy'] = WorkerDay.is_worker_day_vacancy(
+                getattr(self._employee_active_empl, 'shop_id', None),
+                validated_data['shop_id'],
+                getattr(self._employee_active_empl, 'main_work_type_id', None),
+                validated_data.get('worker_day_details', []),
+                is_vacancy=validated_data.get('is_vacancy', False),
+            )
 
     def _run_transaction_checks(self, employee_id, dt, is_fact, is_approved):
         WorkerDay.check_work_time_overlap(
@@ -444,34 +451,6 @@ class WorkerDayWithParentSerializer(WorkerDaySerializer):
     parent_worker_day_id = serializers.IntegerField()
 
 
-class VacancySerializer(serializers.Serializer):
-    id = serializers.IntegerField()
-    first_name = serializers.CharField()
-    last_name = serializers.CharField()
-    employee_id = serializers.IntegerField()
-    worker_day_details = WorkerDayCashboxDetailsListSerializer(many=True, required=False)
-    is_fact = serializers.BooleanField()
-    is_approved = serializers.BooleanField()
-    dttm_work_start = serializers.DateTimeField(default=None)
-    dttm_work_end = serializers.DateTimeField(default=None)
-    dt = serializers.DateField()
-    type = serializers.CharField(source='type_id')
-    is_outsource = serializers.BooleanField()
-    avatar = serializers.SerializerMethodField('get_avatar_url')
-    worker_shop = serializers.IntegerField(required=False, default=None)
-    user_network_id = serializers.IntegerField(required=False)
-    outsources = NetworkListSerializer(many=True, read_only=True)
-    shop = ShopListSerializer()
-    comment = serializers.CharField(required=False)
-    cost_per_hour = serializers.DecimalField(None, None)
-    total_cost = serializers.FloatField(read_only=True)
-
-    def get_avatar_url(self, obj) -> str:
-        if obj.employee_id and obj.employee.user_id and obj.employee.user.avatar:
-            return obj.employee.user.avatar.url
-        return None
-
-
 class ChangeListSerializer(serializers.Serializer):
     default_error_messages = {
         'check_dates': _('Date start should be less then date end'),
@@ -500,13 +479,16 @@ class ChangeListSerializer(serializers.Serializer):
         super().is_valid(*args, **kwargs)
 
         wd_types_dict = self.context.get('wd_types_dict') or WorkerDayType.get_wd_types_dict()
+        if not wd_types_dict.get(self.validated_data['type_id']).has_details:
+            self.validated_data['is_vacancy'] = False
+
         if self.validated_data['is_vacancy']:
-            self.validated_data['type_id'] = WorkerDay.TYPE_WORKDAY
             self.validated_data['outsources'] = Network.objects.filter(id__in=(self.validated_data.get('outsources') or []))
         else:
             if wd_types_dict.get(self.validated_data['type_id']).is_dayoff:
                 self.validated_data['shop_id'] = None 
             self.validated_data['outsources'] = []
+
         if not wd_types_dict.get(self.validated_data['type_id']).is_dayoff:
             if not self.validated_data.get('tm_work_start'):
                 raise FieldError(self.error_messages['required'], 'tm_work_start')
@@ -535,6 +517,7 @@ class ChangeListSerializer(serializers.Serializer):
 class ChangeRangeSerializer(serializers.Serializer):
     #is_fact = serializers.BooleanField()
     is_approved = serializers.BooleanField()
+    is_blocked = serializers.BooleanField(required=False)
     dt_from = serializers.DateField()
     dt_to = serializers.DateField()
     worker = serializers.CharField(allow_null=False, allow_blank=False)  # табельный номер

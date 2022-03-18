@@ -19,6 +19,7 @@ class TestWorkShiftViewSet(TestsHelperMixin, APITestCase):
         cls.create_departments_and_users()
         cls.work_type_name1 = WorkTypeName.objects.create(
             name='Кассы',
+            network=cls.network,
         )
         cls.work_type1 = WorkType.objects.create(shop=cls.shop2, work_type_name=cls.work_type_name1)
         cls.today = timezone.now().today()
@@ -217,6 +218,7 @@ class TestWorkShiftViewSet(TestsHelperMixin, APITestCase):
             'network': {
                 'allowed_geo_distance_km': None,
                 'allow_creation_several_wdays_for_one_employee_for_one_date': False,
+                'allow_to_manually_set_is_vacancy': False,
                 'allowed_interval_for_early_departure': '00:00:00',
                 'allowed_interval_for_late_arrival': '00:00:00',
                 'default_stats': {
@@ -369,6 +371,7 @@ class TestWorkShiftViewSet(TestsHelperMixin, APITestCase):
             'network': {
                 'allowed_geo_distance_km': None,
                 'allow_creation_several_wdays_for_one_employee_for_one_date': False,
+                'allow_to_manually_set_is_vacancy': False,
                 'allowed_interval_for_early_departure': '00:00:00',
                 'allowed_interval_for_late_arrival': '00:00:00',
                 'default_stats': {
@@ -527,6 +530,7 @@ class TestWorkShiftViewSet(TestsHelperMixin, APITestCase):
             'network': {
                 'allowed_geo_distance_km': None,
                 'allow_creation_several_wdays_for_one_employee_for_one_date': False,
+                'allow_to_manually_set_is_vacancy': False,
                 'allowed_interval_for_early_departure': '00:00:00',
                 'allowed_interval_for_late_arrival': '00:00:00',
                 'default_stats': {

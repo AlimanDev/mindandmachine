@@ -61,3 +61,21 @@ class HasAnotherWdayOnDate(Exception):
                 'Создание нескольких дней на одну дату для одного сотрудника запрещено. ({error_str})').format(
             error_str=error_str
         )
+
+class MainWorkHoursGreaterThanNorm(Exception):
+    def __init__(self, exc_data):
+        self.exc_data = exc_data
+
+    def __str__(self, *args, **kwargs):
+        error_str = ', '.join(
+            (
+                f'{error_data["last_name"]} {error_data["first_name"]} - '
+                f'С {error_data["dt_from"]} по {error_data["dt_to"]} норма: {error_data["norm"]}, в графике: {error_data["total_work_hours"]}'
+            )
+            for error_data in self.exc_data
+        )
+        return gettext(
+                'Операция не может быть выполнена. '
+                'Нарушены ограничения по количеству часов в основном графике.. ({error_str})').format(
+            error_str=error_str
+        )
