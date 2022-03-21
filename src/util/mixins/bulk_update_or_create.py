@@ -430,7 +430,7 @@ class BatchUpdateOrCreateModelMixin:
                     created_objs=objs_to_create, updated_objs=objs_to_update, deleted_objs=objs_to_delete,
                     diff_data=diff_data, stats=stats, model_options=model_options,
                     delete_scope_filters=delete_scope_filters, user=user, diff_obj_keys=diff_obj_keys,
-                    cached_data=cached_data,
+                    cached_data=cached_data, check_perms_extra_kwargs=check_perms_extra_kwargs,
                 )
 
                 if objs_to_delete:

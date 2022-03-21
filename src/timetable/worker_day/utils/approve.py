@@ -354,11 +354,12 @@ class WorkerDayApproveHelper:
                 wdays_to_delete = WorkerDay.objects_with_excluded.filter(
                     employee_days_q, is_fact=self.is_fact,
                 ).exclude(
-                    self.exclude_approve_q |
-                    Q(id__in=wdays_to_approve.values_list('id', flat=True))
+                    id__in=wdays_to_approve.values_list('id', flat=True),
                 ).exclude(
                     employee_id__isnull=True,
                 )
+                if self.exclude_approve_q:
+                    wdays_to_delete = wdays_to_delete.exclude(self.exclude_approve_q)
 
                 # если план
                 if not self.is_fact:

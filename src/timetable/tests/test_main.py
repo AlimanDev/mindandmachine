@@ -3663,10 +3663,189 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
         self.assertEqual(wd.code, code)
 
     def test_sync_vacation_and_sick_at_the_same_time(self):
-        pass
+        WorkerDay.objects.all().delete()
+        doc_id = uuid.uuid4()
+        employee_id = uuid.uuid4()
+
+        WorkerDayFactory(
+            employee=self.employee2,
+            employment=self.employment2,
+            shop=None,
+            dt=self.dt,
+            type_id=WorkerDay.TYPE_HOLIDAY,
+            is_approved=False,
+            is_fact=False,
+        )
+        WorkerDayFactory(
+            employee=self.employee2,
+            employment=self.employment2,
+            shop=None,
+            dt=self.dt,
+            type_id=WorkerDay.TYPE_HOLIDAY,
+            is_approved=True,
+            is_fact=False,
+        )
+
+        code = f'{doc_id}:{employee_id}:{self.dt}'
+        code2 = f'{doc_id}:{employee_id}:{self.dt + timedelta(days=1)}'
+        data = {
+            'data': [
+                {
+                    "code": code,
+                    "tabel_code": self.employee2.tabel_code,
+                    "is_fact": False,
+                    "is_approved": False,
+                    "dt": self.dt,
+                    "type": WorkerDay.TYPE_VACATION,
+                },
+                {
+                    "code": code2,
+                    "tabel_code": self.employee2.tabel_code,
+                    "is_fact": False,
+                    "is_approved": False,
+                    "dt": self.dt + timedelta(days=1),
+                    "type": WorkerDay.TYPE_SICK,
+                }
+            ],
+            'options': {
+                "update_key_field": "code",
+                "delete_scope_fields_list": [],
+                "delete_scope_filters": {
+                    "employee__tabel_code": self.employee2.tabel_code,
+                    "is_fact": False,
+                    "is_approved": False,
+                    "dt__lte": self.dt + timedelta(days=30),
+                    "dt__gte": self.dt - timedelta(days=30),
+                    "type_id__in": [WorkerDay.TYPE_VACATION, WorkerDay.TYPE_SICK],
+                },
+                "model_options": {
+                    "delete_not_allowed_additional_types": True,
+                    "approve_delete_scope_filters_wdays": True,
+                },
+            }
+        }
+        resp = self.client.post(
+            self.get_url('WorkerDay-batch-update-or-create'), self.dump_data(data), content_type='application/json')
+        self.assertEqual(resp.status_code, 200)
+        resp_data = resp.json()
+        self.assertDictEqual(
+            resp_data,
+            {
+                "stats": {
+                    "WorkerDayCashboxDetails": {},
+                    "WorkerDayOutsourceNetwork": {},
+                    "WorkerDay": {
+                        "created": 2,
+                        "deleted": 1
+                    }
+                }
+            }
+        )
+        self.assertEqual(WorkerDay.objects.filter(type_id=WorkerDay.TYPE_VACATION).count(), 2)
+        self.assertEqual(WorkerDay.objects.filter(type_id=WorkerDay.TYPE_SICK).count(), 2)
+        self.assertEqual(WorkerDay.objects.exclude(
+            type_id__in=[WorkerDay.TYPE_VACATION, WorkerDay.TYPE_SICK]).count(), 0)
+        wd = WorkerDay.objects.filter(dt=self.dt, is_approved=True).first()
+        self.assertIsNotNone(wd)
+        self.assertEqual(wd.type_id, WorkerDay.TYPE_VACATION)
+        self.assertEqual(wd.code, code)
+        wd = WorkerDay.objects.filter(dt=self.dt + timedelta(days=1), is_approved=True).first()
+        self.assertIsNotNone(wd)
+        self.assertEqual(wd.type_id, WorkerDay.TYPE_SICK)
+        self.assertEqual(wd.code, code2)
 
     def test_sync_vacation_when_draft_allowed_additional_type_exists(self):
-        pass
+        workday_type = WorkerDayType.objects.filter(
+            code=WorkerDay.TYPE_WORKDAY,
+        ).get()
+        vacation_type = WorkerDayType.objects.filter(
+            code=WorkerDay.TYPE_VACATION,
+        ).get()
+        vacation_type.allowed_additional_types.add(workday_type)
+
+        WorkerDay.objects.all().delete()
+        doc_id = uuid.uuid4()
+        employee_id = uuid.uuid4()
+
+        wd_draft = WorkerDayFactory(
+            employee=self.employee2,
+            employment=self.employment2,
+            shop=self.shop2,
+            dt=self.dt,
+            type_id=WorkerDay.TYPE_WORKDAY,
+            is_approved=False,
+            is_fact=False,
+        )
+
+        code = f'{doc_id}:{employee_id}:{self.dt}'
+        data = {
+            'data': [
+                {
+                    "code": code,
+                    "tabel_code": self.employee2.tabel_code,
+                    "is_fact": False,
+                    "is_approved": False,
+                    "dt": self.dt,
+                    "type": WorkerDay.TYPE_VACATION,
+                }
+            ],
+            'options': {
+                "update_key_field": "code",
+                "delete_scope_fields_list": [],
+                "delete_scope_filters": {
+                    "employee__tabel_code": self.employee2.tabel_code,
+                    "is_fact": False,
+                    "is_approved": False,
+                    "dt__lte": self.dt + timedelta(days=30),
+                    "dt__gte": self.dt - timedelta(days=30),
+                    "type_id__in": [WorkerDay.TYPE_VACATION],
+                },
+                "model_options": {
+                    "delete_not_allowed_additional_types": True,
+                    "approve_delete_scope_filters_wdays": True,
+                },
+            }
+        }
+        resp = self.client.post(
+            self.get_url('WorkerDay-batch-update-or-create'), self.dump_data(data), content_type='application/json')
+        self.assertEqual(resp.status_code, 200)
+        resp_data = resp.json()
+        self.assertDictEqual(
+            resp_data,
+            {
+                "stats": {
+                    "WorkerDayCashboxDetails": {},
+                    "WorkerDayOutsourceNetwork": {},
+                    "WorkerDay": {
+                        "created": 1,
+                    }
+                }
+            }
+        )
+        self.assertEqual(WorkerDay.objects.filter(type_id=WorkerDay.TYPE_VACATION).count(), 2)
+        self.assertEqual(WorkerDay.objects.exclude(
+            type_id__in=[WorkerDay.TYPE_VACATION]).count(), 1)
+        self.assertTrue(WorkerDay.objects.filter(id=wd_draft.id).exists())
+
+        data['data'] = []
+        resp = self.client.post(
+            self.get_url('WorkerDay-batch-update-or-create'), self.dump_data(data), content_type='application/json')
+        self.assertEqual(resp.status_code, 200)
+        resp_data = resp.json()
+        self.assertDictEqual(
+            resp_data,
+            {
+                "stats": {
+                    "WorkerDay": {
+                        "deleted": 1,
+                    }
+                }
+            }
+        )
+        self.assertEqual(WorkerDay.objects.filter(type_id=WorkerDay.TYPE_VACATION).count(), 0)
+        self.assertEqual(WorkerDay.objects.exclude(
+            type_id__in=[WorkerDay.TYPE_VACATION]).count(), 1)
+        self.assertTrue(WorkerDay.objects.filter(id=wd_draft.id).exists())
 
 
 class TestCropSchedule(TestsHelperMixin, APITestCase):
