@@ -39,7 +39,10 @@ class BatchUpdateOrCreateModelMixin:
 
     @classmethod
     def _get_allowed_update_key_fields(cls):
-        return ['id', 'code']
+        l = ['id']
+        if cls._is_field_exist('code'):
+            l.append('code')
+        return l
 
     @classmethod
     def _get_batch_update_or_create_transaction_checks_kwargs(cls, **kwargs):
@@ -243,8 +246,12 @@ class BatchUpdateOrCreateModelMixin:
         """
         allowed_update_key_fields = cls._get_allowed_update_key_fields()
         if update_key_field not in allowed_update_key_fields:
-            raise BatchUpdateOrCreateException(
-                f'Not allowed update key field: "{update_key_field}", allowed fields: {allowed_update_key_fields}')
+            if allowed_update_key_fields:
+                # костыль, чтобы брался id как ключ, вместо code для вложенных объектов
+                update_key_field = allowed_update_key_fields[0]
+            else:
+                raise BatchUpdateOrCreateException(
+                    f'Not allowed update key field: "{update_key_field}"')
 
         try:
             with transaction.atomic():
@@ -298,8 +305,11 @@ class BatchUpdateOrCreateModelMixin:
                     filter_kwargs[f"{update_key_field}__in"] = update_keys
                 if delete_scope_filters:
                     filter_kwargs.update(delete_scope_filters)
-                update_qs = cls.objects.filter(**filter_kwargs).select_related(
-                    *cls._get_batch_update_select_related_fields())
+                if filter_kwargs:
+                    update_qs = cls.objects.filter(**filter_kwargs).select_related(
+                        *cls._get_batch_update_select_related_fields())
+                else:
+                    update_qs = cls.objects.none()
                 existing_objs = {
                     getattr(obj, update_key_field): obj for obj in update_qs
                 }
@@ -459,7 +469,7 @@ class BatchUpdateOrCreateModelMixin:
                 cls._post_batch(
                     created_objs=objs_to_create, updated_objs=objs_to_update, deleted_objs=objs_to_delete,
                     diff_data=diff_data, stats=stats, model_options=model_options,
-                    delete_scope_filters=delete_scope_filters,
+                    delete_scope_filters=delete_scope_filters, user=user,
                 )
 
                 transaction_checks_kwargs = cls._get_batch_update_or_create_transaction_checks_kwargs(

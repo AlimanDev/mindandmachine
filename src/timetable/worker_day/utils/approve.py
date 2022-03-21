@@ -39,7 +39,7 @@ from src.util.models_converter import Converter
 
 class WorkerDayApproveHelper:
     def __init__(self, is_fact, dt_from, dt_to, user=None, shop_id=None, employee_ids=None, wd_types=None,
-                 approve_open_vacs=False):
+                 approve_open_vacs=False, any_draft_wd_exists=True):
         assert shop_id or employee_ids
         self.is_fact = is_fact
         self.dt_from = dt_from
@@ -49,6 +49,7 @@ class WorkerDayApproveHelper:
         self.employee_ids = employee_ids or []
         self._wd_types = wd_types
         self.approve_open_vacs = approve_open_vacs
+        self.any_draft_wd_exists = any_draft_wd_exists
 
     @cached_property
     def wd_types(self):
@@ -68,7 +69,7 @@ class WorkerDayApproveHelper:
     def run(self):
         from src.timetable.worker_day.views import WorkerDayViewSet
         with transaction.atomic():
-            wd_perms = check_worker_day_permissions(
+            allowed_wd_perms = check_worker_day_permissions(
                 self.user,
                 self.shop_id,
                 WorkerDayPermission.APPROVE,
@@ -94,10 +95,14 @@ class WorkerDayApproveHelper:
                 ).values_list('employee_id', flat=True)
 
             wd_types_grouped_by_limit = {}
-            for wd_type, limit_days_in_past, limit_days_in_future, employee_type, shop_type in wd_perms:
-                # фильтруем только по тем типам, которые переданы
-                if wd_type in self.wd_types:
-                    wd_types_grouped_by_limit.setdefault((limit_days_in_past, limit_days_in_future), []).append(wd_type)
+            if self.user:
+                for wd_type, limit_days_in_past, limit_days_in_future, employee_type, shop_type in allowed_wd_perms:
+                    # фильтруем только по тем типам, которые переданы
+                    if wd_type in self.wd_types:
+                        wd_types_grouped_by_limit.setdefault((limit_days_in_past, limit_days_in_future), []).append(wd_type)
+            else:
+                for wd_type in self.wd_types:
+                    wd_types_grouped_by_limit.setdefault((None, None), []).append(wd_type)
             wd_types_q = Q()
             for (limit_days_in_past, limit_days_in_future), wd_types in wd_types_grouped_by_limit.items():
                 q = Q(type_id__in=wd_types)
@@ -126,6 +131,7 @@ class WorkerDayApproveHelper:
                 **employee_filter,
             )
             columns = [
+                'code',
                 'employee_id',
                 'dt',
                 'type_id',
@@ -148,21 +154,23 @@ class WorkerDayApproveHelper:
             ).values_list(*columns))
             draft_df = pd.DataFrame(draft_wdays, columns=columns).drop_duplicates()
 
-            approved_wdays = list(WorkerDay.objects.annotate(
-                any_draft_wd_exists=Exists(
-                    WorkerDay.objects.filter(
-                        approve_condition,
-                        Q(employee__isnull=False, employee_id=OuterRef('employee_id')),
-                        is_approved=False,
-                        dt=OuterRef('dt'),
-                        is_fact=OuterRef('is_fact'),
-                    ),
-                ),
-            ).filter(
+            approved_wdays_qs = WorkerDay.objects.filter(
                 approve_condition,
-                is_approved=True,
-                any_draft_wd_exists=True,  # TODO: избавиться от типа "пусто" ?
-            ).annotate(
+                is_approved=True
+            )
+            if self.any_draft_wd_exists:
+                approved_wdays_qs = approved_wdays_qs.filter(
+                    Exists(
+                        WorkerDay.objects.filter(
+                            approve_condition,
+                            Q(employee__isnull=False, employee_id=OuterRef('employee_id')),
+                            is_approved=False,
+                            dt=OuterRef('dt'),
+                            is_fact=OuterRef('is_fact'),
+                        ),
+                    ),
+                )
+            approved_wdays = list(approved_wdays_qs.annotate(
                 work_type_ids=StringAgg(
                     Cast('work_types', CharField()),
                     distinct=True,
@@ -354,8 +362,7 @@ class WorkerDayApproveHelper:
                     q_obj=employee_days_q,
                     is_approved=True if self.is_fact else None,
                     delta_in_secs=self.shop.network.set_closest_plan_approved_delta_for_manual_fact if self.shop \
-                        else OuterRef('employee__network__set_closest_plan_approved_delta_for_manual_fact'),
-                    # проверить, что работает без магазина
+                        else self.user.network.set_closest_plan_approved_delta_for_manual_fact,
                 )
 
                 # если план, то выполним пересчет часов в ручных корректировках факта
@@ -415,6 +422,7 @@ class WorkerDayApproveHelper:
                             closest_plan_approved_id=approved_wd.closest_plan_approved_id,
                             parent_worker_day_id=approved_wd.id,
                             source=WorkerDay.SOURCE_ON_APPROVE,
+                            code=approved_wd.code,
                         )
                         for approved_wd in approved_wds_list if approved_wd.employee_id
                         # не копируем день без сотрудника (вакансию) в неподтв. версию
@@ -450,21 +458,23 @@ class WorkerDayApproveHelper:
                 dttm_now = timezone.now()
                 # если план
                 if not self.is_fact:
-                    # отмечаем, что график подтвержден
-                    ShopMonthStat.objects.update_or_create(
-                        shop_id=self.shop_id,
-                        dt=self.dt_from.replace(day=1),
-                        defaults=dict(
-                            dttm_status_change=dttm_now,
-                            is_approved=True,
+                    if self.shop:
+                        # отмечаем, что график подтвержден
+                        ShopMonthStat.objects.update_or_create(
+                            shop_id=self.shop_id,
+                            dt=self.dt_from.replace(day=1),
+                            defaults=dict(
+                                dttm_status_change=dttm_now,
+                                is_approved=True,
+                            )
                         )
-                    )
 
                     transaction.on_commit(
                         lambda: recalc_fact_from_records(employee_days_list=list(employee_days_set)))
 
-                    transaction.on_commit(
-                        lambda: vacancies_create_and_cancel_for_shop.delay(self.shop_id))
+                    if self.shop:
+                        transaction.on_commit(
+                            lambda: vacancies_create_and_cancel_for_shop.delay(self.shop_id))
 
                     def _notify_vacancies_created():
                         for vacancy in vacancies_to_approve:

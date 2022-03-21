@@ -790,18 +790,40 @@ class WorkerDay(AbstractModel):
                     is_approved=obj.is_approved,
                     dt=obj.dt,
                 )
-        _total_deleted_count, deleted_dict = WorkerDay.objects.filter(delete_not_allowed_additional_types_q).delete()
-        stats = kwargs.setdefault('stats', {})
-        for original_deleted_cls_name, deleted_count in deleted_dict.items():
-            if deleted_count:
-                deleted_cls_name = original_deleted_cls_name.split('.')[1]
-                deleted_cls_stats = stats.setdefault(deleted_cls_name, {})
-                deleted_cls_stats['deleted'] = deleted_cls_stats.get('deleted', 0) + deleted_dict.get(
-                    original_deleted_cls_name)
+        if delete_not_allowed_additional_types_q:
+            _total_deleted_count, deleted_dict = WorkerDay.objects.filter(delete_not_allowed_additional_types_q).delete()
+            stats = kwargs.setdefault('stats', {})  # TODO: diff_data тоже?
+            for original_deleted_cls_name, deleted_count in deleted_dict.items():
+                if deleted_count:
+                    deleted_cls_name = original_deleted_cls_name.split('.')[1]
+                    deleted_cls_stats = stats.setdefault(deleted_cls_name, {})
+                    deleted_cls_stats['deleted'] = deleted_cls_stats.get('deleted', 0) + deleted_dict.get(
+                        original_deleted_cls_name)
 
     @classmethod
     def _approve_delete_scope_filters_wdays(cls, **kwargs):
-        print(kwargs)
+        from src.timetable.worker_day.utils.approve import WorkerDayApproveHelper
+        from src.timetable.worker_day.serializers import WorkerDayApproveSerializer
+        delete_scope_filters = kwargs.get('delete_scope_filters', {})
+        employee_ids = []
+        if 'employee__tabel_code' in delete_scope_filters:
+            employee_ids = list(Employee.objects.filter(
+                tabel_code=delete_scope_filters.get('employee__tabel_code')).values_list('id', flat=True))
+        elif 'employee__tabel_code__in' in delete_scope_filters:
+            employee_ids = list(Employee.objects.filter(
+                tabel_code__in=delete_scope_filters.get('employee__tabel_code__in')).values_list('id', flat=True))
+        if employee_ids:
+            data = dict(
+                employee_ids=employee_ids,
+                is_fact=delete_scope_filters.get('is_fact'),
+                dt_from=delete_scope_filters.get('dt__gte'),
+                dt_to=delete_scope_filters.get('dt__lte'),
+                wd_types=delete_scope_filters.get('type_id__in'),
+            )
+            serializer = WorkerDayApproveSerializer(data=data)
+            serializer.is_valid(raise_exception=True)
+            WorkerDayApproveHelper(
+                user=kwargs.get('user'), any_draft_wd_exists=False, **serializer.validated_data).run()
 
     @classmethod
     def _post_batch(cls, **kwargs):

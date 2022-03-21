@@ -3619,6 +3619,9 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
         self.assertEqual(wd.type_id, WorkerDay.TYPE_VACATION)
         self.assertEqual(wd.code, code)
 
+    def test_move_approved_vacation_from_one_period_to_another(self):
+        pass
+
 
 class TestCropSchedule(TestsHelperMixin, APITestCase):
     @classmethod

@@ -55,7 +55,7 @@ class RequestApproveSerializer(serializers.Serializer):
 
 
 class WorkerDayApproveSerializer(serializers.Serializer):
-    shop_id = serializers.IntegerField(required=True)
+    shop_id = serializers.IntegerField(required=False)
     is_fact = serializers.BooleanField()
     dt_from = serializers.DateField()
     dt_to = serializers.DateField()
