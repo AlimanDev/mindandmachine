@@ -38,9 +38,8 @@ from src.util.models_converter import Converter
 
 
 class WorkerDayApproveHelper:
-    def __init__(
-            self, is_fact, dt_from, dt_to, user=None, shop_id=None, employee_ids=None, wd_types=None,
-            approve_open_vacs=False):
+    def __init__(self, is_fact, dt_from, dt_to, user=None, shop_id=None, employee_ids=None, wd_types=None,
+                 approve_open_vacs=False):
         assert shop_id or employee_ids
         self.is_fact = is_fact
         self.dt_from = dt_from
@@ -227,7 +226,7 @@ class WorkerDayApproveHelper:
                         dates=StringAgg(Cast('dt', CharField()), delimiter=',', ordering='dt'),
                     ))
                     if protected_wdays:
-                        raise PermissionDenied(self.error_messages['has_no_perm_to_approve_protected_wdays'].format(
+                        raise PermissionDenied(WorkerDayViewSet.error_messages['has_no_perm_to_approve_protected_wdays'].format(
                             protected_wdays=', '.join(
                                 f'{d["employee_user_fio"]}: {d["dates"]}' for d in protected_wdays),
                         ))
@@ -462,7 +461,7 @@ class WorkerDayApproveHelper:
                     )
 
                     transaction.on_commit(
-                        lambda: recalc_fact_from_records.delay(employee_days_list=list(employee_days_set)))
+                        lambda: recalc_fact_from_records(employee_days_list=list(employee_days_set)))
 
                     transaction.on_commit(
                         lambda: vacancies_create_and_cancel_for_shop.delay(self.shop_id))

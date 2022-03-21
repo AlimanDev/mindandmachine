@@ -180,6 +180,7 @@ class WorkerDaySerializer(ModelSerializerWithCreateOnlyFields, UnaccountedOverti
         read_only_fields = ['parent_worker_day_id', 'is_blocked', 'closest_plan_approved_id']
         create_only_fields = ['is_fact']
         ref_name = 'WorkerDaySerializer'
+        validators = []  # удаляем таким образом UniquerTogetherValidator поля code
         extra_kwargs = {
             'is_fact': {
                 'required': False,
