@@ -1,4 +1,5 @@
 from datetime import datetime, time, date, timedelta
+from dateutil.relativedelta import relativedelta
 from django.conf import settings
 from django.db import transaction
 from django.db.models import Q
@@ -15,7 +16,6 @@ from src.integration.models import AttendanceArea, ExternalSystem, UserExternalC
 from src.integration.tasks import import_urv_zkteco, export_workers_zkteco, delete_workers_zkteco
 from src.timetable.tests.factories import WorkTypeFactory, WorkTypeNameFactory
 from src.util.mixins.tests import TestsHelperMixin
-from src.util.test import create_departments_and_users
 
 dttm_first = datetime.combine(date.today(), time(10, 48))
 dttm_second = datetime.combine(date.today(), time(12, 34))
@@ -127,6 +127,7 @@ class TestIntegration(TestsHelperMixin, APITestCase):
         self.position = WorkerPosition.objects.create(
             name='Должность',
             network=self.network,
+            code='position',
         )
         self.att_area, _ = AttendanceArea.objects.update_or_create(
             code='1',
@@ -149,6 +150,15 @@ class TestIntegration(TestsHelperMixin, APITestCase):
             position=self.position,
         )
         self.employment1.position = self.position
+
+        self.shop.code = 'shop'
+        self.shop.save()
+        self.root_shop.code = 'root_shop'
+        self.root_shop.save()
+        self.employment1.code = 'employment1_code'
+        self.employment1.save()
+        self.employee1.tabel_code = 'employee1_code'
+        self.employee1.save()
         
         self.client.force_authenticate(user=self.user1)
 
@@ -1381,9 +1391,122 @@ class TestIntegration(TestsHelperMixin, APITestCase):
                 )
                 self.assertTrue(UserExternalCode.objects.filter(external_system=self.ext_system, user=self.user1).exists())
     
+    def test_change_zone_on_employment_change_shop_batch(self):
+        self.att_area2, _ = AttendanceArea.objects.update_or_create(
+            code='2',
+            external_system=self.ext_system,
+            defaults={
+                'name': 'Тестовая зона2',
+            }
+        )
+        ShopExternalCode.objects.create(
+            attendance_area=self.att_area,
+            shop=self.shop,
+        )
+        self.root_shop_code = ShopExternalCode.objects.create(
+            attendance_area=self.att_area,
+            shop=self.root_shop,
+        )
+        UserExternalCode.objects.create(
+            external_system=self.ext_system,
+            user=self.user1,
+            code=settings.ZKTECO_USER_ID_SHIFT + self.user1.id,
+        )
+        dt = date.today()
+        with patch.object(transaction, 'on_commit', lambda t: t()):
+            with patch('src.integration.zkteco.requests', spec=TestRequestMock) as mock_request:
+                mock_request.json.return_value = {"code": 0}
+                mock_request.request.return_value = mock_request
+
+                options = {
+                    'by_code': True,
+                    'delete_scope_fields_list': [
+                        'employee_id',
+                    ],
+                    'delete_scope_filters': {
+                        'dt_hired__lte': (dt + relativedelta(months=1)).replace(day=1) - timedelta(days=1),
+                        'dt_fired__gte_or_isnull': dt.replace(day=1),
+                    }
+                }
+                data = {
+                    'data': [
+                        {
+                            'code': 'employment1_code',
+                            'shop_code': self.shop.code,
+                            'position_code': self.position.code,
+                            'username': self.user1.username,
+                            'dt_hired': self.employment1.dt_hired.strftime('%Y-%m-%d'),
+                            'tabel_code': self.employee1.tabel_code,
+                        },
+                    ],
+                    'options': options,
+                }
+                
+                resp = self.client.post(
+                    self.get_url('Employment-batch-update-or-create'), self.dump_data(data), content_type='application/json')
+                self.assertEqual(resp.status_code, 200)
+                self.assertDictEqual(
+                    resp.json(),
+                    {
+                        "stats": {
+                            "Employment": {
+                                "updated": 1
+                            }
+                        }
+                    }
+                )
+                self.assertEqual(
+                    mock_request.request.call_args_list, 
+                    [
+                        call(
+                            'POST', 
+                            '/attAreaPerson/set', 
+                            data=None, 
+                            json={'pins': [str(settings.ZKTECO_USER_ID_SHIFT + self.user1.id)], 'code': str(self.att_area.code)}, 
+                            params={'access_token': settings.ZKTECO_KEY}
+                        ),
+                    ]
+                )
+                self.assertTrue(UserExternalCode.objects.filter(external_system=self.ext_system, user=self.user1).exists())
+                mock_request.request.reset_mock()
+                self.root_shop_code.attendance_area = self.att_area2
+                self.root_shop_code.save()
+                data["data"][0]["shop_code"] = self.root_shop.code
+                resp = self.client.post(
+                    self.get_url('Employment-batch-update-or-create'), self.dump_data(data), content_type='application/json')
+                self.assertEqual(resp.status_code, 200)
+                self.assertDictEqual(
+                    resp.json(),
+                    {
+                        "stats": {
+                            "Employment": {
+                                "updated": 1
+                            }
+                        }
+                    }
+                )
+                self.assertEqual(
+                    mock_request.request.call_args_list, 
+                    [
+                        call(
+                            'POST', 
+                            '/attAreaPerson/set', 
+                            data=None, 
+                            json={'pins': [str(settings.ZKTECO_USER_ID_SHIFT + self.user1.id)], 'code': str(self.att_area2.code)}, 
+                            params={'access_token': settings.ZKTECO_KEY}
+                        ),
+                        call(
+                            'POST', 
+                            '/attAreaPerson/delete', 
+                            data=None, 
+                            json={'pins': [str(settings.ZKTECO_USER_ID_SHIFT + self.user1.id)], 'code': str(self.att_area.code)}, 
+                            params={'access_token': settings.ZKTECO_KEY}
+                        ),
+                    ]
+                )
+                self.assertTrue(UserExternalCode.objects.filter(external_system=self.ext_system, user=self.user1).exists())
 
     def test_not_delete_area_when_same_area_in_other_shop(self):
-        self.maxDiff = None
         ShopExternalCode.objects.create(
             attendance_area=self.att_area,
             shop=self.shop,
@@ -1429,6 +1552,91 @@ class TestIntegration(TestsHelperMixin, APITestCase):
                 self.employment1.dt_fired = date(2019, 1, 1)
                 self.employment1.save()
                 self.assertEqual(mock_request.request.call_args_list, [])
+                self.assertTrue(UserExternalCode.objects.filter(external_system=self.ext_system, user=self.user1).exists())
+
+    def test_not_delete_area_when_same_area_in_other_shop_batch(self):
+        ShopExternalCode.objects.create(
+            attendance_area=self.att_area,
+            shop=self.shop,
+        )
+        ShopExternalCode.objects.create(
+            attendance_area=self.att_area,
+            shop=self.root_shop,
+        )
+        dt = date.today()
+        with patch.object(transaction, 'on_commit', lambda t: t()):
+            with patch('src.integration.zkteco.requests', spec=TestRequestMock) as mock_request:
+                mock_request.json.return_value = {"code": 0}
+                mock_request.request.return_value = mock_request
+
+                options = {
+                    'by_code': True,
+                    'delete_scope_fields_list': [
+                        'employee_id',
+                    ]
+                }
+                data = {
+                    'data': [
+                        {
+                            'code': 'employment1_2_code',
+                            'shop_code': self.shop.code,
+                            'position_code': self.position.code,
+                            'username': self.user1.username,
+                            'dt_hired': dt.strftime('%Y-%m-%d'),
+                            'tabel_code': self.employee1.tabel_code,
+                        },
+                        {
+                            'code': 'employment1_code',
+                            'shop_code': self.root_shop.code,
+                            'position_code': self.position.code,
+                            'username': self.user1.username,
+                            'dt_hired': date(2019, 1, 1).strftime('%Y-%m-%d'),
+                            'dt_fired': date(2020, 1, 1).strftime('%Y-%m-%d'),
+                            'tabel_code': self.employee1.tabel_code,
+                        },
+                    ],
+                    'options': options,
+                }
+                
+                resp = self.client.post(
+                    self.get_url('Employment-batch-update-or-create'), self.dump_data(data), content_type='application/json')
+                self.assertEqual(resp.status_code, 200)
+                self.assertDictEqual(
+                    resp.json(),
+                    {
+                        "stats": {
+                            "Employment": {
+                                "updated": 1,
+                                "created": 1
+                            }
+                        }
+                    }
+                )
+
+                self.assertEqual(
+                    mock_request.request.call_args_list, 
+                    [
+                        call(
+                            'POST', 
+                            '/person/add', 
+                            data=None, 
+                            json={
+                                'pin': settings.ZKTECO_USER_ID_SHIFT + self.user1.id, 
+                                'deptCode': settings.ZKTECO_DEPARTMENT_CODE, 
+                                'name': self.user1.first_name, 
+                                'lastName': self.user1.last_name,
+                            }, 
+                            params={'access_token': settings.ZKTECO_KEY}
+                        ),
+                        call(
+                            'POST', 
+                            '/attAreaPerson/set', 
+                            data=None, 
+                            json={'pins': [settings.ZKTECO_USER_ID_SHIFT + self.user1.id], 'code': str(self.att_area.code)}, 
+                            params={'access_token': settings.ZKTECO_KEY}
+                        ),
+                    ]
+                )
                 self.assertTrue(UserExternalCode.objects.filter(external_system=self.ext_system, user=self.user1).exists())
 
 
