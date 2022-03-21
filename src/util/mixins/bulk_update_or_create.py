@@ -201,7 +201,8 @@ class BatchUpdateOrCreateModelMixin:
     def batch_update_or_create(
             cls, data: list, update_key_field: str = 'id', delete_scope_fields_list: list = None,
             delete_scope_values_list: list = None, delete_scope_filters: dict = None, stats=None, user=None,
-            dry_run=False, diff_report_email_to: list = None, check_perms_extra_kwargs=None, generate_delete_scope_values=True):
+            dry_run=False, diff_report_email_to: list = None, check_perms_extra_kwargs=None,
+            generate_delete_scope_values=True, model_options=None):
         """
         Функция для массового создания и/или обновления объектов
 
@@ -255,7 +256,10 @@ class BatchUpdateOrCreateModelMixin:
                 if user:
                     check_perms_extra_kwargs.update(cls._get_check_perms_extra_kwargs(user=user))
                 stats = stats if stats is not None else {}
-                delete_scope_fields_list = delete_scope_fields_list or cls._get_batch_delete_scope_fields_list()
+                delete_scope_fields_list = delete_scope_fields_list \
+                    if delete_scope_fields_list is not None \
+                    else cls._get_batch_delete_scope_fields_list()
+                model_options = model_options or {}
                 delete_scope_values_set = set()
                 if delete_scope_values_list:
                     for delete_scope_values in delete_scope_values_list:
@@ -289,9 +293,9 @@ class BatchUpdateOrCreateModelMixin:
                         update_keys.append(update_key)
                         to_update_dict[update_key] = obj_dict
 
-                filter_kwargs = {
-                    f"{update_key_field}__in": update_keys,
-                }
+                filter_kwargs = {}
+                if update_keys:
+                    filter_kwargs[f"{update_key_field}__in"] = update_keys
                 if delete_scope_filters:
                     filter_kwargs.update(delete_scope_filters)
                 update_qs = cls.objects.filter(**filter_kwargs).select_related(
@@ -369,7 +373,8 @@ class BatchUpdateOrCreateModelMixin:
                 deleted_dict = {}
                 objs_to_delete = []
                 q_for_delete = Q()
-                if delete_scope_fields_list:
+
+                if delete_scope_fields_list or delete_scope_filters:
                     if not delete_scope_values_list and generate_delete_scope_values:
                         for obj_to_update in objs_to_update:
                             delete_scope_values_tuple = tuple(
@@ -392,7 +397,8 @@ class BatchUpdateOrCreateModelMixin:
                             if delete_scope_values_tuple:
                                 delete_scope_values_set.add(delete_scope_values_tuple)
 
-                    if delete_scope_values_set or (not generate_delete_scope_values and delete_scope_filters):
+                    if delete_scope_values_set or (
+                            (not generate_delete_scope_values or not delete_scope_fields_list) and delete_scope_filters):
                         for delete_scope_values_tuples in delete_scope_values_set:
                             q_for_delete |= Q(**dict(delete_scope_values_tuples))
 
@@ -447,17 +453,17 @@ class BatchUpdateOrCreateModelMixin:
                         deleted_cls_stats['deleted'] = deleted_cls_stats.get('deleted', 0) + deleted_dict.get(
                             original_deleted_cls_name)
 
-                transaction_checks_kwargs = cls._get_batch_update_or_create_transaction_checks_kwargs(
-                    data=data, q_for_delete=q_for_delete, user=user)
-                cls._run_batch_update_or_create_transaction_checks(**transaction_checks_kwargs)
-
                 if diff_report_email_to:
                     cls._create_and_send_diff_report(diff_report_email_to, diff_data, diff_headers, now)
 
                 cls._post_batch(
                     created_objs=objs_to_create, updated_objs=objs_to_update, deleted_objs=objs_to_delete,
-                    diff_data=diff_data,
+                    diff_data=diff_data, stats=stats, model_options=model_options,
                 )
+
+                transaction_checks_kwargs = cls._get_batch_update_or_create_transaction_checks_kwargs(
+                    data=data, q_for_delete=q_for_delete, user=user)
+                cls._run_batch_update_or_create_transaction_checks(**transaction_checks_kwargs)
 
                 if dry_run:
                     raise DryRunRevertException()

@@ -762,8 +762,45 @@ class WorkerDay(AbstractModel):
                         cls._check_create_single_obj_perm(user, wd_data)
 
     @classmethod
+    def _delete_not_allowed_additional_types(cls, **kwargs):
+        grouped_by_type = {}
+        for obj in kwargs.get('created_objs', []):
+            grouped_by_type.setdefault(obj.type_id, []).append(obj)
+
+        allowed_wd_types_dict = {}
+        for from_workerdaytype_id, to_workerdaytype_id in WorkerDayType.allowed_additional_types.through.objects.filter(
+            from_workerdaytype_id__in=list(grouped_by_type.keys())
+        ).values_list(
+            'from_workerdaytype_id',
+            'to_workerdaytype_id',
+        ):
+            allowed_wd_types_dict.setdefault(from_workerdaytype_id, []).append(to_workerdaytype_id)
+
+        delete_not_allowed_additional_types_q = Q()
+        for wd_type_id, objects in grouped_by_type.items():
+            for obj in objects:
+                delete_not_allowed_additional_types_q |= Q(
+                    ~Q(type_id=obj.type_id),
+                    ~Q(type__in=allowed_wd_types_dict.get(wd_type_id, [])),
+                    employee_id=obj.employee_id,
+                    is_fact=obj.is_fact,
+                    is_approved=obj.is_approved,
+                    dt=obj.dt,
+                )
+        _total_deleted_count, deleted_dict = WorkerDay.objects.filter(delete_not_allowed_additional_types_q).delete()
+        stats = kwargs.setdefault('stats', {})
+        for original_deleted_cls_name, deleted_count in deleted_dict.items():
+            if deleted_count:
+                deleted_cls_name = original_deleted_cls_name.split('.')[1]
+                deleted_cls_stats = stats.setdefault(deleted_cls_name, {})
+                deleted_cls_stats['deleted'] = deleted_cls_stats.get('deleted', 0) + deleted_dict.get(
+                    original_deleted_cls_name)
+
+    @classmethod
     def _post_batch(cls, **kwargs):
         cls._invalidate_cache(**kwargs)
+        if kwargs.get('model_options', {}).get('delete_not_allowed_additional_types'):
+            cls._delete_not_allowed_additional_types(**kwargs)
 
     @classmethod
     def _invalidate_cache(cls, **kwargs):
@@ -1069,6 +1106,7 @@ class WorkerDay(AbstractModel):
             self.work_hours = self._round_wh()
 
     id = models.BigAutoField(primary_key=True, db_index=True)
+    code = models.CharField(max_length=256, db_index=True, null=True)
     shop = models.ForeignKey(Shop, on_delete=models.PROTECT, null=True)
 
     employee = models.ForeignKey(
