@@ -531,6 +531,9 @@ class WorkerDay(AbstractModel):
     class Meta:
         verbose_name = 'Рабочий день сотрудника'
         verbose_name_plural = 'Рабочие дни сотрудников'
+        unique_together = (
+            ('code', 'is_approved'),
+        )
 
     TYPE_HOLIDAY = 'H'
     TYPE_WORKDAY = 'W'
@@ -797,10 +800,16 @@ class WorkerDay(AbstractModel):
                     original_deleted_cls_name)
 
     @classmethod
+    def _approve_delete_scope_filters_wdays(cls, **kwargs):
+        print(kwargs)
+
+    @classmethod
     def _post_batch(cls, **kwargs):
         cls._invalidate_cache(**kwargs)
         if kwargs.get('model_options', {}).get('delete_not_allowed_additional_types'):
             cls._delete_not_allowed_additional_types(**kwargs)
+        if kwargs.get('model_options', {}).get('approve_delete_scope_filters_wdays'):
+            cls._approve_delete_scope_filters_wdays(**kwargs)
 
     @classmethod
     def _invalidate_cache(cls, **kwargs):
@@ -1106,7 +1115,7 @@ class WorkerDay(AbstractModel):
             self.work_hours = self._round_wh()
 
     id = models.BigAutoField(primary_key=True, db_index=True)
-    code = models.CharField(max_length=256, db_index=True, null=True)
+    code = models.CharField(max_length=256, null=True)
     shop = models.ForeignKey(Shop, on_delete=models.PROTECT, null=True)
 
     employee = models.ForeignKey(

@@ -3579,7 +3579,7 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
                     "is_approved": False,
                     "dt": self.dt,
                     "type": WorkerDay.TYPE_VACATION,
-                },
+                }
             ],
             'options': {
                 "update_key_field": "code",
@@ -3587,12 +3587,13 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
                 "delete_scope_filters": {
                     "employee__tabel_code": self.employee2.tabel_code,
                     "is_fact": False,
-                    "dt__lte": "2022-03-31",
-                    "dt__gte": "2021-02-01",
+                    "dt__lte": self.dt - timedelta(days=30),
+                    "dt__gte": self.dt + timedelta(days=30),
                     "type_id__in": [WorkerDay.TYPE_VACATION],
                 },
                 "model_options": {
                     "delete_not_allowed_additional_types": True,
+                    "approve_delete_scope_filters_wdays": True,
                 },
             }
         }
