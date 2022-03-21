@@ -1,31 +1,29 @@
 from datetime import datetime, date
-from dateutil.relativedelta import relativedelta
 
 from rest_framework import status
 from rest_framework.test import APITestCase
-
-from src.util.test import create_departments_and_users
+from src.util.mixins.tests import TestsHelperMixin
 
 from src.timetable.models import ShopMonthStat
 from src.util.models_converter import Converter
 
-class TestShopMonthStat(APITestCase):
+class TestShopMonthStat(APITestCase, TestsHelperMixin):
     USER_USERNAME = "user1"
     USER_EMAIL = "q@q.q"
     USER_PASSWORD = "4242"
 
-    def setUp(self):
-        super().setUp()
+    @classmethod
+    def setUpTestData(cls):
+        cls.url = '/rest_api/shop_month_stat/'
 
-        self.url = '/rest_api/shop_month_stat/'
-
-        create_departments_and_users(self)
-        self.month_stat = ShopMonthStat.objects.create(
+        cls.create_departments_and_users()
+        cls.month_stat = ShopMonthStat.objects.create(
             dt=date.today().replace(day=1),
             dttm_status_change=datetime.now(),
-            shop_id=self.shop.id,
+            shop_id=cls.shop.id,
         )
-        
+
+    def setUp(self):
         self.client.force_authenticate(user=self.user1)
 
     def test_get_list(self):

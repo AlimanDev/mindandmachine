@@ -27,7 +27,7 @@ class TestCreateMDAUserToShopRelation(TestsHelperMixin, TestCase):
             is_vacancy=True,
             is_fact=False, is_approved=True,
         )
-        cls.work_type_name1 = WorkTypeName.objects.create(name='Тест')
+        cls.work_type_name1 = WorkTypeName.objects.create(name='Тест', network=cls.network)
         cls.work_type1 = WorkType.objects.create(shop=cls.shop, work_type_name=cls.work_type_name1)
         WorkerDayCashboxDetails.objects.create(
             work_type=cls.work_type1,

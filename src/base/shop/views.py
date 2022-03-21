@@ -60,6 +60,7 @@ class ShopViewSet(UpdateorCreateViewSet):
     serializer_class = ShopSerializer
     filterset_class = ShopFilter
     openapi_tags = ['Shop',]
+    queryset = Shop.objects.all()
 
     @swagger_auto_schema(responses={200: ShopSerializer(many=True)}, operation_description='GET /rest_api/department/')
     def list(self, request):
@@ -116,7 +117,7 @@ class ShopViewSet(UpdateorCreateViewSet):
             if include_outsources:
                 shops_filter |= Q(network_id__in=NetworkConnect.objects.filter(client_id=user.network_id).values_list('outsourcing_id', flat=True))
 
-        return Shop.objects.filter(shops_filter).order_by('level', 'name')
+        return super().get_queryset().filter(shops_filter).order_by('level', 'name')
 
     @action(detail=False, methods=['get'], serializer_class=ShopStatSerializer)#, permission_classes=[IsAdminOrIsSelf])
     def stat(self, request):

@@ -1,46 +1,42 @@
-from datetime import datetime
 from unittest.case import skip
-from dateutil.relativedelta import relativedelta
 
 from rest_framework import status
 from rest_framework.test import APITestCase
-
-from src.util.test import create_departments_and_users
+from src.util.mixins.tests import TestsHelperMixin
 
 from src.forecast.models import OperationTypeName, OperationType
 from src.timetable.models import WorkTypeName, WorkType
 
 
-class TestOperationType(APITestCase):
+class TestOperationType(APITestCase, TestsHelperMixin):
     USER_USERNAME = "user1"
     USER_EMAIL = "q@q.q"
     USER_PASSWORD = "4242"
 
-    def setUp(self):
-        super().setUp()
+    @classmethod
+    def setUpTestData(cls):
+        cls.url = '/rest_api/operation_type/'
 
-        self.url = '/rest_api/operation_type/'
-
-        create_departments_and_users(self)
-        self.work_type_name1 = WorkTypeName.objects.create(
+        cls.create_departments_and_users()
+        cls.work_type_name1 = WorkTypeName.objects.create(
             name='Кассы',
-            network=self.network,
+            network=cls.network,
         )
-        self.work_type1 = WorkType.objects.create(shop=self.shop, work_type_name=self.work_type_name1)
-        self.work_type2 = WorkType.objects.create(shop=self.shop2, work_type_name=self.work_type_name1)
-        self.work_type3 = WorkType.objects.create(shop=self.shop3, work_type_name=self.work_type_name1)
+        cls.work_type1 = WorkType.objects.create(shop=cls.shop, work_type_name=cls.work_type_name1)
+        cls.work_type2 = WorkType.objects.create(shop=cls.shop2, work_type_name=cls.work_type_name1)
+        cls.work_type3 = WorkType.objects.create(shop=cls.shop3, work_type_name=cls.work_type_name1)
 
-        self.operation_type_name1 = self.work_type_name1.operation_type_name
-        self.operation_type_name2 = OperationTypeName.objects.create(
+        cls.operation_type_name1 = cls.work_type_name1.operation_type_name
+        cls.operation_type_name2 = OperationTypeName.objects.create(
             name='продажа2',
             code='2',
-            network=self.network,
+            network=cls.network,
         )
 
-        self.operation_type = self.work_type1.operation_type
-        self.operation_type2 = self.work_type2.operation_type
-        
+        cls.operation_type = cls.work_type1.operation_type
+        cls.operation_type2 = cls.work_type2.operation_type
 
+    def setUp(self):
         self.client.force_authenticate(user=self.user1)
 
     def test_get_list(self):
