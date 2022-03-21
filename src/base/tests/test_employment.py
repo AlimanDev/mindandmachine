@@ -1,6 +1,7 @@
 import uuid
 from datetime import timedelta, date, datetime, time
 from unittest import mock
+from django.test import override_settings
 
 import pandas as pd
 from dateutil.relativedelta import relativedelta
@@ -22,10 +23,27 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
     @classmethod
     def setUpTestData(cls):
         cls.create_departments_and_users()
+        cls.break1 = Break.objects.create(
+            name='break1',
+            network=cls.network,
+            value='[[0, 1440, [30, 30]]]',
+        )
         cls.worker_position = WorkerPosition.objects.create(
             name='Директор магазина',
             code='director',
             network=cls.network,
+            breaks=cls.break1,
+        )
+        cls.break2 = Break.objects.create(
+            name='break2',
+            network=cls.network,
+            value='[[0, 1440, [30]]]',
+        )
+        cls.another_worker_position = WorkerPosition.objects.create(
+            name='Заместитель директора магазина',
+            network=cls.network,
+            breaks=cls.break2,
+            code='deputy director',
         )
         cls.wt_name = WorkTypeName.objects.create(name='test_name', code='test_code', network=cls.network)
         cls.wt_name2 = WorkTypeName.objects.create(name='test_name2', code='test_code2', network=cls.network)
@@ -247,23 +265,6 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
 
     def test_work_hours_change_on_update_position(self):
         dt = date.today()
-        break1 = Break.objects.create(
-            name='break1',
-            network=self.network,
-            value='[[0, 1440, [30, 30]]]',
-        )
-        break2 = Break.objects.create(
-            name='break2',
-            network=self.network,
-            value='[[0, 1440, [30]]]',
-        )
-        self.worker_position.breaks = break1
-        self.worker_position.save()
-        another_worker_position = WorkerPosition.objects.create(
-            name='Заместитель директора магазина',
-            network=self.network,
-            breaks=break2,
-        )
         resp = self._create_employment().json()
         for i in range(3):
             WorkerDay.objects.create(
@@ -286,7 +287,7 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
         self.assertEqual(WorkerDay.objects.get(employment_id=resp['id'], dt=dt + timedelta(1)).work_hours,
                          timedelta(hours=9))
         emp = Employment.objects.get(pk=resp['id'])
-        emp.position = another_worker_position
+        emp.position = self.another_worker_position
         emp.save()
         self.assertEqual(WorkerDay.objects.get(employment_id=resp['id'], dt=dt).work_hours, timedelta(hours=9))
         self.assertEqual(WorkerDay.objects.get(employment_id=resp['id'], dt=dt + timedelta(1)).work_hours,
@@ -878,6 +879,8 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
         self._test_update_group_permissions(None, 200, None)
         self.admin_group.subordinates.clear()
 
+    @override_settings(CELERY_TASK_ALWAYS_EAGER=True)
+    @mock.patch.object(transaction, 'on_commit', lambda t: t())
     def test_batch_update_or_create(self):
         now = timezone.now()
         dt_now = now.date()
@@ -989,6 +992,81 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
         self.assertTrue(Employment.objects.filter(id=f_e2.id).exists())
         self.assertTrue(Employment.objects.filter(id=s_e.id).exists())
         self.assertFalse(Employment.objects.filter(id=d_e.id).exists())
+
+        self.employee3.tabel_code = 'employee3'
+        self.employee3.save()
+
+        self.employment3.dt_hired = date(2021, 11, 1)
+        self.employment3.dt_fired = date(3999, 12, 31)
+        self.employment3.position = self.worker_position
+        self.employment3.code = 'current_employment3'
+        self.employment3.save()
+
+        self.network.clean_wdays_on_employment_dt_change = True
+        self.network.save()
+
+        future_plan_worker_day = WorkerDayFactory(
+            employee=self.employee3,
+            employment=self.employment3,
+            dt=dt_now + timedelta(1),
+            dttm_work_start=datetime.combine(dt_now + timedelta(1), time(8)),
+            dttm_work_end=datetime.combine(dt_now + timedelta(1), time(20)),
+            type_id=WorkerDay.TYPE_WORKDAY,
+            shop=self.shop,
+            is_approved=True,
+            is_fact=False,
+        )
+
+        self.assertEqual(future_plan_worker_day.work_hours, timedelta(hours=11))
+
+        data = {
+            'data': [
+                {
+                    'code': 'new_employment3',
+                    'position_code': self.worker_position.code,
+                    'dt_hired': (dt_now + timedelta(days=1)).strftime('%Y-%m-%d'),
+                    'dt_fired': date(3999, 12, 31).strftime('%Y-%m-%d'),
+                    'shop_code': self.shop.code,
+                    'username': self.user3.username,
+                    'tabel_code': self.employee3.tabel_code,
+                },
+                {
+                    'code': 'current_employment3',
+                    'position_code': self.another_worker_position.code,
+                    'dt_hired': date(2021, 11, 1).strftime('%Y-%m-%d'),
+                    'dt_fired': dt_now.strftime('%Y-%m-%d'),
+                    'shop_code': self.shop.code,
+                    'username': self.user3.username,
+                    'tabel_code': self.employee3.tabel_code,
+                },
+            ],
+            'options': options,
+        }
+        
+        resp = self.client.post(
+            self.get_url('Employment-batch-update-or-create'), self.dump_data(data), content_type='application/json')
+        self.assertEqual(resp.status_code, 200)
+        self.assertDictEqual(
+            resp.json(),
+            {
+                "stats": {
+                    "Employment": {
+                        "created": 1,
+                        "updated": 1
+                    }
+                }
+            }
+        )
+        self.employment3.refresh_from_db()
+        created_empl = Employment.objects.get(code='new_employment3')
+        self.assertEqual(self.employment3.dt_fired, dt_now)
+        self.assertEqual(created_empl.dt_hired, dt_now + timedelta(1))
+        self.assertEqual(created_empl.dt_fired, date(3999, 12, 31))
+        self.assertEqual(EmploymentWorkType.objects.filter(employment=created_empl).count(), 2)
+        future_plan_worker_day.refresh_from_db()
+        self.assertEqual(future_plan_worker_day.work_hours, timedelta(hours=11, minutes=30))
+        self.assertEqual(future_plan_worker_day.employment_id, created_empl.id)
+
 
     def test_batch_update_or_create_diff_report(self):
         dt_now = date(2021, 12, 6)
