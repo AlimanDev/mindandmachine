@@ -69,9 +69,11 @@ class TimesheetCalculator:
             'employee__user',
             'shop',
             'employment__shop',
-            'employment__position',
+            'employment__position__breaks',
             'type',
             'closest_plan_approved',
+            'shop__network__breaks', 
+            'shop__settings__breaks',
         ).prefetch_related(
             Prefetch('work_types',
                      queryset=WorkType.objects.all().select_related('work_type_name', 'work_type_name__position'),
@@ -215,8 +217,10 @@ class TimesheetCalculator:
             type_id=WorkerDay.TYPE_EMPTY,
         ).select_related(
             'employee__user__network',
-            'shop__network',
+            'shop__network__breaks', 
             'type',
+            'shop__settings__breaks',
+            'employment__position__breaks',
         ).prefetch_related(
             Prefetch('work_types',
                      queryset=WorkType.objects.all().select_related('work_type_name', 'work_type_name__position'),
