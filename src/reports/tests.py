@@ -681,27 +681,27 @@ class TestScheduleDeviation(APITestCase):
             ]
         )
         report = self.client.get(f'/rest_api/report/schedule_deviation/?dt_from={dt}&dt_to={dt+timedelta(1)}&shop_ids={self.shop.id}')
-        data = pd.read_excel(report.content).fillna('')
-        self.assertEqual(
-            list(data.iloc[10, :].values), 
-            [1, self.shop.name, datetime.combine(dt, time(0, 0)), f'{self.user1.fio} ', '-', self.root_shop.name, 'штат', self.position.name, 'Биржа смен', 10,
-            10.5, 4.5, 0.5, 1, 0.5, 1, 0, 0, 1, 2, 0, 0, 0, 0]
-        )
-        self.assertEqual(
-            list(data.iloc[11, :].values), 
-            [2, self.shop2.name, datetime.combine(dt, time(0, 0)), f'{self.user2.fio} ',
-            self.employee2.tabel_code, self.shop.name, 'штат', '-', 'Биржа смен', 8.75,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8.75, 1]
-        )
-        self.assertEqual(
-            list(data.iloc[12, :].values), 
-            [3, self.shop.name, datetime.combine(dt, time(0, 0)), '-', '-', '-', 'штат', 'Грузчик', 'Биржа смен', 8.75,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8.75, 1]
-        )
-        self.assertEqual(
-            list(data.iloc[13, :].values), 
-            [4, self.shop.name, datetime.combine(dt, time(0, 0)), '-', '-', 'Аутсорс сеть 1', 'не штат', 'Грузчик', 'Биржа смен', 8.75,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8.75, 1]
+        data = tuple(map(lambda x: tuple(x), pd.read_excel(report.content).fillna('').iloc[10:, 1:].values))
+        self.assertCountEqual(
+            data,
+            (
+                (
+                    self.shop.name, datetime.combine(dt, time(0, 0)), f'{self.user1.fio} ', '-', self.root_shop.name, 'штат', 
+                    self.position.name, 'Биржа смен', 10, 10.5, 4.5, 0.5, 1, 0.5, 1, 0, 0, 1, 2, 0, 0, 0, 0
+                ),
+                (
+                    self.shop2.name, datetime.combine(dt, time(0, 0)), f'{self.user2.fio} ', self.employee2.tabel_code, 
+                    self.shop.name, 'штат', '-', 'Биржа смен', 8.75, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8.75, 1
+                ),
+                (
+                    self.shop.name, datetime.combine(dt, time(0, 0)), '-', '-', '-', 'штат', 'Грузчик', 'Биржа смен', 
+                    8.75, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8.75, 1
+                ),
+                (
+                    self.shop.name, datetime.combine(dt, time(0, 0)), '-', '-', 'Аутсорс сеть 1', 'не штат', 'Грузчик', 
+                    'Биржа смен', 8.75, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8.75, 1
+                ),
+            )
         )
 
     def test_get_schedule_deviation_no_data(self):

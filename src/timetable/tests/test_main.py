@@ -4541,7 +4541,7 @@ class TestAttendanceRecords(TestsHelperMixin, APITestCase):
         self.network.allowed_interval_for_early_departure = timedelta(minutes=5)
         self.network.only_fact_hours_that_in_approved_plan = True
         self.network.round_work_hours_alg = Network.ROUND_TO_HALF_AN_HOUR
-        self.network.set_settings_value("break_time_subtractor",  "in_priority_from_bigger_part")
+        # self.network.set_settings_value("break_time_subtractor",  "in_priority_from_bigger_part")
         self.network.save()
         self.breaks.value = '[]'
         self.breaks.save()
@@ -4605,6 +4605,43 @@ class TestAttendanceRecords(TestsHelperMixin, APITestCase):
         self.assertEqual(total, 3)
         self.assertEqual(day, 2.5)
         self.assertEqual(night, 0.5)
+
+        self.breaks.value = '[[0, 3600, [40]]]'
+        self.breaks.save()
+        self.shop.refresh_from_db()
+
+        fact_worker_day.dttm_work_start = datetime.combine(self.dt, time(19))
+        fact_worker_day.dttm_work_end = datetime.combine(self.dt, time(22, 50))
+        fact_worker_day.save()
+        total, day, night = fact_worker_day.calc_day_and_night_work_hours()
+        self.assertEqual(total, 3)
+        self.assertEqual(day, 2.33)
+        self.assertEqual(night, 0.67)
+
+        fact_worker_day.dttm_work_start = datetime.combine(self.dt, time(19, 30))
+        fact_worker_day.save()
+        total, day, night = fact_worker_day.calc_day_and_night_work_hours()
+        self.assertEqual(total, 2.5)
+        self.assertEqual(day, 1.83)
+        self.assertEqual(night, 0.67)
+
+        self.breaks.value = '[[0, 3600, [30]]]'
+        self.breaks.save()
+        self.shop.refresh_from_db()
+
+        fact_worker_day.save()
+        total, day, night = fact_worker_day.calc_day_and_night_work_hours()
+        self.assertEqual(total, 3)
+        self.assertEqual(day, 2.25)
+        self.assertEqual(night, 0.75)
+
+        fact_worker_day.dttm_work_start = datetime.combine(self.dt, time(19))
+        fact_worker_day.save()
+        total, day, night = fact_worker_day.calc_day_and_night_work_hours()
+        self.assertEqual(total, 3.5)
+        self.assertEqual(day, 2.75)
+        self.assertEqual(night, 0.75)
+
 
     def test_two_facts_created_when_there_are_two_plans(self):
         WorkerDay.objects.filter(
