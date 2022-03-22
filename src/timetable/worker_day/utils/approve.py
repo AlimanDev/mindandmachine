@@ -140,7 +140,8 @@ class WorkerDayApproveHelper:
                 'dttm_work_start',
                 'dttm_work_end',
                 'shop_id',
-                'work_type_ids'
+                'work_type_ids',
+                'is_vacancy',
             ]
             draft_wdays = list(WorkerDay.objects.filter(
                 approve_condition,
@@ -481,6 +482,13 @@ class WorkerDayApproveHelper:
                                 dttm_status_change=dttm_now,
                                 is_approved=True,
                             )
+                        )
+                        WorkerDay.check_main_work_hours_norm(
+                            dt_from=self.dt_from,
+                            dt_to=self.dt_to,
+                            employee_id__in=employee_ids,
+                            shop_id=self.shop_id,
+                            exc_cls=ValidationError,
                         )
 
                     transaction.on_commit(

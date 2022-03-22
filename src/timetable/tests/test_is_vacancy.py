@@ -3,7 +3,7 @@ from datetime import date, datetime, time, timedelta
 from src.base.tests.factories import EmployeeFactory, EmploymentFactory, GroupFactory, NetworkFactory, ShopFactory, UserFactory
 from src.timetable.models import AttendanceRecords, GroupWorkerDayPermission, ShopMonthStat, WorkerDay, WorkerDayCashboxDetails, WorkerDayPermission
 from src.timetable.tests.factories import WorkTypeFactory, WorkerDayFactory
-from src.timetable.worker_day.utils import copy_as_excel_cells, create_worker_days_range, exchange
+from src.timetable.worker_day.utils.utils import copy_as_excel_cells, create_worker_days_range, exchange
 from src.util.mixins.tests import TestsHelperMixin
 from rest_framework.test import APITestCase
 
