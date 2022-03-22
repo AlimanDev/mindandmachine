@@ -1,3 +1,4 @@
+from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models
 
 from src.base.models_abstract import AbstractModel, AbstractActiveNetworkSpecificCodeNamedModel
@@ -22,7 +23,7 @@ class EventHistory(AbstractModel):
     event_type = models.ForeignKey('events.EventType', on_delete=models.CASCADE)
     user_author = models.ForeignKey('base.User', null=True, blank=True, on_delete=models.SET_NULL)
     shop = models.ForeignKey('base.Shop', null=True, blank=True, on_delete=models.SET_NULL)
-    context = models.JSONField(default=dict)
+    context = models.JSONField(default=dict, encoder=DjangoJSONEncoder)
 
     class Meta:
         verbose_name = 'История события'

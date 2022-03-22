@@ -7,7 +7,7 @@ from django.db.models import Q
 from src.celery.celery import app
 from src.timetable.models import WorkerDay
 from src.timetable.utils import CleanWdaysHelper
-from src.timetable.worker_day.utils import create_fact_from_attendance_records
+from src.timetable.worker_day.utils.utils import create_fact_from_attendance_records
 
 
 @app.task
