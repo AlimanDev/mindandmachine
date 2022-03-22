@@ -945,6 +945,7 @@ class WorkerDayViewSet(BaseModelViewSet):
                     is_fact=vacancy.is_fact,
                     is_approved=True,
                 ).exclude(id=vacancy.id).delete()
+                vacancy.parent_worker_day_id = None # так как выше удаляем возможного родителя
                 vacancy.is_approved = True
                 vacancy.save()
 
