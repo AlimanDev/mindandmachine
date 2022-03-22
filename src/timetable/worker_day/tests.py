@@ -5,7 +5,7 @@ from datetime import timedelta, time, datetime, date
 
 from django.test.utils import override_settings
 from src.timetable.timesheet.tasks import calc_timesheets
-from src.timetable.worker_day.utils import create_fact_from_attendance_records
+from src.timetable.worker_day.utils.utils import create_fact_from_attendance_records
 from unittest import skip, mock
 
 import pandas

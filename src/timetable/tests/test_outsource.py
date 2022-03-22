@@ -484,7 +484,6 @@ class TestOutsource(TestsHelperMixin, APITestCase):
         )
         self.assertEqual(response.json(), {'result': 'Вакансия успешно принята.'})
 
-
     def test_confirm_outsource_vacancy_from_client_network(self):
         dt_now = self.dt_now
         vacancy = self._create_vacancy(dt_now, datetime.combine(dt_now, time(8)), datetime.combine(dt_now, time(20)), outsources=[self.outsource_network.id,]).json()

@@ -231,6 +231,75 @@ class TestShiftScheduleViewSet(TestsHelperMixin, APITestCase):
             "ShiftSchedule": {}
         })
 
+    def test_can_filter_by_rel_objs_delete_scope_filters(self):
+        shift_schedules_data_2021 = [
+            {
+                "code": "1",
+                "name": "График 1",
+                "days": [
+                    {
+                        "code": "1_2021-01-01",
+                        "dt": "2021-01-01",
+                        "day_type": 'W',
+                        "work_hours": Decimal("13.00"),
+                    },
+                    {
+                        "code": "1_2021-01-02",
+                        "dt": "2021-01-02",
+                        "day_type": 'H',
+                        "work_hours": Decimal("0.00"),
+                    },
+                    {
+                        "code": "1_2021-01-07",
+                        "dt": "2021-01-07",
+                        "day_type": 'W',
+                        "work_hours": Decimal("12.00"),
+                    },
+                ]
+            }
+        ]
+        options = {
+            "by_code": True,
+            "delete_scope_fields_list": ["code"],
+        }
+        data = {
+            "data": shift_schedules_data_2021,
+            "options": options
+        }
+
+        resp = self.client.post(
+            self.get_url('ShiftSchedule-batch-update-or-create'), self.dump_data(data), content_type='application/json')
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(ShiftSchedule.objects.count(), 1)
+        self.assertEqual(ShiftScheduleDay.objects.count(), 3)
+        resp_data = resp.json()
+        self.assertDictEqual(resp_data['stats'], {
+            "ShiftScheduleDay": {
+                "created": 3
+            },
+            "ShiftSchedule": {
+                "created": 1
+            }
+        })
+
+        data["data"] = [
+            {
+                "code": "1",
+                "name": "График 1",
+                "days": []
+            }
+        ]
+        options["rel_objs_delete_scope_filters"] = {
+            "ShiftScheduleDay": {
+                "dt": "2021-01-01",
+            }
+        }
+        resp = self.client.post(
+            self.get_url('ShiftSchedule-batch-update-or-create'), self.dump_data(data), content_type='application/json')
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(ShiftSchedule.objects.count(), 1)
+        self.assertEqual(ShiftScheduleDay.objects.count(), 2)
+
 
 class TestShiftScheduleIntervalViewSet(TestsHelperMixin, APITestCase):
     @classmethod
