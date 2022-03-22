@@ -161,7 +161,20 @@ class WorkerDayViewSet(BaseModelViewSet):
         if request.query_params.get('hours_details', False):
             data = []
 
-            for worker_day in self.filter_queryset(self.get_queryset().prefetch_related(Prefetch('worker_day_details', to_attr='worker_day_details_list')).select_related('last_edited_by', 'shop__network', 'employee')):
+            worker_days = self.filter_queryset(
+                self.get_queryset().prefetch_related(
+                    Prefetch('worker_day_details', to_attr='worker_day_details_list')
+                ).select_related(
+                    'last_edited_by', 
+                    'shop__network__breaks', 
+                    'employee',
+                    'shop__settings__breaks',
+                    'employment__position__breaks',
+                    'closest_plan_approved',
+                )
+            )
+
+            for worker_day in worker_days:
                 wd_dict = WorkerDayListSerializer(worker_day, context=self.get_serializer_context()).data
                 work_hours, work_hours_day, work_hours_night = worker_day.calc_day_and_night_work_hours()
                 wd_dict['work_hours'] = work_hours
@@ -961,6 +974,7 @@ class WorkerDayViewSet(BaseModelViewSet):
                     is_fact=vacancy.is_fact,
                     is_approved=True,
                 ).exclude(id=vacancy.id).delete()
+                vacancy.parent_worker_day_id = None # так как выше удаляем возможного родителя
                 vacancy.is_approved = True
                 vacancy.save()
 

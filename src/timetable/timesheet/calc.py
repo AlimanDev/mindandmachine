@@ -69,9 +69,11 @@ class TimesheetCalculator:
             'employee__user',
             'shop',
             'employment__shop',
-            'employment__position',
+            'employment__position__breaks',
             'type',
             'closest_plan_approved',
+            'shop__network__breaks', 
+            'shop__settings__breaks',
         ).prefetch_related(
             Prefetch('work_types',
                      queryset=WorkType.objects.all().select_related('work_type_name', 'work_type_name__position'),
@@ -142,13 +144,14 @@ class TimesheetCalculator:
             return
         work_type_name = self._get_work_type_name(worker_day=plan_wd)
         is_absent = day_in_past and not plan_wd.type.is_dayoff
+        is_special = day_in_past and not plan_wd.type.is_dayoff and not plan_wd.type.is_work_hours
         d = {
             'employee_id': self.employee.id,
             'dt': dt,
             'shop': self._get_shop(plan_wd),
             'position': self._get_position(plan_wd, work_type_name=work_type_name),
             'work_type_name': work_type_name,
-            'fact_timesheet_type_id': WorkerDay.TYPE_ABSENSE if is_absent else plan_wd.type_id,
+            'fact_timesheet_type_id': WorkerDay.TYPE_HOLIDAY if is_special else WorkerDay.TYPE_ABSENSE if is_absent else plan_wd.type_id,
             'fact_timesheet_source': TimesheetItem.SOURCE_TYPE_SYSTEM if is_absent else TimesheetItem.SOURCE_TYPE_PLAN,
             'is_vacancy': plan_wd.is_vacancy,
         }
@@ -214,8 +217,10 @@ class TimesheetCalculator:
             type_id=WorkerDay.TYPE_EMPTY,
         ).select_related(
             'employee__user__network',
-            'shop__network',
+            'shop__network__breaks', 
             'type',
+            'shop__settings__breaks',
+            'employment__position__breaks',
         ).prefetch_related(
             Prefetch('work_types',
                      queryset=WorkType.objects.all().select_related('work_type_name', 'work_type_name__position'),

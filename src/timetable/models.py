@@ -929,6 +929,11 @@ class WorkerDay(AbstractModel):
             work_hours_night = work_hours
             return work_hours, 0.0, work_hours_night
 
+        network = self.shop.network if self.shop_id else None
+        round_wh_alg_func = None
+        if network and network.round_work_hours_alg is not None:
+            round_wh_alg_func = Network.ROUND_WH_ALGS.get(network.round_work_hours_alg)
+
         if work_start.time() > night_edges[0] or work_start.time() < night_edges[1]:
             tm_start = _time_to_float(work_start.time())
         else:
@@ -939,26 +944,50 @@ class WorkerDay(AbstractModel):
             tm_end = _time_to_float(night_edges[1])
 
         night_seconds = (tm_end - tm_start if tm_end > tm_start else 24 - (tm_start - tm_end)) * 60 * 60
-        total_seconds = (work_end - work_start).total_seconds()
 
-        break_time_seconds = total_seconds - work_seconds
+        if round_wh_alg_func:
+            night_seconds = round_wh_alg_func(night_seconds / 3600) * 3600
+
+        break_time_seconds = self._calc_break(self._get_breaks(), work_start, work_end, plan_approved=self.closest_plan_approved) * 60
+
+        total_seconds = (work_seconds + break_time_seconds)
 
         break_time_subtractor_alias = None
-        if self.shop_id and self.shop.network_id:
-            break_time_subtractor_alias = self.shop.network.settings_values_prop.get('break_time_subtractor')
+        if network:
+            break_time_subtractor_alias = network.settings_values_prop.get('break_time_subtractor')
         break_time_subtractor_cls = break_time_subtractor_map.get(break_time_subtractor_alias or 'default')
         break_time_subtractor = break_time_subtractor_cls(break_time_seconds, total_seconds, night_seconds)
         work_hours_day, work_hours_night = break_time_subtractor.calc()
         work_hours = work_hours_day + work_hours_night
         return work_hours, work_hours_day, work_hours_night
+    
+    def _get_breaks(self):
+        position_break_triplet_cond = self.employment and self.employment.position and self.employment.position.breaks
+        if self.shop and (self.shop.settings or position_break_triplet_cond or self.shop.network.breaks):
+            return self.employment.position.breaks.breaks if position_break_triplet_cond else self.shop.settings.breaks.breaks if self.shop.settings else self.shop.network.breaks.breaks
+    
+    def _calc_break(self, breaks, dttm_work_start, dttm_work_end, plan_approved=None):
+        work_hours = ((dttm_work_end - dttm_work_start).total_seconds() / 60)
+        break_time = 0
+        if not breaks:
+            return break_time
+        for break_triplet in breaks:
+            if work_hours >= break_triplet[0] and work_hours <= break_triplet[1]:
+                break_time = sum(break_triplet[2])
+                break
+        if plan_approved:
+            # учитываем перерыв плана, если факт получился больше
+            fact_hours = self.count_work_hours(dttm_work_start, dttm_work_end, break_time)
+            plan_hours = plan_approved.work_hours
+            if fact_hours > plan_hours:
+                break_time = self._calc_break(breaks, plan_approved.dttm_work_start, plan_approved.dttm_work_end)
+        return break_time
 
     def _calc_wh(self):
         from src.util.models_converter import Converter
         self.dt = Converter.parse_date(self.dt) if isinstance(self.dt, str) else self.dt
-        position_break_triplet_cond = self.employment and self.employment.position and self.employment.position.breaks
-        if not self.type.is_dayoff and self.dttm_work_end and self.dttm_work_start and self.shop and (
-                self.shop.settings or position_break_triplet_cond or self.shop.network.breaks):
-            breaks = self.employment.position.breaks.breaks if position_break_triplet_cond else self.shop.settings.breaks.breaks if self.shop.settings else self.shop.network.breaks.breaks
+        breaks = self._get_breaks()
+        if not self.type.is_dayoff and self.dttm_work_end and self.dttm_work_start and not breaks is None:
             dttm_work_start = _dttm_work_start = self.dttm_work_start
             dttm_work_end = _dttm_work_end = self.dttm_work_end
             if self.shop.network.crop_work_hours_by_shop_schedule and self.crop_work_hours_by_shop_schedule:
@@ -980,18 +1009,19 @@ class WorkerDay(AbstractModel):
                     if self.dttm_work_end > dttm_shop_close:
                         dttm_work_end = dttm_shop_close
             break_time = None
-            fine = 0
+            arrive_fine, departure_fine = 0, 0
             if self.is_fact:
                 plan_approved = None
                 if self.closest_plan_approved_id:
                     plan_approved = WorkerDay.objects.filter(id=self.closest_plan_approved_id).first()
                 if plan_approved:
-                    fine = self.get_fine(
+                    arrive_fine, departure_fine = self.get_fines(
                         _dttm_work_start,
                         _dttm_work_end,
                         plan_approved.dttm_work_start,
                         plan_approved.dttm_work_end,
                         self.employment.position.wp_fines if self.employment and self.employment.position else None,
+                        self.shop.network,
                     )
                 if self.shop.network.only_fact_hours_that_in_approved_plan and not self.type.is_dayoff:
                     if plan_approved:
@@ -1014,19 +1044,16 @@ class WorkerDay(AbstractModel):
                             dttm_work_end = plan_approved.dttm_work_end
                         else:
                             dttm_work_end = min(dttm_work_end, plan_approved.dttm_work_end)
-                        # учитываем перерыв плана, если факт получился больше
-                        fact_hours = self.count_work_hours(breaks, dttm_work_start, dttm_work_end)
-                        plan_hours = plan_approved.work_hours
-                        if fact_hours > plan_hours:
-                            work_hours = (plan_approved.dttm_work_end - plan_approved.dttm_work_start).total_seconds() / 60
-                            for break_triplet in breaks:
-                                if work_hours >= break_triplet[0] and work_hours <= break_triplet[1]:
-                                    break_time = sum(break_triplet[2])
-                                    break
+                        break_time = self._calc_break(breaks, dttm_work_start, dttm_work_end, plan_approved=plan_approved)
                     else:
                         return dttm_work_start, dttm_work_end, datetime.timedelta(0)
 
-            return dttm_work_start, dttm_work_end, self.count_work_hours(breaks, dttm_work_start, dttm_work_end, break_time=break_time, fine=fine)
+            if break_time is None:
+                break_time = self._calc_break(breaks, dttm_work_start, dttm_work_end)
+
+            dttm_work_start, dttm_work_end = dttm_work_start + datetime.timedelta(minutes=arrive_fine), dttm_work_end - datetime.timedelta(minutes=departure_fine)
+
+            return dttm_work_start, dttm_work_end, self.count_work_hours(dttm_work_start, dttm_work_end, break_time)
 
         # потенциально только для is_dayoff == true ? -- чтобы было наглядней сколько часов вычитается из нормы?
         # + вычитать из нормы из work_hours в типах is_reduce_norm?
@@ -1171,15 +1198,8 @@ class WorkerDay(AbstractModel):
         return not self.is_approved
 
     @staticmethod
-    def count_work_hours(break_triplets, dttm_work_start, dttm_work_end, break_time=None, fine=0):
-        work_hours = ((dttm_work_end - dttm_work_start).total_seconds() / 60) - fine
-        if break_time:
-            work_hours = work_hours - break_time
-            return datetime.timedelta(minutes=work_hours)
-        for break_triplet in break_triplets:
-            if work_hours >= break_triplet[0] and work_hours <= break_triplet[1]:
-                work_hours = work_hours - sum(break_triplet[2])
-                break
+    def count_work_hours(dttm_work_start, dttm_work_end, break_time):
+        work_hours = ((dttm_work_end - dttm_work_start).total_seconds() / 60) - break_time
 
         if work_hours < 0:
             return datetime.timedelta(0)
@@ -1187,29 +1207,30 @@ class WorkerDay(AbstractModel):
         return datetime.timedelta(minutes=work_hours)
 
     @staticmethod
-    def get_fine(dttm_work_start, dttm_work_end, dttm_work_start_plan, dttm_work_end_plan, fines):
-        fine = 0
+    def get_fines(dttm_work_start, dttm_work_end, dttm_work_start_plan, dttm_work_end_plan, fines, network):
+        arrive_fine = 0
+        departure_fine = 0
         def _get_fine_from_range(delta, fines_range):
             for min_threshold, max_threshold, fine in fines_range:
                 if delta >= min_threshold and delta <= max_threshold:
                     return fine
             return 0
         if dttm_work_start_plan and dttm_work_end_plan and fines:
-            arrive_timedelta = (dttm_work_start - dttm_work_start_plan).total_seconds() / 60
-            departure_timedelta = (dttm_work_end_plan - dttm_work_end).total_seconds() / 60
+            arrive_timedelta = (dttm_work_start - dttm_work_start_plan).total_seconds()
+            departure_timedelta = (dttm_work_end_plan - dttm_work_end).total_seconds()
             arrive_step = fines.get('arrive_step')
             departure_step = fines.get('departure_step')
             arrive_fines = fines.get('arrive_fines', [])
             departure_fines = fines.get('departure_fines', [])
-            if arrive_timedelta > 0 and arrive_step:
-                fine += arrive_step - (int(arrive_timedelta) % arrive_step or arrive_step)
+            if arrive_timedelta > network.allowed_interval_for_late_arrival.total_seconds() and arrive_step:
+                arrive_fine += arrive_step - (int(arrive_timedelta / 60) % arrive_step or arrive_step)
             else:
-                fine += _get_fine_from_range(arrive_timedelta, arrive_fines)
-            if departure_timedelta > 0 and departure_step:
-                fine += departure_step - (int(departure_timedelta) % departure_step or departure_step)
+                arrive_fine += _get_fine_from_range(arrive_timedelta / 60, arrive_fines)
+            if departure_timedelta > network.allowed_interval_for_early_departure.total_seconds() and departure_step:
+                departure_fine += departure_step - (int(departure_timedelta / 60) % departure_step or departure_step)
             else:
-                fine += _get_fine_from_range(departure_timedelta, departure_fines)
-        return fine
+                departure_fine += _get_fine_from_range(departure_timedelta / 60, departure_fines)
+        return arrive_fine, departure_fine
 
     def get_department(self):
         return self.shop

@@ -4536,6 +4536,113 @@ class TestAttendanceRecords(TestsHelperMixin, APITestCase):
         self.assertEqual(day, 5.25)
         self.assertEqual(night, 0.0)
 
+    def test_calc_day_and_night_work_hours_with_round_algo(self):
+        self.network.allowed_interval_for_late_arrival = timedelta(minutes=5)
+        self.network.allowed_interval_for_early_departure = timedelta(minutes=5)
+        self.network.only_fact_hours_that_in_approved_plan = True
+        self.network.round_work_hours_alg = Network.ROUND_TO_HALF_AN_HOUR
+        # self.network.set_settings_value("break_time_subtractor",  "in_priority_from_bigger_part")
+        self.network.save()
+        self.breaks.value = '[]'
+        self.breaks.save()
+        self.shop.refresh_from_db()
+
+        revision_type = WorkerDayTypeFactory(
+            code='RV',
+            name='Ревизия',
+            short_name='РЕВ',
+            html_color='#009E9A',
+            use_in_plan=True,
+            use_in_fact=True,
+            excel_load_code='РВ',
+            is_dayoff=False,
+            is_work_hours=False,
+            is_reduce_norm=False,
+            show_stat_in_days=True,
+            show_stat_in_hours=True,
+        )
+
+        plan_worker_day = WorkerDayFactory(
+            employee=self.employee3,
+            employment=self.employment3,
+            shop=self.shop,
+            type_id=revision_type.code,
+            dt=self.dt,
+            dttm_work_start=datetime.combine(self.dt, time(19)),
+            dttm_work_end=datetime.combine(self.dt, time(23)),
+            is_fact=False,
+            is_approved=True,
+        )
+
+        fact_worker_day = WorkerDayFactory(
+            employee=self.employee3,
+            employment=self.employment3,
+            shop=self.shop,
+            type_id=revision_type.code,
+            dt=self.dt,
+            dttm_work_start=datetime.combine(self.dt, time(19)),
+            dttm_work_end=datetime.combine(self.dt, time(22, 54)),
+            is_fact=True,
+            is_approved=True,
+            closest_plan_approved=plan_worker_day,
+        )
+
+        total, day, night = fact_worker_day.calc_day_and_night_work_hours()
+        self.assertEqual(total, 4)
+        self.assertEqual(day, 3)
+        self.assertEqual(night, 1)
+
+        fact_worker_day.dttm_work_end = datetime.combine(self.dt, time(22, 29))
+        fact_worker_day.save()
+        total, day, night = fact_worker_day.calc_day_and_night_work_hours()
+        self.assertEqual(total, 3.5)
+        self.assertEqual(day, 3)
+        self.assertEqual(night, 0.5)
+        
+        fact_worker_day.dttm_work_start = datetime.combine(self.dt, time(19, 20))
+        fact_worker_day.save()
+        total, day, night = fact_worker_day.calc_day_and_night_work_hours()
+        self.assertEqual(total, 3)
+        self.assertEqual(day, 2.5)
+        self.assertEqual(night, 0.5)
+
+        self.breaks.value = '[[0, 3600, [40]]]'
+        self.breaks.save()
+        self.shop.refresh_from_db()
+
+        fact_worker_day.dttm_work_start = datetime.combine(self.dt, time(19))
+        fact_worker_day.dttm_work_end = datetime.combine(self.dt, time(22, 50))
+        fact_worker_day.save()
+        total, day, night = fact_worker_day.calc_day_and_night_work_hours()
+        self.assertEqual(total, 3)
+        self.assertEqual(day, 2.33)
+        self.assertEqual(night, 0.67)
+
+        fact_worker_day.dttm_work_start = datetime.combine(self.dt, time(19, 30))
+        fact_worker_day.save()
+        total, day, night = fact_worker_day.calc_day_and_night_work_hours()
+        self.assertEqual(total, 2.5)
+        self.assertEqual(day, 1.83)
+        self.assertEqual(night, 0.67)
+
+        self.breaks.value = '[[0, 3600, [30]]]'
+        self.breaks.save()
+        self.shop.refresh_from_db()
+
+        fact_worker_day.save()
+        total, day, night = fact_worker_day.calc_day_and_night_work_hours()
+        self.assertEqual(total, 3)
+        self.assertEqual(day, 2.25)
+        self.assertEqual(night, 0.75)
+
+        fact_worker_day.dttm_work_start = datetime.combine(self.dt, time(19))
+        fact_worker_day.save()
+        total, day, night = fact_worker_day.calc_day_and_night_work_hours()
+        self.assertEqual(total, 3.5)
+        self.assertEqual(day, 2.75)
+        self.assertEqual(night, 0.75)
+
+
     def test_two_facts_created_when_there_are_two_plans(self):
         WorkerDay.objects.filter(
             dt=self.dt,
@@ -7809,12 +7916,12 @@ class TestFineLogic(APITestCase):
         fact_wd_dir_bad = self._create_or_update_worker_day(self.dir[2], datetime.combine(dt, time(9, 56)), datetime.combine(dt, time(20)), is_fact=True, closest_plan_approved_id=plan_wd_dir.id)
         self.assertEqual(fact_wd_dir_bad.work_hours, timedelta(hours=7, minutes=30))
 
-    def _test_fine_case(self, tm_work_start_paln, tm_work_end_plan, tm_work_start_fact, tm_work_end_fact, work_hours):
+    def _test_fine_case(self, tm_work_start_plan, tm_work_end_plan, tm_work_start_fact, tm_work_end_fact, work_hours):
         WorkerDay.objects.all().delete()
         dt = date.today()
         plan_wd = self._create_or_update_worker_day(
             self.cashier[2], 
-            datetime.combine(dt, tm_work_start_paln), 
+            datetime.combine(dt, tm_work_start_plan), 
             datetime.combine(dt, tm_work_end_plan), 
         )
         fact_wd = self._create_or_update_worker_day(
@@ -7825,6 +7932,7 @@ class TestFineLogic(APITestCase):
             closest_plan_approved_id=plan_wd.id,
         )
         self.assertEqual(fact_wd.work_hours, work_hours)
+        return fact_wd
 
     def test_fine_settings_round(self):
         self.network.fines_settings = json.dumps(
@@ -7847,6 +7955,66 @@ class TestFineLogic(APITestCase):
         self._test_fine_case(time(8), time(20), time(8, 3), time(19, 23), timedelta(hours=10))
         self._test_fine_case(time(8), time(20), time(8, 50), time(19, 23), timedelta(hours=9, minutes=30))
         self._test_fine_case(time(8), time(20), time(8, 50), time(19, 37), timedelta(hours=10))
+    
+    def test_fine_calc_day_night(self):
+        self.network.fines_settings = json.dumps(
+           {
+                r'.*': {
+                    'arrive_step': 30,
+                    'departure_step': 30,
+                },
+            }
+        )
+        self.network.only_fact_hours_that_in_approved_plan = True
+        self.network.round_work_hours_alg = Network.ROUND_TO_HALF_AN_HOUR
+        self.network.save()
+        self.breaks.value='[[0, 3600, [60]]]'
+        self.breaks.save()
+
+        WorkerDay.objects.all().delete()
+        dt = date.today()
+        plan_wd = self._create_or_update_worker_day(
+            self.cashier[2], 
+            datetime.combine(dt, time(18)), 
+            datetime.combine(dt + timedelta(1), time(1)), 
+        )
+        fact_wd = self._create_or_update_worker_day(
+            self.cashier[2], 
+            datetime.combine(dt, time(17, 50)), 
+            datetime.combine(dt + timedelta(1), time(0, 7)), 
+            is_fact=True,
+            closest_plan_approved_id=plan_wd.id,
+        )
+
+        self.assertEqual(fact_wd.dttm_work_start_tabel, datetime.combine(dt, time(18)))
+        self.assertEqual(fact_wd.dttm_work_end_tabel, datetime.combine(dt + timedelta(1), time(0)))
+        work_hours, work_hours_day, work_hours_night = fact_wd.calc_day_and_night_work_hours()
+        self.assertEqual(work_hours, 5)
+        self.assertEqual(work_hours_day, 3.5)
+        self.assertEqual(work_hours_night, 1.5)
+
+    def test_fine_not_applied_because_of_allowed_interval(self):
+        self.network.fines_settings = json.dumps(
+           {
+                r'.*': {
+                    'arrive_step': 30,
+                    'departure_step': 30,
+                },
+            }
+        )
+        self.network.only_fact_hours_that_in_approved_plan = True
+        self.network.allowed_interval_for_late_arrival = timedelta(minutes=5)
+        self.network.allowed_interval_for_early_departure = timedelta(minutes=5)
+        self.network.save()
+
+        fact_wd = self._test_fine_case(time(8), time(20), time(8, 4), time(19, 56), timedelta(hours=11, minutes=30))
+        self.assertEqual(fact_wd.dttm_work_start_tabel, datetime.combine(fact_wd.dt, time(8)))
+        self.assertEqual(fact_wd.dttm_work_end_tabel, datetime.combine(fact_wd.dt, time(20)))
+
+        fact_wd = self._test_fine_case(time(8), time(20), time(8, 6), time(19, 53), timedelta(hours=10, minutes=30))
+        self.assertEqual(fact_wd.dttm_work_start_tabel, datetime.combine(fact_wd.dt, time(8, 30)))
+        self.assertEqual(fact_wd.dttm_work_end_tabel, datetime.combine(fact_wd.dt, time(19, 30)))
+
 
 
 class TestUnaccountedOvertimesAPI(APITestCase):
