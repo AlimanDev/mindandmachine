@@ -59,6 +59,7 @@ from src.timetable.models import (
     ShopMonthStat,
     VacancyBlackList,
 )
+from src.timetable.timesheet.utils import recalc_timesheet_on_data_change
 from src.timetable.work_type.utils import ShopEfficiencyGetter
 
 def search_candidates(vacancy, **kwargs):
@@ -411,6 +412,7 @@ def cancel_vacancy(vacancy_id, auto=True, delete=True, refuse=False):
         if child and child.is_vacancy:
             child.delete()
         if employee:
+            recalc_timesheet_on_data_change({employee.id: [vacancy.dt]})
             employee_obj = employee
             employee = {
                 'first_name': employee.user.first_name,
@@ -731,6 +733,9 @@ def confirm_vacancy(vacancy_id, user=None, employee_id=None, exchange=False, rec
                         'employment',
                     )
                 )
+
+
+                recalc_timesheet_on_data_change({active_employment.employee_id: [vacancy.dt]})
 
                 WorkerDay.objects_with_excluded.filter(
                     dt=vacancy.dt,
