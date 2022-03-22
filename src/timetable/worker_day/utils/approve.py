@@ -398,6 +398,8 @@ class WorkerDayApproveHelper:
                         employee_days_q,
                         is_approved=True,
                         is_fact=self.is_fact,
+                    ).exclude(
+                        self.exclude_approve_q,  # TODO: тест
                     ).select_related(
                         'shop',
                         'employment',
