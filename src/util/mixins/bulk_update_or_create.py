@@ -106,7 +106,8 @@ class BatchUpdateOrCreateModelMixin:
         for rel_obj_key, rel_obj_data_list in all_rel_objs_mapped_by_type.items():
             rel_obj_cls, rel_obj_reverse_fk_field = rel_objs_mapping.get(rel_obj_key)
             delete_scope_values_list = delete_scope_values_list_by_type.get(rel_obj_key)
-            delete_scope_filters = rel_objs_delete_scope_filters.get(rel_obj_cls.__name__, {})
+            delete_scope_filters = rel_objs_delete_scope_filters.get(
+                rel_obj_cls.__name__, {}) if rel_objs_delete_scope_filters else None
             rel_obj_cls.batch_update_or_create(
                 data=rel_obj_data_list, update_key_field=update_key_field,
                 delete_scope_fields_list=[rel_obj_reverse_fk_field],
