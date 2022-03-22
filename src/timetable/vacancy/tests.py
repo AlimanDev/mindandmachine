@@ -1231,6 +1231,8 @@ class TestVacancyActions(APITestCase, TestsHelperMixin):
             type_id=WorkerDay.TYPE_WORKDAY,
             shop=self.shop,
         )
+        dttm_added_approved_vacancy = approved_vacancy.dttm_added
+        dttm_modified_approved_vacancy = approved_vacancy.dttm_modified
         approved_employee_holiday = WorkerDay.objects.create(
             is_approved=True,
             dt=dt,
@@ -1249,10 +1251,14 @@ class TestVacancyActions(APITestCase, TestsHelperMixin):
 
         self.assertEqual(WorkerDay.objects.filter(id=approved_employee_holiday.id).count(), 0)
         self.assertEqual(WorkerDay.objects.filter(id=not_approved_employee_holiday.id).count(), 0)
-        self.assertEqual(WorkerDay.objects.filter(id=approved_vacancy.id, employee=self.employee2).count(), 1)
+        approved_vacancy.refresh_from_db()
+        self.assertEqual(approved_vacancy.employee_id, self.employee2.id)
+        self.assertEqual(approved_vacancy.dttm_added, dttm_added_approved_vacancy)
+        self.assertNotEqual(approved_vacancy.dttm_modified, dttm_modified_approved_vacancy)
         wd = WorkerDay.objects.filter(employee=self.employee2, is_approved=False, type_id=WorkerDay.TYPE_WORKDAY, dt=approved_vacancy.dt).first()
         self.assertIsNotNone(wd)
         self.assertEqual(wd.parent_worker_day_id, approved_vacancy.id)
+        self.assertNotEqual(wd.dttm_added, dttm_added_approved_vacancy)
 
     def test_confirm_vacancy_from_holiday_when_not_approved_work_day(self):
         dt = datetime.date.today()
