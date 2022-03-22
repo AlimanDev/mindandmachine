@@ -1,5 +1,6 @@
 import io
-from datetime import date, datetime
+import logging
+from smtplib import SMTPRecipientsRefused
 
 import pandas as pd
 from django.core.exceptions import FieldDoesNotExist
@@ -10,6 +11,8 @@ from django.utils import timezone
 from src.notifications.helpers import send_mass_html_mail
 from src.reports.helpers import get_datatuple
 from src.util.commons import obj_deep_get
+
+diff_report_logger = logging.getLogger('diff_report')
 
 
 class DryRunRevertException(Exception):
@@ -187,7 +190,10 @@ class BatchUpdateOrCreateModelMixin:
                 'file': output,
             },
         )
-        send_mass_html_mail(datatuple)
+        try:
+            send_mass_html_mail(datatuple)
+        except SMTPRecipientsRefused as e:
+            diff_report_logger.debug(str(e), exc_info=True)
 
     @classmethod
     def _pre_batch(cls, **kwargs):
