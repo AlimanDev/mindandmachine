@@ -205,7 +205,7 @@ class BatchUpdateOrCreateModelMixin:
             cls, data: list, update_key_field: str = 'id', delete_scope_fields_list: list = None,
             delete_scope_values_list: list = None, delete_scope_filters: dict = None, stats=None, user=None,
             dry_run=False, diff_report_email_to: list = None, check_perms_extra_kwargs=None,
-            generate_delete_scope_values=True, model_options=None):
+            generate_delete_scope_values=True, model_options=None, cached_data=None):
         """
         Функция для массового создания и/или обновления объектов
 
@@ -255,6 +255,7 @@ class BatchUpdateOrCreateModelMixin:
 
         try:
             with transaction.atomic():
+                cached_data = cached_data if cached_data is not None else {}
                 diff_data = {}
                 diff_lookup_fields = cls._get_diff_lookup_fields()
                 diff_obj_keys = tuple(lookup_field.split('__') for lookup_field in diff_lookup_fields)
@@ -425,7 +426,12 @@ class BatchUpdateOrCreateModelMixin:
                             diff_data.setdefault('deleted', []).append(
                                 tuple(obj_deep_get(obj_to_delete, *keys) for keys in diff_obj_keys))
 
-                cls._pre_batch(user=user, diff_data=diff_data, check_perms_extra_kwargs=check_perms_extra_kwargs)
+                cls._pre_batch(
+                    created_objs=objs_to_create, updated_objs=objs_to_update, deleted_objs=objs_to_delete,
+                    diff_data=diff_data, stats=stats, model_options=model_options,
+                    delete_scope_filters=delete_scope_filters, user=user, diff_obj_keys=diff_obj_keys,
+                    cached_data=cached_data,
+                )
 
                 if objs_to_delete:
                     _total_deleted_count, deleted_dict = delete_qs.delete()
@@ -469,7 +475,8 @@ class BatchUpdateOrCreateModelMixin:
                 cls._post_batch(
                     created_objs=objs_to_create, updated_objs=objs_to_update, deleted_objs=objs_to_delete,
                     diff_data=diff_data, stats=stats, model_options=model_options,
-                    delete_scope_filters=delete_scope_filters, user=user,
+                    delete_scope_filters=delete_scope_filters, user=user, diff_obj_keys=diff_obj_keys,
+                    cached_data=cached_data,
                 )
 
                 transaction_checks_kwargs = cls._get_batch_update_or_create_transaction_checks_kwargs(

@@ -17,6 +17,7 @@ class BatchUpdateOrCreateOptionsSerializer(serializers.Serializer):
         child=serializers.DictField(), required=False, allow_empty=False, allow_null=False)
     delete_scope_filters = serializers.DictField(required=False)
     return_response = serializers.BooleanField(required=False, allow_null=False)
+    grouped_checks = serializers.BooleanField(required=False, allow_null=False)
     dry_run = serializers.BooleanField(required=False)
     diff_report_email_to = serializers.ListField(child=serializers.CharField(), required=False)
     model_options = serializers.DictField(required=False)
@@ -82,6 +83,9 @@ class BatchUpdateOrCreateViewMixin:
             dry_run=options.get('dry_run', False),
             diff_report_email_to=options.get('diff_report_email_to'),
             model_options=options.get('model_options', {}),
+            check_perms_extra_kwargs=dict(
+                grouped_checks=options.get('grouped_checks', False),
+            ),
         )
 
         res = {

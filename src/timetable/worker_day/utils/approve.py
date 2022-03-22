@@ -39,7 +39,7 @@ from src.util.models_converter import Converter
 
 class WorkerDayApproveHelper:
     def __init__(self, is_fact, dt_from, dt_to, user=None, shop_id=None, employee_ids=None, wd_types=None,
-                 approve_open_vacs=False, any_draft_wd_exists=True):
+                 approve_open_vacs=False, any_draft_wd_exists=True, exclude_approve_q=None):
         assert shop_id or employee_ids
         self.is_fact = is_fact
         self.dt_from = dt_from
@@ -50,6 +50,7 @@ class WorkerDayApproveHelper:
         self._wd_types = wd_types
         self.approve_open_vacs = approve_open_vacs
         self.any_draft_wd_exists = any_draft_wd_exists
+        self.exclude_approve_q = exclude_approve_q
 
     @cached_property
     def wd_types(self):
@@ -155,7 +156,14 @@ class WorkerDayApproveHelper:
             draft_df = pd.DataFrame(draft_wdays, columns=columns).drop_duplicates()
 
             approved_wdays_qs = WorkerDay.objects.filter(
-                approve_condition,
+                Q(
+                    wd_types_q,
+                    Q(shop_id=self.shop_id) | shop_employees_q,
+                    dt__lte=self.dt_to,
+                    dt__gte=self.dt_from,
+                    is_fact=self.is_fact,
+                    **employee_filter,
+                ),
                 is_approved=True
             )
             if self.any_draft_wd_exists:
@@ -204,7 +212,11 @@ class WorkerDayApproveHelper:
                     employee_days_q,
                     is_approved=False,
                     is_fact=self.is_fact,
+
                 )
+
+                if self.exclude_approve_q:
+                    wdays_to_approve = wdays_to_approve.exclude(self.exclude_approve_q)
 
                 # не подтверждаем открытые вакансии
                 if not self.approve_open_vacs:
@@ -342,7 +354,8 @@ class WorkerDayApproveHelper:
                 wdays_to_delete = WorkerDay.objects_with_excluded.filter(
                     employee_days_q, is_fact=self.is_fact,
                 ).exclude(
-                    id__in=wdays_to_approve.values_list('id', flat=True)
+                    self.exclude_approve_q |
+                    Q(id__in=wdays_to_approve.values_list('id', flat=True))
                 ).exclude(
                     employee_id__isnull=True,
                 )

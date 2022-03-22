@@ -3562,9 +3562,19 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
         WorkerDayFactory(
             employee=self.employee2,
             employment=self.employment2,
+            shop=None,
             dt=self.dt,
             type_id=WorkerDay.TYPE_HOLIDAY,
             is_approved=False,
+            is_fact=False,
+        )
+        WorkerDayFactory(
+            employee=self.employee2,
+            employment=self.employment2,
+            shop=None,
+            dt=self.dt,
+            type_id=WorkerDay.TYPE_HOLIDAY,
+            is_approved=True,
             is_fact=False,
         )
 
@@ -3573,7 +3583,6 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
             'data': [
                 {
                     "code": code,
-                    "shop_code": self.shop.code,
                     "tabel_code": self.employee2.tabel_code,
                     "is_fact": False,
                     "is_approved": False,
@@ -3587,8 +3596,9 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
                 "delete_scope_filters": {
                     "employee__tabel_code": self.employee2.tabel_code,
                     "is_fact": False,
-                    "dt__lte": self.dt - timedelta(days=30),
-                    "dt__gte": self.dt + timedelta(days=30),
+                    "is_approved": False,
+                    "dt__lte": self.dt + timedelta(days=30),
+                    "dt__gte": self.dt - timedelta(days=30),
                     "type_id__in": [WorkerDay.TYPE_VACATION],
                 },
                 "model_options": {
@@ -3614,12 +3624,48 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
                 }
             }
         )
-        wd = WorkerDay.objects.first()
+        self.assertEqual(WorkerDay.objects.filter(type_id=WorkerDay.TYPE_VACATION).count(), 2)
+        self.assertEqual(WorkerDay.objects.exclude(type_id=WorkerDay.TYPE_VACATION).count(), 0)
+        wd = WorkerDay.objects.filter(dt=self.dt, is_approved=True).first()
         self.assertIsNotNone(wd)
         self.assertEqual(wd.type_id, WorkerDay.TYPE_VACATION)
         self.assertEqual(wd.code, code)
 
-    def test_move_approved_vacation_from_one_period_to_another(self):
+        # move vacation
+        dt = self.dt + timedelta(days=1)
+        data['data'][0]['dt'] = dt
+        code = f'{doc_id}:{employee_id}:{dt}'
+        data['data'][0]['code'] = code
+        resp = self.client.post(
+            self.get_url('WorkerDay-batch-update-or-create'), self.dump_data(data), content_type='application/json')
+        self.assertEqual(resp.status_code, 200)
+        resp_data = resp.json()
+        self.assertDictEqual(
+            resp_data,
+            {
+                "stats": {
+                    "WorkerDayCashboxDetails": {},
+                    "WorkerDayOutsourceNetwork": {},
+                    "WorkerDay": {
+                        "created": 1,
+                        "deleted": 1
+                    }
+                }
+            }
+        )
+        self.assertEqual(WorkerDay.objects.filter(type_id=WorkerDay.TYPE_VACATION).count(), 2)
+        self.assertEqual(WorkerDay.objects.exclude(type_id=WorkerDay.TYPE_VACATION).count(), 0)
+        wd = WorkerDay.objects.filter(dt=self.dt, is_approved=True).first()
+        self.assertIsNone(wd)
+        wd = WorkerDay.objects.filter(dt=dt, is_approved=True).first()
+        self.assertIsNotNone(wd)
+        self.assertEqual(wd.type_id, WorkerDay.TYPE_VACATION)
+        self.assertEqual(wd.code, code)
+
+    def test_sync_vacation_and_sick_at_the_same_time(self):
+        pass
+
+    def test_sync_vacation_when_draft_allowed_additional_type_exists(self):
         pass
 
 
