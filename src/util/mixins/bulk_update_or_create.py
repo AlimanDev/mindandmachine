@@ -1,5 +1,6 @@
 import io
-from datetime import date, datetime
+import logging
+from smtplib import SMTPRecipientsRefused
 
 import pandas as pd
 from django.core.exceptions import FieldDoesNotExist
@@ -10,6 +11,8 @@ from django.utils import timezone
 from src.notifications.helpers import send_mass_html_mail
 from src.reports.helpers import get_datatuple
 from src.util.commons import obj_deep_get
+
+diff_report_logger = logging.getLogger('diff_report')
 
 
 class DryRunRevertException(Exception):
@@ -93,7 +96,7 @@ class BatchUpdateOrCreateModelMixin:
         return rel_objs_to_create_or_update
 
     @classmethod
-    def _batch_update_or_create_rel_objs(cls, rel_objs_data, objs, rel_objs_mapping, stats, update_key_field):
+    def _batch_update_or_create_rel_objs(cls, rel_objs_data, objs, rel_objs_mapping, stats, update_key_field, rel_objs_delete_scope_filters):
         all_rel_objs_mapped_by_type = {}
         delete_scope_values_list_by_type = {}
         for idx, rel_objs_to_create_or_update in rel_objs_data.items():
@@ -109,10 +112,13 @@ class BatchUpdateOrCreateModelMixin:
         for rel_obj_key, rel_obj_data_list in all_rel_objs_mapped_by_type.items():
             rel_obj_cls, rel_obj_reverse_fk_field = rel_objs_mapping.get(rel_obj_key)
             delete_scope_values_list = delete_scope_values_list_by_type.get(rel_obj_key)
+            delete_scope_filters = rel_objs_delete_scope_filters.get(
+                rel_obj_cls.__name__, {}) if rel_objs_delete_scope_filters else None
             rel_obj_cls.batch_update_or_create(
                 data=rel_obj_data_list, update_key_field=update_key_field,
                 delete_scope_fields_list=[rel_obj_reverse_fk_field],
-                delete_scope_values_list=delete_scope_values_list, stats=stats)
+                delete_scope_values_list=delete_scope_values_list, stats=stats,
+                delete_scope_filters=delete_scope_filters)
 
     @classmethod
     def _is_field_exist(cls, field_name):
@@ -184,7 +190,10 @@ class BatchUpdateOrCreateModelMixin:
                 'file': output,
             },
         )
-        send_mass_html_mail(datatuple)
+        try:
+            send_mass_html_mail(datatuple)
+        except SMTPRecipientsRefused as e:
+            diff_report_logger.debug(str(e), exc_info=True)
 
     @classmethod
     def _pre_batch(cls, **kwargs):
@@ -205,7 +214,8 @@ class BatchUpdateOrCreateModelMixin:
             cls, data: list, update_key_field: str = 'id', delete_scope_fields_list: list = None,
             delete_scope_values_list: list = None, delete_scope_filters: dict = None, stats=None, user=None,
             dry_run=False, diff_report_email_to: list = None, check_perms_extra_kwargs=None,
-            generate_delete_scope_values=True, model_options=None, cached_data=None):
+            generate_delete_scope_values=True, model_options=None, cached_data=None,
+            rel_objs_delete_scope_filters: dict = None):
         """
         Функция для массового создания и/или обновления объектов
 
@@ -242,7 +252,6 @@ class BatchUpdateOrCreateModelMixin:
         # TODO: Оптимистичный лок? Версия объектов? Пример: изменяем один и тот же WorkerDay в разных вкладках,
             должна быть ошибка если объект был изменен?
         # TODO: Настройка, которая определяет сколько объектов может быть создано в рамках delete_scope_fields_list? -- ???
-        # TODO: Сигналы post_batch_update, post_batch_create ?
         """
         allowed_update_key_fields = cls._get_allowed_update_key_fields()
         if update_key_field not in allowed_update_key_fields:
@@ -439,20 +448,23 @@ class BatchUpdateOrCreateModelMixin:
                 if objs_to_skip:
                     cls._batch_update_or_create_rel_objs(
                         rel_objs_data=skip_rel_objs_data, objs=objs_to_skip, rel_objs_mapping=rel_objs_mapping,
-                        stats=stats, update_key_field=update_key_field)
+                        stats=stats, update_key_field=update_key_field,
+                        rel_objs_delete_scope_filters=rel_objs_delete_scope_filters)
 
                 if objs_to_create:
                     cls.objects.bulk_create(objs_to_create)  # в объектах будут проставлены id (только в postgres)
                     cls._batch_update_or_create_rel_objs(
                         rel_objs_data=create_rel_objs_data, objs=objs_to_create, rel_objs_mapping=rel_objs_mapping,
-                        stats=stats, update_key_field=update_key_field)
+                        stats=stats, update_key_field=update_key_field,
+                        rel_objs_delete_scope_filters=rel_objs_delete_scope_filters)
 
                 if objs_to_update:
                     update_fields_set.discard(cls._meta.pk.name)
                     cls.objects.bulk_update(objs_to_update, fields=update_fields_set)
                     cls._batch_update_or_create_rel_objs(
                         rel_objs_data=update_rel_objs_data, objs=objs_to_update, rel_objs_mapping=rel_objs_mapping,
-                        stats=stats, update_key_field=update_key_field)
+                        stats=stats, update_key_field=update_key_field,
+                        rel_objs_delete_scope_filters=rel_objs_delete_scope_filters)
 
                 cls_name = cls.__name__
                 cls_stats = stats.setdefault(cls_name, {})
