@@ -1069,12 +1069,12 @@ class WorkerDay(AbstractModel):
         work_hours_day, work_hours_night = break_time_subtractor.calc()
         work_hours = work_hours_day + work_hours_night
         return work_hours, work_hours_day, work_hours_night
-    
+
     def _get_breaks(self):
         position_break_triplet_cond = self.employment and self.employment.position and self.employment.position.breaks
         if self.shop and (self.shop.settings or position_break_triplet_cond or self.shop.network.breaks):
             return self.employment.position.breaks.breaks if position_break_triplet_cond else self.shop.settings.breaks.breaks if self.shop.settings else self.shop.network.breaks.breaks
-    
+
     def _calc_break(self, breaks, dttm_work_start, dttm_work_end, plan_approved=None):
         work_hours = ((dttm_work_end - dttm_work_start).total_seconds() / 60)
         break_time = 0
@@ -1373,6 +1373,7 @@ class WorkerDay(AbstractModel):
                 Q(dttm_work_end__gte=OuterRef('dttm_work_end')) &
                 Q(dttm_work_start__isnull=True)
             ),
+            type__is_dayoff=False,
             employee__user_id=user_id,
             dt=OuterRef('dt'),
             is_fact=OuterRef('is_fact'),
