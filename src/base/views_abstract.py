@@ -16,6 +16,7 @@ class BatchUpdateOrCreateOptionsSerializer(serializers.Serializer):
     delete_scope_values_list = serializers.ListField(
         child=serializers.DictField(), required=False, allow_empty=False, allow_null=False)
     delete_scope_filters = serializers.DictField(required=False)
+    rel_objs_delete_scope_filters = serializers.DictField(required=False)
     return_response = serializers.BooleanField(required=False, allow_null=False)
     grouped_checks = serializers.BooleanField(required=False, allow_null=False)
     dry_run = serializers.BooleanField(required=False)
@@ -79,6 +80,7 @@ class BatchUpdateOrCreateViewMixin:
             delete_scope_fields_list=options.get('delete_scope_fields_list'),
             delete_scope_values_list=options.get('delete_scope_values_list'),
             delete_scope_filters=delete_scope_filters,
+            rel_objs_delete_scope_filters=options.get('rel_objs_delete_scope_filters', {}),
             user=self.request.user if self.request.user.is_authenticated else None,
             dry_run=options.get('dry_run', False),
             diff_report_email_to=options.get('diff_report_email_to'),
