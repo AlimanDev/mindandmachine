@@ -381,7 +381,7 @@ class WorkerDaySerializer(ModelSerializerWithCreateOnlyFields, UnaccountedOverti
         if employee_id:
             validated_data['is_vacancy'] = WorkerDay.is_worker_day_vacancy(
                 getattr(self._employee_active_empl, 'shop_id', None),
-                validated_data['shop_id'],
+                validated_data.get('shop_id'),
                 getattr(self._employee_active_empl, 'main_work_type_id', None),
                 validated_data.get('worker_day_details', []),
                 is_vacancy=validated_data.get('is_vacancy', False),
