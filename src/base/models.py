@@ -1763,7 +1763,7 @@ class Employment(AbstractActiveModel):
             employees_for_clear_cache.add(deleted_employment.employee_id)
             if employee_network.get(deleted_employment.employee_id) and employee_network.get(deleted_employment.employee_id).clean_wdays_on_employment_dt_change:
                 clean_wdays_kwargs['employee_id__in'].append(deleted_employment.employee_id)
-                if created_employment.dt_hired:
+                if deleted_employment.dt_hired:
                     clean_wdays_kwargs['dt__gte'] = min(clean_wdays_kwargs['dt__gte'], deleted_employment.dt_hired)
 
             if settings.ZKTECO_INTEGRATION:
