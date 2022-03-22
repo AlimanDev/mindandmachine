@@ -1850,7 +1850,7 @@ class Employment(AbstractActiveModel):
                 clean_wdays_kwargs['employee_id__in'].append(employee_id)
                 clean_wdays_kwargs['dt__gte'] = min(
                     clean_wdays_kwargs['dt__gte'], 
-                    created_employment.dt_hired or datetime.datetime.max, 
+                    updated_employment.dt_hired or datetime.datetime.max,
                     before_update[i][5] or datetime.datetime.max,
                 )
             if dt_hired_changed or dt_fired_changed or norm_work_hours_changed or position_changed:
