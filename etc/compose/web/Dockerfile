@@ -50,6 +50,9 @@ RUN apt-get update && apt-get install --no-install-recommends -y \
   # Translations dependencies
   gettext \
   libgeos-dev \
+  # Logrotate and cron
+  cron \
+  logrotate \
   # cleaning up unused files
   && apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false \
   && rm -rf /var/lib/apt/lists/*
@@ -74,6 +77,9 @@ RUN chmod +x -R /commands
 
 
 COPY ./etc/compose/web/uwsgi.ini /webapp/uwsgi.ini
+
+COPY ./etc/compose/web/logrotate/cron /cron.txt
+COPY ./etc/compose/web/logrotate/generate_configs.py /generate_configs.py
 
 ENV UWSGI_WORKERS 4
 ENV UWSGI_THREADS 1

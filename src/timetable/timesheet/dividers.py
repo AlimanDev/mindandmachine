@@ -103,7 +103,7 @@ class BaseTimesheetDivider:
                 self.fiscal_timesheet.main_timesheet.is_holiday(dt=curr_week_last_dt, consider_dayoff_work_hours=False):
             return True
 
-    def _check_weekly_continuous_holidays(self):
+    def _check_weekly_continuous_holidays(self, vacations_only=False):
         logger.info(f'start weekly continuous holidays check')
         first_dt_weekday_num = self.fiscal_timesheet.dt_from.weekday()  # 0 - monday, 6 - sunday
         start_of_week = self.fiscal_timesheet.dt_from - datetime.timedelta(days=first_dt_weekday_num)
@@ -113,7 +113,7 @@ class BaseTimesheetDivider:
         logger.debug(f'stop dt: {dt_stop}')
         while start_of_week <= dt_stop:
             continuous_holidays_count = 0
-            first_holiday_found_dt = None
+            holidays_found_dates = []
             week_dates = pd.date_range(start_of_week, start_of_week + datetime.timedelta(days=6)).date
             prev_day_is_holiday = False
             logger.debug(f'start week with start_of_week: {start_of_week}')
@@ -123,7 +123,10 @@ class BaseTimesheetDivider:
                 start_of_week += datetime.timedelta(days=7)
                 continue
 
+            vacations_dict = {}
             for dt in week_dates:
+                vacations_dict[dt] = self.fiscal_timesheet.main_timesheet.get_items(
+                    dt=dt, filter_func=lambda i: i.day_type.code == WorkerDay.TYPE_VACATION)
                 if self.fiscal_timesheet.dt_from <= dt <= self.fiscal_timesheet.dt_to:
                     current_day_is_holiday = self.fiscal_timesheet.main_timesheet.is_holiday(
                         dt=dt, consider_dayoff_work_hours=False)
@@ -136,13 +139,13 @@ class BaseTimesheetDivider:
                     logger.debug(f'prev_day_is_holiday and current_day_is_holiday, break')
                     break
 
-                if current_day_is_holiday and not first_holiday_found_dt:
+                if current_day_is_holiday:
                     continuous_holidays_count = 1
-                    first_holiday_found_dt = dt
+                    holidays_found_dates.append(dt)
 
                 prev_day_is_holiday = current_day_is_holiday
             logger.debug(f'end week continuous_holidays_count: {continuous_holidays_count}, '
-                         f'first_holiday_found_dt:{first_holiday_found_dt}')
+                         f'holidays_found:{holidays_found_dates}')
 
             if continuous_holidays_count == 2:
                 start_of_week += datetime.timedelta(days=7)
@@ -150,22 +153,63 @@ class BaseTimesheetDivider:
                 continue
 
             if continuous_holidays_count == 1:
-                first_holiday_found_weekday = first_holiday_found_dt.weekday()
+                def _get_min_work_hours_and_dt(dt, prev_dt, min_wh):
+                    work_hours = self.fiscal_timesheet.main_timesheet.get_total_hours_sum(dt=dt)
+                    res = (dt, work_hours) if work_hours < min_wh else (prev_dt, min_wh)
+                    if vacations_only:
+                        vacations = self.fiscal_timesheet.main_timesheet.get_items(
+                            dt=dt, filter_func=lambda i: i.day_type.code == WorkerDay.TYPE_VACATION)
+                        if not vacations:
+                            res = (prev_dt, min_wh)
+                    return res
+
+                min_work_hours = 24.0
+                holiday_dt = None
+                for dt in holidays_found_dates:
+                    if dt.weekday() != 0:
+                        holiday_dt, min_work_hours = _get_min_work_hours_and_dt(
+                            dt - datetime.timedelta(1),
+                            holiday_dt,
+                            min_work_hours,
+                        )
+                    if dt.weekday() != 6:
+                        holiday_dt, min_work_hours = _get_min_work_hours_and_dt(
+                            dt + datetime.timedelta(1),
+                            holiday_dt,
+                            min_work_hours,
+                        )
+
+                if vacations_only:
+                    vacations = vacations_dict.get(holiday_dt)
+                    if not vacations:
+                        logger.debug(
+                            f'holiday_dt {holiday_dt}, no vacations, skip week')
+                        start_of_week += datetime.timedelta(days=7)
+                        continue
+
                 logger.debug(
-                    f'continuous_holidays_count == 1, first_holiday_found_weekday={first_holiday_found_weekday}')
-                if first_holiday_found_weekday == 6:  # sunday
-                    dt = first_holiday_found_dt - datetime.timedelta(days=1)
-                else:
-                    dt = first_holiday_found_dt + datetime.timedelta(days=1)
-                logger.debug(
-                    f'second found holiday {dt}')
-                self._make_holiday(dt)
+                    f'continuous_holidays_count == 1, second found holiday {holiday_dt}')
+                self._make_holiday(holiday_dt)
                 start_of_week += datetime.timedelta(days=7)
 
             if continuous_holidays_count == 0:
-                logger.debug(f'continuous_holidays_count == 0, make last 2 days of week as holidays')
-                for dt in [week_dates[5], week_dates[6]]:
-                    self._make_holiday(dt)
+                logger.debug(f'continuous_holidays_count == 0')
+                if vacations_only:
+                    logger.debug(f'vacations_only, search for 2 continuous vacations from the end of the week')
+                    prev_day_is_vacation = False
+                    for dt in reversed(week_dates):
+                        vacations = vacations_dict.get(dt)
+                        curr_day_is_vacation = bool(vacations)
+                        if prev_day_is_vacation and curr_day_is_vacation:
+                            logger.debug(f'prev day and curr day are vacations, make 2 vacations as holidays')
+                            self._make_holiday(dt + datetime.timedelta(days=1))
+                            self._make_holiday(dt)
+                            break
+                        prev_day_is_vacation = curr_day_is_vacation
+                else:
+                    logger.debug(f'make last 2 days of week as holidays')
+                    for dt in [week_dates[5], week_dates[6]]:
+                        self._make_holiday(dt)
                 start_of_week += datetime.timedelta(days=7)
 
         logger.info(f'finish weekly continuous holidays check')
@@ -173,7 +217,7 @@ class BaseTimesheetDivider:
     def _check_not_more_than_threshold_hours(self):
         for dt in pd.date_range(self.fiscal_timesheet.dt_from, self.fiscal_timesheet.dt_to).date:
             main_timesheet_total_hours_sum = self.fiscal_timesheet.main_timesheet.get_total_hours_sum(dt)
-            hours_overflow = main_timesheet_total_hours_sum - settings.TIMESHEET_MAX_HOURS_THRESHOLD
+            hours_overflow = main_timesheet_total_hours_sum - self.fiscal_timesheet.employee.user.network.timesheet_max_hours_threshold
             if hours_overflow > 0:
                 subtracted_items = self.fiscal_timesheet.main_timesheet.subtract_hours(
                     dt=dt, hours_to_subtract=hours_overflow)
@@ -187,14 +231,11 @@ class BaseTimesheetDivider:
         return {}
 
     def _get_sawh_hours_key(self):
-        return getattr(settings, 'TIMESHEET_DIVIDER_SAWH_HOURS_KEY', 'curr_month')
+        return self.fiscal_timesheet.employee.user.network.timesheet_divider_sawh_hours_key
 
     def _get_min_hours_threshold(self, dt):
-        if callable(settings.TIMESHEET_MIN_HOURS_THRESHOLD):
-            active_employment = self.fiscal_timesheet._get_active_employment(dt)
-            return settings.TIMESHEET_MIN_HOURS_THRESHOLD(active_employment.norm_work_hours)
-        else:
-            return settings.TIMESHEET_MIN_HOURS_THRESHOLD
+        active_employment = self.fiscal_timesheet._get_active_employment(dt)
+        return self.fiscal_timesheet.employee.user.network.get_timesheet_min_hours_threshold(active_employment.norm_work_hours)
 
     def _check_overtimes(self):
         logger.info(
@@ -268,7 +309,7 @@ class BaseTimesheetDivider:
                 main_timesheet_night_hours = self.fiscal_timesheet.main_timesheet.get_night_hours_sum(dt=dt)
                 main_timesheet_total_hours = main_timesheet_day_hours + main_timesheet_night_hours
                 if abs(overtime_plan) >= additional_timesheet_hours:
-                    if main_timesheet_total_hours + additional_timesheet_hours <= settings.TIMESHEET_MAX_HOURS_THRESHOLD:
+                    if main_timesheet_total_hours + additional_timesheet_hours <= self.fiscal_timesheet.employee.user.network.timesheet_max_hours_threshold:
                         hours_transfer = additional_timesheet_hours
                         subtracted_items = self.fiscal_timesheet.additional_timesheet.subtract_hours(
                             dt=dt, hours_to_subtract=hours_transfer,
@@ -278,7 +319,7 @@ class BaseTimesheetDivider:
                         overtime_plan += hours_transfer
                         continue
                     else:
-                        threshold_hours = settings.TIMESHEET_MAX_HOURS_THRESHOLD
+                        threshold_hours = self.fiscal_timesheet.employee.user.network.timesheet_max_hours_threshold
                         hours_transfer = threshold_hours - main_timesheet_total_hours
                         subtracted_items = self.fiscal_timesheet.additional_timesheet.subtract_hours(
                             dt=dt, hours_to_subtract=hours_transfer,
@@ -288,7 +329,7 @@ class BaseTimesheetDivider:
                         overtime_plan += hours_transfer
                         continue
                 else:
-                    if main_timesheet_total_hours + abs(overtime_plan) <= settings.TIMESHEET_MAX_HOURS_THRESHOLD:
+                    if main_timesheet_total_hours + abs(overtime_plan) <= self.fiscal_timesheet.employee.user.network.timesheet_max_hours_threshold:
                         hours_transfer = abs(overtime_plan)
                         subtracted_items = self.fiscal_timesheet.additional_timesheet.subtract_hours(
                             dt=dt, hours_to_subtract=hours_transfer,
@@ -298,7 +339,7 @@ class BaseTimesheetDivider:
                         overtime_plan += hours_transfer
                         continue
                     else:
-                        threshold_hours = settings.TIMESHEET_MAX_HOURS_THRESHOLD
+                        threshold_hours = self.fiscal_timesheet.employee.user.network.timesheet_max_hours_threshold
                         hours_transfer = threshold_hours - main_timesheet_total_hours
                         subtracted_items = self.fiscal_timesheet.additional_timesheet.subtract_hours(
                             dt=dt, hours_to_subtract=hours_transfer,
@@ -348,7 +389,7 @@ class BaseTimesheetDivider:
                     ))
 
 
-class PobedaTimesheetDivider(BaseTimesheetDivider):
+class BasePobedaTimesheetDivider(BaseTimesheetDivider):
     def _move_other_shop_or_position_work_to_additional_timesheet(self):
         for dt in pd.date_range(self.fiscal_timesheet.dt_from, self.fiscal_timesheet.dt_to).date:
             active_employment = self.fiscal_timesheet._get_active_employment(dt)
@@ -393,9 +434,6 @@ class PobedaTimesheetDivider(BaseTimesheetDivider):
             'shop': active_employment.shop,
         }
 
-    def _get_sawh_hours_key(self):
-        return getattr(settings, 'TIMESHEET_DIVIDER_SAWH_HOURS_KEY', 'curr_month_without_reduce_norm')
-
     def _redistribute_vacations_from_additional_timesheet_to_main_timesheet(self):
         vacation_hours = Decimal('0.00')
         for additional_timesheet_item in self.fiscal_timesheet.additional_timesheet.get_items(
@@ -429,6 +467,8 @@ class PobedaTimesheetDivider(BaseTimesheetDivider):
                 filter_func=lambda i: i.day_type.code == WorkerDay.TYPE_ABSENSE):
             self.fiscal_timesheet.additional_timesheet.remove(additional_timesheet_item.dt, additional_timesheet_item)
 
+
+class PobedaTimesheetDivider(BasePobedaTimesheetDivider):
     def divide(self):
         logger.info(f'start pobeda fiscal sheet divide')
         self._init_main_and_additional_timesheets()
@@ -441,6 +481,29 @@ class PobedaTimesheetDivider(BaseTimesheetDivider):
         self._check_overtimes()
         self._fill_empty_dates_as_holidays_in_main_timesheet()
         logger.info(f'finish pobeda fiscal sheet divide')
+
+
+class PobedaManualTimesheetDivider(BasePobedaTimesheetDivider):
+    def _move_vacancies_to_additional_timesheet(self):
+        for dt in pd.date_range(self.fiscal_timesheet.dt_from, self.fiscal_timesheet.dt_to).date:
+            active_employment = self.fiscal_timesheet._get_active_employment(dt)
+            if active_employment:
+                for main_timesheet_item in self.fiscal_timesheet.main_timesheet.get_items(dt=dt):
+                    if main_timesheet_item.is_vacancy:
+                        self.fiscal_timesheet.main_timesheet.remove(dt, main_timesheet_item)
+                        self.fiscal_timesheet.additional_timesheet.add(
+                            dt, main_timesheet_item.copy(overrides={'freezed': True}))
+
+    def divide(self):
+        logger.info(f'start pobeda_manual fiscal sheet divide')
+        self._init_main_and_additional_timesheets()
+        self._move_vacancies_to_additional_timesheet()
+        self._check_weekly_continuous_holidays(vacations_only=True)
+        self._replace_sick_with_absence_type()
+        self._remove_absence_from_additional_timesheet()
+        self._redistribute_vacations_from_additional_timesheet_to_main_timesheet()
+        self._fill_empty_dates_as_holidays_in_main_timesheet()
+        logger.info(f'finish pobeda_manual fiscal sheet divide')
 
 
 class NahodkaTimesheetDivider(BaseTimesheetDivider):
@@ -604,5 +667,6 @@ class ShiftScheduleDivider(BaseTimesheetDivider):
 FISCAL_SHEET_DIVIDERS_MAPPING = {
     'nahodka': NahodkaTimesheetDivider,
     'pobeda': PobedaTimesheetDivider,
+    'pobeda_manual': PobedaManualTimesheetDivider,
     'shift_schedule': ShiftScheduleDivider,
 }

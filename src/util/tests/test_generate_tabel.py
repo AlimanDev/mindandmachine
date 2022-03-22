@@ -30,8 +30,8 @@ class TestGenerateTabel(TestsHelperMixin, TestCase):
         _weekday, days_in_month = monthrange(cls.dt_now.year, cls.dt_now.month)
         cls.dt_from = cls.dt_now.replace(day=1)
         cls.dt_to = cls.dt_now.replace(day=days_in_month)
-        cls.work_type_name = WorkTypeName.objects.create(name='Консультант')
-        cls.work_type_name2 = WorkTypeName.objects.create(name='Кассир')
+        cls.work_type_name = WorkTypeName.objects.create(name='Консультант', network=cls.network)
+        cls.work_type_name2 = WorkTypeName.objects.create(name='Кассир', network=cls.network)
         cls.work_type = WorkType.objects.create(
             work_type_name=cls.work_type_name,
             shop=cls.shop)

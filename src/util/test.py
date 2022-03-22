@@ -83,15 +83,19 @@ class LocalTestCase(LocalTestCaseAsserts, TestCase):
         # work_types
         self.work_type_name1 = WorkTypeName.objects.create(
             name='Кассы',
+            network=self.network,
         )
         self.work_type_name2 = WorkTypeName.objects.create(
             name='Тип_кассы_2',
+            network=self.network,
         )
         self.work_type_name3 = WorkTypeName.objects.create(
             name='Тип_кассы_3',
+            network=self.network,
         )
         self.work_type_name4 = WorkTypeName.objects.create(
             name='тип_кассы_4',
+            network=self.network,
         )
         self.work_type1 = create_work_type(
             self.shop,
@@ -114,15 +118,19 @@ class LocalTestCase(LocalTestCaseAsserts, TestCase):
 
         self.operation_type_name = OperationTypeName.objects.create(
             name='Test',
+            network=self.network,
         )
         self.operation_type_name2 = OperationTypeName.objects.create(
             name='Test2',
+            network=self.network,
         )
         self.operation_type_name3 = OperationTypeName.objects.create(
             name='Test3',
+            network=self.network,
         )
         self.operation_type_name4 = OperationTypeName.objects.create(
             name='Test4',
+            network=self.network,
         )
 
         create_operation_type(OperationType.FORECAST, [
@@ -387,6 +395,7 @@ def create_departments_and_users(self, dt=None):
 
     self.shop_settings = ShopSettings.objects.create(
         breaks=self.breaks,
+        network=self.network,
     )
     # shops
     self.reg_shop1 = Shop.objects.create(
@@ -457,6 +466,7 @@ def create_departments_and_users(self, dt=None):
         first_name='Иван',
         network=self.network,
     )
+
     self.employee1 = Employee.objects.create(user=self.user1)
     self.employment1 = Employment.objects.create(
         code=f'{self.user1.username}:{uuid.uuid4()}:{uuid.uuid4()}',

@@ -11,6 +11,7 @@ from django.db.models import F, Max
 from django.db import transaction
 from src.base.models import (
     Employment,
+    Shop,
     User,
 )
 from src.integration.models import (
@@ -262,9 +263,11 @@ def sync_att_area_zkteco():
             print(f"Sync attendance area {area.name} with code {area.code}")
 
 @app.task
-def export_or_delete_employment_zkteco(employment_id, prev_shop_id=None):
+def export_or_delete_employment_zkteco(employment_id, prev_shop_id=None, prev_shop_code=None):
     zkteco = ZKTeco()
     ext_system, _created = ExternalSystem.objects.get_or_create(code='zkteco')
+    if not prev_shop_id and prev_shop_code:
+        prev_shop_id = getattr(Shop.objects.filter(code=prev_shop_code).first(), 'id', None)
     employment = Employment.objects_with_excluded.get(id=employment_id)
     active_employments = Employment.objects.get_active(
         employee__user_id=employment.employee.user_id,
