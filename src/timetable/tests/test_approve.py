@@ -565,3 +565,39 @@ class TestWorkerDayApprove(TestsHelperMixin, APITestCase):
         )
 
         self.assertEqual(response.status_code, 200)
+
+    def test_approve_vacancy_with_approved_parent(self):
+        dt = date.today()
+        approved = WorkerDayFactory(
+            employee=self.employee,
+            employment=self.employment,
+            dt=dt,
+            type_id=WorkerDay.TYPE_HOLIDAY,
+            is_approved=True,
+            is_fact=False,
+        )
+        not_approved_vacancy = WorkerDayFactory(
+            employee=self.employee,
+            employment=self.employment,
+            dt=dt,
+            dttm_work_start=datetime.combine(dt, time(8)),
+            dttm_work_end=datetime.combine(dt, time(20)),
+            shop=self.shop,
+            type_id=WorkerDay.TYPE_WORKDAY,
+            is_approved=False,
+            is_fact=False,
+            is_vacancy=True,
+            parent_worker_day=approved,
+        )
+        self.add_group_perm(self.group, 'WorkerDay_approve_vacancy', 'POST')
+
+        response = self.client.post(
+            self.get_url('WorkerDay-approve-vacancy', pk=not_approved_vacancy.id)
+        )
+        self.assertEqual(response.status_code, 200)
+
+        not_approved_vacancy.refresh_from_db()
+        self.assertTrue(not_approved_vacancy.is_approved)
+
+        self.assertFalse(WorkerDay.objects.filter(pk=approved.id).exists())
+        self.assertTrue(WorkerDay.objects.filter(parent_worker_day_id=not_approved_vacancy.id).exists())
