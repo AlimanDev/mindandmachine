@@ -29,6 +29,7 @@ from src.timetable.models import (
     WorkerDayType,
 )
 from src.timetable.timesheet.tasks import calc_timesheets
+from src.timetable.timesheet.utils import recalc_timesheet_on_data_change
 from src.timetable.vacancy.tasks import vacancies_create_and_cancel_for_shop
 from src.timetable.vacancy.utils import notify_vacancy_created
 from src.timetable.worker_day.stat import get_month_range
@@ -140,7 +141,8 @@ class WorkerDayApproveHelper:
                 'dttm_work_start',
                 'dttm_work_end',
                 'shop_id',
-                'work_type_ids'
+                'work_type_ids',
+                'is_vacancy',
             ]
             draft_wdays = list(WorkerDay.objects.filter(
                 approve_condition,
@@ -482,6 +484,13 @@ class WorkerDayApproveHelper:
                                 is_approved=True,
                             )
                         )
+                        WorkerDay.check_main_work_hours_norm(
+                            dt_from=self.dt_from,
+                            dt_to=self.dt_to,
+                            employee_id__in=employee_ids,
+                            shop_id=self.shop_id,
+                            exc_cls=ValidationError,
+                        )
 
                     transaction.on_commit(
                         lambda: recalc_fact_from_records(employee_days_list=list(employee_days_set)))
@@ -520,7 +529,6 @@ class WorkerDayApproveHelper:
                     shop_id=self.shop_id,
                     context=approve_event_context,
                 ))
-
                 # запуск пересчета табеля на периоды для которых были изменены дни сотрудников,
                 # но не нарушая ограничения CALC_TIMESHEET_PREV_MONTH_THRESHOLD_DAYS
                 dt_now = dttm_now.date()
@@ -541,6 +549,8 @@ class WorkerDayApproveHelper:
                                         dt_to=_period_end,
                                     ))
                             )
+
+                recalc_timesheet_on_data_change(worker_dates_dict)
 
                 WorkerDay.check_work_time_overlap(
                     employee_days_q=employee_days_q,
