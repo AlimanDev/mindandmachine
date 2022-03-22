@@ -416,56 +416,57 @@ def create_worker_days_range(dates, type_id=WorkerDay.TYPE_WORKDAY, shop_id=None
 
 def check_worker_day_permissions(
         user, shop_id, action, graph_type, wd_types, dt_from, dt_to, error_messages, wd_types_dict, employee_id=None, is_vacancy=False):
-    user_shops = list(user.get_shops(include_descendants=True).values_list('id', flat=True))
-    get_subordinated_group_ids = Group.get_subordinated_group_ids(user)
-    for dt in pd.date_range(dt_from, dt_to).date:
-        if not WorkerDay._has_group_permissions(
-                user, employee_id, dt,
-                user_shops=user_shops, get_subordinated_group_ids=get_subordinated_group_ids, shop_id=shop_id, is_vacancy=is_vacancy,
-        ):
-            raise PermissionDenied(
-                error_messages['employee_not_in_subordinates'].format(
-                employee=User.objects.filter(employees__id=employee_id).first().fio),
-            )
-
-    wd_perms = GroupWorkerDayPermission.objects.filter(
-        group__in=user.get_group_ids(shop_id=shop_id),
-        worker_day_permission__action=action,
-        worker_day_permission__graph_type=graph_type,
-    ).select_related('worker_day_permission').values_list(
-        'worker_day_permission__wd_type_id', 'limit_days_in_past', 'limit_days_in_future', 'employee_type', 'shop_type',
-    ).distinct()
-    wd_perms_dict = {wdp[0]: wdp for wdp in wd_perms}
-
-    today = (datetime.datetime.now() + datetime.timedelta(hours=3)).date()
-    for wd_type_id in wd_types:
-        wdp = wd_perms_dict.get(wd_type_id)
-        wd_type_display_str = wd_types_dict.get(wd_type_id).name
-        if wdp is None:
-            raise PermissionDenied(
-                error_messages['no_action_perm_for_wd_type'].format(
-                    wd_type_str=wd_type_display_str,
-                    action_str=WorkerDayPermission.ACTIONS_DICT.get(action).lower()),
-            )
-
-        limit_days_in_past = wdp[1]
-        limit_days_in_future = wdp[2]
-        date_limit_in_past = None
-        date_limit_in_future = None
-        if limit_days_in_past is not None:
-            date_limit_in_past = today - datetime.timedelta(days=limit_days_in_past)
-        if limit_days_in_future is not None:
-            date_limit_in_future = today + datetime.timedelta(days=limit_days_in_future)
-        if date_limit_in_past or date_limit_in_future:
-            if (date_limit_in_past and dt_from < date_limit_in_past) or \
-                    (date_limit_in_future and dt_to > date_limit_in_future):
-                dt_interval = f'с {Converter.convert_date(date_limit_in_past) or "..."} ' \
-                                f'по {Converter.convert_date(date_limit_in_future) or "..."}'
+    if user:
+        user_shops = list(user.get_shops(include_descendants=True).values_list('id', flat=True))
+        get_subordinated_group_ids = Group.get_subordinated_group_ids(user)
+        for dt in pd.date_range(dt_from, dt_to).date:
+            if not WorkerDay._has_group_permissions(
+                    user, employee_id, dt,
+                    user_shops=user_shops, get_subordinated_group_ids=get_subordinated_group_ids, shop_id=shop_id, is_vacancy=is_vacancy,
+            ):
                 raise PermissionDenied(
-                    error_messages['wd_interval_restriction'].format(
-                        wd_type_str=wd_type_display_str,
-                        action_str=WorkerDayPermission.ACTIONS_DICT.get(action).lower(),
-                        dt_interval=dt_interval,
-                    )
+                    error_messages['employee_not_in_subordinates'].format(
+                    employee=User.objects.filter(employees__id=employee_id).first().fio),
                 )
-    return wd_perms
+
+        wd_perms = GroupWorkerDayPermission.objects.filter(
+            group__in=user.get_group_ids(shop_id=shop_id),
+            worker_day_permission__action=action,
+            worker_day_permission__graph_type=graph_type,
+        ).select_related('worker_day_permission').values_list(
+            'worker_day_permission__wd_type_id', 'limit_days_in_past', 'limit_days_in_future', 'employee_type', 'shop_type',
+        ).distinct()
+        wd_perms_dict = {wdp[0]: wdp for wdp in wd_perms}
+
+        today = (datetime.datetime.now() + datetime.timedelta(hours=3)).date()
+        for wd_type_id in wd_types:
+            wdp = wd_perms_dict.get(wd_type_id)
+            wd_type_display_str = wd_types_dict.get(wd_type_id).name
+            if wdp is None:
+                raise PermissionDenied(
+                    error_messages['no_action_perm_for_wd_type'].format(
+                        wd_type_str=wd_type_display_str,
+                        action_str=WorkerDayPermission.ACTIONS_DICT.get(action).lower()),
+                )
+
+            limit_days_in_past = wdp[1]
+            limit_days_in_future = wdp[2]
+            date_limit_in_past = None
+            date_limit_in_future = None
+            if limit_days_in_past is not None:
+                date_limit_in_past = today - datetime.timedelta(days=limit_days_in_past)
+            if limit_days_in_future is not None:
+                date_limit_in_future = today + datetime.timedelta(days=limit_days_in_future)
+            if date_limit_in_past or date_limit_in_future:
+                if (date_limit_in_past and dt_from < date_limit_in_past) or \
+                        (date_limit_in_future and dt_to > date_limit_in_future):
+                    dt_interval = f'с {Converter.convert_date(date_limit_in_past) or "..."} ' \
+                                    f'по {Converter.convert_date(date_limit_in_future) or "..."}'
+                    raise PermissionDenied(
+                        error_messages['wd_interval_restriction'].format(
+                            wd_type_str=wd_type_display_str,
+                            action_str=WorkerDayPermission.ACTIONS_DICT.get(action).lower(),
+                            dt_interval=dt_interval,
+                        )
+                    )
+        return wd_perms
