@@ -1047,6 +1047,66 @@ class TestPobedaDivider(TestTimesheetMixin, TestCase):
         self.assertEqual(fact_ts_queryset.get(dt=date(2021, 6, 6)).day_type_id, WorkerDay.TYPE_HOLIDAY)
         self.assertEqual(fact_ts_queryset.get(dt=date(2021, 6, 7)).day_type_id, self.san_day.code)
 
+    def test_vacancies_moved_to_additional_timesheet(self):
+        self.network.fiscal_sheet_divider_alias = 'pobeda_manual'
+        self.network.save()
+        wdays = (
+            ((WorkerDay.TYPE_WORKDAY, time(8), time(16), False, self.work_type_worker), (
+                date(2021, 6, 1),
+                date(2021, 6, 2),
+            )),
+            ((WorkerDay.TYPE_WORKDAY, time(16), time(20), True, self.work_type_worker), (
+                date(2021, 6, 1),
+                date(2021, 6, 2),
+            )),
+            ((WorkerDay.TYPE_WORKDAY, time(8), time(20), True, self.work_type_worker), (
+                date(2021, 6, 3),
+            )),
+            ((WorkerDay.TYPE_WORKDAY, time(8), time(20), False, self.work_type_worker), (
+                date(2021, 6, 4),
+            )),
+        )
+        for (wd_type_id, tm_start, tm_end, is_vacancy, work_type), dates in wdays:
+            for dt in dates:
+                is_night_work = False
+                if tm_start and tm_end and tm_end < tm_start:
+                    is_night_work = True
+
+                is_work_day = wd_type_id == WorkerDay.TYPE_WORKDAY
+                WorkerDayFactory(
+                    type_id=wd_type_id,
+                    dt=dt,
+                    shop=self.shop,
+                    employee=self.employee_worker,
+                    employment=self.employment_worker,
+                    dttm_work_start=datetime.combine(dt, tm_start) if is_work_day else None,
+                    dttm_work_end=datetime.combine(dt + timedelta(days=1) if is_night_work else dt,
+                                                   tm_end) if is_work_day else None,
+                    is_fact=is_work_day,
+                    is_approved=True,
+                    is_vacancy=is_vacancy,
+                    cashbox_details__work_type=work_type,
+                )
+        self._calc_timesheets(reraise_exc=True)
+        self.assertEqual(TimesheetItem.objects.filter(
+            timesheet_type=TimesheetItem.TIMESHEET_TYPE_MAIN, dt='2021-06-01',
+            ).aggregate(hours=Sum('day_hours'))['hours'], 7)
+        self.assertEqual(TimesheetItem.objects.filter(
+            timesheet_type=TimesheetItem.TIMESHEET_TYPE_ADDITIONAL, dt='2021-06-01',
+            ).aggregate(hours=Sum('day_hours'))['hours'], 3)
+        self.assertEqual(TimesheetItem.objects.filter(
+            timesheet_type=TimesheetItem.TIMESHEET_TYPE_MAIN, dt='2021-06-02',
+            ).aggregate(hours=Sum('day_hours'))['hours'], 7)
+        self.assertEqual(TimesheetItem.objects.filter(
+            timesheet_type=TimesheetItem.TIMESHEET_TYPE_ADDITIONAL, dt='2021-06-02',
+            ).aggregate(hours=Sum('day_hours'))['hours'], 3)
+        self.assertEqual(TimesheetItem.objects.filter(
+            timesheet_type=TimesheetItem.TIMESHEET_TYPE_ADDITIONAL, dt='2021-06-03',
+            ).aggregate(hours=Sum('day_hours'))['hours'], 11)
+        self.assertEqual(TimesheetItem.objects.filter(
+            timesheet_type=TimesheetItem.TIMESHEET_TYPE_MAIN, dt='2021-06-04',
+            ).aggregate(hours=Sum('day_hours'))['hours'], 11)
+
 
 class TestShiftScheduleDivider(TestTimesheetMixin, TestCase):
     @classmethod
