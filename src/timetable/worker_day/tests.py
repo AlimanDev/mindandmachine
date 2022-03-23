@@ -719,8 +719,19 @@ class TestUploadDownload(TestsHelperMixin, APITestCase):
             ]
         )
 
-        WorkType.objects.create(work_type_name=WorkTypeName.objects.create(name='Кассы'), shop_id=self.shop.id)
+        WorkerDayType.objects.filter(code=WorkerDay.TYPE_SICK).update(
+            get_work_hours_method=WorkerDayType.GET_WORK_HOURS_METHOD_TYPE_MANUAL,
+            is_work_hours=True,
+        )
+        self.cahbox_name = WorkTypeName.objects.create(name='Кассы')
+        self.dm_name = WorkTypeName.objects.create(name='ДМ')
+        self.cashbox_work_type = WorkType.objects.create(work_type_name=self.cahbox_name, shop_id=self.shop.id)
+        self.dm_work_type = WorkType.objects.create(work_type_name=self.dm_name, shop_id=self.shop.id)
         self.url = '/rest_api/worker_day/'
+        self.dm_position = WorkerPosition.objects.get(name='Директор магазина')
+        self.seller_position = WorkerPosition.objects.get(name='Продавец')
+        self.dm_position.default_work_type_names.add(self.dm_name)
+        self.seller_position.default_work_type_names.add(self.cahbox_name)
         self.network.add_users_from_excel = True
         self.network.allow_creation_several_wdays_for_one_employee_for_one_date = True
         self.network.save()
@@ -737,11 +748,18 @@ class TestUploadDownload(TestsHelperMixin, APITestCase):
         self.assertEqual(Employee.objects.filter(user=user).count(), 2)
         self.assertTrue(Employee.objects.filter(tabel_code='A23739').exists())
 
+    def _assertWorkerDay(self, tabel_code, dt, is_vacancy=False, work_type_id=None, type_id=WorkerDay.TYPE_WORKDAY, work_hours=None):
+        wd = WorkerDay.objects.get(employee__tabel_code=tabel_code, dt=dt, is_fact=False, is_approved=False)
+        self.assertEqual(wd.is_vacancy, is_vacancy)
+        self.assertEqual(wd.type_id, type_id)
+        if work_type_id:
+            self.assertEqual(wd.work_types.first().id, work_type_id)
+        if work_hours:
+            self.assertEqual(wd.work_hours, work_hours)
+
     def test_upload_timetable(self):
-        file = open('etc/scripts/timetable.xlsx', 'rb')
-        with override_settings(UPLOAD_TT_MATCH_EMPLOYMENT=False):
+        with override_settings(UPLOAD_TT_MATCH_EMPLOYMENT=False), open('etc/scripts/timetable.xlsx', 'rb') as file:
             response = self.client.post(f'{self.url}upload/', {'shop_id': self.shop.id, 'file': file}, HTTP_ACCEPT_LANGUAGE='ru')
-        file.close()
         self.assertEqual(response.status_code, 200)
         self.assertEqual(WorkerDay.objects.filter(is_approved=False, source=WorkerDay.SOURCE_UPLOAD).count(), 181)
         self.assertEqual(WorkerDay.objects.filter(
@@ -753,6 +771,14 @@ class TestUploadDownload(TestsHelperMixin, APITestCase):
         self.assertEqual(User.objects.filter(last_name='Смешнов').count(), 1)
         user = User.objects.filter(last_name='Смешнов').first()
         self.assertEqual(Employee.objects.filter(user=user).count(), 2)
+        self._assertWorkerDay('A23739', '2020-04-13', is_vacancy=True, work_type_id=self.dm_work_type.id)
+        self._assertWorkerDay('A23739', '2020-04-14', is_vacancy=True, work_type_id=self.cashbox_work_type.id)
+        self._assertWorkerDay('28479', '2020-04-14', is_vacancy=True, work_type_id=self.dm_work_type.id)
+        self._assertWorkerDay('27511', '2020-04-13', is_vacancy=True, work_type_id=self.cashbox_work_type.id)
+        self._assertWorkerDay('27665', '2020-04-14', work_hours=timedelta(hours=10), type_id=WorkerDay.TYPE_SICK)
+        self._assertWorkerDay('27665', '2020-04-15', work_hours=timedelta(hours=10), type_id=WorkerDay.TYPE_SICK)
+        self._assertWorkerDay('26856', '2020-04-14', work_type_id=self.cashbox_work_type.id)
+
 
     def test_upload_timetable_leading_zeros(self):
         file = open('etc/scripts/timetable_leading_zeros.xlsx', 'rb')
@@ -910,8 +936,8 @@ class TestUploadDownload(TestsHelperMixin, APITestCase):
         self.assertEqual(tabel[tabel.columns[4]][16], 'К 10:00-21:00')
         self.assertEqual(tabel[tabel.columns[5]][16], 'ОТ 8.0')
         self.assertEqual(tabel[tabel.columns[33]][16], '2')
-        self.assertEqual(tabel[tabel.columns[34]][16], '26')
-        self.assertEqual(tabel[tabel.columns[37]][16], '14')
+        self.assertEqual(tabel[tabel.columns[34]][16], '46')
+        self.assertEqual(tabel[tabel.columns[37]][16], '12')
         self.assertEqual(tabel[tabel.columns[38]][16], '1')
 
     def test_download_timetable_with_child_region(self):
