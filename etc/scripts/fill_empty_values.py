@@ -4,10 +4,14 @@ from src.forecast.models import OperationTypeName, OperationTypeTemplate, Period
 from src.base.models import Shop
 from django.db import transaction
 
-def fill_empty_values_with_zero(operation_type_name_ids=[], dttm_from=None, dttm_to=None):
+def fill_empty_values_with_zero(operation_type_name_ids=[], dttm_from=None, dttm_to=None, shop_ids=[]):
     names_filter = {}
     if operation_type_name_ids:
         names_filter['id__in'] = operation_type_name_ids
+
+    shops_filter = {}
+    if shop_ids:
+        shops_filter['id__in'] = shop_ids
 
     dttms_filter = {}
     if dttm_from:
@@ -22,7 +26,7 @@ def fill_empty_values_with_zero(operation_type_name_ids=[], dttm_from=None, dttm
     for ot in OperationTypeTemplate.objects.filter(operation_type_name_id__in=names.keys()): 
         operation_templates.setdefault(ot.load_template_id, {})[ot.operation_type_name_id] = ot.forecast_step 
 
-    shops = Shop.objects.filter(load_template__isnull=False)
+    shops = Shop.objects.filter(load_template__isnull=False, **shops_filter)
 
     operation_types = {}
 
