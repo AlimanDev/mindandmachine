@@ -38,6 +38,7 @@ from src.timetable.exceptions import (
     MultipleWDTypesOnOneDateForOneEmployee,
     HasAnotherWdayOnDate,
 )
+from src.util.commons import obj_deep_get
 from src.util.mixins.qs import AnnotateValueEqualityQSMixin
 from src.util.time import _time_to_float
 
@@ -282,6 +283,12 @@ class EmploymentWorkType(AbstractModel):
     def get_department(self):
         return self.employment.shop
 
+class WorkerConstraintManager(models.Manager):
+    def get_queryset(self):
+        return super().get_queryset().filter(
+            models.Q(employment__dttm_deleted__date__gt=timezone.now().date()) | models.Q(employment__dttm_deleted__isnull=True)
+        )
+
 
 class WorkerConstraint(AbstractModel):
     class Meta(object):
@@ -298,6 +305,9 @@ class WorkerConstraint(AbstractModel):
     weekday = models.SmallIntegerField()  # 0 - monday, 6 - sunday
     is_lite = models.BooleanField(default=False)  # True -- если сам сотрудник выставил, False -- если менеджер
     tm = models.TimeField()
+
+    objects = WorkerConstraintManager()
+    objects_with_excluded = models.Manager()
 
     def get_department(self):
         return self.employment.shop
@@ -534,6 +544,9 @@ class WorkerDay(AbstractModel):
     class Meta:
         verbose_name = 'Рабочий день сотрудника'
         verbose_name_plural = 'Рабочие дни сотрудников'
+        unique_together = (
+            ('code', 'is_approved'),
+        )
 
     TYPE_HOLIDAY = 'H'
     TYPE_WORKDAY = 'W'
@@ -747,6 +760,8 @@ class WorkerDay(AbstractModel):
 
     @classmethod
     def _pre_batch(cls, user, **kwargs):
+        if kwargs.get('model_options', {}).get('delete_not_allowed_additional_types'):
+            cls._delete_not_allowed_additional_types(**kwargs)
         check_perms_extra_kwargs = kwargs.get('check_perms_extra_kwargs', {})
         grouped_checks = check_perms_extra_kwargs.pop('grouped_checks', False)
         if grouped_checks:
@@ -765,7 +780,101 @@ class WorkerDay(AbstractModel):
                         cls._check_delete_single_wd_data_perm(user, wd_data)
 
     @classmethod
+    def _delete_not_allowed_additional_types(cls, **kwargs):
+        grouped_by_type = {}
+        for obj in kwargs.get('created_objs', []):
+            grouped_by_type.setdefault(obj.type_id, []).append(obj)
+
+        allowed_wd_types_dict = {}
+        for from_workerdaytype_id, to_workerdaytype_id in WorkerDayType.allowed_additional_types.through.objects.filter(
+            from_workerdaytype_id__in=list(grouped_by_type.keys())
+        ).values_list(
+            'from_workerdaytype_id',
+            'to_workerdaytype_id',
+        ):
+            allowed_wd_types_dict.setdefault(from_workerdaytype_id, []).append(to_workerdaytype_id)
+
+        delete_not_allowed_additional_types_q = Q()
+        for wd_type_id, objects in grouped_by_type.items():
+            for obj in objects:
+                delete_not_allowed_additional_types_q |= Q(
+                    ~Q(type_id=obj.type_id),
+                    ~Q(type__in=allowed_wd_types_dict.get(wd_type_id, [])),
+                    employee_id=obj.employee_id,
+                    is_fact=obj.is_fact,
+                    is_approved=obj.is_approved,
+                    dt=obj.dt,
+                )
+        if delete_not_allowed_additional_types_q:
+            delete_qs = WorkerDay.objects.filter(delete_not_allowed_additional_types_q)
+            objs_to_delete = list(delete_qs)
+            _total_deleted_count, deleted_dict = delete_qs.delete()
+            stats = kwargs.setdefault('stats', {})
+            if 'deleted_objs' in kwargs:
+                kwargs['deleted_objs'].extend(objs_to_delete)
+            if 'diff_data' in kwargs and 'diff_obj_keys' in kwargs:
+                for obj_to_delete in objs_to_delete:
+                    kwargs['diff_data'].setdefault('deleted', []).append(
+                        tuple(obj_deep_get(obj_to_delete, *keys) for keys in kwargs['diff_obj_keys']))
+            for original_deleted_cls_name, deleted_count in deleted_dict.items():
+                if deleted_count:
+                    deleted_cls_name = original_deleted_cls_name.split('.')[1]
+                    deleted_cls_stats = stats.setdefault(deleted_cls_name, {})
+                    deleted_cls_stats['deleted'] = deleted_cls_stats.get('deleted', 0) + deleted_dict.get(
+                        original_deleted_cls_name)
+
+    @classmethod
+    def _approve_delete_scope_filters_wdays(cls, **kwargs):
+        from src.timetable.worker_day.utils.approve import WorkerDayApproveHelper
+        from src.timetable.worker_day.serializers import WorkerDayApproveSerializer
+        delete_scope_filters = kwargs.get('delete_scope_filters', {})
+        employee_ids = []
+        if 'employee__tabel_code' in delete_scope_filters:
+            employee_ids = list(Employee.objects.filter(
+                tabel_code=delete_scope_filters.get('employee__tabel_code')).values_list('id', flat=True))
+        elif 'employee__tabel_code__in' in delete_scope_filters:
+            employee_ids = list(Employee.objects.filter(
+                tabel_code__in=delete_scope_filters.get('employee__tabel_code__in')).values_list('id', flat=True))
+        if employee_ids:
+            data = dict(
+                employee_ids=employee_ids,
+                is_fact=delete_scope_filters.get('is_fact'),
+                dt_from=delete_scope_filters.get('dt__gte'),
+                dt_to=delete_scope_filters.get('dt__lte'),
+                wd_types=delete_scope_filters.get('type_id__in'),
+            )
+            serializer = WorkerDayApproveSerializer(data=data)
+            serializer.is_valid(raise_exception=True)
+            exclude_approve_q = Q()
+            grouped_by_type = {}
+            for obj in kwargs.get('created_objs', []):
+                grouped_by_type.setdefault(obj.type_id, []).append(obj.dt)
+            for obj in kwargs.get('deleted_objs', []):
+                grouped_by_type.setdefault(obj.type_id, []).append(obj.dt)
+            allowed_wd_types_dict = {}
+            for from_workerdaytype_id, to_workerdaytype_id in WorkerDayType.allowed_additional_types.through.objects.filter(
+                    from_workerdaytype_id__in=list(grouped_by_type.keys())
+            ).values_list(
+                'from_workerdaytype_id',
+                'to_workerdaytype_id',
+            ):
+                allowed_wd_types_dict.setdefault(from_workerdaytype_id, []).append(to_workerdaytype_id)
+            for wd_type_id, dates in grouped_by_type.items():
+                exclude_approve_q |= Q(
+                    type__in=allowed_wd_types_dict.get(wd_type_id, []),
+                    dt__in=dates,
+                )
+            WorkerDayApproveHelper(
+                user=kwargs.get('user'),
+                any_draft_wd_exists=False,
+                exclude_approve_q=exclude_approve_q,
+                **serializer.validated_data,
+            ).run()
+
+    @classmethod
     def _post_batch(cls, **kwargs):
+        if kwargs.get('model_options', {}).get('approve_delete_scope_filters_wdays'):
+            cls._approve_delete_scope_filters_wdays(**kwargs)
         cls._invalidate_cache(**kwargs)
 
     @classmethod
@@ -960,12 +1069,12 @@ class WorkerDay(AbstractModel):
         work_hours_day, work_hours_night = break_time_subtractor.calc()
         work_hours = work_hours_day + work_hours_night
         return work_hours, work_hours_day, work_hours_night
-    
+
     def _get_breaks(self):
         position_break_triplet_cond = self.employment and self.employment.position and self.employment.position.breaks
         if self.shop and (self.shop.settings or position_break_triplet_cond or self.shop.network.breaks):
             return self.employment.position.breaks.breaks if position_break_triplet_cond else self.shop.settings.breaks.breaks if self.shop.settings else self.shop.network.breaks.breaks
-    
+
     def _calc_break(self, breaks, dttm_work_start, dttm_work_end, plan_approved=None):
         work_hours = ((dttm_work_end - dttm_work_start).total_seconds() / 60)
         break_time = 0
@@ -1115,6 +1224,7 @@ class WorkerDay(AbstractModel):
             self.work_hours = self._round_wh()
 
     id = models.BigAutoField(primary_key=True, db_index=True)
+    code = models.CharField(max_length=256, null=True)
     shop = models.ForeignKey(Shop, on_delete=models.PROTECT, null=True)
 
     employee = models.ForeignKey(
@@ -1263,6 +1373,7 @@ class WorkerDay(AbstractModel):
                 Q(dttm_work_end__gte=OuterRef('dttm_work_end')) &
                 Q(dttm_work_start__isnull=True)
             ),
+            type__is_dayoff=False,
             employee__user_id=user_id,
             dt=OuterRef('dt'),
             is_fact=OuterRef('is_fact'),
@@ -1510,7 +1621,6 @@ class WorkerDay(AbstractModel):
         date_ranges = map(lambda x: (x.replace(day=1), x), pd.date_range(dt_from.replace(day=1), dt_to + relativedelta(day=31), freq='1M').date)
 
         data_greater_norm = []
-        norm_key = getattr(settings, 'TIMESHEET_DIVIDER_SAWH_HOURS_KEY', 'curr_month')
 
         for dt_from, dt_to in date_ranges:
             stats = WorkersStatsGetter(
@@ -1529,7 +1639,10 @@ class WorkerDay(AbstractModel):
                             x[0],
                             employees[x[0]].user.last_name,
                             employees[x[0]].user.first_name,
-                            x[1].get("plan", {}).get("approved", {}).get("sawh_hours", {}).get(norm_key, 0),
+                            x[1].get("plan", {}).get("approved", {}).get("sawh_hours", {}).get(
+                                employees[x[0]].user.network.timesheet_divider_sawh_hours_key, 
+                                0
+                            ),
                             x[1].get("plan", {}).get("approved", {}).get("work_hours", {}).get("all_shops_main", 0),
                         ),
                         stats.items(),
@@ -2367,12 +2480,19 @@ class AttendanceRecords(AbstractModel):
                     )
                     WorkerDay.check_work_time_overlap(
                             employee_id=associated_wday.employee_id, dt=associated_wday.dt, is_fact=True, is_approved=True)
+                    self.fact_wd = fact_approved
+                    self._recalc_timesheet()
             except WorkTimeOverlap:
                 pass
             else:
                 if fact_approved.type.has_details:
                     self._create_wd_details(associated_wday.dt, fact_approved, associated_wday.employment, associated_wday)
                 self._create_or_update_not_approved_fact(fact_approved)
+    
+    def _recalc_timesheet(self):
+        if self.fact_wd and self.fact_wd.dttm_work_start and self.fact_wd.dttm_work_end:
+            from src.timetable.timesheet.utils import recalc_timesheet_on_data_change
+            transaction.on_commit(lambda: recalc_timesheet_on_data_change({self.fact_wd.employee_id: [self.fact_wd.dt, self.fact_wd.dt]}))
 
     def save(self, *args, recalc_fact_from_att_records=False, **kwargs):
         """
@@ -2409,7 +2529,8 @@ class AttendanceRecords(AbstractModel):
 
                 if fact_approved:
                     self.fact_wd = fact_approved
-                    if fact_approved.last_edited_by_id:
+                    if fact_approved.last_edited_by_id and (
+                            recalc_fact_from_att_records and not self.user.network.edit_manual_fact_on_recalc_fact_from_att_records):
                         return res
 
                     # если это отметка о приходе, то не перезаписываем время начала работы в графике
@@ -2433,6 +2554,7 @@ class AttendanceRecords(AbstractModel):
                     if fact_approved.type.has_details and not fact_approved.worker_day_details.exists():
                         self._create_wd_details(self.dt, fact_approved, active_user_empl, closest_plan_approved)
                     fact_approved.save()
+                    self._recalc_timesheet()
                     self._create_or_update_not_approved_fact(fact_approved)
                 else:
                     if self.type == self.TYPE_LEAVING:
@@ -2465,6 +2587,7 @@ class AttendanceRecords(AbstractModel):
                             # логично дату предыдущую ставить, так как это значение в отчетах используется
                             self.dt = prev_fa_wd.dt
                             super(AttendanceRecords, self).save(update_fields=['dt',])
+                            self._recalc_timesheet()
                             self._create_or_update_not_approved_fact(prev_fa_wd)
                             return res
 
@@ -2497,6 +2620,7 @@ class AttendanceRecords(AbstractModel):
                         }
                     )
                     self.fact_wd = fact_approved
+                    self._recalc_timesheet()
                     if fact_approved.type.has_details and (
                             _wd_created or not fact_approved.worker_day_details.exists()):
                         self._create_wd_details(self.dt, fact_approved, active_user_empl, closest_plan_approved)

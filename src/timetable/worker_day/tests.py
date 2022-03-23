@@ -5,7 +5,7 @@ from datetime import timedelta, time, datetime, date
 
 from django.test.utils import override_settings
 from src.timetable.timesheet.tasks import calc_timesheets
-from src.timetable.worker_day.utils import create_fact_from_attendance_records
+from src.timetable.worker_day.utils.utils import create_fact_from_attendance_records
 from unittest import skip, mock
 
 import pandas
@@ -35,7 +35,7 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
         cls.worker_stat_url = '/rest_api/worker_day/worker_stat/'
         cls.url_approve = '/rest_api/worker_day/approve/'
         cls.daily_stat_url = '/rest_api/worker_day/daily_stat/'
-        cls.work_type_name = WorkTypeName.objects.create(name='Магазин')
+        cls.work_type_name = WorkTypeName.objects.create(name='Магазин', network=cls.network)
         cls.work_type = WorkType.objects.create(
             work_type_name=cls.work_type_name,
             shop=cls.shop,
@@ -138,7 +138,8 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
 
         otn1 = OperationTypeName.objects.create(
             is_special=True,
-            name='special'
+            name='special',
+            network=self.network,
         )
         ot1 = OperationType.objects.create(
             operation_type_name=otn1,
@@ -612,7 +613,8 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
     def _create_wd_and_task(self, wd_type_id, start_timedelta, end_timedelta):
         wd = self.create_worker_day(type_id=wd_type_id, shop=self.shop, dt=self.dt, is_approved=False, is_fact=False)
         otn = OperationTypeName.objects.create(
-            name='Приём врача'
+            name='Приём врача',
+            network=self.network,
         )
         ot = OperationType.objects.create(
             operation_type_name=otn,
@@ -707,13 +709,14 @@ class TestUploadDownload(TestsHelperMixin, APITestCase):
     USER_EMAIL = "q@q.q"
     USER_PASSWORD = "4242"
 
-    def setUp(self):
-        super().setUp()
-        create_departments_and_users(self)
+    @classmethod
+    def setUpTestData(cls):
+        cls.create_departments_and_users()
         WorkerPosition.objects.bulk_create(
             [
                 WorkerPosition(
                     name=name,
+                    network=cls.network,
                 )
                 for name in ['Директор магазина', 'Продавец', 'Продавец-кассир', 'ЗДМ']
             ]
@@ -723,18 +726,20 @@ class TestUploadDownload(TestsHelperMixin, APITestCase):
             get_work_hours_method=WorkerDayType.GET_WORK_HOURS_METHOD_TYPE_MANUAL,
             is_work_hours=True,
         )
-        self.cahbox_name = WorkTypeName.objects.create(name='Кассы')
-        self.dm_name = WorkTypeName.objects.create(name='ДМ')
-        self.cashbox_work_type = WorkType.objects.create(work_type_name=self.cahbox_name, shop_id=self.shop.id)
-        self.dm_work_type = WorkType.objects.create(work_type_name=self.dm_name, shop_id=self.shop.id)
-        self.url = '/rest_api/worker_day/'
-        self.dm_position = WorkerPosition.objects.get(name='Директор магазина')
-        self.seller_position = WorkerPosition.objects.get(name='Продавец')
-        self.dm_position.default_work_type_names.add(self.dm_name)
-        self.seller_position.default_work_type_names.add(self.cahbox_name)
-        self.network.add_users_from_excel = True
-        self.network.allow_creation_several_wdays_for_one_employee_for_one_date = True
-        self.network.save()
+        cls.cahbox_name = WorkTypeName.objects.create(name='Кассы', network=cls.network)
+        cls.dm_name = WorkTypeName.objects.create(name='ДМ', network=cls.network)
+        cls.cashbox_work_type = WorkType.objects.create(work_type_name=cls.cahbox_name, shop_id=cls.shop.id)
+        cls.dm_work_type = WorkType.objects.create(work_type_name=cls.dm_name, shop_id=cls.shop.id)
+        cls.url = '/rest_api/worker_day/'
+        cls.dm_position = WorkerPosition.objects.get(name='Директор магазина')
+        cls.seller_position = WorkerPosition.objects.get(name='Продавец')
+        cls.dm_position.default_work_type_names.add(cls.dm_name)
+        cls.seller_position.default_work_type_names.add(cls.cahbox_name)
+        cls.network.add_users_from_excel = True
+        cls.network.allow_creation_several_wdays_for_one_employee_for_one_date = True
+        cls.network.save()
+    
+    def setUp(self):
         self.client.force_authenticate(user=self.user1)
 
     def test_upload_timetable_match_tabel_code(self):
@@ -874,7 +879,6 @@ class TestUploadDownload(TestsHelperMixin, APITestCase):
         self.assertEqual(tabel[tabel.columns[1]][11], 'Иванов Иван Иванович')
         self.assertEqual(tabel[tabel.columns[26]][14], 'В')
 
-    @override_settings(FISCAL_SHEET_DIVIDER_ALIAS='nahodka')
     def test_download_timetable_for_inspection(self):
         fill_calendar('2020.4.1', '2021.12.31', self.region.id)
         WorkerDayType.objects.filter(code=WorkerDay.TYPE_VACATION).update(is_dayoff=True, is_work_hours=True)
@@ -883,6 +887,7 @@ class TestUploadDownload(TestsHelperMixin, APITestCase):
         file.close()
         self.network.set_settings_value('timetable_add_holiday_count_field', True)
         self.network.set_settings_value('timetable_add_vacation_count_field', True)
+        self.network.fiscal_sheet_divider_alias = 'nahodka'
         self.network.save()
         WorkerDay.objects.update(is_approved=True)
         calc_timesheets(dt_from=date(2020, 4, 1), dt_to=date(2020, 4, 30))
@@ -946,6 +951,7 @@ class TestUploadDownload(TestsHelperMixin, APITestCase):
             name='Child',
             parent=self.region,
             code='child',
+            network=self.network,
         )
         ProductionDay.objects.create(
             dt='2020-04-04',

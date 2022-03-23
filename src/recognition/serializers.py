@@ -6,6 +6,7 @@ from django.db.models import Q
 from rest_framework import serializers
 
 from src.base.models import Shop, NetworkConnect
+from src.base.serializers import BaseModelSerializer
 from src.recognition.models import TickPoint, Tick, TickPhoto
 from src.timetable.models import User as WFMUser
 from src.util.drf.fields import RoundingDecimalField
@@ -44,7 +45,7 @@ class HashSigninSerializer(serializers.Serializer):
         return attrs
 
 
-class TickPointSerializer(serializers.ModelSerializer):
+class TickPointSerializer(BaseModelSerializer):
     shop_id = serializers.IntegerField()
 
     class Meta:
@@ -57,7 +58,7 @@ class TickPointSerializer(serializers.ModelSerializer):
         }
 
 
-class TickSerializer(serializers.ModelSerializer):
+class TickSerializer(BaseModelSerializer):
     lateness = serializers.SerializerMethodField()
     # worker_day_details = serializers.SerializerMethodField()
     # worker_day_details = WorkerDayDetailsSerializer(many=True)
@@ -89,7 +90,7 @@ class TickSerializer(serializers.ModelSerializer):
         return int(obj.lateness.total_seconds()) if isinstance(obj.lateness, timedelta) else None
 
 
-class PostTickSerializer_point(serializers.ModelSerializer):
+class PostTickSerializer_point(BaseModelSerializer):
     user_id = serializers.IntegerField()
     employee_id = serializers.IntegerField(required=False)
     dttm = serializers.DateTimeField(required=False)
@@ -99,7 +100,7 @@ class PostTickSerializer_point(serializers.ModelSerializer):
         fields = ['user_id', 'employee_id', 'type', 'dttm']
 
 
-class PostTickSerializer_user(serializers.ModelSerializer):
+class PostTickSerializer_user(BaseModelSerializer):
     dttm = serializers.DateTimeField(required=False)
     employee_id = serializers.IntegerField(required=False)
 
@@ -137,7 +138,7 @@ class PostTickSerializer_user(serializers.ModelSerializer):
         return attrs
 
 
-class TickPhotoSerializer(serializers.ModelSerializer):
+class TickPhotoSerializer(BaseModelSerializer):
     is_verified = serializers.SerializerMethodField()
 
     class Meta:
@@ -156,7 +157,7 @@ class TickPhotoSerializer(serializers.ModelSerializer):
         return 1 if obj.verified_score else 0
 
 
-class PostTickPhotoSerializer(serializers.ModelSerializer):
+class PostTickPhotoSerializer(BaseModelSerializer):
     tick_id = serializers.IntegerField()
     dttm = serializers.DateTimeField(required=False)
 

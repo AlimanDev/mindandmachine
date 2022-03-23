@@ -1,4 +1,5 @@
 from django.http.response import Http404
+from django.db.models import F
 from rest_framework import serializers
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -10,14 +11,18 @@ from .mixins import GetObjectByCodeMixin, ApiLogMixin
 
 class BatchUpdateOrCreateOptionsSerializer(serializers.Serializer):
     by_code = serializers.BooleanField(required=False)
+    update_key_field = serializers.CharField(required=False)
     delete_scope_fields_list = serializers.ListField(
-        child=serializers.CharField(), required=False, allow_empty=False, allow_null=False)
+        child=serializers.CharField(), required=False, allow_empty=True, allow_null=False)
     delete_scope_values_list = serializers.ListField(
         child=serializers.DictField(), required=False, allow_empty=False, allow_null=False)
     delete_scope_filters = serializers.DictField(required=False)
+    rel_objs_delete_scope_filters = serializers.DictField(required=False)
     return_response = serializers.BooleanField(required=False, allow_null=False)
+    grouped_checks = serializers.BooleanField(required=False, allow_null=False)
     dry_run = serializers.BooleanField(required=False)
     diff_report_email_to = serializers.ListField(child=serializers.CharField(), required=False)
+    model_options = serializers.DictField(required=False)
 
 
 def _patch_obj_serializer(obj_serializer, update_key_field='id'):
@@ -39,10 +44,11 @@ class BatchUpdateOrCreateViewMixin:
 
             def __init__(self, *args, **kwargs):
                 super(BatchUpdateOrCreateSerializer, self).__init__(*args, **kwargs)
+                update_key_field = this.request.data.get('options', {}).get('update_key_field')
                 by_code = this.request.data.get('options', {}).get('by_code')
                 _patch_obj_serializer(
                     obj_serializer=self.fields['data'],
-                    update_key_field='code' if by_code else 'id'
+                    update_key_field=update_key_field or ('code' if by_code else 'id')
                 )
 
         return BatchUpdateOrCreateSerializer
@@ -71,13 +77,18 @@ class BatchUpdateOrCreateViewMixin:
             delete_scope_filters.update({'code__isnull': False})
         objects, stats = self._get_model_from_serializer(serializer).batch_update_or_create(
             data=serializer.validated_data.get('data'),
-            update_key_field='code' if options.get('by_code') else 'id',
+            update_key_field=options.get('update_key_field') or ('code' if options.get('by_code') else 'id'),
             delete_scope_fields_list=options.get('delete_scope_fields_list'),
             delete_scope_values_list=options.get('delete_scope_values_list'),
             delete_scope_filters=delete_scope_filters,
+            rel_objs_delete_scope_filters=options.get('rel_objs_delete_scope_filters', {}),
             user=self.request.user if self.request.user.is_authenticated else None,
             dry_run=options.get('dry_run', False),
             diff_report_email_to=options.get('diff_report_email_to'),
+            model_options=options.get('model_options', {}),
+            check_perms_extra_kwargs=dict(
+                grouped_checks=options.get('grouped_checks', False),
+            ),
         )
 
         res = {
@@ -94,6 +105,36 @@ class BatchUpdateOrCreateViewMixin:
 
 class BaseModelViewSet(ApiLogMixin, BatchUpdateOrCreateViewMixin, ModelViewSet):
     http_method_names = ['get', 'post', 'put', 'delete']
+    available_extra_fields = []
+    def _get_available_extra_fields(self, request):
+        extra_fields = request.query_params.get('extra_fields') or request.data.get('extra_fields') or []
+        if extra_fields:
+            extra_fields = set(map(lambda x: x.strip(), extra_fields.split(',')))
+        available_extra_fields = set(self.available_extra_fields).intersection(extra_fields)
+        return list(available_extra_fields)
+
+    def get_manager(self):
+        model = self.queryset.model
+        manager = model.objects
+        if self.action in ['update'] and hasattr(model, 'objects_with_excluded'):
+            manager = model.objects_with_excluded
+        
+        return manager
+
+    def get_queryset(self):
+        manager = self.get_manager()
+        available_extra_fields = self._get_available_extra_fields(self.request)
+
+        return manager.annotate(
+            **{
+                extra_field: F(extra_field) for extra_field in available_extra_fields
+            }
+        )
+    
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context['extra_fields'] = self._get_available_extra_fields(self.request)
+        return context
 
 
 class BaseActiveNamedModelViewSet(GetObjectByCodeMixin, BaseModelViewSet):
