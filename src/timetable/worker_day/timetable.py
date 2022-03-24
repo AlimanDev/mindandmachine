@@ -43,7 +43,7 @@ SKIP_SYMBOLS = ['NAN', '']
 DIVIDERS = ['-', '.', ',', '\n', '\r', ' ']
 MULTIPLE_WDAYS_DIVIDER = '/'
 PARSE_CELL_STR_PATTERN = re.compile(
-    r'(?P<excel_code>[а-яА-ЯA-Za-z]+)?(?P<time_str>~?\d{1,2}:\d{1,2}\s*[' + r'\\'.join(DIVIDERS) + r']\s*\d{1,2}:\d{1,2})?(?P<work_type_name>\(\w+( +\w+)*\))?(?P<work_hours>\d*[.,]\d+|\d+)?')
+    r'(?P<excel_code>[а-яА-ЯA-Za-z]+)?(?P<time_str>~?\d{1,2}:\d{1,2}\s*[' + r'\\'.join(DIVIDERS) + r']\s*\d{1,2}:\d{1,2})?\s*(?P<work_type_name>\(\w+( +\w+)*\))?(?P<work_hours>\d*[.,]\d+|\d+)?')
 
 
 class BaseUploadDownloadTimeTable:
@@ -53,7 +53,7 @@ class BaseUploadDownloadTimeTable:
         self.shop_id = form['shop_id']
         self.shop = Shop.objects.get(pk=form['shop_id'])
         self.shop_work_type_id_by_name = {
-            wt_tuple[0]: wt_tuple[1] for wt_tuple in WorkType.objects.filter(
+            wt_tuple[0].lower(): wt_tuple[1] for wt_tuple in WorkType.objects.filter(
                 shop_id=self.shop_id).values_list('work_type_name__name', 'id')
         }
         self.wd_types_dict = WorkerDayType.get_wd_types_dict()
@@ -90,7 +90,7 @@ class BaseUploadDownloadTimeTable:
                         work_type_name = m.group('work_type_name')
                         work_type_id = None
                         if work_type_name:  # TODO: тест
-                            work_type_name = work_type_name.strip('()')
+                            work_type_name = work_type_name.strip('()').lower()
                             work_type_id = self.shop_work_type_id_by_name.get(work_type_name)
                         return wd_type_id, work_type_id, is_vacancy, parse(times[0]).time(), parse(
                             times[1]).time(), None
@@ -98,7 +98,7 @@ class BaseUploadDownloadTimeTable:
             else:
                 work_hours = m.group('work_hours')
                 if work_hours:
-                    return wd_type_id, None, None, None, None, work_hours
+                    return wd_type_id, None, None, None, None, work_hours.replace(',', '.')
 
         return None, None, None, None, None, None
 
