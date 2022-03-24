@@ -10,7 +10,7 @@ class WorkTimeOverlap(Exception):
             f'{overlap["employee__user__last_name"]} {overlap["employee__user__first_name"]} - {overlap["dt"]}'
             for overlap in self.overlaps
         )
-        return gettext('Операция не может быть выполнена. Недопустимое пересечение времени работы. ({overlaps_str})').format(
+        return gettext('The operation cannot be performed. Unacceptable intersection of working hours. ({overlaps_str})').format(
             overlaps_str=overlaps_str
         )
 
@@ -26,7 +26,7 @@ class WorkDayTaskViolation(Exception):
             for task_violation in self.task_violations
         )
         return gettext(
-            'Операция не может быть выполнена. Нарушены ограничения по запланированным задачам. ({task_violation_str})').format(
+            'The operation cannot be performed. Restrictions on scheduled tasks have been violated. ({task_violation_str})').format(
             task_violation_str=task_violation_str
         )
 
@@ -41,8 +41,8 @@ class MultipleWDTypesOnOneDateForOneEmployee(Exception):
             for error_data in self.multiple_workday_types_data
         )
         return gettext(
-                'Операция не может быть выполнена. '
-                'Нарушены ограничения по разрешенным типам дней на одну дату для одного сотрудника.. ({error_str})').format(
+                'The operation cannot be performed. '
+                'The restrictions on the allowed types of days on one date for one employee have been violated.. ({error_str})').format(
             error_str=error_str
         )
 
@@ -57,8 +57,8 @@ class HasAnotherWdayOnDate(Exception):
             for error_data in self.exc_data
         )
         return gettext(
-                'Операция не может быть выполнена. '
-                'Создание нескольких дней на одну дату для одного сотрудника запрещено. ({error_str})').format(
+                'The operation cannot be performed. '
+                'Creating multiple days on the same date for one employee is prohibited. ({error_str})').format(
             error_str=error_str
         )
 
@@ -75,7 +75,7 @@ class MainWorkHoursGreaterThanNorm(Exception):
             for error_data in self.exc_data
         )
         return gettext(
-                'Операция не может быть выполнена. '
-                'Нарушены ограничения по количеству часов в основном графике.. ({error_str})').format(
+                'The operation cannot be performed. '
+                'The restrictions on the number of hours in the main schedule have been violated.. ({error_str})').format(
             error_str=error_str
         )

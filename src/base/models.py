@@ -335,7 +335,7 @@ class Network(AbstractActiveModel):
                 return Decimal(self.timesheet_min_hours_threshold)
         except:
             raise ValueError(
-                'timesheet_min_hours_threshold может принимать либо численное значение, либо название функции'
+                _('timesheet_min_hours_threshold can take either a numerical value or a function name')
             )
 
     def set_settings_value(self, k, v, save=False):
@@ -391,7 +391,7 @@ class Network(AbstractActiveModel):
         if self.analytics_type == Network.ANALYTICS_TYPE_CUSTOM_IFRAME:
             analytics_iframe = self.settings_values_prop.get('analytics_iframe')
             if not analytics_iframe:
-                raise DjangoValidationError('Необходимо заполнить analytics_iframe в значениях настроек')
+                raise DjangoValidationError(_('It is necessary to fill in analytics_iframe in the settings values'))
 
 
 class NetworkConnect(AbstractActiveModel):
@@ -2119,7 +2119,7 @@ class ShopSchedule(AbstractModel):
 
     def clean(self):
         if self.type == self.WORKDAY_TYPE and self.opens is None or self.closes is None:
-            raise ValidationError('opens and closes fields are required for workday type')
+            raise ValidationError(_('Opens and closes fields are required for workday type'))
 
         if self.type == self.HOLIDAY_TYPE:
             self.opens = None
@@ -2242,7 +2242,7 @@ class ShiftScheduleDay(AbstractModel):
 
     def clean(self):
         if (self.day_hours + self.night_hours) != self.work_hours:
-            raise DjangoValidationError('work_hours should be sum of day_hours and night_hours')
+            raise DjangoValidationError(_('Work hours should be sum of day hours and night hours'))
 
 
 class ShiftScheduleInterval(AbstractModel):

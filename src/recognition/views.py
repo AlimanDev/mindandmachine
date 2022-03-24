@@ -100,7 +100,7 @@ class TickPointAuthToken(ObtainAuthToken):
                           tick_point.shop.network_id and \
                           tick_point.shop.network.settings_values_prop.get('skip_check_urv_token', False)
         if not skip_check_urv_token and token:  # Only one auth token
-            raise exceptions.AuthenticationFailed('Для этой точки уже открыта сессия')
+            raise exceptions.AuthenticationFailed(_('A session is already open for this tick point'))
 
         token, _tpt_created = TickPointToken.objects.get_or_create(user=tick_point)
 

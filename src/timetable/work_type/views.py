@@ -1,6 +1,7 @@
 from datetime import datetime
 
 from django.db.models import Q
+from django.utils.translation import gettext_lazy as _
 from django_filters.rest_framework import FilterSet, CharFilter
 from drf_yasg.utils import swagger_auto_schema
 from rest_framework import serializers
@@ -57,7 +58,7 @@ class EfficiencySerializer(serializers.Serializer):
         super(EfficiencySerializer, self).is_valid(*args, **kwargs)
 
         if self.validated_data['from_dt'] > self.validated_data['to_dt']:
-            raise serializers.ValidationError('dt_from have to be less or equal than dt_to')
+            raise serializers.ValidationError(_('Date start should be less then date end'))
 
 
 class WorkTypeFilter(FilterSet):

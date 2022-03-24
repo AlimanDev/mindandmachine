@@ -1,3 +1,4 @@
+from django.utils.translation import gettext_lazy as _
 from rest_framework.exceptions import (
     PermissionDenied,
     APIException,
@@ -19,7 +20,7 @@ class GetEmbedInfoAPIView(APIView):
         report_permission = ReportPermission.get_report_perm(user=request.user)
 
         if not report_permission:
-            raise PermissionDenied('Нет доступных отчетов.')
+            raise PermissionDenied(_('There are no reports available.'))
 
         try:
             embed_info = PbiEmbedService(

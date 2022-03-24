@@ -258,7 +258,7 @@ class UserSerializer(BaseNetworkSerializer):
 
         auth_type = attrs.get('auth_type')
         if auth_type == User.LDAP_AUTH and not attrs.get('ldap_login'):
-            raise serializers.ValidationError('ldap_login should be specified for ldap auth_type.')
+            raise serializers.ValidationError(_('ldap_login should be specified for ldap auth_type.'))
 
         return attrs
 
