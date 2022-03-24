@@ -248,7 +248,7 @@ class SystemExportStrategy(ExportStrategy):
     def clean(self):
         period_needed_strategies = [SystemExportStrategy.WORK_HOURS_PIVOT_TABLE]
         if self.strategy_type in period_needed_strategies and self.period is None:
-            raise ValidationError(f'Для стратегии "{self.strategy_type}" обязательно выбрать период.')
+            raise ValidationError(_("For the '{}' strategy, you must select a period.").format(self.strategy_type)) # Для стратегии "{}" обязательно выбрать период.
 
     def get_strategy_cls_kwargs(self):
         kwargs = super(SystemExportStrategy, self).get_strategy_cls_kwargs()

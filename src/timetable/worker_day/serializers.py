@@ -213,7 +213,7 @@ class WorkerDaySerializer(ModelSerializerWithCreateOnlyFields, UnaccountedOverti
 
     def validate(self, attrs):
         if self.instance and self.instance.is_approved:
-            raise ValidationError({"error": "Нельзя менять подтвержденную версию."})
+            raise ValidationError({"error": _("You cannot change the approved version.")}) # Нельзя менять подтвержденную версию.
 
         if not self.instance:
             attrs['source'] = WorkerDay.SOURCE_FULL_EDITOR
@@ -228,7 +228,7 @@ class WorkerDaySerializer(ModelSerializerWithCreateOnlyFields, UnaccountedOverti
         attrs['type'] = wd_type_obj
         if is_fact and not wd_type_obj.use_in_fact:
             raise ValidationError({
-                "error": "Для фактической неподтвержденной версии можно установить только {}".format(
+                "error": _("For the fact not approved version, you can only set {}").format(
                     ", ".join([i.name for i in self.wd_types_dict.values() if i.use_in_fact])
                 )
             })
@@ -710,7 +710,7 @@ class BlockOrUnblockWorkerDaySerializer(serializers.ModelSerializer):
             if len(shops) == 1:
                 attrs['shop_id'] = shops[0].id
             else:
-                raise NotFound(detail=f'Подразделение с кодом "{shop_code}" не найдено')
+                raise NotFound(detail=_("The shop with the code '{}' was not found").format(shop_code))
 
         if (attrs.get('employee_id') is None) and ('worker_username' in attrs):
             username = attrs.pop('worker_username')
@@ -719,7 +719,7 @@ class BlockOrUnblockWorkerDaySerializer(serializers.ModelSerializer):
                 employee = Employee.objects.filter(user=users[0]).first()
                 attrs['employee_id'] = employee.id
             else:
-                raise NotFound(detail=f'Пользователь "{username}" не найден')
+                raise NotFound(detail=_("User '{}' not found").format(username)) # Пользователь "{}" не найден
 
         return attrs
 

@@ -3,6 +3,7 @@ import datetime
 import numpy as np
 from django.db.models import Q, F, Sum, Exists, OuterRef
 from django.utils.functional import cached_property
+from django.utils.translation import gettext_lazy as _
 from rest_framework.exceptions import ValidationError
 
 from src.base.models import (
@@ -107,7 +108,7 @@ class ShopEfficiencyGetter:
         if self.work_type_ids:
             work_types = work_types.filter(id__in=self.work_type_ids)
             if work_types.count() != len(self.work_type_ids):
-                raise ShopEfficiencyGetterError('bad work_type_ids')
+                raise ShopEfficiencyGetterError(_('bad work_type_ids'))
 
         self.work_types = {wt.id: wt for wt in work_types}
 
