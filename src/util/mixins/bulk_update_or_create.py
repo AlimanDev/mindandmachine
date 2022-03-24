@@ -313,9 +313,8 @@ class BatchUpdateOrCreateModelMixin:
                 filter_kwargs = {}
                 if update_keys:
                     filter_kwargs[f"{update_key_field}__in"] = update_keys
-                if delete_scope_filters:
-                    filter_kwargs.update(delete_scope_filters)
-                if filter_kwargs:
+                    if delete_scope_filters:
+                        filter_kwargs.update(delete_scope_filters)
                     update_qs = cls.objects.filter(**filter_kwargs).select_related(
                         *cls._get_batch_update_select_related_fields())
                 else:
