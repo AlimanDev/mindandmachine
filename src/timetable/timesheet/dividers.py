@@ -494,11 +494,11 @@ class PobedaManualTimesheetDivider(BasePobedaTimesheetDivider):
         for dt in pd.date_range(self.fiscal_timesheet.dt_from, self.fiscal_timesheet.dt_to).date:
             active_employment = self.fiscal_timesheet._get_active_employment(dt)
             if active_employment:
-                for main_timesheet_item in self.fiscal_timesheet.main_timesheet.get_items(dt=dt):
-                    if main_timesheet_item.is_vacancy:
-                        self.fiscal_timesheet.main_timesheet.remove(dt, main_timesheet_item)
-                        self.fiscal_timesheet.additional_timesheet.add(
-                            dt, main_timesheet_item.copy(overrides={'freezed': True}))
+                items = self.fiscal_timesheet.main_timesheet.get_items(dt=dt, filter_func=lambda i: i.is_vacancy)
+                for main_timesheet_item in items:
+                    self.fiscal_timesheet.main_timesheet.remove(dt, main_timesheet_item)
+                    self.fiscal_timesheet.additional_timesheet.add(
+                        dt, main_timesheet_item.copy(overrides={'freezed': True}))
 
     def divide(self):
         logger.info(f'start pobeda_manual fiscal sheet divide')
