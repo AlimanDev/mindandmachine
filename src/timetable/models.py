@@ -445,12 +445,14 @@ class WorkerDayType(AbstractModel):
     GET_WORK_HOURS_METHOD_TYPE_MONTH_AVERAGE_SAWH_HOURS = 'average_sawh_hours'
     GET_WORK_HOURS_METHOD_TYPE_NORM_HOURS = 'norm_hours'
     GET_WORK_HOURS_METHOD_TYPE_MANUAL = 'manual'
+    GET_WORK_HOURS_METHOD_TYPE_MANUAL_OR_MONTH_AVERAGE_SAWH_HOURS = 'manual_or_average_sawh_hours'
 
     GET_WORK_HOURS_METHOD_TYPES = (
         (GET_WORK_HOURS_METHOD_TYPE_MONTH_AVERAGE_SAWH_HOURS,
          'Расчет часов на основе среднемесячного значения рекомендуемой нормы'),
         (GET_WORK_HOURS_METHOD_TYPE_NORM_HOURS, 'Расчет часов на основе нормы по производственному календарю'),
         (GET_WORK_HOURS_METHOD_TYPE_MANUAL, 'Ручное проставление часов'),
+        (GET_WORK_HOURS_METHOD_TYPE_MANUAL_OR_MONTH_AVERAGE_SAWH_HOURS, 'Ручное проставление часов или среднемесячное значение рекомендуемой нормы'),
     )
 
     code = models.CharField(max_length=64, primary_key=True, verbose_name='Код', help_text='Первычный ключ')
@@ -1159,7 +1161,13 @@ class WorkerDay(AbstractModel):
         # + вычитать из нормы из work_hours в типах is_reduce_norm?
         if self.type.is_dayoff and self.type.is_work_hours:
             work_hours = 0
-            if self.type.get_work_hours_method == WorkerDayType.GET_WORK_HOURS_METHOD_TYPE_MONTH_AVERAGE_SAWH_HOURS:
+            if (
+                self.type.get_work_hours_method == WorkerDayType.GET_WORK_HOURS_METHOD_TYPE_MONTH_AVERAGE_SAWH_HOURS or 
+                (
+                    self.type.get_work_hours_method == WorkerDayType.GET_WORK_HOURS_METHOD_TYPE_MANUAL_OR_MONTH_AVERAGE_SAWH_HOURS and 
+                    not self.work_hours
+                )
+            ):
                 from src.timetable.worker_day.stat import WorkersStatsGetter
                 employee_stats = WorkersStatsGetter(
                     employee_id=self.employee_id,
@@ -1187,7 +1195,10 @@ class WorkerDay(AbstractModel):
                 if prod_cal:
                     work_hours = prod_cal.norm_hours
 
-            elif self.type.get_work_hours_method == WorkerDayType.GET_WORK_HOURS_METHOD_TYPE_MANUAL:
+            elif self.type.get_work_hours_method in [
+                WorkerDayType.GET_WORK_HOURS_METHOD_TYPE_MANUAL, 
+                WorkerDayType.GET_WORK_HOURS_METHOD_TYPE_MANUAL_OR_MONTH_AVERAGE_SAWH_HOURS,
+            ]:
                 return None, None, self.work_hours
 
             return None, None, datetime.timedelta(hours=work_hours)
