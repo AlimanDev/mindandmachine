@@ -338,7 +338,7 @@ class TestTicksViewSet(TestsHelperMixin, APITestCase):
         )
         self.assertEqual(resp_coming.status_code, status.HTTP_200_OK)
         self.assertTrue(TickPoint.objects.filter(name=f'autocreate tickpoint {self.shop.id}').exists())
-        tick_point = TickPoint.objects.create(name='Test', shop=self.shop)
+        tick_point = TickPoint.objects.create(name='Test', shop=self.shop, network=self.network)
         ip_auth.tick_point = tick_point
         ip_auth.save()
         resp_leaving = self.client.post(

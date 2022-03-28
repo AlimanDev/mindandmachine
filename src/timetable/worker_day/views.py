@@ -3,7 +3,7 @@ import datetime
 import pandas as pd
 from dateutil.relativedelta import relativedelta
 from django.db import transaction
-from django.db.models import OuterRef, Subquery, Q, F, Exists
+from django.db.models import OuterRef, Q, F, Exists
 from django.db.models.query import Prefetch
 from django.http import HttpResponse
 from django.utils import timezone
@@ -12,9 +12,9 @@ from django.utils.translation import gettext_lazy as _
 from django_filters import utils
 from drf_yasg.utils import swagger_auto_schema
 from rest_framework.decorators import action
-from rest_framework.pagination import LimitOffsetPagination
 from rest_framework.response import Response
 from rest_framework.serializers import ValidationError
+from src.base.pagination import LimitOffsetPaginationWithOptionalCount
 
 from src.base.exceptions import FieldError
 from src.base.models import Employment, Shop, Employee
@@ -32,6 +32,7 @@ from src.timetable.models import (
     WorkerDayType,
     TimesheetItem,
 )
+from src.timetable.timesheet.utils import recalc_timesheet_on_data_change
 from src.timetable.vacancy.utils import cancel_vacancies, cancel_vacancy, confirm_vacancy, notify_vacancy_created
 from src.timetable.worker_day.serializers import (
     ConfirmVacancyToWorkerSerializer,
@@ -40,7 +41,6 @@ from src.timetable.worker_day.serializers import (
     WorkerDaySerializer,
     WorkerDayApproveSerializer,
     WorkerDayWithParentSerializer,
-    VacancySerializer,
     DuplicateSrializer,
     DeleteWorkerDaysSerializer,
     ExchangeSerializer,
@@ -96,9 +96,15 @@ class WorkerDayViewSet(BaseModelViewSet):
     filterset_class = WorkerDayFilter
     filter_backends = [MultiShopsFilterBackend]
     openapi_tags = ['WorkerDay',]
+    queryset = WorkerDay.objects.all()
+    available_extra_fields = ['shop__name']
 
     def get_queryset(self):
-        queryset = WorkerDay.objects.filter(canceled=False).prefetch_related(Prefetch('outsources', to_attr='outsources_list'))
+        queryset = super().get_queryset().filter(
+            canceled=False,
+        ).select_related(
+            'last_edited_by',
+        ).prefetch_related(Prefetch('outsources', to_attr='outsources_list'))
 
         if self.request.query_params.get('by_code', False):
             return queryset.annotate(
@@ -364,7 +370,7 @@ class WorkerDayViewSet(BaseModelViewSet):
         if not filterset_class.form.is_valid():
             raise utils.translate_validation(filterset_class.errors)
         
-        paginator = LimitOffsetPagination()
+        paginator = LimitOffsetPaginationWithOptionalCount()
         allowed_outsource_network_subq = WorkerDayOutsourceNetwork.objects.filter(
             workerday_id=OuterRef('id'),
             network_id=self.request.user.network_id,
@@ -402,26 +408,12 @@ class WorkerDayViewSet(BaseModelViewSet):
                     Q(is_outsource=True, outsource_network_allowed=True, is_approved=True) &
                     (Q(employee__isnull=True) | Q(employee__user__network_id=request.user.network_id)) # чтобы не попадали вакансии с сотрудниками другой аутсорс сети
                 ), # аутсорс фильтр
-            ).select_related(
-                'shop',
-                'employee__user',
             ).prefetch_related(
-                'worker_day_details',
-                'outsources',
-            ).annotate(
-                first_name=F('employee__user__first_name'),
-                last_name=F('employee__user__last_name'),
-                worker_shop=Subquery(
-                    Employment.objects.get_active(
-                        OuterRef('employee__user__network_id'),
-                        employee_id=OuterRef('employee_id')
-                    ).values('shop_id')[:1]
-                ),
-                user_network_id=F('employee__user__network_id'),
+                Prefetch('worker_day_details', to_attr='worker_day_details_list'),
             ),
         )
         data = paginator.paginate_queryset(queryset, request)
-        data = VacancySerializer(data, many=True, context=self.get_serializer_context())
+        data = WorkerDayListSerializer(data, many=True, context=self.get_serializer_context())
 
         return paginator.get_paginated_response(data.data)
 
@@ -538,6 +530,11 @@ class WorkerDayViewSet(BaseModelViewSet):
                 )
                 transaction.on_commit(lambda: recalc_wdays.delay(
                     id__in=list(WorkerDay.objects.filter(closest_plan_approved=parent_id).values_list('id', flat=True))))
+                recalc_timesheet_on_data_change(
+                    {
+                        vacancy.employee_id: [vacancy.dt],
+                    }
+                )
             else:
                 transaction.on_commit(lambda: notify_vacancy_created(vacancy, is_auto=False))
                 vacancy.is_approved = True
@@ -596,6 +593,7 @@ class WorkerDayViewSet(BaseModelViewSet):
         deleted = to_delete_qs.delete()
 
         wdays_to_create = []
+        employee_dates = {}
         for dt in [d.date() for d in pd.date_range(dt_from, dt_to)]:
             if dt not in existing_dates:
                 employment = Employment.objects.get_active_empl_by_priority(
@@ -618,7 +616,11 @@ class WorkerDayViewSet(BaseModelViewSet):
                             source=WorkerDay.SOURCE_CHANGE_RANGE,
                         )
                     )
+                    employee_dates.setdefault(employment.employee_id, []).append(dt)
         WorkerDay.objects.bulk_create(wdays_to_create)
+
+        if is_approved:
+            recalc_timesheet_on_data_change(employee_dates)
 
         if res is not None:
             employee_stats = res.setdefault(employee_tabel_code, {})
@@ -938,6 +940,13 @@ class WorkerDayViewSet(BaseModelViewSet):
             data['user'] = request.user
 
             res = Response(WorkerDaySerializer(exchange(data, self.error_messages), many=True).data)
+
+            recalc_timesheet_on_data_change(
+                {
+                    data['employee1_id']: data['dates'],
+                    data['employee2_id']: data['dates'],
+                }
+            )
 
             WorkerDay.check_work_time_overlap(
                 employee_id__in=[data['employee1_id'], data['employee2_id']],

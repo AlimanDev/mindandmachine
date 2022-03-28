@@ -1,0 +1,4 @@
+PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+LANG=C.UTF-8
+
+0 0 * * * logrotate /etc/logrotate.conf

@@ -1,11 +1,8 @@
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import models
 from django.db.models import Q, Case, When, BooleanField
+from django.utils.translation import gettext_lazy as _
 
-from src.base.models import (
-    User,
-    Group,
-)
 from src.base.models_abstract import AbstractModel
 
 
@@ -41,10 +38,10 @@ class ReportPermission(AbstractModel):
 
     def clean(self):
         if not (self.user_id or self.group_id):
-            raise DjangoValidationError('Необходимо выбрать либо пользователя, либо группу')
+            raise DjangoValidationError(_('You must select either a user or a group'))
 
         if self.user_id and self.group_id:
-            raise DjangoValidationError('Нельзя одновременно выбрать и пользователя и группу')
+            raise DjangoValidationError(_('You cannot select both a user and a group at the same time'))
 
     @classmethod
     def get_report_perm(cls, user):

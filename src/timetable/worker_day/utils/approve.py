@@ -29,6 +29,7 @@ from src.timetable.models import (
     WorkerDayType,
 )
 from src.timetable.timesheet.tasks import calc_timesheets
+from src.timetable.timesheet.utils import recalc_timesheet_on_data_change
 from src.timetable.vacancy.tasks import vacancies_create_and_cancel_for_shop
 from src.timetable.vacancy.utils import notify_vacancy_created
 from src.timetable.worker_day.stat import get_month_range
@@ -530,26 +531,7 @@ class WorkerDayApproveHelper:
                     context=approve_event_context,
                 ))
 
-                # запуск пересчета табеля на периоды для которых были изменены дни сотрудников,
-                # но не нарушая ограничения CALC_TIMESHEET_PREV_MONTH_THRESHOLD_DAYS
-                dt_now = dttm_now.date()
-                for employee_id, dates in worker_dates_dict.items():
-                    periods = set()
-                    for dt in dates:
-                        dt_start, dt_end = get_month_range(year=dt.year, month_num=dt.month)
-                        if (dt_now - dt_end).days <= settings.CALC_TIMESHEET_PREV_MONTH_THRESHOLD_DAYS:
-                            periods.add((dt_start, dt_end))
-                    if periods:
-                        for period_start, period_end in periods:
-                            transaction.on_commit(
-                                lambda _employee_id=employee_id, _period_start=Converter.convert_date(period_start),
-                                       _period_end=Converter.convert_date(period_end): calc_timesheets.apply_async(
-                                    kwargs=dict(
-                                        employee_id__in=[_employee_id],
-                                        dt_from=_period_start,
-                                        dt_to=_period_end,
-                                    ))
-                            )
+                recalc_timesheet_on_data_change(worker_dates_dict)
 
                 WorkerDay.check_work_time_overlap(
                     employee_days_q=employee_days_q,

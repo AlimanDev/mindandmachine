@@ -31,9 +31,31 @@ from src.base.models import (
 )
 from src.timetable.serializers import EmploymentWorkTypeSerializer, EmploymentWorkTypeListSerializer
 from src.timetable.worker_constraint.serializers import WorkerConstraintSerializer, WorkerConstraintListSerializer
+from src.util.commons import obj_deep_get
 
 
-class ModelSerializerWithCreateOnlyFields(serializers.ModelSerializer):
+class BaseSerializer(serializers.Serializer):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.extra_fields = self.context.pop('extra_fields', [])
+
+    def _get_extra_field(self, instance, field):
+        if self.context['view'].action == 'create':
+            return obj_deep_get(instance, *field.split('__'))
+        else:
+            return getattr(instance, field, None)
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        for field in self.extra_fields:
+            data[field] = self._get_extra_field(instance, field)
+        
+        return data
+
+class BaseModelSerializer(BaseSerializer, serializers.ModelSerializer):
+    pass
+
+class ModelSerializerWithCreateOnlyFields(BaseModelSerializer):
     class Meta:
         create_only_fields = []
 
@@ -51,17 +73,17 @@ class ModelSerializerWithCreateOnlyFields(serializers.ModelSerializer):
                     raise serializers.ValidationError({field: self.error_messages['required']})
         return data
 
-class BaseNetworkSerializer(serializers.ModelSerializer):
+class BaseNetworkSerializer(BaseModelSerializer):
     network_id = serializers.HiddenField(default=CurrentUserNetwork())
 
 
-class OutsourceClientNetworkSerializer(serializers.Serializer):
+class OutsourceClientNetworkSerializer(BaseSerializer):
     name = serializers.CharField()
     code = serializers.CharField()
     id = serializers.IntegerField()
 
 
-class NetworkSerializer(serializers.ModelSerializer):
+class NetworkSerializer(BaseModelSerializer):
     logo = serializers.SerializerMethodField('get_logo_url')
     default_stats = serializers.SerializerMethodField()
     show_tabel_graph = serializers.SerializerMethodField()
@@ -160,8 +182,7 @@ class NetworkSerializer(serializers.ModelSerializer):
             'allow_to_manually_set_is_vacancy',
         ]
 
-
-class NetworkListSerializer(serializers.Serializer):
+class NetworkListSerializer(BaseSerializer):
     id = serializers.IntegerField()
     name = serializers.CharField()
 
@@ -174,7 +195,7 @@ class NetworkWithOutsourcingsAndClientsSerializer(NetworkSerializer):
         fields = NetworkSerializer.Meta.fields + ['outsourcings', 'clients']
 
 
-class UserListSerializer(serializers.Serializer):
+class UserListSerializer(BaseSerializer):
     id = serializers.IntegerField()
     first_name = serializers.CharField()
     last_name = serializers.CharField()
@@ -200,7 +221,7 @@ class UserListSerializer(serializers.Serializer):
             return False
 
 
-class UserShorSerializer(serializers.Serializer):
+class UserShorSerializer(BaseSerializer):
     id = serializers.IntegerField()
     first_name = serializers.CharField()
     last_name = serializers.CharField()
@@ -237,7 +258,7 @@ class UserSerializer(BaseNetworkSerializer):
 
         auth_type = attrs.get('auth_type')
         if auth_type == User.LDAP_AUTH and not attrs.get('ldap_login'):
-            raise serializers.ValidationError('ldap_login should be specified for ldap auth_type.')
+            raise serializers.ValidationError(_('ldap_login should be specified for ldap auth_type.'))
 
         return attrs
 
@@ -310,7 +331,7 @@ class AuthUserSerializer(UserSerializer):
         fields = UserSerializer.Meta.fields + ['network', 'shop_id', 'allowed_tabs', 'subordinate_employee_ids', 'self_employee_ids']
 
 
-class PasswordSerializer(serializers.Serializer):
+class PasswordSerializer(BaseSerializer):
     default_error_messages = {
         "password_mismatch": _("Passwords are mismatched."),
         "password_wrong": _("Password is wrong."),
@@ -340,18 +361,18 @@ class PasswordSerializer(serializers.Serializer):
         pass
 
 
-class FunctionGroupSerializer(serializers.ModelSerializer):
+class FunctionGroupSerializer(BaseModelSerializer):
     class Meta:
         model = FunctionGroup
         fields = ['id', 'group_id', 'func', 'method']
 
 
-class AutoTimetableSerializer(serializers.Serializer):
+class AutoTimetableSerializer(BaseSerializer):
     auto_timetable = serializers.BooleanField()
     employment_ids = serializers.ListField(child=serializers.IntegerField())
 
 
-class EmploymentListSerializer(serializers.Serializer):
+class EmploymentListSerializer(BaseSerializer):
     id = serializers.IntegerField()
     employee_id = serializers.IntegerField(required=False)
     user_id = serializers.IntegerField(source='employee.user_id')
@@ -395,7 +416,7 @@ class EmploymentListSerializer(serializers.Serializer):
             self.fields.pop('worker_constraints')
 
 
-class EmploymentSerializer(serializers.ModelSerializer):
+class EmploymentSerializer(BaseModelSerializer):
     default_error_messages = {
         "emp_check_dates": _("Employment from {dt_hired} to {dt_fired} already exists."),
         "no_user_with_username": _("There is {amount} models of user with username: {username}."),
@@ -609,7 +630,7 @@ class WorkerPositionSerializer(BaseNetworkSerializer):
         return super().update(instance, validated_data, *args, **kwargs)
 
 
-class ShopSettingsSerializer(serializers.ModelSerializer):
+class ShopSettingsSerializer(BaseModelSerializer):
     network_id = serializers.IntegerField(default=CurrentUserNetwork(), write_only=True)
 
     class Meta:
@@ -631,7 +652,7 @@ class ShopSettingsSerializer(serializers.ModelSerializer):
                   ]
 
 
-class GroupSerializer(serializers.ModelSerializer):
+class GroupSerializer(BaseModelSerializer):
     network_id = serializers.HiddenField(default=CurrentUserNetwork())
     class Meta:
         model = Group
@@ -649,7 +670,7 @@ class BreakSerializer(BaseNetworkSerializer):
         return data
 
 
-class ShopScheduleSerializer(serializers.ModelSerializer):
+class ShopScheduleSerializer(BaseModelSerializer):
     class Meta:
         model = ShopSchedule
         fields = (
@@ -674,13 +695,13 @@ class ShopScheduleSerializer(serializers.ModelSerializer):
         }
 
 
-class EmployeeShiftScheduleQueryParamsSerializer(serializers.Serializer):
+class EmployeeShiftScheduleQueryParamsSerializer(BaseSerializer):
     employee_id = serializers.IntegerField()
     dt__gte = serializers.DateField()
     dt__lte = serializers.DateField()
 
 
-class ContentBlockSerializer(serializers.ModelSerializer):
+class ContentBlockSerializer(BaseModelSerializer):
     body = serializers.SerializerMethodField()
 
     def get_body(self, obj: ContentBlock):
