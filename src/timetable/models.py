@@ -1,9 +1,9 @@
 import datetime
 import json
-import pandas as pd
 from decimal import Decimal
-from dateutil.relativedelta import relativedelta
 
+import pandas as pd
+from dateutil.relativedelta import relativedelta
 from django.conf import settings
 from django.contrib.auth.models import (
     UserManager
@@ -13,11 +13,15 @@ from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models
 from django.db import transaction
 from django.db.models import (
-    Subquery, OuterRef, Max, Q, Case, When, Value, FloatField, F, IntegerField, Exists, BooleanField, Count, Sum, Prefetch,
+    Subquery, OuterRef, Max, Q, Case, When, Value, FloatField, F, IntegerField, Exists, BooleanField, Count, Sum,
+    Prefetch,
 )
+from django.db.models.expressions import Func
 from django.db.models.expressions import RawSQL
+from django.db.models.fields import CharField
 from django.db.models.fields import PositiveSmallIntegerField
-from django.db.models.functions import Abs, Cast, Extract, Least, Coalesce
+from django.db.models.fields.json import JSONField
+from django.db.models.functions import Abs, Cast, Extract, Least
 from django.db.models.query import QuerySet
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
@@ -28,6 +32,7 @@ from src.base.models import Shop, Employment, User, Network, Break, ProductionDa
 from src.base.models_abstract import AbstractModel, AbstractActiveModel, AbstractActiveNetworkSpecificCodeNamedModel, \
     AbstractActiveModelManager
 from src.events.signals import event_signal
+from src.integration.mda.tmp_backport import ArraySubquery
 from src.recognition.events import EMPLOYEE_WORKING_NOT_ACCORDING_TO_PLAN
 from src.tasks.models import Task
 from src.timetable.break_time_subtractor import break_time_subtractor_map
@@ -522,6 +527,62 @@ class WorkerDayType(AbstractModel):
         if self.code and self.tracker.has_changed('is_reduce_norm'):
             cache.delete_pattern("prod_cal_*_*_*")
         return super().save(*args, **kwargs)
+
+
+class Restriction(AbstractModel):
+    RESTRICTION_TYPE_DT_MAX_HOURS = 1
+
+    RESTRICTION_TYPE_CHOICES = (
+        (RESTRICTION_TYPE_DT_MAX_HOURS, 'Максимальное количество часов на одну дату у сотрудника'),
+    )
+
+    position = models.ForeignKey('base.WorkerPosition', null=True, blank=True, on_delete=models.CASCADE)
+    worker_day_type = models.ForeignKey('timetable.WorkerDayType', null=True, blank=True, on_delete=models.CASCADE)
+    dt_max_hours = models.DurationField(null=True, blank=True)
+    restriction_type = PositiveSmallIntegerField(
+        choices=RESTRICTION_TYPE_CHOICES, default=RESTRICTION_TYPE_DT_MAX_HOURS)
+    is_vacancy = models.BooleanField(null=None, blank=True, default=None,
+                                         verbose_name='None -- для любой смены (осн. или доп.), '
+                                                      'True -- только для доп. смен, False -- только для осн. смен')
+
+    class Meta:
+        verbose_name = 'Ограничение'
+        verbose_name_plural = 'Ограничения'
+
+    @classmethod
+    def check_restrictions(cls, employee_days_q, is_fact, exc_cls=None):  # TODO: тест
+        restrictions = cls.objects.annotate(
+            dt_max_hours_restrictions=ArraySubquery(WorkerDay.objects.filter(
+                employee_days_q,
+                is_fact=is_fact,
+                is_approved=True,
+                # employment__position=OuterRef('position'),  # TODO: джоин если None ???
+                type=OuterRef('worker_day_type'),
+            ).values_list(
+                'employee',
+                'dt',
+            ).annotate(
+                current_work_hours=Sum('work_hours'),
+            ).filter(
+                current_work_hours__gt=OuterRef('dt_max_hours'),
+            ).annotate(
+                data_json=Func(
+                    Value('employee', output_field=CharField()), F("employee"),
+                    Value('dt', output_field=CharField()), F("dt"),
+                    function="jsonb_build_object",
+                    output_field=JSONField()
+                ),
+            ).values_list(
+                'data_json', flat=True,
+            ).distinct()),
+        ).values(
+            'dt_max_hours_restrictions',
+        )
+        for restriction in restrictions:
+            if restriction['dt_max_hours_restrictions']:
+                raise exc_cls(
+                    restriction['dt_max_hours_restrictions']  # TODO: человекочитаемая ошибка
+                )
 
 
 class WorkerDay(AbstractModel):

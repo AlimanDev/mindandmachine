@@ -27,6 +27,7 @@ from src.timetable.models import (
     WorkerDayOutsourceNetwork,
     WorkerDayPermission,
     WorkerDayType,
+    Restriction,
 )
 from src.timetable.timesheet.tasks import calc_timesheets
 from src.timetable.vacancy.tasks import vacancies_create_and_cancel_for_shop
@@ -553,5 +554,10 @@ class WorkerDayApproveHelper:
 
                 WorkerDay.check_work_time_overlap(
                     employee_days_q=employee_days_q,
+                    exc_cls=ValidationError,
+                )
+                Restriction.check_restrictions(
+                    employee_days_q=employee_days_q,
+                    is_fact=self.is_fact,
                     exc_cls=ValidationError,
                 )
