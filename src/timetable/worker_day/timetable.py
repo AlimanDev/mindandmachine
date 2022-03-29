@@ -532,7 +532,10 @@ class UploadDownloadTimetableCells(BaseUploadDownloadTimeTable):
                                 cell_data)
                             wd_type_obj = self.wd_types_dict.get(wd_type_id)
                             if not (wd_type_obj.is_dayoff and wd_type_obj.is_work_hours and
-                                    wd_type_obj.get_work_hours_method == WorkerDayType.GET_WORK_HOURS_METHOD_TYPE_MANUAL):
+                                    wd_type_obj.get_work_hours_method in [
+                                        WorkerDayType.GET_WORK_HOURS_METHOD_TYPE_MANUAL, 
+                                        WorkerDayType.GET_WORK_HOURS_METHOD_TYPE_MANUAL_OR_MONTH_AVERAGE_SAWH_HOURS
+                            ]):
                                 dttm_work_start = datetime.datetime.combine(
                                     dt, tm_work_start
                                 )
