@@ -27,6 +27,7 @@ from src.timetable.models import (
     WorkerDayOutsourceNetwork,
     WorkerDayPermission,
     WorkerDayType,
+    Restriction,
 )
 from src.timetable.timesheet.tasks import calc_timesheets
 from src.timetable.timesheet.utils import recalc_timesheet_on_data_change
@@ -535,5 +536,11 @@ class WorkerDayApproveHelper:
 
                 WorkerDay.check_work_time_overlap(
                     employee_days_q=employee_days_q,
+                    exc_cls=ValidationError,
+                )
+                Restriction.check_restrictions(
+                    employee_days_q=employee_days_q,
+                    is_fact=self.is_fact,
+                    is_approved=True,
                     exc_cls=ValidationError,
                 )

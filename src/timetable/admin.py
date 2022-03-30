@@ -27,6 +27,7 @@ from src.timetable.models import (
     GroupWorkerDayPermission,
     WorkerDayPermission,
     TimesheetItem,
+    Restriction,
 )
 from .resources import GroupWorkerDayPermissionResource
 
@@ -332,3 +333,8 @@ class TimesheetItemAdmin(admin.ModelAdmin):
         'day_hours',
         'night_hours',
     )
+
+
+@admin.register(Restriction)
+class RestrictionAdmin(admin.ModelAdmin):
+    pass

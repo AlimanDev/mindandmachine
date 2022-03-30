@@ -1,9 +1,9 @@
 import datetime
 import json
-import pandas as pd
 from decimal import Decimal
-from dateutil.relativedelta import relativedelta
 
+import pandas as pd
+from dateutil.relativedelta import relativedelta
 from django.conf import settings
 from django.contrib.auth.models import (
     UserManager
@@ -13,11 +13,15 @@ from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models
 from django.db import transaction
 from django.db.models import (
-    Subquery, OuterRef, Max, Q, Case, When, Value, FloatField, F, IntegerField, Exists, BooleanField, Count, Sum, Prefetch,
+    Subquery, OuterRef, Max, Q, Case, When, Value, FloatField, F, IntegerField, Exists, BooleanField, Count, Sum,
+    Prefetch, ExpressionWrapper, NullBooleanField
 )
+from django.db.models.expressions import Func
 from django.db.models.expressions import RawSQL
+from django.db.models.fields import CharField
 from django.db.models.fields import PositiveSmallIntegerField
-from django.db.models.functions import Abs, Cast, Extract, Least, Coalesce
+from django.db.models.fields.json import JSONField
+from django.db.models.functions import Abs, Cast, Extract, Least
 from django.db.models.query import QuerySet
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
@@ -28,6 +32,7 @@ from src.base.models import Shop, Employment, User, Network, Break, ProductionDa
 from src.base.models_abstract import AbstractModel, AbstractActiveModel, AbstractActiveNetworkSpecificCodeNamedModel, \
     AbstractActiveModelManager
 from src.events.signals import event_signal
+from src.integration.mda.tmp_backport import ArraySubquery
 from src.recognition.events import EMPLOYEE_WORKING_NOT_ACCORDING_TO_PLAN
 from src.tasks.models import Task
 from src.timetable.break_time_subtractor import break_time_subtractor_map
@@ -37,6 +42,7 @@ from src.timetable.exceptions import (
     WorkDayTaskViolation,
     MultipleWDTypesOnOneDateForOneEmployee,
     HasAnotherWdayOnDate,
+    DtMaxHoursRestrictionViolated,
 )
 from src.util.commons import obj_deep_get
 from src.util.mixins.qs import AnnotateValueEqualityQSMixin
@@ -510,6 +516,7 @@ class WorkerDayType(AbstractModel):
     )
     ordering = models.PositiveSmallIntegerField(default=0)
     is_active = models.BooleanField(default=True)
+    subtract_breaks = models.BooleanField(default=True)
     tracker = FieldTracker(fields=('is_reduce_norm',))
 
     class Meta(AbstractModel.Meta):
@@ -533,6 +540,115 @@ class WorkerDayType(AbstractModel):
         if self.code and self.tracker.has_changed('is_reduce_norm'):
             cache.delete_pattern("prod_cal_*_*_*")
         return super().save(*args, **kwargs)
+
+
+class Restriction(AbstractModel):
+    RESTRICTION_TYPE_DT_MAX_HOURS = 1
+
+    RESTRICTION_TYPE_CHOICES = (
+        (RESTRICTION_TYPE_DT_MAX_HOURS, 'Максимальное количество часов на одну дату у сотрудника'),
+    )
+
+    work_type_position = models.ForeignKey(
+        'base.WorkerPosition', null=True, blank=True, on_delete=models.CASCADE, related_name='+')
+    employment_position = models.ForeignKey(
+        'base.WorkerPosition', null=True, blank=True, on_delete=models.CASCADE, related_name='+')
+    worker_day_type = models.ForeignKey('timetable.WorkerDayType', null=True, blank=True, on_delete=models.CASCADE)
+    dt_max_hours = models.DurationField(null=True, blank=True)
+    restriction_type = PositiveSmallIntegerField(
+        choices=RESTRICTION_TYPE_CHOICES, default=RESTRICTION_TYPE_DT_MAX_HOURS)
+    is_vacancy = models.NullBooleanField(default=None,
+                                         verbose_name='None -- для любой смены (осн. или доп.), '
+                                                      'True -- только для доп. смен, False -- только для осн. смен')
+    work_type_name = models.ForeignKey('timetable.WorkTypeName', null=True, blank=True, on_delete=models.CASCADE)
+
+
+    class Meta:
+        verbose_name = 'Ограничение'
+        verbose_name_plural = 'Ограничения'
+
+    @classmethod
+    def check_restrictions(cls, employee_days_q, is_fact=None, is_approved=None, raise_exc=True, exc_cls=None):  # TODO: тест
+        filter_kwargs = {}
+        if is_fact is not None:
+            filter_kwargs['is_fact'] = is_fact
+        if is_approved is not None:
+            filter_kwargs['is_approved'] = is_approved
+
+        restrictions = cls.objects.annotate(
+            dt_max_hours_restrictions=ArraySubquery(WorkerDay.objects.annotate(
+                # outer_work_type_position=ExpressionWrapper(
+                #     OuterRef('work_type_position'),
+                #     output_field=IntegerField()
+                # ),
+                # outer_employment_position=ExpressionWrapper(
+                #     OuterRef('employment_position'),
+                #     output_field=IntegerField()
+                # ),
+                outer_worker_day_type=ExpressionWrapper(
+                    OuterRef('worker_day_type'),
+                    output_field=IntegerField()
+                ),
+                # outer_work_type_name=ExpressionWrapper(
+                #     OuterRef('work_type_name'),
+                #     output_field=IntegerField()
+                # ),
+                outer_is_vacancy=ExpressionWrapper(
+                    OuterRef('is_vacancy'),
+                    output_field=NullBooleanField()
+                ),
+            ).filter(
+                employee_days_q,
+                # Q(outer_employment_position__isnull=True) | Q(outer_employment_position=F('employment__position')),
+                Q(outer_worker_day_type__isnull=True) | Q(outer_worker_day_type=F('type')),
+                Q(outer_is_vacancy__isnull=True) | Q(outer_is_vacancy=F('is_vacancy')),
+                # Q(
+                #     Q(type__has_details=False) |
+                #     Q(
+                #         Q(
+                #             Q(outer_work_type_position__isnull=True) |
+                #             Q(outer_work_type_position=F('worker_day_details__work_type__work_type_name__position'))
+                #         ),
+                #         Q(
+                #             Q(outer_work_type_name__isnull=True) |
+                #             Q(outer_work_type_name=F('worker_day_details__work_type__work_type_name'))
+                #         ),
+                #     )
+                # ),
+                **filter_kwargs,
+            ).values_list(
+                'employee',
+                'dt',
+            ).annotate(
+                current_work_hours=Sum('work_hours'),
+            ).filter(
+                current_work_hours__gt=OuterRef('dt_max_hours'),
+            ).annotate(
+                data_json=Func(
+                    Value('last_name', output_field=CharField()), F("employee__user__last_name"),
+                    Value('first_name', output_field=CharField()), F("employee__user__first_name"),
+                    Value('dt', output_field=CharField()), F("dt"),
+                    Value('current_work_hours', output_field=CharField()), F("current_work_hours"),
+                    Value('dt_max_hours', output_field=CharField()), OuterRef("dt_max_hours"),
+                    Value('worker_day_type', output_field=CharField()), OuterRef('worker_day_type__name'),
+                    function="jsonb_build_object",
+                    output_field=JSONField()
+                ),
+            ).values_list(
+                'data_json', flat=True,
+            ).distinct()),
+        ).values(
+            'dt_max_hours_restrictions',
+        )
+        if raise_exc:
+            for restriction in restrictions:
+                if restriction['dt_max_hours_restrictions']:
+                    original_exc = DtMaxHoursRestrictionViolated(exc_data=restriction['dt_max_hours_restrictions'])
+                    if exc_cls:
+                        raise exc_cls(str(original_exc))
+                    raise original_exc
+
+        return restrictions
 
 
 class WorkerDay(AbstractModel):
@@ -1100,11 +1216,11 @@ class WorkerDay(AbstractModel):
     def _calc_wh(self):
         from src.util.models_converter import Converter
         self.dt = Converter.parse_date(self.dt) if isinstance(self.dt, str) else self.dt
-        breaks = self._get_breaks()
-        if not self.type.is_dayoff and self.dttm_work_end and self.dttm_work_start and not breaks is None:
+        breaks = self._get_breaks() if self.type.subtract_breaks else None
+        if not self.type.is_dayoff and self.dttm_work_end and self.dttm_work_start:
             dttm_work_start = _dttm_work_start = self.dttm_work_start
             dttm_work_end = _dttm_work_end = self.dttm_work_end
-            if self.shop.network.crop_work_hours_by_shop_schedule and self.crop_work_hours_by_shop_schedule:
+            if self.shop_id and self.shop.network.crop_work_hours_by_shop_schedule and self.crop_work_hours_by_shop_schedule:
                 shop_schedule = self.shop.get_schedule(dt=self.dt)
                 if shop_schedule is None:
                     return dttm_work_start, dttm_work_end, datetime.timedelta(0)
@@ -1137,7 +1253,7 @@ class WorkerDay(AbstractModel):
                         self.employment.position.wp_fines if self.employment and self.employment.position else None,
                         self.shop.network,
                     )
-                if self.shop.network.only_fact_hours_that_in_approved_plan and not self.type.is_dayoff:
+                if self.shop_id and self.shop.network.only_fact_hours_that_in_approved_plan and not self.type.is_dayoff:
                     if plan_approved:
                         late_arrival_delta = self.shop.network.allowed_interval_for_late_arrival
                         allowed_late_arrival_cond = late_arrival_delta and \
@@ -1158,11 +1274,12 @@ class WorkerDay(AbstractModel):
                             dttm_work_end = plan_approved.dttm_work_end
                         else:
                             dttm_work_end = min(dttm_work_end, plan_approved.dttm_work_end)
-                        break_time = self._calc_break(breaks, dttm_work_start, dttm_work_end, plan_approved=plan_approved)
+                        if self.type.subtract_breaks:
+                            break_time = self._calc_break(breaks, dttm_work_start, dttm_work_end, plan_approved=plan_approved)
                     else:
                         return dttm_work_start, dttm_work_end, datetime.timedelta(0)
 
-            if break_time is None:
+            if self.type.subtract_breaks and break_time is None:
                 break_time = self._calc_break(breaks, dttm_work_start, dttm_work_end)
 
             dttm_work_start, dttm_work_end = dttm_work_start + datetime.timedelta(minutes=arrive_fine), dttm_work_end - datetime.timedelta(minutes=departure_fine)
@@ -1322,8 +1439,10 @@ class WorkerDay(AbstractModel):
         return not self.is_approved
 
     @staticmethod
-    def count_work_hours(dttm_work_start, dttm_work_end, break_time):
-        work_hours = ((dttm_work_end - dttm_work_start).total_seconds() / 60) - break_time
+    def count_work_hours(dttm_work_start, dttm_work_end, break_time=0):
+        work_hours = ((dttm_work_end - dttm_work_start).total_seconds() / 60)
+        if break_time:
+            work_hours -= break_time
 
         if work_hours < 0:
             return datetime.timedelta(0)
