@@ -81,6 +81,7 @@ class Network(AbstractActiveModel):
     FISCAL_SHEET_DIVIDERS_ALIAS_CHOICES = (
         ('nahodka', 'Находка'),
         ('pobeda', 'Победа'),
+        ('pobeda_manual', 'Победа с ручным проставлением доп. смен'),
         ('shift_schedule', 'По расписанию смен'),
     )
 
