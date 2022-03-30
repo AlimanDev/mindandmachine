@@ -31,6 +31,7 @@ from src.timetable.models import (
     WorkerDayType,
 )
 from src.timetable.tests.factories import WorkerDayFactory
+from src.timetable.worker_day.tasks import recalc_wdays
 from ._base import TestTimesheetMixin
 
 
@@ -1101,6 +1102,72 @@ class TestPobedaDivider(TestTimesheetMixin, TestCase):
         self.assertEqual(TimesheetItem.objects.filter(
             timesheet_type=TimesheetItem.TIMESHEET_TYPE_MAIN, dt='2021-06-04',
             ).aggregate(hours=Sum('day_hours'))['hours'], 11)
+        
+    @override_settings(FISCAL_SHEET_DIVIDER_ALIAS='pobeda_manual')
+    def test_personnel_diviations_replaced_with_holiday_by_get_wh_type(self):
+        WorkerDay.objects.all().delete()
+        WorkerDayType.objects.filter(
+            code=WorkerDay.TYPE_SELF_VACATION,
+        ).update(
+            is_work_hours=True,
+        )
+
+        days = [
+            (date(2021, 6, 1), date(2021, 6, 6), WorkerDay.TYPE_VACATION),
+            (date(2021, 6, 7), date(2021, 6, 13), WorkerDay.TYPE_SELF_VACATION),
+        ]
+
+        for dt_from, dt_to, type_id in days:
+            for dt in pd.date_range(dt_from, dt_to, freq='1d').date:
+                WorkerDayFactory(
+                    type_id=type_id,
+                    dt=dt,
+                    employee=self.employee_worker,
+                    employment=self.employment_worker,
+                    is_fact=False,
+                    is_approved=True,
+                )
+
+        self._calc_timesheets(reraise_exc=True, dttm_now=datetime(2021, 6, 15, 10, 10, 10))
+
+        vacation_qs = TimesheetItem.objects.filter(timesheet_type=TimesheetItem.TIMESHEET_TYPE_MAIN, day_type_id=WorkerDay.TYPE_VACATION)
+        self_vacation_qs = TimesheetItem.objects.filter(timesheet_type=TimesheetItem.TIMESHEET_TYPE_MAIN, day_type_id=WorkerDay.TYPE_SELF_VACATION)
+        holiday_qs = TimesheetItem.objects.filter(
+            timesheet_type=TimesheetItem.TIMESHEET_TYPE_MAIN, 
+            day_type_id=WorkerDay.TYPE_HOLIDAY, 
+            dt__gte='2021-06-01',
+            dt__lte='2021-06-13',
+        )
+
+        self.assertEqual(vacation_qs.count(), 6)
+        self.assertEqual(self_vacation_qs.count(), 7)
+        self.assertEqual(holiday_qs.count(), 0)
+
+        WorkerDayType.objects.filter(
+            code=WorkerDay.TYPE_VACATION,
+        ).update(
+            get_work_hours_method=WorkerDayType.GET_WORK_HOURS_METHOD_TYPE_MANUAL_OR_MONTH_AVERAGE_SAWH_HOURS,
+        )
+
+        recalc_wdays()
+
+        self._calc_timesheets(reraise_exc=True, dttm_now=datetime(2021, 6, 15, 10, 10, 10))
+        self.assertEqual(holiday_qs.count(), 1)
+        self.assertEqual(vacation_qs.count(), 5)
+        self.assertEqual(self_vacation_qs.count(), 7)
+
+        WorkerDayType.objects.filter(
+            code=WorkerDay.TYPE_SELF_VACATION,
+        ).update(
+            get_work_hours_method=WorkerDayType.GET_WORK_HOURS_METHOD_TYPE_MANUAL_OR_MONTH_AVERAGE_SAWH_HOURS,
+        )
+
+        recalc_wdays()
+
+        self._calc_timesheets(reraise_exc=True, dttm_now=datetime(2021, 6, 15, 10, 10, 10))
+        self.assertEqual(vacation_qs.count(), 5)
+        self.assertEqual(holiday_qs.count(), 3)
+        self.assertEqual(self_vacation_qs.count(), 5)
 
 
 @override_settings(FISCAL_SHEET_DIVIDER_ALIAS='shift_schedule')

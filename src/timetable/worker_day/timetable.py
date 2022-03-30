@@ -532,7 +532,10 @@ class UploadDownloadTimetableCells(BaseUploadDownloadTimeTable):
                                 cell_data)
                             wd_type_obj = self.wd_types_dict.get(wd_type_id)
                             if not (wd_type_obj.is_dayoff and wd_type_obj.is_work_hours and
-                                    wd_type_obj.get_work_hours_method == WorkerDayType.GET_WORK_HOURS_METHOD_TYPE_MANUAL):
+                                    wd_type_obj.get_work_hours_method in [
+                                        WorkerDayType.GET_WORK_HOURS_METHOD_TYPE_MANUAL, 
+                                        WorkerDayType.GET_WORK_HOURS_METHOD_TYPE_MANUAL_OR_MONTH_AVERAGE_SAWH_HOURS
+                            ]):
                                 dttm_work_start = datetime.datetime.combine(
                                     dt, tm_work_start
                                 )
@@ -719,7 +722,10 @@ class UploadDownloadTimetableCells(BaseUploadDownloadTimeTable):
                 if wdays_list:
                     for wd in wdays_list:
                         excel_code = self.wd_type_mapping.get(wd.type_id, '')
-                        if wd.type.is_dayoff and wd.type.is_work_hours and wd.type.get_work_hours_method == WorkerDayType.GET_WORK_HOURS_METHOD_TYPE_MANUAL:
+                        if wd.type.is_dayoff and wd.type.is_work_hours and wd.type.get_work_hours_method in [
+                                WorkerDayType.GET_WORK_HOURS_METHOD_TYPE_MANUAL, 
+                                WorkerDayType.GET_WORK_HOURS_METHOD_TYPE_MANUAL_OR_MONTH_AVERAGE_SAWH_HOURS
+                        ]:
                             _cell_value = excel_code + str(round(wd.work_hours.total_seconds() / 3600, 2))
                             cell_values.append(_cell_value)
                         elif not wd.type.is_dayoff:
@@ -1007,7 +1013,10 @@ class UploadDownloadTimetableRows(BaseUploadDownloadTimeTable):
                 if wdays_list:
                     for wd in wdays_list:  # TODO: нехватает типа дня? Как отличать командировку от рабочего дня, например?
                         row_data = row_data.copy()
-                        if wd.type.is_dayoff and wd.type.is_work_hours and wd.type.get_work_hours_method == WorkerDayType.GET_WORK_HOURS_METHOD_TYPE_MANUAL:
+                        if wd.type.is_dayoff and wd.type.is_work_hours and wd.type.get_work_hours_method in [
+                                WorkerDayType.GET_WORK_HOURS_METHOD_TYPE_MANUAL, 
+                                WorkerDayType.GET_WORK_HOURS_METHOD_TYPE_MANUAL_OR_MONTH_AVERAGE_SAWH_HOURS
+                        ]:
                             # TODO: доработать экспорт и импорт
                             row_data['work_hours'] = str(round(wd.work_hours.total_seconds() / 3600))
                         else:
