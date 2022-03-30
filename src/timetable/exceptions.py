@@ -62,6 +62,7 @@ class HasAnotherWdayOnDate(Exception):
             error_str=error_str
         )
 
+
 class MainWorkHoursGreaterThanNorm(Exception):
     def __init__(self, exc_data):
         self.exc_data = exc_data
@@ -77,5 +78,24 @@ class MainWorkHoursGreaterThanNorm(Exception):
         return gettext(
                 'The operation cannot be performed. '
                 'The restrictions on the number of hours in the main schedule have been violated.. ({error_str})').format(
+            error_str=error_str
+        )
+
+
+class DtMaxHoursRestrictionViolated(Exception):
+    def __init__(self, exc_data):
+        self.exc_data = exc_data
+
+    def __str__(self, *args, **kwargs):
+        error_str = ', '.join(
+            (
+                f'{error_data["last_name"]} {error_data["first_name"]} - '
+                f'{error_data["worker_day_type"] or ""} {error_data["dt"]} текущее значение {error_data["current_work_hours"]}, разрешено не более {error_data["dt_max_hours"]}'
+            )
+            for error_data in self.exc_data
+        )
+        return gettext(
+                'Операция не может быть выполнена. '
+                'Нарушены ограничения по максимальному количеству часов. ({error_str})').format(
             error_str=error_str
         )

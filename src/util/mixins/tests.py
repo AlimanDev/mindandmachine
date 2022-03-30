@@ -22,6 +22,8 @@ class TestsHelperMixin:
     USER_EMAIL = "q@q.q"
     USER_PASSWORD = "4242"
 
+    maxDiff = None
+
     def _set_authorization_token(self, login):
         response = self.client.post(
             path=reverse('time_attendance_auth'),
