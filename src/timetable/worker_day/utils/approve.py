@@ -559,5 +559,6 @@ class WorkerDayApproveHelper:
                 Restriction.check_restrictions(
                     employee_days_q=employee_days_q,
                     is_fact=self.is_fact,
+                    is_approved=True,
                     exc_cls=ValidationError,
                 )
