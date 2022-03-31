@@ -15,7 +15,7 @@ from src.base.models import (
     Employment,
 )
 from src.integration.models import VMdaUsers
-from ._tmp_backport import ArraySubquery
+from .tmp_backport import ArraySubquery
 from .serializers import (
     ShopDTOSerializer,
     RegionDTOSerializer,
