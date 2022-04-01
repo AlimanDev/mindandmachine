@@ -1,9 +1,16 @@
-from src.base.permissions import Permission
-from rest_framework.viewsets import ViewSet
 from rest_framework.decorators import action
+from rest_framework.viewsets import ViewSet
+
+from src.base.permissions import Permission
+from src.reports.serializers import (
+    ReportFilterSerializer,
+    ConsolidatedTimesheetReportSerializer,
+)
+from src.reports.utils.consolidated_timesheet_report import ConsolidatedTimesheetReportGenerator
 from src.reports.utils.pivot_tabel import PlanAndFactPivotTabel
-from src.reports.serializers import ReportFilterSerializer
 from src.reports.utils.schedule_deviation import schedule_deviation_report_response
+from src.util.http import prepare_response
+
 
 class ReportsViewSet(ViewSet):
     permission_classes = [Permission]
@@ -30,9 +37,28 @@ class ReportsViewSet(ViewSet):
         filters = self._add_filter(data, filters, 'network_ids', 'worker__network_id__in')
         filters = self._add_filter(data, filters, 'work_type_name', 'work_type_name__in')
 
-
         pt = PlanAndFactPivotTabel()
         return pt.get_response(**filters)
+
+    @action(detail=False, methods=['get'])
+    def consolidated_timesheet_report(self, request):
+        serializer = ConsolidatedTimesheetReportSerializer(data=request.query_params)
+        serializer.is_valid(raise_exception=True)
+
+        shop = serializer.validated_data.get('shop_id')
+        dt_from = serializer.validated_data.get('dt_from')
+        dt_to = serializer.validated_data.get('dt_to')
+        report_content = ConsolidatedTimesheetReportGenerator(
+            shop=shop,
+            dt_from=dt_from,
+            dt_to=dt_to,
+            group_by=serializer.validated_data.get('group_by'),
+        ).generate(sheet_name=shop.name)
+        return prepare_response(
+            report_content,
+            output_name=f'Консолидированный отчет об отработанном времени {shop.name} {dt_from}-{dt_to}.xlsx',
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        )
 
     @action(detail=False, methods=['get'])
     def schedule_deviation(self, request):

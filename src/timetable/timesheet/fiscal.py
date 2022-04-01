@@ -46,6 +46,7 @@ class TimesheetItem:
             dttm_work_start=self.dttm_work_start,
             dttm_work_end=self.dttm_work_end,
             is_vacancy=self.is_vacancy,
+            source=self.source,
         )
         if overrides:
             kwargs.update(overrides)
