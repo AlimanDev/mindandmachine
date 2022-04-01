@@ -167,6 +167,7 @@ class WorkerDaySerializer(ModelSerializerWithCreateOnlyFields, UnaccountedOverti
     unaccounted_overtime = serializers.SerializerMethodField()
     closest_plan_approved_id = serializers.IntegerField(required=False, read_only=True)
     total_cost = serializers.FloatField(read_only=True)
+    work_hours = serializers.DurationField(allow_null=True, required=False)
 
     _employee_active_empl = None
 
@@ -221,6 +222,8 @@ class WorkerDaySerializer(ModelSerializerWithCreateOnlyFields, UnaccountedOverti
                 attrs['source'] = WorkerDay.SOURCE_INTEGRATION
             elif self.context.get('batch'):
                 attrs['source'] = WorkerDay.SOURCE_FAST_EDITOR
+            if not 'work_hours' in attrs:
+                attrs['work_hours'] = None
 
         is_fact = attrs['is_fact'] if 'is_fact' in attrs else getattr(self.instance, 'is_fact', None)
         wd_type = attrs.pop('type_id')
