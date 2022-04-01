@@ -1110,6 +1110,7 @@ class TestPobedaDivider(TestTimesheetMixin, TestCase):
             code=WorkerDay.TYPE_SELF_VACATION,
         ).update(
             is_work_hours=True,
+            get_work_hours_method=WorkerDayType.GET_WORK_HOURS_METHOD_TYPE_MONTH_AVERAGE_SAWH_HOURS,
         )
 
         days = [

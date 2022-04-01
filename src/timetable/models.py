@@ -1285,7 +1285,7 @@ class WorkerDay(AbstractModel):
                 self.type.get_work_hours_method == WorkerDayType.GET_WORK_HOURS_METHOD_TYPE_MONTH_AVERAGE_SAWH_HOURS or 
                 (
                     self.type.get_work_hours_method == WorkerDayType.GET_WORK_HOURS_METHOD_TYPE_MANUAL_OR_MONTH_AVERAGE_SAWH_HOURS and 
-                    not self.work_hours
+                    self.work_hours is None
                 )
             ):
                 from src.timetable.worker_day.stat import WorkersStatsGetter
@@ -1319,7 +1319,7 @@ class WorkerDay(AbstractModel):
                 WorkerDayType.GET_WORK_HOURS_METHOD_TYPE_MANUAL, 
                 WorkerDayType.GET_WORK_HOURS_METHOD_TYPE_MANUAL_OR_MONTH_AVERAGE_SAWH_HOURS,
             ]:
-                return None, None, self.work_hours
+                return None, None, self.work_hours or datetime.timedelta(0)
 
             return None, None, datetime.timedelta(hours=work_hours)
 
