@@ -3293,6 +3293,16 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
                     "is_fact": False,
                     "is_approved": False,
                     "type": WorkerDay.TYPE_VACATION,
+                    "work_hours": None,
+                },
+                {
+                    "shop_id": self.shop.id,
+                    "employee_id": self.employee2.id,
+                    "dt": date(2021, 11, 4),
+                    "is_fact": False,
+                    "is_approved": False,
+                    "type": WorkerDay.TYPE_VACATION,
+                    "work_hours": "00:00:00",
                 },
             ],
         }
@@ -3300,11 +3310,13 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
             self.get_url('WorkerDay-batch-update-or-create'), self.dump_data(data), content_type='application/json')
         self.assertEqual(resp.status_code, 200)
         plan_not_approved_qs = WorkerDay.objects.filter(is_fact=False, is_approved=False)
-        self.assertEqual(plan_not_approved_qs.count(), 2)
+        self.assertEqual(plan_not_approved_qs.count(), 3)
         plan_not_approved_wday_manual = plan_not_approved_qs.get(dt=date(2021, 11, 2))
         plan_not_approved_wday_calculated_as_average_sawh_hours = plan_not_approved_qs.get(dt=date(2021, 11, 3))
+        plan_not_approved_wday_manual_zero = plan_not_approved_qs.get(dt=date(2021, 11, 4))
         self.assertEqual(plan_not_approved_wday_manual.work_hours, timedelta(seconds=60*60*10.5))
         self.assertEqual(plan_not_approved_wday_calculated_as_average_sawh_hours.work_hours, timedelta(seconds=19080))
+        self.assertEqual(plan_not_approved_wday_manual_zero.work_hours, timedelta(0))
 
     def test_set_cost_per_hour(self):
         response = self.client.put(
