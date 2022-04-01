@@ -132,6 +132,23 @@ class TestRecalcOnDataChange(TestTimesheetMixin, APITestCase):
         )
 
     def test_recalc_on_approve(self, _calc_timesheets_apply_async):
+        AttendanceRecords.objects.create(
+            dt=date(2021, 6, 12),
+            dttm=datetime(2021, 6, 12, 10, 5),
+            employee=self.employee_worker,
+            user=self.user_worker,
+            shop=self.shop,
+            type=AttendanceRecords.TYPE_COMING,
+        )
+        AttendanceRecords.objects.create(
+            dt=date(2021, 6, 12),
+            dttm=datetime(2021, 6, 12, 20, 13),
+            employee=self.employee_worker,
+            user=self.user_worker,
+            shop=self.shop,
+            type=AttendanceRecords.TYPE_LEAVING,
+        )
+        _calc_timesheets_apply_async.reset_mock()
         WorkerDayFactory(
             is_approved=False,
             is_fact=False,
