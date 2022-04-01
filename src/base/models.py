@@ -1845,6 +1845,7 @@ class FunctionGroup(AbstractModel):
         ('Receipt', 'Чек (receipt)'),
         ('Reports_pivot_tabel', 'Скачать сводный табель (Получить) (report/pivot_tabel/)'),
         ('Reports_schedule_deviation', 'Скачать отчет по отклонениям от планового графика (Получить) (report/schedule_deviation/)'),
+        ('Reports_consolidated_timesheet_report', 'Скачать "Консолидированный отчет об отработанном времени" (Получить) (report/consolidated_timesheet_report/)'),
         ('Group', 'Группа доступа (group)'),
         ('Shop', 'Отдел (department)'),
         ('Shop_stat', 'Статистика по отделам (Получить) (department/stat/)'),
