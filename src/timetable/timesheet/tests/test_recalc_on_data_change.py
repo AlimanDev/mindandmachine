@@ -9,6 +9,7 @@ from rest_framework.test import APITestCase
 from src.base.tests.factories import EmployeeFactory, EmploymentFactory, UserFactory
 from src.timetable.models import AttendanceRecords, EmploymentWorkType, GroupWorkerDayPermission, ShopMonthStat, TimesheetItem, WorkerDay, WorkerDayPermission
 from src.timetable.tests.factories import WorkerDayFactory
+from src.timetable.worker_day.tasks import recalc_fact_from_records
 from ._base import TestTimesheetMixin
 
 
@@ -278,3 +279,32 @@ class TestRecalcOnDataChange(TestTimesheetMixin, APITestCase):
         )
 
         self._test_recalc_called(_calc_timesheets_apply_async.call_args_list, [self.employee_worker.id])
+    
+    def test_recalc_not_called_on_recalc_fact_from_attendance_records(self, _calc_timesheets_apply_async):
+        WorkerDay.objects.all().delete()
+
+        AttendanceRecords.objects.create(
+            dt=date(2021, 6, 14),
+            dttm=datetime(2021, 6, 14, 10, 5),
+            employee=self.employee_worker,
+            user=self.user_worker,
+            shop=self.shop,
+            type=AttendanceRecords.TYPE_COMING,
+        )
+        AttendanceRecords.objects.create(
+            dt=date(2021, 6, 14),
+            dttm=datetime(2021, 6, 14, 20, 13),
+            employee=self.employee_worker,
+            user=self.user_worker,
+            shop=self.shop,
+            type=AttendanceRecords.TYPE_LEAVING,
+        )
+        WorkerDay.objects.all().delete()
+
+        _calc_timesheets_apply_async.reset_mock()
+
+        recalc_fact_from_records(date(2021, 6, 14), date(2021, 6, 14), shop_ids=[self.shop.id])
+
+        _calc_timesheets_apply_async.assert_not_called()
+
+        self.assertEqual(WorkerDay.objects.filter(is_fact=True).count(), 2)

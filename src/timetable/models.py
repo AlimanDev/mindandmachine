@@ -2349,7 +2349,7 @@ class AttendanceRecords(AbstractModel):
                     WorkerDay.check_work_time_overlap(
                             employee_id=associated_wday.employee_id, dt=associated_wday.dt, is_fact=True, is_approved=True)
                     self.fact_wd = fact_approved
-                    self._recalc_timesheet()
+                    self._recalc_timesheet(recalc_fact_from_att_records)
             except WorkTimeOverlap:
                 pass
             else:
@@ -2357,8 +2357,8 @@ class AttendanceRecords(AbstractModel):
                     self._create_wd_details(associated_wday.dt, fact_approved, associated_wday.employment, associated_wday)
                 self._create_or_update_not_approved_fact(fact_approved)
     
-    def _recalc_timesheet(self):
-        if self.fact_wd and self.fact_wd.dttm_work_start and self.fact_wd.dttm_work_end:
+    def _recalc_timesheet(self, recalc_fact_from_att_records=False):
+        if not recalc_fact_from_att_records and self.fact_wd and self.fact_wd.dttm_work_start and self.fact_wd.dttm_work_end:
             from src.timetable.timesheet.utils import recalc_timesheet_on_data_change
             transaction.on_commit(lambda: recalc_timesheet_on_data_change({self.fact_wd.employee_id: [self.fact_wd.dt, self.fact_wd.dt]}))
 
@@ -2421,7 +2421,7 @@ class AttendanceRecords(AbstractModel):
                     if fact_approved.type.has_details and not fact_approved.worker_day_details.exists():
                         self._create_wd_details(self.dt, fact_approved, active_user_empl, closest_plan_approved)
                     fact_approved.save()
-                    self._recalc_timesheet()
+                    self._recalc_timesheet(recalc_fact_from_att_records)
                     self._create_or_update_not_approved_fact(fact_approved)
                 else:
                     if self.type == self.TYPE_LEAVING:
@@ -2454,7 +2454,7 @@ class AttendanceRecords(AbstractModel):
                             # логично дату предыдущую ставить, так как это значение в отчетах используется
                             self.dt = prev_fa_wd.dt
                             super(AttendanceRecords, self).save(update_fields=['dt',])
-                            self._recalc_timesheet()
+                            self._recalc_timesheet(recalc_fact_from_att_records)
                             self._create_or_update_not_approved_fact(prev_fa_wd)
                             return res
 
@@ -2487,7 +2487,7 @@ class AttendanceRecords(AbstractModel):
                         }
                     )
                     self.fact_wd = fact_approved
-                    self._recalc_timesheet()
+                    self._recalc_timesheet(recalc_fact_from_att_records)
                     if fact_approved.type.has_details and (
                             _wd_created or not fact_approved.worker_day_details.exists()):
                         self._create_wd_details(self.dt, fact_approved, active_user_empl, closest_plan_approved)
