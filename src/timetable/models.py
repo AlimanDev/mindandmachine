@@ -691,7 +691,7 @@ class WorkerDay(AbstractModel):
         from src.timetable.worker_day_permissions.checkers import DeleteQsWdPermissionChecker
         perm_checker = DeleteQsWdPermissionChecker(
             user=user,
-            wd_qs=delete_qs,
+            wd_qs=delete_qs.exclude(employee__isnull=False, employment__isnull=True),
             cached_data={
                 'wd_types_dict': kwargs.get('wd_types_dict'),
             },
@@ -704,6 +704,7 @@ class WorkerDay(AbstractModel):
         return [
             'dt',
             'employee_id',
+            'employment_id',
             'shop_id',
             'type_id',
             'is_fact',
@@ -719,7 +720,9 @@ class WorkerDay(AbstractModel):
         """
         grouped_wd_min_max_dt_data = {}
         grouped_wd_perm_check_data = []
-        for dt, employee_id, shop_id, type_id, is_fact, is_vacancy in diff_data:
+        for dt, employee_id, employment_id, shop_id, type_id, is_fact, is_vacancy in diff_data:
+            if employee_id and not employment_id:
+                continue
             k_data = dict(
                 employee_id=employee_id,
                 type_id=type_id,
@@ -765,7 +768,8 @@ class WorkerDay(AbstractModel):
                 if deleted:
                     grouped_wd_perm_check_data = cls._get_grouped_perm_check_data(deleted)
                     for wd_data in grouped_wd_perm_check_data:
-                        cls._check_create_single_obj_perm(user, wd_data)
+                        cls._check_delete_single_wd_data_perm(
+                            user, obj_data=wd_data, check_active_empl=check_active_empl)
 
     @classmethod
     def _delete_not_allowed_additional_types(cls, **kwargs):
@@ -874,7 +878,7 @@ class WorkerDay(AbstractModel):
         for obj in kwargs.get('deleted_objs', []):
             grouped_by_employee.setdefault(obj.employee_id, []).append(obj.type_id)
         for i, obj in enumerate(kwargs.get('updated_objs', [])):
-            prev_type = kwargs['diff_data']['before_update'][i][3]
+            prev_type = kwargs['diff_data']['before_update'][i][4]
             new_type = obj.type_id
             if prev_type != new_type or new_type in reduce_norm_types:
                 grouped_by_employee.setdefault(obj.employee_id, []).extend([new_type, prev_type])

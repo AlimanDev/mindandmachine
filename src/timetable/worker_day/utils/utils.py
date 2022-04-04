@@ -441,7 +441,12 @@ def check_worker_day_permissions(
         today = (datetime.datetime.now() + datetime.timedelta(hours=3)).date()
         for wd_type_id in wd_types:
             wdp = wd_perms_dict.get(wd_type_id)
-            wd_type_display_str = wd_types_dict.get(wd_type_id).name
+            wd_type_obj = wd_types_dict.get(wd_type_id)
+            if not wd_type_obj:
+                raise PermissionDenied(
+                    f'There are no day type with code={wd_type_id}'
+                )
+            wd_type_display_str = wd_type_obj.name
             if wdp is None:
                 raise PermissionDenied(
                     error_messages['no_action_perm_for_wd_type'].format(
