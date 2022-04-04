@@ -812,7 +812,7 @@ class WorkerDay(AbstractModel):
         from src.timetable.worker_day_permissions.checkers import DeleteQsWdPermissionChecker
         perm_checker = DeleteQsWdPermissionChecker(
             user=user,
-            wd_qs=delete_qs,
+            wd_qs=delete_qs.exclude(employee__isnull=False, employment__isnull=True),
             cached_data={
                 'wd_types_dict': kwargs.get('wd_types_dict'),
             },
@@ -825,6 +825,7 @@ class WorkerDay(AbstractModel):
         return [
             'dt',
             'employee_id',
+            'employment_id',
             'shop_id',
             'type_id',
             'is_fact',
@@ -840,7 +841,9 @@ class WorkerDay(AbstractModel):
         """
         grouped_wd_min_max_dt_data = {}
         grouped_wd_perm_check_data = []
-        for dt, employee_id, shop_id, type_id, is_fact, is_vacancy in diff_data:
+        for dt, employee_id, employment_id, shop_id, type_id, is_fact, is_vacancy in diff_data:
+            if employee_id and not employment_id:
+                continue
             k_data = dict(
                 employee_id=employee_id,
                 type_id=type_id,
@@ -995,7 +998,7 @@ class WorkerDay(AbstractModel):
         for obj in kwargs.get('deleted_objs', []):
             grouped_by_employee.setdefault(obj.employee_id, []).append(obj.type_id)
         for i, obj in enumerate(kwargs.get('updated_objs', [])):
-            prev_type = kwargs['diff_data']['before_update'][i][3]
+            prev_type = kwargs['diff_data']['before_update'][i][4]
             new_type = obj.type_id
             if prev_type != new_type or new_type in reduce_norm_types:
                 grouped_by_employee.setdefault(obj.employee_id, []).extend([new_type, prev_type])
@@ -1112,7 +1115,7 @@ class WorkerDay(AbstractModel):
         skip_fields_list = ['created_by', 'last_edited_by', 'source']
         if not (existing_obj.type.is_dayoff and existing_obj.type.is_work_hours and
                 existing_obj.type.get_work_hours_method in [
-                    WorkerDayType.GET_WORK_HOURS_METHOD_TYPE_MANUAL, 
+                    WorkerDayType.GET_WORK_HOURS_METHOD_TYPE_MANUAL,
                     WorkerDayType.GET_WORK_HOURS_METHOD_TYPE_MANUAL_OR_MONTH_AVERAGE_SAWH_HOURS
             ]):
             # TODO: тест
@@ -1282,9 +1285,9 @@ class WorkerDay(AbstractModel):
         if self.type.is_dayoff and self.type.is_work_hours:
             work_hours = 0
             if (
-                self.type.get_work_hours_method == WorkerDayType.GET_WORK_HOURS_METHOD_TYPE_MONTH_AVERAGE_SAWH_HOURS or 
+                self.type.get_work_hours_method == WorkerDayType.GET_WORK_HOURS_METHOD_TYPE_MONTH_AVERAGE_SAWH_HOURS or
                 (
-                    self.type.get_work_hours_method == WorkerDayType.GET_WORK_HOURS_METHOD_TYPE_MANUAL_OR_MONTH_AVERAGE_SAWH_HOURS and 
+                    self.type.get_work_hours_method == WorkerDayType.GET_WORK_HOURS_METHOD_TYPE_MANUAL_OR_MONTH_AVERAGE_SAWH_HOURS and
                     self.work_hours is None
                 )
             ):
@@ -1316,7 +1319,7 @@ class WorkerDay(AbstractModel):
                     work_hours = prod_cal.norm_hours
 
             elif self.type.get_work_hours_method in [
-                WorkerDayType.GET_WORK_HOURS_METHOD_TYPE_MANUAL, 
+                WorkerDayType.GET_WORK_HOURS_METHOD_TYPE_MANUAL,
                 WorkerDayType.GET_WORK_HOURS_METHOD_TYPE_MANUAL_OR_MONTH_AVERAGE_SAWH_HOURS,
             ]:
                 return None, None, self.work_hours or datetime.timedelta(0)
