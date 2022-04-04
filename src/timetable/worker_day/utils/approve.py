@@ -392,8 +392,7 @@ class WorkerDayApproveHelper:
                     if wd_ids:
                         recalc_wdays(id__in=wd_ids)
 
-                approved_wds_list = list(
-                    WorkerDay.objects.filter(
+                approved_wds_list_qs = WorkerDay.objects.filter(
                         employee_days_q,
                         is_approved=True,
                         is_fact=self.is_fact,
@@ -410,7 +409,9 @@ class WorkerDayApproveHelper:
                             to_attr='outsources_list',
                         ),
                     ).distinct()
-                )
+                if self.exclude_approve_q:
+                    approved_wds_list_qs = approved_wds_list_qs.exclude(self.exclude_approve_q)  # TODO: тест
+                approved_wds_list = list(approved_wds_list_qs)
 
                 not_approved_wds_list = WorkerDay.objects.bulk_create(
                     [

@@ -1328,6 +1328,7 @@ class WorkerDay(AbstractModel):
                 Q(dttm_work_end__gte=OuterRef('dttm_work_end')) &
                 Q(dttm_work_start__isnull=True)
             ),
+            type__is_dayoff=False,
             employee__user_id=user_id,
             dt=OuterRef('dt'),
             is_fact=OuterRef('is_fact'),
