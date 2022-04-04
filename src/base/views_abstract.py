@@ -19,7 +19,6 @@ class BatchUpdateOrCreateOptionsSerializer(serializers.Serializer):
     delete_scope_filters = serializers.DictField(required=False)
     rel_objs_delete_scope_filters = serializers.DictField(required=False)
     return_response = serializers.BooleanField(required=False, allow_null=False)
-    grouped_checks = serializers.BooleanField(required=False, allow_null=False)
     dry_run = serializers.BooleanField(required=False)
     diff_report_email_to = serializers.ListField(child=serializers.CharField(), required=False)
     model_options = serializers.DictField(required=False)
@@ -72,6 +71,7 @@ class BatchUpdateOrCreateViewMixin:
         serializer.is_valid(raise_exception=True)
 
         options = serializer.validated_data.get('options', {})
+        model_options = options.get('model_options', {})
         delete_scope_filters = options.get('delete_scope_filters', {})
         if options.get('by_code'):
             delete_scope_filters.update({'code__isnull': False})
@@ -85,10 +85,11 @@ class BatchUpdateOrCreateViewMixin:
             user=self.request.user if self.request.user.is_authenticated else None,
             dry_run=options.get('dry_run', False),
             diff_report_email_to=options.get('diff_report_email_to'),
-            model_options=options.get('model_options', {}),
             check_perms_extra_kwargs=dict(
-                grouped_checks=options.get('grouped_checks', False),
+                grouped_checks=model_options.pop('grouped_checks', False),
+                check_active_empl=model_options.pop('check_active_empl', True),
             ),
+            model_options=model_options,
         )
 
         res = {
