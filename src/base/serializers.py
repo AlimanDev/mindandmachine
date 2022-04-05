@@ -501,7 +501,7 @@ class EmploymentSerializer(serializers.ModelSerializer):
         if descrease_dt_fired_cond:
             attrs['dt_fired'] = attrs['dt_fired'] - timedelta(1)
 
-        if attrs['dt_hired'] and attrs['dt_fired'] and attrs['dt_fired'] < attrs['dt_hired']:
+        if attrs.get('dt_hired') and attrs.get('dt_fired') and attrs['dt_fired'] < attrs['dt_hired']:
             self.fail('dt_fired_cant_be_less_than_dt_hired')
 
         return attrs
