@@ -46,7 +46,7 @@ def _get_calc_periods(dt_hired=None, dt_fired=None, dt_from=None, dt_to=None):
         if dt_start < dt_end:
             periods.add((dt_start, dt_end))
 
-    return list(periods)
+    return sorted(periods, key=lambda i: i[0])
 
 
 class TimesheetCalculator:
