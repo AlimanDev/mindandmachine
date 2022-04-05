@@ -392,7 +392,8 @@ class EmploymentSerializer(serializers.ModelSerializer):
         "no_shop": _("There is {amount} models of shop with code: {code}."),
         "no_position": _("There is {amount} models of position with code: {code}."),
         "no_network_connect": _("You are not allowed to choose shops from other network."),
-        "bad_network_shop_position": _("Network of shop and position should be equal.")
+        "bad_network_shop_position": _("Network of shop and position should be equal."),
+        "dt_fired_cant_be_less_than_dt_hired": _("Дата увольнения не может быть меньше даты начала трудоустройства."),  # Employment end date cannot be less than employment start date
     }
 
     position_id = serializers.IntegerField(required=False)
@@ -499,6 +500,9 @@ class EmploymentSerializer(serializers.ModelSerializer):
             'request'].user.network.descrease_employment_dt_fired_in_api and 'dt_hired' in attrs and attrs['dt_fired']
         if descrease_dt_fired_cond:
             attrs['dt_fired'] = attrs['dt_fired'] - timedelta(1)
+
+        if attrs['dt_hired'] and attrs['dt_fired'] and attrs['dt_fired'] < attrs['dt_hired']:
+            self.fail('dt_fired_cant_be_less_than_dt_hired')
 
         return attrs
 
