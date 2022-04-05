@@ -2481,6 +2481,7 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
             **{
                 "shop_id": self.shop.id,
                 "employee_id": self.employee2.id,
+                "employment_id": self.employment2.id,
                 "dt": self.dt,
                 "is_fact": False,
                 "is_approved": False,
@@ -2513,7 +2514,7 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
                 "detail": "У вас нет прав на удаление типа дня \"Рабочий день\" для сотрудника Иванов И. в подразделении Shop1"
             }
         )
-        WorkerDay.objects.all().delete()
+
         self.admin_group.subordinates.add(self.employment2.function_group)
         Employment.objects.filter(employee=self.employee1).update(shop=self.shop2)
         resp = self.client.post(
