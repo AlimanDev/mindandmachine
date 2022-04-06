@@ -1,5 +1,6 @@
 import datetime
 import io
+import re
 from collections import OrderedDict
 
 import pandas as pd
@@ -149,6 +150,7 @@ class ConsolidatedTimesheetReportGenerator:
         worksheet.write(f'A{len(df.index) + 4}', 'Итого часов')
 
     def generate(self, sheet_name):
+        sheet_name = re.sub(r'[\[\]:*?/\\]', '', sheet_name)
         data = self._get_data()
         df = pd.DataFrame(data, columns=self.columns_mapping.values()).fillna('')
         df = df.apply(pd.to_numeric, errors='ignore', downcast='float')
