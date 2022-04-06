@@ -330,7 +330,7 @@ class BatchUpdateOrCreateModelMixin:
                         obj_to_create = to_update_dict.pop(update_key)
                         to_create.append(obj_to_create)
                         if user and not check_perms_extra_kwargs.get('grouped_checks'):
-                            cls._check_create_single_obj_perm(user, obj_dict, **check_perms_extra_kwargs)
+                            cls._check_create_single_obj_perm(user, obj_to_create, **check_perms_extra_kwargs)
                     else:
                         existing_obj = existing_objs.get(update_key)
                         need_to_skip = True
@@ -351,7 +351,7 @@ class BatchUpdateOrCreateModelMixin:
                             update_obj_dict['dttm_modified'] = now
                             if user:
                                 cls._check_update_single_obj_perm(
-                                    user, existing_obj, obj_dict, **check_perms_extra_kwargs)
+                                    user, existing_obj, update_obj_dict, **check_perms_extra_kwargs)
 
                 if to_skip:
                     skip_rel_objs_data = cls._pop_rel_objs_data(
