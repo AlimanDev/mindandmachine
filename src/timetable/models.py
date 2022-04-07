@@ -1182,7 +1182,9 @@ class WorkerDay(AbstractModel):
         if round_wh_alg_func:
             night_seconds = round_wh_alg_func(night_seconds / 3600) * 3600
 
-        break_time_seconds = self._calc_break(self._get_breaks(), work_start, work_end, plan_approved=self.closest_plan_approved) * 60
+        break_time_seconds = 0
+        if self.type.subtract_breaks:
+            break_time_seconds = self._calc_break(self._get_breaks(), work_start, work_end, plan_approved=self.closest_plan_approved) * 60
 
         total_seconds = (work_seconds + break_time_seconds)
 
