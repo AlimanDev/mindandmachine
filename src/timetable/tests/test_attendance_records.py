@@ -676,6 +676,17 @@ class TestAttendanceRecords(TestsHelperMixin, APITestCase):
         self.assertEqual(day, 5.25)
         self.assertEqual(night, 0.0)
 
+    def test_calc_day_and_night_work_hours_when_subtract_breaks_is_disabled(self):
+        self.worker_day_fact_approved.type.subtract_breaks = False
+        self.worker_day_fact_approved.type.save()
+        self.worker_day_fact_approved.dttm_work_start = datetime.combine(self.dt, time(20, 30))
+        self.worker_day_fact_approved.dttm_work_end = datetime.combine(self.dt + timedelta(days=1), time(1, 30))
+        self.worker_day_fact_approved.save()
+        total, day, night = self.worker_day_fact_approved.calc_day_and_night_work_hours()
+        self.assertEqual(total, 5)
+        self.assertEqual(day, 1.5)
+        self.assertEqual(night, 3.5)
+
     def test_calc_day_and_night_work_hours_with_round_algo(self):
         self.network.allowed_interval_for_late_arrival = timedelta(minutes=5)
         self.network.allowed_interval_for_early_departure = timedelta(minutes=5)

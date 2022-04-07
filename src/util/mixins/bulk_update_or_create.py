@@ -329,7 +329,7 @@ class BatchUpdateOrCreateModelMixin:
                         obj_to_create = to_update_dict.pop(update_key)
                         to_create.append(obj_to_create)
                         if user and not check_perms_extra_kwargs.get('grouped_checks'):
-                            cls._check_create_single_obj_perm(user, obj_dict, **check_perms_extra_kwargs)
+                            cls._check_create_single_obj_perm(user, obj_to_create, **check_perms_extra_kwargs)
                     else:
                         existing_obj = existing_objs.get(update_key)
                         skip_update_equality_fields = cls._get_skip_update_equality_fields(existing_obj)
