@@ -1063,6 +1063,26 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
         self.assertEqual(future_plan_worker_day.work_hours, timedelta(hours=11, minutes=30))
         self.assertEqual(future_plan_worker_day.employment_id, created_empl.id)
 
+        # restore "deleted" employment
+        employment = Employment.objects.filter(code='new_employment3').first()
+        employment.delete()
+        self.assertIsNotNone(employment.dttm_deleted)
+        resp = self.client.post(
+            self.get_url('Employment-batch-update-or-create'), self.dump_data(data), content_type='application/json')
+        self.assertEqual(resp.status_code, 200)
+        self.assertDictEqual(
+            resp.json(),
+            {
+                "stats": {
+                    "Employment": {
+                        "skipped": 1,
+                        "updated": 1
+                    }
+                }
+            }
+        )
+        employment.refresh_from_db()
+        self.assertIsNone(employment.dttm_deleted)
 
     def test_batch_update_or_create_diff_report(self):
         dt_now = date(2021, 12, 6)

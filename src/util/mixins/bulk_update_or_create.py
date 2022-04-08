@@ -134,7 +134,11 @@ class BatchUpdateOrCreateModelMixin:
         pass
 
     @classmethod
-    def _get_batch_delete_manager(cls, ):
+    def _get_batch_update_manager(cls):
+        return cls.objects
+
+    @classmethod
+    def _get_batch_delete_manager(cls):
         if hasattr(cls, 'objects_with_excluded'):
             return cls.objects_with_excluded
         return cls.objects
@@ -311,14 +315,15 @@ class BatchUpdateOrCreateModelMixin:
                         to_update_dict[update_key] = obj_dict
 
                 filter_kwargs = {}
+                update_manager = cls._get_batch_update_manager()
                 if update_keys:
                     filter_kwargs[f"{update_key_field}__in"] = update_keys
                     if delete_scope_filters:
                         filter_kwargs.update(delete_scope_filters)
-                    update_qs = cls.objects.filter(**filter_kwargs).select_related(
+                    update_qs = update_manager.filter(**filter_kwargs).select_related(
                         *cls._get_batch_update_select_related_fields())
                 else:
-                    update_qs = cls.objects.none()
+                    update_qs = update_manager.none()
                 existing_objs = {
                     getattr(obj, update_key_field): obj for obj in update_qs
                 }
@@ -333,6 +338,8 @@ class BatchUpdateOrCreateModelMixin:
                             cls._check_create_single_obj_perm(user, obj_to_create, **check_perms_extra_kwargs)
                     else:
                         existing_obj = existing_objs.get(update_key)
+                        if hasattr(existing_obj, 'dttm_deleted') and existing_obj.dttm_deleted is not None:
+                            update_obj_dict['dttm_deleted'] = None
                         need_to_skip = True
                         for k, v in update_obj_dict.items():
                             if k not in rel_objs_mapping and k not in skip_update_equality_fields:
@@ -459,7 +466,7 @@ class BatchUpdateOrCreateModelMixin:
 
                 if objs_to_update:
                     update_fields_set.discard(cls._meta.pk.name)
-                    cls.objects.bulk_update(objs_to_update, fields=update_fields_set)
+                    update_manager.bulk_update(objs_to_update, fields=update_fields_set)
                     cls._batch_update_or_create_rel_objs(
                         rel_objs_data=update_rel_objs_data, objs=objs_to_update, rel_objs_mapping=rel_objs_mapping,
                         stats=stats, update_key_field=update_key_field,
