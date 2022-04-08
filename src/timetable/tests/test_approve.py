@@ -495,3 +495,6 @@ class TestWorkerDayApprove(TestsHelperMixin, APITestCase):
         self.assertTrue(vac_not_approved2.is_approved)
         self.assertEqual(WorkerDay.objects.filter(is_fact=False, is_approved=True).count(), 2)
         self.assertEqual(WorkerDay.objects.filter(is_fact=False, is_approved=False).count(), 0)
+
+    def test_approve_only_specific_worker_day_types(self):
+        pass
