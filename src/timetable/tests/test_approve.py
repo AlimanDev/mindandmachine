@@ -601,3 +601,6 @@ class TestWorkerDayApprove(TestsHelperMixin, APITestCase):
 
         self.assertFalse(WorkerDay.objects.filter(pk=approved.id).exists())
         self.assertTrue(WorkerDay.objects.filter(parent_worker_day_id=not_approved_vacancy.id).exists())
+
+    def test_approve_only_specific_worker_day_types(self):
+        pass
