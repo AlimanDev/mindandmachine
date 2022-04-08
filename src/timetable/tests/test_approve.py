@@ -603,4 +603,47 @@ class TestWorkerDayApprove(TestsHelperMixin, APITestCase):
         self.assertTrue(WorkerDay.objects.filter(parent_worker_day_id=not_approved_vacancy.id).exists())
 
     def test_approve_only_specific_worker_day_types(self):
-        pass
+        plan_not_approved1 = WorkerDayFactory(
+            dt=self.today,
+            employee=self.employee,
+            employment=self.employment,
+            shop=self.shop2,
+            type_id=WorkerDay.TYPE_VACATION,
+            is_fact=False,
+            is_approved=False,
+        )
+        plan_approved1 = WorkerDayFactory(
+            dt=self.today,
+            employee=self.employee,
+            employment=self.employment,
+            shop=self.shop2,
+            type_id=WorkerDay.TYPE_VACATION,
+            is_fact=False,
+            is_approved=True,
+        )
+        plan_approved2 = WorkerDayFactory(
+            dt=self.today,
+            employee=self.employee,
+            employment=self.employment,
+            shop=self.shop,
+            type_id=WorkerDay.TYPE_WORKDAY,
+            is_fact=False,
+            is_approved=True,
+            dttm_work_start=datetime.combine(self.today, time(10)),
+            dttm_work_end=datetime.combine(self.today, time(14)),
+            last_edited_by=self.user,
+            cashbox_details__work_type=self.work_type,
+        )
+
+        resp = self._approve(
+            self.shop.id,
+            is_fact=False,
+            dt_from=self.today,
+            dt_to=self.today,
+            wd_types=[WorkerDay.TYPE_WORKDAY],
+            approve_open_vacs=True,
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(WorkerDay.objects.filter(id=plan_not_approved1.id).exists())
+        self.assertTrue(WorkerDay.objects.filter(id=plan_approved1.id).exists())
+        self.assertFalse(WorkerDay.objects.filter(id=plan_approved2.id).exists())
