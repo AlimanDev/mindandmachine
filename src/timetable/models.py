@@ -2088,10 +2088,6 @@ class AttendanceRecords(AbstractModel):
                 record_type = initial_record_type
         else:
             record_type = initial_record_type or calculated_record_type
-            employee_id = closest_plan_approved.employee_id
-            employment = closest_plan_approved.employment
-            if not employment:
-                raise ValidationError(_('You have no active employment'))
             dt = closest_plan_approved.dt
 
         return employee_id, employment, dt, record_type, closest_plan_approved

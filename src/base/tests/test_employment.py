@@ -878,6 +878,7 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
     @override_settings(CELERY_TASK_ALWAYS_EAGER=True)
     @mock.patch.object(transaction, 'on_commit', lambda t: t())
     def test_batch_update_or_create(self):
+        Employment.objects.filter(employee=self.employee2, code__isnull=True).delete()
         now = timezone.now()
         dt_now = now.date()
 
@@ -901,6 +902,7 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
                     'shop_code': self.shop2.code,
                     'username': self.user2.username,
                     'tabel_code': self.employee2.tabel_code,
+                    'norm_work_hours': 100,
                 },
             ],
             'options': options,
@@ -958,6 +960,15 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
             dt_hired=now,
             dt_fired=None,
         )
+        wd = WorkerDayFactory(
+            dt=dt_now,
+            employee=self.employee2,
+            employment=d_e,
+            shop=self.shop2,
+            type_id=WorkerDay.TYPE_WORKDAY,
+            is_fact=False,
+            is_approved=True,
+        )
 
         # curr empl without code to skip
         s_e = Employment.objects.create(
@@ -966,6 +977,7 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
             position=self.worker_position,
             dt_hired=now,
             dt_fired=None,
+            norm_work_hours=0,
         )
         d_e.refresh_from_db()
         self.assertTrue(Employment.objects.filter(id=d_e.id).exists())
@@ -988,6 +1000,9 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
         self.assertTrue(Employment.objects.filter(id=f_e2.id).exists())
         self.assertTrue(Employment.objects.filter(id=s_e.id).exists())
         self.assertFalse(Employment.objects.filter(id=d_e.id).exists())
+        deleted_wd = WorkerDay.objects_with_excluded.filter(id=wd.id).first()
+        self.assertNotEqual(deleted_wd.employment_id, d_e.id)
+        self.assertEqual(deleted_wd.employment.code, 'e_new')
 
         self.employee3.tabel_code = 'employee3'
         self.employee3.save()
