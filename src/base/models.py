@@ -1661,6 +1661,10 @@ class Employment(AbstractActiveModel):
         return ['employee_id']
 
     @classmethod
+    def _get_batch_update_manager(cls):
+        return cls.objects_with_excluded
+
+    @classmethod
     def _get_batch_delete_manager(cls):
         return cls.objects
 
