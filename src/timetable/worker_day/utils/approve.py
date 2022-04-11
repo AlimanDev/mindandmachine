@@ -41,7 +41,7 @@ from src.util.models_converter import Converter
 
 class WorkerDayApproveHelper:
     def __init__(self, is_fact, dt_from, dt_to, user=None, shop_id=None, employee_ids=None, wd_types=None,
-                 approve_open_vacs=False, any_draft_wd_exists=True, exclude_approve_q=None):
+                 approve_open_vacs=False, any_draft_wd_exists=False, exclude_approve_q=None):
         assert shop_id or employee_ids
         self.is_fact = is_fact
         self.dt_from = dt_from
@@ -355,7 +355,8 @@ class WorkerDayApproveHelper:
                             lambda f_json_data=json_data: send_doctors_schedule_to_mis.delay(json_data=f_json_data))
 
                 wdays_to_delete = WorkerDay.objects_with_excluded.filter(
-                    employee_days_q, is_fact=self.is_fact,
+                    employee_days_q,
+                    is_fact=self.is_fact,
                 ).exclude(
                     id__in=wdays_to_approve.values_list('id', flat=True),
                 ).exclude(
