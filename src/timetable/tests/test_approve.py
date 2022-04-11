@@ -539,5 +539,5 @@ class TestWorkerDayApprove(TestsHelperMixin, APITestCase):
         )
         self.assertEqual(resp.status_code, 200)
         self.assertTrue(WorkerDay.objects.filter(id=plan_not_approved1.id).exists())
-        self.assertTrue(WorkerDay.objects.filter(id=plan_approved1.id).exists())
-        self.assertFalse(WorkerDay.objects.filter(id=plan_approved2.id).exists())
+        self.assertTrue(self.similar_wday_exists(wd=plan_approved1))
+        self.assertFalse(self.similar_wday_exists(wd=plan_approved2))
