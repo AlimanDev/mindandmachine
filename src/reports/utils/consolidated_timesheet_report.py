@@ -95,9 +95,6 @@ class ConsolidatedTimesheetReportGenerator:
                         source=TimesheetItem.SOURCE_TYPE_FACT,
                     )
                 annotations_dict[wd_type.code] = Sum('day_hours', filter=q) + Sum('night_hours', filter=q)
-            # annotations_dict['other_personnel_types'] = \  # TODO: нужна именно отдельная колонка другие кадровые состояния7
-            #     Sum('day_hours', filter=Q(day_type__show_stat_in_hours=False)) + \
-            #     Sum('night_hours', filter=Q(day_type__show_stat_in_hours=False))
             total_main_work_hours_q = Q(
                 Q(day_type__is_dayoff=True) | Q(source=TimesheetItem.SOURCE_TYPE_FACT),
                 day_type__is_work_hours=True,
@@ -107,6 +104,15 @@ class ConsolidatedTimesheetReportGenerator:
                 Sum('day_hours', filter=total_main_work_hours_q) + \
                 Sum('night_hours', filter=total_main_work_hours_q)
         return annotations_dict
+
+    def _get_order_by_list(self):
+        order_by = []
+        if 'employee' in self.group_by:
+            order_by.append('employee__user__last_name')
+            order_by.append('employee__user__first_name')
+        if 'position' in self.group_by:
+            order_by.append('position__name')
+        return order_by
 
     def _get_data(self):
         annotations_dict = self._get_annotations_dict()
@@ -122,6 +128,8 @@ class ConsolidatedTimesheetReportGenerator:
             **annotations_dict,
         ).values_list(
             *self.columns_mapping.keys(),
+        ).order_by(
+            *self._get_order_by_list(),
         ))
         return data
 
