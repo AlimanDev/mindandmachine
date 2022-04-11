@@ -19,7 +19,7 @@ from rest_framework.serializers import ValidationError
 from src.base.exceptions import FieldError
 from src.base.models import Employment, Shop, Employee
 from src.base.permissions import WdPermission
-from src.base.views_abstract import BaseModelViewSet
+from src.base.views_abstract import BaseActiveNamedModelViewSet
 from src.events.signals import event_signal
 from src.reports.utils.overtimes_undertimes import overtimes_undertimes_xlsx
 from src.timetable.backends import MultiShopsFilterBackend
@@ -74,7 +74,7 @@ from src.util.upload import get_uploaded_file
 from .stat import WorkersStatsGetter
 
 
-class WorkerDayViewSet(BaseModelViewSet):
+class WorkerDayViewSet(BaseActiveNamedModelViewSet):
     error_messages = {  # вынести из вьюсета
         "worker_days_mismatch": _("Worker days mismatch."),
         "no_timetable": _("Workers don't have timetable."),
