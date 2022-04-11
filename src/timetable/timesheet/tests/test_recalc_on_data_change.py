@@ -149,7 +149,7 @@ class TestRecalcOnDataChange(TestTimesheetMixin, APITestCase):
             type=AttendanceRecords.TYPE_LEAVING,
         )
         _calc_timesheets_apply_async.reset_mock()
-        WorkerDayFactory(
+        wd = WorkerDayFactory(
             is_approved=False,
             is_fact=False,
             shop=self.shop,
@@ -161,6 +161,7 @@ class TestRecalcOnDataChange(TestTimesheetMixin, APITestCase):
             dttm_work_end=datetime(2021, 6, 12, 21),
             cashbox_details__work_type=self.work_type_worker,
         )
+        WorkerDay.objects.exclude(id=wd.id).delete()
 
         response = self.client.post(
             self.get_url('WorkerDay-approve'),

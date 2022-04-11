@@ -265,6 +265,21 @@ class TestsHelperMixin:
         df.to_excel(writer)
         writer.save()
 
+    @classmethod
+    def similar_wday_exists(cls, wd, fields=None):
+        fields = fields or [
+            'code',
+            'employee_id',
+            'dt',
+            'type_id',
+            'work_hours',
+            'dttm_work_start',
+            'dttm_work_end',
+            'shop_id',
+        ]
+        kwargs = {f: getattr(wd, f) for f in fields}
+        return WorkerDay.objects.filter(**kwargs).exists()
+
     @staticmethod
     def _create_att_record(type, dttm, user_id, employee_id, shop_id, terminal=True):
         from src.timetable.models import AttendanceRecords

@@ -17,6 +17,7 @@ def fix_wd_employments(**kwargs):
     WorkerDay.objects_with_excluded.filter(
         Q(employee__isnull=False),
         Q(employment__isnull=True) |
+        Q(employment__dttm_deleted__isnull=False) |
         Q(Q(dt__lt=F('employment__dt_hired')) | Q(dt__gt=F('employment__dt_fired'))),
         **kwargs,
     ).exclude(
