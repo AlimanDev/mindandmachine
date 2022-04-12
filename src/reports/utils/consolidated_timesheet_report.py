@@ -18,8 +18,10 @@ from src.timetable.models import WorkerDayType
 
 
 class ConsolidatedTimesheetReportGenerator:
-    def __init__(self, shop, dt_from: datetime.date, dt_to: datetime.date, group_by: list, cached_data=None):
-        self.shop = shop
+    def __init__(self, shops, dt_from: datetime.date, dt_to: datetime.date, group_by: list, shops_names=None,
+                 cached_data=None):
+        self.shops = shops
+        self.shops_names = shops_names
         self.dt_from = dt_from
         self.dt_to = dt_to
         self.group_by = group_by or ['employee']
@@ -30,7 +32,7 @@ class ConsolidatedTimesheetReportGenerator:
             id__in=Employment.objects.get_active_empl_by_priority(
                 dt_from=self.dt_from,
                 dt_to=self.dt_to,
-                shop=self.shop,
+                shop__in=self.shops,
             ).values_list('employee_id', flat=True)
         )
 
@@ -95,9 +97,6 @@ class ConsolidatedTimesheetReportGenerator:
                         source=TimesheetItem.SOURCE_TYPE_FACT,
                     )
                 annotations_dict[wd_type.code] = Sum('day_hours', filter=q) + Sum('night_hours', filter=q)
-            # annotations_dict['other_personnel_types'] = \  # TODO: нужна именно отдельная колонка другие кадровые состояния7
-            #     Sum('day_hours', filter=Q(day_type__show_stat_in_hours=False)) + \
-            #     Sum('night_hours', filter=Q(day_type__show_stat_in_hours=False))
             total_main_work_hours_q = Q(
                 Q(day_type__is_dayoff=True) | Q(source=TimesheetItem.SOURCE_TYPE_FACT),
                 day_type__is_work_hours=True,
@@ -108,11 +107,20 @@ class ConsolidatedTimesheetReportGenerator:
                 Sum('night_hours', filter=total_main_work_hours_q)
         return annotations_dict
 
+    def _get_order_by_list(self):
+        order_by = []
+        if 'employee' in self.group_by:
+            order_by.append('employee__user__last_name')
+            order_by.append('employee__user__first_name')
+        if 'position' in self.group_by:
+            order_by.append('position__name')
+        return order_by
+
     def _get_data(self):
         annotations_dict = self._get_annotations_dict()
         data = list(TimesheetItem.objects.filter(
             Q(day_hours__gt=0) | Q(night_hours__gt=0),
-            Q(day_type__is_dayoff=False, shop=self.shop) |
+            Q(day_type__is_dayoff=False, shop__in=self.shops) |
             Q(day_type__is_dayoff=True, employee__in=self._get_employees_qs()),
             dt__gte=self.dt_from,
             dt__lte=self.dt_to,
@@ -122,6 +130,8 @@ class ConsolidatedTimesheetReportGenerator:
             **annotations_dict,
         ).values_list(
             *self.columns_mapping.keys(),
+        ).order_by(
+            *self._get_order_by_list(),
         ))
         return data
 
@@ -143,11 +153,12 @@ class ConsolidatedTimesheetReportGenerator:
             'font': 14,
         })
         worksheet.merge_range('A1:D1', 'Консолидированный отчет об отработанном времени', title_merge_f)
-        worksheet.write('A2', 'Наименование объекта')
-        worksheet.merge_range('B2:D2', f'{self.shop.name}')
+        worksheet.write('A2', 'Наименование объектов')
+        worksheet.merge_range('B2:D2', f'{self.shops_names}')
         worksheet.write('A3', 'Период')
         worksheet.merge_range('B3:D3', f'{self.dt_from.strftime("%Y.%m.%d")} - {self.dt_to.strftime("%Y.%m.%d")}')
-        worksheet.write(f'A{len(df.index) + 4}', 'Итого часов')
+        bold_format = workbook.add_format({'bold': 1, 'font': 11})
+        worksheet.write(f'A{len(df.index) + 4}', 'Итого часов', bold_format)
 
     def generate(self, sheet_name):
         sheet_name = re.sub(r'[\[\]:*?/\\]', '', sheet_name)

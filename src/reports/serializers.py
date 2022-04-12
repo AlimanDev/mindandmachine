@@ -40,7 +40,7 @@ class ReportFilterSerializer(serializers.Serializer, ValidateMixin):
 
 
 class ConsolidatedTimesheetReportSerializer(serializers.Serializer):
-    shop_id = serializers.PrimaryKeyRelatedField(queryset=Shop.objects)
+    shop_id__in = serializers.CharField()
     dt_from = serializers.DateField()
     dt_to = serializers.DateField()
     group_by = serializers.ChoiceField(choices=['employee', 'employee_position', 'position'], allow_blank=False)
