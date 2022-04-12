@@ -1089,4 +1089,9 @@ class WorkersStatsGetter:
                     overtime['curr_month_end'] = (
                         work_hours_prev_months + work_hours_curr_month) - norm_hours_curr_month_end
 
+                    # округление для того, чтобы обойти проблему потери точности при сложении float
+                    # (по-хорошему надо все расчеты переделать на Decimal)
+                    sawh_hours['curr_month_without_reduce_norm'] = round(sawh_hours['curr_month_without_reduce_norm'], 8)
+                    sawh_hours['curr_month'] = round(sawh_hours['curr_month'], 8)
+                    sawh_hours['selected_period'] = round(sawh_hours['selected_period'], 8)
         return res

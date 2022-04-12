@@ -90,7 +90,7 @@ class SawhSettingsHelperMixin(TestsHelperMixin):
 
     def _test_hours_for_period(
             self, dt_from, dt_to, expected_norm_hours, hours_k='sawh_hours', plan_fact_k='plan',
-            approved_k='approved', period_k='selected_period', employee_id=None):
+            approved_k='approved', period_k='selected_period', employee_id=None, round_to=8):
         workers_stats_getter = WorkersStatsGetter(
             employee_id=employee_id or self.employee.id,
             shop_id=self.shop.id,
@@ -99,6 +99,8 @@ class SawhSettingsHelperMixin(TestsHelperMixin):
         )
         workers_stats = workers_stats_getter.run()
         norm_hours = workers_stats[employee_id or self.employee.id][plan_fact_k][approved_k][hours_k][period_k]
+        if round_to:
+            expected_norm_hours = round(expected_norm_hours, round_to)
         self.assertEqual(norm_hours, expected_norm_hours)
         return norm_hours
 
