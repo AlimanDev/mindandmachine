@@ -593,8 +593,8 @@ class TestGetWorkersStatAndTabel(MultipleActiveEmploymentsSupportMixin, APITestC
                             "by_months": {
                                 "3": 147.61290322580646
                             },
-                            "selected_period": 147.61290322580646,
-                            "curr_month": 147.61290322580646,
+                            "selected_period": 147.61290323,
+                            "curr_month": 147.61290323,
                             "curr_month_without_reduce_norm": 176.0
                         }
                     },
@@ -620,8 +620,8 @@ class TestGetWorkersStatAndTabel(MultipleActiveEmploymentsSupportMixin, APITestC
                             "by_months": {
                                 "3": 147.61290322580646
                             },
-                            "selected_period": 147.61290322580646,
-                            "curr_month": 147.61290322580646,
+                            "selected_period": 147.61290323,
+                            "curr_month": 147.61290323,
                             "curr_month_without_reduce_norm": 176.0
                         }
                     }
@@ -670,8 +670,8 @@ class TestGetWorkersStatAndTabel(MultipleActiveEmploymentsSupportMixin, APITestC
                             "by_months": {
                                 "3": 147.61290322580646
                             },
-                            "selected_period": 147.61290322580646,
-                            "curr_month": 147.61290322580646,
+                            "selected_period": 147.61290323,
+                            "curr_month": 147.61290323,
                             "curr_month_without_reduce_norm": 176.0
                         }
                     },
@@ -746,8 +746,8 @@ class TestGetWorkersStatAndTabel(MultipleActiveEmploymentsSupportMixin, APITestC
                             "by_months": {
                                 "3": 73.80645161290323
                             },
-                            "selected_period": 73.80645161290323,
-                            "curr_month": 73.80645161290323,
+                            "selected_period": 73.80645161,
+                            "curr_month": 73.80645161,
                             "curr_month_without_reduce_norm": 88.0
                         }
                     },
@@ -773,8 +773,8 @@ class TestGetWorkersStatAndTabel(MultipleActiveEmploymentsSupportMixin, APITestC
                             "by_months": {
                                 "3": 73.80645161290323
                             },
-                            "selected_period": 73.80645161290323,
-                            "curr_month": 73.80645161290323,
+                            "selected_period": 73.80645161,
+                            "curr_month": 73.80645161,
                             "curr_month_without_reduce_norm": 88.0
 
                         }
@@ -824,8 +824,8 @@ class TestGetWorkersStatAndTabel(MultipleActiveEmploymentsSupportMixin, APITestC
                             "by_months": {
                                 "3": 73.80645161290323
                             },
-                            "selected_period": 73.80645161290323,
-                            "curr_month": 73.80645161290323,
+                            "selected_period": 73.80645161,
+                            "curr_month": 73.80645161,
                             "curr_month_without_reduce_norm": 88.0
                         }
                     },
