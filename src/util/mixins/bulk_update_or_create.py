@@ -1,5 +1,6 @@
 import io
-from datetime import date, datetime
+import logging
+from smtplib import SMTPRecipientsRefused
 
 import pandas as pd
 from django.core.exceptions import FieldDoesNotExist
@@ -10,6 +11,8 @@ from django.utils import timezone
 from src.notifications.helpers import send_mass_html_mail
 from src.reports.helpers import get_datatuple
 from src.util.commons import obj_deep_get
+
+diff_report_logger = logging.getLogger('diff_report')
 
 
 class DryRunRevertException(Exception):
@@ -39,7 +42,10 @@ class BatchUpdateOrCreateModelMixin:
 
     @classmethod
     def _get_allowed_update_key_fields(cls):
-        return ['id', 'code']
+        l = ['id']
+        if cls._is_field_exist('code'):
+            l.append('code')
+        return l
 
     @classmethod
     def _get_batch_update_or_create_transaction_checks_kwargs(cls, **kwargs):
@@ -90,7 +96,7 @@ class BatchUpdateOrCreateModelMixin:
         return rel_objs_to_create_or_update
 
     @classmethod
-    def _batch_update_or_create_rel_objs(cls, rel_objs_data, objs, rel_objs_mapping, stats, update_key_field):
+    def _batch_update_or_create_rel_objs(cls, rel_objs_data, objs, rel_objs_mapping, stats, update_key_field, rel_objs_delete_scope_filters):
         all_rel_objs_mapped_by_type = {}
         delete_scope_values_list_by_type = {}
         for idx, rel_objs_to_create_or_update in rel_objs_data.items():
@@ -106,10 +112,13 @@ class BatchUpdateOrCreateModelMixin:
         for rel_obj_key, rel_obj_data_list in all_rel_objs_mapped_by_type.items():
             rel_obj_cls, rel_obj_reverse_fk_field = rel_objs_mapping.get(rel_obj_key)
             delete_scope_values_list = delete_scope_values_list_by_type.get(rel_obj_key)
+            delete_scope_filters = rel_objs_delete_scope_filters.get(
+                rel_obj_cls.__name__, {}) if rel_objs_delete_scope_filters else None
             rel_obj_cls.batch_update_or_create(
                 data=rel_obj_data_list, update_key_field=update_key_field,
                 delete_scope_fields_list=[rel_obj_reverse_fk_field],
-                delete_scope_values_list=delete_scope_values_list, stats=stats)
+                delete_scope_values_list=delete_scope_values_list, stats=stats,
+                delete_scope_filters=delete_scope_filters)
 
     @classmethod
     def _is_field_exist(cls, field_name):
@@ -125,7 +134,11 @@ class BatchUpdateOrCreateModelMixin:
         pass
 
     @classmethod
-    def _get_batch_delete_manager(cls, ):
+    def _get_batch_update_manager(cls):
+        return cls.objects
+
+    @classmethod
+    def _get_batch_delete_manager(cls):
         if hasattr(cls, 'objects_with_excluded'):
             return cls.objects_with_excluded
         return cls.objects
@@ -181,7 +194,10 @@ class BatchUpdateOrCreateModelMixin:
                 'file': output,
             },
         )
-        send_mass_html_mail(datatuple)
+        try:
+            send_mass_html_mail(datatuple)
+        except SMTPRecipientsRefused as e:
+            diff_report_logger.debug(str(e), exc_info=True)
 
     @classmethod
     def _pre_batch(cls, **kwargs):
@@ -201,7 +217,9 @@ class BatchUpdateOrCreateModelMixin:
     def batch_update_or_create(
             cls, data: list, update_key_field: str = 'id', delete_scope_fields_list: list = None,
             delete_scope_values_list: list = None, delete_scope_filters: dict = None, stats=None, user=None,
-            dry_run=False, diff_report_email_to: list = None, check_perms_extra_kwargs=None, generate_delete_scope_values=True):
+            dry_run=False, diff_report_email_to: list = None, check_perms_extra_kwargs=None,
+            generate_delete_scope_values=True, model_options=None, cached_data=None,
+            rel_objs_delete_scope_filters: dict = None):
         """
         Функция для массового создания и/или обновления объектов
 
@@ -238,15 +256,19 @@ class BatchUpdateOrCreateModelMixin:
         # TODO: Оптимистичный лок? Версия объектов? Пример: изменяем один и тот же WorkerDay в разных вкладках,
             должна быть ошибка если объект был изменен?
         # TODO: Настройка, которая определяет сколько объектов может быть создано в рамках delete_scope_fields_list? -- ???
-        # TODO: Сигналы post_batch_update, post_batch_create ?
         """
         allowed_update_key_fields = cls._get_allowed_update_key_fields()
         if update_key_field not in allowed_update_key_fields:
-            raise BatchUpdateOrCreateException(
-                f'Not allowed update key field: "{update_key_field}", allowed fields: {allowed_update_key_fields}')
+            if allowed_update_key_fields:
+                # костыль, чтобы брался id как ключ, вместо code для вложенных объектов
+                update_key_field = allowed_update_key_fields[0]
+            else:
+                raise BatchUpdateOrCreateException(
+                    f'Not allowed update key field: "{update_key_field}"')
 
         try:
             with transaction.atomic():
+                cached_data = cached_data if cached_data is not None else {}
                 diff_data = {}
                 diff_lookup_fields = cls._get_diff_lookup_fields()
                 diff_obj_keys = tuple(lookup_field.split('__') for lookup_field in diff_lookup_fields)
@@ -255,7 +277,10 @@ class BatchUpdateOrCreateModelMixin:
                 if user:
                     check_perms_extra_kwargs.update(cls._get_check_perms_extra_kwargs(user=user))
                 stats = stats if stats is not None else {}
-                delete_scope_fields_list = delete_scope_fields_list or cls._get_batch_delete_scope_fields_list()
+                delete_scope_fields_list = delete_scope_fields_list \
+                    if delete_scope_fields_list is not None \
+                    else cls._get_batch_delete_scope_fields_list()
+                model_options = model_options or {}
                 delete_scope_values_set = set()
                 if delete_scope_values_list:
                     for delete_scope_values in delete_scope_values_list:
@@ -289,13 +314,16 @@ class BatchUpdateOrCreateModelMixin:
                         update_keys.append(update_key)
                         to_update_dict[update_key] = obj_dict
 
-                filter_kwargs = {
-                    f"{update_key_field}__in": update_keys,
-                }
-                if delete_scope_filters:
-                    filter_kwargs.update(delete_scope_filters)
-                update_qs = cls.objects.filter(**filter_kwargs).select_related(
-                    *cls._get_batch_update_select_related_fields())
+                filter_kwargs = {}
+                update_manager = cls._get_batch_update_manager()
+                if update_keys:
+                    filter_kwargs[f"{update_key_field}__in"] = update_keys
+                    if delete_scope_filters:
+                        filter_kwargs.update(delete_scope_filters)
+                    update_qs = update_manager.filter(**filter_kwargs).select_related(
+                        *cls._get_batch_update_select_related_fields())
+                else:
+                    update_qs = update_manager.none()
                 existing_objs = {
                     getattr(obj, update_key_field): obj for obj in update_qs
                 }
@@ -307,9 +335,11 @@ class BatchUpdateOrCreateModelMixin:
                         obj_to_create = to_update_dict.pop(update_key)
                         to_create.append(obj_to_create)
                         if user and not check_perms_extra_kwargs.get('grouped_checks'):
-                            cls._check_create_single_obj_perm(user, obj_dict, **check_perms_extra_kwargs)
+                            cls._check_create_single_obj_perm(user, obj_to_create, **check_perms_extra_kwargs)
                     else:
                         existing_obj = existing_objs.get(update_key)
+                        if hasattr(existing_obj, 'dttm_deleted') and existing_obj.dttm_deleted is not None:
+                            update_obj_dict['dttm_deleted'] = None
                         need_to_skip = True
                         for k, v in update_obj_dict.items():
                             if k not in rel_objs_mapping and k not in skip_update_equality_fields:
@@ -328,7 +358,7 @@ class BatchUpdateOrCreateModelMixin:
                             update_obj_dict['dttm_modified'] = now
                             if user:
                                 cls._check_update_single_obj_perm(
-                                    user, existing_obj, obj_dict, **check_perms_extra_kwargs)
+                                    user, existing_obj, update_obj_dict, **check_perms_extra_kwargs)
 
                 if to_skip:
                     skip_rel_objs_data = cls._pop_rel_objs_data(
@@ -369,7 +399,8 @@ class BatchUpdateOrCreateModelMixin:
                 deleted_dict = {}
                 objs_to_delete = []
                 q_for_delete = Q()
-                if delete_scope_fields_list:
+
+                if delete_scope_fields_list or delete_scope_filters:
                     if not delete_scope_values_list and generate_delete_scope_values:
                         for obj_to_update in objs_to_update:
                             delete_scope_values_tuple = tuple(
@@ -392,7 +423,8 @@ class BatchUpdateOrCreateModelMixin:
                             if delete_scope_values_tuple:
                                 delete_scope_values_set.add(delete_scope_values_tuple)
 
-                    if delete_scope_values_set or (not generate_delete_scope_values and delete_scope_filters):
+                    if delete_scope_values_set or (
+                            (not generate_delete_scope_values or not delete_scope_fields_list) and delete_scope_filters):
                         for delete_scope_values_tuples in delete_scope_values_set:
                             q_for_delete |= Q(**dict(delete_scope_values_tuples))
 
@@ -409,7 +441,12 @@ class BatchUpdateOrCreateModelMixin:
                             diff_data.setdefault('deleted', []).append(
                                 tuple(obj_deep_get(obj_to_delete, *keys) for keys in diff_obj_keys))
 
-                cls._pre_batch(user=user, diff_data=diff_data, check_perms_extra_kwargs=check_perms_extra_kwargs)
+                cls._pre_batch(
+                    created_objs=objs_to_create, updated_objs=objs_to_update, deleted_objs=objs_to_delete,
+                    diff_data=diff_data, stats=stats, model_options=model_options,
+                    delete_scope_filters=delete_scope_filters, user=user, diff_obj_keys=diff_obj_keys,
+                    cached_data=cached_data, check_perms_extra_kwargs=check_perms_extra_kwargs,
+                )
 
                 if objs_to_delete:
                     _total_deleted_count, deleted_dict = delete_qs.delete()
@@ -417,20 +454,23 @@ class BatchUpdateOrCreateModelMixin:
                 if objs_to_skip:
                     cls._batch_update_or_create_rel_objs(
                         rel_objs_data=skip_rel_objs_data, objs=objs_to_skip, rel_objs_mapping=rel_objs_mapping,
-                        stats=stats, update_key_field=update_key_field)
+                        stats=stats, update_key_field=update_key_field,
+                        rel_objs_delete_scope_filters=rel_objs_delete_scope_filters)
 
                 if objs_to_create:
                     cls.objects.bulk_create(objs_to_create)  # в объектах будут проставлены id (только в postgres)
                     cls._batch_update_or_create_rel_objs(
                         rel_objs_data=create_rel_objs_data, objs=objs_to_create, rel_objs_mapping=rel_objs_mapping,
-                        stats=stats, update_key_field=update_key_field)
+                        stats=stats, update_key_field=update_key_field,
+                        rel_objs_delete_scope_filters=rel_objs_delete_scope_filters)
 
                 if objs_to_update:
                     update_fields_set.discard(cls._meta.pk.name)
-                    cls.objects.bulk_update(objs_to_update, fields=update_fields_set)
+                    update_manager.bulk_update(objs_to_update, fields=update_fields_set)
                     cls._batch_update_or_create_rel_objs(
                         rel_objs_data=update_rel_objs_data, objs=objs_to_update, rel_objs_mapping=rel_objs_mapping,
-                        stats=stats, update_key_field=update_key_field)
+                        stats=stats, update_key_field=update_key_field,
+                        rel_objs_delete_scope_filters=rel_objs_delete_scope_filters)
 
                 cls_name = cls.__name__
                 cls_stats = stats.setdefault(cls_name, {})
@@ -447,17 +487,19 @@ class BatchUpdateOrCreateModelMixin:
                         deleted_cls_stats['deleted'] = deleted_cls_stats.get('deleted', 0) + deleted_dict.get(
                             original_deleted_cls_name)
 
-                transaction_checks_kwargs = cls._get_batch_update_or_create_transaction_checks_kwargs(
-                    data=data, q_for_delete=q_for_delete, user=user)
-                cls._run_batch_update_or_create_transaction_checks(**transaction_checks_kwargs)
-
                 if diff_report_email_to:
                     cls._create_and_send_diff_report(diff_report_email_to, diff_data, diff_headers, now)
 
                 cls._post_batch(
                     created_objs=objs_to_create, updated_objs=objs_to_update, deleted_objs=objs_to_delete,
-                    diff_data=diff_data,
+                    diff_data=diff_data, stats=stats, model_options=model_options,
+                    delete_scope_filters=delete_scope_filters, user=user, diff_obj_keys=diff_obj_keys,
+                    cached_data=cached_data,
                 )
+
+                transaction_checks_kwargs = cls._get_batch_update_or_create_transaction_checks_kwargs(
+                    data=data, q_for_delete=q_for_delete, user=user)
+                cls._run_batch_update_or_create_transaction_checks(**transaction_checks_kwargs)
 
                 if dry_run:
                     raise DryRunRevertException()

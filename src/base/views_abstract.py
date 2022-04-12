@@ -10,14 +10,17 @@ from .mixins import GetObjectByCodeMixin, ApiLogMixin
 
 class BatchUpdateOrCreateOptionsSerializer(serializers.Serializer):
     by_code = serializers.BooleanField(required=False)
+    update_key_field = serializers.CharField(required=False)
     delete_scope_fields_list = serializers.ListField(
-        child=serializers.CharField(), required=False, allow_empty=False, allow_null=False)
+        child=serializers.CharField(), required=False, allow_empty=True, allow_null=False)
     delete_scope_values_list = serializers.ListField(
         child=serializers.DictField(), required=False, allow_empty=False, allow_null=False)
     delete_scope_filters = serializers.DictField(required=False)
+    rel_objs_delete_scope_filters = serializers.DictField(required=False)
     return_response = serializers.BooleanField(required=False, allow_null=False)
     dry_run = serializers.BooleanField(required=False)
     diff_report_email_to = serializers.ListField(child=serializers.CharField(), required=False)
+    model_options = serializers.DictField(required=False)
 
 
 def _patch_obj_serializer(obj_serializer, update_key_field='id'):
@@ -39,10 +42,11 @@ class BatchUpdateOrCreateViewMixin:
 
             def __init__(self, *args, **kwargs):
                 super(BatchUpdateOrCreateSerializer, self).__init__(*args, **kwargs)
+                update_key_field = this.request.data.get('options', {}).get('update_key_field')
                 by_code = this.request.data.get('options', {}).get('by_code')
                 _patch_obj_serializer(
                     obj_serializer=self.fields['data'],
-                    update_key_field='code' if by_code else 'id'
+                    update_key_field=update_key_field or ('code' if by_code else 'id')
                 )
 
         return BatchUpdateOrCreateSerializer
@@ -66,18 +70,25 @@ class BatchUpdateOrCreateViewMixin:
         serializer.is_valid(raise_exception=True)
 
         options = serializer.validated_data.get('options', {})
+        model_options = options.get('model_options', {})
         delete_scope_filters = options.get('delete_scope_filters', {})
         if options.get('by_code'):
             delete_scope_filters.update({'code__isnull': False})
         objects, stats = self._get_model_from_serializer(serializer).batch_update_or_create(
             data=serializer.validated_data.get('data'),
-            update_key_field='code' if options.get('by_code') else 'id',
+            update_key_field=options.get('update_key_field') or ('code' if options.get('by_code') else 'id'),
             delete_scope_fields_list=options.get('delete_scope_fields_list'),
             delete_scope_values_list=options.get('delete_scope_values_list'),
             delete_scope_filters=delete_scope_filters,
+            rel_objs_delete_scope_filters=options.get('rel_objs_delete_scope_filters', {}),
             user=self.request.user if self.request.user.is_authenticated else None,
             dry_run=options.get('dry_run', False),
             diff_report_email_to=options.get('diff_report_email_to'),
+            check_perms_extra_kwargs=dict(
+                grouped_checks=model_options.pop('grouped_checks', False),
+                check_active_empl=model_options.pop('check_active_empl', True),
+            ),
+            model_options=model_options,
         )
 
         res = {

@@ -1505,9 +1505,11 @@ class Employment(AbstractActiveModel):
             WorkerDay.objects.filter(employment=self).update(employment_id=None)
             if self.employee.user.network.clean_wdays_on_employment_dt_change:
                 transaction.on_commit(lambda: clean_wdays.delay(id__in=wdays_ids))
-            transaction.on_commit(lambda: export_or_delete_employment_zkteco.delay(self.id))
+            res = super(Employment, self).delete(**kwargs)
+            if settings.ZKTECO_INTEGRATION:
+                transaction.on_commit(lambda: export_or_delete_employment_zkteco.delay(self.id))
             transaction.on_commit(lambda: cache.delete_pattern(f"prod_cal_*_*_{self.employee_id}"))
-            return super(Employment, self).delete(**kwargs)
+            return res
 
     def __init__(self, *args, **kwargs):
         shop_code = kwargs.pop('shop_code', None)
@@ -1541,46 +1543,15 @@ class Employment(AbstractActiveModel):
         res = super().save(*args, **kwargs)
         # при создании трудоустройства или при смене должности проставляем типы работ по умолчанию
         if force_create_work_types or is_new or position_has_changed:
-            from src.timetable.models import EmploymentWorkType, WorkType
-            work_type_names = WorkerPosition.default_work_type_names.through.objects.filter(
-                workerposition_id=self.position_id,
-            ).values_list('worktypename', flat=True)
+            self.create_or_update_work_types([self])
 
-            work_types = []
-            for work_type_name_id in work_type_names:
-                work_type, _wt_created = WorkType.objects.get_or_create(
-                    shop_id=self.shop_id,
-                    work_type_name_id=work_type_name_id,
-                )
-                work_types.append(work_type)
-
-            if work_types or not is_new:
-                EmploymentWorkType.objects.filter(employment_id=self.id).delete()
-
-            if work_types:
-                EmploymentWorkType.objects.bulk_create(
-                    EmploymentWorkType(
-                        employment_id=self.id,
-                        work_type=work_type,
-                        priority=1 if i == 0 else 0,
-                    ) for i, work_type in enumerate(work_types)
-                )
         # при смене должности пересчитываем рабочие часы в будущем
         if not is_new and position_has_changed:
-            from src.timetable.models import WorkerDay
-            dt = datetime.date.today()
-            for wd in WorkerDay.objects.filter(
-                        employment_id=self.id,
-                        is_fact=False,
-                        dt__gt=dt,
-                        type__is_dayoff=False,
-                    ):
-                wd.save()
+            self.recalc_future_worker_days([self.id])
 
         if (is_new or (self.tracker.has_changed('dt_hired') or self.tracker.has_changed('dt_fired'))) and \
                 self.employee.user.network and self.employee.user.network.clean_wdays_on_employment_dt_change:
             from src.timetable.worker_day.tasks import clean_wdays
-            from src.timetable.models import WorkerDay
             from src.util.models_converter import Converter
             kwargs = {}
             if is_new:
@@ -1615,6 +1586,64 @@ class Employment(AbstractActiveModel):
     def is_active(self, dt=None):
         dt = dt or timezone.now().date()
         return (self.dt_hired is None or self.dt_hired <= dt) and (self.dt_fired is None or self.dt_fired >= dt)
+    
+    @staticmethod
+    def create_or_update_work_types(employments):
+        from src.timetable.models import EmploymentWorkType, WorkType
+        with transaction.atomic():
+            default_work_types = {}
+
+            for employment in employments:
+                default_work_types.setdefault(employment.position_id, {}).setdefault(employment.shop_id, [])
+
+            work_type_names = WorkerPosition.default_work_type_names.through.objects.filter(
+                workerposition_id__in=default_work_types.keys(),
+            ).values_list('worktypename_id', 'workerposition_id')
+
+
+            for work_type_name_id, position_id in work_type_names:
+                for shop_id in default_work_types[position_id].keys():
+                    work_type, _wt_created = WorkType.objects.get_or_create(
+                        shop_id=shop_id,
+                        work_type_name_id=work_type_name_id,
+                    )
+                    default_work_types[position_id][shop_id].append(work_type)
+
+            EmploymentWorkType.objects.filter(employment_id__in=map(lambda x: x.id, employments)).delete()
+            EmploymentWorkType.objects.bulk_create(
+                EmploymentWorkType(
+                    employment_id=employment.id,
+                    work_type=work_type,
+                    priority=1 if i == 0 else 0,
+                ) 
+                for employment in employments
+                for i, work_type in enumerate(default_work_types[employment.position_id][employment.shop_id])
+            )
+
+    @staticmethod
+    def recalc_future_worker_days(employment_ids):
+        from src.timetable.models import WorkerDay
+        dt = datetime.date.today()
+        for wd in WorkerDay.objects.filter(
+                    employment_id__in=employment_ids,
+                    is_fact=False,
+                    dt__gt=dt,
+                    type__is_dayoff=False,
+                ).select_related(
+                    'employment__position__breaks',
+                    'shop__network__breaks',
+                    'type',
+                    'shop__settings__breaks',
+                ):
+            wd.save()
+
+    @classmethod
+    def _get_batch_delete_scope_fields_list(cls):
+        return ['employee_id']
+
+    @classmethod
+    def _get_batch_update_manager(cls):
+        return cls.objects_with_excluded
 
     @classmethod
     def _get_batch_delete_manager(cls):
@@ -1651,6 +1680,97 @@ class Employment(AbstractActiveModel):
     @classmethod
     def _get_diff_report_subject_fmt(cls):
         return 'Сверка трудоустройств от {dttm_now}'
+    
+    @classmethod
+    def _post_batch(cls, **kwargs):
+        from src.integration.tasks import export_or_delete_employment_zkteco
+        from src.timetable.worker_day.tasks import clean_wdays
+        from src.util.models_converter import Converter
+        created_objs = kwargs.get('created_objs', [])
+        updated_objs = kwargs.get('updated_objs', [])
+        deleted_objs = kwargs.get('deleted_objs', [])
+        before_update = kwargs.get('diff_data', {}).get('before_update', [])
+        after_update = kwargs.get('diff_data', {}).get('after_update', [])
+
+        employee_network = {
+            e.id: e.user.network
+            for e in Employee.objects.filter(
+                id__in=list(map(lambda x: x.employee_id, created_objs)) + list(map(lambda x: x.employee_id, updated_objs))
+            ).select_related('user__network')
+        }
+
+        employments_create_or_update_work_types = []
+        employments_for_recalc_wh_in_future = []
+        clean_wdays_kwargs = {
+            'employee_id__in': [],
+            'dt__gte': datetime.date.today(),
+        }
+        employees_for_clear_cache = set()
+        zkteco_data = []
+
+        for created_employment in created_objs:
+            employments_create_or_update_work_types.append(created_employment)
+            employees_for_clear_cache.add(created_employment.employee_id)
+            if employee_network.get(created_employment.employee_id) and employee_network.get(created_employment.employee_id).clean_wdays_on_employment_dt_change:
+                clean_wdays_kwargs['employee_id__in'].append(created_employment.employee_id)
+                if created_employment.dt_hired:
+                    clean_wdays_kwargs['dt__gte'] = min(clean_wdays_kwargs['dt__gte'], created_employment.dt_hired)
+            
+            if settings.ZKTECO_INTEGRATION:
+                zkteco_data.append({'id': created_employment.id})
+
+        for i, updated_employment in enumerate(updated_objs):
+            shop_changed = before_update[i][1] != after_update[i][1]
+            position_changed = before_update[i][3] != after_update[i][3]
+            norm_work_hours_changed = before_update[i][4] != after_update[i][4]
+            dt_hired_changed = before_update[i][5] != after_update[i][5]
+            dt_fired_changed = before_update[i][6] != after_update[i][6]
+            employee_id = updated_employment.employee_id
+
+            if position_changed:
+                employments_create_or_update_work_types.append(updated_employment)
+                employments_for_recalc_wh_in_future.append(updated_employment.id)
+            
+            if (dt_hired_changed or dt_fired_changed) and employee_network.get(employee_id) and employee_network.get(employee_id).clean_wdays_on_employment_dt_change:
+                clean_wdays_kwargs['employee_id__in'].append(employee_id)
+                clean_wdays_kwargs['dt__gte'] = min(
+                    clean_wdays_kwargs['dt__gte'], 
+                    updated_employment.dt_hired or datetime.datetime.max,
+                    before_update[i][5] or datetime.datetime.max,
+                )
+            if dt_hired_changed or dt_fired_changed or norm_work_hours_changed or position_changed:
+                employees_for_clear_cache.add(employee_id)
+            
+            if (dt_hired_changed or dt_fired_changed or shop_changed) and settings.ZKTECO_INTEGRATION:
+                zkteco_data.append({'id': updated_employment.id, 'prev_shop_code': before_update[i][1] if shop_changed else None})
+
+        for deleted_employment in deleted_objs:
+            employees_for_clear_cache.add(deleted_employment.employee_id)
+            if employee_network.get(deleted_employment.employee_id) and employee_network.get(deleted_employment.employee_id).clean_wdays_on_employment_dt_change:
+                clean_wdays_kwargs['employee_id__in'].append(deleted_employment.employee_id)
+                if deleted_employment.dt_hired:
+                    clean_wdays_kwargs['dt__gte'] = min(clean_wdays_kwargs['dt__gte'], deleted_employment.dt_hired)
+
+            if settings.ZKTECO_INTEGRATION:
+                zkteco_data.append({'id': deleted_employment.id})
+
+        clean_wdays_kwargs['dt__gte'] = Converter.convert_date(clean_wdays_kwargs['dt__gte'])
+        
+        cls.create_or_update_work_types(employments_create_or_update_work_types)
+        cls.recalc_future_worker_days(employments_for_recalc_wh_in_future)
+
+        transaction.on_commit(
+            lambda: clean_wdays.delay(
+                **clean_wdays_kwargs,
+            )
+        )
+        transaction.on_commit(
+           lambda: [cache.delete_pattern(f"prod_cal_*_*_{e_id}") for e_id in employees_for_clear_cache]
+        )
+        transaction.on_commit(
+            lambda: [export_or_delete_employment_zkteco.delay(data['id'], prev_shop_code=data.get('prev_shop_code')) for data in zkteco_data]
+        )
+
 
 
 class FunctionGroup(AbstractModel):

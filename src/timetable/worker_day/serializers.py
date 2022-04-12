@@ -55,7 +55,7 @@ class RequestApproveSerializer(serializers.Serializer):
 
 
 class WorkerDayApproveSerializer(serializers.Serializer):
-    shop_id = serializers.IntegerField(required=True)
+    shop_id = serializers.IntegerField(required=False)
     is_fact = serializers.BooleanField()
     dt_from = serializers.DateField()
     dt_to = serializers.DateField()
@@ -137,6 +137,7 @@ class WorkerDaySerializer(ModelSerializerWithCreateOnlyFields, UnaccountedOverti
         'worker_day_exist': _("Worker day already exist."),
         'worker_day_intercept': _("Worker day intercepts with another: {shop_name}, {work_start}, {work_end}."),
         "no_user": _("There is {amount} models of user with username: {username}."),
+        "no_employee": _("There is {amount} models of employee with personnel number: {tabel_code}."),
         "wd_details_shop_mismatch": _("Shop in work type and in work day must match."),
         "user_mismatch": _("User in employment and in worker day must match."),
         "no_active_employments": _(
@@ -157,6 +158,7 @@ class WorkerDaySerializer(ModelSerializerWithCreateOnlyFields, UnaccountedOverti
     user_login = serializers.CharField(required=False, read_only=True)
     employment_tabel_code = serializers.CharField(required=False, read_only=True)
     username = serializers.CharField(required=False, write_only=True)
+    tabel_code = serializers.CharField(required=False, write_only=True)
     created_by = serializers.HiddenField(default=serializers.CurrentUserDefault())
     last_edited_by = serializers.HiddenField(default=serializers.CurrentUserDefault())
     outsources = NetworkSerializer(many=True, read_only=True)
@@ -169,15 +171,16 @@ class WorkerDaySerializer(ModelSerializerWithCreateOnlyFields, UnaccountedOverti
 
     class Meta:
         model = WorkerDay
-        fields = ['id', 'employee_id', 'shop_id', 'employment_id', 'type', 'dt', 'dttm_work_start', 'dttm_work_end',
+        fields = ['id', 'code', 'employee_id', 'shop_id', 'employment_id', 'type', 'dt', 'dttm_work_start', 'dttm_work_end',
                   'comment', 'is_approved', 'worker_day_details', 'is_fact', 'work_hours', 'parent_worker_day_id',
                   'is_outsource', 'is_vacancy', 'shop_code', 'user_login', 'username', 'created_by', 'last_edited_by',
                   'crop_work_hours_by_shop_schedule', 'dttm_work_start_tabel', 'dttm_work_end_tabel', 'is_blocked',
                   'employment_tabel_code', 'outsources', 'outsources_ids', 'unaccounted_overtime',
-                  'closest_plan_approved_id', 'cost_per_hour', 'total_cost'] 
+                  'closest_plan_approved_id', 'cost_per_hour', 'total_cost', 'tabel_code']
         read_only_fields = ['parent_worker_day_id', 'is_blocked', 'closest_plan_approved_id']
         create_only_fields = ['is_fact']
         ref_name = 'WorkerDaySerializer'
+        validators = []  # удаляем таким образом UniquerTogetherValidator поля code
         extra_kwargs = {
             'is_fact': {
                 'required': False,
@@ -275,6 +278,15 @@ class WorkerDaySerializer(ModelSerializerWithCreateOnlyFields, UnaccountedOverti
                 attrs['employee_id'] = employee.id
             else:
                 self.fail('no_user', amount=len(users), username=username)
+
+        if (attrs.get('employee_id') is None) and ('tabel_code' in attrs):
+            tabel_code = attrs.pop('tabel_code')
+            employees = list(Employee.objects.filter(
+                tabel_code=tabel_code, user__network_id=self.context['request'].user.network_id))
+            if len(employees) == 1:
+                attrs['employee_id'] = employees[0].id
+            else:
+                self.fail('no_employee', amount=len(employees), tabel_code=tabel_code)
 
         if not wd_type == WorkerDay.TYPE_WORKDAY:
             attrs['worker_day_details'] = []

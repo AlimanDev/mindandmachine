@@ -254,3 +254,18 @@ class TestsHelperMixin:
         writer = pd.ExcelWriter(filename, engine='xlsxwriter')
         df.to_excel(writer)
         writer.save()
+
+    @classmethod
+    def similar_wday_exists(cls, wd, fields=None):
+        fields = fields or [
+            'code',
+            'employee_id',
+            'dt',
+            'type_id',
+            'work_hours',
+            'dttm_work_start',
+            'dttm_work_end',
+            'shop_id',
+        ]
+        kwargs = {f: getattr(wd, f) for f in fields}
+        return WorkerDay.objects.filter(**kwargs).exists()

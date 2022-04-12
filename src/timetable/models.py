@@ -35,6 +35,7 @@ from src.timetable.exceptions import (
     MultipleWDTypesOnOneDateForOneEmployee,
     HasAnotherWdayOnDate,
 )
+from src.util.commons import obj_deep_get
 from src.util.mixins.qs import AnnotateValueEqualityQSMixin
 from src.util.time import _time_to_float
 
@@ -531,6 +532,9 @@ class WorkerDay(AbstractModel):
     class Meta:
         verbose_name = 'Рабочий день сотрудника'
         verbose_name_plural = 'Рабочие дни сотрудников'
+        unique_together = (
+            ('code', 'is_approved'),
+        )
 
     TYPE_HOLIDAY = 'H'
     TYPE_WORKDAY = 'W'
@@ -687,7 +691,7 @@ class WorkerDay(AbstractModel):
         from src.timetable.worker_day_permissions.checkers import DeleteQsWdPermissionChecker
         perm_checker = DeleteQsWdPermissionChecker(
             user=user,
-            wd_qs=delete_qs,
+            wd_qs=delete_qs.exclude(employee__isnull=False, employment__isnull=True),
             cached_data={
                 'wd_types_dict': kwargs.get('wd_types_dict'),
             },
@@ -700,6 +704,7 @@ class WorkerDay(AbstractModel):
         return [
             'dt',
             'employee_id',
+            'employment_id',
             'shop_id',
             'type_id',
             'is_fact',
@@ -715,7 +720,9 @@ class WorkerDay(AbstractModel):
         """
         grouped_wd_min_max_dt_data = {}
         grouped_wd_perm_check_data = []
-        for dt, employee_id, shop_id, type_id, is_fact, is_vacancy in diff_data:
+        for dt, employee_id, employment_id, shop_id, type_id, is_fact, is_vacancy in diff_data:
+            if employee_id and not employment_id:
+                continue
             k_data = dict(
                 employee_id=employee_id,
                 type_id=type_id,
@@ -744,6 +751,8 @@ class WorkerDay(AbstractModel):
 
     @classmethod
     def _pre_batch(cls, user, **kwargs):
+        if kwargs.get('model_options', {}).get('delete_not_allowed_additional_types'):
+            cls._delete_not_allowed_additional_types(**kwargs)
         check_perms_extra_kwargs = kwargs.get('check_perms_extra_kwargs', {})
         grouped_checks = check_perms_extra_kwargs.pop('grouped_checks', False)
         if grouped_checks:
@@ -759,10 +768,105 @@ class WorkerDay(AbstractModel):
                 if deleted:
                     grouped_wd_perm_check_data = cls._get_grouped_perm_check_data(deleted)
                     for wd_data in grouped_wd_perm_check_data:
-                        cls._check_create_single_obj_perm(user, wd_data)
+                        cls._check_delete_single_wd_data_perm(
+                            user, obj_data=wd_data, check_active_empl=check_active_empl)
+
+    @classmethod
+    def _delete_not_allowed_additional_types(cls, **kwargs):
+        grouped_by_type = {}
+        for obj in kwargs.get('created_objs', []):
+            grouped_by_type.setdefault(obj.type_id, []).append(obj)
+
+        allowed_wd_types_dict = {}
+        for from_workerdaytype_id, to_workerdaytype_id in WorkerDayType.allowed_additional_types.through.objects.filter(
+            from_workerdaytype_id__in=list(grouped_by_type.keys())
+        ).values_list(
+            'from_workerdaytype_id',
+            'to_workerdaytype_id',
+        ):
+            allowed_wd_types_dict.setdefault(from_workerdaytype_id, []).append(to_workerdaytype_id)
+
+        delete_not_allowed_additional_types_q = Q()
+        for wd_type_id, objects in grouped_by_type.items():
+            for obj in objects:
+                delete_not_allowed_additional_types_q |= Q(
+                    ~Q(type_id=obj.type_id),
+                    ~Q(type__in=allowed_wd_types_dict.get(wd_type_id, [])),
+                    employee_id=obj.employee_id,
+                    is_fact=obj.is_fact,
+                    is_approved=obj.is_approved,
+                    dt=obj.dt,
+                )
+        if delete_not_allowed_additional_types_q:
+            delete_qs = WorkerDay.objects.filter(delete_not_allowed_additional_types_q)
+            objs_to_delete = list(delete_qs)
+            _total_deleted_count, deleted_dict = delete_qs.delete()
+            stats = kwargs.setdefault('stats', {})
+            if 'deleted_objs' in kwargs:
+                kwargs['deleted_objs'].extend(objs_to_delete)
+            if 'diff_data' in kwargs and 'diff_obj_keys' in kwargs:
+                for obj_to_delete in objs_to_delete:
+                    kwargs['diff_data'].setdefault('deleted', []).append(
+                        tuple(obj_deep_get(obj_to_delete, *keys) for keys in kwargs['diff_obj_keys']))
+            for original_deleted_cls_name, deleted_count in deleted_dict.items():
+                if deleted_count:
+                    deleted_cls_name = original_deleted_cls_name.split('.')[1]
+                    deleted_cls_stats = stats.setdefault(deleted_cls_name, {})
+                    deleted_cls_stats['deleted'] = deleted_cls_stats.get('deleted', 0) + deleted_dict.get(
+                        original_deleted_cls_name)
+
+    @classmethod
+    def _approve_delete_scope_filters_wdays(cls, **kwargs):
+        from src.timetable.worker_day.utils.approve import WorkerDayApproveHelper
+        from src.timetable.worker_day.serializers import WorkerDayApproveSerializer
+        delete_scope_filters = kwargs.get('delete_scope_filters', {})
+        employee_ids = []
+        if 'employee__tabel_code' in delete_scope_filters:
+            employee_ids = list(Employee.objects.filter(
+                tabel_code=delete_scope_filters.get('employee__tabel_code')).values_list('id', flat=True))
+        elif 'employee__tabel_code__in' in delete_scope_filters:
+            employee_ids = list(Employee.objects.filter(
+                tabel_code__in=delete_scope_filters.get('employee__tabel_code__in')).values_list('id', flat=True))
+        if employee_ids:
+            data = dict(
+                employee_ids=employee_ids,
+                is_fact=delete_scope_filters.get('is_fact'),
+                dt_from=delete_scope_filters.get('dt__gte'),
+                dt_to=delete_scope_filters.get('dt__lte'),
+                wd_types=delete_scope_filters.get('type_id__in'),
+            )
+            serializer = WorkerDayApproveSerializer(data=data)
+            serializer.is_valid(raise_exception=True)
+            exclude_approve_q = Q()
+            grouped_by_type = {}
+            for obj in kwargs.get('created_objs', []):
+                grouped_by_type.setdefault(obj.type_id, []).append(obj.dt)
+            for obj in kwargs.get('deleted_objs', []):
+                grouped_by_type.setdefault(obj.type_id, []).append(obj.dt)
+            allowed_wd_types_dict = {}
+            for from_workerdaytype_id, to_workerdaytype_id in WorkerDayType.allowed_additional_types.through.objects.filter(
+                    from_workerdaytype_id__in=list(grouped_by_type.keys())
+            ).values_list(
+                'from_workerdaytype_id',
+                'to_workerdaytype_id',
+            ):
+                allowed_wd_types_dict.setdefault(from_workerdaytype_id, []).append(to_workerdaytype_id)
+            for wd_type_id, dates in grouped_by_type.items():
+                exclude_approve_q |= Q(
+                    type__in=allowed_wd_types_dict.get(wd_type_id, []),
+                    dt__in=dates,
+                )
+            WorkerDayApproveHelper(
+                user=kwargs.get('user'),
+                any_draft_wd_exists=False,
+                exclude_approve_q=exclude_approve_q,
+                **serializer.validated_data,
+            ).run()
 
     @classmethod
     def _post_batch(cls, **kwargs):
+        if kwargs.get('model_options', {}).get('approve_delete_scope_filters_wdays'):
+            cls._approve_delete_scope_filters_wdays(**kwargs)
         cls._invalidate_cache(**kwargs)
 
     @classmethod
@@ -774,7 +878,7 @@ class WorkerDay(AbstractModel):
         for obj in kwargs.get('deleted_objs', []):
             grouped_by_employee.setdefault(obj.employee_id, []).append(obj.type_id)
         for i, obj in enumerate(kwargs.get('updated_objs', [])):
-            prev_type = kwargs['diff_data']['before_update'][i][3]
+            prev_type = kwargs['diff_data']['before_update'][i][4]
             new_type = obj.type_id
             if prev_type != new_type or new_type in reduce_norm_types:
                 grouped_by_employee.setdefault(obj.employee_id, []).extend([new_type, prev_type])
@@ -1069,6 +1173,7 @@ class WorkerDay(AbstractModel):
             self.work_hours = self._round_wh()
 
     id = models.BigAutoField(primary_key=True, db_index=True)
+    code = models.CharField(max_length=256, null=True)
     shop = models.ForeignKey(Shop, on_delete=models.PROTECT, null=True)
 
     employee = models.ForeignKey(
@@ -1223,6 +1328,7 @@ class WorkerDay(AbstractModel):
                 Q(dttm_work_end__gte=OuterRef('dttm_work_end')) &
                 Q(dttm_work_start__isnull=True)
             ),
+            type__is_dayoff=False,
             employee__user_id=user_id,
             dt=OuterRef('dt'),
             is_fact=OuterRef('is_fact'),
