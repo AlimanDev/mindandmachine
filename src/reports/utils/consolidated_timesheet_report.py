@@ -46,7 +46,8 @@ class ConsolidatedTimesheetReportGenerator:
         columns_mapping.update(OrderedDict(
             fact_total_hours='Итого рабочих часов',
             main_total_hours='Основной табель, рабочих ч',
-            additional_total_hours='Дополнительный табель, рабочих ч',
+            additional_total_hours='Доп. табель (всего), рабочих ч',
+            additional_night_hours='Доп. табель (ночных), рабочих ч',
         ))
         if 'employee' in self.group_by:
             for wd_type in self.show_stat_in_hours_wd_types:
@@ -78,6 +79,7 @@ class ConsolidatedTimesheetReportGenerator:
             ('fact_total_hours', Sum('day_hours', filter=fact_q) + Sum('night_hours', filter=fact_q)),
             ('main_total_hours', Sum('day_hours', filter=main_q) + Sum('night_hours', filter=main_q)),
             ('additional_total_hours', Sum('day_hours', filter=additional_q) + Sum('night_hours', filter=additional_q)),
+            ('additional_night_hours', Sum('night_hours', filter=Q(additional_q, night_hours__gt=0))),
         ])
         if 'employee' in self.group_by:
             annotations_dict['employee_fio'] = Concat(
@@ -144,7 +146,7 @@ class ConsolidatedTimesheetReportGenerator:
         workbook = writer.book
         worksheet = writer.sheets[sheet_name]
         worksheet.set_row(0, 40)
-        worksheet.set_row(3, 60)
+        worksheet.set_row(3, 50)
         for i, width in enumerate(self.get_col_widths(df, 0, len(self.group_by))):
             worksheet.set_column(i, i, width)
         hours_title_f = workbook.add_format({
