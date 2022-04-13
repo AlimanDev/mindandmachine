@@ -1490,6 +1490,9 @@ class Employment(AbstractActiveModel):
     dt_new_week_availability_from = models.DateField(null=True, blank=True)
     is_visible = models.BooleanField(default=True)
 
+    sawh_settings = models.ForeignKey(
+        'base.SAWHSettings', verbose_name='Настройка нормы', null=True, blank=True, on_delete=models.SET_NULL)
+
     tracker = FieldTracker(fields=['position', 'dt_hired', 'dt_fired', 'norm_work_hours', 'shop_id'])
 
     objects = EmploymentManager.from_queryset(EmploymentQuerySet)()
@@ -1961,7 +1964,7 @@ class SAWHSettings(AbstractActiveNetworkSpecificCodeNamedModel):
     )
 
     work_hours_by_months = models.JSONField(
-        verbose_name='Настройки по распределению часов в рамках уч. периода',
+        verbose_name='Настройки по распределению часов',
         blank=True,
         default=dict,
     )  # Название ключей должно начинаться с m (например январь -- m1), чтобы можно было фильтровать через django orm
@@ -1979,6 +1982,11 @@ class SAWHSettings(AbstractActiveNetworkSpecificCodeNamedModel):
 class SAWHSettingsMapping(AbstractModel):
     sawh_settings = models.ForeignKey('base.SAWHSettings', on_delete=models.CASCADE, verbose_name='Настройки СУРВ')
     year = models.PositiveSmallIntegerField(verbose_name='Год учетного периода', default=current_year)
+    work_hours_by_months = models.JSONField(
+        verbose_name='Настройки по распределению часов в рамках года',
+        null=True,
+        blank=True,
+    )
     shops = models.ManyToManyField('base.Shop', blank=True)
     positions = models.ManyToManyField('base.WorkerPosition', blank=True, related_name='+')
     employees = models.ManyToManyField('base.Employee', blank=True, related_name='+')

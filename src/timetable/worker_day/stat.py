@@ -16,6 +16,7 @@ from django.db.models import (
     F, Q,
     Value,
     FloatField,
+    ExpressionWrapper,
 )
 from django.db.models.functions import Cast, TruncDate
 from django.db.models.functions import Extract, Coalesce
@@ -338,10 +339,12 @@ class WorkersStatsGetter:
     def employments_list(self):
         dt_from, dt_to = self.acc_period_range
         sawh_settings_subq = SAWHSettingsMapping.objects.filter(
-            Q(positions__id=OuterRef('position_id')) | Q(shops__id=OuterRef('shop_id')) | Q(employees__id=OuterRef('employee_id')),
+            Q(sawh_settings_id=OuterRef('sawh_settings_id')) | Q(positions__id=OuterRef('position_id')) | Q(shops__id=OuterRef('shop_id')) | Q(employees__id=OuterRef('employee_id')),
             ~Q(exclude_positions__id=OuterRef('position_id')),
             year=self.year,
-        ).order_by('-priority')
+        ).order_by(
+            '-priority',
+        )
 
         # рефакторинг
         outsourcing_network_qs = list(
@@ -364,11 +367,14 @@ class WorkersStatsGetter:
             dt_from=dt_from,
             dt_to=dt_to,
         ).select_related(
-            'position'
+            'position',
         ).order_by(
-            'dt_hired'
+            'dt_hired',
         ).annotate(
-            sawh_hours_by_months=Subquery(sawh_settings_subq.values('sawh_settings__work_hours_by_months')[:1]),
+            sawh_hours_by_months=Coalesce(
+                Subquery(sawh_settings_subq.values('work_hours_by_months')[:1]),
+                Subquery(sawh_settings_subq.values("sawh_settings__work_hours_by_months")[:1])
+            ),
             sawh_settings_type=Subquery(sawh_settings_subq.values('sawh_settings__type')[:1]),
         ).distinct()
         if self.employee_id:

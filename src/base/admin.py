@@ -529,6 +529,12 @@ class SAWHSettingsMappingInline(admin.StackedInline):
 
     filter_horizontal = ('shops', 'positions', 'employees', 'exclude_positions')
 
+    def get_formset(self, request, obj=None, **kwargs):
+        formset = super(SAWHSettingsMappingInline, self).get_formset(request, obj, **kwargs)
+        queryset = formset.form.base_fields["employees"].queryset.select_related('user')
+        formset.form.base_fields["employees"].queryset = queryset
+        return formset
+
 
 @admin.register(SAWHSettings)
 class SAWHSettingsAdmin(admin.ModelAdmin):
@@ -542,9 +548,6 @@ class SAWHSettingsAdmin(admin.ModelAdmin):
     inlines = (
         SAWHSettingsMappingInline,
     )
-
-    def get_queryset(self, request):
-        return super(SAWHSettingsAdmin, self).get_queryset(request).filter(network_id=request.user.network_id)
 
 
 @admin.register(ShopSchedule)
