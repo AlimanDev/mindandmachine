@@ -48,6 +48,8 @@ class TimesheetSummarySerializer(BaseModelSerializer):
     main_timesheet_day_hours = serializers.DecimalField(read_only=True, max_digits=4, decimal_places=2)
     main_timesheet_night_hours = serializers.DecimalField(read_only=True, max_digits=4, decimal_places=2)
     additional_timesheet_hours = serializers.DecimalField(read_only=True, max_digits=4, decimal_places=2)
+    additional_timesheet_day_hours = serializers.DecimalField(read_only=True, max_digits=4, decimal_places=2)
+    additional_timesheet_night_hours = serializers.DecimalField(read_only=True, max_digits=4, decimal_places=2)
 
     class Meta:
         model = TimesheetItem
@@ -64,6 +66,8 @@ class TimesheetSummarySerializer(BaseModelSerializer):
             'main_timesheet_day_hours',
             'main_timesheet_night_hours',
             'additional_timesheet_hours',
+            'additional_timesheet_day_hours',
+            'additional_timesheet_night_hours',
         )
 
 

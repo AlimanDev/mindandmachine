@@ -46,7 +46,8 @@ class ConsolidatedTimesheetReportGenerator:
         columns_mapping.update(OrderedDict(
             fact_total_hours='Итого рабочих часов',
             main_total_hours='Основной табель, рабочих ч',
-            additional_total_hours='Дополнительный табель, рабочих ч',
+            additional_total_hours='Доп. табель (всего), рабочих ч',
+            additional_night_hours='Доп. табель (ночных), рабочих ч',
         ))
         if 'employee' in self.group_by:
             for wd_type in self.show_stat_in_hours_wd_types:
@@ -78,6 +79,7 @@ class ConsolidatedTimesheetReportGenerator:
             ('fact_total_hours', Sum('day_hours', filter=fact_q) + Sum('night_hours', filter=fact_q)),
             ('main_total_hours', Sum('day_hours', filter=main_q) + Sum('night_hours', filter=main_q)),
             ('additional_total_hours', Sum('day_hours', filter=additional_q) + Sum('night_hours', filter=additional_q)),
+            ('additional_night_hours', Sum('night_hours', filter=Q(additional_q, night_hours__gt=0))),
         ])
         if 'employee' in self.group_by:
             annotations_dict['employee_fio'] = Concat(
@@ -136,28 +138,40 @@ class ConsolidatedTimesheetReportGenerator:
         return data
 
     @staticmethod
-    def get_col_widths(dataframe):
+    def get_col_widths(dataframe, start_col, end_col):
         # max of the lengths of column name and its values for each column, left to right
-        return [max([len(str(s)) for s in dataframe[col].values] + [len(col)]) + 2 for col in dataframe.columns]
+        return [max([len(str(s)) for s in dataframe[col].values] + [len(col)]) + 2 for col in dataframe.columns[start_col: end_col]]
 
     def _beatufy_report(self, df, writer, sheet_name):
         workbook = writer.book
         worksheet = writer.sheets[sheet_name]
         worksheet.set_row(0, 40)
-        for i, width in enumerate(self.get_col_widths(df)):
+        worksheet.set_row(3, 50)
+        for i, width in enumerate(self.get_col_widths(df, 0, len(self.group_by))):
             worksheet.set_column(i, i, width)
+        hours_title_f = workbook.add_format({
+            'bold': 1,
+            'align': 'center',
+            'valign': 'top',
+            'text_wrap': True,
+            'font_size': 10,
+        })
+        for idx, column_name in enumerate(list(self.columns_mapping.values())[len(self.group_by):]):
+            i = idx + len(self.group_by)
+            worksheet.set_column(i, i, 9)
+            worksheet.write(3, i, column_name, hours_title_f)
         title_merge_f = workbook.add_format({
             'bold': 1,
             'align': 'center',
             'valign': 'vcenter',
-            'font': 14,
+            'font_size': 14,
         })
         worksheet.merge_range('A1:D1', 'Консолидированный отчет об отработанном времени', title_merge_f)
         worksheet.write('A2', 'Наименование объектов')
         worksheet.merge_range('B2:D2', f'{self.shops_names}')
         worksheet.write('A3', 'Период')
         worksheet.merge_range('B3:D3', f'{self.dt_from.strftime("%Y.%m.%d")} - {self.dt_to.strftime("%Y.%m.%d")}')
-        bold_format = workbook.add_format({'bold': 1, 'font': 11})
+        bold_format = workbook.add_format({'bold': 1, 'font_size': 11})
         worksheet.write(f'A{len(df.index) + 4}', 'Итого часов', bold_format)
 
     def generate(self, sheet_name):
