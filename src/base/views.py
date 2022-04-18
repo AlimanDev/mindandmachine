@@ -367,7 +367,7 @@ class WorkerPositionViewSet(UpdateorCreateViewSet):
                 ).values_list('outsourcing_id', flat=True)
             )
         now = timezone.now()
-        return WorkerPosition.objects.annotate(
+        qs = WorkerPosition.objects.annotate(
             is_active=ExpressionWrapper(
                 Q(dttm_deleted__isnull=True) | 
                 Q(dttm_deleted__gte=now),
@@ -376,6 +376,13 @@ class WorkerPositionViewSet(UpdateorCreateViewSet):
         ).filter(
             network_filter,
         )
+        include_allowed_sawh_settings = self.request.query_params.get('include_allowed_sawh_settings')
+        if include_allowed_sawh_settings and bool(distutils.util.strtobool(include_allowed_sawh_settings)):
+            qs = qs.prefetch_related(
+                Prefetch('allowed_sawh_settings', to_attr='allowed_sawh_settings_list')
+            )
+        return qs
+
 
 class ShopSettingsViewSet(BaseActiveNamedModelViewSet):
     pagination_class = LimitOffsetPagination

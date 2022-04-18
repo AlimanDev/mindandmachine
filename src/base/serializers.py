@@ -28,6 +28,7 @@ from src.base.models import (
     Break,
     ShopSchedule,
     Employee,
+    SAWHSettings,
 )
 from src.timetable.serializers import EmploymentWorkTypeSerializer, EmploymentWorkTypeListSerializer
 from src.timetable.worker_constraint.serializers import WorkerConstraintSerializer, WorkerConstraintListSerializer
@@ -377,6 +378,7 @@ class EmploymentListSerializer(serializers.Serializer):
     dt_to_function_group = serializers.DateField()
     is_active = serializers.BooleanField()
     code = serializers.CharField()
+    sawh_settings_id = serializers.IntegerField()
 
     def __init__(self, *args, **kwargs):
         super(EmploymentListSerializer, self).__init__(*args, **kwargs)
@@ -421,6 +423,7 @@ class EmploymentSerializer(serializers.ModelSerializer):
     dt_fired = serializers.DateField(required=False, default=None, allow_null=True)
     tabel_code = serializers.CharField(required=False, source='employee.tabel_code', allow_blank=True, allow_null=True)
     is_active = serializers.BooleanField(read_only=True)
+    sawh_settings_id = serializers.IntegerField(required=False, allow_null=True)
 
     class Meta:
         model = Employment
@@ -429,7 +432,7 @@ class EmploymentSerializer(serializers.ModelSerializer):
                   'shift_hours_length_min', 'shift_hours_length_max', 'auto_timetable', 'tabel_code', 'is_ready_for_overworkings',
                   'dt_new_week_availability_from', 'is_visible',  'worker_constraints', 'work_types',
                   'shop_code', 'position_code', 'username', 'code', 'function_group_id', 'dt_to_function_group',
-                  'employee_id', 'is_active',
+                  'employee_id', 'is_active', 'sawh_settings_id',
         ]
         create_only_fields = ['employee_id']
         read_only_fields = []
@@ -582,22 +585,38 @@ class EmploymentSerializer(serializers.ModelSerializer):
         return super().update(instance, validated_data, *args, **kwargs)
 
 
+class AllowedSawhSettingSerializer(BaseNetworkSerializer):
+    class Meta:
+        model = SAWHSettings
+        fields = (
+            'id',
+            'name',
+        )
+
+
 class WorkerPositionSerializer(BaseNetworkSerializer):
     group_id = serializers.IntegerField(required=False, allow_null=True)
     is_active = serializers.BooleanField(read_only=True)
+
     class Meta:
         model = WorkerPosition
         fields = ['id', 'name', 'network_id', 'code', 'breaks_id', 'group_id', 'is_active']
 
     def __init__(self, *args, **kwargs):
         super(WorkerPositionSerializer, self).__init__(*args, **kwargs)
-        if not self.context.get('request'):
-            return
-        self.fields['code'].validators.append(
-            UniqueValidator(
-                WorkerPosition.objects.filter(network=self.context.get('request').user.network)
+        request = self.context.get('request')
+        if request:
+            self.fields['code'].validators.append(
+                UniqueValidator(
+                    WorkerPosition.objects.filter(network=request.user.network)
+                )
             )
-        )
+            include_allowed_sawh_settings = request.query_params.get('include_allowed_sawh_settings')
+            if include_allowed_sawh_settings and bool(distutils.util.strtobool(include_allowed_sawh_settings)):
+                self.fields['allowed_sawh_settings'] = AllowedSawhSettingSerializer(
+                    many=True, read_only=True,
+                    source='allowed_sawh_settings_list',
+                )
 
     def to_representation(self, instance):
         data = super().to_representation(instance)

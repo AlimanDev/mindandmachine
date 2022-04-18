@@ -1339,6 +1339,15 @@ class User(DjangoAbstractUser, AbstractModel):
         )
 
 
+class AllowedSawhSetting(AbstractModel):
+    position = models.ForeignKey('base.WorkerPosition', on_delete=models.CASCADE)
+    sawh_settings = models.ForeignKey('base.SAWHSettings', on_delete=models.CASCADE)
+
+    class Meta:
+        verbose_name = 'Разрешенная настройки нормы часов'
+        verbose_name_plural = 'Разрешенные настройки нормы часов'
+
+
 class WorkerPosition(AbstractActiveNetworkSpecificCodeNamedModel):
     """
     Describe employee's position
@@ -1358,6 +1367,8 @@ class WorkerPosition(AbstractActiveNetworkSpecificCodeNamedModel):
     breaks = models.ForeignKey(Break, on_delete=models.PROTECT, null=True, blank=True)
     hours_in_a_week = models.PositiveSmallIntegerField(default=40, verbose_name='Часов в рабочей неделе')
     ordering = models.PositiveSmallIntegerField(default=9999, verbose_name='Индекс должности для сортировки')
+    allowed_sawh_settings = models.ManyToManyField(
+        'base.SAWHSettings', through='base.AllowedSawhSetting', blank=True)
     tracker = FieldTracker(fields=['hours_in_a_week'])
 
     def __str__(self):

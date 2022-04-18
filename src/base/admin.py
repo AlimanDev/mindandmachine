@@ -61,6 +61,7 @@ from src.base.models import (
     ShiftScheduleDay,
     ShiftScheduleInterval,
     ContentBlock,
+    AllowedSawhSetting,
 )
 from src.base.shop.utils import get_offset_timezone_dict, get_shop_name
 from src.timetable.models import GroupWorkerDayPermission
@@ -231,10 +232,51 @@ class RegionAdmin(admin.ModelAdmin):
     list_filter = ('parent',)
 
 
+class WorkerPositionAdminForm(forms.ModelForm):
+    class Meta:
+        model = WorkerPosition
+        fields = '__all__'
+
+    allowed_sawh_settings = forms.ModelMultipleChoiceField(
+        queryset=SAWHSettings.objects.none(),
+        label='Разрешенные настройки нормы',
+        blank=True,
+        widget=FilteredSelectMultiple(
+            verbose_name=SAWHSettings._meta.verbose_name,
+            is_stacked=False,
+        ),
+    )
+
+    def __init__(self, *args, **kwargs):
+        super(WorkerPositionAdminForm, self).__init__(*args, **kwargs)
+        if self.instance:
+            self.fields['allowed_sawh_settings'].queryset = SAWHSettings.objects.filter(
+                network_id=self.instance.network_id).select_related('network')
+            self.fields['allowed_sawh_settings'].initial = SAWHSettings.objects.filter(
+                id__in=AllowedSawhSetting.objects.filter(
+                    position=self.instance).values_list('sawh_settings_id', flat=True)
+            ).select_related('network')
+
+    def save(self, *args, **kwargs):
+        instance = super(WorkerPositionAdminForm, self).save(*args, **kwargs)
+        with transaction.atomic():
+            AllowedSawhSetting.objects.filter(position=self.instance).delete()
+            AllowedSawhSetting.objects.bulk_create(
+                [
+                    AllowedSawhSetting(position=self.instance, sawh_settings=sawh_settings)
+                    for sawh_settings in self.cleaned_data['allowed_sawh_settings']
+                ]
+            )
+
+        return instance
+
+
 @admin.register(WorkerPosition)
 class WorkerPositionAdmin(admin.ModelAdmin):
     list_display = ('id', 'name', 'code')
     search_fields = ('name', 'code')
+    list_filter = ('network',)
+    form = WorkerPositionAdminForm
 
 
 class QsUserChangeForm(UserChangeForm):
@@ -546,6 +588,7 @@ class SAWHSettingsAdminForm(forms.ModelForm):
     employments = forms.ModelMultipleChoiceField(
         queryset=Employment.objects.none(),
         label='Трудоустройства',
+        blank=True,
         widget=FilteredSelectMultiple(
             verbose_name=SAWHSettings._meta.verbose_name,
             is_stacked=False,
@@ -648,4 +691,21 @@ class ContentBlockAdmin(admin.ModelAdmin):
     search_fields = ('code', 'name', 'network__name',)
     list_filter = (
         ('network', RelatedOnlyDropdownNameOrderedFilter),
+    )
+
+
+@admin.register(AllowedSawhSetting)
+class AllowedSawhSettingAdmin(admin.ModelAdmin):
+    list_display = ('position', 'sawh_settings', )
+    search_fields = (
+        'position_id',
+        'sawh_settings_id',
+        'position__name',
+        'position__code',
+        'sawh_settings__name',
+        'sawh_settings__code',
+    )
+    list_filter = (
+        ('position', RelatedOnlyDropdownNameOrderedFilter),
+        ('sawh_settings', RelatedOnlyDropdownNameOrderedFilter),
     )
