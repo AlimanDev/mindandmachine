@@ -1,22 +1,22 @@
 import json
 import urllib.parse
-from mptt.exceptions import InvalidMove
 
-from diff_match_patch import diff_match_patch
 from dateutil.parser import parse
+from diff_match_patch import diff_match_patch
 from django import forms
 from django.conf import settings
 from django.contrib import admin, messages
 from django.contrib.admin import helpers
-from django.contrib.admin.options import IS_POPUP_VAR, TO_FIELD_VAR
 from django.contrib.admin.exceptions import DisallowedModelAdminToField
+from django.contrib.admin.options import IS_POPUP_VAR, TO_FIELD_VAR
 from django.contrib.admin.utils import unquote, flatten_fieldsets
+from django.contrib.admin.widgets import FilteredSelectMultiple
 from django.contrib.auth.admin import UserAdmin
 from django.contrib.auth.forms import UserChangeForm
 from django.core.exceptions import PermissionDenied
-from django.db import models
-from django.forms.formsets import all_valid
+from django.db import models, transaction
 from django.forms import Form
+from django.forms.formsets import all_valid
 from django.http import Http404, HttpResponseRedirect
 from django.template.response import TemplateResponse
 from django.urls import path, reverse, resolve
@@ -27,9 +27,11 @@ from import_export import resources
 from import_export.admin import ExportActionMixin, ImportMixin
 from import_export.fields import Field
 from import_export.widgets import ForeignKeyWidget
+from mptt.exceptions import InvalidMove
 from sesame.utils import get_token
-from src.base.admin_filters import CustomChoiceDropdownFilter, RelatedOnlyDropdownLastNameOrderedFilter, RelatedOnlyDropdownNameOrderedFilter
 
+from src.base.admin_filters import CustomChoiceDropdownFilter, RelatedOnlyDropdownLastNameOrderedFilter, \
+    RelatedOnlyDropdownNameOrderedFilter
 from src.base.forms import (
     CustomConfirmImportShopForm,
     CustomImportShopForm,
@@ -63,6 +65,7 @@ from src.base.models import (
     ShiftScheduleDay,
     ShiftScheduleInterval,
     ContentBlock,
+    AllowedSawhSetting,
 )
 from src.base.shop.utils import get_offset_timezone_dict, get_shop_name
 from src.timetable.models import GroupWorkerDayPermission
@@ -237,10 +240,51 @@ class RegionAdmin(admin.ModelAdmin):
     list_filter = ('parent',)
 
 
+class WorkerPositionAdminForm(forms.ModelForm):
+    class Meta:
+        model = WorkerPosition
+        fields = '__all__'
+
+    allowed_sawh_settings = forms.ModelMultipleChoiceField(
+        queryset=SAWHSettings.objects.none(),
+        label='Разрешенные настройки нормы',
+        blank=True,
+        widget=FilteredSelectMultiple(
+            verbose_name=SAWHSettings._meta.verbose_name,
+            is_stacked=False,
+        ),
+    )
+
+    def __init__(self, *args, **kwargs):
+        super(WorkerPositionAdminForm, self).__init__(*args, **kwargs)
+        if self.instance:
+            self.fields['allowed_sawh_settings'].queryset = SAWHSettings.objects.filter(
+                network_id=self.instance.network_id).select_related('network')
+            self.fields['allowed_sawh_settings'].initial = SAWHSettings.objects.filter(
+                id__in=AllowedSawhSetting.objects.filter(
+                    position=self.instance).values_list('sawh_settings_id', flat=True)
+            ).select_related('network')
+
+    def save(self, *args, **kwargs):
+        instance = super(WorkerPositionAdminForm, self).save(*args, **kwargs)
+        with transaction.atomic():
+            AllowedSawhSetting.objects.filter(position=self.instance).delete()
+            AllowedSawhSetting.objects.bulk_create(
+                [
+                    AllowedSawhSetting(position=self.instance, sawh_settings=sawh_settings)
+                    for sawh_settings in self.cleaned_data['allowed_sawh_settings']
+                ]
+            )
+
+        return instance
+
+
 @admin.register(WorkerPosition)
 class WorkerPositionAdmin(admin.ModelAdmin):
     list_display = ('id', 'name', 'code')
     search_fields = ('name', 'code')
+    list_filter = ('network',)
+    form = WorkerPositionAdminForm
 
 
 class QsUserChangeForm(UserChangeForm):
@@ -391,7 +435,7 @@ class ShopAdmin(ImportMixin, admin.ModelAdmin):
 
     def get_confirm_import_form(self):
         return CustomConfirmImportShopForm
-    
+
     def get_deleted_objects(self, *args, **kwargs):
         with Shop._deletion_context():
             return super().get_deleted_objects(*args, **kwargs)
@@ -527,7 +571,7 @@ class ShopAdmin(ImportMixin, admin.ModelAdmin):
         context.update(extra_context or {})
 
         return self.render_change_form(request, context, add=add, change=not add, obj=obj, form_url=form_url)
-    
+
     def get_import_form(self):
         return CustomImportShopForm
 
@@ -679,6 +723,42 @@ class SAWHSettingsMappingInline(admin.StackedInline):
 
     filter_horizontal = ('shops', 'positions', 'employees', 'exclude_positions')
 
+    def get_formset(self, request, obj=None, **kwargs):
+        formset = super(SAWHSettingsMappingInline, self).get_formset(request, obj, **kwargs)
+        queryset = formset.form.base_fields["employees"].queryset.select_related('user')
+        formset.form.base_fields["employees"].queryset = queryset
+        return formset
+
+
+class SAWHSettingsAdminForm(forms.ModelForm):
+    class Meta:
+        model = SAWHSettings
+        fields = '__all__'
+
+    employments = forms.ModelMultipleChoiceField(
+        queryset=Employment.objects.none(),
+        label='Трудоустройства',
+        blank=True,
+        widget=FilteredSelectMultiple(
+            verbose_name=SAWHSettings._meta.verbose_name,
+            is_stacked=False,
+        )
+    )
+
+    def __init__(self, *args, **kwargs):
+        super(SAWHSettingsAdminForm, self).__init__(*args, **kwargs)
+        if self.instance:
+            self.fields['employments'].queryset = Employment.objects.filter(
+                employee__user__network_id=self.instance.network_id).select_related('employee__user', 'shop')
+            self.fields['employments'].initial = self.instance.employments.select_related('employee__user', 'shop')
+
+    def save(self, *args, **kwargs):
+        instance = super(SAWHSettingsAdminForm, self).save(*args, **kwargs)
+        with transaction.atomic():
+            self.fields['employments'].initial.update(sawh_settings=None)
+            self.cleaned_data['employments'].update(sawh_settings=instance)
+        return instance
+
 
 @admin.register(SAWHSettings)
 class SAWHSettingsAdmin(admin.ModelAdmin):
@@ -687,14 +767,11 @@ class SAWHSettingsAdmin(admin.ModelAdmin):
         'code',
         'type',
     )
-
     save_as = True
     inlines = (
         SAWHSettingsMappingInline,
     )
-
-    def get_queryset(self, request):
-        return super(SAWHSettingsAdmin, self).get_queryset(request).filter(network_id=request.user.network_id)
+    form = SAWHSettingsAdminForm
 
 
 @admin.register(ShopSchedule)
@@ -764,4 +841,21 @@ class ContentBlockAdmin(admin.ModelAdmin):
     search_fields = ('code', 'name', 'network__name',)
     list_filter = (
         ('network', RelatedOnlyDropdownNameOrderedFilter),
+    )
+
+
+@admin.register(AllowedSawhSetting)
+class AllowedSawhSettingAdmin(admin.ModelAdmin):
+    list_display = ('position', 'sawh_settings', )
+    search_fields = (
+        'position_id',
+        'sawh_settings_id',
+        'position__name',
+        'position__code',
+        'sawh_settings__name',
+        'sawh_settings__code',
+    )
+    list_filter = (
+        ('position', RelatedOnlyDropdownNameOrderedFilter),
+        ('sawh_settings', RelatedOnlyDropdownNameOrderedFilter),
     )
