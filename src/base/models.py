@@ -1458,7 +1458,7 @@ class Employment(AbstractActiveModel):
         verbose_name_plural = 'Трудоустройства'
 
     def __str__(self):
-        return '{}, {}, {}'.format(self.id, self.shop, self.employee)
+        return '{}, {}, {}, {}, {}'.format(self.id, self.shop, self.employee, self.dt_hired, self.dt_fired)
 
     id = models.BigAutoField(primary_key=True)
     code = models.CharField(max_length=128, null=True, blank=True, unique=True)
@@ -1491,7 +1491,12 @@ class Employment(AbstractActiveModel):
     is_visible = models.BooleanField(default=True)
 
     sawh_settings = models.ForeignKey(
-        'base.SAWHSettings', verbose_name='Настройка нормы', null=True, blank=True, on_delete=models.SET_NULL)
+        to='base.SAWHSettings',
+        on_delete=models.SET_NULL,
+        verbose_name='Настройка нормы',
+        null=True, blank=True,
+        related_name='employments',
+    )
 
     tracker = FieldTracker(fields=['position', 'dt_hired', 'dt_fired', 'norm_work_hours', 'shop_id'])
 
@@ -1965,8 +1970,8 @@ class SAWHSettings(AbstractActiveNetworkSpecificCodeNamedModel):
 
     work_hours_by_months = models.JSONField(
         verbose_name='Настройки по распределению часов',
+        null=True,
         blank=True,
-        default=dict,
     )  # Название ключей должно начинаться с m (например январь -- m1), чтобы можно было фильтровать через django orm
     type = models.PositiveSmallIntegerField(
         default=PART_OF_PROD_CAL_SUMM, choices=SAWH_SETTINGS_TYPES, verbose_name='Тип расчета')

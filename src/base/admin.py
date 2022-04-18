@@ -1,17 +1,18 @@
 import json
 import urllib.parse
 
-from diff_match_patch import diff_match_patch
 from dateutil.parser import parse
+from diff_match_patch import diff_match_patch
 from django import forms
 from django.conf import settings
 from django.contrib import admin, messages
 from django.contrib.admin.options import IS_POPUP_VAR
 from django.contrib.admin.utils import unquote
+from django.contrib.admin.widgets import FilteredSelectMultiple
 from django.contrib.auth.admin import UserAdmin
 from django.contrib.auth.forms import UserChangeForm
 from django.core.exceptions import PermissionDenied
-from django.db import models
+from django.db import models, transaction
 from django.forms import Form
 from django.http import Http404, HttpResponseRedirect
 from django.template.response import TemplateResponse
@@ -24,8 +25,9 @@ from import_export.admin import ExportActionMixin, ImportMixin
 from import_export.fields import Field
 from import_export.widgets import ForeignKeyWidget
 from sesame.utils import get_token
-from src.base.admin_filters import CustomChoiceDropdownFilter, RelatedOnlyDropdownLastNameOrderedFilter, RelatedOnlyDropdownNameOrderedFilter
 
+from src.base.admin_filters import CustomChoiceDropdownFilter, RelatedOnlyDropdownLastNameOrderedFilter, \
+    RelatedOnlyDropdownNameOrderedFilter
 from src.base.forms import (
     CustomConfirmImportShopForm,
     CustomImportShopForm,
@@ -536,6 +538,35 @@ class SAWHSettingsMappingInline(admin.StackedInline):
         return formset
 
 
+class SAWHSettingsAdminForm(forms.ModelForm):
+    class Meta:
+        model = SAWHSettings
+        fields = '__all__'
+
+    employments = forms.ModelMultipleChoiceField(
+        queryset=Employment.objects.none(),
+        label='Трудоустройства',
+        widget=FilteredSelectMultiple(
+            verbose_name=SAWHSettings._meta.verbose_name,
+            is_stacked=False,
+        )
+    )
+
+    def __init__(self, *args, **kwargs):
+        super(SAWHSettingsAdminForm, self).__init__(*args, **kwargs)
+        if self.instance:
+            self.fields['employments'].queryset = Employment.objects.filter(
+                employee__user__network_id=self.instance.network_id).select_related('employee__user', 'shop')
+            self.fields['employments'].initial = self.instance.employments.select_related('employee__user', 'shop')
+
+    def save(self, *args, **kwargs):
+        instance = super(SAWHSettingsAdminForm, self).save(*args, **kwargs)
+        with transaction.atomic():
+            self.fields['employments'].initial.update(sawh_settings=None)
+            self.cleaned_data['employments'].update(sawh_settings=instance)
+        return instance
+
+
 @admin.register(SAWHSettings)
 class SAWHSettingsAdmin(admin.ModelAdmin):
     list_display = (
@@ -543,11 +574,11 @@ class SAWHSettingsAdmin(admin.ModelAdmin):
         'code',
         'type',
     )
-
     save_as = True
     inlines = (
         SAWHSettingsMappingInline,
     )
+    form = SAWHSettingsAdminForm
 
 
 @admin.register(ShopSchedule)
