@@ -338,11 +338,16 @@ class WorkersStatsGetter:
     @cached_property
     def employments_list(self):
         dt_from, dt_to = self.acc_period_range
-        sawh_settings_mapping_subq = SAWHSettingsMapping.objects.filter(
-            Q(positions__id=OuterRef('position_id')) | Q(shops__id=OuterRef('shop_id')) | Q(employees__id=OuterRef('employee_id')),
+        sawh_settings_mapping_subq = SAWHSettingsMapping.objects.annotate(
+          is_equal_sawh_settings=ExpressionWrapper(
+              Q(sawh_settings_id=OuterRef('sawh_settings_id')), output_field=BooleanField()),
+        ).filter(
+            Q(is_equal_sawh_settings=True) | Q(positions__id=OuterRef('position_id')) | Q(
+                shops__id=OuterRef('shop_id')) | Q(employees__id=OuterRef('employee_id')),
             ~Q(exclude_positions__id=OuterRef('position_id')),
             year=self.year,
         ).order_by(
+            '-is_equal_sawh_settings',
             '-priority',
         )
 
@@ -373,7 +378,10 @@ class WorkersStatsGetter:
         ).annotate(
             sawh_hours_by_months=Coalesce(
                 F('sawh_settings__work_hours_by_months'),
-                Subquery(sawh_settings_mapping_subq.values("sawh_settings__work_hours_by_months")[:1]),
+                Coalesce(
+                    Subquery(sawh_settings_mapping_subq.values("work_hours_by_months")[:1]),
+                    Subquery(sawh_settings_mapping_subq.values("sawh_settings__work_hours_by_months")[:1])
+                ),
             ),
             sawh_settings_type=Coalesce(
                 F('sawh_settings__type'),

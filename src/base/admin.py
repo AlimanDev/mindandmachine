@@ -588,6 +588,7 @@ class SAWHSettingsAdminForm(forms.ModelForm):
     employments = forms.ModelMultipleChoiceField(
         queryset=Employment.objects.none(),
         label='Трудоустройства',
+        required=False,
         blank=True,
         widget=FilteredSelectMultiple(
             verbose_name=SAWHSettings._meta.verbose_name,
@@ -597,7 +598,7 @@ class SAWHSettingsAdminForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super(SAWHSettingsAdminForm, self).__init__(*args, **kwargs)
-        if self.instance:
+        if self.instance and self.instance.id:
             self.fields['employments'].queryset = Employment.objects.filter(
                 employee__user__network_id=self.instance.network_id).select_related('employee__user', 'shop')
             self.fields['employments'].initial = self.instance.employments.select_related('employee__user', 'shop')
@@ -605,8 +606,9 @@ class SAWHSettingsAdminForm(forms.ModelForm):
     def save(self, *args, **kwargs):
         instance = super(SAWHSettingsAdminForm, self).save(*args, **kwargs)
         with transaction.atomic():
-            self.fields['employments'].initial.update(sawh_settings=None)
-            self.cleaned_data['employments'].update(sawh_settings=instance)
+            if instance.id:
+                self.fields['employments'].initial.update(sawh_settings=None)
+                self.cleaned_data['employments'].update(sawh_settings=instance)
         return instance
 
 
