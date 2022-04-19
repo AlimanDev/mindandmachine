@@ -60,9 +60,9 @@ def migrate_pobeda_sawh_settings(apps, schema_editor):
                 rename_from_obj.save()
 
         allowed = (
-            ('Заместитель директора магазина', ('zdm_1', 'zdm_2'))
+            ('Заместитель директора магазина', ('zdm_1', 'zdm_2')),
         )
-        for position_name, *sawh_settings_codes in allowed:
+        for position_name, sawh_settings_codes in allowed:
             for position in WorkerPosition.objects.filter(name=position_name, network=pobeda_network):
                 AllowedSawhSetting.objects.bulk_create(AllowedSawhSetting(
                     position=position,
