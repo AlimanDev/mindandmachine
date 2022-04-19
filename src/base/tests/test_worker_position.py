@@ -57,6 +57,7 @@ class TestWorkerPositionAPI(TestsHelperMixin, APITestCase):
 
     def test_list_with_allowed_sawh_settings(self):
         sawh_settings = SAWHSettings.objects.create(
+            network=self.network,
             type=SAWHSettings.FIXED_HOURS,
             name=self.worker_position.name,
         )
