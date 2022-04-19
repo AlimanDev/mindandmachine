@@ -1603,7 +1603,7 @@ class Employment(AbstractActiveModel):
         related_name='employments',
     )
 
-    tracker = FieldTracker(fields=['position', 'dt_hired', 'dt_fired', 'norm_work_hours', 'shop_id'])
+    tracker = FieldTracker(fields=['position', 'dt_hired', 'dt_fired', 'norm_work_hours', 'shop_id', 'sawh_settings_id'])
 
     objects = EmploymentManager.from_queryset(EmploymentQuerySet)()
     objects_with_excluded = models.Manager.from_queryset(EmploymentQuerySet)()
@@ -1713,7 +1713,12 @@ class Employment(AbstractActiveModel):
         if (is_new or self.tracker.has_changed('dt_hired') or self.tracker.has_changed('dt_fired') or self.tracker.has_changed('shop_id')) and settings.ZKTECO_INTEGRATION:
             transaction.on_commit(lambda: export_or_delete_employment_zkteco.delay(self.id, prev_shop_id=(self.tracker.previous('shop_id') if self.tracker.has_changed('shop_id') else None)))
 
-        if (is_new or self.tracker.has_changed('dt_hired') or self.tracker.has_changed('dt_fired') or position_has_changed or self.tracker.has_changed('norm_work_hours')):
+        if (is_new
+                or self.tracker.has_changed('dt_hired')
+                or self.tracker.has_changed('dt_fired')
+                or position_has_changed
+                or self.tracker.has_changed('norm_work_hours')
+                or self.tracker.has_changed('sawh_settings_id')):
             transaction.on_commit(lambda: cache.delete_pattern(f"prod_cal_*_*_{self.employee_id}"))
             if not is_new:
                 from src.timetable.timesheet.utils import recalc_timesheet_on_data_change
