@@ -1425,6 +1425,15 @@ class User(DjangoAbstractUser, AbstractModel):
         )
 
 
+class AllowedSawhSetting(AbstractModel):
+    position = models.ForeignKey('base.WorkerPosition', on_delete=models.CASCADE)
+    sawh_settings = models.ForeignKey('base.SAWHSettings', on_delete=models.CASCADE)
+
+    class Meta:
+        verbose_name = 'Разрешенная настройки нормы часов'
+        verbose_name_plural = 'Разрешенные настройки нормы часов'
+
+
 class WorkerPosition(AbstractActiveNetworkSpecificCodeNamedModel):
     """
     Describe employee's position
@@ -1444,6 +1453,8 @@ class WorkerPosition(AbstractActiveNetworkSpecificCodeNamedModel):
     breaks = models.ForeignKey(Break, on_delete=models.PROTECT, null=True, blank=True)
     hours_in_a_week = models.PositiveSmallIntegerField(default=40, verbose_name='Часов в рабочей неделе')
     ordering = models.PositiveSmallIntegerField(default=9999, verbose_name='Индекс должности для сортировки')
+    allowed_sawh_settings = models.ManyToManyField(
+        'base.SAWHSettings', through='base.AllowedSawhSetting', blank=True)
     tracker = FieldTracker(fields=['hours_in_a_week'])
 
     def __str__(self):
@@ -1552,7 +1563,7 @@ class Employment(AbstractActiveModel):
         verbose_name_plural = 'Трудоустройства'
 
     def __str__(self):
-        return '{}, {}, {}'.format(self.id, self.shop, self.employee)
+        return '{}, {}, {}, {}, {}'.format(self.id, self.shop, self.employee, self.dt_hired, self.dt_fired)
 
     id = models.BigAutoField(primary_key=True)
     code = models.CharField(max_length=128, null=True, blank=True, unique=True)
@@ -1584,7 +1595,15 @@ class Employment(AbstractActiveModel):
     dt_new_week_availability_from = models.DateField(null=True, blank=True)
     is_visible = models.BooleanField(default=True)
 
-    tracker = FieldTracker(fields=['position', 'dt_hired', 'dt_fired', 'norm_work_hours', 'shop_id'])
+    sawh_settings = models.ForeignKey(
+        to='base.SAWHSettings',
+        on_delete=models.SET_NULL,
+        verbose_name='Настройка нормы',
+        null=True, blank=True,
+        related_name='employments',
+    )
+
+    tracker = FieldTracker(fields=['position', 'dt_hired', 'dt_fired', 'norm_work_hours', 'shop_id', 'sawh_settings_id'])
 
     objects = EmploymentManager.from_queryset(EmploymentQuerySet)()
     objects_with_excluded = models.Manager.from_queryset(EmploymentQuerySet)()
@@ -1694,7 +1713,12 @@ class Employment(AbstractActiveModel):
         if (is_new or self.tracker.has_changed('dt_hired') or self.tracker.has_changed('dt_fired') or self.tracker.has_changed('shop_id')) and settings.ZKTECO_INTEGRATION:
             transaction.on_commit(lambda: export_or_delete_employment_zkteco.delay(self.id, prev_shop_id=(self.tracker.previous('shop_id') if self.tracker.has_changed('shop_id') else None)))
 
-        if (is_new or self.tracker.has_changed('dt_hired') or self.tracker.has_changed('dt_fired') or position_has_changed or self.tracker.has_changed('norm_work_hours')):
+        if (is_new
+                or self.tracker.has_changed('dt_hired')
+                or self.tracker.has_changed('dt_fired')
+                or position_has_changed
+                or self.tracker.has_changed('norm_work_hours')
+                or self.tracker.has_changed('sawh_settings_id')):
             transaction.on_commit(lambda: cache.delete_pattern(f"prod_cal_*_*_{self.employee_id}"))
             if not is_new:
                 from src.timetable.timesheet.utils import recalc_timesheet_on_data_change
@@ -2062,9 +2086,9 @@ class SAWHSettings(AbstractActiveNetworkSpecificCodeNamedModel):
     )
 
     work_hours_by_months = models.JSONField(
-        verbose_name='Настройки по распределению часов в рамках уч. периода',
+        verbose_name='Настройки по распределению часов',
+        null=True,
         blank=True,
-        default=dict,
     )  # Название ключей должно начинаться с m (например январь -- m1), чтобы можно было фильтровать через django orm
     type = models.PositiveSmallIntegerField(
         default=PART_OF_PROD_CAL_SUMM, choices=SAWH_SETTINGS_TYPES, verbose_name='Тип расчета')
@@ -2080,6 +2104,11 @@ class SAWHSettings(AbstractActiveNetworkSpecificCodeNamedModel):
 class SAWHSettingsMapping(AbstractModel):
     sawh_settings = models.ForeignKey('base.SAWHSettings', on_delete=models.CASCADE, verbose_name='Настройки СУРВ')
     year = models.PositiveSmallIntegerField(verbose_name='Год учетного периода', default=current_year)
+    work_hours_by_months = models.JSONField(
+        verbose_name='Настройки по распределению часов в рамках года',
+        null=True,
+        blank=True,
+    )
     shops = models.ManyToManyField('base.Shop', blank=True)
     positions = models.ManyToManyField('base.WorkerPosition', blank=True, related_name='+')
     employees = models.ManyToManyField('base.Employee', blank=True, related_name='+')

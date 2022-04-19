@@ -3,7 +3,7 @@ from django.test import TestCase
 from rest_framework.test import APITestCase
 from datetime import timedelta
 
-from src.base.models import WorkerPosition
+from src.base.models import WorkerPosition, SAWHSettings, AllowedSawhSetting
 from src.base.tests.factories import GroupFactory, NetworkFactory, BreakFactory
 from src.timetable.models import WorkTypeName
 from src.timetable.tests.factories import WorkTypeNameFactory
@@ -33,11 +33,11 @@ class TestWorkerPositionAPI(TestsHelperMixin, APITestCase):
                     network=cls.network,
                 )
                 for name, code in [
-                ('Директор магазина', 'director'),
-                ('Продавец', 'seller'),
-                ('Продавец-кассир', 'seller2'),
-                ('ЗДМ', 'director2'),
-            ]
+                    ('Директор магазина', 'director'),
+                    ('Продавец', 'seller'),
+                    ('Продавец-кассир', 'seller2'),
+                    ('ЗДМ', 'director2'),
+                ]
             ]
         )
         cls.worker_position = WorkerPosition.objects.last()
@@ -54,6 +54,24 @@ class TestWorkerPositionAPI(TestsHelperMixin, APITestCase):
         self.assertEqual(len(resp.json()), self.worker_positions_count)
         self.assertEqual(resp.json()[0]['name'], 'Директор магазина')
         self.assertEqual(resp.json()[1]['name'], 'ЗДМ')
+
+    def test_list_with_allowed_sawh_settings(self):
+        sawh_settings = SAWHSettings.objects.create(
+            network=self.network,
+            type=SAWHSettings.FIXED_HOURS,
+            name=self.worker_position.name,
+        )
+        AllowedSawhSetting.objects.create(
+            position=self.worker_position,
+            sawh_settings=sawh_settings,
+        )
+        resp = self.client.get(self.get_url('WorkerPosition-list'), data={'include_allowed_sawh_settings': True})
+        self.assertEqual(resp.status_code, 200)
+        resp_data = resp.json()
+        self.assertEqual(len(resp_data), self.worker_positions_count)
+        worker_position = list(filter(lambda x: x['id'] == self.worker_position.id, resp.json()))[0]
+        self.assertIn('allowed_sawh_settings', worker_position)
+        self.assertEqual(len(worker_position['allowed_sawh_settings']), 1)
 
     def test_list_is_active(self):
         resp = self.client.get(self.get_url('WorkerPosition-list'))
