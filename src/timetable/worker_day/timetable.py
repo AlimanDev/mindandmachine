@@ -46,6 +46,10 @@ PARSE_CELL_STR_PATTERN = re.compile(
     r'(?P<excel_code>[а-яА-ЯA-Za-z]+)?(?P<time_str>~?\d{1,2}:\d{1,2}\s*[' + r'\\'.join(DIVIDERS) + r']\s*\d{1,2}:\d{1,2})?\s*(?P<work_type_name>\(\w+( +\w+)*\))?(?P<work_hours>\d*[.,]\d+|\d+)?')
 
 
+class CellError(Exception):
+    pass
+
+
 class BaseUploadDownloadTimeTable:
     def __init__(self, user, form):
         self.user = user
@@ -69,6 +73,13 @@ class BaseUploadDownloadTimeTable:
 
     def _parse_cell_data(self, cell_data: str):
         cell_data = cell_data.strip()
+        if cell_data in self.wd_type_mapping_reversed:
+            wd_type_id = self.wd_type_mapping_reversed.get(cell_data)
+            wd_type_obj = self.wd_types_dict.get(wd_type_id)
+            if not wd_type_obj.is_dayoff:
+                raise CellError('type {} should specify time'.format(wd_type_id))
+            return wd_type_obj, None, None
+
         m = PARSE_CELL_STR_PATTERN.search(cell_data)
         if m:
             wd_type_id = WorkerDay.TYPE_WORKDAY
@@ -76,8 +87,9 @@ class BaseUploadDownloadTimeTable:
             if excel_code:
                 wd_type_id = self.wd_type_mapping_reversed.get(excel_code)
                 if wd_type_id is None:
-                    return None, None, None, None, None, None
+                    raise CellError('type with excel_code={} not found'.format(excel_code))
 
+            wd_type_obj = self.wd_types_dict.get(wd_type_id)
             time_str = m.group('time_str')
             if time_str:
                 is_vacancy = False
@@ -92,7 +104,7 @@ class BaseUploadDownloadTimeTable:
                         if work_type_name:  # TODO: тест
                             work_type_name = work_type_name.strip('()').lower()
                             work_type_id = self.shop_work_type_id_by_name.get(work_type_name)
-                        return wd_type_id, work_type_id, is_vacancy, parse(times[0]).time(), parse(
+                        return wd_type_obj, work_type_id, is_vacancy, parse(times[0]).time(), parse(
                             times[1]).time(), None
 
             else:
@@ -520,34 +532,29 @@ class UploadDownloadTimetableCells(BaseUploadDownloadTimeTable):
                 for cell_data in cell_data_list:
                     dttm_work_start = None
                     dttm_work_end = None
-                    work_hours = None
-                    wd_type_obj = None
-                    work_type_id = None
-                    is_vacancy = None
                     try:
                         if cell_data.replace(' ', '').replace('\n', '') in SKIP_SYMBOLS:
                             continue
-                        if not (cell_data in self.wd_type_mapping_reversed):
-                            wd_type_id, work_type_id, is_vacancy, tm_work_start, tm_work_end, work_hours = self._parse_cell_data(
-                                cell_data)
-                            wd_type_obj = self.wd_types_dict.get(wd_type_id)
-                            if not (wd_type_obj.is_dayoff and wd_type_obj.is_work_hours and
-                                    wd_type_obj.get_work_hours_method in [
-                                        WorkerDayType.GET_WORK_HOURS_METHOD_TYPE_MANUAL, 
-                                        WorkerDayType.GET_WORK_HOURS_METHOD_TYPE_MANUAL_OR_MONTH_AVERAGE_SAWH_HOURS
-                            ]):
-                                dttm_work_start = datetime.datetime.combine(
-                                    dt, tm_work_start
-                                )
-                                dttm_work_end = datetime.datetime.combine(
-                                    dt, tm_work_end
-                                )
-                                if dttm_work_end < dttm_work_start:
-                                    dttm_work_end += datetime.timedelta(days=1)
-                        elif not is_fact:
-                            wd_type_id = self.wd_type_mapping_reversed[cell_data]
-                        else:
-                            continue
+
+                        wd_type_obj, work_type_id, is_vacancy, tm_work_start, tm_work_end, work_hours = self._parse_cell_data(
+                            cell_data)
+                        if is_fact and not wd_type_obj.use_in_fact:
+                            raise CellError('type {} not allowed in fact'.format(wd_type_obj.code))
+
+                        if not (wd_type_obj.is_dayoff and wd_type_obj.is_work_hours and
+                                wd_type_obj.get_work_hours_method in [
+                                    WorkerDayType.GET_WORK_HOURS_METHOD_TYPE_MANUAL,
+                                    WorkerDayType.GET_WORK_HOURS_METHOD_TYPE_MANUAL_OR_MONTH_AVERAGE_SAWH_HOURS
+                        ]):
+                            dttm_work_start = datetime.datetime.combine(
+                                dt, tm_work_start
+                            )
+                            dttm_work_end = datetime.datetime.combine(
+                                dt, tm_work_end
+                            )
+                            if dttm_work_end < dttm_work_start:
+                                dttm_work_end += datetime.timedelta(days=1)
+
                     except Exception as e:
                         raise ValidationError(
                             {
@@ -559,8 +566,6 @@ class UploadDownloadTimetableCells(BaseUploadDownloadTimeTable):
                             }
                         )
 
-                    if not wd_type_obj:
-                        wd_type_obj = self.wd_types_dict.get(wd_type_id)
                     employment = self._get_employment(employments_dict, employee.id, dt)
                     # TODO: перенести сюда проверку наличия активного тр-ва ???
                     new_wd_dict = dict(
@@ -572,10 +577,10 @@ class UploadDownloadTimetableCells(BaseUploadDownloadTimeTable):
                         employment=employment,
                         dttm_work_start=dttm_work_start,
                         dttm_work_end=dttm_work_end,
-                        type_id=wd_type_id,
+                        type_id=wd_type_obj.code,
                         created_by=self.user,
                         last_edited_by=self.user,
-                        closest_plan_approved=WorkerDay.get_closest_plan_approved_q(
+                        closest_plan_approved_id=WorkerDay.get_closest_plan_approved_q(
                             employee_id=employee.id,
                             dt=dt,
                             dttm_work_start=dttm_work_start,
@@ -583,16 +588,16 @@ class UploadDownloadTimetableCells(BaseUploadDownloadTimeTable):
                             delta_in_secs=self.user.network.set_closest_plan_approved_delta_for_manual_fact,
                         ).annotate(
                             order_by_val=RawSQL("""LEAST(
-                                ABS(EXTRACT(EPOCH FROM (U0."dttm_work_start" - "timetable_workerday"."dttm_work_start"))),
-                                ABS(EXTRACT(EPOCH FROM (U0."dttm_work_end" - "timetable_workerday"."dttm_work_end")))
-                            )""", [])
+                                ABS(EXTRACT(EPOCH FROM (%s - "timetable_workerday"."dttm_work_start"))),
+                                ABS(EXTRACT(EPOCH FROM (%s - "timetable_workerday"."dttm_work_end")))
+                            )""", [dttm_work_start, dttm_work_end])
                         ).order_by(
                             'order_by_val',
-                        ).values('id').first() if (is_fact and not wd_type_obj.is_dayoff) else None,
+                        ).values_list('id', flat=True).first() if (is_fact and not wd_type_obj.is_dayoff) else None,
                         source=WorkerDay.SOURCE_UPLOAD,
                         work_hours=datetime.timedelta(hours=float(work_hours)) if work_hours else None,
                     )
-                    if wd_type_id == WorkerDay.TYPE_WORKDAY:
+                    if wd_type_obj.has_details:
                         new_wd_dict['worker_day_details'] = [
                             dict(
                                 work_type_id=work_type_id or employment.work_type_id or default_work_type.id,
@@ -723,7 +728,7 @@ class UploadDownloadTimetableCells(BaseUploadDownloadTimeTable):
                     for wd in wdays_list:
                         excel_code = self.wd_type_mapping.get(wd.type_id, '')
                         if wd.type.is_dayoff and wd.type.is_work_hours and wd.type.get_work_hours_method in [
-                                WorkerDayType.GET_WORK_HOURS_METHOD_TYPE_MANUAL, 
+                                WorkerDayType.GET_WORK_HOURS_METHOD_TYPE_MANUAL,
                                 WorkerDayType.GET_WORK_HOURS_METHOD_TYPE_MANUAL_OR_MONTH_AVERAGE_SAWH_HOURS
                         ]:
                             _cell_value = excel_code + str(round(wd.work_hours.total_seconds() / 3600, 2))
@@ -1014,7 +1019,7 @@ class UploadDownloadTimetableRows(BaseUploadDownloadTimeTable):
                     for wd in wdays_list:  # TODO: нехватает типа дня? Как отличать командировку от рабочего дня, например?
                         row_data = row_data.copy()
                         if wd.type.is_dayoff and wd.type.is_work_hours and wd.type.get_work_hours_method in [
-                                WorkerDayType.GET_WORK_HOURS_METHOD_TYPE_MANUAL, 
+                                WorkerDayType.GET_WORK_HOURS_METHOD_TYPE_MANUAL,
                                 WorkerDayType.GET_WORK_HOURS_METHOD_TYPE_MANUAL_OR_MONTH_AVERAGE_SAWH_HOURS
                         ]:
                             # TODO: доработать экспорт и импорт
