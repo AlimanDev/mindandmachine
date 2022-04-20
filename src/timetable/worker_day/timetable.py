@@ -78,7 +78,7 @@ class BaseUploadDownloadTimeTable:
             wd_type_obj = self.wd_types_dict.get(wd_type_id)
             if not wd_type_obj.is_dayoff:
                 raise CellError('type {} should specify time'.format(wd_type_id))
-            return wd_type_obj, None, None
+            return wd_type_obj, None, False, None, None, None
 
         m = PARSE_CELL_STR_PATTERN.search(cell_data)
         if m:
@@ -110,9 +110,9 @@ class BaseUploadDownloadTimeTable:
             else:
                 work_hours = m.group('work_hours')
                 if work_hours:
-                    return wd_type_id, None, None, None, None, work_hours.replace(',', '.')
+                    return wd_type_obj, None, False, None, None, work_hours.replace(',', '.')
 
-        return None, None, None, None, None, None
+        raise CellError('not parsed')
 
     @staticmethod
     def _get_employment(employments_dict, employee_id, dt):
@@ -541,7 +541,7 @@ class UploadDownloadTimetableCells(BaseUploadDownloadTimeTable):
                         if is_fact and not wd_type_obj.use_in_fact:
                             raise CellError('type {} not allowed in fact'.format(wd_type_obj.code))
 
-                        if not (wd_type_obj.is_dayoff and wd_type_obj.is_work_hours and
+                        if tm_work_start and tm_work_end and not (wd_type_obj.is_dayoff and wd_type_obj.is_work_hours and
                                 wd_type_obj.get_work_hours_method in [
                                     WorkerDayType.GET_WORK_HOURS_METHOD_TYPE_MANUAL,
                                     WorkerDayType.GET_WORK_HOURS_METHOD_TYPE_MANUAL_OR_MONTH_AVERAGE_SAWH_HOURS
