@@ -552,7 +552,6 @@ class WorkerDayApproveHelper:
                                         dt_to=_period_end,
                                     ))
                             )
-
                 WorkerDay.check_work_time_overlap(
                     employee_days_q=employee_days_q,
                     exc_cls=ValidationError,

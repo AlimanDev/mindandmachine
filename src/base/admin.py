@@ -38,6 +38,8 @@ from src.base.forms import (
     BreakAdminForm,
     CustomImportFunctionGroupForm,
     CustomConfirmImportFunctionGroupForm,
+    SawhSettingsAdminForm,
+    SawhSettingsMappingAdminForm,
 )
 from src.base.models import (
     Employment,
@@ -240,6 +242,7 @@ class WorkerPositionAdminForm(forms.ModelForm):
     allowed_sawh_settings = forms.ModelMultipleChoiceField(
         queryset=SAWHSettings.objects.none(),
         label='Разрешенные настройки нормы',
+        required=False,
         blank=True,
         widget=FilteredSelectMultiple(
             verbose_name=SAWHSettings._meta.verbose_name,
@@ -567,31 +570,24 @@ class BreakAdmin(admin.ModelAdmin):
     form = BreakAdminForm
 
 
-class SAWHSettingsMappingInline(admin.StackedInline):
+class SAWHSettingsMappingInline(admin.TabularInline):
     model = SAWHSettingsMapping
     extra = 0
-
-    filter_horizontal = ('shops', 'positions', 'employees', 'exclude_positions')
-
-    def get_formset(self, request, obj=None, **kwargs):
-        formset = super(SAWHSettingsMappingInline, self).get_formset(request, obj, **kwargs)
-        queryset = formset.form.base_fields["employees"].queryset.select_related('user')
-        formset.form.base_fields["employees"].queryset = queryset
-        return formset
+    form = SawhSettingsMappingAdminForm
 
 
-class SAWHSettingsAdminForm(forms.ModelForm):
+class SAWHSettingsAdminForm(SawhSettingsAdminForm):
     class Meta:
         model = SAWHSettings
         fields = '__all__'
 
-    employments = forms.ModelMultipleChoiceField(
-        queryset=Employment.objects.none(),
-        label='Трудоустройства',
+    positions = forms.ModelMultipleChoiceField(
+        queryset=WorkerPosition.objects.none(),
+        label='Должности',
         required=False,
         blank=True,
         widget=FilteredSelectMultiple(
-            verbose_name=SAWHSettings._meta.verbose_name,
+            verbose_name=WorkerPosition._meta.verbose_name,
             is_stacked=False,
         )
     )
@@ -599,16 +595,16 @@ class SAWHSettingsAdminForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super(SAWHSettingsAdminForm, self).__init__(*args, **kwargs)
         if self.instance and self.instance.id:
-            self.fields['employments'].queryset = Employment.objects.filter(
-                employee__user__network_id=self.instance.network_id).select_related('employee__user', 'shop')
-            self.fields['employments'].initial = self.instance.employments.select_related('employee__user', 'shop')
+            self.fields['positions'].queryset = WorkerPosition.objects.filter(
+                network_id=self.instance.network_id)
+            self.fields['positions'].initial = self.instance.positions.all()
 
     def save(self, *args, **kwargs):
         instance = super(SAWHSettingsAdminForm, self).save(*args, **kwargs)
         with transaction.atomic():
             if instance.id:
-                self.fields['employments'].initial.update(sawh_settings=None)
-                self.cleaned_data['employments'].update(sawh_settings=instance)
+                self.fields['positions'].initial.update(sawh_settings=None)
+                self.cleaned_data['positions'].update(sawh_settings=instance)
         return instance
 
 

@@ -1,13 +1,17 @@
-from django_json_widget.widgets import JSONEditorWidget
 from django import forms
+from django_json_widget.widgets import JSONEditorWidget
 from import_export.forms import ImportForm, ConfirmImportForm
+
 from src.base.models import Group, Network
+
 
 class CustomSelectWidget(forms.Select):
     template_name = 'select.html'
 
+
 class DefaultOverrideAdminWidgetsForm(forms.ModelForm):
     json_fields = []
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         for field in self.json_fields:
@@ -63,6 +67,7 @@ class CustomConfirmImportFunctionGroupForm(ConfirmImportForm):
         super().__init__(*args, **kwargs)
         self.fields['groups'] = forms.ModelMultipleChoiceField(queryset=Group.objects.all(), required=True)
 
+
 class CustomImportShopForm(ImportForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -73,3 +78,15 @@ class CustomConfirmImportShopForm(ConfirmImportForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields['network'] = forms.ModelChoiceField(queryset=Network.objects.all(), required=True)
+
+
+class SawhSettingsAdminForm(DefaultOverrideAdminWidgetsForm):
+    json_fields = [
+        'work_hours_by_months',
+    ]
+
+
+class SawhSettingsMappingAdminForm(DefaultOverrideAdminWidgetsForm):
+    json_fields = [
+        'work_hours_by_months',
+    ]

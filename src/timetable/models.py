@@ -43,6 +43,7 @@ from src.timetable.exceptions import (
     MultipleWDTypesOnOneDateForOneEmployee,
     HasAnotherWdayOnDate,
     DtMaxHoursRestrictionViolated,
+    SawhSettingsIsNotSetRestrictionViolated,
 )
 from src.util.commons import obj_deep_get
 from src.util.mixins.qs import AnnotateValueEqualityQSMixin
@@ -535,9 +536,12 @@ class WorkerDayType(AbstractModel):
 
 class Restriction(AbstractModel):
     RESTRICTION_TYPE_DT_MAX_HOURS = 1
+    RESTRICTION_TYPE_SAWH_SETTINGS_IS_NOT_SET = 2
 
     RESTRICTION_TYPE_CHOICES = (
         (RESTRICTION_TYPE_DT_MAX_HOURS, 'Максимальное количество часов на одну дату у сотрудника'),
+        (RESTRICTION_TYPE_SAWH_SETTINGS_IS_NOT_SET,
+         'Настройки нормы не установлены (через должность, либо через трудоустройство)'),
     )
 
     work_type_position = models.ForeignKey(
@@ -567,74 +571,110 @@ class Restriction(AbstractModel):
             filter_kwargs['is_approved'] = is_approved
 
         restrictions = cls.objects.annotate(
-            dt_max_hours_restrictions=ArraySubquery(WorkerDay.objects.annotate(
-                # outer_work_type_position=ExpressionWrapper(
-                #     OuterRef('work_type_position'),
-                #     output_field=IntegerField()
-                # ),
-                # outer_employment_position=ExpressionWrapper(
-                #     OuterRef('employment_position'),
-                #     output_field=IntegerField()
-                # ),
-                outer_worker_day_type=ExpressionWrapper(
-                    OuterRef('worker_day_type'),
-                    output_field=IntegerField()
-                ),
-                # outer_work_type_name=ExpressionWrapper(
-                #     OuterRef('work_type_name'),
-                #     output_field=IntegerField()
-                # ),
-                outer_is_vacancy=ExpressionWrapper(
-                    OuterRef('is_vacancy'),
-                    output_field=NullBooleanField()
-                ),
-            ).filter(
-                employee_days_q,
-                # Q(outer_employment_position__isnull=True) | Q(outer_employment_position=F('employment__position')),
-                Q(outer_worker_day_type__isnull=True) | Q(outer_worker_day_type=F('type')),
-                Q(outer_is_vacancy__isnull=True) | Q(outer_is_vacancy=F('is_vacancy')),
-                # Q(
-                #     Q(type__has_details=False) |
-                #     Q(
-                #         Q(
-                #             Q(outer_work_type_position__isnull=True) |
-                #             Q(outer_work_type_position=F('worker_day_details__work_type__work_type_name__position'))
-                #         ),
-                #         Q(
-                #             Q(outer_work_type_name__isnull=True) |
-                #             Q(outer_work_type_name=F('worker_day_details__work_type__work_type_name'))
-                #         ),
-                #     )
-                # ),
-                **filter_kwargs,
-            ).values_list(
-                'employee',
-                'dt',
-            ).annotate(
-                current_work_hours=Sum('work_hours'),
-            ).filter(
-                current_work_hours__gt=OuterRef('dt_max_hours'),
-            ).annotate(
-                data_json=Func(
-                    Value('last_name', output_field=CharField()), F("employee__user__last_name"),
-                    Value('first_name', output_field=CharField()), F("employee__user__first_name"),
-                    Value('dt', output_field=CharField()), F("dt"),
-                    Value('current_work_hours', output_field=CharField()), F("current_work_hours"),
-                    Value('dt_max_hours', output_field=CharField()), OuterRef("dt_max_hours"),
-                    Value('worker_day_type', output_field=CharField()), OuterRef('worker_day_type__name'),
-                    function="jsonb_build_object",
-                    output_field=JSONField()
-                ),
-            ).values_list(
-                'data_json', flat=True,
-            ).distinct()),
+            sawh_settings_is_not_set_restrictions=Case(
+                When(restriction_type=Restriction.RESTRICTION_TYPE_SAWH_SETTINGS_IS_NOT_SET, then=ArraySubquery(
+                    Employment.objects.filter(
+                        ~Q(Q(sawh_settings__isnull=False) | Q(position__sawh_settings__isnull=False)),
+                        id__in=WorkerDay.objects.filter(
+                            employee_days_q,
+                            **filter_kwargs,
+                        ).values_list('employment_id', flat=True),
+                    ).annotate(
+                        data_json=Func(
+                            Value('last_name', output_field=CharField()), F("employee__user__last_name"),
+                            Value('first_name', output_field=CharField()), F("employee__user__first_name"),
+                            Value('dt_hired', output_field=CharField()), F("dt_hired"),
+                            Value('dt_fired', output_field=CharField()), F("dt_fired"),
+                            function="jsonb_build_object",
+                            output_field=JSONField()
+                        ),
+                    ).values_list(
+                        'data_json', flat=True,
+                    ))), default=[]),
+            dt_max_hours_restrictions=Case(
+                When(restriction_type=Restriction.RESTRICTION_TYPE_DT_MAX_HOURS,
+                     then=ArraySubquery(WorkerDay.objects.annotate(
+                         # outer_work_type_position=ExpressionWrapper(
+                         #     OuterRef('work_type_position'),
+                         #     output_field=IntegerField()
+                         # ),
+                         # outer_employment_position=ExpressionWrapper(
+                         #     OuterRef('employment_position'),
+                         #     output_field=IntegerField()
+                         # ),
+                         outer_worker_day_type=ExpressionWrapper(
+                             OuterRef('worker_day_type'),
+                             output_field=IntegerField()
+                         ),
+                         # outer_work_type_name=ExpressionWrapper(
+                         #     OuterRef('work_type_name'),
+                         #     output_field=IntegerField()
+                         # ),
+                         outer_is_vacancy=ExpressionWrapper(
+                             OuterRef('is_vacancy'),
+                             output_field=NullBooleanField()
+                         ),
+                     ).filter(
+                         employee_days_q,
+                         # Q(outer_employment_position__isnull=True) | Q(outer_employment_position=F('employment__position')),
+                         Q(outer_worker_day_type__isnull=True) | Q(
+                             outer_worker_day_type=F('type')),
+                         Q(outer_is_vacancy__isnull=True) | Q(
+                             outer_is_vacancy=F('is_vacancy')),
+                         # Q(
+                         #     Q(type__has_details=False) |
+                         #     Q(
+                         #         Q(
+                         #             Q(outer_work_type_position__isnull=True) |
+                         #             Q(outer_work_type_position=F('worker_day_details__work_type__work_type_name__position'))
+                         #         ),
+                         #         Q(
+                         #             Q(outer_work_type_name__isnull=True) |
+                         #             Q(outer_work_type_name=F('worker_day_details__work_type__work_type_name'))
+                         #         ),
+                         #     )
+                         # ),
+                         **filter_kwargs,
+                     ).values_list(
+                         'employee',
+                         'dt',
+                     ).annotate(
+                         current_work_hours=Sum('work_hours'),
+                     ).filter(
+                         current_work_hours__gt=OuterRef('dt_max_hours'),
+                     ).annotate(
+                         data_json=Func(
+                             Value('last_name', output_field=CharField()),
+                             F("employee__user__last_name"),
+                             Value('first_name', output_field=CharField()),
+                             F("employee__user__first_name"),
+                             Value('dt', output_field=CharField()), F("dt"),
+                             Value('current_work_hours', output_field=CharField()),
+                             F("current_work_hours"),
+                             Value('dt_max_hours', output_field=CharField()),
+                             OuterRef("dt_max_hours"),
+                             Value('worker_day_type', output_field=CharField()),
+                             OuterRef('worker_day_type__name'),
+                             function="jsonb_build_object",
+                             output_field=JSONField()
+                         ),
+                     ).values_list(
+                         'data_json', flat=True,
+                     ).distinct())), default=[]),
         ).values(
             'dt_max_hours_restrictions',
+            'sawh_settings_is_not_set_restrictions',
         )
         if raise_exc:
             for restriction in restrictions:
                 if restriction['dt_max_hours_restrictions']:
                     original_exc = DtMaxHoursRestrictionViolated(exc_data=restriction['dt_max_hours_restrictions'])
+                    if exc_cls:
+                        raise exc_cls(str(original_exc))
+                    raise original_exc
+                if restriction['sawh_settings_is_not_set_restrictions']:
+                    original_exc = SawhSettingsIsNotSetRestrictionViolated(
+                        exc_data=restriction['sawh_settings_is_not_set_restrictions'])
                     if exc_cls:
                         raise exc_cls(str(original_exc))
                     raise original_exc

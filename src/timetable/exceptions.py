@@ -99,3 +99,21 @@ class DtMaxHoursRestrictionViolated(Exception):
                 'Нарушены ограничения по максимальному количеству часов. ({error_str})').format(
             error_str=error_str
         )
+
+
+class SawhSettingsIsNotSetRestrictionViolated(Exception):
+    def __init__(self, exc_data):
+        self.exc_data = exc_data
+
+    def __str__(self, *args, **kwargs):
+        error_str = ', '.join(
+            (
+                f'{error_data["last_name"]} {error_data["first_name"]}'
+            )
+            for error_data in self.exc_data
+        )
+        return gettext(
+                'Операция не может быть выполнена. '
+                'Не настроена норма часов у сотрудников: {error_str}. Обратитесь, пожалуйста, к администратору системы.').format(
+            error_str=error_str
+        )
