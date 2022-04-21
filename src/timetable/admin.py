@@ -337,4 +337,4 @@ class TimesheetItemAdmin(admin.ModelAdmin):
 
 @admin.register(Restriction)
 class RestrictionAdmin(admin.ModelAdmin):
-    pass
+    list_display = ('restriction_type', 'worker_day_type', 'is_vacancy', 'dt_max_hours')

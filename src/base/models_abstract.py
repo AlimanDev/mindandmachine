@@ -111,7 +111,7 @@ class AbstractActiveNamedModel(AbstractActiveModel, AbstractNamedModel):
         abstract = True
 
 
-class AbstractActiveNetworkSpecificCodeNamedModelManager(models.Manager):
+class AbstractActiveNetworkSpecificCodeNamedModelManager(AbstractActiveModelManager):
     pass
 
 

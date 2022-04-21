@@ -148,7 +148,3 @@ class TestOperationType(APITestCase, TestsHelperMixin):
         response = self.client.delete(f'{self.url}{self.operation_type.id}/')
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         self.assertIsNotNone(OperationType.objects.get(id=self.operation_type.id).dttm_deleted)
-
-
-
-    
