@@ -108,6 +108,3 @@ class TestOperationTypeName(APITestCase, TestsHelperMixin):
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         self.assertIsNotNone(OperationTypeName.objects.get(id=self.operation_type_name1.id).dttm_deleted)
         self.assertEqual(OperationType.objects.filter(dttm_deleted__isnull=False).count(), 1)
-
-
-    

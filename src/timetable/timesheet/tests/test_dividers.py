@@ -348,16 +348,17 @@ class TestPobedaDivider(TestTimesheetMixin, TestCase):
         cls.san_day = cls._create_san_day()
         sawh_settings = SAWHSettings.objects.create(
             network=cls.network,
+            type=SAWHSettings.FIXED_HOURS,
+        )
+        SAWHSettingsMapping.objects.create(
+            year=2021,
+            sawh_settings=sawh_settings,
             work_hours_by_months={
                 'm6': 175,
             },
-            type=SAWHSettings.FIXED_HOURS,
         )
-        sawh_settings_mapping = SAWHSettingsMapping.objects.create(
-            year=2021,
-            sawh_settings=sawh_settings,
-        )
-        sawh_settings_mapping.positions.add(cls.position_worker)
+        cls.position_worker.sawh_settings = sawh_settings
+        cls.position_worker.save()
         WorkerDayType.objects.filter(
             code__in=[WorkerDay.TYPE_VACATION, WorkerDay.TYPE_MATERNITY]
         ).update(
@@ -373,6 +374,7 @@ class TestPobedaDivider(TestTimesheetMixin, TestCase):
 
     def setUp(self) -> None:
         self.employment_worker.refresh_from_db()
+        self.position_worker.refresh_from_db()
 
     def test_calc_timesheets(self):
         self._calc_timesheets(reraise_exc=True)
@@ -1185,14 +1187,10 @@ class TestShiftScheduleDivider(TestTimesheetMixin, TestCase):
         cls.network.save()
         sawh_settings = SAWHSettings.objects.create(
             network=cls.network,
-            work_hours_by_months={},
             type=SAWHSettings.SHIFT_SCHEDULE,
         )
-        sawh_settings_mapping = SAWHSettingsMapping.objects.create(
-            year=2021,
-            sawh_settings=sawh_settings,
-        )
-        sawh_settings_mapping.positions.add(cls.position_worker)
+        cls.position_worker.sawh_settings = sawh_settings
+        cls.position_worker.save()
         # 7-13 июня рабочие дни по плановому графику
         # 12,13 выходные
         cls.shift_schedule = ShiftSchedule.objects.create(

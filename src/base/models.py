@@ -1453,6 +1453,13 @@ class WorkerPosition(AbstractActiveNetworkSpecificCodeNamedModel):
     breaks = models.ForeignKey(Break, on_delete=models.PROTECT, null=True, blank=True)
     hours_in_a_week = models.PositiveSmallIntegerField(default=40, verbose_name='Часов в рабочей неделе')
     ordering = models.PositiveSmallIntegerField(default=9999, verbose_name='Индекс должности для сортировки')
+    sawh_settings = models.ForeignKey(
+        to='base.SAWHSettings',
+        on_delete=models.PROTECT,
+        verbose_name='Настройка нормы',
+        null=True, blank=True,
+        related_name='positions',
+    )
     allowed_sawh_settings = models.ManyToManyField(
         'base.SAWHSettings', through='base.AllowedSawhSetting', blank=True)
     tracker = FieldTracker(fields=['hours_in_a_week'])
@@ -1597,7 +1604,7 @@ class Employment(AbstractActiveModel):
 
     sawh_settings = models.ForeignKey(
         to='base.SAWHSettings',
-        on_delete=models.SET_NULL,
+        on_delete=models.PROTECT,
         verbose_name='Настройка нормы',
         null=True, blank=True,
         related_name='employments',
@@ -2069,9 +2076,21 @@ def current_year():
     return datetime.datetime.now().year
 
 
+class SawhSettingsManager(models.Manager):
+    def get_queryset(self):
+        return super().get_queryset().filter(
+            models.Q(dttm_deleted__date__gt=timezone.now().date()) | models.Q(dttm_deleted__isnull=True)
+        )
+
+
+class SawhSettingsQuerySet(QuerySet):
+    def delete(self):
+        self.update(dttm_deleted=timezone.now())
+
+
 class SAWHSettings(AbstractActiveNetworkSpecificCodeNamedModel):
     """
-    Настройки суммированного учета рабочего времени.
+    Настройки нормы часов.
     Модель нужна для распределения часов по месяцам в рамках учетного периода.
     """
 
@@ -2093,9 +2112,12 @@ class SAWHSettings(AbstractActiveNetworkSpecificCodeNamedModel):
     type = models.PositiveSmallIntegerField(
         default=PART_OF_PROD_CAL_SUMM, choices=SAWH_SETTINGS_TYPES, verbose_name='Тип расчета')
 
+    objects = SawhSettingsManager.from_queryset(SawhSettingsQuerySet)()
+    objects_with_excluded = models.Manager.from_queryset(SawhSettingsQuerySet)()
+
     class Meta:
-        verbose_name = 'Настройки суммированного учета рабочего времени'
-        verbose_name_plural = 'Настройки суммированного учета рабочего времени'
+        verbose_name = 'Настройки нормы часов'
+        verbose_name_plural = 'Настройки нормы часов'
 
     def __str__(self):
         return f'{self.name} {self.network.name}'
@@ -2109,15 +2131,14 @@ class SAWHSettingsMapping(AbstractModel):
         null=True,
         blank=True,
     )
-    shops = models.ManyToManyField('base.Shop', blank=True)
-    positions = models.ManyToManyField('base.WorkerPosition', blank=True, related_name='+')
-    employees = models.ManyToManyField('base.Employee', blank=True, related_name='+')
-    exclude_positions = models.ManyToManyField('base.WorkerPosition', blank=True, related_name='+')
-    priority = models.PositiveSmallIntegerField(default=0)
 
     class Meta:
-        verbose_name = 'Настройки суммированного учета рабочего времени'
-        verbose_name_plural = 'Настройки суммированного учета рабочего времени'
+        verbose_name = 'Настройки нормы часов'
+        verbose_name_plural = 'Настройки нормы часов'
+        ordering = ['-year']
+        unique_together = (
+            ('year', 'sawh_settings'),
+        )
 
 
 class ShopSchedule(AbstractModel):
