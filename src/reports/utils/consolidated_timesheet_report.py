@@ -4,8 +4,7 @@ import re
 from collections import OrderedDict
 
 import pandas as pd
-from django.db.models import Q, F, Value, Case, When
-from django.db.models import Sum
+from django.db.models import Q, F, Value, Case, When, Sum
 from django.db.models.functions import Concat
 from django.utils.functional import cached_property
 
@@ -13,8 +12,10 @@ from src.base.models import (
     Employee,
     Employment,
 )
-from src.timetable.models import TimesheetItem
-from src.timetable.models import WorkerDayType
+from src.timetable.models import (
+    TimesheetItem,
+    WorkerDayType,
+)
 
 
 class ConsolidatedTimesheetReportGenerator:
@@ -24,7 +25,10 @@ class ConsolidatedTimesheetReportGenerator:
         self.shops_names = shops_names
         self.dt_from = dt_from
         self.dt_to = dt_to
-        self.group_by = group_by or ['employee']
+        if len(self.shops) > 1:
+            self.group_by = ['shop'] + (group_by or ['employee'])
+        else:
+            self.group_by = group_by or ['employee']
         self.cached_data = cached_data or {}
 
     def _get_employees_qs(self):
@@ -39,6 +43,8 @@ class ConsolidatedTimesheetReportGenerator:
     @cached_property
     def columns_mapping(self):
         columns_mapping = OrderedDict()
+        if 'shop' in self.group_by:
+            columns_mapping['shop__name'] = 'Магазин'
         if 'employee' in self.group_by:
             columns_mapping['employee_fio'] = 'Сотрудник'
         if 'position' in self.group_by:
@@ -111,6 +117,8 @@ class ConsolidatedTimesheetReportGenerator:
 
     def _get_order_by_list(self):
         order_by = []
+        if 'shop' in self.group_by:
+            order_by.append('shop__name')
         if 'employee' in self.group_by:
             order_by.append('employee__user__last_name')
             order_by.append('employee__user__first_name')
@@ -167,7 +175,7 @@ class ConsolidatedTimesheetReportGenerator:
             'font_size': 14,
         })
         worksheet.merge_range('A1:D1', 'Консолидированный отчет об отработанном времени', title_merge_f)
-        worksheet.write('A2', 'Наименование объектов')
+        worksheet.write('A2', 'Наименование {}'.format('объектов' if len(self.shops) > 1 else 'объекта'))
         worksheet.merge_range('B2:D2', f'{self.shops_names}')
         worksheet.write('A3', 'Период')
         worksheet.merge_range('B3:D3', f'{self.dt_from.strftime("%Y.%m.%d")} - {self.dt_to.strftime("%Y.%m.%d")}')
