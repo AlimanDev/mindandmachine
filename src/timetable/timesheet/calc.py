@@ -144,17 +144,20 @@ class TimesheetCalculator:
             return
         work_type_name = self._get_work_type_name(worker_day=plan_wd)
         is_absent = day_in_past and not plan_wd.type.is_dayoff
-        is_special = day_in_past and not plan_wd.type.is_dayoff and not plan_wd.type.is_work_hours
+        is_special = not plan_wd.type.is_dayoff and not plan_wd.type.is_work_hours
+        if is_absent and is_special:
+            return
         d = {
             'employee_id': self.employee.id,
             'dt': dt,
             'shop': self._get_shop(plan_wd),
             'position': self._get_position(plan_wd, work_type_name=work_type_name),
             'work_type_name': work_type_name,
-            'fact_timesheet_type_id': WorkerDay.TYPE_HOLIDAY if is_special else WorkerDay.TYPE_ABSENSE if is_absent else plan_wd.type_id,
+            'fact_timesheet_type_id': WorkerDay.TYPE_ABSENSE if is_absent else plan_wd.type_id,
             'fact_timesheet_source': TimesheetItem.SOURCE_TYPE_SYSTEM if is_absent else TimesheetItem.SOURCE_TYPE_PLAN,
             'is_vacancy': plan_wd.is_vacancy,
         }
+        # рефакторинг
         if not day_in_past and not plan_wd.type.is_dayoff:
             total_hours, day_hours, night_hours = plan_wd.calc_day_and_night_work_hours()
             d['fact_timesheet_dttm_work_start'] = plan_wd.dttm_work_start_tabel
@@ -162,11 +165,16 @@ class TimesheetCalculator:
             d['fact_timesheet_total_hours'] = total_hours
             d['fact_timesheet_day_hours'] = day_hours
             d['fact_timesheet_night_hours'] = night_hours
-        if (plan_wd.type.is_dayoff and plan_wd.type.is_work_hours):
+        if plan_wd.type.is_work_hours and plan_wd.type.is_dayoff:
             dayoff_work_hours = plan_wd.work_hours.total_seconds() / 3600
             d['fact_timesheet_total_hours'] = dayoff_work_hours
             d['fact_timesheet_day_hours'] = dayoff_work_hours
             d['fact_timesheet_night_hours'] = 0
+        if plan_wd.type.is_work_hours and is_absent and self.wd_types_dict.get(WorkerDay.TYPE_ABSENSE).is_work_hours:
+            total_hours, day_hours, night_hours = plan_wd.calc_day_and_night_work_hours()
+            d['fact_timesheet_total_hours'] = total_hours
+            d['fact_timesheet_day_hours'] = day_hours
+            d['fact_timesheet_night_hours'] = night_hours
 
         fact_timesheet_dict.setdefault(empl_dt_key, []).append(d)
 

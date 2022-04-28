@@ -268,6 +268,38 @@ class TestTimesheetCalc(TestTimesheetMixin, TestCase):
             day_hours=0,
         ).count(), 1)
 
+        absence = self.wd_types_dict.get(WorkerDay.TYPE_ABSENSE)
+        absence.is_work_hours = True
+        absence.save()
+        self._calc_timesheets(
+            dt_from=date(2021, 6, 1),
+            dt_to=date(2021, 6, 30),
+            dttm_now=datetime(2021, 10, 1),
+        )
+        self.assertEqual(TimesheetItem.objects.filter(
+            timesheet_type=TimesheetItem.TIMESHEET_TYPE_FACT,
+            dt=dt,
+        ).count(), 2)
+        dt_timesheet = TimesheetItem.objects.filter(
+            timesheet_type=TimesheetItem.TIMESHEET_TYPE_FACT,
+            dt=dt,
+        ).aggregate(
+            total_hours_sum=Sum('day_hours') + Sum('night_hours'),
+        )
+        self.assertEqual(dt_timesheet['total_hours_sum'], 19)
+        self.assertEqual(TimesheetItem.objects.filter(
+            timesheet_type=TimesheetItem.TIMESHEET_TYPE_FACT,
+            dt=dt,
+            day_type_id=WorkerDay.TYPE_VACATION,
+            day_hours=10,
+        ).count(), 1)
+        self.assertEqual(TimesheetItem.objects.filter(
+            timesheet_type=TimesheetItem.TIMESHEET_TYPE_FACT,
+            dt=dt,
+            day_type_id=WorkerDay.TYPE_ABSENSE,
+            day_hours=9,
+        ).count(), 1)
+
     def test_calc_fact_without_plan_with_holiday_allowed_additional_types(self):
         workday_type = WorkerDayType.objects.filter(
             code=WorkerDay.TYPE_WORKDAY,

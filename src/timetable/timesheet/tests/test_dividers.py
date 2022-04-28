@@ -1043,7 +1043,7 @@ class TestPobedaDivider(TestTimesheetMixin, TestCase):
         self.assertEqual(main_ts_queryset.get(dt=date(2021, 6, 6)).day_type_id, WorkerDay.TYPE_HOLIDAY)
         self.assertEqual(main_ts_queryset.get(dt=date(2021, 6, 7)).day_type_id, WorkerDay.TYPE_HOLIDAY)
         self.assertEqual(fact_ts_queryset.get(dt=date(2021, 6, 5)).day_type_id, self.san_day.code)
-        self.assertEqual(fact_ts_queryset.get(dt=date(2021, 6, 6)).day_type_id, WorkerDay.TYPE_HOLIDAY)
+        self.assertEqual(fact_ts_queryset.filter(dt=date(2021, 6, 6)).exists(), False)
         self.assertEqual(fact_ts_queryset.get(dt=date(2021, 6, 7)).day_type_id, self.san_day.code)
 
     @override_settings(FISCAL_SHEET_DIVIDER_ALIAS='pobeda_manual')
