@@ -153,7 +153,9 @@ class NetworkSerializer(serializers.ModelSerializer):
             'rebuild_timetable_min_delta',
             'analytics_iframe',
             'analytics_type',
+            'show_checkbox_for_inspection_version',
         ]
+
 
 class NetworkListSerializer(serializers.Serializer):
     id = serializers.IntegerField()

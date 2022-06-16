@@ -158,6 +158,11 @@ class Network(AbstractActiveModel):
         choices=TIMETABLE_FORMAT_CHOICES, default='cell_format',
     )
     add_users_from_excel = models.BooleanField(default=False, verbose_name=_('Upload employments from excel'),)
+    show_checkbox_for_inspection_version = models.BooleanField(
+        default=True,
+        verbose_name=_('Show checkbox for downloading inspection version of timetable')
+    )
+
     convert_tabel_to = models.CharField(
         max_length=64, verbose_name=_('Convert tabel to'),
         null=True, blank=True,
