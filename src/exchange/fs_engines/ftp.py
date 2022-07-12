@@ -1,5 +1,4 @@
-import tempfile
-from ftplib import FTP
+import tempfile, ftplib
 
 from django.conf import settings
 
@@ -17,13 +16,17 @@ class FtpEngine(FilesystemEngine):
         self.ftp = self._init_ftp()
 
     def _init_ftp(self):  # TODO: нужно ли закрывать коннекшн?
-        ftp = FTP(host=self.host, user=self.username, passwd=self.password)
+        ftp = ftplib.FTP(host=self.host, user=self.username, passwd=self.password)
         ftp.cwd(self.base_path)
         return ftp
 
     def open_file(self, filename):
         tmp_f = tempfile.NamedTemporaryFile(mode='wb+')
-        self.ftp.retrbinary(f'RETR {filename}', tmp_f.write)
+        try:
+            self.ftp.retrbinary(f'RETR {filename}', tmp_f.write)
+        except (*ftplib.all_errors,):
+            self.ftp = self._init_ftp() 
+            self.ftp.retrbinary(f'RETR {filename}', tmp_f.write)
         tmp_f.seek(0)
         return tmp_f
 
