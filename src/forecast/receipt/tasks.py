@@ -167,6 +167,7 @@ def clean_timeserie_actions():
         if receive_data_info:
             for timeserie in receive_data_info:
                 delete_gap = timeserie.get('delete_gap', 31)
+                data_type = timeserie.get('data_type')
                 dttm_for_delete = (datetime.now() - timedelta(days=delete_gap)).replace(hour=0, minute=0, second=0)
 
                 for aggregate in timeserie['aggregate']:
@@ -184,4 +185,4 @@ def clean_timeserie_actions():
                         shop__dttm_deleted__lte=dttm_now,
                     ).select_related('shop')
                     for operation_type in operations_type:
-                        Receipt.objects.filter(shop=operation_type.shop, dttm__lt=dttm_for_delete).delete()
+                        Receipt.objects.filter(shop=operation_type.shop, dttm__lt=dttm_for_delete, data_type=data_type).delete()
