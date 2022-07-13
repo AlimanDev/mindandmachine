@@ -99,6 +99,7 @@ class TestAggregateTimeserie(TestsHelperMixin, TestCase):
         self.assertEqual(income_sum, 1500)
 
     def test_clean_timeserie_actions(self):
+        ReceiptFactory.create(shop=self.shop, data_type='Другое', dttm=timezone.now() - timedelta(days=60))
         initial_receipts_count = Receipt.objects.count()
         old_receipts_count = 5
         ReceiptFactory.create_batch(
