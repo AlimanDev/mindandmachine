@@ -117,6 +117,13 @@ def aggregate_timeserie_value():
                                 item_df['dttm'] = item_df['dttm'].apply(lambda x: x.replace(minute=0, second=0, microsecond=0))
                             elif grouping_period == 'd1':
                                 item_df['dttm'] = item_df['dttm'].apply(lambda x: x.replace(hour=0, minute=0, second=0, microsecond=0))
+                                item_df = pd.merge(
+                                    pd.DataFrame([dt], columns=['dttm']),
+                                    item_df,
+                                    on='dttm',
+                                    how='left',
+                                )
+                                item_df = item_df.fillna(0)  # пропущенные дни вставляем (в какие то дни что то могут не делать)
                             else:
                                 # todo: добавить варианты, когда группируем не по часам.
                                 raise NotImplementedError(f'grouping {grouping_period}, timeserie {timeserie}, network {network}')
