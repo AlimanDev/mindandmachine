@@ -60,7 +60,6 @@ def aggregate_timeserie_value():
                 for aggregate in timeserie['aggregate']:
                     aggr_filters = aggregate.get('timeserie_filters')
                     timeserie_action = aggregate.get('timeserie_action', 'sum')
-                    dttm_for_update = (datetime.now() - timedelta(days=update_gap)).replace(hour=0, minute=0, second=0)
 
                     # check all needed
                     if not (aggregate.get('timeserie_code') and (
@@ -83,77 +82,77 @@ def aggregate_timeserie_value():
                     ).select_related('shop')
 
                     for operation_type in operations_type:
-                        items_list = []
-                        items = Receipt.objects.filter(
-                            shop=operation_type.shop, dttm__gte=dttm_for_update, data_type=data_type)
-                        for item in items:
-                            item.info = json.loads(item.info)
+                        for dt in (date.today() - timedelta(days=i) for i in range(update_gap+1)):
+                            # Большое кол-во чеков занимают слишком много ОЗУ, обрабатываем по одному дню
+                            items_list = []
+                            items = Receipt.objects.filter(
+                                shop=operation_type.shop, dt=dt, data_type=data_type)
+                            for item in items:
+                                item.info = json.loads(item.info)
 
-                            # Пропускаем записи, которые не удовл. значениям в фильтре
-                            if aggr_filters and not all(item.info.get(k) == v for k, v in aggr_filters.items()):
-                                continue
+                                # Пропускаем записи, которые не удовл. значениям в фильтре
+                                if aggr_filters and not all(item.info.get(k) == v for k, v in aggr_filters.items()):
+                                    continue
 
-                            value = 0
-                            if 'timeserie_value' in aggregate:
-                                value = item.info.get(aggregate['timeserie_value'], 0)  # fixme: то ли ошибку лучше кидать, то ли пропускать (0 ставить)
-                                if isinstance(value, str):
-                                    value = value.replace(',', '.')
-                                value = float(value)
-                            elif 'timeserie_value_complex' in aggregate:
-                                value = '_'.join(item.info.get(field_name) for field_name in aggregate['timeserie_value_complex'])
-                            items_list.append({
-                                'dttm': item.dttm,
-                                'value': value,
-                            })
+                                value = 0
+                                if 'timeserie_value' in aggregate:
+                                    value = item.info.get(aggregate['timeserie_value'], 0)  # fixme: то ли ошибку лучше кидать, то ли пропускать (0 ставить)
+                                    if isinstance(value, str):
+                                        value = value.replace(',', '.')
+                                    value = float(value)
+                                elif 'timeserie_value_complex' in aggregate:
+                                    value = '_'.join(item.info.get(field_name) for field_name in aggregate['timeserie_value_complex'])
+                                items_list.append({
+                                    'dttm': item.dttm,
+                                    'value': value,
+                                })
 
-                        item_df = pd.DataFrame(items_list, columns=['dttm', 'value'])
-                        dates = pd.date_range(dttm_for_update.date(), dttm_now.date())  # item_df.dttm.dt.date.unique()
+                            item_df = pd.DataFrame(items_list, columns=['dttm', 'value'])
 
-                        if grouping_period == 'h1':
-                            # todo: вообще в item_df могут быть значения за какие-то периоды, но не за все. Когда нет, то по хорошему
-                            # надо ставить 0. Ноооо, скорей всего в этом случае (когда событий мало) нулевые периоды плохо будут
-                            # влиять на модель прогноза (если нет события, то риск ошибиться большой).
+                            if grouping_period == 'h1':
+                                # todo: вообще в item_df могут быть значения за какие-то периоды, но не за все. Когда нет, то по хорошему
+                                # надо ставить 0. Ноооо, скорей всего в этом случае (когда событий мало) нулевые периоды плохо будут
+                                # влиять на модель прогноза (если нет события, то риск ошибиться большой).
 
-                            item_df['dttm'] = item_df['dttm'].apply(lambda x: x.replace(minute=0, second=0, microsecond=0))
-                        elif grouping_period == 'd1':
-                            item_df['dttm'] = item_df['dttm'].apply(lambda x: x.replace(hour=0, minute=0, second=0, microsecond=0))
-                            item_df = pd.merge(
-                                pd.DataFrame(dates, columns=['dttm']),
-                                item_df,
-                                on='dttm',
-                                how='left',
-                            )
-                            item_df = item_df.fillna(0)  # пропущенные дни вставляем (в какие то дни что то могут не делать)
+                                item_df['dttm'] = item_df['dttm'].apply(lambda x: x.replace(minute=0, second=0, microsecond=0))
+                            elif grouping_period == 'd1':
+                                item_df['dttm'] = item_df['dttm'].apply(lambda x: x.replace(hour=0, minute=0, second=0, microsecond=0))
+                                item_df = pd.merge(
+                                    pd.DataFrame([dt], columns=['dttm']),
+                                    item_df,
+                                    on='dttm',
+                                    how='left',
+                                )
+                                item_df = item_df.fillna(0)  # пропущенные дни вставляем (в какие то дни что то могут не делать)
+                            else:
+                                # todo: добавить варианты, когда группируем не по часам.
+                                raise NotImplementedError(f'grouping {grouping_period}, timeserie {timeserie}, network {network}')
 
-                        else:
-                            # todo: добавить варианты, когда группируем не по часам.
-                            raise NotImplementedError(f'grouping {grouping_period}, timeserie {timeserie}, network {network}')
+                            periods_data = item_df.groupby('dttm')['value']
+                            if timeserie_action == 'sum':
+                                periods_data = periods_data.sum()
+                            elif timeserie_action == 'count':
+                                periods_data = periods_data.count()
+                            elif timeserie_action == 'nunique':
+                                periods_data = periods_data.nunique()
+                            else:
+                                raise NotImplementedError(f'timeserie_action {timeserie_action}, timeserie {timeserie}, network {network}')
 
-                        periods_data = item_df.groupby('dttm')['value']
-                        if timeserie_action == 'sum':
-                            periods_data = periods_data.sum()
-                        elif timeserie_action == 'count':
-                            periods_data = periods_data.count()
-                        elif timeserie_action == 'nunique':
-                            periods_data = periods_data.nunique()
-                        else:
-                            raise NotImplementedError(f'timeserie_action {timeserie_action}, timeserie {timeserie}, network {network}')
-
-                        periods_data = periods_data.reset_index()
-                        PeriodClients.objects.filter(
-                            operation_type=operation_type,
-                            dttm_forecast__date__in=dates,
-                            type=PeriodClients.FACT_TYPE,
-                        ).delete()
-
-                        PeriodClients.objects.bulk_create([
-                            PeriodClients(
+                            periods_data = periods_data.reset_index()
+                            PeriodClients.objects.filter(
                                 operation_type=operation_type,
-                                dttm_forecast=period['dttm'],
-                                value=period['value'],
+                                dttm_forecast__date=dt,
                                 type=PeriodClients.FACT_TYPE,
-                            ) for _, period in periods_data.iterrows()
-                        ])
+                            ).delete()
+
+                            PeriodClients.objects.bulk_create([
+                                PeriodClients(
+                                    operation_type=operation_type,
+                                    dttm_forecast=period['dttm'],
+                                    value=period['value'],
+                                    type=PeriodClients.FACT_TYPE,
+                                ) for _, period in periods_data.iterrows()
+                            ])
 
 
 @app.task
