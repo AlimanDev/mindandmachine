@@ -118,7 +118,7 @@ def aggregate_timeserie_value():
                             elif grouping_period == 'd1':
                                 item_df['dttm'] = item_df['dttm'].apply(lambda x: x.replace(hour=0, minute=0, second=0, microsecond=0))
                                 item_df = pd.merge(
-                                    pd.DataFrame([dt], columns=['dttm']),
+                                    pd.DataFrame([dt], columns=['dttm']).astype('datetime64[ns]'),
                                     item_df,
                                     on='dttm',
                                     how='left',
