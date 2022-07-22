@@ -430,7 +430,7 @@ class TestAmbarImportData(TestsHelperMixin, TestCase):
 
         import_error_results = self.import_error_job.run()
         self.assertEqual(len(import_error_results.get('errors')), 1)
-        self.assertEqual(
-            import_error_results['errors'][0],
-            f'FileNotFoundError: No such file or directory: {os.path.join(self.import_error_job.base_path, "Error_2021-11-13.csv")}'
+        self.assertIn(
+            f'Error_2021-11-13.csv',
+            import_error_results['errors'][0]
         )
