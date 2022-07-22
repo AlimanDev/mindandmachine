@@ -1,8 +1,9 @@
 import json, ftplib
-from datetime import datetime
+from datetime import date, datetime
 
 import pandas as pd
 from django.contrib.contenttypes.models import ContentType
+from django.db import transaction
 from faker.providers.date_time import Provider as DateTimeProvider
 
 from src.base.models import Shop
@@ -148,47 +149,50 @@ class ImportHistDataStrategy(BaseSystemImportStrategy):
         }
         return res
 
-    def load_file(self, dt, filename):
+    def load_file(self, dt: date, filename: str) -> set[str]:
         load_errors = set()
         extra_kwargs = {}
         if self.columns:
             extra_kwargs['index_col'] = False
             extra_kwargs['names'] = self.columns
+        
         try:
-            with self.fs_engine.open_file(filename) as f:
-                df_chunks = pd.read_csv(f, dtype=str, delimiter=self.csv_delimiter, chunksize=1000, **extra_kwargs)
-                for df in df_chunks:
-                    if self.receipt_code_columns:
-                        df['receipt_code'] = df[self.receipt_code_columns].agg(''.join, axis=1)
-                    else:
-                        df['receipt_code'] = df.apply(lambda x: hash(tuple(x)), axis=1)
-
+            with transaction.atomic():
+                with self.fs_engine.open_file(filename) as f:
+                    df_chunks = pd.read_csv(f, dtype=str, delimiter=self.csv_delimiter, chunksize=1000, **extra_kwargs)
+                    shops_id = []
                     receipts = []
-                    receipt_codes = set()
-                    for index, row in df.iterrows():
-                        shop_num = row[self.shop_num_column_name]
-                        shop_id = self.get_shop_id_by_shop_num(shop_num)
-                        if not shop_id:
-                            load_errors.add(f'cant map shop_id for shop_num="{shop_num}"')
-                            continue
+                    for df in df_chunks:
+                        if self.receipt_code_columns:
+                            df['receipt_code'] = df[self.receipt_code_columns].agg(''.join, axis=1)
+                        else:
+                            df['receipt_code'] = df.apply(lambda x: hash(tuple(x)), axis=1)
+                            # Хэши в разных запусках python генерятся разные! Можно сравнивать только в чеках, импортированных в рамках одного таска.
 
-                        dttm = datetime.strptime(
-                            row[self.dt_or_dttm_column_name],
-                            self.dt_or_dttm_format,
-                        )
-                        receipts.append(
-                            Receipt(
-                                code=row['receipt_code'],
-                                dttm=dttm,
-                                dt=dttm.date(),
-                                shop_id=shop_id,
-                                data_type=self.data_type,
-                                info=row.to_json(),
+                        for index, row in df.iterrows():
+                            shop_num = row[self.shop_num_column_name]
+                            shop_id = self.get_shop_id_by_shop_num(shop_num)
+                            if not shop_id:
+                                load_errors.add(f'cant map shop_id for shop_num="{shop_num}"')
+                                continue
+                            shops_id.append(shop_id)
+
+                            dttm = datetime.strptime(
+                                row[self.dt_or_dttm_column_name],
+                                self.dt_or_dttm_format,
                             )
-                        )
-                        receipt_codes.add(row['receipt_code'])
-                    Receipt.objects.filter(code__in=list(receipt_codes)).delete()
-                    Receipt.objects.bulk_create(receipts)
+                            receipts.append(
+                                Receipt(
+                                    code=row['receipt_code'],
+                                    dttm=dttm,
+                                    dt=dttm.date(),
+                                    shop_id=shop_id,
+                                    data_type=self.data_type,
+                                    info=row.to_json(),
+                                )
+                            )
+                    Receipt.objects.filter(dt=dt, data_type=self.data_type, shop_id__in=shops_id).delete()
+                    Receipt.objects.bulk_create(receipts, batch_size=10000)
         except (FileNotFoundError, PermissionError, *ftplib.all_errors) as e:
             load_errors.add(f'{e.__class__.__name__}: {str(e)}: {filename}')
         return load_errors
