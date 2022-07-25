@@ -130,8 +130,7 @@ class ConsolidatedTimesheetReportGenerator:
         annotations_dict = self._get_annotations_dict()
         data = list(TimesheetItem.objects.filter(
             Q(day_hours__gt=0) | Q(night_hours__gt=0),
-            Q(day_type__is_dayoff=False, shop__in=self.shops) |
-            Q(day_type__is_dayoff=True, employee__in=self._get_employees_qs()),
+            employee__in=self._get_employees_qs(),
             dt__gte=self.dt_from,
             dt__lte=self.dt_to,
         ).values(

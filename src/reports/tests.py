@@ -14,6 +14,7 @@ from src.base.models import FunctionGroup, Network, WorkerPosition
 from src.base.tests.factories import EmployeeFactory, EmploymentFactory, GroupFactory, NetworkFactory, ShopFactory, \
     UserFactory
 from src.reports.models import ReportConfig, ReportType, Period, UserShopGroups, UserSubordinates, EmploymentStats
+from src.timetable.models import TimesheetItem
 from src.reports.reports import PIVOT_TABEL
 from src.reports.tasks import cron_report, fill_user_shop_groups, fill_user_subordinates, fill_employments_stats
 from src.timetable.models import ScheduleDeviations, WorkerDay, WorkerDayOutsourceNetwork, WorkerDayType
@@ -363,6 +364,11 @@ class TestReportsViewSet(TestsHelperMixin, APITestCase):
             group=cls.group_dir,
             access_type='ALL',
         )
+        FunctionGroup.objects.create(
+            func='Reports_consolidated_timesheet_report',
+            group=cls.group_dir,
+            access_type='ALL'
+        )
 
         cls.dt = (datetime.now().date() - relativedelta(months=1)).replace(day=21)
         WorkerDayFactory(
@@ -401,7 +407,24 @@ class TestReportsViewSet(TestsHelperMixin, APITestCase):
             dttm_work_end=datetime.combine(cls.dt, time(20)),
             cashbox_details__work_type__work_type_name__name='Кассир',
         )
-
+        TimesheetItem.objects.create(
+            shop=cls.shop,
+            employee=cls.employee_dir,
+            dt=cls.dt,
+            timesheet_type=TimesheetItem.TIMESHEET_TYPE_FACT,
+            day_type_id=WorkerDay.TYPE_WORKDAY,
+            source=TimesheetItem.SOURCE_TYPE_FACT,
+            day_hours=4
+        )
+        TimesheetItem.objects.create(
+            shop=cls.shop,
+            employee=cls.employee_worker,
+            dt=cls.dt,
+            timesheet_type=TimesheetItem.TIMESHEET_TYPE_FACT,
+            day_type_id=WorkerDay.TYPE_WORKDAY,
+            source=TimesheetItem.SOURCE_TYPE_FACT,
+            day_hours=4
+        )
     def setUp(self):
         self.client.force_authenticate(user=self.user_dir)
 
@@ -414,6 +437,21 @@ class TestReportsViewSet(TestsHelperMixin, APITestCase):
         self.assertEqual(list(df.iloc[0, 5:].values), [0.00, 10.75, 10.75])
         self.assertEqual(list(df.iloc[1, 5:].values), [10.75, 10.75, 21.50])
         self.assertEqual(list(df.iloc[2, 5:].values), [10.75, 21.50, 32.25])
+
+    def test_consolidated_timesheet_report_get(self):
+        query_params = {
+            'shop_id__in': self.shop.id,
+            'dt_from': self.dt - timedelta(1),
+            'dt_to': self.dt,
+            'group_by': 'employee',
+        }
+        response = self.client.get('/rest_api/report/consolidated_timesheet_report/', query_params)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.headers.get('content-type'), 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+        df = pd.read_excel(response.content)
+        self.assertEqual(len(df.columns), 6)
+        self.assertEqual(len(df.values), 6)
+        self.assertEqual(list(df.iloc[5, :2].values), ['Итого часов', 8])
 
 
 class TestScheduleDeviation(APITestCase):
