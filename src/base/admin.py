@@ -651,7 +651,7 @@ class ApiLogAdmin(admin.ModelAdmin):
         ('user', RelatedOnlyDropdownLastNameOrderedFilter),
         'response_status_code',
     )
-    search_fields = ('url_kwargs',)
+    search_fields = ('url_kwargs', 'request_data')
     raw_id_fields = ('user',)
     list_select_related = ('user',)
 
