@@ -3,7 +3,17 @@ from datetime import date, datetime, time, timedelta
 from django.db.models import Sum
 from django.test import TestCase, override_settings
 
-from src.base.models import WorkerPosition
+from src.base.models import Employment, WorkerPosition
+from src.base.tests.factories import (
+    ShopFactory,
+    UserFactory,
+    GroupFactory,
+    EmploymentFactory,
+    NetworkFactory,
+    EmployeeFactory,
+    WorkerPositionFactory,
+    BreakFactory,
+)
 from src.timetable.models import WorkerDay, TimesheetItem, WorkTypeName, WorkType, WorkerDayType
 from src.timetable.tests.factories import WorkerDayFactory
 from ._base import TestTimesheetMixin
@@ -343,3 +353,22 @@ class TestTimesheetCalc(TestTimesheetMixin, TestCase):
         self._calc_timesheets()
         dt_timesheet = TimesheetItem.objects.get(dt=dt)
         self.assertEqual(dt_timesheet.day_type_id, WorkerDay.TYPE_VACATION)
+
+    def test_delete_hanging_timesheet_items(self):
+        dt = date.today()
+        self._calc_timesheets(dttm_now=dt, cleanup=False)
+        count_before = TimesheetItem.objects.count()
+        self._calc_timesheets(dttm_now=dt) # cleanup=True
+        self.assertEqual(count_before, TimesheetItem.objects.count())
+        empl = EmploymentFactory(
+            dt_hired=(dt - timedelta(101)),
+            dt_fired=(dt - timedelta(100))
+        )
+        TimesheetItem.objects.create(
+            timesheet_type=TimesheetItem.TIMESHEET_TYPE_FACT,
+            employee=empl.employee,
+            dt=dt,
+            day_type_id=WorkerDay.TYPE_WORKDAY,
+        )
+        self._calc_timesheets(dttm_now=dt)
+        self.assertEqual(count_before, TimesheetItem.objects.count())
