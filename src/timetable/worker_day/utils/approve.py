@@ -188,9 +188,9 @@ class WorkerDayApproveHelper:
             ).values_list(*columns))
             approved_df = pd.DataFrame(approved_wdays, columns=columns)
 
-            combined_dfs = pd.concat([draft_df, approved_df])
-            symmetric_difference = combined_dfs.drop_duplicates(keep=False).replace({np.nan: None})
-
+            combined_dfs = pd.concat([draft_df, approved_df]).drop_duplicates(keep=False)
+            symmetric_difference = combined_dfs.drop_duplicates(keep=False).astype(object)
+            symmetric_difference.where(pd.notnull(symmetric_difference), None, inplace=True)
             employee_dt_pairs_list = list(
                 symmetric_difference[['employee_id', 'dt']].sort_values(
                     ['employee_id', 'dt'], ascending=[True, True]).values.tolist())
