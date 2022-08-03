@@ -701,6 +701,38 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
         resp = self.client.post(f"{self.url_approve}", data, format='json')
         self.assertContains(resp, text='', status_code=200)
 
+    def test_bug_in_approval(self):
+        '''Баг (ответ с ошибкой 500), связанный с неправильной заменой numpy.NaN на None в подтверждении дней'''
+        dt_next_month = (self.dt.replace(day=1) + timedelta(days=32)).replace(day=1)
+        WorkerDay.objects.create(
+            shop_id=self.shop.id,
+            dt = dt_next_month + timedelta(days=2),
+            type_id = WorkerDay.TYPE_WORKDAY,
+            is_approved=False,
+            is_fact=False,
+            is_vacancy=True,
+            employee=self.employee2,
+            employment=self.employment2
+        )
+        WorkerDay.objects.create(
+            shop_id=self.shop.id,
+            dt = dt_next_month + timedelta(days=3),
+            type_id = WorkerDay.TYPE_WORKDAY,
+            is_approved=True,
+            is_fact=False,
+            is_vacancy=True,
+        )
+        data = {
+            'dt_from': dt_next_month,
+            'dt_to': (dt_next_month + timedelta(days=32)).replace(day=1) - timedelta(days=1),
+            'employee_ids': [],
+            'is_fact': False,
+            'shop_id': self.shop.id,
+            'approve_open_vacs': True,
+        }
+        response = self.client.post(f"{self.url_approve}", data, format='json')
+        self.assertEqual(response.status_code, 200)
+
 
 class TestUploadDownload(TestsHelperMixin, APITestCase):
     USER_USERNAME = "user1"
