@@ -35,6 +35,7 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
         cls.worker_stat_url = '/rest_api/worker_day/worker_stat/'
         cls.url_approve = '/rest_api/worker_day/approve/'
         cls.daily_stat_url = '/rest_api/worker_day/daily_stat/'
+        cls.batch_update_or_create_url = '/rest_api/worker_day/batch_update_or_create/'
         cls.work_type_name = WorkTypeName.objects.create(name='Магазин')
         cls.work_type = WorkType.objects.create(
             work_type_name=cls.work_type_name,
@@ -732,6 +733,36 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
         }
         response = self.client.post(f"{self.url_approve}", data, format='json')
         self.assertEqual(response.status_code, 200)
+
+    def test_vacation_wh_unchanged_from_batch_update_or_create(self):
+        WorkerDayType.objects.filter(code=WorkerDay.TYPE_VACATION).update(
+            get_work_hours_method=WorkerDayType.GET_WORK_HOURS_METHOD_TYPE_MANUAL_OR_MONTH_AVERAGE_SAWH_HOURS,
+            is_work_hours=True
+        )
+        vacation = self.create_worker_day(type_id=WorkerDay.TYPE_VACATION)
+        code = 'some-code-employee2-vacation'
+        vacation.code = code
+        vacation.save()
+        data = {
+            'data': [
+                {
+                    'code': code,
+                    'tabel_code': self.employee2.tabel_code,
+                    'is_fact': False,
+                    'is_approved': False,
+                    'dt': self.dt,
+                    'type': WorkerDay.TYPE_VACATION
+                }
+            ],
+            'options': {
+                'update_key_field': 'code',
+            }
+        }
+        res = self.client.post(self.batch_update_or_create_url, data, format='json')
+        self.assertEqual(res.status_code, 200)
+        wd = WorkerDay.objects.filter(employee=self.employee2).first()
+        self.assertEqual(vacation.id, wd.id)
+        self.assertEqual(vacation.work_hours, wd.work_hours)
 
 
 class TestUploadDownload(TestsHelperMixin, APITestCase):
