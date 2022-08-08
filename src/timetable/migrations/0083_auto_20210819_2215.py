@@ -206,9 +206,11 @@ def set_blank_main_timesheet_as_null(apps, schema_editor):
 
 
 def drop_views(apps, schema_editor):
-    schema_editor.execute(
-        "drop view performance; drop view v_mda_users; drop view metabase_financial_stat; drop view plan_and_fact_hours; drop view timetable_plan_and_fact_hours; ")
-
+    statement = "drop view performance; drop view v_mda_users; drop view metabase_financial_stat; drop view plan_and_fact_hours; drop view timetable_plan_and_fact_hours; "
+    Network = apps.get_model('base', 'Network')
+    if Network.objects.filter(code='orteka').exists():
+        statement = "drop view v_efficiency; drop view v_plan_and_fact_hours_1y; " + statement
+    schema_editor.execute(statement)
 
 def recreate_views(apps, schema_editor):
     schema_editor.execute("""\
@@ -414,7 +416,105 @@ FROM ((public.metabase_to turnover
     LEFT JOIN public.plan_and_fact_hours fot ON (((turnover.shop_id = fot."ID Магазина") AND (turnover.dt = fot."Дата"))))
     LEFT JOIN public.base_employment e ON (((e.shop_id = turnover.shop_id) AND (e.dt_hired <= turnover.dt) AND ((e.dt_fired IS NULL) OR (e.dt_fired >= turnover.dt)))))
 GROUP BY turnover.dt, turnover.shop_id, turnover.plan, turnover.fact;""")
-
+    
+    Network = apps.get_model('base', 'Network')
+    if Network.objects.filter(code='orteka').exists():
+        schema_editor.execute("""\
+CREATE OR REPLACE VIEW v_efficiency AS
+ SELECT t.shop_id,
+    t.income,
+    t.dt,
+    t.shop_code,
+    t.income_name,
+    t.income_code,
+    ( SELECT sum(pc2.value) AS sum
+           FROM forecast_periodclients pc2
+             JOIN forecast_operationtype ot2 ON pc2.operation_type_id = ot2.id
+             JOIN forecast_operationtypename otn2 ON ot2.operation_type_name_id = otn2.id
+          WHERE ot2.shop_id = t.shop_id AND pc2.dttm_forecast::date = t.dt AND pc2.type::text = 'F'::text AND otn2.code::text = 'clients'::text AND pc2.dttm_forecast > (CURRENT_DATE - '1 year'::interval)) AS clients,
+        CASE
+            WHEN t.income_code::text = 'income'::text THEN ( SELECT sum(pf1."Фактические часы работы") AS sum
+               FROM plan_and_fact_hours pf1
+              WHERE pf1."ID Магазина" = t.shop_id AND pf1."Дата" = t.dt)
+            WHEN t.income_code::text = 'income_seller'::text THEN ( SELECT sum(pf2."Фактические часы работы") AS sum
+               FROM plan_and_fact_hours pf2
+              WHERE pf2."ID Магазина" = t.shop_id AND pf2."Дата" = t.dt AND pf2."Тип работ"::text = 'Продавец-кассир'::text)
+            WHEN t.income_code::text = 'income_mk'::text THEN ( SELECT sum(pf3."Фактические часы работы") AS sum
+               FROM plan_and_fact_hours pf3
+              WHERE pf3."ID Магазина" = t.shop_id AND pf3."Дата" = t.dt AND pf3."Тип работ"::text = 'Врач'::text)
+            ELSE NULL::double precision
+        END AS work_hours
+   FROM ( SELECT s.id AS shop_id,
+            sum(pc.value) AS income,
+            pc.dttm_forecast::date AS dt,
+            s.code AS shop_code,
+            otn.name AS income_name,
+            otn.code AS income_code
+           FROM forecast_periodclients pc
+             JOIN forecast_operationtype ot ON pc.operation_type_id = ot.id
+             JOIN forecast_operationtypename otn ON ot.operation_type_name_id = otn.id
+             JOIN base_shop s ON ot.shop_id = s.id
+          WHERE pc.type::text = 'F'::text AND otn.code::text ~~ 'income%%'::text AND pc.dttm_forecast > (CURRENT_DATE - '1 year'::interval)
+          GROUP BY s.id, s.code, (pc.dttm_forecast::date), otn.name, otn.code) t;
+""")
+        schema_editor.execute("""\
+CREATE OR REPLACE VIEW v_plan_and_fact_hours_1y AS
+SELECT tt_pf.dt AS "Дата",
+    tt_pf.shop_id AS "ID Магазина",
+    tt_pf.shop_name AS "Магазин",
+    tt_pf.shop_code AS "Код магазина",
+    tt_pf.employee_id::bigint AS "ID Сотрудника",
+    tt_pf.worker_fio AS "Сотрудник",
+    round(tt_pf.fact_work_hours::numeric, 2)::double precision AS "Фактические часы работы",
+    round(tt_pf.plan_work_hours::numeric, 2)::double precision AS "Плановые часы работы",
+    tt_pf.late_arrival AS "Опоздания",
+    tt_pf.early_departure AS "Ранний уход",
+    tt_pf.is_vacancy::integer AS "Вакансия",
+    tt_pf.is_vacancy,
+    tt_pf.ticks_fact_count AS "К-во отметок факт",
+    tt_pf.ticks_plan_count AS "К-во отметок план",
+    tt_pf.worker_username AS "Табельный номер",
+    tt_pf.work_type_name AS "Тип работ",
+    tt_pf.auto_created_plan AS "Авт-ки созданный план",
+    tt_pf.auto_created_fact AS "Авт-ки созданный факт",
+    tt_pf.tabel_code AS "Табельный номер трудоустройства",
+    tt_pf.worker_id AS "ID Пользователя",
+    tt_pf.shop_network AS "Сеть Подразделения",
+    tt_pf.user_network AS "Сеть Сотрудника",
+    tt_pf.is_outsource::integer AS "Аутсорс",
+    NULL::double precision AS "Норма часов (для суммы)"
+   FROM timetable_plan_and_fact_hours tt_pf
+  WHERE tt_pf.wd_type_id::text = 'W'::text AND tt_pf.dt > (CURRENT_DATE - '1 year'::interval)
+UNION ALL
+ SELECT pc.dt AS "Дата",
+    pc.shop_id AS "ID Магазина",
+    NULL::character varying(128) AS "Магазин",
+    pc.code AS "Код магазина",
+    pc.employee_id::bigint AS "ID Сотрудника",
+    NULL::text AS "Сотрудник",
+    NULL::double precision AS "Фактические часы работы",
+    NULL::double precision AS "Плановые часы работы",
+    NULL::integer AS "Опоздания",
+    NULL::integer AS "Ранний уход",
+    NULL::integer AS "Вакансия",
+    NULL::boolean AS is_vacancy,
+    NULL::integer AS "К-во отметок факт",
+    NULL::integer AS "К-во отметок план",
+    NULL::character varying(150) AS "Табельный номер",
+    NULL::character varying AS "Тип работ",
+    NULL::bigint AS "Авт-ки созданный план",
+    NULL::bigint AS "Авт-ки созданный факт",
+    NULL::character varying(64) AS "Табельный номер трудоустройства",
+    pc.user_id AS "ID Пользователя",
+    NULL::character varying(128) AS "Сеть Подразделения",
+    NULL::character varying(128) AS "Сеть Сотрудника",
+    NULL::integer AS "Аутсорс",
+    ( SELECT sum(pc2.norm_hours) / COALESCE(NULLIF(count(pc2.id), 0), 1::bigint)::double precision
+           FROM prod_cal pc2
+          WHERE pc.employee_id = pc2.employee_id AND date_trunc('month'::text, pc.dt::timestamp with time zone) = date_trunc('month'::text, pc2.dt::timestamp with time zone)) AS "Норма часов (для суммы)"
+   FROM prod_cal pc
+  WHERE pc.dt >= (CURRENT_DATE - '1 year'::interval) AND pc.dt < (now() + '2 mons'::interval);
+""")
 
 class Migration(migrations.Migration):
     dependencies = [
