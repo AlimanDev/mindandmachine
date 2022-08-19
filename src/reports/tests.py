@@ -498,12 +498,21 @@ class TestReportsViewSet(TestsHelperMixin, APITestCase):
         }
         response = self.client.get('/rest_api/report/consolidated_timesheet_report/', query_params)
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.headers.get('content-type'), 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
         df = pd.read_excel(response.content)
         self.assertEqual(len(df.columns), 8)
         self.assertEqual(len(df.values), 8)
         self.assertCountEqual(list(df['Unnamed: 1'][3:7].values), [f'{self.position.name}', f'{self.position_outsource.name} ({self.network_outsource.name})', f'{self.position.name} ({self.network_outsource.name})', f'{self.position.name}'])
         self.assertCountEqual(list(df['Unnamed: 2'][3:7].values), ['Штат', 'Штат', 'Нештат', 'Нештат'])
+
+        query_params ['group_by'] = 'position'
+        response = self.client.get('/rest_api/report/consolidated_timesheet_report/', query_params)
+        self.assertEqual(response.status_code, 200)
+        df = pd.read_excel(response.content)
+        self.assertEqual(len(df.columns), 6)
+        self.assertEqual(len(df.values), 7)
+        self.assertCountEqual(list(df['Консолидированный отчет об отработанном времени'][3:6].values), [f'{self.position.name}', f'{self.position_outsource.name} ({self.network_outsource.name})', f'{self.position.name} ({self.network_outsource.name})'])
+        self.assertCountEqual(list(df['Unnamed: 1'][3:6].values), ['Штат', 'Нештат', 'Нештат'])
+
 
 class TestScheduleDeviation(APITestCase):
     USER_USERNAME = "user1"

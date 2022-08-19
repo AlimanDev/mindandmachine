@@ -49,9 +49,8 @@ class ConsolidatedTimesheetReportGenerator:
         if 'employee' in self.group_by:
             columns_mapping['employee_fio'] = 'Сотрудник'
         if 'position' in self.group_by:
-            columns_mapping['position__name'] = 'Должность'
-            if 'employee' in self.group_by:
-                columns_mapping['is_staff'] = 'Тип трудоустройства' #Штат/Нештат
+            columns_mapping['position_and_outsource_network'] = 'Должность' #Добавляется название аутсорс сети, если есть
+            columns_mapping['is_staff'] = 'Тип трудоустройства' #Штат/Нештат
         columns_mapping.update(OrderedDict(
             fact_total_hours='Итого рабочих часов',
             main_total_hours='Основной табель, рабочих ч',
@@ -116,15 +115,15 @@ class ConsolidatedTimesheetReportGenerator:
             annotations_dict['total_main_work_hours'] = \
                 Sum('day_hours', filter=total_main_work_hours_q) + \
                 Sum('night_hours', filter=total_main_work_hours_q)
-            if 'position' in self.group_by:
-                #Для аутсорс сотрудников - "Должность (Название аутсорс сети)"
-                annotations_dict['position__name'] = Concat(
-                    F('position__name'),
-                    Case(
-                        When(~Q(employee__user__network=F('shop__network')), then=Concat(Value(' ('), F('employee__user__network__name'), Value(')'))),
-                        default=Value(''))
-                )
-                annotations_dict['is_staff'] = Case(When(Q(employee_id__in=self.employee_ids), then=Value('Штат')), default=Value('Нештат'))
+        if 'position' in self.group_by:
+            #Для аутсорс сотрудников - "Должность (Название аутсорс сети)"
+            annotations_dict['position_and_outsource_network'] = Concat(
+                F('position__name'),
+                Case(
+                    When(~Q(employee__user__network=F('shop__network')), then=Concat(Value(' ('), F('employee__user__network__name'), Value(')'))),
+                    default=Value(''))
+            )
+            annotations_dict['is_staff'] = Case(When(Q(employee_id__in=self.employee_ids), then=Value('Штат')), default=Value('Нештат'))
         return annotations_dict
 
     def _get_order_by_list(self):
@@ -136,6 +135,7 @@ class ConsolidatedTimesheetReportGenerator:
             order_by.append('employee__user__first_name')
         if 'position' in self.group_by:
             order_by.append('position__name')
+            order_by.append('position_and_outsource_network')
         return order_by
 
     def _get_data(self) -> list[tuple]:
