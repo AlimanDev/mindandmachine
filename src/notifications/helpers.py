@@ -3,6 +3,7 @@ import mimetypes
 
 from django.utils.html import strip_tags
 from django.core.mail import get_connection, EmailMultiAlternatives
+from django.conf import settings
 
 
 def textify(html):
@@ -41,7 +42,7 @@ def send_mass_html_mail(datatuple, fail_silently=False, user=None, password=None
         username=user, password=password, fail_silently=fail_silently)
     messages = []
     for subject, text, html, file_data, from_email, recipient in datatuple:
-        message = EmailMultiAlternatives(subject, text, from_email, recipient)
+        message = EmailMultiAlternatives(subject, text, from_email, recipient, headers={'X-Campaign-Id': settings.COMPANY_NAME})
         message.attach_alternative(html, 'text/html')
         if file_data and file_data.get('file'):
             message.attach(file_data.get('name', 'No name'), file_data['file'].getvalue(), file_data.get('type', mimetypes.guess_type(file_data.get('name', 'No name'))[0]))

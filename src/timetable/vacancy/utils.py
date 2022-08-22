@@ -47,7 +47,7 @@ from src.events.signals import event_signal
 from src.timetable.events import EMPLOYEE_VACANCY_DELETED, VACANCY_CONFIRMED_TYPE, VACANCY_CREATED, VACANCY_DELETED, VACANCY_RECONFIRMED_TYPE, VACANCY_REFUSED
 from src.conf.djconfig import (
     QOS_DATETIME_FORMAT,
-    EMAIL_HOST_USER,
+    DEFAULT_FROM_EMAIL,
 )
 from src.timetable.exceptions import WorkTimeOverlap
 from src.timetable.models import (
@@ -376,7 +376,7 @@ def do_shift_elongation(vacancy, max_working_hours):
             msg = EmailMultiAlternatives(
                 subject='Изменение в графике выхода сотрудников',
                 body=message,
-                from_email=EMAIL_HOST_USER,
+                from_email=DEFAULT_FROM_EMAIL,
                 to=[worker_day.shop.email,],
             )
             msg.send()
@@ -1226,7 +1226,7 @@ def workers_exchange():
                             msg = EmailMultiAlternatives(
                                 subject='Изменение в графике выхода сотрудников',
                                 body=message,
-                                from_email=EMAIL_HOST_USER,
+                                from_email=DEFAULT_FROM_EMAIL,
                                 to=[shop_to.email,],
                             )
                             msg.send()
@@ -1239,7 +1239,7 @@ def workers_exchange():
                             msg = EmailMultiAlternatives(
                                 subject='Изменение в графике выхода сотрудников',
                                 body=message,
-                                from_email=EMAIL_HOST_USER,
+                                from_email=DEFAULT_FROM_EMAIL,
                                 to=[shop_from.email,],
                             )
                             msg.send()

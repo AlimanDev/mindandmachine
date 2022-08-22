@@ -18,7 +18,7 @@ from src.base.models import (
     Employment,
 )
 from src.celery.celery import app
-from src.conf.djconfig import EMAIL_HOST_USER, URV_DELETE_BIOMETRICS_DAYS_AFTER_FIRED
+from src.conf.djconfig import DEFAULT_FROM_EMAIL, URV_DELETE_BIOMETRICS_DAYS_AFTER_FIRED, COMPANY_NAME
 from src.events.signals import event_signal
 from src.recognition.events import EMPLOYEE_NOT_CHECKED_IN, EMPLOYEE_NOT_CHECKED_OUT
 from src.recognition.utils import get_worker_days_with_no_ticks
@@ -104,8 +104,9 @@ def send_notify_email(message, send2user_ids, title=None, file=None, html_conten
     msg = EmailMultiAlternatives(
         subject='Сообщение от Mind&Machine' if title is None else title,
         body=message,
-        from_email=EMAIL_HOST_USER,
+        from_email=DEFAULT_FROM_EMAIL,
         to=user_emails,
+        headers={'X-Campaign-Id': COMPANY_NAME}
     )
     if file:
         msg.attach_file(file)
