@@ -31,7 +31,8 @@ class ConsolidatedTimesheetReportGenerator:
             self.group_by = group_by or ['employee']
         self.cached_data = cached_data or {}
 
-    def _get_employees_qs(self):
+    @cached_property
+    def employee_ids(self):
         return Employee.objects.filter(
             id__in=Employment.objects.get_active_empl_by_priority(
                 dt_from=self.dt_from,
@@ -48,7 +49,8 @@ class ConsolidatedTimesheetReportGenerator:
         if 'employee' in self.group_by:
             columns_mapping['employee_fio'] = 'Сотрудник'
         if 'position' in self.group_by:
-            columns_mapping['position__name'] = 'Должность'
+            columns_mapping['position_and_outsource_network'] = 'Должность' #Добавляется название аутсорс сети, если есть
+            columns_mapping['is_staff'] = 'Тип трудоустройства' #Штат/Нештат
         columns_mapping.update(OrderedDict(
             fact_total_hours='Итого рабочих часов',
             main_total_hours='Основной табель, рабочих ч',
@@ -72,7 +74,7 @@ class ConsolidatedTimesheetReportGenerator:
             '-ordering',
         ))
 
-    def _get_annotations_dict(self):
+    def _get_annotations_dict(self) -> dict:
         base_q = Q(
             day_type__is_dayoff=False,
             day_type__is_work_hours=True,
@@ -113,6 +115,15 @@ class ConsolidatedTimesheetReportGenerator:
             annotations_dict['total_main_work_hours'] = \
                 Sum('day_hours', filter=total_main_work_hours_q) + \
                 Sum('night_hours', filter=total_main_work_hours_q)
+        if 'position' in self.group_by:
+            #Для аутсорс сотрудников - "Должность (Название аутсорс сети)"
+            annotations_dict['position_and_outsource_network'] = Concat(
+                F('position__name'),
+                Case(
+                    When(~Q(employee__user__network=F('shop__network')), then=Concat(Value(' ('), F('employee__user__network__name'), Value(')'))),
+                    default=Value(''))
+            )
+            annotations_dict['is_staff'] = Case(When(Q(employee_id__in=self.employee_ids), then=Value('Штат')), default=Value('Нештат'))
         return annotations_dict
 
     def _get_order_by_list(self):
@@ -124,14 +135,15 @@ class ConsolidatedTimesheetReportGenerator:
             order_by.append('employee__user__first_name')
         if 'position' in self.group_by:
             order_by.append('position__name')
+            order_by.append('position_and_outsource_network')
         return order_by
 
-    def _get_data(self):
+    def _get_data(self) -> list[tuple]:
         annotations_dict = self._get_annotations_dict()
         data = list(TimesheetItem.objects.filter(
             Q(day_hours__gt=0) | Q(night_hours__gt=0),
             Q(day_type__is_dayoff=False, shop__in=self.shops) |
-            Q(day_type__is_dayoff=True, employee__in=self._get_employees_qs()),
+            Q(day_type__is_dayoff=True, employee__in=self.employee_ids),
             dt__gte=self.dt_from,
             dt__lte=self.dt_to,
         ).values(
@@ -155,7 +167,8 @@ class ConsolidatedTimesheetReportGenerator:
         worksheet = writer.sheets[sheet_name]
         worksheet.set_row(0, 40)
         worksheet.set_row(3, 50)
-        for i, width in enumerate(self.get_col_widths(df, 0, len(self.group_by))):
+        general_headers_len = len(self.group_by) + (1 if self.columns_mapping.get('is_staff') else 0)
+        for i, width in enumerate(self.get_col_widths(df, 0, general_headers_len)):
             worksheet.set_column(i, i, width)
         hours_title_f = workbook.add_format({
             'bold': 1,
@@ -164,8 +177,8 @@ class ConsolidatedTimesheetReportGenerator:
             'text_wrap': True,
             'font_size': 10,
         })
-        for idx, column_name in enumerate(list(self.columns_mapping.values())[len(self.group_by):]):
-            i = idx + len(self.group_by)
+        for idx, column_name in enumerate(list(self.columns_mapping.values())[general_headers_len:]):
+            i = idx + general_headers_len
             worksheet.set_column(i, i, 9)
             worksheet.write(3, i, column_name, hours_title_f)
         title_merge_f = workbook.add_format({
