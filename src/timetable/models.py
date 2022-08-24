@@ -1,6 +1,7 @@
 import datetime
 import json
 from decimal import Decimal
+from typing import OrderedDict, Union
 
 import pandas as pd
 from dateutil.relativedelta import relativedelta
@@ -1151,14 +1152,14 @@ class WorkerDay(AbstractModel):
         return True
 
     @classmethod
-    def _get_skip_update_equality_fields(cls, existing_obj):
+    def _get_skip_update_equality_fields(cls, existing_obj: 'WorkerDay', new_data: dict) -> list:
         skip_fields_list = ['created_by', 'last_edited_by', 'source']
-        if not (existing_obj.type.is_dayoff and existing_obj.type.is_work_hours and
+        #Код приходит только в интеграции с 1С, в таком случае не обновляем рабочие часы.
+        if existing_obj.type.is_dayoff and existing_obj.type.is_work_hours and new_data.get('code') and\
                 existing_obj.type.get_work_hours_method in [
                     WorkerDayType.GET_WORK_HOURS_METHOD_TYPE_MANUAL,
                     WorkerDayType.GET_WORK_HOURS_METHOD_TYPE_MANUAL_OR_MONTH_AVERAGE_SAWH_HOURS
-            ]):
-            # TODO: тест
+            ]:
             skip_fields_list.append('work_hours')
         return skip_fields_list
 

@@ -156,7 +156,7 @@ class BatchUpdateOrCreateModelMixin:
         pass
 
     @classmethod
-    def _get_skip_update_equality_fields(cls, existing_obj):
+    def _get_skip_update_equality_fields(cls, existing_obj, new_data):
         return []
 
     @classmethod
@@ -339,7 +339,7 @@ class BatchUpdateOrCreateModelMixin:
                         existing_obj = existing_objs.get(update_key)
                         if hasattr(existing_obj, 'dttm_deleted') and existing_obj.dttm_deleted is not None:
                             update_obj_dict['dttm_deleted'] = None
-                        skip_update_equality_fields = cls._get_skip_update_equality_fields(existing_obj)
+                        skip_update_equality_fields = cls._get_skip_update_equality_fields(existing_obj, update_obj_dict)
                         need_to_skip = True
                         for k, v in update_obj_dict.items():
                             if k not in rel_objs_mapping and k not in skip_update_equality_fields:
