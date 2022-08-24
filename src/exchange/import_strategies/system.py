@@ -160,7 +160,7 @@ class ImportHistDataStrategy(BaseSystemImportStrategy):
             with transaction.atomic():
                 with self.fs_engine.open_file(filename) as f:
                     df_chunks = pd.read_csv(f, dtype=str, delimiter=self.csv_delimiter, chunksize=1000, **extra_kwargs)
-                    shops_id = []
+                    shops_id = set()
                     receipts = []
                     for df in df_chunks:
                         if self.receipt_code_columns:
@@ -175,7 +175,7 @@ class ImportHistDataStrategy(BaseSystemImportStrategy):
                             if not shop_id:
                                 load_errors.add(f'cant map shop_id for shop_num="{shop_num}"')
                                 continue
-                            shops_id.append(shop_id)
+                            shops_id.add(shop_id)
 
                             dttm = datetime.strptime(
                                 row[self.dt_or_dttm_column_name],
@@ -185,7 +185,7 @@ class ImportHistDataStrategy(BaseSystemImportStrategy):
                                 Receipt(
                                     code=row['receipt_code'],
                                     dttm=dttm,
-                                    dt=dttm.date(),
+                                    dt=dt,
                                     shop_id=shop_id,
                                     data_type=self.data_type,
                                     info=row.to_json(),
