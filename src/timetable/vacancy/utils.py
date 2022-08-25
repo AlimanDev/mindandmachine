@@ -59,7 +59,7 @@ from src.timetable.models import (
     ShopMonthStat,
     VacancyBlackList,
 )
-from src.timetable.timesheet.utils import recalc_timesheet_on_data_change
+from src.timetable.timesheet.tasks import recalc_timesheet_on_data_change
 from src.timetable.work_type.utils import ShopEfficiencyGetter
 
 def search_candidates(vacancy, **kwargs):

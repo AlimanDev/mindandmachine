@@ -1529,7 +1529,7 @@ class EmploymentQuerySet(AnnotateValueEqualityQSMixin, QuerySet):
     def delete(self):
         from src.timetable.models import WorkerDay
         from src.timetable.worker_day.tasks import clean_wdays
-        from src.timetable.timesheet.utils import recalc_timesheet_on_data_change
+        from src.timetable.timesheet.tasks import recalc_timesheet_on_data_change
         with transaction.atomic():
             wdays_ids = list(WorkerDay.objects.filter(employment__in=self).values_list('id', flat=True))
             WorkerDay.objects.filter(employment__in=self).update(employment_id=None)
@@ -1639,7 +1639,7 @@ class Employment(AbstractActiveModel):
         from src.timetable.models import WorkerDay
         from src.timetable.worker_day.tasks import clean_wdays
         from src.integration.tasks import export_or_delete_employment_zkteco
-        from src.timetable.timesheet.utils import recalc_timesheet_on_data_change
+        from src.timetable.timesheet.tasks import recalc_timesheet_on_data_change
         with transaction.atomic():
             wdays_ids = list(WorkerDay.objects.filter(employment=self).values_list('id', flat=True))
             WorkerDay.objects.filter(employment=self).update(employment_id=None)
@@ -1728,7 +1728,7 @@ class Employment(AbstractActiveModel):
                 or self.tracker.has_changed('sawh_settings_id')):
             transaction.on_commit(lambda: cache.delete_pattern(f"prod_cal_*_*_{self.employee_id}"))
             if not is_new:
-                from src.timetable.timesheet.utils import recalc_timesheet_on_data_change
+                from src.timetable.timesheet.tasks import recalc_timesheet_on_data_change
                 dt_now = timezone.now().date()
                 recalc_timesheet_on_data_change({self.employee_id: [dt_now.replace(day=1) - datetime.timedelta(1), dt_now]})
 

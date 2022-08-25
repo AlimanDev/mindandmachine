@@ -32,7 +32,7 @@ from src.timetable.models import (
     WorkerDayType,
     TimesheetItem,
 )
-from src.timetable.timesheet.utils import recalc_timesheet_on_data_change
+from src.timetable.timesheet.tasks import recalc_timesheet_on_data_change
 from src.timetable.vacancy.utils import cancel_vacancies, cancel_vacancy, confirm_vacancy, notify_vacancy_created
 from src.timetable.worker_day.serializers import (
     ConfirmVacancyToWorkerSerializer,

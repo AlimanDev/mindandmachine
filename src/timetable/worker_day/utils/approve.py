@@ -29,14 +29,11 @@ from src.timetable.models import (
     WorkerDayType,
     Restriction,
 )
-from src.timetable.timesheet.tasks import calc_timesheets
-from src.timetable.timesheet.utils import recalc_timesheet_on_data_change
+from src.timetable.timesheet.tasks import recalc_timesheet_on_data_change
 from src.timetable.vacancy.tasks import vacancies_create_and_cancel_for_shop
 from src.timetable.vacancy.utils import notify_vacancy_created
-from src.timetable.worker_day.stat import get_month_range
 from src.timetable.worker_day.tasks import recalc_wdays, recalc_fact_from_records
 from src.timetable.worker_day.utils.utils import check_worker_day_permissions
-from src.util.models_converter import Converter
 
 
 class WorkerDayApproveHelper:

@@ -2671,7 +2671,7 @@ class AttendanceRecords(AbstractModel):
 
     def _recalc_timesheet(self, recalc_fact_from_att_records=False):
         if not recalc_fact_from_att_records and self.fact_wd and self.fact_wd.dttm_work_start and self.fact_wd.dttm_work_end:
-            from src.timetable.timesheet.utils import recalc_timesheet_on_data_change
+            from src.timetable.timesheet.tasks import recalc_timesheet_on_data_change
             transaction.on_commit(lambda: recalc_timesheet_on_data_change({self.fact_wd.employee_id: [self.fact_wd.dt, self.fact_wd.dt]}))
 
     def save(self, *args, recalc_fact_from_att_records=False, **kwargs):
