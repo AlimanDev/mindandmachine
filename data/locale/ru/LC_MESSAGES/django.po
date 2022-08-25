@@ -1384,7 +1384,11 @@ msgstr ""
 "Начало периода с которого копируются дни не может быть больше начала периода "
 "куда копируются дни."
 
-#: src/timetable/worker_day/serializers.py:761
+#: src/timetable/worker_day/serializers.py:747
+msgid "Invalid time period."
+msgstr "Указан неправильный промежуток времени."
+
+#: src/timetable/worker_day/serializers.py:749
 msgid "Shop or employees should be defined."
 msgstr "Для получения отчета нужно передать магазин или сотрудников."
 

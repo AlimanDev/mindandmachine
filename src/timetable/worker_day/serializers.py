@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import date, timedelta
 
 import pandas as pd
 from django.db import transaction
@@ -730,6 +730,17 @@ class BlockOrUnblockWorkerDaySerializer(serializers.ModelSerializer):
 class BlockOrUnblockWorkerDayWrapperSerializer(serializers.Serializer):
     worker_days = BlockOrUnblockWorkerDaySerializer(many=True)
 
+class BatchBlockOrUnblockWorkerDaySerializer(serializers.Serializer):
+    dt_from = serializers.DateField(format=QOS_DATE_FORMAT)
+    dt_to = serializers.DateField(format=QOS_DATE_FORMAT)
+    is_blocked = serializers.BooleanField(default=True) #По-умолчанию блокируем
+    shop_ids = serializers.ListField(child=serializers.IntegerField(min_value=1), default=[])
+
+    def validate(self, data):
+        #Нельзя изменять дни в будущем
+        if not data['dt_from'] <= data['dt_to'] <= date.today():
+            raise serializers.ValidationError(_('Invalid time period.'))
+        return data
 
 class RecalcWdaysSerializer(serializers.Serializer):
     shop_id = serializers.IntegerField()

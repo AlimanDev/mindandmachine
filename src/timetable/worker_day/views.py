@@ -12,6 +12,7 @@ from django.utils.translation import gettext_lazy as _
 from django_filters import utils
 from drf_yasg.utils import swagger_auto_schema
 from rest_framework.decorators import action
+from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.serializers import ValidationError
 from src.base.pagination import LimitOffsetPaginationWithOptionalCount
@@ -54,6 +55,7 @@ from src.timetable.worker_day.serializers import (
     RequestApproveSerializer,
     CopyRangeSerializer,
     BlockOrUnblockWorkerDayWrapperSerializer,
+    BatchBlockOrUnblockWorkerDaySerializer,
     RecalcWdaysSerializer,
 )
 from src.timetable.worker_day.stat import count_daily_stat
@@ -1110,6 +1112,49 @@ class WorkerDayViewSet(BaseActiveNamedModelViewSet):
                 is_fact=dict_to_block['is_fact'],
             ).update(is_blocked=False)
         return Response()
+
+    @swagger_auto_schema(
+        request_body=BatchBlockOrUnblockWorkerDaySerializer,
+        responses={200: None},
+        operation_description='''
+            Массово заблокировать/разблокировать рабочие дни (только в прошлом).
+            '''
+    )
+    @action(detail=False, methods=['put'], filterset_class=None, serializer_class=BatchBlockOrUnblockWorkerDaySerializer)
+    def batch_block_or_unblock(self, request: Request):
+        '''
+        PUT /rest_api/worker_day/batch_block_or_unblock/
+        :params
+            dt_from: QOS_DATE_FORMAT, required=True
+            dt_to: QOS_DATE_FORMAT, required=True
+            is_blocked: bool, default=True
+            shop_ids: list[int], default=[]
+
+        :return {
+            "updated": int
+        }
+        '''
+        
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        q = Q(
+            is_blocked=not serializer.validated_data['is_blocked'],
+            dt__range=(serializer.validated_data['dt_from'], serializer.validated_data['dt_to'])
+        )
+        shops = Shop.objects.filter(network=request.user.network)
+        if shop_ids:=serializer.validated_data['shop_ids']:
+            shops = shops.filter(id__in=shop_ids)
+        employees = Employee.objects.filter(
+            employments__in=Employment.objects.get_active(
+                dt_from=serializer.validated_data['dt_from'],
+                dt_to=serializer.validated_data['dt_to'],
+                shop__in=shops
+            )
+        )
+        q &= Q(shop__in=shops) | Q(shop__isnull=True, employee__in=employees)
+        wds = self.get_queryset().filter(q)
+        updated = wds.update(is_blocked=serializer.validated_data['is_blocked'])
+        return Response({'updated': updated})
 
     @swagger_auto_schema(
         request_body=RecalcWdaysSerializer,

@@ -944,6 +944,105 @@ class TestAditionalFunctions(TestsHelperMixin, APITestCase):
         wd.refresh_from_db()
         self.assertFalse(wd.is_blocked)
 
+    def test_batch_block_or_unblock(self):
+        self.create_outsource()
+        dt = date.today()
+        for employment in Employment.objects.get_active(dt_from=dt, dt_to=dt, shop__network=self.network):
+            self.create_worker_days(
+                employment=employment,
+                dt_from=dt - timedelta(5),
+                count=5,
+                from_tm=9,
+                to_tm=18,
+                approved=False,
+                is_blocked=False
+            )
+        total = WorkerDay.objects.filter(shop__network=self.network).count() #40
+        url = self.url + 'batch_block_or_unblock/'
+        
+        #Заблокировать все
+        data = {
+            'dt_from': dt - timedelta(5),
+            'dt_to': dt,
+        }
+        response = self.client.put(url, data)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json().get('updated'), total)
+        
+        #Разблокировать все
+        data['is_blocked'] = False
+        data['shop_ids'] = []
+        response = self.client.put(url, data)
+        self.assertEqual(response.json().get('updated'), total)
+        
+        #Период из 1-го дня
+        data = {
+            'dt_from': dt,
+            'dt_to': dt,
+            'is_blocked': True
+        }
+        response = self.client.put(url, data)
+        updated = WorkerDay.objects.filter(dt=dt, shop__network=self.network).count() #9
+        self.assertEqual(response.json().get('updated'), updated)
+
+        #Заблокировать день у аутсорса сотрудника в магазине основной сети
+        wd = WorkerDayFactory(
+            shop=self.root_shop,
+            employee=self.employee1_outsource,
+            employment=self.employment1_outsource,
+            dt=dt,
+            type_id=WorkerDay.TYPE_WORKDAY,
+            is_blocked=False
+        )
+        data['is_blocked'] = True
+        data['shop_ids'] = [self.root_shop.id]
+        response = self.client.put(url, data)
+        self.assertEqual(response.json().get('updated'), 1)
+        self.assertTrue(WorkerDay.objects.get(id=wd.id, is_blocked=True))
+
+        #Не блокировать нерабочий день у аутсорса сотрудника
+        wd = WorkerDayFactory(
+            shop=None,
+            employee=self.employee1_outsource,
+            employment=self.employment1_outsource,
+            dt=dt,
+            type_id=WorkerDay.TYPE_HOLIDAY,
+            is_blocked=False
+        )
+        del data['shop_ids']
+        response = self.client.put(url, data)
+        self.assertEqual(response.json().get('updated'), 0)
+        self.assertTrue(WorkerDay.objects.get(id=wd.id, is_blocked=False))
+
+        #Заблокировать нерабочий день (по активному трудоустройству в магазине)
+        wd = WorkerDayFactory(
+            shop=None,
+            employee=self.employee1,
+            employment=self.employment1,
+            dt=dt,
+            type_id=WorkerDay.TYPE_HOLIDAY,
+            is_blocked=False
+        )
+        response = self.client.put(url, data)
+        self.assertEqual(response.json().get('updated'), 1)
+        self.assertTrue(WorkerDay.objects.get(id=wd.id, is_blocked=True))
+
+        #Неправильные параметры дат:
+        #dt_from > dt_to
+        data = {
+            'dt_from': dt,
+            'dt_to': dt - timedelta(1),
+        }
+        response = self.client.put(url, data)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        #Нельзя изменять дни в будущем
+        data = {
+            'dt_from': dt + timedelta(1),
+            'dt_to': dt + timedelta(100),
+        }
+        response = self.client.put(url, data)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
     def test_change_list_create_vacancy(self):
         dt_from = date.today()
         data = {

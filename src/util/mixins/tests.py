@@ -73,6 +73,10 @@ class TestsHelperMixin:
     def create_period_clients(*args, **kwargs):
         test.create_period_clients(*args, **kwargs)
 
+    @classmethod
+    def create_outsource(*args, **kwargs):
+        test.create_outsource(*args, **kwargs)
+
     @staticmethod
     def get_url(view_name, *args, **kwargs: dict):
         return reverse(view_name, args=args, kwargs=kwargs)
