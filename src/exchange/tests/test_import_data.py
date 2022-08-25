@@ -335,6 +335,14 @@ class TestAmbarImportData(TestsHelperMixin, TestCase):
             dt_or_dttm_column_name='Дата поставки',
             dt_or_dttm_format='%Y-%m-%d',
         )
+        cls.import_error_strategy = ImportHistDataStrategy.objects.create(
+            system_code='ambar',
+            data_type='Error',
+            filename_fmt='{data_type}_{year:04d}-{month:02d}-{day:02d}.csv',
+            shop_num_column_name='Код магазина',
+            dt_or_dttm_column_name='Дата создания',
+            dt_or_dttm_format='%Y-%m-%d %H:%M:%S.%f',
+        )
         cls.import_shop_mapping_job = ImportJob.objects.create(
             fs_connector=cls.local_fs_connector,
             import_strategy=cls.import_shop_mapping_strategy,
@@ -362,6 +370,11 @@ class TestAmbarImportData(TestsHelperMixin, TestCase):
         cls.import_open_orders_job = ImportJob.objects.create(
             fs_connector=cls.local_fs_connector,
             import_strategy=cls.import_open_orders_strategy,
+            base_path=os.path.join(settings.BASE_DIR, 'src', 'exchange', 'tests', 'files', 'ambar')
+        )
+        cls.import_error_job = ImportJob.objects.create(
+            fs_connector=cls.local_fs_connector,
+            import_strategy=cls.import_error_strategy,
             base_path=os.path.join(settings.BASE_DIR, 'src', 'exchange', 'tests', 'files', 'ambar')
         )
 
@@ -414,6 +427,17 @@ class TestAmbarImportData(TestsHelperMixin, TestCase):
         self.assertEqual(len(import_open_orders_results.get('errors')), 0)
         self.assertEqual(Receipt.objects.filter(data_type='OpenOrders').count(), 1)
         self.assertEqual(Receipt.objects.filter(shop_id=self.shop3.id, data_type='OpenOrders').count(), 1)
+    
+    @freeze_time('2021-11-13')
+    def test_import_hist_data_error(self):
+        """Не удалось найти файл (напр. пропущен день в исторических данных)"""
+
+        import_error_results = self.import_error_job.run()
+        self.assertEqual(len(import_error_results.get('errors')), 1)
+        self.assertIn(
+            f'Error_2021-11-13.csv',
+            import_error_results['errors'][0]
+        )
 
 class TestImportRetry(TestCase):
 

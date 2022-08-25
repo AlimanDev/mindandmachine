@@ -192,7 +192,14 @@ class NetworkAdmin(admin.ModelAdmin):
             ),
         }),
         (_('Vacancy settings'), {'fields': ('need_symbol_for_vacancy', 'allow_workers_confirm_outsource_vacancy', 'show_cost_for_inner_vacancies')}),
-        (_('Format settings'), {'fields': ('download_tabel_template', 'convert_tabel_to', 'timetable_format', 'add_users_from_excel')}),
+        (_('Format settings'), {'fields': (
+            'download_tabel_template',
+            'convert_tabel_to',
+            'timetable_format',
+            'add_users_from_excel',
+            'show_checkbox_for_inspection_version',
+
+        )}),
         (_('Timetable settings'), {'fields': (
             'show_worker_day_additional_info',
             'show_worker_day_tasks',

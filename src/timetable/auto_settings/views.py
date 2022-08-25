@@ -580,7 +580,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
             # Для уволенных сотрудников
             if employment.dt_fired:
                 for dt in dates:
-                    employee_month_days_on_dt = worker_day.get(employment.employee_id, {}).get(dt, [])
+                    employee_month_days_on_dt = worker_day.get(employment.employee_id, {}).get(dt, [])[:]
                     employee_month_days_new_on_dt = employee_month_days_new.setdefault(dt, [])
 
                     if employee_month_days_on_dt and dt <= employment.dt_fired:
@@ -603,7 +603,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
             elif not employment.auto_timetable:
                 employment.is_fixed_hours = True
                 for dt in dates:
-                    employee_month_days_on_dt = worker_day.get(employment.employee_id, {}).get(dt, [])
+                    employee_month_days_on_dt = worker_day.get(employment.employee_id, {}).get(dt, [])[:]
                     employee_month_days_new_on_dt = employee_month_days_new.setdefault(dt, [])
 
                     if employee_month_days_on_dt:
@@ -630,7 +630,7 @@ class AutoSettingsViewSet(viewsets.ViewSet):
                     user_dt = user_dt + timedelta(days=1)
                 user_dt = employment.dt_hired
                 while user_dt <= dt_to:
-                    employee_month_days_on_dt = worker_day.get(employment.employee_id, {}).get(user_dt, [])
+                    employee_month_days_on_dt = worker_day.get(employment.employee_id, {}).get(user_dt, [])[:]
                     employee_month_days_new_on_dt = employee_month_days_new.setdefault(user_dt, [])
                     if employee_month_days_on_dt:
                         for employee_day_on_dt in employee_month_days_on_dt:
