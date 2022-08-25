@@ -22,6 +22,18 @@ class BaseTimesheetDivider:
         self.fiscal_timesheet = fiscal_timesheet
         self.dt_now = timezone.now().date()
 
+    def _handle_dayoff_items(self, dt, dayoff_items, fact_timesheet_items):
+        dayoff_item = dayoff_items[0]
+        self.fiscal_timesheet.main_timesheet.add(dt=dt, timesheet_item=dayoff_item.copy())
+
+        workday_items = list(filter(lambda i: not i.day_type.is_dayoff, fact_timesheet_items))
+        if workday_items:
+            for workday_item in workday_items:
+                self.fiscal_timesheet.additional_timesheet.add(
+                    dt=dt,
+                    timesheet_item=workday_item.copy(overrides={'freezed': True}),
+                )
+
     def _is_holiday(self, item_data, consider_dayoff_work_hours=True):
         if not item_data:
             return True
@@ -366,22 +378,31 @@ class BaseTimesheetDivider:
             if fact_timesheet_items:
                 dayoff_items = list(filter(lambda i: i.day_type.is_dayoff, fact_timesheet_items))
                 if dayoff_items:
-                    dayoff_item = dayoff_items[0]
-                    self.fiscal_timesheet.main_timesheet.add(dt=dt, timesheet_item=dayoff_item.copy())
-
-                    workday_items = list(filter(lambda i: not i.day_type.is_dayoff, fact_timesheet_items))
-                    if workday_items:
-                        for workday_item in workday_items:
-                            self.fiscal_timesheet.additional_timesheet.add(
-                                dt=dt,
-                                timesheet_item=workday_item.copy(overrides={'freezed': True}),
-                            )
+                    self._handle_dayoff_items(dt, dayoff_items, fact_timesheet_items)
                 else:
                     for fact_timesheet_item in fact_timesheet_items:
                         self.fiscal_timesheet.main_timesheet.add(dt=dt, timesheet_item=fact_timesheet_item.copy())
             else:
                 active_employment = self.fiscal_timesheet._get_active_employment(dt)
                 if active_employment:
+                    self.fiscal_timesheet.main_timesheet.add(dt=dt, timesheet_item=TimesheetItem(
+                        dt=dt,
+                        shop=active_employment.shop,
+                        position=active_employment.position,
+                        work_type_name=self.fiscal_timesheet.work_type_names_dict.get(active_employment.main_work_type_name_id),
+                        day_type=self.fiscal_timesheet.wd_types_dict.get(WorkerDay.TYPE_HOLIDAY),
+                    ))
+
+    def _fill_empty_dates_as_holidays_in_main_timesheet(self):
+        for dt in pd.date_range(self.fiscal_timesheet.dt_from, self.fiscal_timesheet.dt_to).date:
+            day_in_past = dt < self.dt_now
+            if self.fiscal_timesheet.employee.user.network.settings_values_prop.get(
+                    'timesheet_only_day_in_past', False) and not day_in_past:
+                continue
+            active_employment = self.fiscal_timesheet._get_active_employment(dt)
+            if active_employment:
+                main_timesheet_items = self.fiscal_timesheet.main_timesheet.get_items(dt=dt)
+                if not main_timesheet_items:
                     self.fiscal_timesheet.main_timesheet.add(dt=dt, timesheet_item=TimesheetItem(
                         dt=dt,
                         shop=active_employment.shop,
@@ -411,24 +432,6 @@ class BasePobedaTimesheetDivider(BaseTimesheetDivider):
                         self.fiscal_timesheet.main_timesheet.remove(dt, main_timesheet_item)
                         self.fiscal_timesheet.additional_timesheet.add(
                             dt, main_timesheet_item.copy(overrides={'freezed': True}))
-
-    def _fill_empty_dates_as_holidays_in_main_timesheet(self):
-        for dt in pd.date_range(self.fiscal_timesheet.dt_from, self.fiscal_timesheet.dt_to).date:
-            day_in_past = dt < self.dt_now
-            if self.fiscal_timesheet.employee.user.network.settings_values_prop.get(
-                    'timesheet_only_day_in_past', False) and not day_in_past:
-                continue
-            active_employment = self.fiscal_timesheet._get_active_employment(dt)
-            if active_employment:
-                main_timesheet_items = self.fiscal_timesheet.main_timesheet.get_items(dt=dt)
-                if not main_timesheet_items:
-                    self.fiscal_timesheet.main_timesheet.add(dt=dt, timesheet_item=TimesheetItem(
-                        dt=dt,
-                        shop=active_employment.shop,
-                        position=active_employment.position,
-                        work_type_name=self.fiscal_timesheet.work_type_names_dict.get(active_employment.main_work_type_name_id),
-                        day_type=self.fiscal_timesheet.wd_types_dict.get(WorkerDay.TYPE_HOLIDAY),
-                    ))
 
     def _get_subtract_filters(self, active_employment, dt):
         return {
@@ -475,11 +478,11 @@ class PobedaTimesheetDivider(BasePobedaTimesheetDivider):
         logger.info(f'start pobeda fiscal sheet divide')
         self._init_main_and_additional_timesheets()
         self._move_other_shop_or_position_work_to_additional_timesheet()
-        self._check_weekly_continuous_holidays()
-        self._replace_sick_with_absence_type()
+        # self._check_weekly_continuous_holidays()
+        # self._replace_sick_with_absence_type()
         self._remove_absence_from_additional_timesheet()
         self._check_not_more_than_threshold_hours()
-        self._redistribute_vacations_from_additional_timesheet_to_main_timesheet()
+        # self._redistribute_vacations_from_additional_timesheet_to_main_timesheet()
         self._check_overtimes()
         self._fill_empty_dates_as_holidays_in_main_timesheet()
         logger.info(f'finish pobeda fiscal sheet divide')
@@ -504,14 +507,34 @@ class PobedaManualTimesheetDivider(BasePobedaTimesheetDivider):
             ).values_list('code', flat=True)
         )
 
+    def _handle_dayoff_items(self, dt, dayoff_items, fact_timesheet_items):
+        has_main_dayoff = False
+        for dayoff_item in dayoff_items:
+            if dayoff_item.is_vacancy:
+                self.fiscal_timesheet.additional_timesheet.add(dt=dt, timesheet_item=dayoff_item.copy())
+            else:
+                has_main_dayoff = True
+                self.fiscal_timesheet.main_timesheet.add(dt=dt, timesheet_item=dayoff_item.copy())
+
+        workday_items = list(filter(lambda i: not i.day_type.is_dayoff, fact_timesheet_items))
+        if workday_items:
+            for workday_item in workday_items:
+                if has_main_dayoff:
+                    self.fiscal_timesheet.additional_timesheet.add(
+                        dt=dt,
+                        timesheet_item=workday_item.copy(overrides={'freezed': True}),
+                    )
+                else:
+                    self.fiscal_timesheet.main_timesheet.add(dt=dt, timesheet_item=workday_item.copy())
+
     def divide(self):
         logger.info(f'start pobeda_manual fiscal sheet divide')
         self._init_main_and_additional_timesheets()
         self._move_vacancies_to_additional_timesheet()
-        self._check_weekly_continuous_holidays(personnel_deviations_only=True)
-        self._replace_sick_with_absence_type()
+        # self._check_weekly_continuous_holidays(personnel_deviations_only=True)
+        # self._replace_sick_with_absence_type()
         self._remove_absence_from_additional_timesheet()
-        self._redistribute_vacations_from_additional_timesheet_to_main_timesheet()
+        # self._redistribute_vacations_from_additional_timesheet_to_main_timesheet()
         self._fill_empty_dates_as_holidays_in_main_timesheet()
         logger.info(f'finish pobeda_manual fiscal sheet divide')
 
@@ -523,6 +546,7 @@ class NahodkaTimesheetDivider(BaseTimesheetDivider):
         self._check_weekly_continuous_holidays()
         self._check_not_more_than_threshold_hours()
         self._check_overtimes()
+        self._fill_empty_dates_as_holidays_in_main_timesheet()
         logger.info(f'finish nahodka fiscal sheet divide')
 
 
@@ -618,6 +642,8 @@ class ShiftScheduleDivider(BaseTimesheetDivider):
                     if not dayoff_item.day_type.is_reduce_norm and shift_schedule_day_type_obj.is_dayoff and (
                             dayoff_item.day_type.code != shift_schedule_day_type_obj.code):
                         override_kwargs = {'day_type': shift_schedule_day_type_obj}
+                        if not shift_schedule_day_type_obj.is_work_hours:
+                            override_kwargs.update({'day_hours': 0, 'night_hours': 0})
                     self.fiscal_timesheet.main_timesheet.add(
                         dt=dt, timesheet_item=dayoff_item.copy(overrides=override_kwargs))
 

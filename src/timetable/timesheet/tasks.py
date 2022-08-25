@@ -1,18 +1,17 @@
 import logging
 
-from django.db.models import Max, Min
-
 from src.base.models import Employee, Employment
 from src.celery.celery import app
 from src.timetable.models import WorkerDayType, WorkTypeName
 from src.util.models_converter import Converter
 from .calc import TimesheetCalculator, _get_calc_periods
+from .utils import delete_hanging_timesheet_items
 
 logger = logging.getLogger('calc_timesheets')
 
 
 @app.task
-def calc_timesheets(employee_id__in: list = None, dt_from=None, dt_to=None, reraise_exc=False):
+def calc_timesheets(employee_id__in: list = None, dt_from=None, dt_to=None, reraise_exc=False, cleanup=True):
     assert (dt_from and dt_to) or (dt_from is None and dt_to is None)
     if dt_from and dt_to:
         if isinstance(dt_from, str):
@@ -49,4 +48,10 @@ def calc_timesheets(employee_id__in: list = None, dt_from=None, dt_to=None, rera
             logger.exception(e)
             if reraise_exc:
                 raise e
+    
+    if cleanup:
+        res = delete_hanging_timesheet_items(calc_periods)
+        if res[0]:
+            logger.info(f'deleted {res[0]} hanging TimesheetItems')
+    
     logger.info('finish calc_timesheets')

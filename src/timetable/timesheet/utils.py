@@ -1,9 +1,12 @@
-from django.conf import settings
-from django.db import transaction
-from django.db.models import Q, F, Sum
-from django.utils import timezone
+from typing import Iterable
+from datetime import date
 
-from src.base.models import Network
+from django.conf import settings
+from django.utils import timezone
+from django.db.models import Q, F, Sum, Exists, OuterRef
+from django.db import transaction
+
+from src.base.models import Employment, Network
 from src.util.models_converter import Converter
 from .tasks import calc_timesheets
 from ..models import WorkerDayType, TimesheetItem
@@ -69,6 +72,20 @@ def get_timesheet_stats(filtered_qs, dt_from, dt_to, user):
 
     return timesheet_stats
 
+def delete_hanging_timesheet_items(calc_periods: Iterable[tuple[date, date]]) -> tuple[int, dict]:
+    '''Удаляет `TimesheetItem` у сотрудников без активного трудоустройства на этот день'''
+    range_q = Q()
+    for period in calc_periods:
+        range_q |= Q(dt__range=(*period,))
+    return TimesheetItem.objects.filter(
+        range_q
+        ).exclude(
+            Exists(
+                Employment.objects.get_active(
+                    dt_from=OuterRef('dt'), dt_to=OuterRef('dt')
+                ).filter(employee=OuterRef('employee'))
+            )
+        ).delete()
 
 def recalc_timesheet_on_data_change(groupped_data):
     # запуск пересчета табеля на периоды для которых были изменены дни сотрудников,

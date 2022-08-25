@@ -3,7 +3,17 @@ from datetime import date, datetime, time, timedelta
 from django.db.models import Sum
 from django.test import TestCase, override_settings
 
-from src.base.models import WorkerPosition
+from src.base.models import Employment, WorkerPosition
+from src.base.tests.factories import (
+    ShopFactory,
+    UserFactory,
+    GroupFactory,
+    EmploymentFactory,
+    NetworkFactory,
+    EmployeeFactory,
+    WorkerPositionFactory,
+    BreakFactory,
+)
 from src.timetable.models import WorkerDay, TimesheetItem, WorkTypeName, WorkType, WorkerDayType
 from src.timetable.tests.factories import WorkerDayFactory
 from ._base import TestTimesheetMixin
@@ -267,6 +277,38 @@ class TestTimesheetCalc(TestTimesheetMixin, TestCase):
             day_hours=0,
         ).count(), 1)
 
+        absence = self.wd_types_dict.get(WorkerDay.TYPE_ABSENSE)
+        absence.is_work_hours = True
+        absence.save()
+        self._calc_timesheets(
+            dt_from=date(2021, 6, 1),
+            dt_to=date(2021, 6, 30),
+            dttm_now=datetime(2021, 10, 1),
+        )
+        self.assertEqual(TimesheetItem.objects.filter(
+            timesheet_type=TimesheetItem.TIMESHEET_TYPE_FACT,
+            dt=dt,
+        ).count(), 2)
+        dt_timesheet = TimesheetItem.objects.filter(
+            timesheet_type=TimesheetItem.TIMESHEET_TYPE_FACT,
+            dt=dt,
+        ).aggregate(
+            total_hours_sum=Sum('day_hours') + Sum('night_hours'),
+        )
+        self.assertEqual(dt_timesheet['total_hours_sum'], 19)
+        self.assertEqual(TimesheetItem.objects.filter(
+            timesheet_type=TimesheetItem.TIMESHEET_TYPE_FACT,
+            dt=dt,
+            day_type_id=WorkerDay.TYPE_VACATION,
+            day_hours=10,
+        ).count(), 1)
+        self.assertEqual(TimesheetItem.objects.filter(
+            timesheet_type=TimesheetItem.TIMESHEET_TYPE_FACT,
+            dt=dt,
+            day_type_id=WorkerDay.TYPE_ABSENSE,
+            day_hours=9,
+        ).count(), 1)
+
     def test_calc_fact_without_plan_with_holiday_allowed_additional_types(self):
         workday_type = WorkerDayType.objects.filter(
             code=WorkerDay.TYPE_WORKDAY,
@@ -310,3 +352,22 @@ class TestTimesheetCalc(TestTimesheetMixin, TestCase):
         self._calc_timesheets()
         dt_timesheet = TimesheetItem.objects.get(dt=dt)
         self.assertEqual(dt_timesheet.day_type_id, WorkerDay.TYPE_VACATION)
+
+    def test_delete_hanging_timesheet_items(self):
+        dt = date.today()
+        self._calc_timesheets(dttm_now=dt, cleanup=False)
+        count_before = TimesheetItem.objects.count()
+        self._calc_timesheets(dttm_now=dt) # cleanup=True
+        self.assertEqual(count_before, TimesheetItem.objects.count())
+        empl = EmploymentFactory(
+            dt_hired=(dt - timedelta(101)),
+            dt_fired=(dt - timedelta(100))
+        )
+        TimesheetItem.objects.create(
+            timesheet_type=TimesheetItem.TIMESHEET_TYPE_FACT,
+            employee=empl.employee,
+            dt=dt,
+            day_type_id=WorkerDay.TYPE_WORKDAY,
+        )
+        self._calc_timesheets(dttm_now=dt)
+        self.assertEqual(count_before, TimesheetItem.objects.count())

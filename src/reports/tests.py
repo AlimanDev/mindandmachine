@@ -14,6 +14,7 @@ from src.base.models import FunctionGroup, Network, WorkerPosition
 from src.base.tests.factories import EmployeeFactory, EmploymentFactory, GroupFactory, NetworkFactory, ShopFactory, \
     UserFactory
 from src.reports.models import ReportConfig, ReportType, Period, UserShopGroups, UserSubordinates, EmploymentStats
+from src.timetable.models import TimesheetItem
 from src.reports.reports import PIVOT_TABEL
 from src.reports.tasks import cron_report, fill_user_shop_groups, fill_user_subordinates, fill_employments_stats
 from src.timetable.models import ScheduleDeviations, WorkerDay, WorkerDayOutsourceNetwork, WorkerDayType
@@ -354,13 +355,22 @@ class TestReportsViewSet(TestsHelperMixin, APITestCase):
         cls.employment_urs = EmploymentFactory(
             employee=cls.employee_urs, shop=cls.root_shop, function_group=cls.group_urs,
         )
+        cls.position = WorkerPosition.objects.create(
+            name='Должность сотрудника',
+            network=cls.network,
+        )
         cls.employment_worker = EmploymentFactory(
-            employee=cls.employee_worker, shop=cls.shop, function_group=cls.group_worker,
+            employee=cls.employee_worker, shop=cls.shop, function_group=cls.group_worker, position=cls.position
         )
         FunctionGroup.objects.create(
             func='Reports_pivot_tabel',
             group=cls.group_dir,
             access_type='ALL',
+        )
+        FunctionGroup.objects.create(
+            func='Reports_consolidated_timesheet_report',
+            group=cls.group_dir,
+            access_type='ALL'
         )
 
         cls.dt = (datetime.now().date() - relativedelta(months=1)).replace(day=21)
@@ -400,6 +410,54 @@ class TestReportsViewSet(TestsHelperMixin, APITestCase):
             dttm_work_end=datetime.combine(cls.dt, time(20)),
             cashbox_details__work_type__work_type_name__name='Кассир',
         )
+        TimesheetItem.objects.create(
+            shop=cls.shop,
+            employee=cls.employee_dir,
+            dt=cls.dt,
+            timesheet_type=TimesheetItem.TIMESHEET_TYPE_FACT,
+            day_type_id=WorkerDay.TYPE_WORKDAY,
+            source=TimesheetItem.SOURCE_TYPE_FACT,
+            day_hours=4,
+            position=cls.position
+        )
+        TimesheetItem.objects.create(
+            shop=cls.shop,
+            employee=cls.employee_worker,
+            dt=cls.dt,
+            timesheet_type=TimesheetItem.TIMESHEET_TYPE_FACT,
+            day_type_id=WorkerDay.TYPE_WORKDAY,
+            source=TimesheetItem.SOURCE_TYPE_FACT,
+            day_hours=4,
+            position=cls.position
+        )
+
+        cls.network_outsource = NetworkFactory(name='Аутсорс-сеть', code='2')
+        cls.user_outsource = UserFactory(email='user_outsource@example.com', network=cls.network_outsource)
+        cls.employee_outsource = EmployeeFactory(user=cls.user_outsource, tabel_code='employee_outsource')
+        cls.position_outsource = WorkerPosition.objects.create(
+            name='Должность сотрудника аутсорса',
+            network=cls.network_outsource,
+        )
+        TimesheetItem.objects.create(
+            shop=cls.shop,
+            employee=cls.employee_outsource,
+            dt=cls.dt,
+            timesheet_type=TimesheetItem.TIMESHEET_TYPE_FACT,
+            day_type_id=WorkerDay.TYPE_WORKDAY,
+            source=TimesheetItem.SOURCE_TYPE_FACT,
+            day_hours=4,
+            position=cls.position_outsource
+        )
+        TimesheetItem.objects.create(
+            shop=cls.shop,
+            employee=cls.employee_outsource,
+            dt=cls.dt,
+            timesheet_type=TimesheetItem.TIMESHEET_TYPE_MAIN,
+            day_type_id=WorkerDay.TYPE_WORKDAY,
+            source=TimesheetItem.SOURCE_TYPE_FACT,
+            day_hours=4,
+            position=cls.position
+        )
 
     def setUp(self):
         self.client.force_authenticate(user=self.user_dir)
@@ -413,6 +471,46 @@ class TestReportsViewSet(TestsHelperMixin, APITestCase):
         self.assertEqual(list(df.iloc[0, 5:].values), [0.00, 10.75, 10.75])
         self.assertEqual(list(df.iloc[1, 5:].values), [10.75, 10.75, 21.50])
         self.assertEqual(list(df.iloc[2, 5:].values), [10.75, 21.50, 32.25])
+
+    def test_consolidated_timesheet_report_get(self):
+        query_params = {
+            'shop_id__in': self.shop.id,
+            'dt_from': self.dt - timedelta(1),
+            'dt_to': self.dt,
+            'group_by': 'employee',
+        }
+        response = self.client.get('/rest_api/report/consolidated_timesheet_report/', query_params)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.headers.get('content-type'), 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+        df = pd.read_excel(response.content)
+        self.assertEqual(len(df.columns), 6)
+        self.assertEqual(len(df.values), 7)
+        self.assertEqual(list(df.iloc[6, :2].values), ['Итого часов', 12])
+
+    def test_consolidated_timesheet_report_outsource_network_name_in_position(self):
+        '''Добавление названия аутсорс сети к должности аутсорс сотрудника'''
+        query_params = {
+            'shop_id__in': self.shop.id,
+            'dt_from': self.dt - timedelta(1),
+            'dt_to': self.dt,
+            'group_by': 'employee_position'
+        }
+        response = self.client.get('/rest_api/report/consolidated_timesheet_report/', query_params)
+        self.assertEqual(response.status_code, 200)
+        df = pd.read_excel(response.content)
+        self.assertEqual(len(df.columns), 8)
+        self.assertEqual(len(df.values), 8)
+        self.assertCountEqual(list(df['Unnamed: 1'][3:7].values), [f'{self.position.name}', f'{self.position_outsource.name} ({self.network_outsource.name})', f'{self.position.name} ({self.network_outsource.name})', f'{self.position.name}'])
+        self.assertCountEqual(list(df['Unnamed: 2'][3:7].values), ['Штат', 'Штат', 'Нештат', 'Нештат'])
+
+        query_params ['group_by'] = 'position'
+        response = self.client.get('/rest_api/report/consolidated_timesheet_report/', query_params)
+        self.assertEqual(response.status_code, 200)
+        df = pd.read_excel(response.content)
+        self.assertEqual(len(df.columns), 6)
+        self.assertEqual(len(df.values), 7)
+        self.assertCountEqual(list(df['Консолидированный отчет об отработанном времени'][3:6].values), [f'{self.position.name}', f'{self.position_outsource.name} ({self.network_outsource.name})', f'{self.position.name} ({self.network_outsource.name})'])
+        self.assertCountEqual(list(df['Unnamed: 1'][3:6].values), ['Штат', 'Нештат', 'Нештат'])
 
 
 class TestScheduleDeviation(APITestCase, TestsHelperMixin):
