@@ -502,6 +502,10 @@ msgstr ""
 "Неправильный формат времени {time} для значения {key}. Формат должен быть "
 "{format}."
 
+#: src/base/shop/serializers.py:738
+msgid "Invalid time period."
+msgstr "Неправильный временной период."
+
 #: src/base/views.py:182
 #, fuzzy
 #| msgid "It is necessary to transfer a biometrics template (file)."
