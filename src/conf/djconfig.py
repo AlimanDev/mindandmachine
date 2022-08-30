@@ -203,13 +203,12 @@ EMAIL_PORT = 587
 # For use SSL
 # EMAIL_USE_SSL = True
 # EMAIL_PORT = 465
-
-DEFAULT_FROM_EMAIL = 'robot@mindandmachine.ru'
-EMAIL_HOST = 'smtp.yandex.ru'
-EMAIL_HOST_USER = 'robot@mindandmachine.ru'
-EMAIL_HOST_PASSWORD = 'TjP6szfJe0PpLNH'
-
-SERVER_EMAIL = EMAIL_HOST_USER
+DEFAULT_FROM_EMAIL = '"Робот" <robot@mindandmachine.ru>'
+SERVER_EMAIL = DEFAULT_FROM_EMAIL
+EMAIL_HOST = 'mndndm.gate.sendsay.ru'
+EMAIL_HOST_USER = 'mindandmachine.mindandmachine@smtpgate'
+EMAIL_HOST_PASSWORD = 'to2Fusinaetheer'
+COMPANY_NAME = 'Не указано' #для отображения в статистике рассылок через SMTP
 
 SFTP_IP = '212.109.194.87'
 SFTP_USERNAME = ''
