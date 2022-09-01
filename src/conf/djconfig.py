@@ -207,7 +207,7 @@ DEFAULT_FROM_EMAIL = '"Робот" <robot@mindandmachine.ru>'
 SERVER_EMAIL = DEFAULT_FROM_EMAIL
 EMAIL_HOST = 'mndndm.gate.sendsay.ru'
 EMAIL_HOST_USER = 'mindandmachine.mindandmachine@smtpgate'
-EMAIL_HOST_PASSWORD = 'to2Fusinaetheer'
+EMAIL_HOST_PASSWORD = 'Si8gePhue3oMoh'
 COMPANY_NAME = 'Не указано' #для отображения в статистике рассылок через SMTP
 
 SFTP_IP = '212.109.194.87'
