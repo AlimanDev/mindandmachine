@@ -1,3 +1,4 @@
+import json
 from calendar import monthrange
 from datetime import date, datetime, time, timedelta
 
@@ -12,7 +13,7 @@ from rest_framework.test import APITestCase
 from etc.scripts import fill_calendar
 from src.base.models import FunctionGroup, Network, WorkerPosition
 from src.base.tests.factories import EmployeeFactory, EmploymentFactory, GroupFactory, NetworkFactory, ShopFactory, \
-    UserFactory
+    UserFactory, WorkerPositionFactory
 from src.reports.models import ReportConfig, ReportType, Period, UserShopGroups, UserSubordinates, EmploymentStats
 from src.reports.reports import PIVOT_TABEL
 from src.reports.tasks import cron_report, fill_user_shop_groups, fill_user_subordinates, fill_employments_stats
@@ -746,6 +747,49 @@ class TestScheduleDeviation(APITestCase):
                 f'{self.user1.fio} ', self.root_shop.name, 'штат', self.position.name, 'Биржа смен' if wd_type.code == WorkerDay.TYPE_WORKDAY else wd_type.name]
             )
 
+    def test_supervisors_and_regions_columns(self):
+        settings_values_dict = self.network.settings_values_prop
+        settings_values_dict['include_region_and_supervisor_in_schedule_deviation_report'] = True
+        self.network.settings_values = json.dumps(settings_values_dict)
+        self.network.save()
+        dt = date.today()
+
+        shop_region = ShopFactory(name='Регион Тест-1', network=self.network)
+        position_region_manager = WorkerPositionFactory(name='Руководитель региона')
+        emp_region_manager = EmploymentFactory(shop=shop_region, position=position_region_manager,)
+
+        supervisor_mentor_shop = ShopFactory(name='Супервайзер-наставник Тест-1', parent=shop_region, network=self.network)
+        position_supervisor_mentor = WorkerPositionFactory(name='Супервайзер-наставник')
+        emp_supervisor_mentor = EmploymentFactory(shop=supervisor_mentor_shop, position=position_supervisor_mentor)
+
+        supervisor_shop = ShopFactory(name='СВ Тест-1', parent=supervisor_mentor_shop, network=self.network)
+        position_supervisor = WorkerPositionFactory(name='Супервайзер')
+        emp_supervisor = EmploymentFactory(shop=supervisor_shop, position=position_supervisor)
+
+        shop = ShopFactory(name='Магазин Тест', parent=supervisor_shop, network=self.network)
+        WorkerDayFactory(
+            dt=dt,
+            shop=shop,
+            type_id=WorkerDay.TYPE_WORKDAY,
+            employee=self.employee1,
+            employment=self.employment1,
+            is_approved=True,
+        )
+
+        res = self.client.get(f'/rest_api/report/schedule_deviation/?dt_from={dt}&dt_to={dt}&shop_ids={shop.id}')
+        data = pd.read_excel(res.content).fillna('')
+        pd.set_option('expand_frame_repr', False)
+        self.assertListEqual(data.iloc[9][1:5].to_list(), ['Регион', 'РР', 'НСВ', 'СВ'])
+        self.assertListEqual(
+            data.iloc[10][1:5].to_list(),
+            [
+                shop_region.name,
+                emp_region_manager.employee.user.fio,
+                emp_supervisor_mentor.employee.user.fio,
+                emp_supervisor.employee.user.fio
+            ]
+        )
+  
 
 class TestFillReportsData(TestsHelperMixin, TestCase):
     @classmethod
