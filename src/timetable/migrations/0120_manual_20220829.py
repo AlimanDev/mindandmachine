@@ -1,16 +1,18 @@
 # Создано вручную 2022-08-29 13:01
+# Миграция дропает и создаёт заново все views, зависящие от timetable_plan_and_fact_hours:
+# metabase_financial_stat;
+# performance;
+# v_efficiency;
+# plan_and_fact_hours;
+# v_plan_and_fact_hours_1y;
+# v_plan_and_fact_hours_2y;
+# pobeda_performance;
 
 from django.db import migrations
 
 def update_views(apps, schema_editor):
     schema_editor.execute("""
-    DROP VIEW IF EXISTS metabase_financial_stat;
-    DROP VIEW IF EXISTS performance;
-    DROP VIEW IF EXISTS v_efficiency;
-    DROP VIEW IF EXISTS plan_and_fact_hours;
-    DROP VIEW IF EXISTS v_plan_and_fact_hours_1y;
-    DROP VIEW IF EXISTS v_plan_and_fact_hours_2y;
-    DROP VIEW IF EXISTS timetable_plan_and_fact_hours;
+    DROP VIEW IF EXISTS timetable_plan_and_fact_hours CASCADE;
     """)
     schema_editor.execute("""
     CREATE VIEW timetable_plan_and_fact_hours AS
@@ -318,7 +320,27 @@ SELECT turnover.dt,
      LEFT JOIN base_employment e ON e.shop_id = turnover.shop_id AND e.dt_hired <= turnover.dt AND (e.dt_fired IS NULL OR e.dt_fired >= turnover.dt)
   GROUP BY turnover.dt, turnover.shop_id, turnover.plan, turnover.fact;
     """)
-
+    schema_editor.execute("""
+    CREATE VIEW pobeda_performance AS
+SELECT pf."Дата" AS dt,
+   ( SELECT sum(pc.value) AS sum
+         FROM forecast_periodclients pc
+            JOIN forecast_operationtype ot ON pc.operation_type_id = ot.id
+            JOIN forecast_operationtypename otn ON ot.operation_type_name_id = otn.id
+            JOIN base_shop s ON ot.shop_id = s.id
+         WHERE ot.shop_id = pf."ID Магазина" AND pc.type::text = 'F'::text AND otn.code::text = 'income'::text AND pc.dttm_forecast::date = pf."Дата") AS income,
+   sum(pf."Фактические часы работы") AS work_hours,
+   pf."ID Магазина" AS shop_id,
+   pf."Код магазина" AS shop_code,
+   ( SELECT sum(pc.value) AS sum
+         FROM forecast_periodclients pc
+            JOIN forecast_operationtype ot ON pc.operation_type_id = ot.id
+            JOIN forecast_operationtypename otn ON ot.operation_type_name_id = otn.id
+            JOIN base_shop s ON ot.shop_id = s.id
+         WHERE ot.shop_id = pf."ID Магазина" AND pc.type::text = 'F'::text AND otn.code::text = 'goods_count'::text AND pc.dttm_forecast::date = pf."Дата") AS goods_count
+FROM plan_and_fact_hours pf
+GROUP BY pf."Дата", pf."ID Магазина", pf."Код магазина";
+    """)
 
 class Migration(migrations.Migration):
 
