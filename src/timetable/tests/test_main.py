@@ -4149,7 +4149,7 @@ class TestAttendanceRecords(TestsHelperMixin, APITestCase):
         self.dt = now().date()
 
         create_departments_and_users(self)
-
+        self.set_wd_allowed_additional_types()
         self.worker_day_plan_approved = WorkerDayFactory(
             shop=self.shop,
             employee=self.employee2,
@@ -5331,6 +5331,7 @@ class TestVacancy(TestsHelperMixin, APITestCase):
     def setUpTestData(cls):
         cls.url = '/rest_api/worker_day/vacancy/'
         cls.create_departments_and_users()
+        cls.set_wd_allowed_additional_types()
         cls.network.set_settings_value(
             'shop_name_form', 
             {

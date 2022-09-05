@@ -694,9 +694,9 @@ def confirm_vacancy(vacancy_id, user=None, employee_id=None, exchange=False, rec
                 res['status_code'] = 400
                 return res
 
-            # откликаться на вакансию можно только в нерабочие/неоплачиваемые дни
-            update_condition = all(
-                 not wd.type.is_work_hours for wd in employee_worker_days if not wd.is_vacancy)
+            # откликаться на вакансию в рабочие дни можно только, если это разрешено настройкой сети или если это разрешено для определённого типа дня
+            update_condition = active_employment.shop.network.allow_creation_several_wdays_for_one_employee_for_one_date or \
+                all(vacancy.type in wd.type.allowed_additional_types.all() for wd in employee_worker_days if not wd.is_vacancy)
             if active_employment.shop_id != vacancy_shop.id and not exchange:
                 try:
                     tt = ShopMonthStat.objects.get(shop=vacancy_shop, dt=vacancy.dt.replace(day=1))
