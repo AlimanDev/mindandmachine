@@ -161,12 +161,16 @@ class TimesheetViewSet(BaseModelViewSet):
         employee_filter = {}
         if serializer.validated_data.get('employee_id__in'):
             employee_filter['employee_id__in'] = serializer.validated_data['employee_id__in']
+        try:
+            shop = Shop.objects.get(id=serializer.validated_data['shop_id'])
+        except Shop.DoesNotExist:
+            raise ValidationError({'detail': _('No shop found.')})
         employee_ids = Employment.objects.get_active(
             dt_from=serializer.validated_data['dt_from'],
             dt_to=serializer.validated_data['dt_to'],
-            extra_q=Q(shop_id=serializer.validated_data['shop_id']) |\
+            extra_q=Q(shop__network=shop.network) |\
                 Q(employee__user__network_id__in=NetworkConnect.objects.filter(
-                        client__shop__id=serializer.validated_data['shop_id']
+                        client__shop=shop
                     ).values_list('outsourcing_id', flat=True)),
             **employee_filter,
         ).values_list('employee_id', flat=True)

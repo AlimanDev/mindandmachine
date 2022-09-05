@@ -915,7 +915,9 @@ class TestOutsource(TestsHelperMixin, APITestCase):
             dt=self.dt_now,
             employee=self.outsource_employee,
             employment=self.outsource_employment,
-            type_id=WorkerDay.TYPE_WORKDAY
+            type_id=WorkerDay.TYPE_WORKDAY,
+            is_approved=True,
+            is_fact=True
         )
         total = TimesheetItem.objects.count()
         data = {

@@ -1,12 +1,13 @@
-from datetime import date, datetime, time
+from datetime import date, datetime, time, timedelta
 from unittest import mock
 
 import pandas as pd
 from django.test import override_settings
 from rest_framework.test import APITestCase
+from rest_framework import status
 
 from src.base.models import Network
-from src.base.tests.factories import EmployeeFactory, ShopFactory
+from src.base.tests.factories import EmployeeFactory, EmploymentFactory, ShopFactory, UserFactory
 from src.timetable.models import TimesheetItem, WorkerDay
 from src.timetable.tests.factories import WorkerDayFactory
 from ._base import TestTimesheetMixin
@@ -115,6 +116,31 @@ class TestTimesheetApiView(TestTimesheetMixin, APITestCase):
         resp = self.client.post(
             self.get_url('Timesheet-recalc'), data=self.dump_data(data), content_type='application/json')
         self.assertContains(resp, 'Не найдено сотрудников удовлетворяющих условиям запроса.', status_code=400)
+
+    @override_settings(CELERY_TASK_ALWAYS_EAGER=True, CELERY_EAGER_PROPAGATES_EXCEPTIONS=True)
+    def test_recalc_timesheet_employee_from_another_shop(self):
+        self.add_group_perm(self.group_worker, 'Timesheet_recalc', 'POST')
+        dt = date.today()
+        emp = EmploymentFactory()
+        WorkerDayFactory(
+            shop=self.shop,
+            dt=dt,
+            employee=emp.employee,
+            employment=emp,
+            type_id=WorkerDay.TYPE_WORKDAY,
+            is_approved=True,
+            is_fact=True
+        )
+        total = TimesheetItem.objects.filter(employee=emp.employee, shop=self.shop).count()
+        data = {
+            'shop_id': self.shop.id,
+            'dt_from': dt.replace(day=1),
+            'dt_to': dt.replace(month=dt.month+1, day=1) - timedelta(1),
+            'employee_id__in': [emp.employee.id]
+        }
+        resp = self.client.post(self.get_url('Timesheet-recalc'), data=self.dump_data(data), content_type='application/json')
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertNotEqual(TimesheetItem.objects.filter(employee=emp.employee, shop=self.shop).count(), total)
 
     def test_timesheet_lines(self):
         self.add_group_perm(self.group_worker, 'Timesheet_lines', 'GET')
