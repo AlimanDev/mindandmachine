@@ -13,7 +13,7 @@ class DailySawhCalculator:
         self.dt_to = dt_to or (self.dt_from + timedelta(30))
 
     def get_daily_sawh(self) -> list[dict]:
-        positions = WorkerPosition.objects.prefetch_related('default_work_type_names', 'sawh_settings', 'sawh_settings__mappings')
+        positions = WorkerPosition.objects.prefetch_related('default_work_type_names', 'sawh_settings', 'sawh_settings__mappings').exclude(default_work_type_names=None)
         daily_sawh = []
         for dttm in pd.date_range(self.dt_from, self.dt_to).tolist():
             for position in positions:
