@@ -162,13 +162,14 @@ class TimesheetViewSet(BaseModelViewSet):
         if serializer.validated_data.get('employee_id__in'):
             employee_filter['employee_id__in'] = serializer.validated_data['employee_id__in']
         employee_ids = Employment.objects.get_active(
-            Shop.objects.get(id=serializer.validated_data['shop_id']).network_id,
             dt_from=serializer.validated_data['dt_from'],
             dt_to=serializer.validated_data['dt_to'],
-            shop_id=serializer.validated_data['shop_id'],
+            extra_q=Q(shop_id=serializer.validated_data['shop_id']) |\
+                Q(employee__user__network_id__in=NetworkConnect.objects.filter(
+                        client__shop__id=serializer.validated_data['shop_id']
+                    ).values_list('outsourcing_id', flat=True)),
             **employee_filter,
         ).values_list('employee_id', flat=True)
-        employee_ids = list(employee_ids)
         if not employee_ids:
             raise ValidationError({'detail': _('No employees satisfying the conditions.')})
         calc_timesheets.delay(
