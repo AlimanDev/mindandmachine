@@ -1,6 +1,10 @@
 from requests import Session
 from requests.adapters import HTTPAdapter
-from requests.packages.urllib3.util.retry import Retry
+from urllib3.util.retry import Retry
+
+
+from django.http import HttpResponse
+from django.utils.encoding import escape_uri_path
 
 
 def make_retry_session(total_retires=5, backoff_factor=0.1, status_forcelist=None):
@@ -19,3 +23,12 @@ def make_retry_session(total_retires=5, backoff_factor=0.1, status_forcelist=Non
     session.mount('https://', adapter)
 
     return session
+
+
+def prepare_response(output, output_name, content_type='application/octet-stream'):
+    response = HttpResponse(
+        output,
+        content_type=content_type,
+    )
+    response['Content-Disposition'] = 'attachment; filename="{}.xlsx"'.format(escape_uri_path(output_name))
+    return response

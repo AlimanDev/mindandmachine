@@ -23,8 +23,8 @@ class TestUserViewSet(TestsHelperMixin, APITestCase):
             code='director',
             network=cls.network,
         )
-        cls.wt_name = WorkTypeName.objects.create(name='test_name', code='test_code')
-        cls.wt_name2 = WorkTypeName.objects.create(name='test_name2', code='test_code2')
+        cls.wt_name = WorkTypeName.objects.create(name='test_name', code='test_code', network=cls.network)
+        cls.wt_name2 = WorkTypeName.objects.create(name='test_name2', code='test_code2', network=cls.network)
         cls.worker_position.default_work_type_names.set([cls.wt_name, cls.wt_name2])
         cls.dt_now = timezone.now().today()
 
@@ -55,7 +55,7 @@ class TestUserViewSet(TestsHelperMixin, APITestCase):
         data['auth_type'] = 'ldap'
         resp = self.client.put(self.get_url('User-detail', pk=username), data=data)
         self.assertContains(
-            resp, text='ldap_login should be specified for ldap auth_type.', status_code=400)
+            resp, text='ldap_login должен быть указан для типа авторизации ldap.', status_code=400)
         data['ldap_login'] = 'some_ldap_login'
         resp = self.client.put(self.get_url('User-detail', pk=username), data=data)
         self.assertEqual(resp.status_code, 200)

@@ -1,18 +1,22 @@
 import logging
 
-from django.db.models import Max, Min
+from django.conf import settings
+from django.utils import timezone
+from django.db import transaction
 
 from src.base.models import Employee, Employment
 from src.celery.celery import app
 from src.timetable.models import WorkerDayType, WorkTypeName
 from src.util.models_converter import Converter
 from .calc import TimesheetCalculator, _get_calc_periods
+from .utils import delete_hanging_timesheet_items
+from ..worker_day.stat import get_month_range
 
 logger = logging.getLogger('calc_timesheets')
 
 
 @app.task
-def calc_timesheets(employee_id__in: list = None, dt_from=None, dt_to=None, reraise_exc=False):
+def calc_timesheets(employee_id__in: list = None, dt_from=None, dt_to=None, reraise_exc=False, cleanup=True):
     assert (dt_from and dt_to) or (dt_from is None and dt_to is None)
     if dt_from and dt_to:
         if isinstance(dt_from, str):
@@ -49,4 +53,32 @@ def calc_timesheets(employee_id__in: list = None, dt_from=None, dt_to=None, rera
             logger.exception(e)
             if reraise_exc:
                 raise e
+    
+    if cleanup:
+        res = delete_hanging_timesheet_items(calc_periods)
+        if res[0]:
+            logger.info(f'deleted {res[0]} hanging TimesheetItems')
+    
     logger.info('finish calc_timesheets')
+
+def recalc_timesheet_on_data_change(groupped_data):
+    # запуск пересчета табеля на периоды для которых были изменены дни сотрудников,
+    # но не нарушая ограничения CALC_TIMESHEET_PREV_MONTH_THRESHOLD_DAYS
+    dt_now = timezone.now().date()
+    for employee_id, dates in groupped_data.items():
+        periods = set()
+        for dt in dates:
+            dt_start, dt_end = get_month_range(year=dt.year, month_num=dt.month)
+            if (dt_now - dt_end).days <= settings.CALC_TIMESHEET_PREV_MONTH_THRESHOLD_DAYS:
+                periods.add((dt_start, dt_end))
+        if periods:
+            for period_start, period_end in periods:
+                transaction.on_commit(
+                    lambda _employee_id=employee_id, _period_start=Converter.convert_date(period_start),
+                            _period_end=Converter.convert_date(period_end): calc_timesheets.apply_async(
+                        kwargs=dict(
+                            employee_id__in=[_employee_id],
+                            dt_from=_period_start,
+                            dt_to=_period_end,
+                        ))
+                    )

@@ -113,7 +113,7 @@ class TestWorkersStatsGetter(TestsHelperMixin, APITestCase):
         WorkerDayFactory(is_fact=True, is_approved=True, employee=self.employee, employment=self.employment,
                          shop=self.shop, dt=date(2020, 12, 2), type_id='W')
         WorkerDayFactory(is_fact=True, is_approved=True, employee=self.employee, employment=self.employment,
-                         shop=self.shop2, dt=date(2020, 12, 3), type_id='W')
+                         shop=self.shop2, is_vacancy=True, dt=date(2020, 12, 3), type_id='W')
         stats = self._get_worker_stats()
         self.assertEqual(
             stats[self.employee.id]['fact']['approved']['work_hours'],
@@ -121,6 +121,8 @@ class TestWorkersStatsGetter(TestsHelperMixin, APITestCase):
                 'acc_period': 27.0,
                 'other_shops': 9.0,
                 'selected_shop': 18.0,
+                'all_shops_main': 18.0,
+                'all_shops_additional': 9.0,
                 'total': 27.0,
                 'until_acc_period_end': 27.0
             }
@@ -381,7 +383,7 @@ class TestWorkersStatsGetter(TestsHelperMixin, APITestCase):
         self._test_cache(2, [self.employee.id, self.employee2.id])
 
         with mock.patch.object(transaction, 'on_commit', lambda t: t()):
-            region2 = Region.objects.create(name='Татарстан')
+            region2 = Region.objects.create(name='Татарстан', network=self.network)
             self.shop.region = region2
             self.shop.save()
             self._test_cache(2, [self.employee.id, self.employee2.id])

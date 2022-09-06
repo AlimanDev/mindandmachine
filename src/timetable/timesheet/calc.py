@@ -69,8 +69,11 @@ class TimesheetCalculator:
             'employee__user',
             'shop',
             'employment__shop',
-            'employment__position',
+            'employment__position__breaks',
             'type',
+            'closest_plan_approved',
+            'shop__network__breaks', 
+            'shop__settings__breaks',
         ).prefetch_related(
             Prefetch('work_types',
                      queryset=WorkType.objects.all().select_related('work_type_name', 'work_type_name__position'),
@@ -141,6 +144,9 @@ class TimesheetCalculator:
             return
         work_type_name = self._get_work_type_name(worker_day=plan_wd)
         is_absent = day_in_past and not plan_wd.type.is_dayoff
+        is_special = not plan_wd.type.is_dayoff and not plan_wd.type.is_work_hours
+        if is_absent and is_special:
+            return
         d = {
             'employee_id': self.employee.id,
             'dt': dt,
@@ -149,7 +155,9 @@ class TimesheetCalculator:
             'work_type_name': work_type_name,
             'fact_timesheet_type_id': WorkerDay.TYPE_ABSENSE if is_absent else plan_wd.type_id,
             'fact_timesheet_source': TimesheetItem.SOURCE_TYPE_SYSTEM if is_absent else TimesheetItem.SOURCE_TYPE_PLAN,
+            'is_vacancy': plan_wd.is_vacancy,
         }
+        # рефакторинг
         if not day_in_past and not plan_wd.type.is_dayoff:
             total_hours, day_hours, night_hours = plan_wd.calc_day_and_night_work_hours()
             d['fact_timesheet_dttm_work_start'] = plan_wd.dttm_work_start_tabel
@@ -157,11 +165,16 @@ class TimesheetCalculator:
             d['fact_timesheet_total_hours'] = total_hours
             d['fact_timesheet_day_hours'] = day_hours
             d['fact_timesheet_night_hours'] = night_hours
-        if (plan_wd.type.is_dayoff and plan_wd.type.is_work_hours):
+        if plan_wd.type.is_work_hours and plan_wd.type.is_dayoff:
             dayoff_work_hours = plan_wd.work_hours.total_seconds() / 3600
             d['fact_timesheet_total_hours'] = dayoff_work_hours
             d['fact_timesheet_day_hours'] = dayoff_work_hours
             d['fact_timesheet_night_hours'] = 0
+        if plan_wd.type.is_work_hours and is_absent and self.wd_types_dict.get(WorkerDay.TYPE_ABSENSE).is_work_hours:
+            total_hours, day_hours, night_hours = plan_wd.calc_day_and_night_work_hours()
+            d['fact_timesheet_total_hours'] = total_hours
+            d['fact_timesheet_day_hours'] = day_hours
+            d['fact_timesheet_night_hours'] = night_hours
 
         fact_timesheet_dict.setdefault(empl_dt_key, []).append(d)
 
@@ -193,6 +206,8 @@ class TimesheetCalculator:
                 wd_dict['fact_timesheet_total_hours'] = total_hours
                 wd_dict['fact_timesheet_day_hours'] = day_hours
                 wd_dict['fact_timesheet_night_hours'] = night_hours
+                wd_dict['is_vacancy'] = worker_day.closest_plan_approved.is_vacancy \
+                    if (worker_day.is_fact and worker_day.closest_plan_approved_id) else worker_day.is_vacancy
             if (worker_day.type.is_dayoff and worker_day.type.is_work_hours):
                 dayoff_work_hours = worker_day.work_hours.total_seconds() / 3600
                 wd_dict['fact_timesheet_total_hours'] = dayoff_work_hours
@@ -210,8 +225,10 @@ class TimesheetCalculator:
             type_id=WorkerDay.TYPE_EMPTY,
         ).select_related(
             'employee__user__network',
-            'shop__network',
+            'shop__network__breaks', 
             'type',
+            'shop__settings__breaks',
+            'employment__position__breaks',
         ).prefetch_related(
             Prefetch('work_types',
                      queryset=WorkType.objects.all().select_related('work_type_name', 'work_type_name__position'),
@@ -283,10 +300,11 @@ class TimesheetCalculator:
         )
         fact_timesheet_data = self._get_fact_timesheet_data(dt_start, dt_end)
         fiscal_timesheet.init_fact_timesheet(fact_timesheet_data)
+        network = self.employee.user.network
 
         logger.info(f'fact timesheet received')
-        if settings.FISCAL_SHEET_DIVIDER_ALIAS:
-            fiscal_timesheet_divider_cls = FISCAL_SHEET_DIVIDERS_MAPPING.get(settings.FISCAL_SHEET_DIVIDER_ALIAS)
+        if network.fiscal_sheet_divider_alias:
+            fiscal_timesheet_divider_cls = FISCAL_SHEET_DIVIDERS_MAPPING.get(network.fiscal_sheet_divider_alias)
             if fiscal_timesheet_divider_cls:
                 fiscal_timesheet_divider = fiscal_timesheet_divider_cls(fiscal_timesheet=fiscal_timesheet)
                 fiscal_timesheet_divider.divide()

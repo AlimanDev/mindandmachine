@@ -49,12 +49,6 @@ class SawhSettingsHelperMixin(TestsHelperMixin):
             tm_close_dict='{"all": "22:00:00"}',
         )
         cls.group = GroupFactory(network=cls.network)
-        cls.worker_position = WorkerPositionFactory(group=cls.group)
-        cls.worker = UserFactory(network=cls.network)
-        cls.employee = EmployeeFactory(user=cls.worker)
-        cls.employment = EmploymentFactory(
-            dt_hired='2001-01-01', dt_fired='3999-12-12',
-            employee=cls.employee, shop=cls.shop, position=cls.worker_position)
         cls.dt = date(2021, 1, 1)
         cls.add_group_perm(cls.group, 'ShopSchedule', 'GET')
         cls.add_group_perm(cls.group, 'ShopSchedule', 'PUT')
@@ -68,7 +62,12 @@ class SawhSettingsHelperMixin(TestsHelperMixin):
             year=2021,
             sawh_settings=cls.sawh_settings,
         )
-        cls.sawh_settings_mapping.shops.add(cls.shop)
+        cls.worker_position = WorkerPositionFactory(group=cls.group, sawh_settings=cls.sawh_settings)
+        cls.worker = UserFactory(network=cls.network)
+        cls.employee = EmployeeFactory(user=cls.worker)
+        cls.employment = EmploymentFactory(
+            dt_hired='2001-01-01', dt_fired='3999-12-12',
+            employee=cls.employee, shop=cls.shop, position=cls.worker_position)
 
         fill_calendar.fill_days('2021.01.01', '2021.12.31', cls.shop.region_id)
 
@@ -90,15 +89,17 @@ class SawhSettingsHelperMixin(TestsHelperMixin):
 
     def _test_hours_for_period(
             self, dt_from, dt_to, expected_norm_hours, hours_k='sawh_hours', plan_fact_k='plan',
-            approved_k='approved', period_k='selected_period'):
+            approved_k='approved', period_k='selected_period', employee_id=None, round_to=8):
         workers_stats_getter = WorkersStatsGetter(
-            employee_id=self.employee.id,
+            employee_id=employee_id or self.employee.id,
             shop_id=self.shop.id,
             dt_from=dt_from,
             dt_to=dt_to,
         )
         workers_stats = workers_stats_getter.run()
-        norm_hours = workers_stats[self.employee.id][plan_fact_k][approved_k][hours_k][period_k]
+        norm_hours = workers_stats[employee_id or self.employee.id][plan_fact_k][approved_k][hours_k][period_k]
+        if round_to:
+            expected_norm_hours = round(expected_norm_hours, round_to)
         self.assertEqual(norm_hours, expected_norm_hours)
         return norm_hours
 
@@ -236,7 +237,6 @@ class TestSAWHSettingsQuarterAccPeriod(SawhSettingsHelperMixin, TestCase):
         self.employment.dt_hired = '2021-01-01'
         self.employment.dt_fired = '2021-02-09'
         self.employment.save()
-        worker_position2 = WorkerPositionFactory(network=self.network)
         sawh_settings2 = SAWHSettings.objects.create(
             network=self.network,
             work_hours_by_months={
@@ -245,12 +245,7 @@ class TestSAWHSettingsQuarterAccPeriod(SawhSettingsHelperMixin, TestCase):
               'm3': 0.375,
             },
         )
-        sawh_settings_mapping2 = SAWHSettingsMapping.objects.create(
-            year=2021,
-            sawh_settings=sawh_settings2,
-            priority=10,
-        )
-        sawh_settings_mapping2.positions.add(worker_position2)
+        worker_position2 = WorkerPositionFactory(network=self.network, sawh_settings=sawh_settings2)
         EmploymentFactory(
             dt_hired='2021-02-10', dt_fired='3999-12-12',
             employee=self.employee, shop=self.shop, position=worker_position2)
@@ -279,7 +274,6 @@ class TestSAWHSettingsQuarterAccPeriod(SawhSettingsHelperMixin, TestCase):
         self.employment.dt_hired = '2021-01-01'
         self.employment.dt_fired = '2021-02-09'
         self.employment.save()
-        worker_position2 = WorkerPositionFactory(network=self.network)
         sawh_settings2 = SAWHSettings.objects.create(
             network=self.network,
             work_hours_by_months={
@@ -288,12 +282,7 @@ class TestSAWHSettingsQuarterAccPeriod(SawhSettingsHelperMixin, TestCase):
               'm3': 0.3125,
             },
         )
-        sawh_settings_mapping2 = SAWHSettingsMapping.objects.create(
-            year=2021,
-            sawh_settings=sawh_settings2,
-            priority=10,
-        )
-        sawh_settings_mapping2.positions.add(worker_position2)
+        worker_position2 = WorkerPositionFactory(network=self.network, sawh_settings=sawh_settings2)
         EmploymentFactory(
             dt_hired='2021-02-10', dt_fired='2021-03-20',
             employee=self.employee, shop=self.shop, position=worker_position2)
@@ -368,8 +357,63 @@ class TestSAWHSettingsQuarterAccPeriod(SawhSettingsHelperMixin, TestCase):
         )
         self.assertEqual(res + res2 + res3, 526)
 
+    def test_fixed_sawh_settings_type_by_employee(self):
+        sawh_settings1 = SAWHSettings.objects.create(
+            network=self.network,
+            name='1',
+            type=SAWHSettings.FIXED_HOURS,
+        )
+        SAWHSettingsMapping.objects.create(
+            year=2021,
+            sawh_settings=sawh_settings1,
+            work_hours_by_months={
+                'm1': 100,
+                'm2': 100,
+            },
+        )
+        employment1 = EmploymentFactory(
+            employee__user__network=self.network,
+            dt_hired='2001-01-01', dt_fired='3999-12-12',
+            shop=self.shop, position=self.worker_position,
+            sawh_settings=sawh_settings1,
+        )
+
+        sawh_settings2 = SAWHSettings.objects.create(
+            network=self.network,
+            name='2',
+            type=SAWHSettings.FIXED_HOURS,
+        )
+        SAWHSettingsMapping.objects.create(
+            year=2021,
+            sawh_settings=sawh_settings2,
+            work_hours_by_months={
+                'm1': 200,
+                'm2': 200,
+            },
+        )
+        employment2 = EmploymentFactory(
+            employee__user__network=self.network,
+            dt_hired='2001-01-01', dt_fired='3999-12-12',
+            shop=self.shop, position=self.worker_position,
+            sawh_settings=sawh_settings2,
+        )
+
+        self._test_hours_for_period(
+            dt_from=date(2021, 2, 1),
+            dt_to=date(2021, 2, 28),
+            expected_norm_hours=100,
+            employee_id=employment1.employee_id,
+        )
+        self._test_hours_for_period(
+            dt_from=date(2021, 2, 1),
+            dt_to=date(2021, 2, 28),
+            expected_norm_hours=200,
+            employee_id=employment2.employee_id,
+        )
+
     def test_override_region_prod_cal(self):
-        self.sawh_settings_mapping.shops.remove(self.shop)
+        self.worker_position.sawh_settings = None
+        self.worker_position.save()
         subregion = RegionFactory(parent=self.region, name='Подрегион', code='subregion')
         ProductionDay.objects.create(region=subregion, dt=date(2021, 2, 10), type=ProductionDay.TYPE_HOLIDAY)
         self.shop.region = subregion
@@ -380,9 +424,11 @@ class TestSAWHSettingsQuarterAccPeriod(SawhSettingsHelperMixin, TestCase):
             expected_norm_hours=143,
         )
 
-    @override_settings(FISCAL_SHEET_DIVIDER_ALIAS='nahodka')
     def test_correct_norm_hours_last_month_acc_period(self):
-        self.sawh_settings_mapping.shops.remove(self.shop)
+        self.network.fiscal_sheet_divider_alias = 'nahodka'
+        self.network.save()
+        self.worker_position.sawh_settings = None
+        self.worker_position.save()
         self._test_hours_for_period(
             dt_from=date(2021, 7, 1),
             dt_to=date(2021, 7, 31),
@@ -633,9 +679,11 @@ class TestSAWHSettingsQuarterAccPeriod(SawhSettingsHelperMixin, TestCase):
         self.assertEqual(timesheet_stats[self.employee.id]['main_total_hours_sum'], Decimal('162.87'))
         self.assertEqual(timesheet_stats[self.employee.id]['sawh_hours'], 162.87)
 
-    @override_settings(FISCAL_SHEET_DIVIDER_ALIAS='nahodka')
     def test_corrected_last_month_sawh_hours_not_more_than_norm_hours(self):
-        self.sawh_settings_mapping.shops.remove(self.shop)
+        self.network.fiscal_sheet_divider_alias = 'nahodka'
+        self.network.save()
+        self.worker_position.sawh_settings = None
+        self.worker_position.save()
         self._test_hours_for_period(
             dt_from=date(2021, 7, 1),
             dt_to=date(2021, 7, 31),

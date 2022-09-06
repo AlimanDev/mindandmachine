@@ -3,10 +3,12 @@ from django.utils.translation import gettext as _
 from django.conf import settings
 from rest_framework import serializers
 
+from src.base.serializers import BaseModelSerializer
+
 from ..models import TimesheetItem
 
 
-class TimesheetItemSerializer(serializers.ModelSerializer):
+class TimesheetItemSerializer(BaseModelSerializer):
     employee__tabel_code = serializers.CharField(read_only=True)
     shop_code = serializers.CharField(read_only=True)
     position_code = serializers.CharField(read_only=True)
@@ -35,7 +37,7 @@ class TimesheetItemSerializer(serializers.ModelSerializer):
         )
 
 
-class TimesheetSummarySerializer(serializers.ModelSerializer):
+class TimesheetSummarySerializer(BaseModelSerializer):
     employee__tabel_code = serializers.CharField(read_only=True)
     fact_timesheet_type = serializers.CharField(read_only=True)
     fact_timesheet_total_hours = serializers.DecimalField(read_only=True, max_digits=4, decimal_places=2)
@@ -46,6 +48,8 @@ class TimesheetSummarySerializer(serializers.ModelSerializer):
     main_timesheet_day_hours = serializers.DecimalField(read_only=True, max_digits=4, decimal_places=2)
     main_timesheet_night_hours = serializers.DecimalField(read_only=True, max_digits=4, decimal_places=2)
     additional_timesheet_hours = serializers.DecimalField(read_only=True, max_digits=4, decimal_places=2)
+    additional_timesheet_day_hours = serializers.DecimalField(read_only=True, max_digits=4, decimal_places=2)
+    additional_timesheet_night_hours = serializers.DecimalField(read_only=True, max_digits=4, decimal_places=2)
 
     class Meta:
         model = TimesheetItem
@@ -62,6 +66,8 @@ class TimesheetSummarySerializer(serializers.ModelSerializer):
             'main_timesheet_day_hours',
             'main_timesheet_night_hours',
             'additional_timesheet_hours',
+            'additional_timesheet_day_hours',
+            'additional_timesheet_night_hours',
         )
 
 

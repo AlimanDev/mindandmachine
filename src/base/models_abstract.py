@@ -22,7 +22,7 @@ class AbstractModel(BatchUpdateOrCreateModelMixin, models.Model):
 
 
 class NetworkSpecificModel(models.Model):
-    network = models.ForeignKey('base.Network', on_delete=models.PROTECT, null=True)
+    network = models.ForeignKey('base.Network', on_delete=models.PROTECT)
 
     class Meta:
         abstract = True
@@ -111,7 +111,7 @@ class AbstractActiveNamedModel(AbstractActiveModel, AbstractNamedModel):
         abstract = True
 
 
-class AbstractActiveNetworkSpecificCodeNamedModelManager(models.Manager):
+class AbstractActiveNetworkSpecificCodeNamedModelManager(AbstractActiveModelManager):
     pass
 
 

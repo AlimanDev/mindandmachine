@@ -1,3 +1,4 @@
+import json
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
@@ -22,6 +23,20 @@ class BaseFilesystemConnector(PolymorphicModel):
         verbose_name = 'Коннектор к файловой системы'
         verbose_name_plural = 'Коннекторы к файловой системе'
 
+class BaseJob(AbstractModel):
+    base_path = models.CharField(blank=True, max_length=512)
+    fs_connector = models.ForeignKey(BaseFilesystemConnector, on_delete=models.CASCADE)
+    retry_attempts = models.TextField(default='{}')
+
+    @property
+    def retries(self):
+        try:
+            return json.loads(self.retry_attempts)
+        except:
+            return {}
+
+    class Meta:
+        abstract = True
 
 class LocalFilesystemConnector(BaseFilesystemConnector):
     default_base_path = models.CharField(max_length=512, default=settings.BASE_DIR)
@@ -175,10 +190,8 @@ class ImportHistDataStrategy(ImportStrategy):
         return ImportHistDataStrategy
 
 
-class ImportJob(AbstractModel):
-    base_path = models.CharField(blank=True, max_length=512)
+class ImportJob(BaseJob):
     import_strategy = models.ForeignKey(ImportStrategy, on_delete=models.CASCADE)
-    fs_connector = models.ForeignKey(BaseFilesystemConnector, on_delete=models.CASCADE)
 
     class Meta:
         verbose_name = 'Задача импорта данных'
@@ -235,7 +248,7 @@ class SystemExportStrategy(ExportStrategy):
     def clean(self):
         period_needed_strategies = [SystemExportStrategy.WORK_HOURS_PIVOT_TABLE]
         if self.strategy_type in period_needed_strategies and self.period is None:
-            raise ValidationError(f'Для стратегии "{self.strategy_type}" обязательно выбрать период.')
+            raise ValidationError(_("For the '{}' strategy, you must select a period.").format(self.strategy_type)) # Для стратегии "{}" обязательно выбрать период.
 
     def get_strategy_cls_kwargs(self):
         kwargs = super(SystemExportStrategy, self).get_strategy_cls_kwargs()
@@ -248,10 +261,8 @@ class SystemExportStrategy(ExportStrategy):
         return SYSTEM_EXPORT_STRATEGIES_DICT.get(self.strategy_type)
 
 
-class ExportJob(AbstractModel):
-    base_path = models.CharField(blank=True, max_length=512)
+class ExportJob(BaseJob):
     export_strategy = models.ForeignKey(ExportStrategy, on_delete=models.CASCADE)
-    fs_connector = models.ForeignKey(BaseFilesystemConnector, on_delete=models.CASCADE)
 
     class Meta:
         verbose_name = 'Задача экспорта данных'

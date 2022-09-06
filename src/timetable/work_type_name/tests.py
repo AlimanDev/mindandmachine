@@ -3,37 +3,39 @@ from rest_framework.test import APITestCase
 
 from src.forecast.models import OperationType, OperationTypeName
 from src.timetable.models import WorkTypeName, WorkType
-from src.util.test import create_departments_and_users
+from src.util.mixins.tests import TestsHelperMixin
 
 
-class TestWorkTypeName(APITestCase):
+class TestWorkTypeName(APITestCase, TestsHelperMixin):
     USER_USERNAME = "user1"
     USER_EMAIL = "q@q.q"
     USER_PASSWORD = "4242"
 
-    def setUp(self):
-        self.url = '/rest_api/work_type_name/'
+    @classmethod
+    def setUpTestData(cls):
+        cls.url = '/rest_api/work_type_name/'
 
-        create_departments_and_users(self)
-        self.work_type_name1 = WorkTypeName.objects.create(
+        cls.create_departments_and_users()
+        cls.work_type_name1 = WorkTypeName.objects.create(
             name='Кассы',
-            network=self.network,
+            network=cls.network,
         )
-        self.wt = WorkType.objects.create(shop=self.shop, work_type_name=self.work_type_name1)
-        self.work_type_name2 = WorkTypeName.objects.create(
+        cls.wt = WorkType.objects.create(shop=cls.shop, work_type_name=cls.work_type_name1)
+        cls.work_type_name2 = WorkTypeName.objects.create(
             name='Тип_кассы_2',
-            network=self.network,
+            network=cls.network,
         )
-        self.wt2 = WorkType.objects.create(shop=self.shop2, work_type_name=self.work_type_name2)
-        self.work_type_name3 = WorkTypeName.objects.create(
+        cls.wt2 = WorkType.objects.create(shop=cls.shop2, work_type_name=cls.work_type_name2)
+        cls.work_type_name3 = WorkTypeName.objects.create(
             name='Тип_кассы_3',
-            network=self.network,
+            network=cls.network,
         )
-        self.work_type_name4 = WorkTypeName.objects.create(
+        cls.work_type_name4 = WorkTypeName.objects.create(
             name='тип_кассы_4',
-            network=self.network,
+            network=cls.network,
         )
 
+    def setUp(self):
         self.client.force_authenticate(user=self.user1)
 
     def test_get_list(self):

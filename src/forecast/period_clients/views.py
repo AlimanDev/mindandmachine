@@ -1,20 +1,20 @@
-from datetime import datetime, timedelta, time
+from datetime import datetime, timedelta
 from rest_framework import serializers, status
 from rest_framework.response import Response
 from django_filters.rest_framework import FilterSet
 from django_filters import DateFilter, NumberFilter
+from src.base.serializers import BaseModelSerializer
 from src.util.utils import JsonResponse
 from src.base.permissions import FilteredListPermission
 from src.forecast.models import OperationType, OperationTypeName, PeriodClients
-from django.db.models import Q, F, Sum
+from django.db.models import F, Sum
+from django.utils.translation import gettext_lazy as _
 from src.conf.djconfig import QOS_DATETIME_FORMAT, QOS_DATE_FORMAT
 from rest_framework.decorators import action
-from src.base.models import Shop, Employment, FunctionGroup
-from src.util.models_converter import Converter
+from src.base.models import Shop
 from src.forecast.load_template.utils import apply_reverse_formula # чтобы тесты не падали
 from src.forecast.period_clients.utils import upload_demand, download_demand_xlsx_util, create_demand, upload_demand_util_v3
 from src.util.upload import get_uploaded_file
-import json
 from src.base.views_abstract import BaseModelViewSet
 from drf_yasg.utils import swagger_auto_schema
 
@@ -36,14 +36,14 @@ class PeriodClientsUpdateSerializer(PeriodClientsDeleteSerializer):
         super(PeriodClientsUpdateSerializer, self).is_valid(*args, **kwargs)
 
         if self.validated_data.get('from_dttm') > self.validated_data.get('to_dttm'):
-            raise serializers.ValidationError('Дата начала не может быть больше даты окончания')
+            raise serializers.ValidationError(_('Date start should be less then date end'))
 
         if self.validated_data.get('from_dttm') < datetime.now() and \
             (self.validated_data.get('type') is 'L' or self.validated_data.get('type') is 'S'):
-            raise serializers.ValidationError('Нельзя изменить прогноз спроса за прошлый период')
+            raise serializers.ValidationError(_('It is impossible to change the demand forecast for the previous period')) # Нельзя изменить прогноз спроса за прошлый период
 
 
-class PeriodClientsSerializer(serializers.ModelSerializer):
+class PeriodClientsSerializer(BaseModelSerializer):
     dttm_forecast = serializers.DateTimeField(format=QOS_DATETIME_FORMAT, read_only=True)
     class Meta:
         model = PeriodClients

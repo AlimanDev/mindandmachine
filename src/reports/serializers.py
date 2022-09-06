@@ -1,5 +1,8 @@
 from rest_framework import serializers
 
+from src.base.models import Shop
+
+
 class ValidateMixin:
     def _validate_ids_value(self, data, name):
         if name in data:
@@ -33,4 +36,15 @@ class ReportFilterSerializer(serializers.Serializer, ValidateMixin):
         attrs = self._validate_bool_value(attrs, 'is_vacancy')
         attrs = self._validate_bool_value(attrs, 'is_outsource')
 
+        return attrs
+
+
+class ConsolidatedTimesheetReportSerializer(serializers.Serializer):
+    shop_id__in = serializers.CharField()
+    dt_from = serializers.DateField()
+    dt_to = serializers.DateField()
+    group_by = serializers.ChoiceField(choices=['employee', 'employee_position', 'position'], allow_blank=False)
+
+    def validate(self, attrs):
+        attrs['group_by'] = attrs['group_by'].split('_')
         return attrs

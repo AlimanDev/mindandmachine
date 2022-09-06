@@ -22,6 +22,8 @@ class TestsHelperMixin:
     USER_EMAIL = "q@q.q"
     USER_PASSWORD = "4242"
 
+    maxDiff = None
+
     def _set_authorization_token(self, login):
         response = self.client.post(
             path=reverse('time_attendance_auth'),
@@ -56,8 +58,8 @@ class TestsHelperMixin:
         return response
 
     @classmethod
-    def create_departments_and_users(cls):
-        create_departments_and_users(cls)
+    def create_departments_and_users(cls, dt=None):
+        create_departments_and_users(cls, dt=dt)
 
     @staticmethod
     def get_url(view_name, *args, **kwargs: dict):
@@ -235,19 +237,27 @@ class TestsHelperMixin:
     def wd_types_dict(self):
         return WorkerDayType.get_wd_types_dict()
 
-    def _create_worker_day(self, employment, dttm_work_start, dttm_work_end, is_fact=False, is_approved=True,
-                           shop_id=None):
-        return WorkerDayFactory(
+    @classmethod
+    def _create_worker_day(cls, employment, dttm_work_start, dttm_work_end, dt=None, is_fact=False, is_approved=True,
+                           shop_id=None, closest_plan_approved_id=None, created_by=None, outsources=[], is_vacancy=False, work_type_name='Работа'):
+        wd = WorkerDayFactory(
             is_approved=is_approved,
             is_fact=is_fact,
-            shop_id=shop_id or employment.shop_id,
+            shop_id=shop_id or getattr(employment, 'shop_id', None),
             employment=employment,
-            employee_id=employment.employee_id,
-            dt=dttm_work_start.date(),
+            employee_id=getattr(employment, 'employee_id', None),
+            dt=dt or getattr(cls, 'dt', None) or dttm_work_start.date(),
             type_id=WorkerDay.TYPE_WORKDAY,
             dttm_work_start=dttm_work_start,
             dttm_work_end=dttm_work_end,
+            closest_plan_approved_id=closest_plan_approved_id,
+            created_by=created_by,
+            is_vacancy=is_vacancy,
+            cashbox_details__work_type__work_type_name__name=work_type_name,
         )
+        if outsources:
+            wd.outsources.add(*outsources)
+        return wd
 
     @staticmethod
     def save_df_as_excel(df, filename):
@@ -276,3 +286,15 @@ class TestsHelperMixin:
         for wdt in WorkerDayType.objects.filter(is_work_hours=False):
             wdt.allowed_additional_types.add(type_workday)
             wdt.save()
+
+    @staticmethod
+    def _create_att_record(type, dttm, user_id, employee_id, shop_id, terminal=True):
+        from src.timetable.models import AttendanceRecords
+        return AttendanceRecords.objects.create(
+            dttm=dttm,
+            shop_id=shop_id,
+            user_id=user_id,
+            employee_id=employee_id,
+            type=type,
+            terminal=terminal,
+        )

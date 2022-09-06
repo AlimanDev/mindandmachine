@@ -68,18 +68,19 @@ class TestAutoWorkerExchange(APITestCase, TestsHelperMixin):
     def setUpTestData(cls):
         cls.set_wd_allowed_additional_types()
         cls.dt_now = now().date()
+        cls.network = Network.objects.create(
+            primary_color='#BDF82',
+            secondary_color='#390AC',
+        )
         cls.region = Region.objects.create(
             name='Москва',
             code=77,
+            network=cls.network,
         )
 
         fill_calendar.main('2018.1.1', (datetime.datetime.now() + datetime.timedelta(days=365)).strftime('%Y.%m.%d'),
                            region_id=1)
 
-        cls.network = Network.objects.create(
-            primary_color='#BDF82',
-            secondary_color='#390AC',
-        )
         cls.network.set_settings_value(
             'shop_name_form', 
             {
@@ -92,11 +93,11 @@ class TestAutoWorkerExchange(APITestCase, TestsHelperMixin):
         )
         cls.network.save()
         cls.breaks = Break.objects.create(network=cls.network, name='Default')
-        cls.shop_settings = ShopSettings.objects.create(breaks=cls.breaks)
+        cls.shop_settings = ShopSettings.objects.create(breaks=cls.breaks, network=cls.network)
         Shop.objects.all().update(network=cls.network)
 
-        cls.director_group = Group.objects.create(name='Director')
-        cls.admin_group = Group.objects.create(name='ADMIN')
+        cls.director_group = Group.objects.create(name='Director', network=cls.network)
+        cls.admin_group = Group.objects.create(name='ADMIN', network=cls.network)
         FunctionGroup.objects.bulk_create([
             FunctionGroup(
                 group=cls.admin_group,
@@ -1232,6 +1233,8 @@ class TestVacancyActions(APITestCase, TestsHelperMixin):
             type_id=WorkerDay.TYPE_WORKDAY,
             shop=self.shop,
         )
+        dttm_added_approved_vacancy = approved_vacancy.dttm_added
+        dttm_modified_approved_vacancy = approved_vacancy.dttm_modified
         approved_employee_holiday = WorkerDay.objects.create(
             is_approved=True,
             dt=dt,
@@ -1250,10 +1253,14 @@ class TestVacancyActions(APITestCase, TestsHelperMixin):
 
         self.assertEqual(WorkerDay.objects.filter(id=approved_employee_holiday.id).count(), 0)
         self.assertEqual(WorkerDay.objects.filter(id=not_approved_employee_holiday.id).count(), 0)
-        self.assertEqual(WorkerDay.objects.filter(id=approved_vacancy.id, employee=self.employee2).count(), 1)
+        approved_vacancy.refresh_from_db()
+        self.assertEqual(approved_vacancy.employee_id, self.employee2.id)
+        self.assertEqual(approved_vacancy.dttm_added, dttm_added_approved_vacancy)
+        self.assertNotEqual(approved_vacancy.dttm_modified, dttm_modified_approved_vacancy)
         wd = WorkerDay.objects.filter(employee=self.employee2, is_approved=False, type_id=WorkerDay.TYPE_WORKDAY, dt=approved_vacancy.dt).first()
         self.assertIsNotNone(wd)
         self.assertEqual(wd.parent_worker_day_id, approved_vacancy.id)
+        self.assertNotEqual(wd.dttm_added, dttm_added_approved_vacancy)
 
     def test_confirm_vacancy_from_holiday_when_not_approved_work_day(self):
         dt = datetime.date.today()

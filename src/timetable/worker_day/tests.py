@@ -35,7 +35,8 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
         cls.worker_stat_url = '/rest_api/worker_day/worker_stat/'
         cls.url_approve = '/rest_api/worker_day/approve/'
         cls.daily_stat_url = '/rest_api/worker_day/daily_stat/'
-        cls.work_type_name = WorkTypeName.objects.create(name='Магазин')
+        cls.batch_update_or_create_url = '/rest_api/worker_day/batch_update_or_create/'
+        cls.work_type_name = WorkTypeName.objects.create(name='Магазин', network=cls.network)
         cls.work_type = WorkType.objects.create(
             work_type_name=cls.work_type_name,
             shop=cls.shop,
@@ -138,7 +139,8 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
 
         otn1 = OperationTypeName.objects.create(
             is_special=True,
-            name='special'
+            name='special',
+            network=self.network,
         )
         ot1 = OperationType.objects.create(
             operation_type_name=otn1,
@@ -612,7 +614,8 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
     def _create_wd_and_task(self, wd_type_id, start_timedelta, end_timedelta):
         wd = self.create_worker_day(type_id=wd_type_id, shop=self.shop, dt=self.dt, is_approved=False, is_fact=False)
         otn = OperationTypeName.objects.create(
-            name='Приём врача'
+            name='Приём врача',
+            network=self.network,
         )
         ot = OperationType.objects.create(
             operation_type_name=otn,
@@ -733,29 +736,106 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
         response = self.client.post(f"{self.url_approve}", data, format='json')
         self.assertEqual(response.status_code, 200)
 
+    def test_vacation_wh_unchanged_from_batch_update_or_create(self):
+        WorkerDayType.objects.filter(code=WorkerDay.TYPE_VACATION).update(
+            get_work_hours_method=WorkerDayType.GET_WORK_HOURS_METHOD_TYPE_MANUAL_OR_MONTH_AVERAGE_SAWH_HOURS,
+            is_work_hours=True
+        )
+        vacation = self.create_worker_day(type_id=WorkerDay.TYPE_VACATION)
+        code = 'some-code-employee2-vacation'
+        vacation.code = code
+        vacation.save()
+
+        #Интеграция 1C с кодом
+        data = {
+            'data': [
+                {
+                    'code': code,
+                    'tabel_code': self.employee2.tabel_code,
+                    'is_fact': False,
+                    'is_approved': False,
+                    'dt': self.dt,
+                    'type': WorkerDay.TYPE_VACATION,
+                    'work_hours': time(9) #должно игнорироваться            
+                }
+            ],
+            'options': {
+                'update_key_field': 'code',
+            }
+        }
+        res = self.client.post(self.batch_update_or_create_url, data, format='json')
+        self.assertEqual(res.status_code, 200)
+        wd = WorkerDay.objects.get(employee=self.employee2)
+        self.assertEqual(vacation.id, wd.id)
+        self.assertEqual(vacation.work_hours, wd.work_hours)
+
+        #Ручное изменение на фронте
+        data = {
+            'data': [
+                {
+                    'id': vacation.id,
+                    'tabel_code': self.employee2.tabel_code,
+                    'is_fact': False,
+                    'is_approved': False,
+                    'dt': self.dt,
+                    'type': WorkerDay.TYPE_VACATION,
+                    'work_hours': time(9) #должно обновиться           
+                }
+            ],
+            'options': {
+                'delete_scope_values_list': [
+                    {
+                        'employee_id': self.employee2.id,
+                        'dt': self.dt,
+                        'is_fact': False,
+                        'is_approved': False
+                    }
+                ]
+            }
+        }
+        res = self.client.post(self.batch_update_or_create_url, data, format='json')
+        self.assertEqual(res.status_code, 200)
+        wd = WorkerDay.objects.get(employee=self.employee2)
+        self.assertEqual(vacation.id, wd.id)
+        self.assertEqual(wd.work_hours, timedelta(hours=9))
+
 
 class TestUploadDownload(TestsHelperMixin, APITestCase):
     USER_USERNAME = "user1"
     USER_EMAIL = "q@q.q"
     USER_PASSWORD = "4242"
 
-    def setUp(self):
-        super().setUp()
-        create_departments_and_users(self)
+    @classmethod
+    def setUpTestData(cls):
+        cls.create_departments_and_users()
         WorkerPosition.objects.bulk_create(
             [
                 WorkerPosition(
                     name=name,
+                    network=cls.network,
                 )
                 for name in ['Директор магазина', 'Продавец', 'Продавец-кассир', 'ЗДМ']
             ]
         )
 
-        WorkType.objects.create(work_type_name=WorkTypeName.objects.create(name='Кассы'), shop_id=self.shop.id)
-        self.url = '/rest_api/worker_day/'
-        self.network.add_users_from_excel = True
-        self.network.allow_creation_several_wdays_for_one_employee_for_one_date = True
-        self.network.save()
+        WorkerDayType.objects.filter(code=WorkerDay.TYPE_SICK).update(
+            get_work_hours_method=WorkerDayType.GET_WORK_HOURS_METHOD_TYPE_MANUAL,
+            is_work_hours=True,
+        )
+        cls.cahbox_name = WorkTypeName.objects.create(name='Кассы', network=cls.network)
+        cls.dm_name = WorkTypeName.objects.create(name='ДМ', network=cls.network)
+        cls.cashbox_work_type = WorkType.objects.create(work_type_name=cls.cahbox_name, shop_id=cls.shop.id)
+        cls.dm_work_type = WorkType.objects.create(work_type_name=cls.dm_name, shop_id=cls.shop.id)
+        cls.url = '/rest_api/worker_day/'
+        cls.dm_position = WorkerPosition.objects.get(name='Директор магазина')
+        cls.seller_position = WorkerPosition.objects.get(name='Продавец')
+        cls.dm_position.default_work_type_names.add(cls.dm_name)
+        cls.seller_position.default_work_type_names.add(cls.cahbox_name)
+        cls.network.add_users_from_excel = True
+        cls.network.allow_creation_several_wdays_for_one_employee_for_one_date = True
+        cls.network.save()
+    
+    def setUp(self):
         self.client.force_authenticate(user=self.user1)
 
     def test_upload_timetable_match_tabel_code(self):
@@ -769,11 +849,18 @@ class TestUploadDownload(TestsHelperMixin, APITestCase):
         self.assertEqual(Employee.objects.filter(user=user).count(), 2)
         self.assertTrue(Employee.objects.filter(tabel_code='A23739').exists())
 
+    def _assertWorkerDay(self, tabel_code, dt, is_vacancy=False, work_type_id=None, type_id=WorkerDay.TYPE_WORKDAY, work_hours=None):
+        wd = WorkerDay.objects.get(employee__tabel_code=tabel_code, dt=dt, is_fact=False, is_approved=False)
+        self.assertEqual(wd.is_vacancy, is_vacancy)
+        self.assertEqual(wd.type_id, type_id)
+        if work_type_id:
+            self.assertEqual(wd.work_types.first().id, work_type_id)
+        if work_hours:
+            self.assertEqual(wd.work_hours, work_hours)
+
     def test_upload_timetable(self):
-        file = open('etc/scripts/timetable.xlsx', 'rb')
-        with override_settings(UPLOAD_TT_MATCH_EMPLOYMENT=False):
+        with override_settings(UPLOAD_TT_MATCH_EMPLOYMENT=False), open('etc/scripts/timetable.xlsx', 'rb') as file:
             response = self.client.post(f'{self.url}upload/', {'shop_id': self.shop.id, 'file': file}, HTTP_ACCEPT_LANGUAGE='ru')
-        file.close()
         self.assertEqual(response.status_code, 200)
         self.assertEqual(WorkerDay.objects.filter(is_approved=False, source=WorkerDay.SOURCE_UPLOAD).count(), 181)
         self.assertEqual(WorkerDay.objects.filter(
@@ -785,6 +872,14 @@ class TestUploadDownload(TestsHelperMixin, APITestCase):
         self.assertEqual(User.objects.filter(last_name='Смешнов').count(), 1)
         user = User.objects.filter(last_name='Смешнов').first()
         self.assertEqual(Employee.objects.filter(user=user).count(), 2)
+        self._assertWorkerDay('A23739', '2020-04-13', is_vacancy=True, work_type_id=self.dm_work_type.id)
+        self._assertWorkerDay('A23739', '2020-04-14', is_vacancy=True, work_type_id=self.cashbox_work_type.id)
+        self._assertWorkerDay('28479', '2020-04-14', is_vacancy=True, work_type_id=self.dm_work_type.id)
+        self._assertWorkerDay('27511', '2020-04-13', is_vacancy=True, work_type_id=self.cashbox_work_type.id)
+        self._assertWorkerDay('27665', '2020-04-14', work_hours=timedelta(hours=10), type_id=WorkerDay.TYPE_SICK)
+        self._assertWorkerDay('27665', '2020-04-15', work_hours=timedelta(hours=10), type_id=WorkerDay.TYPE_SICK)
+        self._assertWorkerDay('26856', '2020-04-14', work_type_id=self.cashbox_work_type.id)
+
 
     def test_upload_timetable_leading_zeros(self):
         file = open('etc/scripts/timetable_leading_zeros.xlsx', 'rb')
@@ -880,7 +975,6 @@ class TestUploadDownload(TestsHelperMixin, APITestCase):
         self.assertEqual(tabel[tabel.columns[1]][11], 'Иванов Иван Иванович')
         self.assertEqual(tabel[tabel.columns[26]][14], 'В')
 
-    @override_settings(FISCAL_SHEET_DIVIDER_ALIAS='nahodka')
     def test_download_timetable_for_inspection(self):
         fill_calendar('2020.4.1', '2021.12.31', self.region.id)
         WorkerDayType.objects.filter(code=WorkerDay.TYPE_VACATION).update(is_dayoff=True, is_work_hours=True)
@@ -889,6 +983,7 @@ class TestUploadDownload(TestsHelperMixin, APITestCase):
         file.close()
         self.network.set_settings_value('timetable_add_holiday_count_field', True)
         self.network.set_settings_value('timetable_add_vacation_count_field', True)
+        self.network.fiscal_sheet_divider_alias = 'nahodka'
         self.network.save()
         WorkerDay.objects.update(is_approved=True)
         calc_timesheets(dt_from=date(2020, 4, 1), dt_to=date(2020, 4, 30))
@@ -942,8 +1037,8 @@ class TestUploadDownload(TestsHelperMixin, APITestCase):
         self.assertEqual(tabel[tabel.columns[4]][16], 'К 10:00-21:00')
         self.assertEqual(tabel[tabel.columns[5]][16], 'ОТ 8.0')
         self.assertEqual(tabel[tabel.columns[33]][16], '2')
-        self.assertEqual(tabel[tabel.columns[34]][16], '26')
-        self.assertEqual(tabel[tabel.columns[37]][16], '14')
+        self.assertEqual(tabel[tabel.columns[34]][16], '46')
+        self.assertEqual(tabel[tabel.columns[37]][16], '12')
         self.assertEqual(tabel[tabel.columns[38]][16], '1')
 
     def test_download_timetable_with_child_region(self):
@@ -952,6 +1047,7 @@ class TestUploadDownload(TestsHelperMixin, APITestCase):
             name='Child',
             parent=self.region,
             code='child',
+            network=self.network,
         )
         ProductionDay.objects.create(
             dt='2020-04-04',

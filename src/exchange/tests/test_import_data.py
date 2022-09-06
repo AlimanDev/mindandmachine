@@ -1,9 +1,12 @@
+from datetime import datetime, timedelta
 import json
 import os
+from celery.app.task import Task
 
+from unittest import mock
 from django.conf import settings
 from django.db.models import Sum
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from freezegun import freeze_time
 
 from src.base.tests.factories import (
@@ -16,6 +19,7 @@ from src.exchange.models import (
     ImportJob,
     LocalFilesystemConnector,
 )
+from src.exchange.tasks import run_import_job
 from src.forecast.models import (
     Receipt,
     PeriodClients,
@@ -434,3 +438,46 @@ class TestAmbarImportData(TestsHelperMixin, TestCase):
             f'Error_2021-11-13.csv',
             import_error_results['errors'][0]
         )
+
+class TestImportRetry(TestCase):
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.local_fs_connector = LocalFilesystemConnector.objects.create(
+            name='local',
+        )
+        cls.import_shop_mapping_strategy = ImportShopMappingStrategy.objects.create(
+            system_code='',
+            filename='',
+            file_format='xlsx',
+            wfm_shop_name_field_name='',
+            external_shop_code_field_name='',
+        )
+        cls.import_job = ImportJob.objects.create(
+            fs_connector=cls.local_fs_connector,
+            import_strategy=cls.import_shop_mapping_strategy,
+            retry_attempts=json.dumps({1: 8600, 3: 45}),
+        )
+    
+    @freeze_time('2022-02-16')
+    @override_settings(CELERY_TASK_ALWAYS_EAGER=True)
+    @mock.patch.object(Task, 'retry', side_effect=Task.retry, autospec=Task.retry) # чтобы отследить вызовы, не трогая функционал
+    @mock.patch.object(ImportJob, 'run', side_effect=Exception())
+    @mock.patch('celery.app.task.Context.called_directly', new_callable=mock.PropertyMock)
+    def test_retry(self, called_directly, mock_run, mock_retry):
+        dttm = datetime(2022, 2, 16)
+        called_directly.return_value = False
+        run_import_job.delay(self.import_job.id)
+        self.assertEqual(mock_retry.call_count, 4)
+        mock_retry.assert_has_calls(
+            [
+                mock.call(mock.ANY, max_retries=3, eta=dttm + timedelta(seconds=8600), exc=mock.ANY),
+                mock.call(mock.ANY, max_retries=3, eta=dttm + timedelta(seconds=3600), exc=mock.ANY),
+                mock.call(mock.ANY, max_retries=3, eta=dttm + timedelta(seconds=45), exc=mock.ANY),
+                mock.call(mock.ANY, max_retries=3, eta=dttm + timedelta(seconds=3600), exc=mock.ANY),
+            ]
+        )
+        mock_retry.reset_mock()
+        mock_run.side_effect = [Exception(), 'OK']
+        run_import_job.delay(self.import_job.id)
+        self.assertEqual(mock_retry.call_count, 1)

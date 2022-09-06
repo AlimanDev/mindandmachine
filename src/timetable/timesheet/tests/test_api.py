@@ -13,7 +13,6 @@ from src.timetable.tests.factories import WorkerDayFactory
 from ._base import TestTimesheetMixin
 
 
-@override_settings(FISCAL_SHEET_DIVIDER_ALIAS=None)
 class TestTimesheetApiView(TestTimesheetMixin, APITestCase):
     def setUp(self):
         self.client.force_authenticate(user=self.user_worker)

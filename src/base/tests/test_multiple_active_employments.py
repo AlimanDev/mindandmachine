@@ -18,6 +18,7 @@ from src.base.tests.factories import (
     NetworkFactory,
     EmployeeFactory,
 )
+from src.med_docs.models import MedicalDocument, MedicalDocumentType
 from src.recognition.models import Tick
 from src.timetable.models import WorkerDay, WorkerDayPermission, GroupWorkerDayPermission
 from src.timetable.tests.factories import WorkerDayFactory, WorkTypeFactory
@@ -567,6 +568,8 @@ class TestGetWorkersStatAndTabel(MultipleActiveEmploymentsSupportMixin, APITestC
                         "work_hours": {
                             "selected_shop": 43.75,
                             "other_shops": 0.0,
+                            "all_shops_main": 43.75,
+                            "all_shops_additional": 0.0,
                             "total": 43.75,
                             "until_acc_period_end": 43.75,
                             "acc_period": 43.75
@@ -591,8 +594,8 @@ class TestGetWorkersStatAndTabel(MultipleActiveEmploymentsSupportMixin, APITestC
                             "by_months": {
                                 "3": 147.61290322580646
                             },
-                            "selected_period": 147.61290322580646,
-                            "curr_month": 147.61290322580646,
+                            "selected_period": 147.61290323,
+                            "curr_month": 147.61290323,
                             "curr_month_without_reduce_norm": 176.0
                         }
                     },
@@ -618,8 +621,8 @@ class TestGetWorkersStatAndTabel(MultipleActiveEmploymentsSupportMixin, APITestC
                             "by_months": {
                                 "3": 147.61290322580646
                             },
-                            "selected_period": 147.61290322580646,
-                            "curr_month": 147.61290322580646,
+                            "selected_period": 147.61290323,
+                            "curr_month": 147.61290323,
                             "curr_month_without_reduce_norm": 176.0
                         }
                     }
@@ -634,6 +637,8 @@ class TestGetWorkersStatAndTabel(MultipleActiveEmploymentsSupportMixin, APITestC
                         "work_hours": {
                             "selected_shop": 0.0,
                             "other_shops": 0.0,
+                            "all_shops_main": 0.0,
+                            "all_shops_additional": 0.0,
                             "total": 0.0,
                             "until_acc_period_end": 0.0,
                             "prev_months": 0,
@@ -666,8 +671,8 @@ class TestGetWorkersStatAndTabel(MultipleActiveEmploymentsSupportMixin, APITestC
                             "by_months": {
                                 "3": 147.61290322580646
                             },
-                            "selected_period": 147.61290322580646,
-                            "curr_month": 147.61290322580646,
+                            "selected_period": 147.61290323,
+                            "curr_month": 147.61290323,
                             "curr_month_without_reduce_norm": 176.0
                         }
                     },
@@ -716,6 +721,8 @@ class TestGetWorkersStatAndTabel(MultipleActiveEmploymentsSupportMixin, APITestC
                         "work_hours": {
                             "selected_shop": 87.5,
                             "other_shops": 0.0,
+                            "all_shops_main": 87.5,
+                            "all_shops_additional": 0.0,
                             "total": 87.5,
                             "until_acc_period_end": 87.5,
                             "acc_period": 87.5
@@ -740,8 +747,8 @@ class TestGetWorkersStatAndTabel(MultipleActiveEmploymentsSupportMixin, APITestC
                             "by_months": {
                                 "3": 73.80645161290323
                             },
-                            "selected_period": 73.80645161290323,
-                            "curr_month": 73.80645161290323,
+                            "selected_period": 73.80645161,
+                            "curr_month": 73.80645161,
                             "curr_month_without_reduce_norm": 88.0
                         }
                     },
@@ -767,8 +774,8 @@ class TestGetWorkersStatAndTabel(MultipleActiveEmploymentsSupportMixin, APITestC
                             "by_months": {
                                 "3": 73.80645161290323
                             },
-                            "selected_period": 73.80645161290323,
-                            "curr_month": 73.80645161290323,
+                            "selected_period": 73.80645161,
+                            "curr_month": 73.80645161,
                             "curr_month_without_reduce_norm": 88.0
 
                         }
@@ -784,6 +791,8 @@ class TestGetWorkersStatAndTabel(MultipleActiveEmploymentsSupportMixin, APITestC
                         "work_hours": {
                             "selected_shop": 0.0,
                             "other_shops": 0.0,
+                            "all_shops_main": 0.0,
+                            "all_shops_additional": 0.0,
                             "total": 0.0,
                             "until_acc_period_end": 0.0,
                             "prev_months": 0,
@@ -816,8 +825,8 @@ class TestGetWorkersStatAndTabel(MultipleActiveEmploymentsSupportMixin, APITestC
                             "by_months": {
                                 "3": 73.80645161290323
                             },
-                            "selected_period": 73.80645161290323,
-                            "curr_month": 73.80645161290323,
+                            "selected_period": 73.80645161,
+                            "curr_month": 73.80645161,
                             "curr_month_without_reduce_norm": 88.0
                         }
                     },
@@ -1068,3 +1077,30 @@ class TestEmployeeAPI(MultipleActiveEmploymentsSupportMixin, APITestCase):
         self.assertTrue(employee1_1_data['has_shop_employment'])
         employee3_data = list(filter(lambda i: i['id'] == self.employee3.id, resp_data))[0]
         self.assertFalse(employee3_data['has_shop_employment'])
+
+    def test_get_employee_with_medical_documents(self):
+        self.client.force_authenticate(user=self.user1)
+        med_doc = MedicalDocument.objects.create(
+            employee=self.employee1_1,
+            medical_document_type=MedicalDocumentType.objects.create(name='Мед. док.'),
+            dt_from='2021-01-01',
+            dt_to='3999-01-01',
+        )
+        resp = self.client.get(
+            self.get_url('Employee-list'), data={'include_medical_documents': True, 'id': self.employee1_1.id})
+        self.assertEqual(resp.status_code, 200)
+        resp_data = resp.json()
+        self.assertEqual(len(resp_data), 1)
+        employee_data = resp_data[0]
+        self.assertIn('medical_documents', employee_data)
+        medical_documents_data = employee_data['medical_documents'][0]
+        self.assertDictEqual(
+            medical_documents_data,
+            {
+                'dt_from': '2021-01-01',
+                'dt_to': '3999-01-01',
+                'employee_id': self.employee1_1.id,
+                'id': med_doc.id,
+                'medical_document_type_id': med_doc.medical_document_type_id,
+            },
+        )

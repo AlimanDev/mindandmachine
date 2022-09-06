@@ -92,6 +92,10 @@ class TimesheetViewSet(BaseModelViewSet):
             main_timesheet_night_hours=Sum('night_hours', filter=Q(wh_q, timesheet_type=TimesheetItem.TIMESHEET_TYPE_MAIN)),
             additional_timesheet_hours=Sum(F('day_hours') + F('night_hours'), filter=Q(
                 wh_q, timesheet_type=TimesheetItem.TIMESHEET_TYPE_ADDITIONAL)),
+            additional_timesheet_day_hours=Sum(F('day_hours'), filter=Q(
+                wh_q, timesheet_type=TimesheetItem.TIMESHEET_TYPE_ADDITIONAL)),
+            additional_timesheet_night_hours=Sum(F('night_hours'), filter=Q(
+                wh_q, timesheet_type=TimesheetItem.TIMESHEET_TYPE_ADDITIONAL)),
         )
 
         page = self.paginate_queryset(grouped_qs)

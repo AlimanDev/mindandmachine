@@ -1,4 +1,5 @@
 from django.http.response import Http404
+from django.db.models import F
 from rest_framework import serializers
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -105,6 +106,36 @@ class BatchUpdateOrCreateViewMixin:
 
 class BaseModelViewSet(ApiLogMixin, BatchUpdateOrCreateViewMixin, ModelViewSet):
     http_method_names = ['get', 'post', 'put', 'delete']
+    available_extra_fields = []
+    def _get_available_extra_fields(self, request):
+        extra_fields = request.query_params.get('extra_fields') or request.data.get('extra_fields') or []
+        if extra_fields:
+            extra_fields = set(map(lambda x: x.strip(), extra_fields.split(',')))
+        available_extra_fields = set(self.available_extra_fields).intersection(extra_fields)
+        return list(available_extra_fields)
+
+    def get_manager(self):
+        model = self.queryset.model
+        manager = model.objects
+        if self.action in ['update'] and hasattr(model, 'objects_with_excluded'):
+            manager = model.objects_with_excluded
+        
+        return manager
+
+    def get_queryset(self):
+        manager = self.get_manager()
+        available_extra_fields = self._get_available_extra_fields(self.request)
+
+        return manager.annotate(
+            **{
+                extra_field: F(extra_field) for extra_field in available_extra_fields
+            }
+        )
+    
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context['extra_fields'] = self._get_available_extra_fields(self.request)
+        return context
 
 
 class BaseActiveNamedModelViewSet(GetObjectByCodeMixin, BaseModelViewSet):
