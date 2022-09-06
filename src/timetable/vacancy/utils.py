@@ -47,7 +47,7 @@ from src.events.signals import event_signal
 from src.timetable.events import EMPLOYEE_VACANCY_DELETED, VACANCY_CONFIRMED_TYPE, VACANCY_CREATED, VACANCY_DELETED, VACANCY_RECONFIRMED_TYPE, VACANCY_REFUSED
 from src.conf.djconfig import (
     QOS_DATETIME_FORMAT,
-    EMAIL_HOST_USER,
+    DEFAULT_FROM_EMAIL,
 )
 from src.timetable.exceptions import WorkTimeOverlap
 from src.timetable.models import (
@@ -377,7 +377,7 @@ def do_shift_elongation(vacancy, max_working_hours):
             msg = EmailMultiAlternatives(
                 subject='Изменение в графике выхода сотрудников',
                 body=message,
-                from_email=EMAIL_HOST_USER,
+                from_email=DEFAULT_FROM_EMAIL,
                 to=[worker_day.shop.email,],
             )
             msg.send()
@@ -696,9 +696,9 @@ def confirm_vacancy(vacancy_id, user=None, employee_id=None, exchange=False, rec
                 res['status_code'] = 400
                 return res
 
-            # откликаться на вакансию можно только в нерабочие/неоплачиваемые дни
-            update_condition = all(
-                 not wd.type.is_work_hours for wd in employee_worker_days if not wd.is_vacancy)
+            # откликаться на вакансию в рабочие дни можно только, если это разрешено настройкой сети или если это разрешено для определённого типа дня
+            update_condition = active_employment.shop.network.allow_creation_several_wdays_for_one_employee_for_one_date or \
+                all(vacancy.type in wd.type.allowed_additional_types.all() for wd in employee_worker_days if not wd.is_vacancy)
             if active_employment.shop_id != vacancy_shop.id and not exchange:
                 try:
                     tt = ShopMonthStat.objects.get(shop=vacancy_shop, dt=vacancy.dt.replace(day=1))
@@ -1233,7 +1233,7 @@ def workers_exchange():
                             msg = EmailMultiAlternatives(
                                 subject='Изменение в графике выхода сотрудников',
                                 body=message,
-                                from_email=EMAIL_HOST_USER,
+                                from_email=DEFAULT_FROM_EMAIL,
                                 to=[shop_to.email,],
                             )
                             msg.send()
@@ -1246,7 +1246,7 @@ def workers_exchange():
                             msg = EmailMultiAlternatives(
                                 subject='Изменение в графике выхода сотрудников',
                                 body=message,
-                                from_email=EMAIL_HOST_USER,
+                                from_email=DEFAULT_FROM_EMAIL,
                                 to=[shop_from.email,],
                             )
                             msg.send()

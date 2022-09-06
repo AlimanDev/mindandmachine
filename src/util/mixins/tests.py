@@ -280,6 +280,13 @@ class TestsHelperMixin:
         kwargs = {f: getattr(wd, f) for f in fields}
         return WorkerDay.objects.filter(**kwargs).exists()
 
+    @classmethod
+    def set_wd_allowed_additional_types(cls):
+        type_workday = WorkerDayType.objects.get(code=WorkerDay.TYPE_WORKDAY)
+        for wdt in WorkerDayType.objects.filter(is_work_hours=False):
+            wdt.allowed_additional_types.add(type_workday)
+            wdt.save()
+
     @staticmethod
     def _create_att_record(type, dttm, user_id, employee_id, shop_id, terminal=True):
         from src.timetable.models import AttendanceRecords
