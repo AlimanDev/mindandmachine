@@ -13,7 +13,7 @@ from src.base.models import Employment, FunctionGroup
 from src.recognition.models import TickPoint
 from src.timetable.models import WorkerDay, WorkerDayCashboxDetails, WorkerDayType
 from src.timetable.tests.factories import WorkerDayTypeFactory, WorkerDayFactory
-from src.util.test import create_departments_and_users
+from src.util import test
 from src.util.utils import generate_user_token
 
 
@@ -58,8 +58,20 @@ class TestsHelperMixin:
         return response
 
     @classmethod
-    def create_departments_and_users(cls, dt=None):
-        create_departments_and_users(cls, dt=dt)
+    def create_departments_and_users(*args, **kwargs):
+        test.create_departments_and_users(*args, **kwargs)
+
+    @staticmethod
+    def create_work_type(*args, **kwargs):
+        test.create_work_type(*args, **kwargs)
+
+    @staticmethod
+    def create_operation_type(*args, **kwargs):
+        test.create_operation_type(*args, **kwargs)
+
+    @staticmethod
+    def create_period_clients(*args, **kwargs):
+        test.create_period_clients(*args, **kwargs)
 
     @staticmethod
     def get_url(view_name, *args, **kwargs: dict):

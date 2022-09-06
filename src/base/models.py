@@ -1988,6 +1988,7 @@ class FunctionGroup(AbstractModel):
         ('Reports_schedule_deviation', 'Скачать отчет по отклонениям от планового графика (Получить) (report/schedule_deviation/)'),
         ('Reports_consolidated_timesheet_report', 'Скачать "Консолидированный отчет об отработанном времени" (Получить) (report/consolidated_timesheet_report/)'),
         ('Group', 'Группа доступа (group)'),
+        ('SAWHSettings_daily', 'Получить данные по норме часов для каждого рабочего дня (Получить) (sawh_settings/daily)'),
         ('Shop', 'Отдел (department)'),
         ('Shop_stat', 'Статистика по отделам (Получить) (department/stat/)'),
         ('Shop_tree', 'Дерево отделов (Получить) (department/tree/)'),
@@ -2129,7 +2130,7 @@ class SAWHSettings(AbstractActiveNetworkSpecificCodeNamedModel):
 
 
 class SAWHSettingsMapping(AbstractModel):
-    sawh_settings = models.ForeignKey('base.SAWHSettings', on_delete=models.CASCADE, verbose_name='Настройки СУРВ')
+    sawh_settings = models.ForeignKey('base.SAWHSettings', on_delete=models.CASCADE, verbose_name='Настройки СУРВ', related_name='mappings')
     year = models.PositiveSmallIntegerField(verbose_name='Год учетного периода', default=current_year)
     work_hours_by_months = models.JSONField(
         verbose_name='Настройки по распределению часов в рамках года',
