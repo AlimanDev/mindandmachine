@@ -31,7 +31,6 @@ class TestOutsource(TestsHelperMixin, APITestCase):
     @classmethod
     def setUpTestData(cls):
         cls.create_departments_and_users()
-        cls.set_wd_allowed_additional_types()
         cls.client_network = Network.objects.create(
             name='Клиент',
             breaks=cls.breaks,
