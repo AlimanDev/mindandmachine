@@ -2,6 +2,7 @@ from datetime import timedelta, time, datetime, date
 
 from django.utils.timezone import now
 from rest_framework.test import APITestCase
+from rest_framework import status
 
 from src.base.models import (
     Employment,
@@ -1211,7 +1212,8 @@ class TestAttendanceRecords(TestsHelperMixin, APITestCase):
             type_id=WorkerDay.TYPE_WORKDAY,
             closest_plan_approved=None,
         )
-        confirm_vacancy(vacancy_id=vacancy.id, user=self.employee3.user, employee_id=self.employee3.id)
+        resp = confirm_vacancy(vacancy_id=vacancy.id, user=self.employee3.user, employee_id=self.employee3.id)
+        self.assertEqual(resp.get('status_code'), status.HTTP_200_OK)
         wd_approved_fact.refresh_from_db()
         self.assertIsNotNone(wd_approved_fact.closest_plan_approved_id)
         self.assertEqual(wd_approved_fact.closest_plan_approved_id, vacancy.id)

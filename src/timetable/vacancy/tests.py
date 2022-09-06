@@ -50,7 +50,6 @@ from src.timetable.models import (
     ShopMonthStat,
     EmploymentWorkType,
     WorkerDayPermission,
-    WorkerDayType,
 )
 from src.timetable.vacancy.utils import (
     cancel_vacancy,
@@ -63,10 +62,9 @@ from src.timetable.vacancy.utils import (
 )
 
 @override_settings(CELERY_TASK_ALWAYS_EAGER=True)
-class TestAutoWorkerExchange(APITestCase, TestsHelperMixin):
+class TestAutoWorkerExchange(APITestCase):
     @classmethod
     def setUpTestData(cls):
-        cls.set_wd_allowed_additional_types()
         cls.dt_now = now().date()
         cls.network = Network.objects.create(
             primary_color='#BDF82',
@@ -1011,7 +1009,7 @@ class TestVacancyActions(APITestCase, TestsHelperMixin):
     @classmethod
     def setUpTestData(cls):
         cls.create_departments_and_users()
-        cls.set_wd_allowed_additional_types()
+
 
     def test_cancel_vacancy_without_worker(self):
         dt = datetime.date.today()
@@ -1344,68 +1342,6 @@ class TestVacancyActions(APITestCase, TestsHelperMixin):
             1,
         )
 
-    def test_confirm_vacancy_network_setting(self):
-        dt = datetime.date.today()
-        WorkerDay.objects.create(
-            is_vacancy=False,
-            is_approved=True,
-            dt=dt,
-            dttm_work_start=datetime.datetime.combine(dt, datetime.time(8)),
-            dttm_work_end=datetime.datetime.combine(dt, datetime.time(15)),
-            type_id=WorkerDay.TYPE_WORKDAY,
-            shop=self.shop,
-            employee=self.employee2,
-            employment=self.employment2,
-        )
-        vacancy = WorkerDay.objects.create(
-            is_vacancy=True,
-            is_approved=True,
-            dt=dt,
-            dttm_work_start=datetime.datetime.combine(dt, datetime.time(16)),
-            dttm_work_end=datetime.datetime.combine(dt, datetime.time(20)),
-            type_id=WorkerDay.TYPE_WORKDAY,
-            shop=self.shop,
-        )
-        res = confirm_vacancy(vacancy_id=vacancy.id, user=self.user2, employee_id=self.employee2.id)
-        self.assertEqual(res.get('status_code'), 400)
-        self.network.allow_creation_several_wdays_for_one_employee_for_one_date = True
-        self.network.save()
-        res = confirm_vacancy(vacancy_id=vacancy.id, user=self.user2, employee_id=self.employee2.id)
-        self.assertEqual(res.get('status_code'), 200)
-
-    def test_confirm_vacancy_with_allowed_additional_types(self):
-        dt = datetime.date.today()
-        WorkerDay.objects.create(
-            is_vacancy=False,
-            is_approved=True,
-            dt=dt,
-            type_id=WorkerDay.TYPE_HOLIDAY,
-            shop=self.shop,
-            employee=self.employee2,
-            employment=self.employment2,
-        )
-        vacancy = WorkerDay.objects.create(
-            is_vacancy=True,
-            is_approved=True,
-            dt=dt,
-            dttm_work_start=datetime.datetime.combine(dt, datetime.time(16)),
-            dttm_work_end=datetime.datetime.combine(dt, datetime.time(20)),
-            type_id=WorkerDay.TYPE_WORKDAY,
-            shop=self.shop,
-        )
-
-        type_holiday = WorkerDayType.objects.get(code=WorkerDay.TYPE_HOLIDAY)
-        type_holiday.allowed_additional_types.clear()
-        type_holiday.save()
-        res = confirm_vacancy(vacancy_id=vacancy.id, user=self.user2, employee_id=self.employee2.id)
-        self.assertEqual(res.get('status_code'), 400)
-
-        type_holiday = WorkerDayType.objects.get(code=WorkerDay.TYPE_HOLIDAY)
-        type_holiday.allowed_additional_types.add(WorkerDayType.objects.get(code=WorkerDay.TYPE_WORKDAY))
-        type_holiday.save()
-        res = confirm_vacancy(vacancy_id=vacancy.id, user=self.user2, employee_id=self.employee2.id)
-        self.assertEqual(res.get('status_code'), 200)
-
     def test_reconfirm_vacancy(self):
         dt = datetime.date.today()
         approved_employee1_vacancy = WorkerDay.objects.create(
@@ -1484,7 +1420,6 @@ class TestVacancyNotification(APITestCase, TestsHelperMixin):
     @classmethod
     def setUpTestData(cls):
         cls.create_departments_and_users()
-        cls.set_wd_allowed_additional_types()
         cls.outsource_network1 = Network.objects.create(
             name='Outsource network 1',
         )

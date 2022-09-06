@@ -281,10 +281,9 @@ class TestURVTicks(MultipleActiveEmploymentsSupportMixin, APITestCase):
 
 
 @override_settings(CELERY_TASK_ALWAYS_EAGER=True)
-class TestConfirmVacancy(MultipleActiveEmploymentsSupportMixin, APITestCase, TestsHelperMixin):
+class TestConfirmVacancy(MultipleActiveEmploymentsSupportMixin, APITestCase):
     @classmethod
     def setUpTestData(cls):
-        cls.set_wd_allowed_additional_types()
         super(TestConfirmVacancy, cls).setUpTestData()
         cls.dt_now = date.today()
         cls.network.trust_tick_request = True
