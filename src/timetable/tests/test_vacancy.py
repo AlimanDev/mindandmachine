@@ -89,6 +89,7 @@ class TestVacancy(TestsHelperMixin, APITestCase):
             worker_day=cls.vacancy,
             work_part=0.5,
         )
+        cls.set_wd_allowed_additional_types()
 
     def setUp(self):
         self.client.force_authenticate(user=self.user1)

@@ -13,8 +13,8 @@ class TestCreateGroupFunctions(TestCase):
     def setUpTestData(self):
         self.network = Network.objects.create(name='net')
 
-    def test_crete_funcs(self):
+    def test_create_funcs(self):
         update_group_functions(None, network=self.network, verbose=False)
 
         self.assertEqual(Group.objects.filter(network=self.network).count(), 5)
-        self.assertEqual(FunctionGroup.objects.filter(group__network=self.network).count(), 1277)
+        self.assertEqual(FunctionGroup.objects.filter(group__network=self.network).count(), 1280)

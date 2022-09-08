@@ -84,6 +84,7 @@ class TestAttendanceRecords(TestsHelperMixin, APITestCase):
         )
         cls.network.trust_tick_request = True
         cls.network.save()
+        cls.set_wd_allowed_additional_types()
 
     def test_attendancerecords_update(self):
         tm_start = datetime.combine(self.dt, time(6, 0, 0))
