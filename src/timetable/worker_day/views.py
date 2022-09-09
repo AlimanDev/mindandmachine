@@ -1120,10 +1120,10 @@ class WorkerDayViewSet(BaseActiveNamedModelViewSet):
             Массово заблокировать/разблокировать рабочие дни (только в прошлом).
             '''
     )
-    @action(detail=False, methods=['put'], filterset_class=None, serializer_class=BatchBlockOrUnblockWorkerDaySerializer)
+    @action(detail=False, methods=['post'], filterset_class=None, serializer_class=BatchBlockOrUnblockWorkerDaySerializer)
     def batch_block_or_unblock(self, request: Request):
         '''
-        PUT /rest_api/worker_day/batch_block_or_unblock/
+        POST /rest_api/worker_day/batch_block_or_unblock/
         :params
             dt_from: QOS_DATE_FORMAT, required=True
             dt_to: QOS_DATE_FORMAT, required=True

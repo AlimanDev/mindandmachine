@@ -965,14 +965,14 @@ class TestAditionalFunctions(TestsHelperMixin, APITestCase):
             'dt_from': dt - timedelta(5),
             'dt_to': dt,
         }
-        response = self.client.put(url, data)
+        response = self.client.post(url, data)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.json().get('updated'), total)
         
         #Разблокировать все
         data['is_blocked'] = False
         data['shop_ids'] = []
-        response = self.client.put(url, data)
+        response = self.client.post(url, data)
         self.assertEqual(response.json().get('updated'), total)
         
         #Период из 1-го дня
@@ -981,7 +981,7 @@ class TestAditionalFunctions(TestsHelperMixin, APITestCase):
             'dt_to': dt,
             'is_blocked': True
         }
-        response = self.client.put(url, data)
+        response = self.client.post(url, data)
         updated = WorkerDay.objects.filter(dt=dt, shop__network=self.network).count() #9
         self.assertEqual(response.json().get('updated'), updated)
 
@@ -996,7 +996,7 @@ class TestAditionalFunctions(TestsHelperMixin, APITestCase):
         )
         data['is_blocked'] = True
         data['shop_ids'] = [self.root_shop.id]
-        response = self.client.put(url, data)
+        response = self.client.post(url, data)
         self.assertEqual(response.json().get('updated'), 1)
         self.assertTrue(WorkerDay.objects.get(id=wd.id, is_blocked=True))
 
@@ -1010,7 +1010,7 @@ class TestAditionalFunctions(TestsHelperMixin, APITestCase):
             is_blocked=False
         )
         del data['shop_ids']
-        response = self.client.put(url, data)
+        response = self.client.post(url, data)
         self.assertEqual(response.json().get('updated'), 0)
         self.assertTrue(WorkerDay.objects.get(id=wd.id, is_blocked=False))
 
@@ -1023,7 +1023,7 @@ class TestAditionalFunctions(TestsHelperMixin, APITestCase):
             type_id=WorkerDay.TYPE_HOLIDAY,
             is_blocked=False
         )
-        response = self.client.put(url, data)
+        response = self.client.post(url, data)
         self.assertEqual(response.json().get('updated'), 1)
         self.assertTrue(WorkerDay.objects.get(id=wd.id, is_blocked=True))
 
@@ -1033,14 +1033,14 @@ class TestAditionalFunctions(TestsHelperMixin, APITestCase):
             'dt_from': dt,
             'dt_to': dt - timedelta(1),
         }
-        response = self.client.put(url, data)
+        response = self.client.post(url, data)
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         #Нельзя изменять дни в будущем
         data = {
             'dt_from': dt + timedelta(1),
             'dt_to': dt + timedelta(100),
         }
-        response = self.client.put(url, data)
+        response = self.client.post(url, data)
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_change_list_create_vacancy(self):
