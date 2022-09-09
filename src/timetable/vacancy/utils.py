@@ -48,6 +48,7 @@ from src.timetable.events import EMPLOYEE_VACANCY_DELETED, VACANCY_CONFIRMED_TYP
 from src.conf.djconfig import (
     QOS_DATETIME_FORMAT,
     DEFAULT_FROM_EMAIL,
+    COMPANY_NAME
 )
 from src.timetable.exceptions import WorkTimeOverlap
 from src.timetable.models import (
@@ -379,6 +380,7 @@ def do_shift_elongation(vacancy, max_working_hours):
                 body=message,
                 from_email=DEFAULT_FROM_EMAIL,
                 to=[worker_day.shop.email,],
+                headers={'X-Campaign-Id': COMPANY_NAME}
             )
             msg.send()
 
