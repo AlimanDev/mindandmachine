@@ -1144,13 +1144,11 @@ class WorkerDayViewSet(BaseActiveNamedModelViewSet):
         shops = Shop.objects.filter(network=request.user.network)
         if shop_ids:=serializer.validated_data['shop_ids']:
             shops = shops.filter(id__in=shop_ids)
-        employees = Employee.objects.filter(
-            employments__in=Employment.objects.get_active(
-                dt_from=serializer.validated_data['dt_from'],
-                dt_to=serializer.validated_data['dt_to'],
-                shop__in=shops
-            )
-        )
+        employees = Employment.objects.get_active(
+            dt_from=serializer.validated_data['dt_from'],
+            dt_to=serializer.validated_data['dt_to'],
+            shop__in=shops
+        ).distinct('employee').values_list('employee', flat=True)
         q &= Q(shop__in=shops) | Q(shop__isnull=True, employee__in=employees)
         wds = self.get_queryset().filter(q)
         updated = wds.update(is_blocked=serializer.validated_data['is_blocked'])
