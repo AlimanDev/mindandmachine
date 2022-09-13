@@ -799,6 +799,40 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
         self.assertEqual(vacation.id, wd.id)
         self.assertEqual(wd.work_hours, timedelta(hours=9))
 
+    def test_approve_with_closest_plan_approved_without_workhours(self):
+        self.shop.network.only_fact_hours_that_in_approved_plan = True
+        self.shop.network.save()
+        wd1 = WorkerDay.objects.create(
+            employee=self.employee1,
+            employment=self.employment1,
+            type_id=WorkerDay.TYPE_HOLIDAY,
+            dt=self.dt,
+            is_fact=False,
+            is_approved=True
+        )
+        wd2 = WorkerDay.objects.create(
+            shop=self.shop,
+            employee=self.employee1,
+            employment=self.employment1,
+            type_id=WorkerDay.TYPE_WORKDAY,
+            dt=self.dt,
+            dttm_work_start=datetime.combine(self.dt, time(9)),
+            dttm_work_end=datetime.combine(self.dt, time(18)),
+            closest_plan_approved=wd1,
+            is_fact=True,
+            is_approved=False
+        )
+
+        data = {
+            'dt_from': self.dt,
+            'dt_to': self.dt,
+            'employee_ids': [self.employee1.id],
+            'is_fact': True,
+            'shop_id': self.shop.id,
+        }
+        res = self.client.post(f"{self.url_approve}", data, format='json')
+        self.assertEqual(res.status_code, 200)
+        self.assertTrue(WorkerDay.objects.filter(id=wd2.id, is_approved=True))
 
 class TestUploadDownload(TestsHelperMixin, APITestCase):
     USER_USERNAME = "user1"

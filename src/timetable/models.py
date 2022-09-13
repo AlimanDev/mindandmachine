@@ -1288,9 +1288,7 @@ class WorkerDay(AbstractModel):
             break_time = None
             arrive_fine, departure_fine = 0, 0
             if self.is_fact:
-                plan_approved = None
-                if self.closest_plan_approved_id:
-                    plan_approved = WorkerDay.objects.filter(id=self.closest_plan_approved_id).first()
+                plan_approved = self.closest_plan_approved
                 if plan_approved:
                     arrive_fine, departure_fine = self.get_fines(
                         _dttm_work_start,
@@ -1302,27 +1300,35 @@ class WorkerDay(AbstractModel):
                     )
                 if self.shop_id and self.shop.network.only_fact_hours_that_in_approved_plan and not self.type.is_dayoff:
                     if plan_approved:
-                        late_arrival_delta = self.shop.network.allowed_interval_for_late_arrival
-                        allowed_late_arrival_cond = late_arrival_delta and \
-                            dttm_work_start > plan_approved.dttm_work_start and \
-                            (dttm_work_start - plan_approved.dttm_work_start).total_seconds() < \
-                                                                late_arrival_delta.total_seconds()
-                        if allowed_late_arrival_cond:
-                            dttm_work_start = plan_approved.dttm_work_start
-                        else:
-                            dttm_work_start = max(dttm_work_start, plan_approved.dttm_work_start)
+                        if plan_approved.dttm_work_start:
+                            late_arrival_delta = self.shop.network.allowed_interval_for_late_arrival
+                            allowed_late_arrival_cond = late_arrival_delta and \
+                                dttm_work_start > plan_approved.dttm_work_start and \
+                                (dttm_work_start - plan_approved.dttm_work_start).total_seconds() < \
+                                                                    late_arrival_delta.total_seconds()
+                            if allowed_late_arrival_cond:
+                                dttm_work_start = plan_approved.dttm_work_start
+                            else:
+                                dttm_work_start = max(dttm_work_start, plan_approved.dttm_work_start)
 
-                        early_departure_delta = self.shop.network.allowed_interval_for_early_departure
-                        allowed_early_departure_cond = early_departure_delta and \
-                                                    dttm_work_end < plan_approved.dttm_work_end and \
-                                                    (plan_approved.dttm_work_end - dttm_work_end).total_seconds() < \
-                                                    early_departure_delta.total_seconds()
-                        if allowed_early_departure_cond:
-                            dttm_work_end = plan_approved.dttm_work_end
-                        else:
-                            dttm_work_end = min(dttm_work_end, plan_approved.dttm_work_end)
+                        if plan_approved.dttm_work_end:
+                            early_departure_delta = self.shop.network.allowed_interval_for_early_departure
+                            allowed_early_departure_cond = early_departure_delta and \
+                                                        dttm_work_end < plan_approved.dttm_work_end and \
+                                                        (plan_approved.dttm_work_end - dttm_work_end).total_seconds() < \
+                                                        early_departure_delta.total_seconds()
+                            if allowed_early_departure_cond:
+                                dttm_work_end = plan_approved.dttm_work_end
+                            else:
+                                dttm_work_end = min(dttm_work_end, plan_approved.dttm_work_end)
+
                         if self.type.subtract_breaks:
-                            break_time = self._calc_break(breaks, dttm_work_start, dttm_work_end, plan_approved=plan_approved)
+                            break_time = self._calc_break(
+                                breaks,
+                                dttm_work_start,
+                                dttm_work_end, 
+                                plan_approved=plan_approved if (plan_approved.dttm_work_start and plan_approved.dttm_work_end) else None
+                            )
                     else:
                         return dttm_work_start, dttm_work_end, datetime.timedelta(0)
 
