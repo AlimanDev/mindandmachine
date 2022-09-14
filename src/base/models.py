@@ -2032,6 +2032,7 @@ class FunctionGroup(AbstractModel):
         ('WorkerDay_request_approve', 'Запросить подтверждение графика (Создать) (worker_day/request_approve/)'),
         ('WorkerDay_block', 'Заблокировать рабочий день (Создать) (worker_day/block/)'),
         ('WorkerDay_unblock', 'Разблокировать рабочий день (Создать) (worker_day/unblock/)'),
+        ('WorkerDay_batch_block_or_unblock', 'Массово заблокировать/разблокировать рабочие дни (только в прошлом) (Создать) (worker_day/batch_block_or_unblock/)'),
         ('WorkerDay_generate_upload_example', 'Скачать шаблон графика (Получить) (worker_day/generate_upload_example/)'),
         ('WorkerDay_recalc', 'Пересчитать часы (Создать) (worker_day/recalc/)'),
         ('WorkerDay_overtimes_undertimes_report', 'Скачать отчет о переработках/недоработках (Получить) (worker_day/overtimes_undertimes_report/)'),

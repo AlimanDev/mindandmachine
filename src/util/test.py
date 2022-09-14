@@ -598,6 +598,34 @@ def create_departments_and_users(self, dt=None):
     for s in [self.root_shop, self.shop, self.shop2, self.shop3, self.reg_shop1, self.reg_shop2]:
         s.refresh_from_db()
 
+def create_outsource(self, dt=None):
+    dt = dt or now().date() - relativedelta(months=1)
+    self.network_outsource = Network.objects.create(code='outsource', name='Аутсорс-сеть')
+    self.region_outsource = Region.objects.create(
+        network=self.network_outsource,
+        name='Аутсорс-регион',
+        code='outsource',
+    )
+    self.shop_outsource = Shop.objects.create(
+        name='Аутсорс-магазин',
+        network=self.network_outsource,
+        region=self.region_outsource  
+    )
+    self.user1_outsource = User.objects.create_user(
+        'user1_outsource',
+        'user1_outsource@example.ru',
+        'user1_outsource_password',
+        first_name='Аут',
+        last_name='Сорсович',
+        network=self.network,
+    )
+    self.employee1_outsource = Employee.objects.create(user=self.user1_outsource)
+    self.employment1_outsource = Employment.objects.create(
+        code=f'{self.user1_outsource.username}:{uuid.uuid4()}:{uuid.uuid4()}',
+        employee=self.employee1_outsource,
+        shop=self.shop_outsource,
+    )
+    
 # def create_camera_cashbox_stat(camera_cashbox_obj, dttm, queue):
 #     CameraCashboxStat.objects.create(
 #         camera_cashbox=camera_cashbox_obj,
