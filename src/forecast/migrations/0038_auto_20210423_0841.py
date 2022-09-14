@@ -22,34 +22,6 @@ def create_daily_earnings_per_user(appsapp, schema_editor):
     """
     )
 
-    schema_editor.execute(
-        """
-        create or replace view performance as
-        select t.dt,
-               t.income,
-               coalesce((select date_part('epoch'::text, sum(greatest(wd.work_hours, interval '0 hours'))) / 3600::double precision
-                from timetable_workerday wd
-                where wd.dt = t.dt
-                  and wd.shop_id = t.shop_id
-                  and wd.is_approved = True
-                  and wd.is_fact = True
-                  and NOT (wd.employment_id IS NULL AND wd.type = 'W' AND wd.employee_id IS NOT NULL)), 0) as work_hours,
-               t.shop_id,
-               t.shop_code
-        from (select s.id                   as shop_id,
-                     s.code                 as shop_code,
-                     pc.dttm_forecast::date as dt,
-                     sum(pc.value)          as income
-              from forecast_periodclients pc
-                       inner join forecast_operationtype ot on pc.operation_type_id = ot.id
-                       inner join forecast_operationtypename otn on ot.operation_type_name_id = otn.id
-                       inner join base_shop s on ot.shop_id = s.id
-              where pc.type = 'F' and otn.code = 'income'
-              group by s.id, s.code, pc.dttm_forecast::date) t
-
-        """
-    )
-
 
 class Migration(migrations.Migration):
 
