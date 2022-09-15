@@ -20,6 +20,7 @@ db.sqlite3
 
 logs/*.log*
 
+venv
 venv/**
 venv3.6/*
 venv39/*
@@ -38,6 +39,6 @@ coverage.xml
 junit.xml
 xunit.xml
 .pytest_cache/
-./etc/compose/tests_mounts/**
+etc/compose/tests_mounts
 docker-compose.yml
 .env
