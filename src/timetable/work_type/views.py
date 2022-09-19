@@ -1,6 +1,7 @@
 from datetime import datetime
 
 from django.db.models import Q
+from django.utils.translation import gettext_lazy as _
 from django_filters.rest_framework import FilterSet, CharFilter
 from drf_yasg.utils import swagger_auto_schema
 from rest_framework import serializers
@@ -14,20 +15,18 @@ from src.base.views_abstract import BaseModelViewSet
 from src.conf.djconfig import QOS_DATE_FORMAT
 from src.timetable.models import WorkType, WorkTypeName
 from src.timetable.work_type.utils import ShopEfficiencyGetter
-from src.timetable.work_type_name.views import WorkTypeNameSerializer
 from src.util.openapi.responses import efficieny_response_schema_dict as response_schema_dict
 
 
 # Serializers define the API representation.
 class WorkTypeSerializer(ModelSerializerWithCreateOnlyFields):
-    work_type_name = WorkTypeNameSerializer(read_only=True)
     code = serializers.CharField(required=False, write_only=True)
     shop_id = serializers.IntegerField(required=False)
-    work_type_name_id = serializers.IntegerField(required=False, write_only=True)
+    work_type_name_id = serializers.IntegerField(required=False)
     class Meta:
         model = WorkType
         fields = ['id', 'priority', 'dttm_last_update_queue', 'min_workers_amount', 'max_workers_amount',\
-             'probability', 'prior_weight', 'shop_id', 'code', 'work_type_name_id', 'work_type_name', 'preliminary_cost_per_hour']
+             'probability', 'prior_weight', 'shop_id', 'code', 'work_type_name_id', 'preliminary_cost_per_hour']
         create_only_fields = ['work_type_name_id']
         validators = [
             UniqueTogetherValidator(
@@ -40,7 +39,6 @@ class WorkTypeSerializer(ModelSerializerWithCreateOnlyFields):
         if data.get('code', False) and not self.instance:
             data['work_type_name_id'] = WorkTypeName.objects.get(code=data.get('code')).id   
         return super().to_internal_value(data)
-
 
 
 class EfficiencySerializer(serializers.Serializer):
@@ -60,7 +58,7 @@ class EfficiencySerializer(serializers.Serializer):
         super(EfficiencySerializer, self).is_valid(*args, **kwargs)
 
         if self.validated_data['from_dt'] > self.validated_data['to_dt']:
-            raise serializers.ValidationError('dt_from have to be less or equal than dt_to')
+            raise serializers.ValidationError(_('Date start should be less then date end'))
 
 
 class WorkTypeFilter(FilterSet):
@@ -191,7 +189,7 @@ class WorkTypeViewSet(BaseModelViewSet):
 
     def get_queryset(self):
         return self.filter_queryset(
-            WorkType.objects.select_related('work_type_name').filter(
+            WorkType.objects.filter(
                 Q(dttm_deleted__isnull=True) | Q(dttm_deleted__gte=datetime.now()),
             )
         )

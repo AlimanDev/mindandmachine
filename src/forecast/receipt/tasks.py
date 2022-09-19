@@ -141,7 +141,7 @@ def aggregate_timeserie_value():
                             periods_data = periods_data.reset_index()
                             PeriodClients.objects.filter(
                                 operation_type=operation_type,
-                                dttm_forecast__date=dt,
+                                dt_report=dt,
                                 type=PeriodClients.FACT_TYPE,
                             ).delete()
 
@@ -149,6 +149,7 @@ def aggregate_timeserie_value():
                                 PeriodClients(
                                     operation_type=operation_type,
                                     dttm_forecast=period['dttm'],
+                                    dt_report=dt,
                                     value=period['value'],
                                     type=PeriodClients.FACT_TYPE,
                                 ) for _, period in periods_data.iterrows()

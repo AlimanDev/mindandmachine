@@ -15,7 +15,7 @@ from src.base.models import (
     Employment,
 )
 from src.integration.models import VMdaUsers
-from ._tmp_backport import ArraySubquery
+from .tmp_backport import ArraySubquery
 from .serializers import (
     ShopDTOSerializer,
     RegionDTOSerializer,
@@ -37,7 +37,7 @@ class MdaIntegrationHelper:
         return Q(dttm_modified__gt=self.dttm_now - timedelta(seconds=threshold_seconds))
 
     def _get_shops_queryset(self, threshold_seconds=None):
-        qs = Shop.objects.filter(
+        qs = Shop.objects_with_excluded.filter(
             Q(employments__isnull=False),
             Q(dt_closed__isnull=True) | Q(dt_closed__gt=self.dt_now - timedelta(days=CLOSED_OR_DELETED_THRESHOLD_DAYS)),
             Q(dttm_deleted__isnull=True) | Q(
@@ -58,7 +58,7 @@ class MdaIntegrationHelper:
         return qs
 
     def _get_regions_queryset(self, threshold_seconds=None):
-        qs = Shop.objects.filter(
+        qs = Shop.objects_with_excluded.filter(
             Q(child__isnull=False) | Q(employments__isnull=False),
             Q(dttm_deleted__isnull=True) | Q(
                 dttm_deleted__gt=self.dt_now - timedelta(days=CLOSED_OR_DELETED_THRESHOLD_DAYS)),
@@ -71,7 +71,7 @@ class MdaIntegrationHelper:
         return qs
 
     def _get_divisions_queryset(self, threshold_seconds=None):
-        qs = Shop.objects.filter(
+        qs = Shop.objects_with_excluded.filter(
             Q(child__isnull=False) | Q(employments__isnull=False),
             Q(dttm_deleted__isnull=True) | Q(
                 dttm_deleted__gt=self.dt_now - timedelta(days=CLOSED_OR_DELETED_THRESHOLD_DAYS)),

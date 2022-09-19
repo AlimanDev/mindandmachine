@@ -57,6 +57,7 @@ def upload_demand_util_v1(df, shop_id, lang):
                 operation_type=op_types[work_type],
                 value=data['Значение'],
                 dttm_forecast=data['Время'],
+                dt_report=data['Время'].date(),
                 type=PeriodClients.LONG_FORECASE_TYPE,
             )
             for _not_used, data in work_type_df.iterrows()
@@ -88,6 +89,7 @@ def upload_demand_util_v2(new_workload, shop_id, type=PeriodClients.LONG_FORECAS
             [
                 PeriodClients(
                     dttm_forecast=row['dttm'],
+                    dt_report=row['dttm'].date(),
                     operation_type=operation,
                     type=type,
                     value=row[operation_type]
@@ -159,6 +161,7 @@ def upload_demand_util_v3(operation_type_name, demand_file, index_col=None, type
                                 PeriodClients(
                                     operation_type=operation_types[s.id],
                                     dttm_forecast=row[DTTM_COL],
+                                    dt_report=row[DTTM_COL].date(),
                                     value=row[VALUE_COL],
                                     type=type,
                                 )
@@ -368,6 +371,7 @@ def create_demand(data):
                 PeriodClients(
                     type=forecase_type,
                     dttm_forecast=period_demand_value.get('dttm'),
+                    dt_report=period_demand_value.get('dttm').date(),
                     operation_type=operation_type,
                     value=clients,
                 )

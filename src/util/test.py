@@ -83,15 +83,19 @@ class LocalTestCase(LocalTestCaseAsserts, TestCase):
         # work_types
         self.work_type_name1 = WorkTypeName.objects.create(
             name='Кассы',
+            network=self.network,
         )
         self.work_type_name2 = WorkTypeName.objects.create(
             name='Тип_кассы_2',
+            network=self.network,
         )
         self.work_type_name3 = WorkTypeName.objects.create(
             name='Тип_кассы_3',
+            network=self.network,
         )
         self.work_type_name4 = WorkTypeName.objects.create(
             name='тип_кассы_4',
+            network=self.network,
         )
         self.work_type1 = create_work_type(
             self.shop,
@@ -114,15 +118,19 @@ class LocalTestCase(LocalTestCaseAsserts, TestCase):
 
         self.operation_type_name = OperationTypeName.objects.create(
             name='Test',
+            network=self.network,
         )
         self.operation_type_name2 = OperationTypeName.objects.create(
             name='Test2',
+            network=self.network,
         )
         self.operation_type_name3 = OperationTypeName.objects.create(
             name='Test3',
+            network=self.network,
         )
         self.operation_type_name4 = OperationTypeName.objects.create(
             name='Test4',
+            network=self.network,
         )
 
         create_operation_type(OperationType.FORECAST, [
@@ -387,6 +395,7 @@ def create_departments_and_users(self, dt=None):
 
     self.shop_settings = ShopSettings.objects.create(
         breaks=self.breaks,
+        network=self.network,
     )
     # shops
     self.reg_shop1 = Shop.objects.create(
@@ -457,6 +466,7 @@ def create_departments_and_users(self, dt=None):
         first_name='Иван',
         network=self.network,
     )
+
     self.employee1 = Employee.objects.create(user=self.user1)
     self.employment1 = Employment.objects.create(
         code=f'{self.user1.username}:{uuid.uuid4()}:{uuid.uuid4()}',
@@ -588,6 +598,34 @@ def create_departments_and_users(self, dt=None):
     for s in [self.root_shop, self.shop, self.shop2, self.shop3, self.reg_shop1, self.reg_shop2]:
         s.refresh_from_db()
 
+def create_outsource(self, dt=None):
+    dt = dt or now().date() - relativedelta(months=1)
+    self.network_outsource = Network.objects.create(code='outsource', name='Аутсорс-сеть')
+    self.region_outsource = Region.objects.create(
+        network=self.network_outsource,
+        name='Аутсорс-регион',
+        code='outsource',
+    )
+    self.shop_outsource = Shop.objects.create(
+        name='Аутсорс-магазин',
+        network=self.network_outsource,
+        region=self.region_outsource  
+    )
+    self.user1_outsource = User.objects.create_user(
+        'user1_outsource',
+        'user1_outsource@example.ru',
+        'user1_outsource_password',
+        first_name='Аут',
+        last_name='Сорсович',
+        network=self.network,
+    )
+    self.employee1_outsource = Employee.objects.create(user=self.user1_outsource)
+    self.employment1_outsource = Employment.objects.create(
+        code=f'{self.user1_outsource.username}:{uuid.uuid4()}:{uuid.uuid4()}',
+        employee=self.employee1_outsource,
+        shop=self.shop_outsource,
+    )
+    
 # def create_camera_cashbox_stat(camera_cashbox_obj, dttm, queue):
 #     CameraCashboxStat.objects.create(
 #         camera_cashbox=camera_cashbox_obj,
@@ -620,6 +658,7 @@ def create_operation_type(do_forecast, operation_type_names, dttm_deleted=None):
 def create_period_clients(dttm_forecast, value, type, operation_type):
     PeriodClients.objects.create(
         dttm_forecast=dttm_forecast,
+        dt_report=dttm_forecast.date(),
         value=value,
         type=type,
         operation_type=operation_type

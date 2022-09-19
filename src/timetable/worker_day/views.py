@@ -3,7 +3,7 @@ import datetime
 import pandas as pd
 from dateutil.relativedelta import relativedelta
 from django.db import transaction
-from django.db.models import OuterRef, Subquery, Q, F, Exists
+from django.db.models import OuterRef, Q, F, Exists
 from django.db.models.query import Prefetch
 from django.http import HttpResponse
 from django.utils import timezone
@@ -12,9 +12,10 @@ from django.utils.translation import gettext_lazy as _
 from django_filters import utils
 from drf_yasg.utils import swagger_auto_schema
 from rest_framework.decorators import action
-from rest_framework.pagination import LimitOffsetPagination
+from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.serializers import ValidationError
+from src.base.pagination import LimitOffsetPaginationWithOptionalCount
 
 from src.base.exceptions import FieldError
 from src.base.models import Employment, Shop, Employee
@@ -32,6 +33,7 @@ from src.timetable.models import (
     WorkerDayType,
     TimesheetItem,
 )
+from src.timetable.timesheet.tasks import recalc_timesheet_on_data_change
 from src.timetable.vacancy.utils import cancel_vacancies, cancel_vacancy, confirm_vacancy, notify_vacancy_created
 from src.timetable.worker_day.serializers import (
     ConfirmVacancyToWorkerSerializer,
@@ -40,7 +42,6 @@ from src.timetable.worker_day.serializers import (
     WorkerDaySerializer,
     WorkerDayApproveSerializer,
     WorkerDayWithParentSerializer,
-    VacancySerializer,
     DuplicateSrializer,
     DeleteWorkerDaysSerializer,
     ExchangeSerializer,
@@ -54,6 +55,7 @@ from src.timetable.worker_day.serializers import (
     RequestApproveSerializer,
     CopyRangeSerializer,
     BlockOrUnblockWorkerDayWrapperSerializer,
+    BatchBlockOrUnblockWorkerDaySerializer,
     RecalcWdaysSerializer,
 )
 from src.timetable.worker_day.stat import count_daily_stat
@@ -96,9 +98,15 @@ class WorkerDayViewSet(BaseActiveNamedModelViewSet):
     filterset_class = WorkerDayFilter
     filter_backends = [MultiShopsFilterBackend]
     openapi_tags = ['WorkerDay',]
+    queryset = WorkerDay.objects.all()
+    available_extra_fields = ['shop__name']
 
     def get_queryset(self):
-        queryset = WorkerDay.objects.filter(canceled=False).prefetch_related(Prefetch('outsources', to_attr='outsources_list'))
+        queryset = super().get_queryset().filter(
+            canceled=False,
+        ).select_related(
+            'last_edited_by',
+        ).prefetch_related(Prefetch('outsources', to_attr='outsources_list'))
 
         if self.request.query_params.get('by_code', False):
             return queryset.annotate(
@@ -148,7 +156,20 @@ class WorkerDayViewSet(BaseActiveNamedModelViewSet):
         if request.query_params.get('hours_details', False):
             data = []
 
-            for worker_day in self.filter_queryset(self.get_queryset().prefetch_related(Prefetch('worker_day_details', to_attr='worker_day_details_list')).select_related('last_edited_by', 'shop__network', 'employee')):
+            worker_days = self.filter_queryset(
+                self.get_queryset().prefetch_related(
+                    Prefetch('worker_day_details', to_attr='worker_day_details_list')
+                ).select_related(
+                    'last_edited_by',
+                    'shop__network__breaks',
+                    'employee',
+                    'shop__settings__breaks',
+                    'employment__position__breaks',
+                    'closest_plan_approved',
+                )
+            )
+
+            for worker_day in worker_days:
                 wd_dict = WorkerDayListSerializer(worker_day, context=self.get_serializer_context()).data
                 work_hours, work_hours_day, work_hours_night = worker_day.calc_day_and_night_work_hours()
                 wd_dict['work_hours'] = work_hours
@@ -351,7 +372,7 @@ class WorkerDayViewSet(BaseActiveNamedModelViewSet):
         if not filterset_class.form.is_valid():
             raise utils.translate_validation(filterset_class.errors)
         
-        paginator = LimitOffsetPagination()
+        paginator = LimitOffsetPaginationWithOptionalCount()
         allowed_outsource_network_subq = WorkerDayOutsourceNetwork.objects.filter(
             workerday_id=OuterRef('id'),
             network_id=self.request.user.network_id,
@@ -389,26 +410,12 @@ class WorkerDayViewSet(BaseActiveNamedModelViewSet):
                     Q(is_outsource=True, outsource_network_allowed=True, is_approved=True) &
                     (Q(employee__isnull=True) | Q(employee__user__network_id=request.user.network_id)) # чтобы не попадали вакансии с сотрудниками другой аутсорс сети
                 ), # аутсорс фильтр
-            ).select_related(
-                'shop',
-                'employee__user',
             ).prefetch_related(
-                'worker_day_details',
-                'outsources',
-            ).annotate(
-                first_name=F('employee__user__first_name'),
-                last_name=F('employee__user__last_name'),
-                worker_shop=Subquery(
-                    Employment.objects.get_active(
-                        OuterRef('employee__user__network_id'),
-                        employee_id=OuterRef('employee_id')
-                    ).values('shop_id')[:1]
-                ),
-                user_network_id=F('employee__user__network_id'),
+                Prefetch('worker_day_details', to_attr='worker_day_details_list'),
             ),
         )
         data = paginator.paginate_queryset(queryset, request)
-        data = VacancySerializer(data, many=True, context=self.get_serializer_context())
+        data = WorkerDayListSerializer(data, many=True, context=self.get_serializer_context())
 
         return paginator.get_paginated_response(data.data)
 
@@ -495,6 +502,7 @@ class WorkerDayViewSet(BaseActiveNamedModelViewSet):
                     is_fact=vacancy.is_fact,
                     is_approved=True,
                 ).exclude(id=vacancy.id).delete()
+                vacancy.parent_worker_day_id = None # так как выше удаляем возможного родителя
                 vacancy.is_approved = True
                 vacancy.save()
 
@@ -524,6 +532,11 @@ class WorkerDayViewSet(BaseActiveNamedModelViewSet):
                 )
                 transaction.on_commit(lambda: recalc_wdays.delay(
                     id__in=list(WorkerDay.objects.filter(closest_plan_approved=parent_id).values_list('id', flat=True))))
+                recalc_timesheet_on_data_change(
+                    {
+                        vacancy.employee_id: [vacancy.dt],
+                    }
+                )
             else:
                 transaction.on_commit(lambda: notify_vacancy_created(vacancy, is_auto=False))
                 vacancy.is_approved = True
@@ -550,12 +563,13 @@ class WorkerDayViewSet(BaseActiveNamedModelViewSet):
         vacancy.save()
         return Response(WorkerDaySerializer(vacancy).data)
 
-    def _change_range(self, is_fact, is_approved, dt_from, dt_to, wd_type, employee_tabel_code, res=None):
+    def _change_range(self, is_fact, is_approved, is_blocked, dt_from, dt_to, wd_type, employee_tabel_code, res=None):
         employee_dt_pairs_list = list(WorkerDay.objects.filter(
             employee__tabel_code=employee_tabel_code,
             dt__gte=dt_from,
             dt__lte=dt_to,
             is_approved=is_approved,
+            is_blocked=is_blocked,
             is_fact=is_fact,
             type=wd_type,
         ).values_list('employee_id', 'dt').distinct())
@@ -581,6 +595,7 @@ class WorkerDayViewSet(BaseActiveNamedModelViewSet):
         deleted = to_delete_qs.delete()
 
         wdays_to_create = []
+        employee_dates = {}
         for dt in [d.date() for d in pd.date_range(dt_from, dt_to)]:
             if dt not in existing_dates:
                 employment = Employment.objects.get_active_empl_by_priority(
@@ -595,6 +610,7 @@ class WorkerDayViewSet(BaseActiveNamedModelViewSet):
                             employee_id=employment.employee_id,
                             dt=dt,
                             is_approved=is_approved,
+                            is_blocked=is_blocked,
                             is_fact=is_fact,
                             type=wd_type,
                             created_by=self.request.user,
@@ -602,7 +618,11 @@ class WorkerDayViewSet(BaseActiveNamedModelViewSet):
                             source=WorkerDay.SOURCE_CHANGE_RANGE,
                         )
                     )
+                    employee_dates.setdefault(employment.employee_id, []).append(dt)
         WorkerDay.objects.bulk_create(wdays_to_create)
+
+        if is_approved:
+            recalc_timesheet_on_data_change(employee_dates)
 
         if res is not None:
             employee_stats = res.setdefault(employee_tabel_code, {})
@@ -630,6 +650,7 @@ class WorkerDayViewSet(BaseActiveNamedModelViewSet):
                 self._change_range(
                     is_fact=False,  # всегда в план
                     is_approved=range['is_approved'],
+                    is_blocked=range.get('is_blocked', False),
                     dt_from=range['dt_from'],
                     dt_to=range['dt_to'],
                     wd_type=range['type'],
@@ -640,6 +661,7 @@ class WorkerDayViewSet(BaseActiveNamedModelViewSet):
                     self._change_range(
                         is_fact=False,  # всегда в план
                         is_approved=False,
+                        is_blocked=range.get('is_blocked', False),
                         dt_from=range['dt_from'],
                         dt_to=range['dt_to'],
                         wd_type=range['type'],
@@ -921,6 +943,13 @@ class WorkerDayViewSet(BaseActiveNamedModelViewSet):
 
             res = Response(WorkerDaySerializer(exchange(data, self.error_messages), many=True).data)
 
+            recalc_timesheet_on_data_change(
+                {
+                    data['employee1_id']: data['dates'],
+                    data['employee2_id']: data['dates'],
+                }
+            )
+
             WorkerDay.check_work_time_overlap(
                 employee_id__in=[data['employee1_id'], data['employee2_id']],
                 dt__in=data['dates'],
@@ -945,8 +974,8 @@ class WorkerDayViewSet(BaseActiveNamedModelViewSet):
         data.validated_data['network_id'] = request.user.network_id
         shop = Shop.objects.get(id=data.validated_data.get('shop_id'))
         timetable_generator_cls = get_timetable_generator_cls(timetable_format=shop.network.timetable_format)
-        timetable_generator = timetable_generator_cls(user=self.request.user)
-        return timetable_generator.upload(data.validated_data, file)
+        timetable_generator = timetable_generator_cls(user=self.request.user, form=data.validated_data)
+        return timetable_generator.upload(file)
 
     @swagger_auto_schema(
         query_serializer=GenerateUploadTimetableExampleSerializer,
@@ -973,7 +1002,7 @@ class WorkerDayViewSet(BaseActiveNamedModelViewSet):
 
         shop = Shop.objects.get(id=shop_id)
         timetable_generator_cls = get_timetable_generator_cls(timetable_format=shop.network.timetable_format)
-        timetable_generator = timetable_generator_cls(user=self.request.user)
+        timetable_generator = timetable_generator_cls(user=self.request.user, form=serializer.validated_data)
         return timetable_generator.generate_upload_example(shop_id, dt_from, dt_to, is_fact, is_approved, employee_id__in)
 
     @swagger_auto_schema(
@@ -992,8 +1021,8 @@ class WorkerDayViewSet(BaseActiveNamedModelViewSet):
         data.validated_data['network_id'] = request.user.network_id
         shop = Shop.objects.get(id=data.validated_data.get('shop_id'))
         timetable_generator_cls = get_timetable_generator_cls(timetable_format=shop.network.timetable_format)
-        timetable_generator = timetable_generator_cls(user=self.request.user)
-        return timetable_generator.upload(data.validated_data, file, is_fact=True)
+        timetable_generator = timetable_generator_cls(user=self.request.user, form=data.validated_data)
+        return timetable_generator.upload(file, is_fact=True)
 
     @swagger_auto_schema(
         query_serializer=DownloadSerializer,
@@ -1008,8 +1037,8 @@ class WorkerDayViewSet(BaseActiveNamedModelViewSet):
         data.is_valid(raise_exception=True)
         shop = Shop.objects.get(id=data.validated_data.get('shop_id'))
         timetable_generator_cls = get_timetable_generator_cls(timetable_format=shop.network.timetable_format)
-        timetable_generator = timetable_generator_cls(user=self.request.user)
-        return timetable_generator.download(data.validated_data)
+        timetable_generator = timetable_generator_cls(user=self.request.user, form=data.validated_data)
+        return timetable_generator.download()
 
     @swagger_auto_schema(
         query_serializer=DownloadSerializer,
@@ -1083,6 +1112,47 @@ class WorkerDayViewSet(BaseActiveNamedModelViewSet):
                 is_fact=dict_to_block['is_fact'],
             ).update(is_blocked=False)
         return Response()
+
+    @swagger_auto_schema(
+        request_body=BatchBlockOrUnblockWorkerDaySerializer,
+        responses={200: None},
+        operation_description='''
+            Массово заблокировать/разблокировать рабочие дни (только в прошлом).
+            '''
+    )
+    @action(detail=False, methods=['post'], filterset_class=None, serializer_class=BatchBlockOrUnblockWorkerDaySerializer)
+    def batch_block_or_unblock(self, request: Request):
+        '''
+        POST /rest_api/worker_day/batch_block_or_unblock/
+        :params
+            dt_from: QOS_DATE_FORMAT, required=True
+            dt_to: QOS_DATE_FORMAT, required=True
+            is_blocked: bool, default=True
+            shop_ids: list[int], default=[]
+
+        :return {
+            "updated": int
+        }
+        '''
+        
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        q = Q(
+            is_blocked=not serializer.validated_data['is_blocked'],
+            dt__range=(serializer.validated_data['dt_from'], serializer.validated_data['dt_to'])
+        )
+        shops = Shop.objects.filter(network=request.user.network)
+        if shop_ids:=serializer.validated_data['shop_ids']:
+            shops = shops.filter(id__in=shop_ids)
+        employees = Employment.objects.get_active(
+            dt_from=serializer.validated_data['dt_from'],
+            dt_to=serializer.validated_data['dt_to'],
+            shop__in=shops
+        ).distinct('employee').values_list('employee', flat=True)
+        q &= Q(shop__in=shops) | Q(shop__isnull=True, employee__in=employees)
+        wds = self.get_queryset().filter(q)
+        updated = wds.update(is_blocked=serializer.validated_data['is_blocked'])
+        return Response({'updated': updated})
 
     @swagger_auto_schema(
         request_body=RecalcWdaysSerializer,

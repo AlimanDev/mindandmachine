@@ -5,7 +5,6 @@ from datetime import timedelta, time
 
 import io
 import pandas
-from django.apps import apps
 from rest_framework.test import APITestCase
 
 from src.forecast.models import (
@@ -18,192 +17,198 @@ from src.forecast.period_clients.utils import create_demand
 from src.timetable.models import (
     WorkTypeName,
 )
+from src.util.mixins.tests import TestsHelperMixin
 from src.util.models_converter import Converter
-from src.util.test import create_departments_and_users
 
 
-class TestDemand(APITestCase):
+class TestDemand(APITestCase, TestsHelperMixin):
     USER_USERNAME = "user1"
     USER_EMAIL = "q@q.q"
     USER_PASSWORD = "4242"
 
-    def setUp(self):
-        super().setUp()
+    @classmethod
+    def setUpTestData(cls):
+        cls.url = '/rest_api/period_clients/'
 
-        self.url = '/rest_api/period_clients/'
+        cls.create_departments_and_users()
 
-        create_departments_and_users(self)
-
-        self.work_type_name1 = WorkTypeName.objects.create(
+        cls.work_type_name1 = WorkTypeName.objects.create(
             name='Кассы',
             code="Cashbox",
+            network=cls.network,
         )
-        self.work_type_name2 = WorkTypeName.objects.create(
+        cls.work_type_name2 = WorkTypeName.objects.create(
             name='Торговый зал',
             code="Trade hall",
+            network=cls.network,
         )
-        self.work_type_name3 = WorkTypeName.objects.create(
+        cls.work_type_name3 = WorkTypeName.objects.create(
             name='Кассы3',
             code="Cashbox3",
+            network=cls.network,
         )
-        self.work_type_name4 = WorkTypeName.objects.create(
+        cls.work_type_name4 = WorkTypeName.objects.create(
             name='Кассы4',
             code="Cashbox4",
+            network=cls.network,
         )
-        self.work_type_name5 = WorkTypeName.objects.create(
+        cls.work_type_name5 = WorkTypeName.objects.create(
             name='Кассы5',
             code="clients",
+            network=cls.network,
         )
-        self.work_type1 = WorkType.objects.create(shop=self.shop, work_type_name=self.work_type_name1)
-        self.work_type2 = WorkType.objects.create(shop=self.shop, work_type_name=self.work_type_name2)
-        self.work_type3 = WorkType.objects.create(shop=self.shop, work_type_name=self.work_type_name3)
-        self.work_type4 = WorkType.objects.create(shop=self.shop, work_type_name=self.work_type_name4)
-        self.work_type5 = WorkType.objects.create(shop=self.shop, work_type_name=self.work_type_name5)
+        cls.work_type1 = WorkType.objects.create(shop=cls.shop, work_type_name=cls.work_type_name1)
+        cls.work_type2 = WorkType.objects.create(shop=cls.shop, work_type_name=cls.work_type_name2)
+        cls.work_type3 = WorkType.objects.create(shop=cls.shop, work_type_name=cls.work_type_name3)
+        cls.work_type4 = WorkType.objects.create(shop=cls.shop, work_type_name=cls.work_type_name4)
+        cls.work_type5 = WorkType.objects.create(shop=cls.shop, work_type_name=cls.work_type_name5)
 
-        self.date = datetime.now().date() + timedelta(days=1)
-        self.op_type_name = self.work_type_name1.operation_type_name
-        self.op_type_name2 = self.work_type_name2.operation_type_name
-        self.o_type_1 = self.work_type1.operation_type
-        self.o_type_2 = self.work_type2.operation_type
-        self.o_type_3 = self.work_type3.operation_type
-        self.o_type_4 = self.work_type5.operation_type
-        self.o_type_5 = self.work_type4.operation_type
+        cls.date = datetime.now().date() + timedelta(days=1)
+        cls.op_type_name = cls.work_type_name1.operation_type_name
+        cls.op_type_name2 = cls.work_type_name2.operation_type_name
+        cls.o_type_1 = cls.work_type1.operation_type
+        cls.o_type_2 = cls.work_type2.operation_type
+        cls.o_type_3 = cls.work_type3.operation_type
+        cls.o_type_4 = cls.work_type5.operation_type
+        cls.o_type_5 = cls.work_type4.operation_type
 
-        test_data = {
-            'PeriodClients': [
-                {
-                    'dttm_forecast': datetime(2018, 5, 7, 0, 0),
-                    'operation_type': self.o_type_1,
-                    'value': 20
-                },
-                {
-                    'dttm_forecast': datetime(2018, 5, 7, 0, 0),
-                    'operation_type': self.o_type_2,
-                    'value': 10
-                },
-                {
-                    'dttm_forecast': datetime(2018, 5, 7, 0, 0),
-                    'operation_type': self.o_type_3,
-                    'value': 30
-                },
-                {
-                    'dttm_forecast': datetime(2018, 6, 7, 9, 0),
-                    'operation_type': self.o_type_1,
-                    'value': 30
-                },
-                {
-                    'dttm_forecast': datetime(2018, 6, 7, 9, 0),
-                    'operation_type': self.o_type_2,
-                    'value': 20
-                },
-                {
-                    'dttm_forecast': datetime(2018, 6, 7, 9, 0),
-                    'operation_type': self.o_type_3,
-                    'value': 5
-                },
-                {
-                    'dttm_forecast': datetime(2018, 6, 7, 9, 0),
-                    'operation_type': self.o_type_1,
-                    'value': 15,
-                    'type': PeriodClients.FACT_TYPE
-                },
-                {
-                    'dttm_forecast': datetime(2018, 6, 7, 9, 0),
-                    'operation_type': self.o_type_2,
-                    'value': 19,
-                    'type': PeriodClients.FACT_TYPE
-                },
-                {
-                    'dttm_forecast': datetime(2018, 6, 7, 9, 0),
-                    'operation_type': self.o_type_3,
-                    'value': 5,
-                    'type': PeriodClients.FACT_TYPE
-                },
-                {
-                    'dttm_forecast': datetime(2018, 6, 7, 9, 0),
-                    'operation_type': self.o_type_1,
-                    'value': 12,
-                    'type': PeriodClients.SHORT_FORECAST_TYPE
-                },
-                {
-                    'dttm_forecast': datetime(2018, 6, 7, 9, 0),
-                    'operation_type': self.o_type_2,
-                    'value': 10,
-                    'type': PeriodClients.SHORT_FORECAST_TYPE
-                },
-                {
-                    'dttm_forecast': datetime(2018, 6, 7, 9, 0),
-                    'operation_type': self.o_type_3,
-                    'value': 6,
-                    'type': PeriodClients.SHORT_FORECAST_TYPE
-                },
-                {
-                    'dttm_forecast': datetime.combine(self.date, time(12, 0)),
-                    'operation_type': self.o_type_4,
-                    'value': 10
-                },
-                {
-                    'dttm_forecast': datetime.combine(self.date, time(12, 30)),
-                    'operation_type': self.o_type_4,
-                    'value': 20
-                },
-                {
-                    'dttm_forecast': datetime.combine(self.date, time(13, 0)),
-                    'operation_type': self.o_type_4,
-                    'value': 15
-                },
-                {
-                    'dttm_forecast': datetime.combine(self.date, time(13, 30)),
-                    'operation_type': self.o_type_4,
-                    'value': 10
-                },
-                {
-                    'dttm_forecast': datetime.combine(self.date + timedelta(days=1), time(13, 0)),
-                    'operation_type': self.o_type_4,
-                    'value': 10
-                }
+        test_data = [
+            {
+                'dttm_forecast': datetime(2018, 5, 7, 0, 0),
+                'operation_type': cls.o_type_1,
+                'value': 20
+            },
+            {
+                'dttm_forecast': datetime(2018, 5, 7, 0, 0),
+                'operation_type': cls.o_type_2,
+                'value': 10
+            },
+            {
+                'dttm_forecast': datetime(2018, 5, 7, 0, 0),
+                'operation_type': cls.o_type_3,
+                'value': 30
+            },
+            {
+                'dttm_forecast': datetime(2018, 6, 7, 9, 0),
+                'operation_type': cls.o_type_1,
+                'value': 30
+            },
+            {
+                'dttm_forecast': datetime(2018, 6, 7, 9, 0),
+                'operation_type': cls.o_type_2,
+                'value': 20
+            },
+            {
+                'dttm_forecast': datetime(2018, 6, 7, 9, 0),
+                'operation_type': cls.o_type_3,
+                'value': 5
+            },
+            {
+                'dttm_forecast': datetime(2018, 6, 7, 9, 0),
+                'operation_type': cls.o_type_1,
+                'value': 15,
+                'type': PeriodClients.FACT_TYPE
+            },
+            {
+                'dttm_forecast': datetime(2018, 6, 7, 9, 0),
+                'operation_type': cls.o_type_2,
+                'value': 19,
+                'type': PeriodClients.FACT_TYPE
+            },
+            {
+                'dttm_forecast': datetime(2018, 6, 7, 9, 0),
+                'operation_type': cls.o_type_3,
+                'value': 5,
+                'type': PeriodClients.FACT_TYPE
+            },
+            {
+                'dttm_forecast': datetime(2018, 6, 7, 9, 0),
+                'operation_type': cls.o_type_1,
+                'value': 12,
+                'type': PeriodClients.SHORT_FORECAST_TYPE
+            },
+            {
+                'dttm_forecast': datetime(2018, 6, 7, 9, 0),
+                'operation_type': cls.o_type_2,
+                'value': 10,
+                'type': PeriodClients.SHORT_FORECAST_TYPE
+            },
+            {
+                'dttm_forecast': datetime(2018, 6, 7, 9, 0),
+                'operation_type': cls.o_type_3,
+                'value': 6,
+                'type': PeriodClients.SHORT_FORECAST_TYPE
+            },
+            {
+                'dttm_forecast': datetime.combine(cls.date, time(12, 0)),
+                'operation_type': cls.o_type_4,
+                'value': 10
+            },
+            {
+                'dttm_forecast': datetime.combine(cls.date, time(12, 30)),
+                'operation_type': cls.o_type_4,
+                'value': 20
+            },
+            {
+                'dttm_forecast': datetime.combine(cls.date, time(13, 0)),
+                'operation_type': cls.o_type_4,
+                'value': 15
+            },
+            {
+                'dttm_forecast': datetime.combine(cls.date, time(13, 30)),
+                'operation_type': cls.o_type_4,
+                'value': 10
+            },
+            {
+                'dttm_forecast': datetime.combine(cls.date + timedelta(days=1), time(13, 0)),
+                'operation_type': cls.o_type_4,
+                'value': 10
+            }
+        ]
+        cls.o_types = [cls.o_type_1, cls.o_type_2, cls.o_type_3, cls.o_type_4, cls.o_type_5]
+        PeriodClients.objects.bulk_create(
+            [
+                PeriodClients(dt_report=data['dttm_forecast'].date(), **data)
+                for data in test_data
             ]
-        }
-        self.o_types = [self.o_type_1, self.o_type_2, self.o_type_3, self.o_type_4, self.o_type_5]
-        for model in test_data.keys():
-            for data in test_data[model]:
-                apps.get_model('forecast', model).objects.create(**data)
+        )
 
-        self.create_data = {
+        cls.create_data = {
             "status": "R",
             "serie": [
                 {
                     "dttm": Converter.convert_datetime(datetime(2019, 9, 1, 10)),
                     "value": 2.1225757598876953,
-                    "timeserie_id": self.o_type_5.id,
+                    "timeserie_id": cls.o_type_5.id,
                 },
                 {
                     "dttm": Converter.convert_datetime(datetime(2019, 9, 1, 10, 30)),
                     "value": 2.2346010208129883,
-                    "timeserie_id": self.o_type_5.id,
+                    "timeserie_id": cls.o_type_5.id,
                 },
                 {
                     "dttm": Converter.convert_datetime(datetime(2019, 9, 1, 11)),
                     "value": 2.195962905883789,
-                    "timeserie_id": self.o_type_5.id,
+                    "timeserie_id": cls.o_type_5.id,
                 },
                 {
                     "dttm": Converter.convert_datetime(datetime(2019, 9, 1, 11, 30)),
                     "value": 2.307988166809082,
-                    "timeserie_id": self.o_type_5.id,
+                    "timeserie_id": cls.o_type_5.id,
                 },
             ],
             "dt_from": Converter.convert_date(datetime(2019, 9, 1)),
             "dt_to": Converter.convert_date(datetime(2019, 11, 2)),
-            "shop_id": self.shop.id,
+            "shop_id": cls.shop.id,
         }
-        self.data = {
-            'from_dttm': Converter.convert_datetime(datetime.combine(self.date, time(12, 0))),
-            'to_dttm': Converter.convert_datetime(datetime.combine(self.date + timedelta(days=1), time(13, 0))),
-            'shop_id': self.shop.id,
+        cls.data = {
+            'from_dttm': Converter.convert_datetime(datetime.combine(cls.date, time(12, 0))),
+            'to_dttm': Converter.convert_datetime(datetime.combine(cls.date + timedelta(days=1), time(13, 0))),
+            'shop_id': cls.shop.id,
             'type': 'L',
         }
 
+    def setUp(self):
         self.client.force_authenticate(user=self.user1)
 
     def test_create_algo(self):

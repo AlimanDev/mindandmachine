@@ -3,7 +3,7 @@ from dateutil.relativedelta import relativedelta
 from django.db import models, transaction
 from django.db.models.aggregates import Max, Min
 from django.utils.functional import cached_property
-from django.utils.translation import gettext as _
+from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 import json
 
@@ -241,7 +241,7 @@ class OperationTypeRelation(AbstractModel):
                     ) and not (self.max_value and self.threshold and self.days_of_week),
                     self._enrich_error_msg(
                         _("For relation 'change workload between' {} are required.").format(
-                            ', '.join([msg for cond, msg in change_workload_between_required_errors if not cond])
+                            ', '.join([str(msg) for cond, msg in change_workload_between_required_errors if not cond])
                         )
                     ),
                 ),
@@ -404,7 +404,8 @@ class PeriodClients(AbstractModel):
         return '{}, {}, {}, {}'.format(self.dttm_forecast, self.type, self.operation_type, self.value)
 
     id = models.BigAutoField(primary_key=True)
-    dttm_forecast = models.DateTimeField()
+    dttm_forecast = models.DateTimeField(verbose_name=_('aggregation date and time'))
+    dt_report = models.DateField(verbose_name=_('report (data file) date'))
     type = models.CharField(choices=FORECAST_TYPES, max_length=1, default=LONG_FORECASE_TYPE)
     operation_type = models.ForeignKey(OperationType, on_delete=models.PROTECT)
     value = models.FloatField(default=0)

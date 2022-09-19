@@ -1,3 +1,4 @@
+import json
 from calendar import monthrange
 from datetime import date, datetime, time, timedelta
 
@@ -12,24 +13,24 @@ from rest_framework.test import APITestCase
 from etc.scripts import fill_calendar
 from src.base.models import FunctionGroup, Network, WorkerPosition
 from src.base.tests.factories import EmployeeFactory, EmploymentFactory, GroupFactory, NetworkFactory, ShopFactory, \
-    UserFactory
+    UserFactory, WorkerPositionFactory
 from src.reports.models import ReportConfig, ReportType, Period, UserShopGroups, UserSubordinates, EmploymentStats
+from src.timetable.models import TimesheetItem
 from src.reports.reports import PIVOT_TABEL
 from src.reports.tasks import cron_report, fill_user_shop_groups, fill_user_subordinates, fill_employments_stats
 from src.timetable.models import ScheduleDeviations, WorkerDay, WorkerDayOutsourceNetwork, WorkerDayType
 from src.timetable.tests.factories import WorkerDayFactory
 from src.util.mixins.tests import TestsHelperMixin
-from src.util.test import create_departments_and_users
 
 
-class TestReportConfig(APITestCase):
+class TestReportConfig(APITestCase, TestsHelperMixin):
     USER_USERNAME = "user1"
     USER_EMAIL = "q@q.q"
     USER_PASSWORD = "4242"
 
-    def setUp(self):
-        super().setUp()
-        create_departments_and_users(self)
+    @classmethod
+    def setUpTestData(cls):
+        cls.create_departments_and_users()
 
     def _create_config(self, count_of_periods, period, period_start=Period.PERIOD_START_YESTERDAY):
         period, _period_created = Period.objects.get_or_create(
@@ -355,13 +356,22 @@ class TestReportsViewSet(TestsHelperMixin, APITestCase):
         cls.employment_urs = EmploymentFactory(
             employee=cls.employee_urs, shop=cls.root_shop, function_group=cls.group_urs,
         )
+        cls.position = WorkerPosition.objects.create(
+            name='Должность сотрудника',
+            network=cls.network,
+        )
         cls.employment_worker = EmploymentFactory(
-            employee=cls.employee_worker, shop=cls.shop, function_group=cls.group_worker,
+            employee=cls.employee_worker, shop=cls.shop, function_group=cls.group_worker, position=cls.position
         )
         FunctionGroup.objects.create(
             func='Reports_pivot_tabel',
             group=cls.group_dir,
             access_type='ALL',
+        )
+        FunctionGroup.objects.create(
+            func='Reports_consolidated_timesheet_report',
+            group=cls.group_dir,
+            access_type='ALL'
         )
 
         cls.dt = (datetime.now().date() - relativedelta(months=1)).replace(day=21)
@@ -401,6 +411,54 @@ class TestReportsViewSet(TestsHelperMixin, APITestCase):
             dttm_work_end=datetime.combine(cls.dt, time(20)),
             cashbox_details__work_type__work_type_name__name='Кассир',
         )
+        TimesheetItem.objects.create(
+            shop=cls.shop,
+            employee=cls.employee_dir,
+            dt=cls.dt,
+            timesheet_type=TimesheetItem.TIMESHEET_TYPE_FACT,
+            day_type_id=WorkerDay.TYPE_WORKDAY,
+            source=TimesheetItem.SOURCE_TYPE_FACT,
+            day_hours=4,
+            position=cls.position
+        )
+        TimesheetItem.objects.create(
+            shop=cls.shop,
+            employee=cls.employee_worker,
+            dt=cls.dt,
+            timesheet_type=TimesheetItem.TIMESHEET_TYPE_FACT,
+            day_type_id=WorkerDay.TYPE_WORKDAY,
+            source=TimesheetItem.SOURCE_TYPE_FACT,
+            day_hours=4,
+            position=cls.position
+        )
+
+        cls.network_outsource = NetworkFactory(name='Аутсорс-сеть', code='2')
+        cls.user_outsource = UserFactory(email='user_outsource@example.com', network=cls.network_outsource)
+        cls.employee_outsource = EmployeeFactory(user=cls.user_outsource, tabel_code='employee_outsource')
+        cls.position_outsource = WorkerPosition.objects.create(
+            name='Должность сотрудника аутсорса',
+            network=cls.network_outsource,
+        )
+        TimesheetItem.objects.create(
+            shop=cls.shop,
+            employee=cls.employee_outsource,
+            dt=cls.dt,
+            timesheet_type=TimesheetItem.TIMESHEET_TYPE_FACT,
+            day_type_id=WorkerDay.TYPE_WORKDAY,
+            source=TimesheetItem.SOURCE_TYPE_FACT,
+            day_hours=4,
+            position=cls.position_outsource
+        )
+        TimesheetItem.objects.create(
+            shop=cls.shop,
+            employee=cls.employee_outsource,
+            dt=cls.dt,
+            timesheet_type=TimesheetItem.TIMESHEET_TYPE_MAIN,
+            day_type_id=WorkerDay.TYPE_WORKDAY,
+            source=TimesheetItem.SOURCE_TYPE_FACT,
+            day_hours=4,
+            position=cls.position
+        )
 
     def setUp(self):
         self.client.force_authenticate(user=self.user_dir)
@@ -415,21 +473,63 @@ class TestReportsViewSet(TestsHelperMixin, APITestCase):
         self.assertEqual(list(df.iloc[1, 5:].values), [10.75, 10.75, 21.50])
         self.assertEqual(list(df.iloc[2, 5:].values), [10.75, 21.50, 32.25])
 
+    def test_consolidated_timesheet_report_get(self):
+        query_params = {
+            'shop_id__in': self.shop.id,
+            'dt_from': self.dt - timedelta(1),
+            'dt_to': self.dt,
+            'group_by': 'employee',
+        }
+        response = self.client.get('/rest_api/report/consolidated_timesheet_report/', query_params)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.headers.get('content-type'), 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+        df = pd.read_excel(response.content)
+        self.assertEqual(len(df.columns), 6)
+        self.assertEqual(len(df.values), 7)
+        self.assertEqual(list(df.iloc[6, :2].values), ['Итого часов', 12])
 
-class TestScheduleDeviation(APITestCase):
+    def test_consolidated_timesheet_report_outsource_network_name_in_position(self):
+        '''Добавление названия аутсорс сети к должности аутсорс сотрудника'''
+        query_params = {
+            'shop_id__in': self.shop.id,
+            'dt_from': self.dt - timedelta(1),
+            'dt_to': self.dt,
+            'group_by': 'employee_position'
+        }
+        response = self.client.get('/rest_api/report/consolidated_timesheet_report/', query_params)
+        self.assertEqual(response.status_code, 200)
+        df = pd.read_excel(response.content)
+        self.assertEqual(len(df.columns), 8)
+        self.assertEqual(len(df.values), 8)
+        self.assertCountEqual(list(df['Unnamed: 1'][3:7].values), [f'{self.position.name}', f'{self.position_outsource.name} ({self.network_outsource.name})', f'{self.position.name} ({self.network_outsource.name})', f'{self.position.name}'])
+        self.assertCountEqual(list(df['Unnamed: 2'][3:7].values), ['Штат', 'Штат', 'Нештат', 'Нештат'])
+
+        query_params ['group_by'] = 'position'
+        response = self.client.get('/rest_api/report/consolidated_timesheet_report/', query_params)
+        self.assertEqual(response.status_code, 200)
+        df = pd.read_excel(response.content)
+        self.assertEqual(len(df.columns), 6)
+        self.assertEqual(len(df.values), 7)
+        self.assertCountEqual(list(df['Консолидированный отчет об отработанном времени'][3:6].values), [f'{self.position.name}', f'{self.position_outsource.name} ({self.network_outsource.name})', f'{self.position.name} ({self.network_outsource.name})'])
+        self.assertCountEqual(list(df['Unnamed: 1'][3:6].values), ['Штат', 'Нештат', 'Нештат'])
+
+
+class TestScheduleDeviation(APITestCase, TestsHelperMixin):
     USER_USERNAME = "user1"
     USER_EMAIL = "q@q.q"
     USER_PASSWORD = "4242"
 
-    def setUp(self):
-        super().setUp()
-        create_departments_and_users(self)
-        self.position = WorkerPosition.objects.create(
+    @classmethod
+    def setUpTestData(cls):
+        cls.create_departments_and_users()
+        cls.position = WorkerPosition.objects.create(
             name='Должность сотрудника',
-            network=self.network,
+            network=cls.network,
         )
-        self.employment1.position = self.position
-        self.employment1.save()
+        cls.employment1.position = cls.position
+        cls.employment1.save()
+
+    def setUp(self):
         self.client.force_authenticate(self.user1)
 
     def assertHours(self, 
@@ -681,27 +781,27 @@ class TestScheduleDeviation(APITestCase):
             ]
         )
         report = self.client.get(f'/rest_api/report/schedule_deviation/?dt_from={dt}&dt_to={dt+timedelta(1)}&shop_ids={self.shop.id}')
-        data = pd.read_excel(report.content).fillna('')
-        self.assertEqual(
-            list(data.iloc[10, :].values), 
-            [1, self.shop.name, datetime.combine(dt, time(0, 0)), f'{self.user1.fio} ', '-', self.root_shop.name, 'штат', self.position.name, 'Биржа смен', 10,
-            10.5, 4.5, 0.5, 1, 0.5, 1, 0, 0, 1, 2, 0, 0, 0, 0]
-        )
-        self.assertEqual(
-            list(data.iloc[11, :].values), 
-            [2, self.shop2.name, datetime.combine(dt, time(0, 0)), f'{self.user2.fio} ',
-            self.employee2.tabel_code, self.shop.name, 'штат', '-', 'Биржа смен', 8.75,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8.75, 1]
-        )
-        self.assertEqual(
-            list(data.iloc[12, :].values), 
-            [3, self.shop.name, datetime.combine(dt, time(0, 0)), '-', '-', '-', 'штат', 'Грузчик', 'Биржа смен', 8.75,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8.75, 1]
-        )
-        self.assertEqual(
-            list(data.iloc[13, :].values), 
-            [4, self.shop.name, datetime.combine(dt, time(0, 0)), '-', '-', 'Аутсорс сеть 1', 'не штат', 'Грузчик', 'Биржа смен', 8.75,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8.75, 1]
+        data = tuple(map(lambda x: tuple(x), pd.read_excel(report.content).fillna('').iloc[10:, 1:].values))
+        self.assertCountEqual(
+            data,
+            (
+                (
+                    self.shop.name, datetime.combine(dt, time(0, 0)), f'{self.user1.fio} ', '-', self.root_shop.name, 'штат', 
+                    self.position.name, 'Биржа смен', 10, 10.5, 4.5, 0.5, 1, 0.5, 1, 0, 0, 1, 2, 0, 0, 0, 0
+                ),
+                (
+                    self.shop2.name, datetime.combine(dt, time(0, 0)), f'{self.user2.fio} ', self.employee2.tabel_code, 
+                    self.shop.name, 'штат', '-', 'Биржа смен', 8.75, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8.75, 1
+                ),
+                (
+                    self.shop.name, datetime.combine(dt, time(0, 0)), '-', '-', '-', 'штат', 'Грузчик', 'Биржа смен', 
+                    8.75, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8.75, 1
+                ),
+                (
+                    self.shop.name, datetime.combine(dt, time(0, 0)), '-', '-', 'Аутсорс сеть 1', 'не штат', 'Грузчик', 
+                    'Биржа смен', 8.75, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8.75, 1
+                ),
+            )
         )
 
     def test_get_schedule_deviation_no_data(self):
@@ -746,6 +846,49 @@ class TestScheduleDeviation(APITestCase):
                 f'{self.user1.fio} ', self.root_shop.name, 'штат', self.position.name, 'Биржа смен' if wd_type.code == WorkerDay.TYPE_WORKDAY else wd_type.name]
             )
 
+    def test_supervisors_and_regions_columns(self):
+        settings_values_dict = self.network.settings_values_prop
+        settings_values_dict['include_region_and_supervisor_in_schedule_deviation_report'] = True
+        self.network.settings_values = json.dumps(settings_values_dict)
+        self.network.save()
+        dt = date.today()
+
+        shop_region = ShopFactory(name='Регион Тест-1', network=self.network)
+        position_region_manager = WorkerPositionFactory(name='Руководитель региона')
+        emp_region_manager = EmploymentFactory(shop=shop_region, position=position_region_manager,)
+
+        supervisor_mentor_shop = ShopFactory(name='Супервайзер-наставник Тест-1', parent=shop_region, network=self.network)
+        position_supervisor_mentor = WorkerPositionFactory(name='Супервайзер-наставник')
+        emp_supervisor_mentor = EmploymentFactory(shop=supervisor_mentor_shop, position=position_supervisor_mentor)
+
+        supervisor_shop = ShopFactory(name='СВ Тест-1', parent=supervisor_mentor_shop, network=self.network)
+        position_supervisor = WorkerPositionFactory(name='Супервайзер')
+        emp_supervisor = EmploymentFactory(shop=supervisor_shop, position=position_supervisor)
+
+        shop = ShopFactory(name='Магазин Тест', parent=supervisor_shop, network=self.network)
+        WorkerDayFactory(
+            dt=dt,
+            shop=shop,
+            type_id=WorkerDay.TYPE_WORKDAY,
+            employee=self.employee1,
+            employment=self.employment1,
+            is_approved=True,
+        )
+
+        res = self.client.get(f'/rest_api/report/schedule_deviation/?dt_from={dt}&dt_to={dt}&shop_ids={shop.id}')
+        data = pd.read_excel(res.content).fillna('')
+        pd.set_option('expand_frame_repr', False)
+        self.assertListEqual(data.iloc[9][1:5].to_list(), ['Регион', 'РР', 'НСВ', 'СВ'])
+        self.assertListEqual(
+            data.iloc[10][1:5].to_list(),
+            [
+                shop_region.name,
+                emp_region_manager.employee.user.fio,
+                emp_supervisor_mentor.employee.user.fio,
+                emp_supervisor.employee.user.fio
+            ]
+        )
+  
 
 class TestFillReportsData(TestsHelperMixin, TestCase):
     @classmethod

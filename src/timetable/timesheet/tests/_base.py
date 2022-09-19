@@ -37,7 +37,7 @@ class TestTimesheetMixin(TestsHelperMixin):
             settings__breaks=breaks,
         )
         cls.user_worker = UserFactory(email='worker@example.com', network=cls.network)
-        cls.employee_worker = EmployeeFactory(user=cls.user_worker)
+        cls.employee_worker = EmployeeFactory(user=cls.user_worker, tabel_code='employee_worker')
         cls.group_worker = GroupFactory(name='Сотрудник', network=cls.network)
         cls.position_worker = WorkerPositionFactory(
             name='Работник', group=cls.group_worker,
@@ -90,8 +90,9 @@ class TestTimesheetMixin(TestsHelperMixin):
         cls.add_group_perm(cls.group_worker, 'Timesheet', 'GET')
         cls.add_group_perm(cls.group_worker, 'Timesheet_stats', 'GET')
         fill_calendar.fill_days('2021.01.1', '2021.12.31', cls.shop.region.id)
+        cls.set_wd_allowed_additional_types()
 
-    def _calc_timesheets(self, employee_id=None, dt_from=None, dt_to=None, dttm_now=None, reraise_exc=True):
+    def _calc_timesheets(self, employee_id=None, dt_from=None, dt_to=None, dttm_now=None, reraise_exc=True, cleanup=True):
         dttm_now = dttm_now or datetime.combine(date(2021, 6, 7), time(10, 10, 10))
         with freeze_time(dttm_now):
-            calc_timesheets(employee_id__in=[employee_id or self.employee_worker.id], dt_from=dt_from, dt_to=dt_to, reraise_exc=reraise_exc)
+            calc_timesheets(employee_id__in=[employee_id or self.employee_worker.id], dt_from=dt_from, dt_to=dt_to, reraise_exc=reraise_exc, cleanup=cleanup)

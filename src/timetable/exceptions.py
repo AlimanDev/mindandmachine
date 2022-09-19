@@ -10,7 +10,7 @@ class WorkTimeOverlap(Exception):
             f'{overlap["employee__user__last_name"]} {overlap["employee__user__first_name"]} - {overlap["dt"]}'
             for overlap in self.overlaps
         )
-        return gettext('Операция не может быть выполнена. Недопустимое пересечение времени работы. ({overlaps_str})').format(
+        return gettext('The operation cannot be performed. Unacceptable intersection of working hours. ({overlaps_str})').format(
             overlaps_str=overlaps_str
         )
 
@@ -26,7 +26,7 @@ class WorkDayTaskViolation(Exception):
             for task_violation in self.task_violations
         )
         return gettext(
-            'Операция не может быть выполнена. Нарушены ограничения по запланированным задачам. ({task_violation_str})').format(
+            'The operation cannot be performed. Restrictions on scheduled tasks have been violated. ({task_violation_str})').format(
             task_violation_str=task_violation_str
         )
 
@@ -41,8 +41,8 @@ class MultipleWDTypesOnOneDateForOneEmployee(Exception):
             for error_data in self.multiple_workday_types_data
         )
         return gettext(
-                'Операция не может быть выполнена. '
-                'Нарушены ограничения по разрешенным типам дней на одну дату для одного сотрудника.. ({error_str})').format(
+                'The operation cannot be performed. '
+                'The restrictions on the allowed types of days on one date for one employee have been violated. ({error_str})').format(
             error_str=error_str
         )
 
@@ -57,7 +57,63 @@ class HasAnotherWdayOnDate(Exception):
             for error_data in self.exc_data
         )
         return gettext(
+                'The operation cannot be performed. '
+                'Creating multiple days on the same date for one employee is prohibited. ({error_str})').format(
+            error_str=error_str
+        )
+
+
+class MainWorkHoursGreaterThanNorm(Exception):
+    def __init__(self, exc_data):
+        self.exc_data = exc_data
+
+    def __str__(self, *args, **kwargs):
+        error_str = ', '.join(
+            (
+                f'{error_data["last_name"]} {error_data["first_name"]} - '
+                f'С {error_data["dt_from"]} по {error_data["dt_to"]} норма: {error_data["norm"]}, в графике: {error_data["total_work_hours"]}'
+            )
+            for error_data in self.exc_data
+        )
+        return gettext(
+                'The operation cannot be performed. '
+                'The restrictions on the number of hours in the main schedule have been violated. ({error_str})').format(
+            error_str=error_str
+        )
+
+
+class DtMaxHoursRestrictionViolated(Exception):
+    def __init__(self, exc_data):
+        self.exc_data = exc_data
+
+    def __str__(self, *args, **kwargs):
+        error_str = ', '.join(
+            (
+                f'{error_data["last_name"]} {error_data["first_name"]} - '
+                f'{error_data["worker_day_type"] or ""} {error_data["dt"]} текущее значение {error_data["current_work_hours"]}, разрешено не более {error_data["dt_max_hours"]}'
+            )
+            for error_data in self.exc_data
+        )
+        return gettext(
                 'Операция не может быть выполнена. '
-                'Создание нескольких дней на одну дату для одного сотрудника запрещено. ({error_str})').format(
+                'Нарушены ограничения по максимальному количеству часов. ({error_str})').format(
+            error_str=error_str
+        )
+
+
+class SawhSettingsIsNotSetRestrictionViolated(Exception):
+    def __init__(self, exc_data):
+        self.exc_data = exc_data
+
+    def __str__(self, *args, **kwargs):
+        error_str = ', '.join(
+            (
+                f'{error_data["last_name"]} {error_data["first_name"]}'
+            )
+            for error_data in self.exc_data
+        )
+        return gettext(
+                'Операция не может быть выполнена. '
+                'Не настроена норма часов у сотрудников: {error_str}. Обратитесь, пожалуйста, к администратору системы.').format(
             error_str=error_str
         )

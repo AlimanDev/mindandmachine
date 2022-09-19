@@ -112,54 +112,54 @@ class TestIntegration(TestsHelperMixin, APITestCase):
     USER_EMAIL = "q@q.q"
     USER_PASSWORD = "4242"
 
-    def setUp(self):
-        super().setUp()
+    @classmethod
+    def setUpTestData(cls):
+        cls.dt = now().date()
 
-        self.dt = now().date()
-
-        self.create_departments_and_users()
-        self.ext_system, _ = ExternalSystem.objects.get_or_create(
+        cls.create_departments_and_users()
+        cls.ext_system, _ = ExternalSystem.objects.get_or_create(
             code='zkteco',
             defaults={
                 'name':'ZKTeco',
             },
         )
-        self.position = WorkerPosition.objects.create(
+        cls.position = WorkerPosition.objects.create(
             name='Должность',
-            network=self.network,
+            network=cls.network,
             code='position',
         )
-        self.att_area, _ = AttendanceArea.objects.update_or_create(
+        cls.att_area, _ = AttendanceArea.objects.update_or_create(
             code='1',
-            external_system=self.ext_system,
+            external_system=cls.ext_system,
             defaults={
                 'name': 'Тестовая зона',
             }
         )
-        self.att_area2, _ = AttendanceArea.objects.update_or_create(
+        cls.att_area2, _ = AttendanceArea.objects.update_or_create(
             code='2',
-            external_system=self.ext_system,
+            external_system=cls.ext_system,
             defaults={
                 'name': 'Тестовая зона 2',
             }
         )
 
         Employment.objects.filter(
-            shop=self.shop,
+            shop=cls.shop,
         ).update(
-            position=self.position,
+            position=cls.position,
         )
-        self.employment1.position = self.position
+        cls.employment1.position = cls.position
 
-        self.shop.code = 'shop'
-        self.shop.save()
-        self.root_shop.code = 'root_shop'
-        self.root_shop.save()
-        self.employment1.code = 'employment1_code'
-        self.employment1.save()
-        self.employee1.tabel_code = 'employee1_code'
-        self.employee1.save()
+        cls.shop.code = 'shop'
+        cls.shop.save()
+        cls.root_shop.code = 'root_shop'
+        cls.root_shop.save()
+        cls.employment1.code = 'employment1_code'
+        cls.employment1.save()
+        cls.employee1.tabel_code = 'employee1_code'
+        cls.employee1.save()
         
+    def setUp(self):
         self.client.force_authenticate(user=self.user1)
 
 

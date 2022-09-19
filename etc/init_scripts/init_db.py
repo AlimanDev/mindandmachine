@@ -22,12 +22,11 @@ from src.base.models import (
     User,
     Group,
     Employment,
-    FunctionGroup,
     Network,
+    Employee
 )
 from src.forecast.models import (
     OperationType,
-    OperationTypeName,
     PeriodClients,
 )
 from src.timetable.models import (
@@ -38,7 +37,6 @@ from src.timetable.models import (
 from etc.scripts import fill_calendar
 from etc.scripts.create_access_groups import password_generator, update_group_functions
 from dateutil.relativedelta import relativedelta
-from src.util.models_converter import Converter
 
 
 def fill_demand(shop):
@@ -84,14 +82,15 @@ algo_params = json.dumps([
 
 
 def main(lang='ru', need_test_shop=False):
+    network = Network.objects.first()
     region = Region.objects.create(
         name=f"Регион 1",
+        network=network
     )
     fill_calendar.fill_days('2020.1.1', (datetime.now() + timedelta(days=730)).date().strftime('%Y.%m.%d'), 1, file_name='../scripts/work_data.csv')
     super_shop = Shop.objects.first()
     super_shop.name = 'Корневой магазин'
     super_shop.save()
-    network = Network.objects.first()
     update_group_functions(network=network, path='../scripts/function_group_default.xlsx')
     admin = User.objects.create(
         is_staff=True,
@@ -101,21 +100,21 @@ def main(lang='ru', need_test_shop=False):
         last_name='Admin',
         network=network,
     )
+    admin_e = Employee.objects.create(
+        user=admin
+    )
+    admin_group = Group.objects.get(name='Администратор')
     Employment.objects.create(
-        user=admin,
-        function_group=Group.objects.get(name='Администратор'),
+        employee=admin_e,
+        function_group=admin_group,
         dt_hired=date.today(),
         shop=super_shop,
     )
     u_pass = password_generator()
     admin.set_password(u_pass)
     admin.save()
-    print('admin login: {}, password: {}'.format('qadmin', u_pass))
-    work_type_names = {}
-    operation_type_names = {}
+    print(f'admin login: {admin.username}, password: {u_pass}')
     if need_test_shop:
-        last_work_type_code = 0
-        last_operation_type_code = 0
         shop = Shop.objects.create(
             parent_id=super_shop.id,
             name='Тестовый отдел',
@@ -135,13 +134,15 @@ def main(lang='ru', need_test_shop=False):
             )
             u.username = f'u{u.id}'
             u.save()
+            e = Employee.objects.create(user=u)
             Employment.objects.create(
-                user=u,
+                employee=e,
                 dt_hired=date(2019, 1, 1),
                 shop=shop,
             )
+        last_work_type_code = 0
         work_types = ['Кассы', 'Торговый зал']
-        operation_types = []
+        work_type_names = {}
         for work_type in work_types:
             if work_type not in work_type_names:
                 last_work_type_code += 1
@@ -151,15 +152,6 @@ def main(lang='ru', need_test_shop=False):
                     network=network,
                 )
             work_type = WorkType.objects.create(work_type_name=work_type_names[work_type], shop_id=shop.id)
-            if work_type not in operation_type_names:
-                last_operation_type_code += 1
-                operation_type_names[work_type] =  OperationTypeName.objects.create(
-                    name=work_type,
-                    code=last_operation_type_code,
-                    network=network,
-                )
-            operation_types.append(OperationType(operation_type_name=operation_type_names[work_type], work_type=work_type))
-        OperationType.objects.bulk_create(operation_types)
         fill_demand(shop)
     Shop.objects.rebuild()
     ExchangeSettings.objects.create(network=network)

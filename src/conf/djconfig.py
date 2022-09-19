@@ -56,6 +56,7 @@ DEBUG = env.bool('DJANGO_DEBUG', default=True)
 ALLOWED_HOSTS = ['*']
 
 INSTALLED_APPS = [
+    'django_light',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -89,6 +90,8 @@ INSTALLED_APPS = [
     'polymorphic',
     'src.exchange',
     'src.pbi',
+    'mptt',
+    'src.med_docs',
 ]
 
 REST_FRAMEWORK = {
@@ -203,13 +206,12 @@ EMAIL_PORT = 587
 # For use SSL
 # EMAIL_USE_SSL = True
 # EMAIL_PORT = 465
-
-DEFAULT_FROM_EMAIL = 'robot@mindandmachine.ru'
-EMAIL_HOST = 'smtp.yandex.ru'
-EMAIL_HOST_USER = 'robot@mindandmachine.ru'
-EMAIL_HOST_PASSWORD = 'TjP6szfJe0PpLNH'
-
-SERVER_EMAIL = EMAIL_HOST_USER
+DEFAULT_FROM_EMAIL = '"Робот" <robot@mindandmachine.ru>'
+SERVER_EMAIL = DEFAULT_FROM_EMAIL
+EMAIL_HOST = 'mndndm.gate.sendsay.ru'
+EMAIL_HOST_USER = 'mindandmachine.mindandmachine@smtpgate'
+EMAIL_HOST_PASSWORD = 'Si8gePhue3oMoh'
+COMPANY_NAME = 'not-specified' #для отображения в статистике рассылок через SMTP
 
 SFTP_IP = '212.109.194.87'
 SFTP_USERNAME = ''
@@ -498,10 +500,6 @@ SESAME_ONE_TIME = True
 SESAME_MAX_AGE = 60 * 60  # время жизни временного токена 1 час
 SESAME_TOKEN_NAME = 'otp_token'
 
-# Возможные вариант можно найти по FISCAL_SHEET_DIVIDERS_MAPPING
-# Если == None, то при расчете табеля разделение на осн. и доп. не производится
-FISCAL_SHEET_DIVIDER_ALIAS = None
-
 ENV_LVL_PROD = 'prod'
 ENV_LVL_TEST = 'test'
 ENV_LVL_LOCAL = 'local'
@@ -512,9 +510,6 @@ API_LOG_DELETE_GAP = 90
 # если текущий день месяца > {CALC_TIMESHEET_PREV_MONTH_THRESHOLD_DAYS},
 # то за прошлый месяца автоматически пересчет не запускается
 CALC_TIMESHEET_PREV_MONTH_THRESHOLD_DAYS = 4
-
-TIMESHEET_MAX_HOURS_THRESHOLD = Decimal('12.00')
-TIMESHEET_MIN_HOURS_THRESHOLD = Decimal('4.00')
 
 DOWNLOAD_TIMETABLE_GET_CODE_FUNC = lambda e: e.employee.tabel_code or ''
 

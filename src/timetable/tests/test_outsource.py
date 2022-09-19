@@ -1,15 +1,17 @@
 from datetime import datetime, date, timedelta, time
+from re import M
 
 from django.core import mail
 from django.test import override_settings
 from rest_framework.test import APITestCase
+from rest_framework import status
 
 from src.base.models import Shop, NetworkConnect, Network, User, Employee, Employment, Group, FunctionGroup
 from src.events.models import EventType
 from src.notifications.models.event_notification import EventEmailNotification
 from src.recognition.models import TickPoint, Tick
 from src.timetable.events import VACANCY_CONFIRMED_TYPE
-from src.timetable.models import ShopMonthStat
+from src.timetable.models import ShopMonthStat, TimesheetItem
 from src.timetable.models import (
     WorkerDay,
     WorkType,
@@ -29,6 +31,7 @@ class TestOutsource(TestsHelperMixin, APITestCase):
     @classmethod
     def setUpTestData(cls):
         cls.create_departments_and_users()
+        cls.set_wd_allowed_additional_types()
         cls.client_network = Network.objects.create(
             name='Клиент',
             breaks=cls.breaks,
@@ -515,22 +518,14 @@ class TestOutsource(TestsHelperMixin, APITestCase):
         response_data = sorted(response.json()['results'], key=lambda i: i['id'])
         data = {
             'id': vacancy['id'],
-            'first_name': self.user1.first_name,
-            'last_name': self.user1.last_name,
+            'employee_id': self.employee1.id,
             'is_outsource': True,
-            'avatar': None,
-            'worker_shop': self.employment1.shop_id,
-            'user_network_id': self.user1.network_id,
         }
         response = response_data[0]
         assert_response = {
             'id': response['id'],
-            'first_name': response['first_name'],
-            'last_name': response['last_name'],
+            'employee_id': response['employee_id'],
             'is_outsource': response['is_outsource'],
-            'avatar': response['avatar'],
-            'worker_shop': response['worker_shop'],
-            'user_network_id': response['user_network_id'],
         }
         self.assertEqual(assert_response, data)
         # получаем список отделов с аутсорс организациями
@@ -576,6 +571,7 @@ class TestOutsource(TestsHelperMixin, APITestCase):
                     'secondary_color': '', 
                     'allowed_geo_distance_km': None,
                     'allow_creation_several_wdays_for_one_employee_for_one_date': False,
+                    'allow_to_manually_set_is_vacancy': False,
                     'enable_camera_ticks': False,
                     'show_worker_day_additional_info': False,
                     'allowed_interval_for_late_arrival': '00:00:00',
@@ -905,3 +901,25 @@ class TestOutsource(TestsHelperMixin, APITestCase):
         self.assertCountEqual(vac_ids, [vacancy3['id'], vacancy4['id']])
         response = self.client.get(f'/rest_api/worker_day/vacancy/?limit=10&offset=0&outsourcing_network_id__in={self.outsource_network.id},{self.outsource_network2.id}')
         self.assertEqual(len(response.json()['results']), 4)
+
+    @override_settings(CELERY_TASK_ALWAYS_EAGER=True, CELERY_EAGER_PROPAGATES_EXCEPTIONS=True)
+    def test_recalc_timesheet_with_outsource(self):
+        WorkerDayFactory(
+            shop=self.client_shop,
+            dt=self.dt_now,
+            employee=self.outsource_employee,
+            employment=self.outsource_employment,
+            type_id=WorkerDay.TYPE_WORKDAY,
+            is_approved=True,
+            is_fact=True
+        )
+        total = TimesheetItem.objects.count()
+        data = {
+            'shop_id': self.client_shop.id,
+            'dt_from': self.dt_now.replace(day=1),
+            'dt_to': self.dt_now.replace(month=self.dt_now.month+1, day=1) - timedelta(1),
+            'employee_id__in': [self.outsource_employee.id]
+        }
+        resp = self.client.post(self.get_url('Timesheet-recalc'), data=self.dump_data(data), content_type='application/json')
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertNotEqual(TimesheetItem.objects.count(), total)

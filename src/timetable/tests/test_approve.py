@@ -1,10 +1,13 @@
-from datetime import time, datetime, timedelta
+import pandas as pd
+from datetime import date, time, datetime, timedelta
 
 from django.utils.timezone import now
 from rest_framework.test import APITestCase
+from etc.scripts.fill_calendar import fill_days
 
 from src.base.tests.factories import (
     NetworkFactory,
+    RegionFactory,
     UserFactory,
     EmploymentFactory,
     ShopFactory,
@@ -40,8 +43,9 @@ class TestWorkerDayApprove(TestsHelperMixin, APITestCase):
         )
         cls.user = UserFactory(network=cls.network)
         cls.employee = EmployeeFactory(user=cls.user)
-        cls.shop = ShopFactory(network=cls.network)
-        cls.shop2 = ShopFactory(network=cls.network)
+        cls.region = RegionFactory()
+        cls.shop = ShopFactory(network=cls.network, region=cls.region)
+        cls.shop2 = ShopFactory(network=cls.network, region=cls.region)
         cls.group = GroupFactory(network=cls.network)
         cls.position = WorkerPositionFactory(network=cls.network, group=cls.group)
         cls.employment = EmploymentFactory(employee=cls.employee, shop=cls.shop, position=cls.position)
@@ -495,6 +499,108 @@ class TestWorkerDayApprove(TestsHelperMixin, APITestCase):
         self.assertTrue(vac_not_approved2.is_approved)
         self.assertEqual(WorkerDay.objects.filter(is_fact=False, is_approved=True).count(), 2)
         self.assertEqual(WorkerDay.objects.filter(is_fact=False, is_approved=False).count(), 0)
+
+    def test_check_norm_on_approve(self):
+        self.network.set_settings_value('check_main_work_hours_norm', True)
+        self.network.save()
+        fill_days('2021.12.1', '2022.3.1', self.region.id)
+
+        WorkerDay.objects.all().delete()
+
+        for dt in pd.date_range(date(2022, 1, 1), date(2022, 2, 28), freq='1d'):
+            WorkerDayFactory(
+                dt=dt,
+                employee=self.employee,
+                employment=self.employment,
+                dttm_work_start=datetime.combine(dt, time(8)),
+                dttm_work_end=datetime.combine(dt, time(22)),
+                is_approved=False,
+                is_fact=False,
+                type_id=WorkerDay.TYPE_WORKDAY,
+                shop=self.shop,
+            )
+        
+        response = self._approve(
+            self.shop.id,
+            False,
+            date(2022, 2, 1),
+            date(2022, 2, 28),
+            wd_types=[WorkerDay.TYPE_WORKDAY],
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(
+            response.json(),
+            ['Операция не может быть выполнена. Нарушены ограничения по количеству часов в основном графике. '
+            f'({self.user.last_name} {self.user.first_name} - С 2022-02-01 по 2022-02-28 норма: 151.0, в графике: 364.0)']
+        )
+        
+        self.assertFalse(WorkerDay.objects.filter(is_approved=True).exists())
+
+        response = self._approve(
+            self.shop.id,
+            False,
+            date(2022, 1, 1),
+            date(2022, 2, 28),
+            wd_types=[WorkerDay.TYPE_WORKDAY],
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(
+            response.json(),
+            ['Операция не может быть выполнена. Нарушены ограничения по количеству часов в основном графике. '
+            f'({self.user.last_name} {self.user.first_name} - С 2022-01-01 по 2022-01-31 норма: 128.0, в графике: 403.0, '
+            f'{self.user.last_name} {self.user.first_name} - С 2022-02-01 по 2022-02-28 норма: 151.0, в графике: 364.0)']
+        )
+
+        self.assertFalse(WorkerDay.objects.filter(is_approved=True).exists())
+
+        WorkerDay.objects.update(is_vacancy=True)
+        response = self._approve(
+            self.shop.id,
+            False,
+            date(2022, 1, 1),
+            date(2022, 2, 28),
+            wd_types=[WorkerDay.TYPE_WORKDAY],
+        )
+
+        self.assertEqual(response.status_code, 200)
+
+    def test_approve_vacancy_with_approved_parent(self):
+        dt = date.today()
+        approved = WorkerDayFactory(
+            employee=self.employee,
+            employment=self.employment,
+            dt=dt,
+            type_id=WorkerDay.TYPE_HOLIDAY,
+            is_approved=True,
+            is_fact=False,
+        )
+        not_approved_vacancy = WorkerDayFactory(
+            employee=self.employee,
+            employment=self.employment,
+            dt=dt,
+            dttm_work_start=datetime.combine(dt, time(8)),
+            dttm_work_end=datetime.combine(dt, time(20)),
+            shop=self.shop,
+            type_id=WorkerDay.TYPE_WORKDAY,
+            is_approved=False,
+            is_fact=False,
+            is_vacancy=True,
+            parent_worker_day=approved,
+        )
+        self.add_group_perm(self.group, 'WorkerDay_approve_vacancy', 'POST')
+
+        response = self.client.post(
+            self.get_url('WorkerDay-approve-vacancy', pk=not_approved_vacancy.id)
+        )
+        self.assertEqual(response.status_code, 200)
+
+        not_approved_vacancy.refresh_from_db()
+        self.assertTrue(not_approved_vacancy.is_approved)
+
+        self.assertFalse(WorkerDay.objects.filter(pk=approved.id).exists())
+        self.assertTrue(WorkerDay.objects.filter(parent_worker_day_id=not_approved_vacancy.id).exists())
 
     def test_approve_only_specific_worker_day_types(self):
         plan_not_approved1 = WorkerDayFactory(

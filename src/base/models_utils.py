@@ -114,3 +114,28 @@ def check_func_groups():
     if missing_views:
         raise ValueError('The following views are not mentioned in FUNCS list: ' + ', '.join(missing_views))
 #
+
+class OverrideBaseManager:
+    prev_managers = {}
+    models = []
+    manager = None
+
+    def __init__(self, models, manager='objects'):
+        self.models = models
+        self.manager = manager
+        for model in models:
+            self.prev_managers[model.__name__] = getattr(model._meta, 'base_manager_name', None)
+          
+    def __enter__(self):
+        for model in self.models:
+            model._meta.base_manager_name = self.manager
+            if "base_manager" in model._meta.__dict__:
+                del model._meta.__dict__["base_manager"]
+        return self
+      
+    def __exit__(self, exc_type, exc_value, exc_traceback):
+        for model in self.models:
+            prev_manager = self.prev_managers.get(model.__name__)
+            model._meta.base_manager_name = prev_manager
+            if "base_manager" in model._meta.__dict__:
+                del model._meta.__dict__["base_manager"]

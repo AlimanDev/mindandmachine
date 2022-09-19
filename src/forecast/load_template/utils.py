@@ -188,7 +188,8 @@ def apply_formula(operation_type, operation_type_template, operation_type_relati
                 continue
             values_list.append(
                 PeriodClients(
-                    dttm_forecast=dttm, 
+                    dttm_forecast=dttm,
+                    dt_report=dttm.date(),
                     operation_type=operation_type, 
                     value=result[dttm2index(dt_from, dttm)],
                     type=PeriodClients.LONG_FORECASE_TYPE,

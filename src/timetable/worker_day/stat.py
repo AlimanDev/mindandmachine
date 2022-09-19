@@ -16,6 +16,7 @@ from django.db.models import (
     F, Q,
     Value,
     FloatField,
+    ExpressionWrapper,
 )
 from django.db.models.functions import Cast, TruncDate
 from django.db.models.functions import Extract, Coalesce
@@ -225,7 +226,7 @@ def get_month_range(year, month_num, return_days_in_month=False):
 
 class WorkersStatsGetter:
     def __init__(self, dt_from, dt_to, employee_id=None, employee_id__in=None, network=None, shop_id=None,
-                 hours_by_types: list = None):
+                 hours_by_types: list = None, use_cache=True):
         """
         :param dt_from:
         :param dt_to:
@@ -248,6 +249,7 @@ class WorkersStatsGetter:
             show_stat_in_hours=True,
         ).values_list('code', flat=True))
         self._network = network
+        self.use_cache = use_cache
 
     @cached_property
     def shift_schedule_data(self):
@@ -336,11 +338,15 @@ class WorkersStatsGetter:
     @cached_property
     def employments_list(self):
         dt_from, dt_to = self.acc_period_range
-        sawh_settings_subq = SAWHSettingsMapping.objects.filter(
-            Q(positions__id=OuterRef('position_id')) | Q(shops__id=OuterRef('shop_id')),
-            ~Q(exclude_positions__id=OuterRef('position_id')),
+        sawh_settings_mapping_subq = SAWHSettingsMapping.objects.annotate(
+          is_equal_sawh_settings=ExpressionWrapper(
+              Q(sawh_settings_id=OuterRef('sawh_settings_id')), output_field=BooleanField()),
+        ).filter(
+            Q(is_equal_sawh_settings=True) | Q(sawh_settings_id=OuterRef('position__sawh_settings_id')),
             year=self.year,
-        ).order_by('-priority')
+        ).order_by(
+            '-is_equal_sawh_settings',
+        )
 
         # рефакторинг
         outsourcing_network_qs = list(
@@ -363,12 +369,19 @@ class WorkersStatsGetter:
             dt_from=dt_from,
             dt_to=dt_to,
         ).select_related(
-            'position'
+            'position',
         ).order_by(
-            'dt_hired'
+            'dt_hired',
         ).annotate(
-            sawh_hours_by_months=Subquery(sawh_settings_subq.values('sawh_settings__work_hours_by_months')[:1]),
-            sawh_settings_type=Subquery(sawh_settings_subq.values('sawh_settings__type')[:1]),
+            sawh_hours_by_months=Coalesce(
+                F('sawh_settings__work_hours_by_months'),
+                Subquery(sawh_settings_mapping_subq.values("work_hours_by_months")[:1]),
+                F('position__sawh_settings__work_hours_by_months'),
+            ),
+            sawh_settings_type=Coalesce(
+                F('sawh_settings__type'),
+                F('position__sawh_settings__type'),
+            ),
         ).distinct()
         if self.employee_id:
             employments = employments.filter(employee_id=self.employee_id)
@@ -498,14 +511,17 @@ class WorkersStatsGetter:
     def _get_prod_cal_cached(self):
         cached_data = []
 
-        for e in self.employees_dict.keys():
-            key = f'prod_cal_{self.dt_from}_{self.dt_to}_{e}'
-            cached = cache.get(key)
-            if not cached:
-                cached = self._get_prod_cal_for_employee(e)
-                cache.set(key, cached, timeout=settings.CACHE_TTL.get('prod_cal', 86400))
-            cached_data.extend(cached)
-        
+        if self.use_cache:
+            for e in self.employees_dict.keys():
+                key = f'prod_cal_{self.dt_from}_{self.dt_to}_{e}'
+                cached = cache.get(key)
+                if not cached:
+                    cached = self._get_prod_cal_for_employee(e)
+                    cache.set(key, cached, timeout=settings.CACHE_TTL.get('prod_cal', 86400))
+                cached_data.extend(cached)
+        else:
+            cached_data = list(self.prod_cal_qs.filter(employee_id__in=self.employees_dict.keys()))
+
         return cached_data
 
     def run(self):
@@ -567,7 +583,17 @@ class WorkersStatsGetter:
             work_hours_outside_of_selected_period=Coalesce(Sum(Extract(F('work_hours'), 'epoch') / 3600,
                                                          filter=Q(outside_of_selected_period_q, work_hours__gte=timedelta(0),
                                                                   type__is_work_hours=True),
-                                                         output_field=FloatField()), 0.0)
+                                                         output_field=FloatField()), 0.0),
+            work_hours_all_shops_main=Coalesce(Sum(Extract(F('work_hours'), 'epoch') / 3600,
+                                                filter=Q(selected_period_q, Q(is_vacancy=False),
+                                                         work_hours__gte=timedelta(0),
+                                                         type__is_work_hours=True),
+                                                output_field=FloatField()), 0.0),
+            work_hours_all_shops_additional=Coalesce(Sum(Extract(F('work_hours'), 'epoch') / 3600,
+                                                filter=Q(selected_period_q, Q(is_vacancy=True),
+                                                         work_hours__gte=timedelta(0),
+                                                         type__is_work_hours=True),
+                                                output_field=FloatField()), 0.0)
         ).order_by('employee_id', '-is_fact', '-is_approved')  # такая сортировка нужна для work_hours_prev_months
         if self.hours_by_types:
             work_days = work_days.annotate(**{
@@ -597,6 +623,8 @@ class WorkersStatsGetter:
             for work_hours in work_hours_dicts:
                 work_hours['selected_shop'] = work_hours.get('selected_shop', 0) + wd_dict['work_hours_selected_shop']
                 work_hours['other_shops'] = work_hours.get('other_shops', 0) + wd_dict['work_hours_other_shops']
+                work_hours['all_shops_main'] = work_hours.get('all_shops_main', 0) + wd_dict['work_hours_all_shops_main']
+                work_hours['all_shops_additional'] = work_hours.get('all_shops_additional', 0) + wd_dict['work_hours_all_shops_additional']
                 work_hours['total'] = work_hours.get('total', 0) + wd_dict['work_hours_selected_period']
                 work_hours['until_acc_period_end'] = work_hours.get(
                     'until_acc_period_end', 0) + wd_dict['work_hours_until_acc_period_end']
@@ -1073,4 +1101,9 @@ class WorkersStatsGetter:
                     overtime['curr_month_end'] = (
                         work_hours_prev_months + work_hours_curr_month) - norm_hours_curr_month_end
 
+                    # округление для того, чтобы обойти проблему потери точности при сложении float
+                    # (по-хорошему надо все расчеты переделать на Decimal)
+                    sawh_hours['curr_month_without_reduce_norm'] = round(sawh_hours['curr_month_without_reduce_norm'], 8)
+                    sawh_hours['curr_month'] = round(sawh_hours['curr_month'], 8)
+                    sawh_hours['selected_period'] = round(sawh_hours['selected_period'], 8)
         return res

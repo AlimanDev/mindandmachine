@@ -87,16 +87,13 @@ class EmploymentViewSet(UpdateorCreateViewSet):
     serializer_class = EmploymentSerializer
     filterset_class = EmploymentFilter
     openapi_tags = ['Employment', 'Integration',]
+    queryset = Employment.objects.all()
 
     def perform_update(self, serializer):
         serializer.save(dttm_deleted=None)
 
     def get_queryset(self):
-        manager = Employment.objects
-        if self.action in ['update']:
-            manager = Employment.objects_with_excluded
-
-        qs = manager.filter(
+        qs = super().get_queryset().filter(
             Q(shop__network_id=self.request.user.network_id) | 
             Q(employee__user__network_id=self.request.user.network_id), # чтобы можно было аутсорсу редактировать трудоустройтсва своих сотрудников
         ).order_by('-dt_hired')
@@ -288,6 +285,10 @@ class EmployeeViewSet(UpdateorCreateViewSet):
             if show_constraints and bool(distutils.util.strtobool(show_constraints)):
                 employments_qs = employments_qs.prefetch_related(Prefetch('worker_constraints', to_attr='worker_constraints_list'))
             filtered_qs = filtered_qs.prefetch_related(Prefetch('employments', queryset=employments_qs, to_attr='employments_list'))
+        include_medical_documents = self.request.query_params.get('include_medical_documents')
+        if include_medical_documents and bool(distutils.util.strtobool(include_medical_documents)):
+            filtered_qs = filtered_qs.prefetch_related(
+                Prefetch('medical_documents', to_attr='medical_documents_list'))
         return filtered_qs
 
     @action(detail=False, methods=['get'])
@@ -363,7 +364,7 @@ class WorkerPositionViewSet(UpdateorCreateViewSet):
                 ).values_list('outsourcing_id', flat=True)
             )
         now = timezone.now()
-        return WorkerPosition.objects.annotate(
+        qs = WorkerPosition.objects.annotate(
             is_active=ExpressionWrapper(
                 Q(dttm_deleted__isnull=True) | 
                 Q(dttm_deleted__gte=now),
@@ -372,6 +373,13 @@ class WorkerPositionViewSet(UpdateorCreateViewSet):
         ).filter(
             network_filter,
         )
+        include_allowed_sawh_settings = self.request.query_params.get('include_allowed_sawh_settings')
+        if include_allowed_sawh_settings and bool(distutils.util.strtobool(include_allowed_sawh_settings)):
+            qs = qs.prefetch_related(
+                Prefetch('allowed_sawh_settings', to_attr='allowed_sawh_settings_list')
+            )
+        return qs
+
 
 class ShopSettingsViewSet(BaseActiveNamedModelViewSet):
     pagination_class = LimitOffsetPagination

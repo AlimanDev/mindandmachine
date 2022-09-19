@@ -1,47 +1,43 @@
-from datetime import datetime
-from dateutil.relativedelta import relativedelta
-
 from rest_framework import status
 from rest_framework.test import APITestCase
+from src.util.mixins.tests import TestsHelperMixin
 
-from src.util.test import create_departments_and_users
 
 from src.forecast.models import OperationTypeName, OperationType
 from src.timetable.models import WorkTypeName, WorkType
 
-from src.base.models import FunctionGroup
 
-
-class TestOperationTypeName(APITestCase):
+class TestOperationTypeName(APITestCase, TestsHelperMixin):
     USER_USERNAME = "user1"
     USER_EMAIL = "q@q.q"
     USER_PASSWORD = "4242"
 
-    def setUp(self):
-        super().setUp()
+    @classmethod
+    def setUpTestData(cls):
+        cls.url = '/rest_api/operation_type_name/'
 
-        self.url = '/rest_api/operation_type_name/'
-
-        create_departments_and_users(self)
-        self.work_type_name1 = WorkTypeName.objects.create(
+        cls.create_departments_and_users()
+        cls.work_type_name1 = WorkTypeName.objects.create(
             name='Кассы',
-            network=self.network,
+            network=cls.network,
         )
-        self.operation_type_name1 = self.work_type_name1.operation_type_name
-        self.work_type = WorkType.objects.create(shop=self.shop, work_type_name=self.work_type_name1)
-        self.operation_type_name2 = OperationTypeName.objects.create(
+        cls.operation_type_name1 = cls.work_type_name1.operation_type_name
+        cls.work_type = WorkType.objects.create(shop=cls.shop, work_type_name=cls.work_type_name1)
+        cls.operation_type_name2 = OperationTypeName.objects.create(
             name='Тип_кассы_2',
-            network=self.network,
+            network=cls.network,
         )
-        self.operation_type_name3 = OperationTypeName.objects.create(
+        cls.operation_type_name3 = OperationTypeName.objects.create(
             name='Тип_кассы_3',
-            network=self.network,
+            network=cls.network,
         )
-        self.operation_type_name4 = OperationTypeName.objects.create(
+        cls.operation_type_name4 = OperationTypeName.objects.create(
             name='тип_кассы_4',
-            network=self.network,
+            network=cls.network,
         )
 
+
+    def setUp(self):
         self.client.force_authenticate(user=self.user1)
 
     def test_get_list(self):
@@ -112,6 +108,3 @@ class TestOperationTypeName(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         self.assertIsNotNone(OperationTypeName.objects.get(id=self.operation_type_name1.id).dttm_deleted)
         self.assertEqual(OperationType.objects.filter(dttm_deleted__isnull=False).count(), 1)
-
-
-    

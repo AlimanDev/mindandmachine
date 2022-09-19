@@ -1,6 +1,9 @@
-from django.db.models import Q, F, Sum
+from typing import Iterable
+from datetime import date
 
-from src.base.models import Network
+from django.db.models import Q, F, Sum, Exists, OuterRef
+
+from src.base.models import Employment, Network
 from ..models import WorkerDayType, TimesheetItem
 from ..worker_day.stat import WorkersStatsGetter
 
@@ -63,6 +66,21 @@ def get_timesheet_stats(filtered_qs, dt_from, dt_to, user):
                 employee_id, {}).get('plan', {}).get('approved', {}).get('sawh_hours', {}).get('curr_month_without_reduce_norm', None)
 
     return timesheet_stats
+
+def delete_hanging_timesheet_items(calc_periods: Iterable[tuple[date, date]]) -> tuple[int, dict]:
+    '''Удаляет `TimesheetItem` у сотрудников без активного трудоустройства на этот день'''
+    range_q = Q()
+    for period in calc_periods:
+        range_q |= Q(dt__range=(*period,))
+    return TimesheetItem.objects.filter(
+        range_q
+        ).exclude(
+            Exists(
+                Employment.objects.get_active(
+                    dt_from=OuterRef('dt'), dt_to=OuterRef('dt')
+                ).filter(employee=OuterRef('employee'))
+            )
+        ).delete()
 
 
 class BaseTimesheetLinesGroupByStrategy:

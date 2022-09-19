@@ -23,7 +23,7 @@ class TestUpdateShopStats(TestsHelperMixin, TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.create_departments_and_users()
-        cls.work_type_name = WorkTypeName.objects.create(name='Кассы', code='test')
+        cls.work_type_name = WorkTypeName.objects.create(name='Кассы', code='test', network=cls.network)
         cls.work_type = WorkType.objects.create(shop=cls.shop, work_type_name=cls.work_type_name)
 
         cls.operation_type = OperationType.objects.get(shop=cls.shop, work_type=cls.work_type)
@@ -33,6 +33,7 @@ class TestUpdateShopStats(TestsHelperMixin, TestCase):
                 if 10 < tm < 20:
                     PeriodClients.objects.create(
                         dttm_forecast=datetime.datetime.combine(dt, datetime.time(tm)),
+                        dt_report=dt,
                         value=2.0,
                         operation_type=cls.operation_type,
                     )

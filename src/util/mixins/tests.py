@@ -13,7 +13,7 @@ from src.base.models import Employment, FunctionGroup
 from src.recognition.models import TickPoint
 from src.timetable.models import WorkerDay, WorkerDayCashboxDetails, WorkerDayType
 from src.timetable.tests.factories import WorkerDayTypeFactory, WorkerDayFactory
-from src.util.test import create_departments_and_users
+from src.util import test
 from src.util.utils import generate_user_token
 
 
@@ -21,6 +21,8 @@ class TestsHelperMixin:
     USER_USERNAME = "user1"
     USER_EMAIL = "q@q.q"
     USER_PASSWORD = "4242"
+
+    maxDiff = None
 
     def _set_authorization_token(self, login):
         response = self.client.post(
@@ -56,8 +58,24 @@ class TestsHelperMixin:
         return response
 
     @classmethod
-    def create_departments_and_users(cls):
-        create_departments_and_users(cls)
+    def create_departments_and_users(*args, **kwargs):
+        test.create_departments_and_users(*args, **kwargs)
+
+    @staticmethod
+    def create_work_type(*args, **kwargs):
+        test.create_work_type(*args, **kwargs)
+
+    @staticmethod
+    def create_operation_type(*args, **kwargs):
+        test.create_operation_type(*args, **kwargs)
+
+    @staticmethod
+    def create_period_clients(*args, **kwargs):
+        test.create_period_clients(*args, **kwargs)
+
+    @classmethod
+    def create_outsource(*args, **kwargs):
+        test.create_outsource(*args, **kwargs)
 
     @staticmethod
     def get_url(view_name, *args, **kwargs: dict):
@@ -235,19 +253,27 @@ class TestsHelperMixin:
     def wd_types_dict(self):
         return WorkerDayType.get_wd_types_dict()
 
-    def _create_worker_day(self, employment, dttm_work_start, dttm_work_end, is_fact=False, is_approved=True,
-                           shop_id=None):
-        return WorkerDayFactory(
+    @classmethod
+    def _create_worker_day(cls, employment, dttm_work_start, dttm_work_end, dt=None, is_fact=False, is_approved=True,
+                           shop_id=None, closest_plan_approved_id=None, created_by=None, outsources=[], is_vacancy=False, work_type_name='Работа'):
+        wd = WorkerDayFactory(
             is_approved=is_approved,
             is_fact=is_fact,
-            shop_id=shop_id or employment.shop_id,
+            shop_id=shop_id or getattr(employment, 'shop_id', None),
             employment=employment,
-            employee_id=employment.employee_id,
-            dt=dttm_work_start.date(),
+            employee_id=getattr(employment, 'employee_id', None),
+            dt=dt or getattr(cls, 'dt', None) or dttm_work_start.date(),
             type_id=WorkerDay.TYPE_WORKDAY,
             dttm_work_start=dttm_work_start,
             dttm_work_end=dttm_work_end,
+            closest_plan_approved_id=closest_plan_approved_id,
+            created_by=created_by,
+            is_vacancy=is_vacancy,
+            cashbox_details__work_type__work_type_name__name=work_type_name,
         )
+        if outsources:
+            wd.outsources.add(*outsources)
+        return wd
 
     @staticmethod
     def save_df_as_excel(df, filename):
@@ -269,3 +295,22 @@ class TestsHelperMixin:
         ]
         kwargs = {f: getattr(wd, f) for f in fields}
         return WorkerDay.objects.filter(**kwargs).exists()
+
+    @classmethod
+    def set_wd_allowed_additional_types(cls):
+        type_workday = WorkerDayType.objects.get(code=WorkerDay.TYPE_WORKDAY)
+        for wdt in WorkerDayType.objects.filter(is_work_hours=False):
+            wdt.allowed_additional_types.add(type_workday)
+            wdt.save()
+
+    @staticmethod
+    def _create_att_record(type, dttm, user_id, employee_id, shop_id, terminal=True):
+        from src.timetable.models import AttendanceRecords
+        return AttendanceRecords.objects.create(
+            dttm=dttm,
+            shop_id=shop_id,
+            user_id=user_id,
+            employee_id=employee_id,
+            type=type,
+            terminal=terminal,
+        )
