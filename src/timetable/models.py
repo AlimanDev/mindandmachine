@@ -466,10 +466,10 @@ class WorkerDayType(AbstractModel):
 
     GET_WORK_HOURS_METHOD_TYPES = (
         (GET_WORK_HOURS_METHOD_TYPE_MONTH_AVERAGE_SAWH_HOURS,
-         'Расчет часов на основе среднемесячного значения рекомендуемой нормы'),
-        (GET_WORK_HOURS_METHOD_TYPE_NORM_HOURS, 'Расчет часов на основе нормы по производственному календарю'),
-        (GET_WORK_HOURS_METHOD_TYPE_MANUAL, 'Ручное проставление часов'),
-        (GET_WORK_HOURS_METHOD_TYPE_MANUAL_OR_MONTH_AVERAGE_SAWH_HOURS, 'Ручное проставление часов или среднемесячное значение рекомендуемой нормы'),
+         _('Hours calculation based on average monthly value of the recommended norm')),
+        (GET_WORK_HOURS_METHOD_TYPE_NORM_HOURS, _('Hours calculation based on production calendar norm')),
+        (GET_WORK_HOURS_METHOD_TYPE_MANUAL, _('Manual setting of hours')),
+        (GET_WORK_HOURS_METHOD_TYPE_MANUAL_OR_MONTH_AVERAGE_SAWH_HOURS, _('Manual setting of hours or average monthly value of the recommended norm')),
     )
 
     code = models.CharField(max_length=64, primary_key=True, verbose_name='Код', help_text='Первычный ключ')
@@ -549,9 +549,9 @@ class Restriction(AbstractModel):
     RESTRICTION_TYPE_SAWH_SETTINGS_IS_NOT_SET = 2
 
     RESTRICTION_TYPE_CHOICES = (
-        (RESTRICTION_TYPE_DT_MAX_HOURS, 'Максимальное количество часов на одну дату у сотрудника'),
+        (RESTRICTION_TYPE_DT_MAX_HOURS, _('Maximum number of hours for one date for employee')),
         (RESTRICTION_TYPE_SAWH_SETTINGS_IS_NOT_SET,
-         'Настройки нормы не установлены (через должность, либо через трудоустройство)'),
+         _('Norm settings are not configured (through position or employment)')),
     )
 
     work_type_position = models.ForeignKey(

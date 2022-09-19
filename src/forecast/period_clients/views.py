@@ -284,7 +284,8 @@ class PeriodClientsViewSet(BaseModelViewSet):
                 for date in dates_to_add:
                         models.append(
                             PeriodClients(
-                                dttm_forecast=date, 
+                                dttm_forecast=date,
+                                dt_report=date.date(), 
                                 operation_type_id=o_id, 
                                 value=set_value,
                                 type=type,

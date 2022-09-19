@@ -42,7 +42,7 @@ class MultipleWDTypesOnOneDateForOneEmployee(Exception):
         )
         return gettext(
                 'The operation cannot be performed. '
-                'The restrictions on the allowed types of days on one date for one employee have been violated.. ({error_str})').format(
+                'The restrictions on the allowed types of days on one date for one employee have been violated. ({error_str})').format(
             error_str=error_str
         )
 
@@ -77,7 +77,7 @@ class MainWorkHoursGreaterThanNorm(Exception):
         )
         return gettext(
                 'The operation cannot be performed. '
-                'The restrictions on the number of hours in the main schedule have been violated.. ({error_str})').format(
+                'The restrictions on the number of hours in the main schedule have been violated. ({error_str})').format(
             error_str=error_str
         )
 

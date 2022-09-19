@@ -531,7 +531,7 @@ class TestWorkerDayApprove(TestsHelperMixin, APITestCase):
         self.assertEqual(response.status_code, 400)
         self.assertEqual(
             response.json(),
-            ['Операция не может быть выполнена. Нарушены ограничения по количеству часов в основном графике.. '
+            ['Операция не может быть выполнена. Нарушены ограничения по количеству часов в основном графике. '
             f'({self.user.last_name} {self.user.first_name} - С 2022-02-01 по 2022-02-28 норма: 151.0, в графике: 364.0)']
         )
         
@@ -548,7 +548,7 @@ class TestWorkerDayApprove(TestsHelperMixin, APITestCase):
         self.assertEqual(response.status_code, 400)
         self.assertEqual(
             response.json(),
-            ['Операция не может быть выполнена. Нарушены ограничения по количеству часов в основном графике.. '
+            ['Операция не может быть выполнена. Нарушены ограничения по количеству часов в основном графике. '
             f'({self.user.last_name} {self.user.first_name} - С 2022-01-01 по 2022-01-31 норма: 128.0, в графике: 403.0, '
             f'{self.user.last_name} {self.user.first_name} - С 2022-02-01 по 2022-02-28 норма: 151.0, в графике: 364.0)']
         )

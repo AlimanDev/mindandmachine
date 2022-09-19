@@ -957,12 +957,12 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
         response = self.client.put(f"{self.url}{self.worker_day_plan_approved.id}/", data, format='json')
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(response.json(),
-                         {'error': ['Нельзя менять подтвержденную версию.']}
+                         {'error': ['You cannot change the approved version.']}
                          )
 
         response = self.client.put(f"{self.url}{self.worker_day_fact_approved.id}/", data, format='json')
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertEqual(response.json(), {'error': ['Нельзя менять подтвержденную версию.']})
+        self.assertEqual(response.json(), {'error': ['You cannot change the approved version.']})
 
     def test_edit_worker_day(self):
         dt = self.dt + timedelta(days=1)
@@ -2802,7 +2802,7 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
             self.get_url('WorkerDay-batch-update-or-create'), self.dump_data(data), content_type='application/json')
         self.assertContains(
             resp, 'Операция не может быть выполнена. '
-                  'Нарушены ограничения по разрешенным типам дней на одну дату для одного сотрудника..', status_code=400)
+                  'Нарушены ограничения по разрешенным типам дней на одну дату для одного сотрудника.', status_code=400)
 
     def test_cant_batch_create_different_dayoff_types_on_one_date_for_one_employee(self):
         WorkerDay.objects.all().delete()
@@ -2830,7 +2830,7 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
             self.get_url('WorkerDay-batch-update-or-create'), self.dump_data(data), content_type='application/json')
         self.assertContains(
             resp, 'Операция не может быть выполнена. '
-                  'Нарушены ограничения по разрешенным типам дней на одну дату для одного сотрудника..', status_code=400)
+                  'Нарушены ограничения по разрешенным типам дней на одну дату для одного сотрудника.', status_code=400)
 
     def test_cant_create_multiple_wdays_on_one_date_if_setting_is_enabled(self):
         WorkerDay.objects.all().delete()

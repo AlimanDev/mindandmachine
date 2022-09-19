@@ -192,17 +192,20 @@ class TestWorkType(APITestCase, TestsHelperMixin):
                     value=2,
                     operation_type=op_type,
                     dttm_forecast=datetime.combine(dt, time(j)),
+                    dt_report=dt,
                 )
                 PeriodClients.objects.create(
                     value=1,
                     operation_type=op_type3,
                     dttm_forecast=datetime.combine(dt, time(j)),
+                    dt_report=dt,
                 )
                 PeriodClients.objects.create(
                     value=100,
                     type=PeriodClients.FACT_TYPE,
                     operation_type=op_type_income,
                     dttm_forecast=datetime.combine(dt, time(j)),
+                    dt_report=dt,
                 )
 
         wd = WorkerDay.objects.create(
@@ -455,6 +458,7 @@ class TestWorkType(APITestCase, TestsHelperMixin):
                 value=1,
                 operation_type=op_type,
                 dttm_forecast=datetime.combine(after_after_tomorrow, time(j)),
+                dt_report=after_after_tomorrow,
             )
 
         del get_params['graph_type']

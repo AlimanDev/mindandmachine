@@ -168,7 +168,7 @@ class TestDemand(APITestCase, TestsHelperMixin):
         cls.o_types = [cls.o_type_1, cls.o_type_2, cls.o_type_3, cls.o_type_4, cls.o_type_5]
         PeriodClients.objects.bulk_create(
             [
-                PeriodClients(**data)
+                PeriodClients(dt_report=data['dttm_forecast'].date(), **data)
                 for data in test_data
             ]
         )

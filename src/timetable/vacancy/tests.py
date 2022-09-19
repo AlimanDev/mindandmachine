@@ -314,6 +314,7 @@ class TestAutoWorkerExchange(APITestCase, TestsHelperMixin):
         while dttm_from < dttm_to:
             pc_list.append(PeriodClients(
                 dttm_forecast=dttm_from,
+                dt_report=dttm_from.date(),
                 value=value,
                 type=PeriodClients.LONG_FORECASE_TYPE,
                 operation_type=operation_type

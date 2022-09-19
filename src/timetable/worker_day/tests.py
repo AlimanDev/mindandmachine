@@ -158,6 +158,7 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
                         operation_type=ot,
                         value=1,
                         dttm_forecast=datetime.combine(dt, time(tm, 0, 0)),
+                        dt_report=dt,
                         type='L',
                     )
 

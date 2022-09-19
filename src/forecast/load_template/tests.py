@@ -315,6 +315,7 @@ class TestLoadTemplate(APITestCase, TestsHelperMixin):
                     for tm in range(24):
                         PeriodClients.objects.create(
                             dttm_forecast=datetime.combine(dt, time(tm)),
+                            dt_report=dt,
                             value=2.0,
                             operation_type=ot,
                             type=PeriodClients.FACT_TYPE,
@@ -364,6 +365,7 @@ class TestLoadTemplate(APITestCase, TestsHelperMixin):
                 for tm in range(24):
                     PeriodClients.objects.create(
                         dttm_forecast=datetime.combine(dt, time(tm)),
+                        dt_report=dt,
                         value=2.0,
                         operation_type=operation_type,
                         type=PeriodClients.FACT_TYPE,

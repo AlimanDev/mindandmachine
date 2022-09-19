@@ -658,6 +658,7 @@ def create_operation_type(do_forecast, operation_type_names, dttm_deleted=None):
 def create_period_clients(dttm_forecast, value, type, operation_type):
     PeriodClients.objects.create(
         dttm_forecast=dttm_forecast,
+        dt_report=dttm_forecast.date(),
         value=value,
         type=type,
         operation_type=operation_type
