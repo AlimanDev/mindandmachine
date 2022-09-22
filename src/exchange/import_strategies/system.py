@@ -177,10 +177,15 @@ class ImportHistDataStrategy(BaseSystemImportStrategy):
                                 continue
                             shops_id.add(shop_id)
 
-                            dttm = datetime.strptime(
-                                row[self.dt_or_dttm_column_name],
-                                self.dt_or_dttm_format,
-                            )
+                            try:
+                                dttm = datetime.strptime(
+                                    row[self.dt_or_dttm_column_name],
+                                    self.dt_or_dttm_format,
+                                )
+                            except TypeError as e:
+                                load_errors.add(f'{e.__class__.__name__}: {str(e)}: {filename}: row: {index}')
+                                continue
+
                             receipts.append(
                                 Receipt(
                                     code=row['receipt_code'],
