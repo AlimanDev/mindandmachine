@@ -19,12 +19,13 @@ class BaseSystemImportStrategy(BaseImportStrategy):
 
 
 class ImportShopMappingStrategy(BaseSystemImportStrategy):
-    def __init__(self, system_code, system_name, filename, file_format, wfm_shop_code_field_name,
+    def __init__(self, system_code, system_name, filename, file_format, csv_delimiter, wfm_shop_code_field_name,
                  wfm_shop_name_field_name, external_shop_code_field_name, **kwargs):
         self.system_code = system_code
         self.system_name = system_name
         self.filename = filename
         self.file_format = file_format
+        self.csv_delimiter = csv_delimiter
         self.wfm_shop_code_field_name = wfm_shop_code_field_name
         self.wfm_shop_name_field_name = wfm_shop_name_field_name
         self.external_shop_code_field_name = external_shop_code_field_name
@@ -34,7 +35,7 @@ class ImportShopMappingStrategy(BaseSystemImportStrategy):
         if self.file_format == 'xlsx':
             return pd.read_excel(f)
         elif self.file_format == 'csv':
-            return pd.read_csv(f)
+            return pd.read_csv(f, delimiter=self.csv_delimiter)
 
         raise NotImplementedError
 

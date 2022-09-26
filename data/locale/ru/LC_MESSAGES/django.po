@@ -12,7 +12,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Django REST framework\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2022-09-19 09:31+0000\n"
+"POT-Creation-Date: 2022-09-26 11:20+0000\n"
 "PO-Revision-Date: 2017-08-03 14:58+0000\n"
 "Last-Translator: Grigory Mishchenko <grishkokot@gmail.com>\n"
 "Language-Team: Russian (http://www.transifex.com/django-rest-framework-1/"
@@ -401,7 +401,7 @@ msgstr ""
 msgid "There is not load template with code {}."
 msgstr "Шаблон нагрузки с кодом {} не найден."
 
-#: src/base/models.py:1626
+#: src/base/models.py:1625
 msgid ""
 "Unable to define worker access group. Assign an access group to him or a "
 "position associated with an access group."
@@ -409,29 +409,29 @@ msgstr ""
 "Невозможно определить группу доступа работника. Назначьте ему группу доступа "
 "либо должность, связанную с группой доступа."
 
-#: src/base/models.py:2185
+#: src/base/models.py:2184
 msgid "Opens and closes fields are required for workday type"
 msgstr "Время открытия и закрытия обязательно для рабочего типа дня"
 
-#: src/base/models.py:2308
+#: src/base/models.py:2307
 msgid "Work hours should be sum of day hours and night hours"
 msgstr "Рабочие часы должны равняться сумме дневных и ночных часов"
 
-#: src/base/permissions.py:107
+#: src/base/permissions.py:106
 #, python-brace-format
 msgid "Not found worker day with id={wd_id}"
 msgstr "Не найден рабочей день с id={wd_id}"
 
-#: src/base/permissions.py:150
+#: src/base/permissions.py:148
 msgid "shop_id should be defined"
 msgstr "Произошла ошибка. Попробуйте перезагрузить страницу."
 
 #: src/base/sawhsettings/serializers.py:14
-#: src/timetable/worker_day/serializers.py:742
+#: src/timetable/worker_day/serializers.py:743
 msgid "Invalid time period."
 msgstr "Неправильный временной период."
 
-#: src/base/serializers.py:262
+#: src/base/serializers.py:265
 msgid "ldap_login should be specified for ldap auth_type."
 msgstr "ldap_login должен быть указан для типа авторизации ldap."
 
@@ -439,51 +439,51 @@ msgstr "ldap_login должен быть указан для типа автор
 msgid "The employee's tabel code must be unique"
 msgstr "Табельный номер сотрудника должен быть уникален."
 
-#: src/base/serializers.py:337
+#: src/base/serializers.py:342
 msgid "Passwords are mismatched."
 msgstr "Пароли не совпадают."
 
-#: src/base/serializers.py:338
+#: src/base/serializers.py:343
 msgid "Password is wrong."
 msgstr "Неверный пароль."
 
-#: src/base/serializers.py:423
+#: src/base/serializers.py:428
 #, python-brace-format
 msgid "Employment from {dt_hired} to {dt_fired} already exists."
 msgstr ""
 "В этом магазине уже заведено трудоустройство с {dt_hired} по {dt_fired}."
 
-#: src/base/serializers.py:424 src/timetable/worker_day/serializers.py:140
+#: src/base/serializers.py:429 src/timetable/worker_day/serializers.py:140
 #, python-brace-format
 msgid "There is {amount} models of user with username: {username}."
 msgstr ""
 "Существует {amount} моделей пользователя с именем пользователя: {username}."
 
-#: src/base/serializers.py:425
+#: src/base/serializers.py:430
 #, python-brace-format
 msgid "There is {amount} models of user with user_id: {user_id}."
 msgstr "Существует {amount} моделей пользователя с user_id: {user_id}."
 
-#: src/base/serializers.py:426 src/tasks/serializers.py:20
+#: src/base/serializers.py:431 src/tasks/serializers.py:20
 #: src/tasks/serializers.py:21
 #, python-brace-format
 msgid "There is {amount} models of shop with code: {code}."
 msgstr "Есть {amount} магазинов с кодом: {code}."
 
-#: src/base/serializers.py:427
+#: src/base/serializers.py:432
 #, python-brace-format
 msgid "There is {amount} models of position with code: {code}."
 msgstr "Есть {amount} должностей с кодом: {code}."
 
-#: src/base/serializers.py:428
+#: src/base/serializers.py:433
 msgid "You are not allowed to choose shops from other network."
 msgstr "Вы не можете выбирать магазины из другой сети."
 
-#: src/base/serializers.py:429
+#: src/base/serializers.py:434
 msgid "Network of shop and position should be equal."
 msgstr "Сети магазина и должности должны совпадать."
 
-#: src/base/serializers.py:430
+#: src/base/serializers.py:435
 msgid "Дата увольнения не может быть меньше даты начала трудоустройства."
 msgstr ""
 
@@ -534,13 +534,17 @@ msgid ""
 msgstr ""
 "Биометрия уже создана. Для создания новой биометрии сначала удалите нынешнюю."
 
-#: src/exchange/models.py:121
+#: src/exchange/models.py:107 src/exchange/models.py:152
+msgid "csv delimiter"
+msgstr "Разделитель csv"
+
+#: src/exchange/models.py:122
 msgid ""
 "Одно из полей \"Название поля кода магазина в WFM-системе\" или \"Название "
 "поля наименования магазина в WFM-системе\" должно быть заполнено."
 msgstr ""
 
-#: src/exchange/models.py:251
+#: src/exchange/models.py:253
 msgid "For the '{}' strategy, you must select a period."
 msgstr "Для стратегии '{}' обязательно выбрать период."
 
@@ -1326,7 +1330,7 @@ msgstr "Пересчет можно запускать только для 1 м�
 msgid "No shop found."
 msgstr "Магазин не найден."
 
-#: src/timetable/timesheet/views.py:182 src/timetable/worker_day/views.py:1181
+#: src/timetable/timesheet/views.py:182 src/timetable/worker_day/views.py:1185
 msgid "No employees satisfying the conditions."
 msgstr "Не найдено сотрудников удовлетворяющих условиям запроса."
 
@@ -1481,17 +1485,17 @@ msgstr "Подразделение с кодом '{}' не найдено"
 msgid "User '{}' not found"
 msgstr "Пользователь '{}' не найден"
 
-#: src/timetable/worker_day/serializers.py:758
+#: src/timetable/worker_day/serializers.py:761
 msgid "Shop or employees should be defined."
 msgstr "Для получения отчета нужно передать магазин или сотрудников."
 
-#: src/timetable/worker_day/serializers.py:765
+#: src/timetable/worker_day/serializers.py:768
 #: src/timetable/worker_day/views.py:93
 #, python-brace-format
 msgid "Employee {employee} is not your subordinate."
 msgstr "Сотрудник {employee} не является Вашим подчиненным."
 
-#: src/timetable/worker_day/serializers.py:766
+#: src/timetable/worker_day/serializers.py:769
 #: src/timetable/worker_day/views.py:92
 msgid "There is no such user in your network."
 msgstr "В вашей сети нет такого пользователя."
@@ -1662,7 +1666,7 @@ msgstr "Невозможно отредактировать вакансию, т
 msgid "{}_timesheet_for_shop_{}_from_{}.{}"
 msgstr "{}_табель_для_подразделения_{}_от_{}.{}"
 
-#: src/timetable/worker_day/views.py:1187
+#: src/timetable/worker_day/views.py:1191
 msgid "Hours recalculation started successfully."
 msgstr "Пересчет часов успешно запущен."
 
