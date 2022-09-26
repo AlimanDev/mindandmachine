@@ -219,8 +219,8 @@ class UserListSerializer(BaseSerializer):
             return obj.avatar.url
         return None
 
-    def get_has_biometrics(self, obj) -> Optional[bool]:
-        return getattr(obj, 'userconnecter_id', None)
+    def get_has_biometrics(self, obj) -> bool:
+        return bool(getattr(obj, 'userconnecter_id', False))
 
 
 class UserShorSerializer(BaseSerializer):
@@ -271,8 +271,8 @@ class UserSerializer(BaseNetworkSerializer):
             return obj.avatar.url
         return None
 
-    def get_has_biometrics(self, obj) -> Optional[bool]:
-        return getattr(obj, 'userconnecter_id', None)
+    def get_has_biometrics(self, obj) -> bool:
+        return bool(getattr(obj, 'userconnecter_id', False))
 
 
 class EmployeeSerializer(BaseNetworkSerializer):
