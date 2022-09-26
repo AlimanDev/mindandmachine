@@ -97,7 +97,7 @@ class WorkerDayViewSet(BaseActiveNamedModelViewSet):
     serializer_class = WorkerDaySerializer
     filterset_class = WorkerDayFilter
     filter_backends = [MultiShopsFilterBackend]
-    openapi_tags = ['WorkerDay',]
+    openapi_tags = ['WorkerDay']
     queryset = WorkerDay.objects.all()
     available_extra_fields = ['shop__name']
 
@@ -1120,9 +1120,14 @@ class WorkerDayViewSet(BaseActiveNamedModelViewSet):
             Массово заблокировать/разблокировать рабочие дни (только в прошлом).
             '''
     )
-    @action(detail=False, methods=['post'], filterset_class=None, serializer_class=BatchBlockOrUnblockWorkerDaySerializer)
+    @action(
+        detail=False,
+        methods=['post'],
+        filterset_class=None,
+        serializer_class=BatchBlockOrUnblockWorkerDaySerializer
+    )
     def batch_block_or_unblock(self, request: Request):
-        '''
+        """
         POST /rest_api/worker_day/batch_block_or_unblock/
         :params
             dt_from: QOS_DATE_FORMAT, required=True
@@ -1133,8 +1138,7 @@ class WorkerDayViewSet(BaseActiveNamedModelViewSet):
         :return {
             "updated": int
         }
-        '''
-        
+        """
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         q = Q(
@@ -1142,7 +1146,7 @@ class WorkerDayViewSet(BaseActiveNamedModelViewSet):
             dt__range=(serializer.validated_data['dt_from'], serializer.validated_data['dt_to'])
         )
         shops = Shop.objects.filter(network=request.user.network)
-        if shop_ids:=serializer.validated_data['shop_ids']:
+        if shop_ids := serializer.validated_data['shop_ids']:
             shops = shops.filter(id__in=shop_ids)
         employees = Employment.objects.get_active(
             dt_from=serializer.validated_data['dt_from'],

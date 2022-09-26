@@ -1,5 +1,6 @@
 import distutils.util
 import json
+from typing import Optional, List
 from datetime import timedelta
 
 from dateutil.relativedelta import relativedelta
@@ -50,11 +51,12 @@ class BaseSerializer(serializers.Serializer):
         data = super().to_representation(instance)
         for field in self.extra_fields:
             data[field] = self._get_extra_field(instance, field)
-        
         return data
+
 
 class BaseModelSerializer(BaseSerializer, serializers.ModelSerializer):
     pass
+
 
 class ModelSerializerWithCreateOnlyFields(BaseModelSerializer):
     class Meta:
@@ -73,6 +75,7 @@ class ModelSerializerWithCreateOnlyFields(BaseModelSerializer):
                 if seralizer_field and seralizer_field.default is empty and field not in data:
                     raise serializers.ValidationError({field: self.error_messages['required']})
         return data
+
 
 class BaseNetworkSerializer(BaseModelSerializer):
     network_id = serializers.HiddenField(default=CurrentUserNetwork())
@@ -139,7 +142,7 @@ class NetworkSerializer(BaseModelSerializer):
     def get_analytics_iframe(self, obj: Network):
         return obj.settings_values_prop.get('analytics_iframe', '')
 
-    def get_logo_url(self, obj) -> str:
+    def get_logo_url(self, obj) -> Optional[str]:
         if obj.logo:
             return obj.logo.url
         return None
@@ -183,6 +186,7 @@ class NetworkSerializer(BaseModelSerializer):
             'allow_to_manually_set_is_vacancy',
         ]
 
+
 class NetworkListSerializer(BaseSerializer):
     id = serializers.IntegerField()
     name = serializers.CharField()
@@ -210,16 +214,13 @@ class UserListSerializer(BaseSerializer):
     network_id = serializers.IntegerField()
     has_biometrics = serializers.SerializerMethodField()
 
-    def get_avatar_url(self, obj) -> str:
+    def get_avatar_url(self, obj) -> Optional[str]:
         if obj.avatar:
             return obj.avatar.url
         return None
 
     def get_has_biometrics(self, obj) -> bool:
-        if getattr(obj, 'userconnecter_id', None):
-            return True
-        else:
-            return False
+        return bool(getattr(obj, 'userconnecter_id', False))
 
 
 class UserShorSerializer(BaseSerializer):
@@ -229,7 +230,7 @@ class UserShorSerializer(BaseSerializer):
     middle_name = serializers.CharField()
     avatar = serializers.SerializerMethodField('get_avatar_url')
 
-    def get_avatar_url(self, obj) -> str:
+    def get_avatar_url(self, obj) -> Optional[str]:
         if obj.avatar:
             return obj.avatar.url
         return None
@@ -244,9 +245,11 @@ class UserSerializer(BaseNetworkSerializer):
 
     class Meta:
         model = User
-        fields = ['id', 'first_name', 'last_name', 'middle_name', 'network_id',
-                  'birthday', 'sex', 'avatar', 'email', 'phone_number', 'username', 'auth_type', 'ldap_login',
-                  'has_biometrics']
+        fields = [
+            'id', 'first_name', 'last_name', 'middle_name', 'network_id',
+            'birthday', 'sex', 'avatar', 'email', 'phone_number', 'username', 'auth_type', 'ldap_login',
+            'has_biometrics'
+        ]
 
     def validate(self, attrs):
         email = attrs.get('email')
@@ -263,16 +266,13 @@ class UserSerializer(BaseNetworkSerializer):
 
         return attrs
 
-    def get_avatar_url(self, obj) -> str:
+    def get_avatar_url(self, obj) -> Optional[str]:
         if obj.avatar:
             return obj.avatar.url
         return None
 
     def get_has_biometrics(self, obj) -> bool:
-        if getattr(obj, 'userconnecter_id', None):
-            return True
-        else:
-            return False
+        return bool(getattr(obj, 'userconnecter_id', False))
 
 
 class EmployeeSerializer(BaseNetworkSerializer):
@@ -314,22 +314,27 @@ class AuthUserSerializer(UserSerializer):
     subordinate_employee_ids = serializers.SerializerMethodField()
     self_employee_ids = serializers.SerializerMethodField()
 
-    def get_allowed_tabs(self, obj: User):
+    @staticmethod
+    def get_allowed_tabs(obj: User):
         allowed_tabs = []
         for group in Group.objects.filter(id__in=obj.get_group_ids()):
             allowed_tabs.extend(group.allowed_tabs)
 
         return list(set(allowed_tabs))
-    
-    def get_subordinate_employee_ids(self, obj: User):
-        return list(obj.get_subordinates(dt=now().date(), dt_to_shift=relativedelta(months=6)).values_list('id', flat=True))
-    
-    def get_self_employee_ids(self, obj: User):
+
+    @staticmethod
+    def get_subordinate_employee_ids(obj: User) -> List[int]:
+        return obj.get_subordinates(dt=now().date(), dt_to_shift=relativedelta(months=6)).values_list('id', flat=True)
+
+    @staticmethod
+    def get_self_employee_ids(obj: User) -> List[int]:
         dt = now().date()
-        return list(obj.get_active_employments(dt_from=dt, dt_to=dt + relativedelta(months=6)).values_list('employee_id', flat=True))
+        return obj.get_active_employments(dt_from=dt, dt_to=dt + relativedelta(months=6)).values_list('employee_id', flat=True)
 
     class Meta(UserSerializer.Meta):
-        fields = UserSerializer.Meta.fields + ['network', 'shop_id', 'allowed_tabs', 'subordinate_employee_ids', 'self_employee_ids']
+        fields = UserSerializer.Meta.fields + [
+            'network', 'shop_id', 'allowed_tabs', 'subordinate_employee_ids', 'self_employee_ids'
+        ]
 
 
 class PasswordSerializer(BaseSerializer):
@@ -411,7 +416,7 @@ class EmploymentListSerializer(BaseSerializer):
             include_employee = request.query_params.get('include_employee')
             show_constraints = request.query_params.get('show_constraints')
 
-        if (include_employee and bool(distutils.util.strtobool(include_employee))):
+        if include_employee and bool(distutils.util.strtobool(include_employee)):
             self.fields['employee'] = EmployeeSerializer(required=False, read_only=True)
 
         if not(show_constraints and bool(distutils.util.strtobool(show_constraints))):
@@ -448,12 +453,13 @@ class EmploymentSerializer(BaseModelSerializer):
 
     class Meta:
         model = Employment
-        fields = ['id', 'user_id', 'shop_id', 'position_id', 'is_fixed_hours', 'dt_hired', 'dt_fired',
-                  'salary', 'week_availability', 'norm_work_hours', 'min_time_btw_shifts',
-                  'shift_hours_length_min', 'shift_hours_length_max', 'auto_timetable', 'tabel_code', 'is_ready_for_overworkings',
-                  'dt_new_week_availability_from', 'is_visible',  'worker_constraints', 'work_types',
-                  'shop_code', 'position_code', 'username', 'code', 'function_group_id', 'dt_to_function_group',
-                  'employee_id', 'is_active', 'sawh_settings_id',
+        fields = [
+            'id', 'user_id', 'shop_id', 'position_id', 'is_fixed_hours', 'dt_hired', 'dt_fired',
+            'salary', 'week_availability', 'norm_work_hours', 'min_time_btw_shifts',
+            'shift_hours_length_min', 'shift_hours_length_max', 'auto_timetable', 'tabel_code', 'is_ready_for_overworkings',
+            'dt_new_week_availability_from', 'is_visible',  'worker_constraints', 'work_types',
+            'shop_code', 'position_code', 'username', 'code', 'function_group_id', 'dt_to_function_group',
+            'employee_id', 'is_active', 'sawh_settings_id',
         ]
         create_only_fields = ['employee_id']
         read_only_fields = []
@@ -676,13 +682,16 @@ class ShopSettingsSerializer(BaseModelSerializer):
 
 
 class GroupSerializer(BaseModelSerializer):
+
     network_id = serializers.HiddenField(default=CurrentUserNetwork())
+
     class Meta:
         model = Group
         fields = ['id', 'name', 'code', 'network_id']
 
 
 class BreakSerializer(BaseNetworkSerializer):
+
     class Meta:
         model = Break
         fields = ['id', 'name', 'network_id', 'value']

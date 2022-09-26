@@ -86,7 +86,7 @@ class EmploymentViewSet(UpdateorCreateViewSet):
     permission_classes = [Permission]
     serializer_class = EmploymentSerializer
     filterset_class = EmploymentFilter
-    openapi_tags = ['Employment', 'Integration',]
+    openapi_tags = ['Employment', 'Integration']
     queryset = Employment.objects.all()
 
     def perform_update(self, serializer):
@@ -98,17 +98,18 @@ class EmploymentViewSet(UpdateorCreateViewSet):
             Q(employee__user__network_id=self.request.user.network_id), # чтобы можно было аутсорсу редактировать трудоустройтсва своих сотрудников
         ).order_by('-dt_hired')
         if self.action in ['list', 'retrieve']:
-            qs = qs.select_related('position', 'employee', 'employee__user', 'shop').prefetch_related(Prefetch('work_types', to_attr='work_types_list'), Prefetch('worker_constraints', to_attr='worker_constraints_list'))
+            qs = qs.select_related('position', 'employee', 'employee__user', 'shop')\
+                .prefetch_related(
+                    Prefetch('work_types', to_attr='work_types_list'),
+                    Prefetch('worker_constraints', to_attr='worker_constraints_list')
+                )
         return qs
 
     def get_serializer_class(self):
-        if self.action == 'list':
-            return EmploymentListSerializer
-        else:
-            return EmploymentSerializer
+        return EmploymentListSerializer if self.action == 'list' else EmploymentSerializer
 
-    @swagger_auto_schema(responses={200:'OK'},request_body=AutoTimetableSerializer)
-    @action(detail=False, methods=['post',], serializer_class=AutoTimetableSerializer)
+    @swagger_auto_schema(responses={200: 'OK'}, request_body=AutoTimetableSerializer)
+    @action(detail=False, methods=['post'], serializer_class=AutoTimetableSerializer)
     def auto_timetable(self, request):
         data = AutoTimetableSerializer(data=request.data)
         data.is_valid(raise_exception=True)
@@ -116,10 +117,9 @@ class EmploymentViewSet(UpdateorCreateViewSet):
         Employment.objects.filter(id__in=data.get('employment_ids')).update(auto_timetable=data.get('auto_timetable'))
         return Response()
 
-
-    @action(detail=True, methods=['put',])
+    @action(detail=True, methods=['put'])
     def timetable(self, request, pk=None):
-        data = EmploymentSerializer(data=request.data, instance=self.get_object(), context={'request':request, 'view': self})
+        data = EmploymentSerializer(data=request.data, instance=self.get_object(), context={'request': request, 'view': self})
         data.is_valid(raise_exception=True)
         data.save()
         return Response(data.data)

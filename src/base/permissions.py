@@ -38,7 +38,6 @@ class Permission(permissions.BasePermission):
     def has_permission(self, request, view):
         if not bool(request.user and request.user.is_authenticated):
             return False
-
         employments = Employment.objects.get_active(
             network_id=request.user.network_id,
             employee__user=request.user,
@@ -128,7 +127,6 @@ class WdPermission(Permission):
                 perm_checker = DeleteSingleWdPermissionChecker(
                     user=request.user, wd_id=wd_id)
                 return self._has_perm(perm_checker)
-
         return has_permission
 
 

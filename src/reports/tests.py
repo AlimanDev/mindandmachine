@@ -878,7 +878,7 @@ class TestScheduleDeviation(APITestCase, TestsHelperMixin):
         res = self.client.get(f'/rest_api/report/schedule_deviation/?dt_from={dt}&dt_to={dt}&shop_ids={shop.id}')
         data = pd.read_excel(res.content).fillna('')
         pd.set_option('expand_frame_repr', False)
-        self.assertListEqual(data.iloc[9][1:5].to_list(), ['Регион', 'РР', 'НСВ', 'СВ'])
+        self.assertListEqual(data.iloc[9][1:5].to_list(), ['Регион', 'РР', 'СВН', 'СВ'])
         self.assertListEqual(
             data.iloc[10][1:5].to_list(),
             [
