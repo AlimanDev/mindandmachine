@@ -104,6 +104,7 @@ class ImportShopMappingStrategy(ImportStrategy):
     filename = models.CharField(max_length=256, verbose_name='Имя файла')
     file_format = models.CharField(
         max_length=8, verbose_name='Формат файла', choices=FILE_FORMAT_CHOICES, default='xlsx')
+    csv_delimiter = models.CharField(max_length=1, verbose_name=_('csv delimiter'), null=True, blank=True)
     wfm_shop_code_field_name = models.CharField(
         max_length=256, verbose_name='Название поля кода магазина в WFM-системе', null=True, blank=True)
     wfm_shop_name_field_name = models.CharField(
@@ -127,6 +128,7 @@ class ImportShopMappingStrategy(ImportStrategy):
             'system_name': self.system_name or '',
             'filename': self.filename,
             'file_format': self.file_format,
+            'csv_delimiter': self.csv_delimiter,
             'wfm_shop_code_field_name': self.wfm_shop_code_field_name,
             'wfm_shop_name_field_name': self.wfm_shop_name_field_name,
             'external_shop_code_field_name': self.external_shop_code_field_name,
@@ -147,7 +149,7 @@ class ImportHistDataStrategy(ImportStrategy):
     )
     dt_from = models.CharField(max_length=32, verbose_name='Дата от', default='today')
     dt_to = models.CharField(max_length=32, verbose_name='Дата до', default='today')
-    csv_delimiter = models.CharField(max_length=1, verbose_name='Разделитель csv', default=';')
+    csv_delimiter = models.CharField(max_length=1, verbose_name=_('csv delimiter'), default=';')
     columns = models.JSONField(
         null=True, blank=True,
         verbose_name='Наименование колонок в файле',
