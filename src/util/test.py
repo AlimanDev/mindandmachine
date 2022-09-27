@@ -306,6 +306,13 @@ class LocalTestCase(LocalTestCaseAsserts, TestCase):
         """Re-fetch provided item from database"""
         return item.__class__.objects.get(pk=item.pk)
 
+class MockResponse:
+    '`requests` library'
+    def json(self):
+        return {'task_id': 1}
+    
+    def raise_for_status(self):
+        pass
 
 def create_departments_and_users(self, dt=None):
     dt = dt or now().date() - relativedelta(months=1)
