@@ -562,11 +562,13 @@ class Restriction(AbstractModel):
     dt_max_hours = models.DurationField(null=True, blank=True)
     restriction_type = PositiveSmallIntegerField(
         choices=RESTRICTION_TYPE_CHOICES, default=RESTRICTION_TYPE_DT_MAX_HOURS)
-    is_vacancy = models.NullBooleanField(default=None,
-                                         verbose_name='None -- для любой смены (осн. или доп.), '
-                                                      'True -- только для доп. смен, False -- только для осн. смен')
+    is_vacancy = models.BooleanField(
+        default=None,
+        null=True,
+        verbose_name='None -- для любой смены (осн. или доп.), '
+                     'True -- только для доп. смен, False -- только для осн. смен'
+    )
     work_type_name = models.ForeignKey('timetable.WorkTypeName', null=True, blank=True, on_delete=models.CASCADE)
-
 
     class Meta:
         verbose_name = 'Ограничение'
