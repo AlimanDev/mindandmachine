@@ -18,7 +18,7 @@ def enrich_context(context):
     context['host'] = settings.EXTERNAL_HOST
 
 
-@app.task
+@app.task(time_limit=settings.EMAIL_TASK_TIMEOUT)
 def send_event_email_notifications(event_email_notification_id: int, user_author_id: int, context: dict):
     event_email_notification = EventEmailNotification.objects.select_related(
         'event_type',

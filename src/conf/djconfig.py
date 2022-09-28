@@ -211,6 +211,8 @@ SERVER_EMAIL = DEFAULT_FROM_EMAIL
 EMAIL_HOST = 'mndndm.gate.sendsay.ru'
 EMAIL_HOST_USER = 'mindandmachine.mindandmachine@smtpgate'
 EMAIL_HOST_PASSWORD = 'Si8gePhue3oMoh'
+EMAIL_TIMEOUT = 10 #seconds, django setting
+EMAIL_TASK_TIMEOUT = EMAIL_TIMEOUT #celery task setting
 COMPANY_NAME = 'not-specified' #для отображения в статистике рассылок через SMTP
 
 SFTP_IP = '212.109.194.87'

@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
 
+from django.conf import settings
 from django.db.models import Q
 from django_celery_beat.models import CrontabSchedule
 
@@ -12,7 +13,7 @@ from src.timetable.worker_day.stat import WorkersStatsGetter
 from .models import UserShopGroups, UserSubordinates, EmploymentStats
 
 
-@app.task
+@app.task(time_limit=settings.EMAIL_TASK_TIMEOUT)
 def send_report_emails(report_config_id: int, zone: str):
     report_config = ReportConfig.objects.select_related(
         'report_type',
