@@ -171,6 +171,7 @@ class NetworkSerializer(BaseModelSerializer):
             'show_tabel_graph',
             'show_worker_day_tasks',
             'show_user_biometrics_block',
+            'show_checkbox_for_inspection_version',
             'unaccounted_overtime_threshold',
             'forbid_edit_employments_came_through_integration',
             'show_remaking_choice',
