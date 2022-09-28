@@ -87,7 +87,7 @@ def allocation_of_time_for_work_on_cashbox():
                 update_duration(last_user, last_work_type, duration)
 
 
-@app.task
+@app.task(time_limit=settings.EMAIL_TASK_TIMEOUT)
 def send_notify_email(message, send2user_ids, title=None, file=None, html_content=None):
     '''
     Функция-обёртка для отправки email сообщений (в том числе файлов)
