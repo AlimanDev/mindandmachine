@@ -180,6 +180,7 @@ class NetworkSerializer(BaseModelSerializer):
             'get_position_from_work_type_name_in_calc_timesheet',
             'trust_tick_request',
             'show_cost_for_inner_vacancies',
+            'use_internal_exchange',
             'show_employee_shift_schedule_tab',
             'rebuild_timetable_min_delta',
             'analytics_iframe',
@@ -315,6 +316,14 @@ class AuthUserSerializer(UserSerializer):
     subordinate_employee_ids = serializers.SerializerMethodField()
     self_employee_ids = serializers.SerializerMethodField()
 
+    network_employee_ids = serializers.SerializerMethodField()
+
+    def to_representation(self, user: User):
+        data = super(AuthUserSerializer, self).to_representation(user)
+        if user.network.use_internal_exchange:
+            data.pop('network_employee_ids')
+        return data
+
     @staticmethod
     def get_allowed_tabs(obj: User):
         allowed_tabs = []
@@ -324,17 +333,30 @@ class AuthUserSerializer(UserSerializer):
         return list(set(allowed_tabs))
 
     @staticmethod
-    def get_subordinate_employee_ids(obj: User) -> List[int]:
-        return obj.get_subordinates(dt=now().date(), dt_to_shift=relativedelta(months=6)).values_list('id', flat=True)
+    def get_subordinate_employee_ids(user: User) -> List[int]:
+        return user.get_subordinates(dt=now().date(), dt_to_shift=relativedelta(months=6)).values_list('id', flat=True)
 
     @staticmethod
-    def get_self_employee_ids(obj: User) -> List[int]:
+    def get_self_employee_ids(user: User) -> List[int]:
         dt = now().date()
-        return obj.get_active_employments(dt_from=dt, dt_to=dt + relativedelta(months=6)).values_list('employee_id', flat=True)
+        return user.get_active_employments(dt_from=dt, dt_to=dt + relativedelta(months=6)).values_list('employee_id', flat=True)
+
+    @staticmethod
+    def get_network_employee_ids(user: User) -> List[int]:
+        """The field depends on the setting use_internal_exchange in user.network."""
+        if not user.network.use_internal_exchange:
+            dt = now().date()
+            return user.get_subordinates(dt, dt_to_shift=relativedelta(months=6), network_id=user.network_id).values_list('id', flat=True)
+        return []
 
     class Meta(UserSerializer.Meta):
         fields = UserSerializer.Meta.fields + [
-            'network', 'shop_id', 'allowed_tabs', 'subordinate_employee_ids', 'self_employee_ids'
+            'network',
+            'shop_id',
+            'allowed_tabs',
+            'subordinate_employee_ids',
+            'self_employee_ids',
+            'network_employee_ids'
         ]
 
 

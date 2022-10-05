@@ -12,7 +12,6 @@ from django.conf import settings
 from django.contrib.auth.models import (
     AbstractUser as DjangoAbstractUser,
 )
-from django.core.cache import cache
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.core.serializers.json import DjangoJSONEncoder
 from django.core.cache import cache
@@ -120,9 +119,19 @@ class Network(AbstractActiveModel):
     secondary_color = models.CharField(max_length=7, blank=True, verbose_name=_('Secondary color'))
     name = models.CharField(max_length=128, unique=True, verbose_name=_('Name'))
     code = models.CharField(max_length=64, unique=True, null=True, blank=True, verbose_name=_('Code'))
-    # нужен ли идентификатор сотруднка чтобы откликнуться на вакансию
+    # Нужен ли идентификатор сотруднка, чтобы откликнуться на вакансию
     need_symbol_for_vacancy = models.BooleanField(default=False, verbose_name=_('Need symbol for vacancy'))
-    settings_values = models.TextField(default='{}', verbose_name=_('Settings values'))  # настройки для сети. Cейчас есть настройки для приемки чеков + ночные смены
+    show_cost_for_inner_vacancies = models.BooleanField(
+        verbose_name='Отображать поле "стоимость работ" для внутренних вакансий',
+        default=False
+    )
+    use_internal_exchange = models.BooleanField(
+        default=True,
+        verbose_name=_('Use internal exchange'),
+        help_text=_('Regulates the action on the vacancy due to the exchange or natural')
+    )
+    # Настройки для сети. Сейчас есть настройки для приемки чеков + ночные смены
+    settings_values = models.TextField(default='{}', verbose_name=_('Settings values'))
     allowed_interval_for_late_arrival = models.DurationField(
         verbose_name=_('Allowed interval for late_arrival'), default=datetime.timedelta(seconds=0))
     allowed_interval_for_early_departure = models.DurationField(
@@ -287,7 +296,6 @@ class Network(AbstractActiveModel):
     api_timesheet_lines_group_by = models.PositiveSmallIntegerField(
         verbose_name='Группировать данные табеля в api методе /rest_api/timesheet/lines/ по',
         choices=TIMESHEET_LINES_GROUP_BY_CHOICES, default=TIMESHEET_LINES_GROUP_BY_EMPLOYEE_POSITION_SHOP)
-    show_cost_for_inner_vacancies = models.BooleanField('Отображать поле "стоимость работ" для внутренних вакансий', default=False)
     rebuild_timetable_min_delta = models.IntegerField(default=2, verbose_name='Минимальное время для составления графика')
     fiscal_sheet_divider_alias = models.CharField(
         max_length=64, choices=FISCAL_SHEET_DIVIDERS_ALIAS_CHOICES, null=True, blank=True,
@@ -534,6 +542,7 @@ class ShopManager(TreeManager):
         return super().get_queryset().filter(
             models.Q(dttm_deleted__date__gt=timezone.now().date()) | models.Q(dttm_deleted__isnull=True)
         )
+
 
 # на самом деле это отдел
 class Shop(MPTTModel, AbstractActiveNetworkSpecificCodeNamedModel):
@@ -1175,10 +1184,7 @@ class Group(AbstractActiveNetworkSpecificCodeNamedModel):
 
 
 class ProductionDay(AbstractModel):
-    """
-    день из производственного календаря короч.
-
-    """
+    """День из производственного календаря короч."""
 
     class Meta(object):
         verbose_name = 'День производственного календаря'
@@ -1404,7 +1410,17 @@ class User(DjangoAbstractUser, AbstractModel):
 
         return super(User, self).save(*args, **kwargs)
 
-    def get_subordinates(self, dt=None, user_shops=None, user_subordinated_group_ids=None, dt_to_shift=None):
+    def get_subordinates(
+        self,
+        dt=None,
+        user_shops=None,
+        user_subordinated_group_ids=None,
+        dt_to_shift=None,
+        network_id=None
+    ):
+        """Choice of employees who report to me."""
+        if network_id and not user_shops:
+            user_shops = Shop.objects.filter(network_id=network_id).values_list('id', flat=True)
         if not user_shops:
             user_shops = self.get_shops(include_descendants=True).values_list('id', flat=True)
         if not user_subordinated_group_ids:
@@ -1412,7 +1428,6 @@ class User(DjangoAbstractUser, AbstractModel):
         dt_to = dt
         if dt_to_shift and dt_to:
             dt_to += dt_to_shift
-
         return Employee.objects.annotate(
             is_subordinate=models.Exists(
                 Employment.objects.get_active(
@@ -1425,9 +1440,7 @@ class User(DjangoAbstractUser, AbstractModel):
                     shop_id__in=user_shops,
                 )
             )
-        ).filter(
-            is_subordinate=True,
-        )
+        ).filter(is_subordinate=True)
 
 
 class AllowedSawhSetting(AbstractModel):

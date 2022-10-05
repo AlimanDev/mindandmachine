@@ -191,7 +191,14 @@ class NetworkAdmin(admin.ModelAdmin):
                 'round_work_hours_alg',
             ),
         }),
-        (_('Vacancy settings'), {'fields': ('need_symbol_for_vacancy', 'allow_workers_confirm_outsource_vacancy', 'show_cost_for_inner_vacancies')}),
+        (_('Vacancy settings'), {
+            'fields': (
+                'need_symbol_for_vacancy',
+                'use_internal_exchange',
+                'allow_workers_confirm_outsource_vacancy',
+                'show_cost_for_inner_vacancies',
+            )
+        }),
         (_('Format settings'), {'fields': (
             'download_tabel_template',
             'convert_tabel_to',

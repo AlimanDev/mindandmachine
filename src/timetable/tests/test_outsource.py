@@ -587,6 +587,8 @@ class TestOutsource(TestsHelperMixin, APITestCase):
                     'show_tabel_graph': True, 
                     'show_worker_day_tasks': False,
                     'show_user_biometrics_block': False,
+                    'show_checkbox_for_inspection_version': True,
+                    'use_internal_exchange': True,
                     'unaccounted_overtime_threshold': 60,
                     'forbid_edit_employments_came_through_integration': True,
                     'get_position_from_work_type_name_in_calc_timesheet': False,
