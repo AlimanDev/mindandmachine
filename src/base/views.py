@@ -131,7 +131,7 @@ class UserViewSet(UpdateorCreateViewSet):
     serializer_class = UserSerializer
     filterset_class = UserFilter
     get_object_field = 'username'
-    openapi_tags = ['User', 'Integration',]
+    openapi_tags = ['User', 'Integration']
 
     def get_queryset(self):
         user = self.request.user
