@@ -1,6 +1,5 @@
+from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
-
-from src.base.models import Shop
 
 
 class ValidateMixin:
@@ -48,3 +47,16 @@ class ConsolidatedTimesheetReportSerializer(serializers.Serializer):
     def validate(self, attrs):
         attrs['group_by'] = attrs['group_by'].split('_')
         return attrs
+
+class TikReportSerializer(serializers.Serializer):
+    dt_from = serializers.DateField()
+    dt_to = serializers.DateField()
+    shop_id__in = serializers.ListField(child=serializers.IntegerField(min_value=1), required=False)
+    employee_id__in = serializers.ListField(child=serializers.IntegerField(min_value=1), required=False)
+    with_biometrics = serializers.BooleanField(default=False)
+    emails = serializers.ListField(child=serializers.EmailField(), required=False)
+
+    def validate(self, data):
+        if data['dt_to'] < data['dt_from']:
+            raise serializers.ValidationError(_('Invalid time period.'))
+        return data

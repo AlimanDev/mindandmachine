@@ -3,7 +3,7 @@ import os
 import uuid
 
 from django.conf import settings
-from django.utils.translation import gettext as _
+from django.utils.translation import gettext_lazy as _
 from django.db import models
 from django.utils.html import format_html
 from django.utils.timezone import now
@@ -59,11 +59,11 @@ class Tick(AbstractActiveModel):
     TYPE_NO_TYPE = 'N'
 
     RECORD_TYPES = (
-        (TYPE_COMING, 'coming'),
-        (TYPE_LEAVING, 'leaving'),
-        (TYPE_BREAK_START, 'break start'),
-        (TYPE_BREAK_END, 'break_end'),
-        (TYPE_NO_TYPE, 'no_type'),
+        (TYPE_COMING, _('Coming')),
+        (TYPE_LEAVING, _('Leaving')),
+        (TYPE_BREAK_START, _('Break start')),
+        (TYPE_BREAK_END, _('Break end')),
+        (TYPE_NO_TYPE, _('No type')),
     )
 
     id = models.AutoField(primary_key=True)

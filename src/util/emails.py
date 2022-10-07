@@ -1,15 +1,11 @@
-from django.core.mail import EmailMultiAlternatives
-from django.template.loader import render_to_string
+from django.core import mail
 
-from src.conf.djconfig import DEFAULT_FROM_EMAIL, COMPANY_NAME
+from src.conf.djconfig import COMPANY_NAME
 
 
-def send_email(template_name, to, subject, context, request=None):
-    msg = EmailMultiAlternatives(
-        subject=subject,
-        body=render_to_string(template_name, context=context, request=request),
-        from_email=DEFAULT_FROM_EMAIL,
-        to=to if isinstance(to, list) else [to],
-        headers={'X-Campaign-Id': COMPANY_NAME}
-    )
-    msg.send()
+def send_email(*args, **kwargs):
+    'All-purpose email sender. Sets a header for email statistics.'
+    kwargs.setdefault('headers', {}).setdefault('X-Campaign-Id', COMPANY_NAME)
+    fail_silently = kwargs.pop('fail_silently', False)
+    message = mail.EmailMessage(*args, **kwargs)
+    return message.send(fail_silently)

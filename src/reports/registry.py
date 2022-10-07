@@ -1,4 +1,6 @@
+from typing import Iterable
 from django.utils.functional import cached_property
+from django.db.models import QuerySet
 
 class ReportRegistryHolder(type):
     registry = {}
@@ -38,12 +40,23 @@ class BaseRegisteredReport(metaclass=ReportRegistryHolder):
     def __repr__(self):
         return self.__str__()
 
-    def get_file(self):
+    def get_file(self) -> dict:
+        '''
+        Final report file
+
+        return:
+            {
+                'name': str,            # filename
+                'file': io.BytesIO(),
+                'type': str,            # example: 'application/xlsx',
+            }
+        '''
         return None
 
-    def get_recipients_shops(self):
+    def get_recipients_shops(self) -> Iterable[int]:
+        'Iterable (list, set etc.) of shop_id that this report will be sent to'
         return []
 
     @cached_property
-    def report_data(self):
+    def report_data(self) -> QuerySet:
         return None

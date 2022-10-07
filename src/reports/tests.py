@@ -1,4 +1,4 @@
-import json
+import json, pathlib
 from calendar import monthrange
 from datetime import date, datetime, time, timedelta
 
@@ -6,15 +6,20 @@ import pandas as pd
 from dateutil.relativedelta import relativedelta
 from django.core import mail
 from django.core.cache import cache
-from django.test import TestCase
+from django.test import TestCase, override_settings
+from django.conf import settings
 from django_celery_beat.models import CrontabSchedule
+from django.utils.translation import gettext as _
 from rest_framework.test import APITestCase
+from rest_framework import status
 
 from etc.scripts import fill_calendar
 from src.base.models import FunctionGroup, Network, WorkerPosition
 from src.base.tests.factories import EmployeeFactory, EmploymentFactory, GroupFactory, NetworkFactory, ShopFactory, \
     UserFactory, WorkerPositionFactory
+from src.recognition.models import Tick, TickPhoto, TickPoint
 from src.reports.models import ReportConfig, ReportType, Period, UserShopGroups, UserSubordinates, EmploymentStats
+from src.reports import tasks
 from src.timetable.models import TimesheetItem
 from src.reports.reports import PIVOT_TABEL
 from src.reports.tasks import cron_report, fill_user_shop_groups, fill_user_subordinates, fill_employments_stats
@@ -373,9 +378,13 @@ class TestReportsViewSet(TestsHelperMixin, APITestCase):
             group=cls.group_dir,
             access_type='ALL'
         )
-
+        FunctionGroup.objects.create(
+            func='Reports_tick',
+            group=cls.group_dir,
+            access_type='ALL'
+        )
         cls.dt = (datetime.now().date() - relativedelta(months=1)).replace(day=21)
-        WorkerDayFactory(
+        cls.wd1 = WorkerDayFactory(
             is_approved=True,
             is_fact=True,
             shop=cls.shop,
@@ -513,6 +522,86 @@ class TestReportsViewSet(TestsHelperMixin, APITestCase):
         self.assertCountEqual(list(df['Консолидированный отчет об отработанном времени'][3:6].values), [f'{self.position.name}', f'{self.position_outsource.name} ({self.network_outsource.name})', f'{self.position.name} ({self.network_outsource.name})'])
         self.assertCountEqual(list(df['Unnamed: 1'][3:6].values), ['Штат', 'Нештат', 'Нештат'])
 
+    @override_settings(CELERY_TASK_ALWAYS_EAGER=True, MEDIA_ROOT=settings.BASE_DIR)
+    def test_tick_report(self):
+        tickpoint = TickPoint.objects.create(
+            shop=self.wd1.shop,
+            network=self.wd1.shop.network,
+            name='tickpoint'
+        )
+        tick = Tick.objects.create(
+            dttm=self.wd1.dttm_work_start,
+            user=self.wd1.employee.user,
+            employee=self.wd1.employee,
+            tick_point=tickpoint,
+            type=Tick.TYPE_COMING,
+            verified_score=0.5
+        )
+        path = pathlib.Path(settings.MEDIA_ROOT) / 'src/recognition/test_data'
+        tp1 = TickPhoto.objects.create(
+            tick=tick,
+            dttm=tick.dttm,
+            liveness=0.5,
+            image=str(path / '1.jpg'),
+            type=TickPhoto.TYPE_FIRST
+        )
+        TickPhoto.objects.create(
+            tick=tick,
+            dttm=tick.dttm,
+            image=str(path / '2_fake.jpg'), #doesn't matter, just testing the report
+            type=TickPhoto.TYPE_SELF
+        )
+        TickPhoto.objects.create(
+            tick=tick,
+            dttm=tick.dttm,
+            image=str(path / '2.jpg'),
+            type=TickPhoto.TYPE_LAST
+        )
+        reference_list = [
+            self.wd1.employee.user.fio,
+            self.wd1.employee.tabel_code,
+            tickpoint.name,
+            tickpoint.shop.name,
+            tickpoint.shop.code,
+            tick.type_display,
+            pd.Timestamp(tick.dttm),
+            tick.verified_score,
+            tp1.liveness
+        ]
+
+        query_params = {
+            'employee_id__in': [self.wd1.employee.id],
+            'shop_id__in': [self.wd1.shop.id],
+            'dt_from': self.wd1.dt - timedelta(1),
+            'dt_to': self.wd1.dt,
+            'emails': ['example@example.com'],
+        }
+
+        res = self.client.get(self.get_url('Reports-tick'), query_params)
+        self.assertEqual(res.status_code, status.HTTP_202_ACCEPTED)
+
+        tasks.tick_report(**query_params, network_id=self.wd1.shop.network.id)
+        self.assertEqual(len(mail.outbox), 1)
+        file = mail.outbox[0].attachments[0]
+        self.assertIn('tick_report', file[0])
+        self.assertEqual(type(file[1]), bytes)
+        self.assertEqual(file[2], 'application/xlsx')
+
+        del query_params['emails']
+        res = self.client.get(self.get_url('Reports-tick'), query_params)
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(res.headers['Content-Type'], 'application/xlsx')
+        df = pd.read_excel(res.content)
+        df[_('Tick date and time')] = df[_('Tick date and time')].dt.round(freq='s') #pandas reads datetime wrong
+        self.assertListEqual(reference_list, df.iloc[0][0:9].to_list())
+
+        query_params['with_biometrics'] = True
+        del query_params['employee_id__in']
+        del query_params['shop_id__in']
+        res = self.client.get(self.get_url('Reports-tick'), query_params)
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(res.headers['Content-Type'], 'application/docx')
+        
 
 class TestScheduleDeviation(APITestCase, TestsHelperMixin):
     USER_USERNAME = "user1"

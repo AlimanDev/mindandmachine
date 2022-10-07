@@ -1,8 +1,11 @@
-from django.db.models import Q
-from django.utils.functional import cached_property
-from src.reports.registry import BaseRegisteredReport
-
 from datetime import date, timedelta, datetime
+
+from django.db.models import Q, Prefetch, QuerySet
+from django.utils.functional import cached_property
+
+from src.recognition.models import Tick, TickPhoto
+from src.reports.registry import BaseRegisteredReport
+from src.util.dg.ticks_report import TicksOdsReportGenerator, TicksOdtReportGenerator
 
 
 URV_STAT = 'urv_stat'
@@ -13,11 +16,12 @@ UNACCOUNTED_OVERTIME = 'unaccounted_overtime'
 OVERTIMES_UNDERTIMES = 'overtimes_undertimes'
 PIVOT_TABEL = 'pivot_tabel'
 SCHEDULE_DEVATION = 'schedule_devation'
+TICK = 'tick'
 
 
 class DatesReportMixin:
     @staticmethod
-    def get_dates(context):
+    def get_dates(context: dict) -> tuple[date, date]:
         dt_from = context.get('dt_from')
         dt_to = context.get('dt_to')
         if not dt_from or not dt_to:
@@ -118,6 +122,7 @@ class UnaccountedOvertivmeReport(BaseRegisteredReport, DatesReportMixin):
     def get_recipients_shops(self):
         return set(self.report_data.values_list('shop_id', flat=True))
 
+
 class UndertimesOvertimesReport(BaseRegisteredReport):
     name = 'Отчет по переработкам/недоработкам'
     code = OVERTIMES_UNDERTIMES
@@ -164,3 +169,51 @@ class ScheduleDevationReport(BaseRegisteredReport, DatesReportMixin):
             data = data.filter(shop_id__in=self.context.get('shop_ids', []))
         
         return set(data.values_list('shop_id', flat=True))
+
+
+class TickReport(BaseRegisteredReport, DatesReportMixin):
+    name = 'Отчёт об отметках сотрудников'
+    code = TICK
+
+    def __init__(self, network_id: int, context: dict, *args, **kwargs):
+        self.dt_from, self.dt_to = self.get_dates(context)
+        super().__init__(network_id, context, *args, **kwargs)
+    
+    def get_file(self) -> dict:
+        if self.context.get('with_biometrics'):
+            Generator = TicksOdtReportGenerator
+            format = 'docx'
+        else:
+            Generator = TicksOdsReportGenerator
+            format = 'xlsx'
+        report = Generator(
+            ticks_queryset=self.report_data,
+            dt_from=self.dt_from,
+            dt_to=self.dt_to
+        ).generate(convert_to=format)
+        return {
+            'name': f'tick_report_{self.dt_from}_{self.dt_to}.{format}',
+            'file': report,
+            'type': f'application/{format}'
+        }
+        
+    @cached_property
+    def report_data(self) -> QuerySet:
+        qs = Tick.objects.filter(
+            dttm__gte=self.dt_from,
+            dttm__lt=self.dt_to + timedelta(1),
+            user__network_id=self.network_id
+        )
+        if shops := self.context.get('shop_id__in'):
+            qs = qs.filter(tick_point__shop_id__in=shops)
+        if employees := self.context.get('employee_id__in'):
+            qs = qs.filter(employee_id__in=employees)
+        if self.context.get('with_biometrics'):
+            qs = qs.prefetch_related(
+                Prefetch(
+                    'tickphoto_set',
+                    queryset=TickPhoto.objects.all(),
+                    to_attr='tickphotos_list',
+                )
+            )
+        return qs

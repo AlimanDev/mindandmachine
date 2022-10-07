@@ -1,15 +1,19 @@
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
+from typing import Iterable, Union
 
 from django.conf import settings
 from django.db.models import Q
 from django_celery_beat.models import CrontabSchedule
+from django.utils.translation import gettext as _
 
 from src.base.models import Employment, Shop, User, Network
 from src.celery.celery import app
 from src.notifications.helpers import send_mass_html_mail
 from src.reports.helpers import get_datatuple
 from src.reports.models import ReportConfig
+from src.reports.reports import TickReport
 from src.timetable.worker_day.stat import WorkersStatsGetter
+from src.util.emails import send_email
 from .models import UserShopGroups, UserSubordinates, EmploymentStats
 
 
@@ -214,3 +218,33 @@ def fill_employments_stats(prev_acc_period=False, curr_acc_period=True, next_acc
                 ).delete()
                 if employment_stats_to_create:
                     EmploymentStats.objects.bulk_create(employment_stats_to_create, batch_size=1000)
+
+@app.task(time_limit=settings.EMAIL_TASK_TIMEOUT + 60) #accounting for possible email timeout
+def tick_report(
+        dt_from: Union[str, date],
+        dt_to: Union[str, date],
+        network_id: int,
+        with_biometrics: bool = False,
+        shop_id__in: Iterable = None,
+        employee_id__in: Iterable = None,
+        emails: list[str] = None
+    ) -> dict:
+
+    context = {
+        'dt_from': dt_from,
+        'dt_to': dt_to,
+        'with_biometrics': with_biometrics,
+        'shop_id__in': shop_id__in,
+        'employee_id__in': employee_id__in,
+    }
+    report = TickReport(network_id, context).get_file()
+
+    if emails:
+        send_email(
+            subject=_('Tick report'),
+            to=emails,
+            attachments=((report['name'], report['file'], report['type']),)
+        )
+        return f'Report "{report["name"]} sent to {", ".join(emails)}'
+    
+    return report

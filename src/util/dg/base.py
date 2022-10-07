@@ -7,13 +7,13 @@ class BaseDocGenerator:
     Базовый класс для генерации и конвертации документов
     """
 
-    def get_template_path(self):
+    def get_template_path(self) -> str:
         raise NotImplementedError
 
-    def get_data(self):
+    def get_data(self) -> dict:
         raise NotImplementedError
 
-    def generate(self, convert_to=None):
+    def generate(self, convert_to=None) -> bytes:
         template_path = self.get_template_path()
         content = generate_document(
             template_path=template_path,

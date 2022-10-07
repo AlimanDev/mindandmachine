@@ -12,7 +12,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Django REST framework\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2022-10-05 13:53+0000\n"
+"POT-Creation-Date: 2022-10-06 10:15+0000\n"
 "PO-Revision-Date: 2017-08-03 14:58+0000\n"
 "Last-Translator: Grigory Mishchenko <grishkokot@gmail.com>\n"
 "Language-Team: Russian (http://www.transifex.com/django-rest-framework-1/"
@@ -417,11 +417,11 @@ msgstr ""
 "Невозможно определить группу доступа работника. Назначьте ему группу доступа "
 "либо должность, связанную с группой доступа."
 
-#: src/base/models.py:2197
+#: src/base/models.py:2198
 msgid "Opens and closes fields are required for workday type"
 msgstr "Время открытия и закрытия обязательно для рабочего типа дня"
 
-#: src/base/models.py:2320
+#: src/base/models.py:2321
 msgid "Work hours should be sum of day hours and night hours"
 msgstr "Рабочие часы должны равняться сумме дневных и ночных часов"
 
@@ -434,7 +434,7 @@ msgstr "Не найден рабочей день с id={wd_id}"
 msgid "shop_id should be defined"
 msgstr "Произошла ошибка. Попробуйте перезагрузить страницу."
 
-#: src/base/sawhsettings/serializers.py:14
+#: src/base/sawhsettings/serializers.py:14 src/reports/serializers.py:61
 #: src/timetable/worker_day/serializers.py:743
 msgid "Invalid time period."
 msgstr "Неправильный временной период."
@@ -447,51 +447,51 @@ msgstr "ldap_login должен быть указан для типа автор
 msgid "The employee's tabel code must be unique"
 msgstr "Табельный номер сотрудника должен быть уникален."
 
-#: src/base/serializers.py:356
+#: src/base/serializers.py:365
 msgid "Passwords are mismatched."
 msgstr "Пароли не совпадают."
 
-#: src/base/serializers.py:357
+#: src/base/serializers.py:366
 msgid "Password is wrong."
 msgstr "Неверный пароль."
 
-#: src/base/serializers.py:442
+#: src/base/serializers.py:451
 #, python-brace-format
 msgid "Employment from {dt_hired} to {dt_fired} already exists."
 msgstr ""
 "В этом магазине уже заведено трудоустройство с {dt_hired} по {dt_fired}."
 
-#: src/base/serializers.py:443 src/timetable/worker_day/serializers.py:140
+#: src/base/serializers.py:452 src/timetable/worker_day/serializers.py:140
 #, python-brace-format
 msgid "There is {amount} models of user with username: {username}."
 msgstr ""
 "Существует {amount} моделей пользователя с именем пользователя: {username}."
 
-#: src/base/serializers.py:444
+#: src/base/serializers.py:453
 #, python-brace-format
 msgid "There is {amount} models of user with user_id: {user_id}."
 msgstr "Существует {amount} моделей пользователя с user_id: {user_id}."
 
-#: src/base/serializers.py:445 src/tasks/serializers.py:20
+#: src/base/serializers.py:454 src/tasks/serializers.py:20
 #: src/tasks/serializers.py:21
 #, python-brace-format
 msgid "There is {amount} models of shop with code: {code}."
 msgstr "Есть {amount} магазинов с кодом: {code}."
 
-#: src/base/serializers.py:446
+#: src/base/serializers.py:455
 #, python-brace-format
 msgid "There is {amount} models of position with code: {code}."
 msgstr "Есть {amount} должностей с кодом: {code}."
 
-#: src/base/serializers.py:447
+#: src/base/serializers.py:456
 msgid "You are not allowed to choose shops from other network."
 msgstr "Вы не можете выбирать магазины из другой сети."
 
-#: src/base/serializers.py:448
+#: src/base/serializers.py:457
 msgid "Network of shop and position should be equal."
 msgstr "Сети магазина и должности должны совпадать."
 
-#: src/base/serializers.py:449
+#: src/base/serializers.py:458
 msgid "Дата увольнения не может быть меньше даты начала трудоустройства."
 msgstr ""
 
@@ -789,6 +789,26 @@ msgstr ""
 "Сервис распознавания временно недоступен. Пожалуйста, обратитесь к "
 "администратору системы."
 
+#: src/recognition/models.py:62 src/timetable/attendance_records/views.py:32
+msgid "Coming"
+msgstr "Приход"
+
+#: src/recognition/models.py:63 src/timetable/attendance_records/views.py:33
+msgid "Leaving"
+msgstr "Уход"
+
+#: src/recognition/models.py:64
+msgid "Break start"
+msgstr "Начало перерыва"
+
+#: src/recognition/models.py:65
+msgid "Break end"
+msgstr "Конец перерыва"
+
+#: src/recognition/models.py:66
+msgid "No type"
+msgstr "Нет типа"
+
 #: src/recognition/models.py:192
 msgid "Key"
 msgstr "Ключ"
@@ -867,6 +887,14 @@ msgstr "Конец предыдущей половины года"
 #: src/reports/models.py:61
 msgid "End of previous year"
 msgstr "Конец предыдущего года"
+
+#: src/reports/tasks.py:244 src/util/dg/ticks_report.py:26
+msgid "Tick report"
+msgstr "Отчет по отметкам сотрудников"
+
+#: src/reports/tests.py:595 src/util/dg/ticks_report.py:34
+msgid "Tick date and time"
+msgstr "Дата и время отметки"
 
 #: src/reports/utils/overtimes_undertimes.py:181
 #: src/timetable/worker_day/timetable.py:722
@@ -958,14 +986,6 @@ msgstr "Факт подтвержденный"
 #: src/timetable/admin.py:168
 msgid "Not approved fact"
 msgstr "Факт черновик"
-
-#: src/timetable/attendance_records/views.py:32
-msgid "Coming"
-msgstr "Приход"
-
-#: src/timetable/attendance_records/views.py:33
-msgid "Leaving"
-msgstr "Уход"
 
 #: src/timetable/attendance_records/views.py:47
 msgid "Last name"
@@ -1850,6 +1870,42 @@ msgstr "Ноябрь"
 msgid "December"
 msgstr "Декабрь"
 
+#: src/util/dg/ticks_report.py:28
+msgid "Employee"
+msgstr "ФИО сотрудника"
+
+#: src/util/dg/ticks_report.py:29
+msgid "Tabel code"
+msgstr "Табельный номер"
+
+#: src/util/dg/ticks_report.py:30
+msgid "Tick point"
+msgstr "Точка отметки"
+
+#: src/util/dg/ticks_report.py:31 src/util/dg/timesheet.py:365
+msgid "Shop"
+msgstr "Отделение"
+
+#: src/util/dg/ticks_report.py:32 src/util/dg/timesheet.py:369
+msgid "Shop code"
+msgstr "Код отделения"
+
+#: src/util/dg/ticks_report.py:33
+msgid "Tick type"
+msgstr "Тип отметки"
+
+#: src/util/dg/ticks_report.py:35
+msgid "Verified score"
+msgstr "Верификация"
+
+#: src/util/dg/ticks_report.py:36
+msgid "Liveness"
+msgstr "Качество фото"
+
+#: src/util/dg/ticks_report.py:37
+msgid "Photo"
+msgstr "Фото"
+
 #: src/util/dg/timesheet.py:352
 msgid "Tabel for {} {}y"
 msgstr "Табель учета рабочего времени за {} {}г"
@@ -1879,10 +1935,6 @@ msgstr "половину месяца (I, II)"
 msgid "month"
 msgstr "месяц"
 
-#: src/util/dg/timesheet.py:365
-msgid "Shop"
-msgstr "Подразделение выхода"
-
 #: src/util/dg/timesheet.py:366
 msgid "Total hours"
 msgstr "Итого часы"
@@ -1890,10 +1942,6 @@ msgstr "Итого часы"
 #: src/util/dg/timesheet.py:367
 msgid "Total days"
 msgstr "Итого дни"
-
-#: src/util/dg/timesheet.py:369
-msgid "Shop code"
-msgstr "Код ОП"
 
 #: src/util/dg/timesheet.py:370
 msgid "Shop name"

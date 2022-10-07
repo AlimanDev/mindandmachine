@@ -1,18 +1,23 @@
 from rest_framework.decorators import action
 from rest_framework.exceptions import NotFound
 from rest_framework.viewsets import ViewSet
+from rest_framework.request import Request
+from rest_framework.response import Response
+from rest_framework import status
+from django.http import HttpResponse
 
 from src.base.models import Shop
 from src.base.permissions import Permission
+from src.reports import tasks
 from src.reports.serializers import (
     ReportFilterSerializer,
     ConsolidatedTimesheetReportSerializer,
+    TikReportSerializer
 )
 from src.reports.utils.consolidated_timesheet_report import ConsolidatedTimesheetReportGenerator
 from src.reports.utils.pivot_tabel import PlanAndFactPivotTabel
 from src.reports.utils.schedule_deviation import schedule_deviation_report_response
 from src.util.http import prepare_response
-
 
 class ReportsViewSet(ViewSet):
     permission_classes = [Permission]
@@ -23,7 +28,7 @@ class ReportsViewSet(ViewSet):
         return filters
 
     @action(detail=False, methods=['get'])
-    def pivot_tabel(self, request):
+    def pivot_tabel(self, request: Request):
         data = ReportFilterSerializer(data=request.query_params)
         data.is_valid(raise_exception=True)
         data = data.validated_data
@@ -43,7 +48,7 @@ class ReportsViewSet(ViewSet):
         return pt.get_response(**filters)
 
     @action(detail=False, methods=['get'])
-    def consolidated_timesheet_report(self, request):
+    def consolidated_timesheet_report(self, request: Request):
         serializer = ConsolidatedTimesheetReportSerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)
 
@@ -69,7 +74,7 @@ class ReportsViewSet(ViewSet):
         )
 
     @action(detail=False, methods=['get'])
-    def schedule_deviation(self, request):
+    def schedule_deviation(self, request: Request):
         data = ReportFilterSerializer(data=request.query_params)
         data.is_valid(raise_exception=True)
         data = data.validated_data
@@ -83,3 +88,36 @@ class ReportsViewSet(ViewSet):
 
         return schedule_deviation_report_response(data['dt_from'], data['dt_to'], created_by_id=request.user.id,
                                                   shop_ids=data.get('shop_ids'), **filters)
+
+    @action(detail=False, methods=['get'])
+    def tick(self, request: Request):
+        '''
+        Tick report (employee attendance), optionally with photos.
+
+        GET /rest_api/report/tick
+
+        :params
+            dt_from: QOS_DATE_FORMAT, required=True
+            dt_to: QOS_DATE_FORMAT, required=True
+            shop_id__in: list[int], required=False
+            employee_id__in: list[int], required=False
+            with_biometrics: bool, default=False
+            emails: list[str], required=False
+        :return
+            content_type: 'application/xlsx' | 'application/docx'
+        '''
+        serializer = TikReportSerializer(data=request.query_params)
+        serializer.is_valid(raise_exception=True)
+        if serializer.validated_data.get('emails'):
+            tasks.tick_report.delay(**serializer.validated_data, network_id=request.user.network_id)
+            return Response(status=status.HTTP_202_ACCEPTED)
+        else:
+            report = tasks.tick_report(**serializer.validated_data, network_id=request.user.network_id)
+            return HttpResponse(
+                report['file'],
+                content_type=report['type'],
+                headers={
+                'Content-Disposition': f'attachment; filename="{report["name"]}"'
+                }
+            )
+
