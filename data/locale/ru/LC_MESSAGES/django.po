@@ -12,7 +12,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Django REST framework\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2022-10-06 10:15+0000\n"
+"POT-Creation-Date: 2022-10-07 08:27+0000\n"
 "PO-Revision-Date: 2017-08-03 14:58+0000\n"
 "Last-Translator: Grigory Mishchenko <grishkokot@gmail.com>\n"
 "Language-Team: Russian (http://www.transifex.com/django-rest-framework-1/"
@@ -257,6 +257,10 @@ msgstr "Добавлять сотрудников из Excel"
 #: src/base/models.py:182
 msgid "Show checkbox for downloading inspection version of timetable"
 msgstr ""
+
+#: src/base/models.py:184
+msgid "Include biometry (photos) in tick report"
+msgstr "Включать биометрию (фото) в отчёт по отметкам сотрудников"
 
 #: src/base/models.py:186
 msgid "Convert tabel to"
@@ -888,11 +892,15 @@ msgstr "Конец предыдущей половины года"
 msgid "End of previous year"
 msgstr "Конец предыдущего года"
 
+#: src/reports/serializers.py:63
+msgid "Time period must be within one month."
+msgstr "Период должен быть в рамках одного месяца."
+
 #: src/reports/tasks.py:244 src/util/dg/ticks_report.py:26
 msgid "Tick report"
 msgstr "Отчет по отметкам сотрудников"
 
-#: src/reports/tests.py:595 src/util/dg/ticks_report.py:34
+#: src/reports/tests.py:600 src/util/dg/ticks_report.py:34
 msgid "Tick date and time"
 msgstr "Дата и время отметки"
 

@@ -219,7 +219,7 @@ def fill_employments_stats(prev_acc_period=False, curr_acc_period=True, next_acc
                 if employment_stats_to_create:
                     EmploymentStats.objects.bulk_create(employment_stats_to_create, batch_size=1000)
 
-@app.task(time_limit=settings.EMAIL_TASK_TIMEOUT + 60) #accounting for possible email timeout
+@app.task(time_limit=settings.TIME_LIMITS['tick_report']) #accounting for possible email timeout and large data
 def tick_report(
         dt_from: Union[str, date],
         dt_to: Union[str, date],

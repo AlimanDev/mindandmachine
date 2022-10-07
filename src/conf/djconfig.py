@@ -519,6 +519,11 @@ DEFAULT_AUTO_FIELD = 'django.db.models.AutoField'
 
 X_FRAME_OPTIONS = 'SAMEORIGIN'
 
+# time limits for celery tasks
+TIME_LIMITS = {
+    'tick_report': int(os.getenv('TICK_REPORT_TIME_LIMIT', 180)) #tick_report celery task
+}
+
 CACHES = {
     'default': {
         "BACKEND": "django_redis.cache.RedisCache",
