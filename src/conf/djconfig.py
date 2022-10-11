@@ -521,7 +521,7 @@ X_FRAME_OPTIONS = 'SAMEORIGIN'
 
 # time limits for celery tasks
 TIME_LIMITS = {
-    'tick_report': int(os.getenv('TICK_REPORT_TIME_LIMIT', 180)) #tick_report celery task
+    'tick_report': int(os.getenv('TICK_REPORT_TIME_LIMIT', 300)) #tick_report celery task
 }
 
 CACHES = {

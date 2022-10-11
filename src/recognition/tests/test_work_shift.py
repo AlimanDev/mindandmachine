@@ -221,6 +221,7 @@ class TestWorkShiftViewSet(TestsHelperMixin, APITestCase):
                 'allow_to_manually_set_is_vacancy': False,
                 'allowed_interval_for_early_departure': '00:00:00',
                 'allowed_interval_for_late_arrival': '00:00:00',
+                'biometry_in_tick_report': False,
                 'default_stats': {
                     'day_bottom': 'deadtime',
                     'day_top': 'covering',
@@ -376,6 +377,7 @@ class TestWorkShiftViewSet(TestsHelperMixin, APITestCase):
                 'allow_to_manually_set_is_vacancy': False,
                 'allowed_interval_for_early_departure': '00:00:00',
                 'allowed_interval_for_late_arrival': '00:00:00',
+                'biometry_in_tick_report': False,
                 'default_stats': {
                     'day_bottom': 'deadtime',
                     'day_top': 'covering',
@@ -537,6 +539,7 @@ class TestWorkShiftViewSet(TestsHelperMixin, APITestCase):
                 'allow_to_manually_set_is_vacancy': False,
                 'allowed_interval_for_early_departure': '00:00:00',
                 'allowed_interval_for_late_arrival': '00:00:00',
+                'biometry_in_tick_report': False,
                 'default_stats': {
                     'day_bottom': 'deadtime',
                     'day_top': 'covering',

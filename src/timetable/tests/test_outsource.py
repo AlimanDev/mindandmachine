@@ -575,7 +575,8 @@ class TestOutsource(TestsHelperMixin, APITestCase):
                     'enable_camera_ticks': False,
                     'show_worker_day_additional_info': False,
                     'allowed_interval_for_late_arrival': '00:00:00',
-                    'allowed_interval_for_early_departure': '00:00:00', 
+                    'allowed_interval_for_early_departure': '00:00:00',
+                    'biometry_in_tick_report': False,
                     'default_stats': {
                         'timesheet_employee_top': 'fact_total_all_hours_sum',
                         'timesheet_employee_bottom': 'sawh_hours',
