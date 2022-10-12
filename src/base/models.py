@@ -1617,12 +1617,13 @@ class Employment(AbstractActiveModel):
     is_ready_for_overworkings = models.BooleanField(default=False)
 
     dt_new_week_availability_from = models.DateField(null=True, blank=True)
-    is_visible = models.BooleanField(default=True)
+    is_visible = models.BooleanField(default=True, verbose_name=_('Display in the chart of my shop'))
+    is_visible_other_shop = models.BooleanField(default=True, verbose_name=_('Display in the chart of other shops'))
 
     sawh_settings = models.ForeignKey(
         to='base.SAWHSettings',
         on_delete=models.PROTECT,
-        verbose_name='Настройка нормы',
+        verbose_name=_('Sawh settings'),
         null=True, blank=True,
         related_name='employments',
     )

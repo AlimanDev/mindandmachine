@@ -12,7 +12,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Django REST framework\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2022-10-06 10:15+0000\n"
+"POT-Creation-Date: 2022-10-12 09:16+0000\n"
 "PO-Revision-Date: 2017-08-03 14:58+0000\n"
 "Last-Translator: Grigory Mishchenko <grishkokot@gmail.com>\n"
 "Language-Team: Russian (http://www.transifex.com/django-rest-framework-1/"
@@ -409,7 +409,21 @@ msgstr ""
 msgid "There is not load template with code {}."
 msgstr "Шаблон нагрузки с кодом {} не найден."
 
-#: src/base/models.py:1638
+#: src/base/models.py:1620
+msgid "Display in the chart of my shop"
+msgstr "Отображать в графике"
+
+#: src/base/models.py:1621
+msgid "Display in the chart of other shops"
+msgstr "Отображать в графике других магазинов"
+
+#: src/base/models.py:1626
+#, fuzzy
+#| msgid "Basic settings"
+msgid "Sawh settings"
+msgstr "Базовые настройки нормы"
+
+#: src/base/models.py:1639
 msgid ""
 "Unable to define worker access group. Assign an access group to him or a "
 "position associated with an access group."
@@ -417,11 +431,11 @@ msgstr ""
 "Невозможно определить группу доступа работника. Назначьте ему группу доступа "
 "либо должность, связанную с группой доступа."
 
-#: src/base/models.py:2198
+#: src/base/models.py:2199
 msgid "Opens and closes fields are required for workday type"
 msgstr "Время открытия и закрытия обязательно для рабочего типа дня"
 
-#: src/base/models.py:2321
+#: src/base/models.py:2322
 msgid "Work hours should be sum of day hours and night hours"
 msgstr "Рабочие часы должны равняться сумме дневных и ночных часов"
 
@@ -1986,6 +2000,11 @@ msgstr "Не было передано ни одного файла."
 #: src/util/upload.py:26
 msgid "The file was not uploaded."
 msgstr "Файл не был загружен."
+
+#, fuzzy
+#~| msgid "Format settings"
+#~ msgid "Rate setting"
+#~ msgstr "Настройки форматов"
 
 #~ msgid "Feature serie cannot have dependences."
 #~ msgstr "Тип операции для помощи в прогнозе не может иметь зависимостей."
