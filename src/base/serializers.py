@@ -186,6 +186,7 @@ class NetworkSerializer(BaseModelSerializer):
             'analytics_iframe',
             'analytics_type',
             'allow_to_manually_set_is_vacancy',
+            'display_chart_in_other_stores',
         ]
 
 
@@ -421,7 +422,7 @@ class EmploymentListSerializer(BaseSerializer):
     is_ready_for_overworkings = serializers.BooleanField()
     dt_new_week_availability_from = serializers.DateField()
     is_visible = serializers.BooleanField()
-    is_visible_other_shop = serializers.BooleanField()
+    is_visible_other_shops = serializers.BooleanField()
     worker_constraints = WorkerConstraintListSerializer(many=True, source='worker_constraints_list')
     work_types = EmploymentWorkTypeListSerializer(many=True, source='work_types_list')
     function_group_id = serializers.IntegerField()
@@ -481,7 +482,7 @@ class EmploymentSerializer(BaseModelSerializer):
             'id', 'user_id', 'shop_id', 'position_id', 'is_fixed_hours', 'dt_hired', 'dt_fired',
             'salary', 'week_availability', 'norm_work_hours', 'min_time_btw_shifts',
             'shift_hours_length_min', 'shift_hours_length_max', 'auto_timetable', 'tabel_code', 'is_ready_for_overworkings',
-            'dt_new_week_availability_from', 'is_visible', 'is_visible_other_shop',  'worker_constraints', 'work_types',
+            'dt_new_week_availability_from', 'is_visible', 'is_visible_other_shops',  'worker_constraints', 'work_types',
             'shop_code', 'position_code', 'username', 'code', 'function_group_id', 'dt_to_function_group',
             'employee_id', 'is_active', 'sawh_settings_id',
         ]
@@ -495,7 +496,7 @@ class EmploymentSerializer(BaseModelSerializer):
         timetable_fields = [
             'function_group_id', 'is_fixed_hours', 'salary', 'week_availability', 'norm_work_hours', 'shift_hours_length_min', 
             'shift_hours_length_max', 'min_time_btw_shifts', 'is_ready_for_overworkings',
-            'is_visible', 'is_visible_other_shop',
+            'is_visible', 'is_visible_other_shops',
         ]
 
     def validate(self, attrs):
@@ -624,7 +625,7 @@ class EmploymentSerializer(BaseModelSerializer):
             position_from = WorkerPosition.objects.filter(id=instance.position_id).first()
             position_to =  WorkerPosition.objects.filter(id=validated_data.get('position_id')).first()
             Group.check_has_perm_to_edit_group_objects(position_from.group_id if position_from else None, position_to.group_id if position_to else None, user)
-        for field in ('is_visible', 'is_visible_other_shop'):
+        for field in ('is_visible', 'is_visible_other_shops'):
             if getattr(instance, field) != validated_data.get(field, True):
                 Employment.objects.filter(
                     shop_id=instance.shop_id,

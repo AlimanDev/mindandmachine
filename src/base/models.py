@@ -167,7 +167,13 @@ class Network(AbstractActiveModel):
         verbose_name=_('Count only fact hours that in approved plan'),
     )
     copy_plan_to_fact_crossing = models.BooleanField(
-        verbose_name=_("Copy plan to fact crossing"), default=False)
+        default=False,
+        verbose_name=_('Copy plan to fact crossing')
+    )
+    display_chart_in_other_stores = models.BooleanField(
+        default=False,
+        verbose_name=_('Ability to connect to an account in the charts of other stores')
+    )
     download_tabel_template = models.CharField(
         max_length=64, verbose_name=_('Download tabel template'),
         choices=TABEL_FORMAT_CHOICES, default='default',
@@ -1618,7 +1624,7 @@ class Employment(AbstractActiveModel):
 
     dt_new_week_availability_from = models.DateField(null=True, blank=True)
     is_visible = models.BooleanField(default=True, verbose_name=_('Display in the chart of my shop'))
-    is_visible_other_shop = models.BooleanField(default=True, verbose_name=_('Display in the chart of other shops'))
+    is_visible_other_shops = models.BooleanField(default=True, verbose_name=_('Display in the chart of other shops'))
 
     sawh_settings = models.ForeignKey(
         to='base.SAWHSettings',
