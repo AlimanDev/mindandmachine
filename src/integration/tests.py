@@ -89,7 +89,7 @@ class TestRequestMock:
     def json(self):
         return self.response
     
-    def request(self, method, url, params={}, json=None, data=None):
+    def request(self, method, url, params={}, json=None, data=None, timeout=None):
         if params.get('pageNo'):
             self.response = self.responses.get(url, {}).get(params.get('pageNo'), {"data": None})
         else:
@@ -1217,14 +1217,16 @@ class TestIntegration(TestsHelperMixin, APITestCase):
                                 'name': self.user1.first_name, 
                                 'lastName': self.user1.last_name,
                             }, 
-                            params={'access_token': settings.ZKTECO_KEY}
+                            params={'access_token': settings.ZKTECO_KEY},
+                            timeout=settings.REQUESTS_TIMEOUTS['zkteco']
                         ),
                         call(
                             'POST', 
                             '/attAreaPerson/set', 
                             data=None, 
                             json={'pins': [settings.ZKTECO_USER_ID_SHIFT + self.user1.id], 'code': str(self.att_area.code)}, 
-                            params={'access_token': settings.ZKTECO_KEY}
+                            params={'access_token': settings.ZKTECO_KEY},
+                            timeout=settings.REQUESTS_TIMEOUTS['zkteco']
                         )
                     ]
                 )
@@ -1254,7 +1256,8 @@ class TestIntegration(TestsHelperMixin, APITestCase):
                             '/attAreaPerson/delete', 
                             data=None, 
                             json={'pins': [str(settings.ZKTECO_USER_ID_SHIFT + self.user1.id)], 'code': str(self.att_area.code)}, 
-                            params={'access_token': settings.ZKTECO_KEY}
+                            params={'access_token': settings.ZKTECO_KEY},
+                            timeout=settings.REQUESTS_TIMEOUTS['zkteco']
                         ),
                     ]
                 )
@@ -1289,7 +1292,8 @@ class TestIntegration(TestsHelperMixin, APITestCase):
                             '/attAreaPerson/delete', 
                             data=None, 
                             json={'pins': [str(settings.ZKTECO_USER_ID_SHIFT + self.user1.id)], 'code': str(self.att_area.code)}, 
-                            params={'access_token': settings.ZKTECO_KEY}
+                            params={'access_token': settings.ZKTECO_KEY},
+                            timeout=settings.REQUESTS_TIMEOUTS['zkteco']
                         ),
                     ]
                 )
@@ -1318,7 +1322,8 @@ class TestIntegration(TestsHelperMixin, APITestCase):
                             '/attAreaPerson/delete', 
                             data=None, 
                             json={'pins': [str(settings.ZKTECO_USER_ID_SHIFT + self.user1.id)], 'code': str(self.att_area.code)}, 
-                            params={'access_token': settings.ZKTECO_KEY}
+                            params={'access_token': settings.ZKTECO_KEY},
+                            timeout=settings.REQUESTS_TIMEOUTS['zkteco']
                         ),
                     ]
                 )
@@ -1360,7 +1365,8 @@ class TestIntegration(TestsHelperMixin, APITestCase):
                             '/attAreaPerson/set', 
                             data=None, 
                             json={'pins': [str(settings.ZKTECO_USER_ID_SHIFT + self.user1.id)], 'code': str(self.att_area.code)}, 
-                            params={'access_token': settings.ZKTECO_KEY}
+                            params={'access_token': settings.ZKTECO_KEY},
+                            timeout=settings.REQUESTS_TIMEOUTS['zkteco']
                         ),
                     ]
                 )
@@ -1378,14 +1384,16 @@ class TestIntegration(TestsHelperMixin, APITestCase):
                             '/attAreaPerson/set', 
                             data=None, 
                             json={'pins': [str(settings.ZKTECO_USER_ID_SHIFT + self.user1.id)], 'code': str(self.att_area2.code)}, 
-                            params={'access_token': settings.ZKTECO_KEY}
+                            params={'access_token': settings.ZKTECO_KEY},
+                            timeout=settings.REQUESTS_TIMEOUTS['zkteco']
                         ),
                         call(
                             'POST', 
                             '/attAreaPerson/delete', 
                             data=None, 
                             json={'pins': [str(settings.ZKTECO_USER_ID_SHIFT + self.user1.id)], 'code': str(self.att_area.code)}, 
-                            params={'access_token': settings.ZKTECO_KEY}
+                            params={'access_token': settings.ZKTECO_KEY},
+                            timeout=settings.REQUESTS_TIMEOUTS['zkteco']
                         ),
                     ]
                 )
@@ -1463,7 +1471,8 @@ class TestIntegration(TestsHelperMixin, APITestCase):
                             '/attAreaPerson/set', 
                             data=None, 
                             json={'pins': [str(settings.ZKTECO_USER_ID_SHIFT + self.user1.id)], 'code': str(self.att_area.code)}, 
-                            params={'access_token': settings.ZKTECO_KEY}
+                            params={'access_token': settings.ZKTECO_KEY},
+                            timeout=settings.REQUESTS_TIMEOUTS['zkteco']
                         ),
                     ]
                 )
@@ -1493,14 +1502,16 @@ class TestIntegration(TestsHelperMixin, APITestCase):
                             '/attAreaPerson/set', 
                             data=None, 
                             json={'pins': [str(settings.ZKTECO_USER_ID_SHIFT + self.user1.id)], 'code': str(self.att_area2.code)}, 
-                            params={'access_token': settings.ZKTECO_KEY}
+                            params={'access_token': settings.ZKTECO_KEY},
+                            timeout=settings.REQUESTS_TIMEOUTS['zkteco']
                         ),
                         call(
                             'POST', 
                             '/attAreaPerson/delete', 
                             data=None, 
                             json={'pins': [str(settings.ZKTECO_USER_ID_SHIFT + self.user1.id)], 'code': str(self.att_area.code)}, 
-                            params={'access_token': settings.ZKTECO_KEY}
+                            params={'access_token': settings.ZKTECO_KEY},
+                            timeout=settings.REQUESTS_TIMEOUTS['zkteco']
                         ),
                     ]
                 )
@@ -1537,14 +1548,16 @@ class TestIntegration(TestsHelperMixin, APITestCase):
                                 'name': self.user1.first_name, 
                                 'lastName': self.user1.last_name,
                             }, 
-                            params={'access_token': settings.ZKTECO_KEY}
+                            params={'access_token': settings.ZKTECO_KEY},
+                            timeout=settings.REQUESTS_TIMEOUTS['zkteco']
                         ),
                         call(
                             'POST', 
                             '/attAreaPerson/set', 
                             data=None, 
                             json={'pins': [settings.ZKTECO_USER_ID_SHIFT + self.user1.id], 'code': str(self.att_area.code)}, 
-                            params={'access_token': settings.ZKTECO_KEY}
+                            params={'access_token': settings.ZKTECO_KEY},
+                            timeout=settings.REQUESTS_TIMEOUTS['zkteco']
                         ),
                     ]
                 )
@@ -1626,14 +1639,16 @@ class TestIntegration(TestsHelperMixin, APITestCase):
                                 'name': self.user1.first_name, 
                                 'lastName': self.user1.last_name,
                             }, 
-                            params={'access_token': settings.ZKTECO_KEY}
+                            params={'access_token': settings.ZKTECO_KEY},
+                            timeout=settings.REQUESTS_TIMEOUTS['zkteco']
                         ),
                         call(
                             'POST', 
                             '/attAreaPerson/set', 
                             data=None, 
                             json={'pins': [settings.ZKTECO_USER_ID_SHIFT + self.user1.id], 'code': str(self.att_area.code)}, 
-                            params={'access_token': settings.ZKTECO_KEY}
+                            params={'access_token': settings.ZKTECO_KEY},
+                            timeout=settings.REQUESTS_TIMEOUTS['zkteco']
                         ),
                     ]
                 )

@@ -35,7 +35,7 @@ class PbiEmbedService:
         '''
 
         report_url = f'https://api.powerbi.com/v1.0/myorg/groups/{self.report_config.workspace_id}/reports/{self.report_config.report_id}'
-        api_response = requests.get(report_url, headers=self.get_request_header())
+        api_response = requests.get(report_url, headers=self.get_request_header(), timeout=settings.REQUESTS_TIMEOUTS['pbi_embed_service'])
 
         if api_response.status_code != 200:
             raise PbiEmbedServiceException(
@@ -85,7 +85,7 @@ class PbiEmbedService:
         # Generate Embed token for multiple workspaces, datasets, and reports. Refer https://aka.ms/MultiResourceEmbedToken
         embed_token_api = 'https://api.powerbi.com/v1.0/myorg/GenerateToken'
         api_response = requests.post(embed_token_api, data=json.dumps(request_body.__dict__),
-                                     headers=self.get_request_header())
+                                     headers=self.get_request_header(), timeout=settings.REQUESTS_TIMEOUTS['pbi_embed_service'])
 
         if api_response.status_code != 200:
             raise PbiEmbedServiceException(

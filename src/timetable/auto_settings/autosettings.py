@@ -743,7 +743,7 @@ class AutoSettings:
     def send_to_algo(cls, data: dict, api_route: str = '') -> requests.Response:
         try:
             data = json.dumps(data, cls=DjangoJSONEncoder).encode('ascii')
-            response = requests.post(f'http://{settings.TIMETABLE_IP}/' + api_route, data=data)
+            response = requests.post(f'http://{settings.TIMETABLE_IP}/' + api_route, data=data, timeout=settings.REQUESTS_TIMEOUTS['algo'])
             response.raise_for_status()
             return response
         except requests.exceptions.RequestException:

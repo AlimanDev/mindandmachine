@@ -28,7 +28,7 @@ def create_mda_user_to_shop_relation(username, shop_code, debug_info=None):
         url=settings.MDA_PUBLIC_API_HOST + '/api/public/v1/mindandmachine/userToShop/',
         json={'login': username, 'sap': shop_code},
         headers={'x-public-token': settings.MDA_PUBLIC_API_AUTH_TOKEN},
-        timeout=(3, 5),
+        timeout=settings.REQUESTS_TIMEOUTS['create_mda_user_to_shop_relation']
     )
     try:
         resp.raise_for_status()

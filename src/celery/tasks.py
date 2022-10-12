@@ -231,7 +231,8 @@ def send_doctors_schedule_to_mis(json_data, logger=logging.getLogger('send_docto
         resp = requests.post(
             url='https://star.nikamed.ru/mc/hs/Telemed/SetSchedule/',
             json=mis_data,
-            auth=HTTPBasicAuth(settings.MIS_USERNAME.encode('utf-8'), settings.MIS_PASSWORD.encode('utf-8'))
+            auth=HTTPBasicAuth(settings.MIS_USERNAME.encode('utf-8'), settings.MIS_PASSWORD.encode('utf-8')),
+            timeout=settings.REQUESTS_TIMEOUTS['send_doctors_schedule_to_mis']
         )
         try:
             resp.raise_for_status()
