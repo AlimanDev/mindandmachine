@@ -338,5 +338,6 @@ def export_user_biophoto(pin, encoded_photo):
         data=raw_body, 
         headers=headers, 
         params=params,
+        timeout=settings.REQUESTS_TIMEOUTS['zkteco']
     )
     print(f"Recieved from bio host: status {response.status_code}, body {response.content}")

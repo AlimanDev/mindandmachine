@@ -290,7 +290,8 @@ class Tevian:
             data=data,
             json=json,
             params=params,
-            headers=headers
+            headers=headers,
+            timeout=settings.REQUESTS_TIMEOUTS['tevian']
         )
 
         try:

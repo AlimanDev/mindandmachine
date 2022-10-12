@@ -18,7 +18,7 @@ class ConversionError(Exception):
 
 class ConversionEngine:
     max_retries = 1
-    timeout = 15
+    timeout = settings.REQUESTS_TIMEOUTS['converter']
 
     def __init__(self, input_file, input_ext, output_ext):
         self.input_file = input_file

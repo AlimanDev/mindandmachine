@@ -127,7 +127,8 @@ class ZKTeco:
             f"{settings.ZKTECO_HOST}/{url}",
             params=params,
             json=json,
-            data=data
+            data=data,
+            timeout=settings.REQUESTS_TIMEOUTS['zkteco']
         )
 
         try:
