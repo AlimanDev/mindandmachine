@@ -181,7 +181,7 @@ class Network(AbstractActiveModel):
         default=True,
         verbose_name=_('Show checkbox for downloading inspection version of timetable')
     )
-
+    biometry_in_tick_report = models.BooleanField(default=False, verbose_name=_('Include biometry (photos) in tick report'))
     convert_tabel_to = models.CharField(
         max_length=64, verbose_name=_('Convert tabel to'),
         null=True, blank=True,

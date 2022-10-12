@@ -177,6 +177,7 @@ class TickReport(BaseRegisteredReport, DatesReportMixin):
 
     def __init__(self, network_id: int, context: dict, *args, **kwargs):
         self.dt_from, self.dt_to = self.get_dates(context)
+        self.order_by = context.get('order_by', ['user__last_name', 'user__first_name', 'user__middle_name', 'dttm'])
         super().__init__(network_id, context, *args, **kwargs)
     
     def get_file(self) -> dict:
@@ -203,7 +204,7 @@ class TickReport(BaseRegisteredReport, DatesReportMixin):
             dttm__gte=self.dt_from,
             dttm__lt=self.dt_to + timedelta(1),
             user__network_id=self.network_id
-        )
+        ).order_by(*self.order_by)
         if shops := self.context.get('shop_id__in'):
             qs = qs.filter(tick_point__shop_id__in=shops)
         if employees := self.context.get('employee_id__in'):

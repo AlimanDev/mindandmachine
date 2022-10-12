@@ -59,4 +59,6 @@ class TikReportSerializer(serializers.Serializer):
     def validate(self, data):
         if data['dt_to'] < data['dt_from']:
             raise serializers.ValidationError(_('Invalid time period.'))
+        if data['dt_to'].month != data['dt_from'].month:
+            raise serializers.ValidationError(_('Time period must be within one month.'))
         return data
