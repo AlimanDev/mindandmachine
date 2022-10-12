@@ -172,7 +172,7 @@ class Network(AbstractActiveModel):
     )
     display_chart_in_other_stores = models.BooleanField(
         default=False,
-        verbose_name=_('Ability to connect to an account in the charts of other stores')
+        verbose_name=_('Ability to disconnect to an account in the charts of other stores')
     )
     download_tabel_template = models.CharField(
         max_length=64, verbose_name=_('Download tabel template'),
