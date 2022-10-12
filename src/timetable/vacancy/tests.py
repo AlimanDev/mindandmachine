@@ -430,7 +430,6 @@ class TestAutoWorkerExchange(APITestCase, TestsHelperMixin):
         self.assertEqual(len_vacancies, 0)
         create_vacancies_and_notify(self.shop.id, self.work_type1.id)
         vacancies = WorkerDay.objects.filter(is_vacancy=True, source=WorkerDay.SOURCE_AUTO_CREATED_VACANCY).order_by('dttm_work_start')
-        print(vacancies.count(), '!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
         self.assertEqual([vacancies[0].dttm_work_start.time(), vacancies[0].dttm_work_end.time()],
                          [datetime.time(9, 0), datetime.time(21, 0)])
         self.assertEqual([vacancies[1].dttm_work_start.time(), vacancies[1].dttm_work_end.time()],
