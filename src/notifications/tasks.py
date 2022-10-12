@@ -68,7 +68,7 @@ def send_event_email_notifications(event_email_notification_id: int, user_author
                 )
             )
 
-    send_mass_html_mail(datatuple=datatuple)
+    return send_mass_html_mail(datatuple=datatuple)
 
 
 @app.task
