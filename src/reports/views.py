@@ -5,6 +5,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework import status
 from django.http import HttpResponse
+from django.conf import settings
 
 from src.base.models import Shop
 from src.base.permissions import Permission
@@ -115,6 +116,9 @@ class ReportsViewSet(ViewSet):
             serializer.validated_data.pop('with_biometrics', None)
 
         if serializer.validated_data.get('emails'):
+            #celery serializes date as dttm, for some reason
+            serializer.validated_data['dt_from'] = serializer.validated_data['dt_from'].strftime(settings.QOS_DATE_FORMAT) 
+            serializer.validated_data['dt_to'] = serializer.validated_data['dt_to'].strftime(settings.QOS_DATE_FORMAT)
             tasks.tick_report.delay(**serializer.validated_data, network_id=request.user.network_id)
             return Response(status=status.HTTP_202_ACCEPTED)
         else:

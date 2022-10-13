@@ -584,8 +584,6 @@ class TestReportsViewSet(TestsHelperMixin, APITestCase):
 
         res = self.client.get(self.get_url('Reports-tick'), query_params)
         self.assertEqual(res.status_code, status.HTTP_202_ACCEPTED)
-
-        tasks.tick_report(**query_params, network_id=self.wd1.shop.network.id)
         self.assertEqual(len(mail.outbox), 1)
         file = mail.outbox[0].attachments[0]
         self.assertIn('tick_report', file[0])
