@@ -35,12 +35,11 @@ from src.base.models_abstract import (
     AbstractActiveModel,
     AbstractModel,
     AbstractActiveNetworkSpecificCodeNamedModel,
-    NetworkSpecificModel,
-    AbstractCodeNamedModel,
 )
 from src.base.models_utils import OverrideBaseManager
 from src.conf.djconfig import QOS_TIME_FORMAT
 from src.util.mixins.qs import AnnotateValueEqualityQSMixin
+from src.util import images
 from src.timetable.timesheet import min_threshold_funcs
 
 
@@ -1407,8 +1406,12 @@ class User(DjangoAbstractUser, AbstractModel):
     def save(self, *args, **kwargs):
         if not self.password and isinstance(self.username, str) and settings.SET_USER_PASSWORD_AS_LOGIN:
             self.set_password(self.username)
+        super().save(*args, **kwargs)
+        self.compress_image()
 
-        return super(User, self).save(*args, **kwargs)
+    def compress_image(self, quality: int = settings.AVATAR_QUALITY):
+        if self.avatar:
+            return images.compress_image(self.avatar.path, quality)
 
     def get_subordinates(
         self,

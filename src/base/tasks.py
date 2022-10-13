@@ -7,7 +7,7 @@ from .models import (
 )
 
 
-@app.task()
+@app.task
 def clean_api_log():
     for network in Network.objects.all():
         ApiLog.clean_log(
