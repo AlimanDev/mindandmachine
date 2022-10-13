@@ -7,7 +7,7 @@ import django.db.models.deletion
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('base', '0183_alter_network_use_internal_exchange'),
+        ('base', '0184_network_biometry_in_tick_report'),
     ]
 
     operations = [
