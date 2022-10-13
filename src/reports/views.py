@@ -92,7 +92,7 @@ class ReportsViewSet(ViewSet):
     @action(detail=False, methods=['get'])
     def tick(self, request: Request):
         '''
-        Tick report (employee attendance), optionally with photos.
+        Tick report (employee attendance), optionally with photos and email support.
 
         GET /rest_api/report/tick
 
@@ -108,6 +108,12 @@ class ReportsViewSet(ViewSet):
         '''
         serializer = TikReportSerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)
+
+        #biometry and photos option must be manually turned on in network settings
+        if not request.user.network.biometry_in_tick_report:
+            serializer.validated_data.pop('emails', None)
+            serializer.validated_data.pop('with_biometrics', None)
+
         if serializer.validated_data.get('emails'):
             tasks.tick_report.delay(**serializer.validated_data, network_id=request.user.network_id)
             return Response(status=status.HTTP_202_ACCEPTED)

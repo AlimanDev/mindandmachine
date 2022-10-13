@@ -4,6 +4,7 @@ from uuid import uuid4
 
 import requests
 from rest_framework.test import APITestCase
+from django.conf import settings
 
 from src.base.tests.factories import (
     ShopFactory,
@@ -126,7 +127,8 @@ class TestGetEmbedInfo(TestsHelperMixin, APITestCase):
                         headers={
                             'Content-Type': 'application/json',
                             'Authorization': f'Bearer {access_token}',
-                        }
+                        },
+                        timeout=settings.REQUESTS_TIMEOUTS['pbi_embed_service']
                     )
                     requests_post.assert_called_once_with(
                         'https://api.powerbi.com/v1.0/myorg/GenerateToken',
@@ -134,7 +136,9 @@ class TestGetEmbedInfo(TestsHelperMixin, APITestCase):
                         headers={
                             'Content-Type': 'application/json',
                             'Authorization': f'Bearer {access_token}'
-                        })
+                        },
+                        timeout=settings.REQUESTS_TIMEOUTS['pbi_embed_service']
+                    )
                     resp_data = resp.json()
                     self.assertDictEqual(
                         resp_data,

@@ -578,6 +578,11 @@ class TestReportsViewSet(TestsHelperMixin, APITestCase):
         }
 
         res = self.client.get(self.get_url('Reports-tick'), query_params)
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.user_dir.network.biometry_in_tick_report = True
+        self.user_dir.network.save()
+
+        res = self.client.get(self.get_url('Reports-tick'), query_params)
         self.assertEqual(res.status_code, status.HTTP_202_ACCEPTED)
 
         tasks.tick_report(**query_params, network_id=self.wd1.shop.network.id)
@@ -601,7 +606,13 @@ class TestReportsViewSet(TestsHelperMixin, APITestCase):
         res = self.client.get(self.get_url('Reports-tick'), query_params)
         self.assertEqual(res.status_code, status.HTTP_200_OK)
         self.assertEqual(res.headers['Content-Type'], 'application/docx')
-        
+
+        query_params['dt_to'] = self.wd1.dt + timedelta(30)
+        res = self.client.get(self.get_url('Reports-tick'), query_params)
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        query_params['dt_to'] = self.wd1.dt - timedelta(30)
+        res = self.client.get(self.get_url('Reports-tick'), query_params)
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
 
 class TestScheduleDeviation(APITestCase, TestsHelperMixin):
     USER_USERNAME = "user1"

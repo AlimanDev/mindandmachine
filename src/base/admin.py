@@ -205,7 +205,7 @@ class NetworkAdmin(admin.ModelAdmin):
             'timetable_format',
             'add_users_from_excel',
             'show_checkbox_for_inspection_version',
-
+            'biometry_in_tick_report'
         )}),
         (_('Timetable settings'), {'fields': (
             'show_worker_day_additional_info',

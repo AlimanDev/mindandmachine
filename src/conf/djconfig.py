@@ -519,6 +519,25 @@ DEFAULT_AUTO_FIELD = 'django.db.models.AutoField'
 
 X_FRAME_OPTIONS = 'SAMEORIGIN'
 
+# time limits for celery tasks
+TIME_LIMITS = {
+    'tick_report': int(os.getenv('TICK_REPORT_TIME_LIMIT', 300)) #tick_report celery task
+}
+
+# Timeouts for external requests (seconds). Either an integer, or tuple for separate connection and read timeouts
+DEFAULT_REQUESTS_TIMEOUT = int(os.getenv('DEFAULT_REQUESTS_TIMEOUT', 10))
+REQUESTS_TIMEOUTS = {
+    'zkteco': int(os.getenv('ZKTECO_TIMEOUT', DEFAULT_REQUESTS_TIMEOUT)),
+    'tevian': int(os.getenv('TEVIAN_TIMEOUT', DEFAULT_REQUESTS_TIMEOUT)),
+    'send_doctors_schedule_to_mis': int(os.getenv('SEND_DOCTORS_SCHEDULE_TO_MIS_TIMEOUT', DEFAULT_REQUESTS_TIMEOUT)),
+    'pbi_embed_service': int(os.getenv('PBI_EMBED_SERVICE_TIMEOUT', DEFAULT_REQUESTS_TIMEOUT)),
+    'algo': int(os.getenv('ALGO_TIMEOUT', DEFAULT_REQUESTS_TIMEOUT)),
+    'converter': int(os.getenv('CONVERTER_TIMEOUT', DEFAULT_REQUESTS_TIMEOUT)),
+    'mda_sync_orgstruct': (5, 300),
+    'mda_sync_users': (5, 1800),
+    'create_mda_user_to_shop_relation': (3, 5)
+}
+
 CACHES = {
     'default': {
         "BACKEND": "django_redis.cache.RedisCache",

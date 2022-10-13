@@ -24,7 +24,11 @@ def calculate_shops_load(load_template_id, dt_from, dt_to, shop_id=None):
         data = prepare_load_template_request(load_template_id, shop.id, dt_from, dt_to)
         if not (data is None):
             data = json.dumps(data, cls=DjangoJSONEncoder)
-            response = requests.post(f'http://{settings.TIMETABLE_IP}/calculate_shop_load/', data=data)
+            response = requests.post(
+                f'http://{settings.TIMETABLE_IP}/calculate_shop_load/',
+                data=data,
+                timeout=settings.REQUESTS_TIMEOUTS['algo']
+            )
 
 
 
