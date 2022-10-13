@@ -19,7 +19,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='network',
             name='display_chart_in_other_stores',
-            field=models.BooleanField(default=False, verbose_name='Ability to connect to an account in the charts of other stores'),
+            field=models.BooleanField(default=False, verbose_name='Ability to disconnect to an account in the charts of other stores'),
         ),
         migrations.AlterField(
             model_name='employment',
