@@ -42,4 +42,3 @@ xunit.xml
 etc/compose/tests_mounts
 docker-compose.yml
 .env
-Dockerfile
