@@ -12,6 +12,7 @@ from rest_framework.serializers import ValidationError
 
 from src.base.models_abstract import AbstractActiveModel, AbstractActiveNetworkSpecificCodeNamedModel
 from src.timetable.models import User, Shop, Employee
+from src.util import images
 
 
 def user_directory_path(instance, filename):
@@ -187,6 +188,14 @@ class TickPhoto(AbstractActiveModel):
     liveness = models.FloatField(null=True)
     is_front = models.BooleanField(default=False)
 
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        self.compress_image()
+
+    def compress_image(self, quality: int = settings.TICK_PHOTO_QUALITY):
+        """Compress image. Quality: 0-100"""
+        if self.image:
+            return images.compress_image(self.image.path, quality)
 
 class TickPointToken(models.Model):
     key = models.CharField(gettext_lazy("Key"), max_length=40, primary_key=True)

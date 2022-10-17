@@ -71,7 +71,7 @@ from src.base.models import (
 )
 from src.base.shop.utils import get_offset_timezone_dict, get_shop_name
 from src.timetable.models import GroupWorkerDayPermission
-
+from src.util import tasks
 
 class BaseNotWrapRelatedModelaAdmin(admin.ModelAdmin):
     not_wrap_fields = [] # only foreign key fields
@@ -323,6 +323,15 @@ class AdmimGenerateOTPAuthLinkForm(forms.Form):
             {settings.SESAME_TOKEN_NAME: get_token(self.user)})
 
 
+@admin.action(description=_('Compress images'))
+def compress_images(self, request, queryset):
+    tasks.compress_images.delay(
+        queryset.model._meta.app_label,
+        queryset.model._meta.object_name,
+        id__in=tuple(queryset.values_list('id', flat=True))
+    )
+    self.message_user(request, _('Images compression has started'), messages.SUCCESS)
+
 @admin.register(User)
 class QsUserAdmin(UserAdmin):
     list_display = ('first_name', 'last_name', 'shop_name', 'id', 'username',)
@@ -346,6 +355,7 @@ class QsUserAdmin(UserAdmin):
     generate_otp_auth_link_form = AdmimGenerateOTPAuthLinkForm
     generate_otp_auth_link_template = 'generate_otp_auth_link.html'
     change_form_template = 'user_change_form.html'
+    actions = [compress_images]
 
     def get_urls(self):
         return [

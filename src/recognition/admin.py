@@ -10,8 +10,9 @@ from django.http import HttpResponse
 from django.utils.html import format_html
 from django.utils.timezone import now
 from rangefilter.filter import DateTimeRangeFilter
-from src.base.admin_filters import CustomRelatedOnlyDropdownFilter, RelatedOnlyDropdownLastNameOrderedFilter, RelatedOnlyDropdownNameOrderedFilter
 
+from src.base.admin_filters import CustomRelatedOnlyDropdownFilter, RelatedOnlyDropdownLastNameOrderedFilter, RelatedOnlyDropdownNameOrderedFilter
+from src.base.admin import compress_images
 from src.recognition.models import ShopIpAddress, TickPoint, Tick, TickPhoto, UserConnecter
 from src.timetable.models import User, Employment
 from src.util.dg.ticks_report import TicksOdsReportGenerator, TicksOdtReportGenerator
@@ -218,6 +219,7 @@ class TickPhotoAdmin(admin.ModelAdmin):
     readonly_fields = ['image_tag', 'tick']
     list_select_related = ('tick__user', 'tick__tick_point')
     save_as = True
+    actions = [compress_images]
 
     def user(self, obj):
         return obj.tick.user
