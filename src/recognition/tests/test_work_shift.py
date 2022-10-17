@@ -252,6 +252,7 @@ class TestWorkShiftViewSet(TestsHelperMixin, APITestCase):
                 'analytics_iframe': '',
                 'analytics_type': 'metabase',
                 'show_employee_shift_schedule_tab': False,
+                'display_chart_in_other_stores': False,
                 'url': None,
                 'shop_name_form': {
                     "singular": {
@@ -408,6 +409,7 @@ class TestWorkShiftViewSet(TestsHelperMixin, APITestCase):
                 'analytics_iframe': '',
                 'analytics_type': 'metabase',
                 'show_employee_shift_schedule_tab': False,
+                'display_chart_in_other_stores': False,
                 'url': None,
                 'shop_name_form': {
                     "singular": {
@@ -570,6 +572,7 @@ class TestWorkShiftViewSet(TestsHelperMixin, APITestCase):
                 'analytics_iframe': '',
                 'analytics_type': 'metabase',
                 'show_employee_shift_schedule_tab': False,
+                'display_chart_in_other_stores': False,
                 'url': None,
                 'shop_name_form': {
                     "singular": {
