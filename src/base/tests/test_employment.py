@@ -442,7 +442,7 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
             content_type='application/json',
         )
         self.assertEqual(resp.status_code, 403)
-        self.assertEqual(resp.json(), {'detail': 'У вас нет прав для выполнения этой операции.'})
+        self.assertEqual(resp.json(), {'detail': 'У вас недостаточно прав для выполнения данного действия.'})
 
     def test_delete_inactive_function_groups(self):
         self.employment2.dt_to_function_group = date.today() - timedelta(days=5)
@@ -469,6 +469,7 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
             'shift_hours_length_min': None,
             'shift_hours_length_max': None,
             'is_ready_for_overworkings': False,
+            'is_visible_other_shops': True,
             'is_visible': False,
             'function_group_id': self.employee_group.id,
         }
