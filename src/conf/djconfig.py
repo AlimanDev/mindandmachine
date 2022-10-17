@@ -339,6 +339,10 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media/')
 STATIC_URL = '/static/'
 MEDIA_URL = '/_i/media/'
 
+# compression, for less disk space
+TICK_PHOTO_QUALITY = int(os.getenv('TICK_PHOTO_QUALITY', 20))
+AVATAR_QUALITY = int(os.getenv('AVATAR_QUALITY', 70))
+
 FILE_UPLOAD_PERMISSIONS = 0o644
 
 SESSION_COOKIE_SECURE = True
