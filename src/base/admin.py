@@ -240,6 +240,7 @@ class NetworkAdmin(admin.ModelAdmin):
             'set_closest_plan_approved_delta_for_manual_fact',
             'clean_wdays_on_employment_dt_change',
             'rebuild_timetable_min_delta',
+            'show_closed_shops_gap',
             'analytics_type',
         )}),
     )

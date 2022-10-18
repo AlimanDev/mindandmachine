@@ -274,6 +274,7 @@ class Network(AbstractActiveModel):
         default=True,
         verbose_name=_('Show checkbox for downloading inspection version of timetable')
     )
+    show_closed_shops_gap = models.PositiveIntegerField(default=30,  verbose_name=_('Show closed shops in shop tree for N days'))
     show_cost_for_inner_vacancies = models.BooleanField(
         verbose_name='Отображать поле "стоимость работ" для внутренних вакансий',
         default=False
