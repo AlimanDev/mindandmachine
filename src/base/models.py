@@ -108,66 +108,86 @@ class Network(AbstractActiveModel):
         (ROUND_TO_HALF_AN_HOUR, 'Округление до получаса'),
     )
 
+    DEFAULT_NIGHT_EDGES = (
+        '22:00:00',
+        '06:00:00',
+    )
+
     class Meta:
         verbose_name = 'Сеть магазинов'
         verbose_name_plural = 'Сети магазинов'
 
+    name = models.CharField(max_length=128, unique=True, verbose_name=_('Name'))
+    code = models.CharField(max_length=64, unique=True, null=True, blank=True, verbose_name=_('Code'))
     logo = models.ImageField(null=True, blank=True, upload_to='logo/%Y/%m', verbose_name=_('Logo'))
     url = models.CharField(blank=True, null=True, max_length=255)
     primary_color = models.CharField(max_length=7, blank=True, verbose_name=_('Primary color'))
     secondary_color = models.CharField(max_length=7, blank=True, verbose_name=_('Secondary color'))
-    name = models.CharField(max_length=128, unique=True, verbose_name=_('Name'))
-    code = models.CharField(max_length=64, unique=True, null=True, blank=True, verbose_name=_('Code'))
-    # Нужен ли идентификатор сотруднка, чтобы откликнуться на вакансию
-    need_symbol_for_vacancy = models.BooleanField(default=False, verbose_name=_('Need symbol for vacancy'))
-    show_cost_for_inner_vacancies = models.BooleanField(
-        verbose_name='Отображать поле "стоимость работ" для внутренних вакансий',
-        default=False
-    )
-    use_internal_exchange = models.BooleanField(
-        default=True,
-        verbose_name=_('Use internal exchange'),
-        help_text=_('Regulates the action on the vacancy due to the exchange or natural')
-    )
-    # Настройки для сети. Сейчас есть настройки для приемки чеков + ночные смены
-    settings_values = models.TextField(default='{}', verbose_name=_('Settings values'))
-    allowed_interval_for_late_arrival = models.DurationField(
-        verbose_name=_('Allowed interval for late_arrival'), default=datetime.timedelta(seconds=0))
-    allowed_interval_for_early_departure = models.DurationField(
-        verbose_name=_('Allowed interval for early departure'), default=datetime.timedelta(seconds=0))
-    allowed_interval_for_early_arrival = models.DurationField(
-        verbose_name=_('Allowed interval for early arrival'), default=datetime.timedelta(seconds=0))
-    allowed_interval_for_late_departure = models.DurationField(
-        verbose_name=_('Allowed interval for late departure'), default=datetime.timedelta(seconds=0))
-    allow_workers_confirm_outsource_vacancy = models.BooleanField(
-        verbose_name=_('Allow workers confirm outsource vacancy'), default=False)
-    okpo = models.CharField(blank=True, null=True, max_length=15, verbose_name=_('OKPO code'))
+    outsourcings = models.ManyToManyField(
+        'self', through='base.NetworkConnect', through_fields=('client', 'outsourcing'), symmetrical=False, related_name='clients')
+    settings_values = models.TextField(default='{}', verbose_name=_('Settings values')) # General network settings, stored as JSON (see settings_values_prop property) TODO: update to actual JSON field instead of Text
+
+
+    # Network settings
+    accounting_period_length = models.PositiveSmallIntegerField(
+        choices=ACCOUNTING_PERIOD_LENGTH_CHOICES, verbose_name=_('Accounting period length'), default=1)
+    add_users_from_excel = models.BooleanField(default=False, verbose_name=_('Upload employments from excel'),)
+    allow_creation_several_wdays_for_one_employee_for_one_date = models.BooleanField(
+        default=False, verbose_name='Разрешить создание нескольких рабочих дней для 1 сотрудника на 1 дату')
     allowed_geo_distance_km = models.DecimalField(
         max_digits=10, decimal_places=2, null=True, blank=True,
         verbose_name=_('Allowed geo distance (km)'),
     )
-    enable_camera_ticks = models.BooleanField(
-        default=False, verbose_name=_('Enable camera ticks'))
-    show_worker_day_additional_info = models.BooleanField(
-        default=False, verbose_name=_('Show worker day additional info'),
-        help_text=_('Displaying information about who last edited a worker day and when, when hovering over the corner'))
-    show_worker_day_tasks = models.BooleanField(
-        default=False, verbose_name=_('Show worker day tasks'))
-    crop_work_hours_by_shop_schedule = models.BooleanField(
-        default=False, verbose_name=_('Crop work hours by shop schedule')
+    allowed_interval_for_early_arrival = models.DurationField(
+        verbose_name=_('Allowed interval for early arrival'), default=datetime.timedelta(seconds=0))
+    allowed_interval_for_early_departure = models.DurationField(
+        verbose_name=_('Allowed interval for early departure'), default=datetime.timedelta(seconds=0))
+    allowed_interval_for_late_arrival = models.DurationField(
+        verbose_name=_('Allowed interval for late_arrival'), default=datetime.timedelta(seconds=0))
+    allowed_interval_for_late_departure = models.DurationField(
+        verbose_name=_('Allowed interval for late departure'), default=datetime.timedelta(seconds=0))
+    allow_workers_confirm_outsource_vacancy = models.BooleanField(
+        verbose_name=_('Allow workers confirm outsource vacancy'), default=False)
+    api_timesheet_lines_group_by = models.PositiveSmallIntegerField(
+        verbose_name='Группировать данные табеля в api методе /rest_api/timesheet/lines/ по',
+        choices=TIMESHEET_LINES_GROUP_BY_CHOICES, default=TIMESHEET_LINES_GROUP_BY_EMPLOYEE_POSITION_SHOP)
+    biometry_in_tick_report = models.BooleanField(default=False, verbose_name=_('Include biometry (photos) in tick report'))
+    breaks = models.ForeignKey(
+        'base.Break',
+        on_delete=models.PROTECT,
+        blank=True,
+        null=True,
+        verbose_name=_('Default breaks'),
+        related_name='networks',
     )
+    consider_remaining_hours_in_prev_months_when_calc_norm_hours = models.BooleanField(
+        default=False, verbose_name=_('Consider remaining hours in previous months when calculating norm hours'),
+    )
+    convert_tabel_to = models.CharField(
+        max_length=64, verbose_name=_('Convert tabel to'),
+        null=True, blank=True,
+        choices=CONVERT_TABEL_TO_CHOICES,
+        default='xlsx',
+    )
+    copy_plan_to_fact_crossing = models.BooleanField(
+        verbose_name=_("Copy plan to fact crossing"), default=False)
+    correct_norm_hours_last_month_acc_period = models.BooleanField(
+        default=False, verbose_name=_('Корректировать норму часов для последнего месяца уч. периода (если уч. период != 1 мес)'),
+        help_text='Используется при разделении табеля на осн. и доп. Т.е. норма за последний месяц уч. периода = '
+                  '{норма по произв. календарю за уч. период} - {отработанные часы за прошлые месяцы}.')
     clean_wdays_on_employment_dt_change = models.BooleanField(
         default=False, verbose_name=_('Clean worker days on employment date change'),
     )
-    accounting_period_length = models.PositiveSmallIntegerField(
-        choices=ACCOUNTING_PERIOD_LENGTH_CHOICES, verbose_name=_('Accounting period length'), default=1)
-    only_fact_hours_that_in_approved_plan = models.BooleanField(
+    create_employment_on_set_or_update_director_code = models.BooleanField(
         default=False,
-        verbose_name=_('Count only fact hours that in approved plan'),
+        verbose_name=_('Create employment on set or update director code'),
     )
-    copy_plan_to_fact_crossing = models.BooleanField(
-        default=False,
-        verbose_name=_('Copy plan to fact crossing')
+    crop_work_hours_by_shop_schedule = models.BooleanField(
+        default=False, verbose_name=_('Crop work hours by shop schedule')
+    )
+    descrease_employment_dt_fired_in_api = models.BooleanField(
+        default=False, verbose_name=_('Descrease employment date fired in api'),
+        help_text=_('Relevant for data received via the api'),
     )
     display_chart_in_other_stores = models.BooleanField(
         default=False,
@@ -177,29 +197,40 @@ class Network(AbstractActiveModel):
         max_length=64, verbose_name=_('Download tabel template'),
         choices=TABEL_FORMAT_CHOICES, default='default',
     )
-    timetable_format = models.CharField(
-        max_length=64, verbose_name=_('Timetable format'),
-        choices=TIMETABLE_FORMAT_CHOICES, default='cell_format',
+    edit_manual_fact_on_recalc_fact_from_att_records = models.BooleanField(
+        default=False,
+        verbose_name='Изменять ручные корректировки при пересчете факта на основе отметок (при подтверждения плана)',
     )
-    add_users_from_excel = models.BooleanField(default=False, verbose_name=_('Upload employments from excel'),)
-    show_checkbox_for_inspection_version = models.BooleanField(
-        default=True,
-        verbose_name=_('Show checkbox for downloading inspection version of timetable')
-    )
-    biometry_in_tick_report = models.BooleanField(default=False, verbose_name=_('Include biometry (photos) in tick report'))
-    convert_tabel_to = models.CharField(
-        max_length=64, verbose_name=_('Convert tabel to'),
-        null=True, blank=True,
-        choices=CONVERT_TABEL_TO_CHOICES,
-        default='xlsx',
-    )
-    breaks = models.ForeignKey(
-        'base.Break',
+    enable_camera_ticks = models.BooleanField(
+        default=False, verbose_name=_('Enable camera ticks'))
+    exchange_settings = models.ForeignKey(
+        'timetable.ExchangeSettings',
         on_delete=models.PROTECT,
         blank=True,
         null=True,
-        verbose_name=_('Default breaks'),
+        verbose_name=_('Default exchange settings'),
         related_name='networks',
+    )
+    fines_settings = models.TextField(default='{}', verbose_name=_('Fines settings')) # Fines will be calculated during fact hours calculation, example at src.timetable.tests.test_main.TestFineLogic
+    fiscal_sheet_divider_alias = models.CharField(
+        max_length=64, choices=FISCAL_SHEET_DIVIDERS_ALIAS_CHOICES, null=True, blank=True,
+        verbose_name='Алгоритм разделения табеля', 
+        help_text='Если не указано, то при расчете табеля разделение на осн. и доп. не производится')
+    forbid_edit_employments_came_through_integration = models.BooleanField(
+        default=True, verbose_name='Запрещать редактировать трудоустройства, пришедшие через интеграцию',
+        help_text='У которых code не пустой',
+    )
+    get_position_from_work_type_name_in_calc_timesheet = models.BooleanField(
+        default=False,
+        verbose_name='Получать должность по типу работ при формировании фактического табеля',
+    )
+    ignore_parent_code_when_updating_department_via_api = models.BooleanField(
+        default=False, verbose_name=_('Ignore parent code when updating department via api'),
+        help_text=_('It must be enabled for cases when the organizational structure is maintained manually'),
+    )
+    ignore_shop_code_when_updating_employment_via_api = models.BooleanField(
+        default=False, verbose_name='Не учитывать shop_code при изменении трудоустройства через api',
+        help_text='Необходимо включить для случаев, когда привязка трудоустройств к отделам поддерживается вручную',
     )
     load_template = models.ForeignKey(
         'forecast.LoadTemplate',
@@ -209,114 +240,84 @@ class Network(AbstractActiveModel):
         verbose_name=_('Default load template'),
         related_name='networks',
     )
-    exchange_settings = models.ForeignKey(
-        'timetable.ExchangeSettings',
-        on_delete=models.PROTECT,
-        blank=True,
-        null=True,
-        verbose_name=_('Default exchange settings'),
-        related_name='networks',
-    )
-    # при создании новой должности будут проставляться соотв. значения
-    # пример значения можно найти в src.base.tests.test_worker_position.TestSetWorkerPositionDefaultsModel
-    worker_position_default_values = models.TextField(verbose_name=_('Worker position default values'), default='{}')
-    shop_default_values = models.TextField(verbose_name=_('Shop default values'), default='{}')
-    descrease_employment_dt_fired_in_api = models.BooleanField(
-        default=False, verbose_name=_('Descrease employment date fired in api'),
-        help_text=_('Relevant for data received via the api'),
-    )
-    consider_remaining_hours_in_prev_months_when_calc_norm_hours = models.BooleanField(
-        default=False, verbose_name=_('Consider remaining hours in previous months when calculating norm hours'),
-    )
-    correct_norm_hours_last_month_acc_period = models.BooleanField(
-        default=False, verbose_name=_('Корректировать норму часов для последнего месяца уч. периода (если уч. период != 1 мес)'),
-        help_text='Используется при разделении табеля на осн. и доп. Т.е. норма за последний месяц уч. периода = '
-                  '{норма по произв. календарю за уч. период} - {отработанные часы за прошлые месяцы}.')
-    prev_months_work_hours_source = models.PositiveSmallIntegerField(
-        verbose_name='Источник рабочих часов за пред. месяцы уч. периода',
-        choices=PREV_MONTHS_WORK_HOURS_SOURCE_CHOICES, default=WD_FACT_APPROVED)
-    outsourcings = models.ManyToManyField(
-        'self', through='base.NetworkConnect', through_fields=('client', 'outsourcing'), symmetrical=False, related_name='clients')
-    ignore_parent_code_when_updating_department_via_api = models.BooleanField(
-        default=False, verbose_name=_('Ignore parent code when updating department via api'),
-        help_text=_('It must be enabled for cases when the organizational structure is maintained manually'),
-    )
-    create_employment_on_set_or_update_director_code = models.BooleanField(
-        default=False,
-        verbose_name=_('Create employment on set or update director code'),
-    )
-    show_user_biometrics_block = models.BooleanField(
-        default=False,
-        verbose_name=_('Show user biometrics block'),
-    )
-    # при рассчете фактических часов, будут рассчитываться штрафы
-    # пример значения можно найти в src.timetable.tests.test_main.TestFineLogic
-    fines_settings = models.TextField(default='{}', verbose_name=_('Fines settings'))
-    forbid_edit_employments_came_through_integration = models.BooleanField(
-        default=True, verbose_name='Запрещать редактировать трудоустройства, пришедшие через интеграцию',
-        help_text='У которых code не пустой',
-    )
-    ignore_shop_code_when_updating_employment_via_api = models.BooleanField(
-        default=False, verbose_name='Не учитывать shop_code при изменении трудоустройства через api',
-        help_text='Необходимо включить для случаев, когда привязка трудоустройств к отделам поддерживается вручную',
-    )
-    max_work_shift_seconds = models.PositiveIntegerField(
-        verbose_name=_('Maximum shift length (in seconds)'), default=3600 * 16)
-    skip_leaving_tick = models.BooleanField(
-        verbose_name=_('Skip the creation of a departure mark if more than '
-                       'the Maximum shift length has passed since the opening of the previous shift'),
-        default=False,
-    )
-    trust_tick_request = models.BooleanField(
-        verbose_name=_('Create attendance record without check photo.'),
-        default=False,
-    )
     max_plan_diff_in_seconds = models.PositiveIntegerField(
         verbose_name=_('Max difference between the start or end time to "pull" to the planned work day'),
         default=3600 * 7,
     )
-    allow_creation_several_wdays_for_one_employee_for_one_date = models.BooleanField(
-        default=False, verbose_name='Разрешить создание нескольких рабочих дней для 1 сотрудника на 1 дату')
+    max_work_shift_seconds = models.PositiveIntegerField(
+        verbose_name=_('Maximum shift length (in seconds)'), default=3600 * 16)
+    need_symbol_for_vacancy = models.BooleanField(default=False, verbose_name=_('Need symbol for vacancy')) # Whether the worker identificator is needed, to apply for a vacancy
+    okpo = models.CharField(blank=True, null=True, max_length=15, verbose_name=_('OKPO code'))
+    only_fact_hours_that_in_approved_plan = models.BooleanField(
+        default=False,
+        verbose_name=_('Count only fact hours that in approved plan'),
+    )
+    prev_months_work_hours_source = models.PositiveSmallIntegerField(
+        verbose_name='Источник рабочих часов за пред. месяцы уч. периода',
+        choices=PREV_MONTHS_WORK_HOURS_SOURCE_CHOICES, default=WD_FACT_APPROVED)
     run_recalc_fact_from_att_records_on_plan_approve = models.BooleanField(
         default=True, verbose_name='Запускать пересчет факта на основе отметок при подтверждении плана',
     )
-    edit_manual_fact_on_recalc_fact_from_att_records = models.BooleanField(
-        default=False,
-        verbose_name='Изменять ручные корректировки при пересчете факта на основе отметок (при подтверждения плана)',
+    rebuild_timetable_min_delta = models.IntegerField(default=2, verbose_name='Минимальное время для составления графика')
+    round_work_hours_alg = models.PositiveSmallIntegerField(
+        null=True, blank=True,
+        choices=ROUND_WORK_HOURS_ALG_CHOICES,
+        verbose_name='Алгоритм округления рабочих часов',
     )
     set_closest_plan_approved_delta_for_manual_fact = models.PositiveIntegerField(
         verbose_name='Макс. разница времени начала и времени окончания в факте и в плане '
                      'при проставлении ближайшего плана в ручной факт (в секундах)',
         default=60 * 60 * 5,
     )
-    get_position_from_work_type_name_in_calc_timesheet = models.BooleanField(
+    shop_default_values = models.TextField(verbose_name=_('Shop default values'), default='{}')
+    show_checkbox_for_inspection_version = models.BooleanField(
+        default=True,
+        verbose_name=_('Show checkbox for downloading inspection version of timetable')
+    )
+    show_closed_shops_gap = models.PositiveIntegerField(default=30,  verbose_name=_('Show closed shops in shop tree for N days'))
+    show_cost_for_inner_vacancies = models.BooleanField(
+        verbose_name='Отображать поле "стоимость работ" для внутренних вакансий',
+        default=False
+    )
+    show_user_biometrics_block = models.BooleanField(
         default=False,
-        verbose_name='Получать должность по типу работ при формировании фактического табеля',
+        verbose_name=_('Show user biometrics block'),
     )
-    round_work_hours_alg = models.PositiveSmallIntegerField(
-        null=True, blank=True,
-        choices=ROUND_WORK_HOURS_ALG_CHOICES,
-        verbose_name='Алгоритм округления рабочих часов',
+    show_worker_day_additional_info = models.BooleanField(
+        default=False, verbose_name=_('Show worker day additional info'),
+        help_text=_('Displaying information about who last edited a worker day and when, when hovering over the corner'))
+    show_worker_day_tasks = models.BooleanField(
+        default=False, verbose_name=_('Show worker day tasks'))
+    skip_leaving_tick = models.BooleanField(
+        verbose_name=_('Skip the creation of a departure mark if more than '
+                       'the Maximum shift length has passed since the opening of the previous shift'),
+        default=False,
     )
-    api_timesheet_lines_group_by = models.PositiveSmallIntegerField(
-        verbose_name='Группировать данные табеля в api методе /rest_api/timesheet/lines/ по',
-        choices=TIMESHEET_LINES_GROUP_BY_CHOICES, default=TIMESHEET_LINES_GROUP_BY_EMPLOYEE_POSITION_SHOP)
-    rebuild_timetable_min_delta = models.IntegerField(default=2, verbose_name='Минимальное время для составления графика')
-    fiscal_sheet_divider_alias = models.CharField(
-        max_length=64, choices=FISCAL_SHEET_DIVIDERS_ALIAS_CHOICES, null=True, blank=True,
-        verbose_name='Алгоритм разделения табеля', 
-        help_text='Если не указано, то при расчете табеля разделение на осн. и доп. не производится')
     timesheet_max_hours_threshold = models.DecimalField(
         verbose_name='Максимальное количество часов в белом табеле', default=Decimal('12.00'), max_digits=5, decimal_places=2)
     timesheet_min_hours_threshold = models.CharField(
         verbose_name='Минимальное количество часов в белом табеле', max_length=64, default='4.00', 
         help_text='Может принимать либо числовое значение, либо название функции')
     timesheet_divider_sawh_hours_key = models.CharField(max_length=128, default='curr_month')
+    timetable_format = models.CharField(
+        max_length=64, verbose_name=_('Timetable format'),
+        choices=TIMETABLE_FORMAT_CHOICES, default='cell_format',
+    )
+    trust_tick_request = models.BooleanField(
+        verbose_name=_('Create attendance record without check photo.'),
+        default=False,
+    )
+    use_internal_exchange = models.BooleanField(
+        default=True,
+        verbose_name=_('Use internal exchange'),
+        help_text=_('Regulates the action on the vacancy due to the exchange or natural')
+    )
+    worker_position_default_values = models.TextField(verbose_name=_('Worker position default values'), default='{}') #default values for newly created WorkerPosition, example at src.base.tests.test_worker_position.TestSetWorkerPositionDefaultsModel
+
 
     ANALYTICS_TYPE_METABASE = 'metabase'
     ANALYTICS_TYPE_CUSTOM_IFRAME = 'custom_iframe'
     ANALYTICS_TYPE_POWER_BI_EMBED = 'power_bi_embed'
-
     ANALYTICS_TYPE_CHOICES = (
         (ANALYTICS_TYPE_METABASE, 'Метабейз'),
         (ANALYTICS_TYPE_CUSTOM_IFRAME, 'Кастомный iframe (из json настройки analytics_iframe)'),
@@ -326,11 +327,6 @@ class Network(AbstractActiveModel):
         verbose_name='Вид аналитики', max_length=32, choices=ANALYTICS_TYPE_CHOICES, default=ANALYTICS_TYPE_METABASE)
 
     tracker = FieldTracker(fields=('accounting_period_length', 'timesheet_min_hours_threshold'))
-
-    DEFAULT_NIGHT_EDGES = (
-        '22:00:00',
-        '06:00:00',
-    )
 
     @property
     def settings_values_prop(self):

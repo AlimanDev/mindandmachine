@@ -8,7 +8,6 @@ from django_filters.rest_framework import NumberFilter, OrderingFilter
 from rest_framework.decorators import action
 from rest_framework.pagination import LimitOffsetPagination
 from rest_framework.response import Response
-from rest_framework import serializers
 
 from src.base.filters import BaseActiveNamedModelFilter
 from src.base.models import Employment, Shop, Region, NetworkConnect
@@ -175,7 +174,7 @@ class ShopViewSet(UpdateorCreateViewSet):
             shops = Shop.objects.get_queryset_descendants(shops, include_self=True).filter(
                 Q(dttm_deleted__isnull=True) | Q(dttm_deleted__gte=now),
                 Q(dt_closed__isnull=True) |
-                Q(dt_closed__gte=now.today() - datetime.timedelta(days=30)),
+                Q(dt_closed__gt=now.today() - datetime.timedelta(days=user.network.show_closed_shops_gap)),
             ).order_by('level', 'name')
 
         return Response(get_tree(shops))
@@ -222,7 +221,7 @@ class ShopViewSet(UpdateorCreateViewSet):
             shops = Shop.objects.get_queryset_descendants(shops, include_self=True).filter(
                 Q(dttm_deleted__isnull=True) | Q(dttm_deleted__gte=now),
                 Q(dt_closed__isnull=True) |
-                Q(dt_closed__gte=now.today() - datetime.timedelta(days=30)),
+                Q(dt_closed__gt=now.today() - datetime.timedelta(days=self.request.user.network.show_closed_shops_gap)),
             ).order_by('level', 'name')
 
         return Response(get_tree(shops))

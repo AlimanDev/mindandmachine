@@ -943,6 +943,24 @@ class TestDepartment(TestsHelperMixin, APITestCase):
         self.assertEqual(len(response[0]['children'][0]['children']), 2)
         self.assertEqual(len(response[0]['children'][1]['children']), 1)
 
+    def test_setting_show_closed_shops_gap(self):
+        self.shop2.dt_closed = date.today() - timedelta(10)
+        self.shop2.save()
+        response = self.client.get(self.url + 'internal_tree/')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.json()[0]['children'][0]['children']), 2)
+        response = self.client.get(self.url + 'tree/')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.json()[0]['children'][0]['children']), 2)
+        self.network.show_closed_shops_gap = 5
+        self.network.save()
+        response = self.client.get(self.url + 'internal_tree/')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.json()[0]['children'][0]['children']), 1)
+        response = self.client.get(self.url + 'tree/')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.json()[0]['children'][0]['children']), 1)
+
     def test_cant_set_forecast_step_to_zero(self):
         self.shop.forecast_step_minutes = time(0)
         saved = False
