@@ -10,8 +10,10 @@ from django.db import transaction
 from django.utils import timezone
 from freezegun import freeze_time
 from rest_framework.test import APITestCase
+from rest_framework import status
 
 from src.base.models import Group, WorkerPosition, Employment, Break, ApiLog
+from src.base.tests.factories import EmploymentFactory, WorkerPositionFactory
 from src.celery.tasks import delete_inactive_employment_groups
 from src.timetable.models import WorkTypeName, EmploymentWorkType, WorkerDay
 from src.timetable.tests.factories import WorkerDayFactory
@@ -1323,3 +1325,75 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
                 )
             wd.refresh_from_db()
             self.assertEqual(wd.employment_id, e.id)
+
+    @override_settings(CELERY_TASK_ALWAYS_EAGER=True)
+    def test_worker_day_reattachment_to_employment_in_batch_update_or_create_bug(self):
+        """
+        1C integration bug. If you first delete an existing `Employment` (`dttm_deleted` is added),
+        attached `WorkerDay`s are left hanging. If you then create the same `Employment` (`dttm_deleted=None` on the same instance),
+        the WorkerDays are not reattached, since models fields `dt_fired`, `dt_hired` are not updated.
+        """
+        empl1 = self.employment1
+        empl1.position = WorkerPositionFactory()
+        empl1.save()
+        empl2 = EmploymentFactory(
+            code='empl2',
+            employee=empl1.employee,
+            shop=empl1.shop,
+            position=empl1.position,
+            dt_hired=self.dt_now,
+            function_group=empl1.function_group
+        )
+        wd = WorkerDayFactory(
+            employment = empl2,
+            employee = empl2.employee,
+            dt = self.dt_now,
+            type_id=WorkerDay.TYPE_WORKDAY
+        )
+        self.assertTrue(wd.employment)
+        data = {
+            "data": 
+                [
+                    {
+                        "code": empl1.code,
+                        "shop_code": empl1.shop.code,
+                        "position_code": empl1.position.code,
+                        "username": empl1.employee.user.username,
+                        "dt_hired": empl1.dt_hired,
+                        "norm_work_hours": 100
+                    }
+                ],
+            "options": {"by_code": True, "delete_scope_fields_list": ["employee_id"], "dry_run": False}
+        }
+        res = self.client.post(self.get_url('Employment-batch-update-or-create'), data, format='json')
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        wd.refresh_from_db()
+        self.assertFalse(wd.employment)
+
+        data = {
+            "data": 
+                [
+                    {
+                        "code": empl1.code,
+                        "shop_code": empl1.shop.code,
+                        "position_code": empl1.position.code,
+                        "username": empl1.employee.user.username,
+                        "dt_hired": empl1.dt_hired,
+                        "dt_fired": self.dt_now - timedelta(1),
+                        "norm_work_hours": 100
+                    },
+                    {
+                        "code": empl2.code,
+                        "shop_code": empl2.shop.code,
+                        "position_code": empl2.position.code,
+                        "username": empl2.employee.user.username,
+                        "dt_hired": self.dt_now,
+                        "norm_work_hours": 100
+                    }
+                ],
+            "options": {"by_code": True, "delete_scope_fields_list": ["employee_id"], "dry_run": False}
+        }
+        res = self.client.post(self.get_url('Employment-batch-update-or-create'), data, format='json')
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        wd.refresh_from_db()
+        self.assertFalse(wd.employment)
