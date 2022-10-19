@@ -600,7 +600,6 @@ class TestReportsViewSet(TestsHelperMixin, APITestCase):
 
         query_params['with_biometrics'] = True
         del query_params['employee_id__in']
-        del query_params['shop_id__in']
         res = self.client.get(self.get_url('Reports-tick'), query_params)
         self.assertEqual(res.status_code, status.HTTP_200_OK)
         self.assertEqual(res.headers['Content-Type'], 'application/docx')

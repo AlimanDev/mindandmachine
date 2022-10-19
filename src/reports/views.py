@@ -100,7 +100,7 @@ class ReportsViewSet(ViewSet):
         :params
             dt_from: QOS_DATE_FORMAT, required=True
             dt_to: QOS_DATE_FORMAT, required=True
-            shop_id__in: list[int], required=False
+            shop_id__in: list[int], required=True
             employee_id__in: list[int], required=False
             with_biometrics: bool, default=False
             emails: list[str], required=False
