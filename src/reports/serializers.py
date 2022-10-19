@@ -51,7 +51,7 @@ class ConsolidatedTimesheetReportSerializer(serializers.Serializer):
 class TikReportSerializer(serializers.Serializer):
     dt_from = serializers.DateField()
     dt_to = serializers.DateField()
-    shop_id__in = serializers.ListField(child=serializers.IntegerField(min_value=1), required=False)
+    shop_id__in = serializers.ListField(child=serializers.IntegerField(min_value=1))
     employee_id__in = serializers.ListField(child=serializers.IntegerField(min_value=1), required=False)
     with_biometrics = serializers.BooleanField(default=False)
     emails = serializers.ListField(child=serializers.EmailField(), required=False)

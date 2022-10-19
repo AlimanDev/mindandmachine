@@ -202,8 +202,7 @@ class TickReport(BaseRegisteredReport, DatesReportMixin):
     def report_data(self) -> QuerySet:
         qs = Tick.objects.filter(
             dttm__gte=self.dt_from,
-            dttm__lt=self.dt_to + timedelta(1),
-            user__network_id=self.network_id
+            dttm__lt=self.dt_to + timedelta(1)
         ).order_by(*self.order_by)
         if shops := self.context.get('shop_id__in'):
             qs = qs.filter(tick_point__shop_id__in=shops)

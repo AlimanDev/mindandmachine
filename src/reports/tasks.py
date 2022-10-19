@@ -225,9 +225,9 @@ def tick_report(
         dt_to: Union[str, date],
         network_id: int,
         with_biometrics: bool = False,
-        shop_id__in: Iterable = None,
-        employee_id__in: Iterable = None,
-        emails: list[str] = None
+        shop_id__in: Iterable[int] = None,
+        employee_id__in: Iterable[int] = None,
+        emails: Iterable[str] = None
     ) -> dict:
 
     context = {
