@@ -1857,6 +1857,7 @@ class Employment(AbstractActiveModel):
     
     @classmethod
     def _post_batch(cls, **kwargs):
+        """This function call after batch_update_or_create method."""
         from src.integration.tasks import export_or_delete_employment_zkteco
         from src.timetable.worker_day.tasks import clean_wdays
         from src.util.models_converter import Converter
@@ -1881,7 +1882,7 @@ class Employment(AbstractActiveModel):
         }
         employees_for_clear_cache = set()
         zkteco_data = []
-
+        created_employment: Employment
         for created_employment in created_objs:
             employments_create_or_update_work_types.append(created_employment)
             employees_for_clear_cache.add(created_employment.employee_id)
@@ -1889,7 +1890,11 @@ class Employment(AbstractActiveModel):
                 clean_wdays_kwargs['employee_id__in'].append(created_employment.employee_id)
                 if created_employment.dt_hired:
                     clean_wdays_kwargs['dt__gte'] = min(clean_wdays_kwargs['dt__gte'], created_employment.dt_hired)
-            
+            if created_employment.sawh_settings_id is None and \
+                    created_employment.position_id is not None and \
+                    created_employment.position.sawh_settings_id is not None:
+                Employment.objects.filter(pk=created_employment.pk).update(sawh_settings_id=created_employment.position.sawh_settings_id)
+
             if settings.ZKTECO_INTEGRATION:
                 zkteco_data.append({'id': created_employment.id})
 
@@ -1946,8 +1951,8 @@ class Employment(AbstractActiveModel):
         )
 
 
-
 class FunctionGroup(AbstractModel):
+
     class Meta:
         verbose_name = 'Доступ к функциям'
         unique_together = (('func', 'group', 'method'),)

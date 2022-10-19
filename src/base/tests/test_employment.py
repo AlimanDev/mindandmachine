@@ -12,8 +12,8 @@ from freezegun import freeze_time
 from rest_framework.test import APITestCase
 from rest_framework import status
 
-from src.base.models import Group, WorkerPosition, Employment, Break, ApiLog
 from src.base.tests.factories import EmploymentFactory, WorkerPositionFactory
+from src.base.models import Group, WorkerPosition, Employment, Break, ApiLog, SAWHSettings
 from src.celery.tasks import delete_inactive_employment_groups
 from src.timetable.models import WorkTypeName, EmploymentWorkType, WorkerDay
 from src.timetable.tests.factories import WorkerDayFactory
@@ -30,11 +30,18 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
             network=cls.network,
             value='[[0, 1440, [30, 30]]]',
         )
+        cls.sawh_settings = SAWHSettings.objects.create(
+            name='5/2, 8ч',
+            code='5/2, 8h',
+            network=cls.network,
+            type=SAWHSettings.PART_OF_PROD_CAL_SUMM
+        )
         cls.worker_position = WorkerPosition.objects.create(
             name='Директор магазина',
             code='director',
             network=cls.network,
             breaks=cls.break1,
+            sawh_settings=cls.sawh_settings
         )
         cls.break2 = Break.objects.create(
             name='break2',
@@ -916,7 +923,9 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
         }
 
         resp = self.client.post(
-            self.get_url('Employment-batch-update-or-create'), self.dump_data(data), content_type='application/json')
+            self.get_url('Employment-batch-update-or-create'),
+            self.dump_data(data), content_type='application/json'
+        )
         self.assertEqual(resp.status_code, 200)
         self.assertDictEqual(
             resp.json(),
@@ -929,6 +938,9 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
                 }
             }
         )
+
+        e_new_employment = Employment.objects.get(code='e_new')
+        self.assertEqual(e_new_employment.sawh_settings_id, self.sawh_settings.id)
 
         # old employment
         o_e = Employment.objects.create(
@@ -1352,7 +1364,7 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
         )
         self.assertTrue(wd.employment)
         data = {
-            "data": 
+            "data":
                 [
                     {
                         "code": empl1.code,
@@ -1371,7 +1383,7 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
         self.assertFalse(wd.employment)
 
         data = {
-            "data": 
+            "data":
                 [
                     {
                         "code": empl1.code,
