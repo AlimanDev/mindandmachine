@@ -127,7 +127,6 @@ class WorkTypeName(AbstractActiveNetworkSpecificCodeNamedModel):
         else:
             update_or_create_kwargs['work_type_name_id'] = defaults.pop('work_type_name_id')
 
-
         OperationTypeName.objects.update_or_create(
             **update_or_create_kwargs,
             defaults=defaults,
@@ -261,8 +260,11 @@ class Slot(AbstractActiveNetworkSpecificCodeNamedModel):
 
     worker = models.ManyToManyField(User, through=UserWeekdaySlot)
 
+
 class EmploymentWorkType(AbstractModel):
+
     class Meta(object):
+
         verbose_name = 'Информация по сотруднику-типу работ'
         unique_together = (('employment', 'work_type'),)
 
@@ -290,6 +292,7 @@ class EmploymentWorkType(AbstractModel):
 
     def get_department(self):
         return self.employment.shop
+
 
 class WorkerConstraintManager(models.Manager):
     def get_queryset(self):
@@ -338,10 +341,7 @@ class WorkerDayQuerySet(AnnotateValueEqualityQSMixin, QuerySet):
         return self.get_last_ordered(
             *args,
             is_fact=False,
-            order_by=[
-                'is_approved',
-                '-id',
-            ],
+            order_by=['is_approved', '-id'],
             **kwargs
         )
 
@@ -399,14 +399,12 @@ class WorkerDayManager(models.Manager):
                 Q(child__id__isnull=True) | Q(child__worker_day_approve=False),
                 worker_day_approve=True,
             )
-        else:
-            return super().get_queryset().filter(child__id__isnull=True)
         return super().get_queryset().filter(child__id__isnull=True)
 
     def qos_initial_version(self):
         return super().get_queryset().filter(parent_worker_day__isnull=True)
 
-    def qos_filter_version(self, checkpoint, approved_only = False):
+    def qos_filter_version(self, checkpoint, approved_only: bool = False):
         """
         :param checkpoint: 0 or 1 / True of False. If 1 -- current version, else -- initial
         :return:
@@ -472,14 +470,13 @@ class WorkerDayType(AbstractModel):
         (GET_WORK_HOURS_METHOD_TYPE_MANUAL_OR_MONTH_AVERAGE_SAWH_HOURS, _('Manual setting of hours or average monthly value of the recommended norm')),
     )
 
-    code = models.CharField(max_length=64, primary_key=True, verbose_name='Код', help_text='Первычный ключ')
+    code = models.CharField(max_length=64, primary_key=True, verbose_name='Код', help_text='Первичный ключ')
     name = models.CharField(max_length=64, verbose_name='Имя')
     short_name = models.CharField('Для отображения в ячейке', max_length=8)
     html_color = models.CharField(max_length=7)
     use_in_plan = models.BooleanField('Используем ли в плане')
     use_in_fact = models.BooleanField('Используем ли в факте')
-    excel_load_code = models.CharField(
-        'Текстовый код для загрузки и выгрузки в график/табель', max_length=8, unique=True)
+    excel_load_code = models.CharField('Текстовый код для загрузки и выгрузки в график/табель', max_length=8, unique=True)
     is_dayoff = models.BooleanField(
         'Нерабочий день',
         help_text='Если не нерабочий день, то '
@@ -700,7 +697,6 @@ class WorkerDay(AbstractModel):
 
     Что именно делает сотрудник в выбранный день определяет поле type. При этом, если сотрудник работает в этот день, то
     у него должен быть указан магазин (shop). Во всех остальных случаях shop_id должно быть пустым (aa: fixme WorkerDaySerializer)
-
     """
     class Meta:
         verbose_name = 'Рабочий день сотрудника'
@@ -814,9 +810,7 @@ class WorkerDay(AbstractModel):
 
     @classmethod
     def _get_batch_create_extra_kwargs(cls):
-        return {
-            'need_count_wh': True,
-        }
+        return {'need_count_wh': True}
 
     @classmethod
     def _get_rel_objs_mapping(cls):
@@ -1251,7 +1245,7 @@ class WorkerDay(AbstractModel):
         if not breaks:
             return break_time
         for break_triplet in breaks:
-            if work_hours >= break_triplet[0] and work_hours <= break_triplet[1]:
+            if break_triplet[0] <= work_hours <= break_triplet[1]:
                 break_time = sum(break_triplet[2])
                 break
         if plan_approved:
@@ -2292,7 +2286,7 @@ class WorkerDayCashboxDetails(AbstractActiveModel):
 class ShopMonthStat(AbstractModel):
     class Meta(object):
         unique_together = (('shop', 'dt'),)
-        verbose_name = 'Статистика по мгазину за месяц'
+        verbose_name = 'Статистика по магазину за месяц'
         verbose_name_plural = 'Статистики по мгазинам за месяц'
 
     READY = 'R'

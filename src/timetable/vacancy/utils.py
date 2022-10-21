@@ -737,7 +737,6 @@ def confirm_vacancy(vacancy_id, user=None, employee_id=None, exchange=False, rec
                     )
                 )
 
-
                 recalc_timesheet_on_data_change({active_employment.employee_id: [vacancy.dt]})
 
                 WorkerDay.objects_with_excluded.filter(
@@ -840,7 +839,7 @@ def create_vacancies_and_notify(shop_id, work_type_id, dt_from=None, dt_to=None)
     Создает уведомления на неделю вперед, если в магазине будет нехватка кассиров
     """
 
-    shop=Shop.objects.get(id=shop_id)
+    shop = Shop.objects.get(pk=shop_id)
     exchange_settings = shop.get_exchange_settings()
     if exchange_settings is None or not exchange_settings.automatic_create_vacancies:
         return
@@ -860,13 +859,8 @@ def create_vacancies_and_notify(shop_id, work_type_id, dt_from=None, dt_to=None)
         from_dt = dt_from
         to_dt = dt_to
 
-    params = {
-        'from_dt': from_dt,
-        'to_dt': to_dt,
-    }
+    params = {'from_dt': from_dt, 'to_dt': to_dt, 'work_type_ids': [work_type_id]}
 
-    print('check vacancies for {}; {}'.format(shop_id, work_type_id))
-    params['work_type_ids'] = [work_type_id]
     shop_stat = ShopEfficiencyGetter(
         shop_id=shop_id,
         consider_vacancies=True,
@@ -966,7 +960,7 @@ def create_vacancies_and_notify(shop_id, work_type_id, dt_from=None, dt_to=None)
         dttm_to = dttm_from = df_vacancies.dttm_from[i]
         tm_shop_opens = tm_open_dict.get(str(dttm_from.weekday())) if tm_open_dict.get('all') == None else tm_open_dict.get('all')
         tm_shop_closes = tm_close_dict.get(str(dttm_from.weekday())) if tm_close_dict.get('all') == None else tm_close_dict.get('all')
-        if tm_shop_opens == None or tm_shop_closes == None:
+        if tm_shop_opens is None or tm_shop_closes is None:
             continue
 
         dttm_shop_opens = datetime.combine(dttm_from.date(), tm_shop_opens)
@@ -1009,12 +1003,8 @@ def cancel_vacancies(shop_id, work_type_id, dt_from=None, dt_to=None, approved=F
         from_dt = dt_from
         to_dt = dt_to
 
-    params = {
-        'from_dt': from_dt,
-        'to_dt': to_dt,
-    }
+    params = {'from_dt': from_dt, 'to_dt': to_dt, 'work_type_ids': [work_type_id]}
 
-    params['work_type_ids'] = [work_type_id]
     shop_stat = ShopEfficiencyGetter(
         shop_id=shop_id,
         consider_vacancies=True,
@@ -1040,8 +1030,8 @@ def cancel_vacancies(shop_id, work_type_id, dt_from=None, dt_to=None, approved=F
 
     for vacancy in vacancies:
         cond = (df_stat['dttm'] >= vacancy.dttm_work_start) & (df_stat['dttm'] <= vacancy.dttm_work_end)
-        overflow = df_stat.loc[cond,'overflow'].apply(lambda x:  x if (x < 1.0 and x >-1.0) else 1 if x >=1 else -1 ).mean()
-        print ('vacancy {} overflow {}'.format(vacancy, overflow))
+        overflow = df_stat.loc[cond,'overflow'].apply(lambda x:  x if 1.0 > x > -1.0 else 1 if x >= 1 else -1).mean()
+        print('vacancy {} overflow {}'.format(vacancy, overflow))
         lack = 1-overflow
         if lack < exchange_settings.automatic_delete_vacancy_lack_max:
             print ('cancel_vacancy overflow {} {} {}'.format(overflow, vacancy, vacancy.dttm_work_start))
@@ -1266,5 +1256,5 @@ def _lack_add(df, work_type_id, dttm_from, dttm_to, add):
 def _lack_calc(df, work_type_id, dttm_from, dttm_to):
     cond = (df.work_type_id == work_type_id) & (df['dttm'] >= dttm_from) & (df['dttm'] < dttm_to)
     return df.loc[cond, 'lack'].apply(
-        lambda x: x if (x < 1.0 and x > -1.0) else 1 if x >= 1 else -1
+        lambda x: x if 1.0 > x > -1.0 else 1 if x >= 1 else -1
     ).mean()

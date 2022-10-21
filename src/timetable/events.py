@@ -1,4 +1,3 @@
-from uuid import uuid4
 from src.events.registry import BaseRegisteredEvent
 
 REQUEST_APPROVE_EVENT_TYPE = 'request_approve'
@@ -9,6 +8,7 @@ VACANCY_CREATED = 'vacancy_created'
 VACANCY_DELETED = 'vacancy_deleted'
 VACANCY_REFUSED = 'vacancy_refused'
 EMPLOYEE_VACANCY_DELETED = 'employee_vacancy_deleted'
+
 
 class RequestApproveEvent(BaseRegisteredEvent):
     name = 'Запрос на подтверждение графика'

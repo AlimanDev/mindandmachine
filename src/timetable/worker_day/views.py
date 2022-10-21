@@ -78,10 +78,10 @@ from .stat import WorkersStatsGetter
 
 class WorkerDayViewSet(BaseActiveNamedModelViewSet):
     error_messages = {  # вынести из вьюсета
-        "worker_days_mismatch": _("Worker days mismatch."),
-        "no_timetable": _("Workers don't have timetable."),
-        'cannot_delete': _("Cannot_delete approved version."),
-        'na_worker_day_exists': _("Not approved version already exists."),
+        'worker_days_mismatch': _('Worker days mismatch.'),
+        'no_timetable': _("Workers don't have timetable."),
+        'cannot_delete': _('Cannot_delete approved version.'),
+        'na_worker_day_exists': _('Not approved version already exists.'),
         'no_action_perm_for_wd_type': _('You do not have rights to {action_str} the day type "{wd_type_str}"'),
         'wd_interval_restriction': _('You do not have the rights to {action_str} the type of day "{wd_type_str}" '
                                                'on the selected dates. '
@@ -89,8 +89,8 @@ class WorkerDayViewSet(BaseActiveNamedModelViewSet):
                                                'Allowed interval: {dt_interval}'),
         'has_no_perm_to_approve_protected_wdays': _('You do not have rights to approve protected worker days ({protected_wdays}). '
                                                    'Please contact your system administrator.'),
-        "no_such_user_in_network": _("There is no such user in your network."),
-        "employee_not_in_subordinates": _("Employee {employee} is not your subordinate."),
+        'no_such_user_in_network': _('There is no such user in your network.'),
+        'employee_not_in_subordinates': _('Employee {employee} is not your subordinate.'),
     }
 
     permission_classes = [WdPermission]  # временно из-за биржи смен vacancy  [FilteredListPermission]
@@ -180,7 +180,9 @@ class WorkerDayViewSet(BaseActiveNamedModelViewSet):
                 data.append(wd_dict)
         else:
             data = WorkerDayListSerializer(
-                self.filter_queryset(self.get_queryset().prefetch_related(Prefetch('worker_day_details', to_attr='worker_day_details_list')).select_related('last_edited_by', 'employee')),
+                self.filter_queryset(self.get_queryset().prefetch_related(
+                    Prefetch('worker_day_details', to_attr='worker_day_details_list')
+                ).select_related('last_edited_by', 'employee')),
                 many=True, context=self.get_serializer_context()
             ).data
 
@@ -224,28 +226,28 @@ class WorkerDayViewSet(BaseActiveNamedModelViewSet):
                         # Если нет ни плана ни факта, то добавляем выходной
                         if not plan_wd:
                             d = {
-                                "id": None,
-                                "worker_id": employee.user_id,
-                                "employee_id": employee.id,
-                                "shop_id": None,
-                                "employment_id": None,  # нужен?
-                                "type": "H",
-                                "dt": Converter.convert_date(dt),
-                                "dttm_work_start": None,
-                                "dttm_work_end": None,
-                                "dttm_work_start_tabel": None,
-                                "dttm_work_end_tabel": None,
-                                "comment": None,
-                                "is_approved": None,
-                                "worker_day_details": [],
-                                "outsources": [],
-                                "is_fact": None,
-                                "work_hours": 0,
-                                "parent_worker_day_id": None,
-                                "created_by_id": None,
-                                "last_edited_by": None,
-                                "dttm_modified": None,
-                                "is_blocked": None
+                                'id': None,
+                                'worker_id': employee.user_id,
+                                'employee_id': employee.id,
+                                'shop_id': None,
+                                'employment_id': None,  # нужен?
+                                'type': "H",
+                                'dt': Converter.convert_date(dt),
+                                'dttm_work_start': None,
+                                'dttm_work_end': None,
+                                'dttm_work_start_tabel': None,
+                                'dttm_work_end_tabel': None,
+                                'comment': None,
+                                'is_approved': None,
+                                'worker_day_details': [],
+                                'outsources': [],
+                                'is_fact': None,
+                                'work_hours': 0,
+                                'parent_worker_day_id': None,
+                                'created_by_id': None,
+                                'last_edited_by': None,
+                                'dttm_modified': None,
+                                'is_blocked': None
                             }
                             if self.request.query_params.get('by_code', False):
                                 d['shop_code'] = None
@@ -258,28 +260,28 @@ class WorkerDayViewSet(BaseActiveNamedModelViewSet):
                         if plan_wd and not plan_wd.type.is_dayoff:
                             day_in_past = dt < dt_now
                             d = {
-                                "id": None,
-                                "worker_id": employee.user_id,
-                                "employee_id": employee.id,
-                                "shop_id": plan_wd.shop_id,
-                                "employment_id": plan_wd.employment_id,
-                                "type": WorkerDay.TYPE_ABSENSE if day_in_past else WorkerDay.TYPE_WORKDAY,
-                                "dt": Converter.convert_date(dt),
-                                "dttm_work_start": None,
-                                "dttm_work_end": None,
-                                "dttm_work_start_tabel": None,
-                                "dttm_work_end_tabel": None,
-                                "comment": None,
-                                "is_approved": None,
-                                "worker_day_details": None,
-                                "outsources": None,
-                                "is_fact": None,
-                                "work_hours": 0,
-                                "parent_worker_day_id": None,
-                                "created_by_id": None,
-                                "last_edited_by": None,
-                                "dttm_modified": None,
-                                "is_blocked": None,
+                                'id': None,
+                                'worker_id': employee.user_id,
+                                'employee_id': employee.id,
+                                'shop_id': plan_wd.shop_id,
+                                'employment_id': plan_wd.employment_id,
+                                'type': WorkerDay.TYPE_ABSENSE if day_in_past else WorkerDay.TYPE_WORKDAY,
+                                'dt': Converter.convert_date(dt),
+                                'dttm_work_start': None,
+                                'dttm_work_end': None,
+                                'dttm_work_start_tabel': None,
+                                'dttm_work_end_tabel': None,
+                                'comment': None,
+                                'is_approved': None,
+                                'worker_day_details': None,
+                                'outsources': None,
+                                'is_fact': None,
+                                'work_hours': 0,
+                                'parent_worker_day_id': None,
+                                'created_by_id': None,
+                                'last_edited_by': None,
+                                'dttm_modified': None,
+                                'is_blocked': None,
                             }
                             if not day_in_past:
                                 d["work_hours_details"] = {
@@ -295,9 +297,7 @@ class WorkerDayViewSet(BaseActiveNamedModelViewSet):
 
     @action(detail=False, methods=['post'])
     def request_approve(self, request, *args, **kwargs):
-        """
-        Запрос на подтверждение графика
-        """
+        """Запрос на подтверждение графика."""
         serializer = RequestApproveSerializer(data=request.data, **kwargs)
         serializer.is_valid(raise_exception=True)
         event_context = serializer.data.copy()
@@ -314,9 +314,7 @@ class WorkerDayViewSet(BaseActiveNamedModelViewSet):
     @swagger_auto_schema(
         request_body=WorkerDayApproveSerializer,
         responses={200: 'empty response'},
-        operation_description='''
-        Метод для подтверждения графика
-        ''',
+        operation_description="Метод для подтверждения графика",
     )
     @action(detail=False, methods=['post'])
     def approve(self, request):
@@ -328,9 +326,7 @@ class WorkerDayViewSet(BaseActiveNamedModelViewSet):
         return Response()
 
     @swagger_auto_schema(
-        operation_description='''
-        Возвращает статистику по сотрудникам
-        ''',
+        operation_description='Возвращает статистику по сотрудникам',
         responses=worker_stat_response_schema_dictionary,
     )
     @action(detail=False, methods=['get'], filterset_class=WorkerDayStatFilter)
@@ -345,9 +341,7 @@ class WorkerDayViewSet(BaseActiveNamedModelViewSet):
         return Response(stat)
 
     @swagger_auto_schema(
-        operation_description='''
-        Возвращает статистику по дням
-        ''',
+        operation_description='Возвращает статистику по дням',
         responses=daily_stat_response_schema_dictionary,
     )
     @action(detail=False, methods=['get'], filterset_class=WorkerDayStatFilter)
@@ -361,11 +355,7 @@ class WorkerDayViewSet(BaseActiveNamedModelViewSet):
         stat = count_daily_stat(data)
         return Response(stat)
 
-    @swagger_auto_schema(
-        operation_description='''
-        Возвращает вакансии
-        ''',
-    )
+    @swagger_auto_schema(operation_description='Возвращает вакансии')
     @action(detail=False, methods=['get'], filterset_class=VacancyFilter)
     def vacancy(self, request):
         filterset_class = VacancyFilter(request.query_params, request=request)
@@ -399,7 +389,7 @@ class WorkerDayViewSet(BaseActiveNamedModelViewSet):
                 outsource_network_allowed=Exists(allowed_outsource_network_subq),
             ).filter(
                 (
-                    Q(shop__network_id=request.user.network_id)&
+                    Q(shop__network_id=request.user.network_id) &
                     (
                         Q(is_outsource=True) | Q(employee__isnull=True) |
                         Q(employee_id__in=available_employee) |
@@ -420,9 +410,7 @@ class WorkerDayViewSet(BaseActiveNamedModelViewSet):
         return paginator.get_paginated_response(data.data)
 
     @swagger_auto_schema(
-        operation_description='''
-        Метод для выхода на вакансию
-        ''',
+        operation_description='Метод для выхода на вакансию',
         responses=confirm_vacancy_response_schema_dictionary,
     )
     @action(detail=True, methods=['post'], serializer_class=None)
@@ -434,10 +422,8 @@ class WorkerDayViewSet(BaseActiveNamedModelViewSet):
         return Response({'result': result}, status=status_code)
 
     @swagger_auto_schema(
-        operation_description='''
-        Метод для вывывода на вакансию сотрудника
-        ''',
-        responses=confirm_vacancy_response_schema_dictionary,
+        operation_description='Метод для вывода на вакансию сотрудника',
+        responses=confirm_vacancy_response_schema_dictionary
     )
     @action(detail=True, methods=['post'], serializer_class=None)
     def confirm_vacancy_to_worker(self, request, pk=None):
@@ -451,9 +437,7 @@ class WorkerDayViewSet(BaseActiveNamedModelViewSet):
         return Response({'result': result}, status=status_code)
 
     @swagger_auto_schema(
-        operation_description='''
-        Метод для переназначения сотрудника на вакансию
-        ''',
+        operation_description='Метод для переназначения сотрудника на вакансию',
         responses=confirm_vacancy_response_schema_dictionary,
     )
     @action(detail=True, methods=['post'], serializer_class=None)
@@ -467,11 +451,7 @@ class WorkerDayViewSet(BaseActiveNamedModelViewSet):
 
         return Response({'result': result}, status=status_code)
     
-    @swagger_auto_schema(
-        operation_description='''
-        Метод для отказа от вакансии
-        ''',
-    )
+    @swagger_auto_schema(operation_description='Метод для отказа от вакансии')
     @action(detail=True, methods=['post'], serializer_class=None)
     def refuse_vacancy(self, request, pk=None):
         result = confirm_vacancy(pk, refuse=True)
@@ -480,11 +460,7 @@ class WorkerDayViewSet(BaseActiveNamedModelViewSet):
 
         return Response({'result': result}, status=status_code)
 
-    @swagger_auto_schema(
-        operation_description='''
-        Метод для подтверждения вакансии
-        ''',
-    )
+    @swagger_auto_schema(operation_description='Метод для подтверждения вакансии')
     @action(detail=True, methods=['post'])
     def approve_vacancy(self, request, pk=None):
         with transaction.atomic():
@@ -502,7 +478,7 @@ class WorkerDayViewSet(BaseActiveNamedModelViewSet):
                     is_fact=vacancy.is_fact,
                     is_approved=True,
                 ).exclude(id=vacancy.id).delete()
-                vacancy.parent_worker_day_id = None # так как выше удаляем возможного родителя
+                vacancy.parent_worker_day_id = None     # так как выше удаляем возможного родителя
                 vacancy.is_approved = True
                 vacancy.save()
 
@@ -544,11 +520,7 @@ class WorkerDayViewSet(BaseActiveNamedModelViewSet):
 
         return Response(WorkerDaySerializer(vacancy).data)
 
-    @swagger_auto_schema(
-        operation_description='''
-        Метод для получения редактируемой версии вакансии
-        ''',
-    )
+    @swagger_auto_schema(operation_description='Метод для получения редактируемой версии вакансии')
     @action(detail=True, methods=['get'])
     def editable_vacancy(self, request, pk=None):
         vacancy = WorkerDay.objects.filter(pk=pk, is_vacancy=True).first()
@@ -633,10 +605,10 @@ class WorkerDayViewSet(BaseActiveNamedModelViewSet):
 
     @swagger_auto_schema(
         request_body=ChangeRangeListSerializer,
-        operation_description='''
+        operation_description="""
         Метод для создания/обновления дней за период
         Обычно используется для получения отпусков/больничных из 1С ЗУП
-        ''',
+        """,
         responses=change_range_response_schema_dictionary,
     )
     @action(detail=False, methods=['post'])
@@ -672,10 +644,8 @@ class WorkerDayViewSet(BaseActiveNamedModelViewSet):
 
     @swagger_auto_schema(
         request_body=CopyApprovedSerializer,
-        operation_description='''
-        Метод для копирования подтвержденных рабочих дней в черновик
-        ''',
-        responses={200:WorkerDaySerializer(many=True)},
+        operation_description='Метод для копирования подтвержденных рабочих дней в черновик',
+        responses={200: WorkerDaySerializer(many=True)},
     )
     @action(detail=False, methods=['post'])
     def copy_approved(self, request):
@@ -804,10 +774,8 @@ class WorkerDayViewSet(BaseActiveNamedModelViewSet):
 
     @swagger_auto_schema(
         request_body=DuplicateSrializer,
-        operation_description='''
-        Метод для копирования рабочих дней
-        ''',
-        responses={200:WorkerDaySerializer(many=True)},
+        operation_description='Метод для копирования рабочих дней',
+        responses={200: WorkerDaySerializer(many=True)},
     )
     @action(detail=False, methods=['post'])
     def duplicate(self, request):
@@ -833,10 +801,8 @@ class WorkerDayViewSet(BaseActiveNamedModelViewSet):
 
     @swagger_auto_schema(
         request_body=CopyRangeSerializer,
-        operation_description='''
-        Метод для копирования рабочих дней
-        ''',
-        responses={200:WorkerDaySerializer(many=True)},
+        operation_description='Метод для копирования рабочих дней',
+        responses={200: WorkerDaySerializer(many=True)},
     )
     @action(detail=False, methods=['post'])
     def copy_range(self, request):
@@ -871,9 +837,7 @@ class WorkerDayViewSet(BaseActiveNamedModelViewSet):
 
     @swagger_auto_schema(
         request_body=DeleteWorkerDaysSerializer,
-        operation_description='''
-        Метод для удаления рабочих дней
-        ''',
+        operation_description='Метод для удаления рабочих дней',
         responses={200: 'empty response'},
     )
     @action(detail=False, methods=['post'])
@@ -908,10 +872,8 @@ class WorkerDayViewSet(BaseActiveNamedModelViewSet):
 
     @swagger_auto_schema(
         request_body=ExchangeSerializer,
-        operation_description='''
-        Метод для обмена рабочими сменами в черновике
-        ''',
-        responses={200:WorkerDaySerializer(many=True)},
+        operation_description='Метод для обмена рабочими сменами в черновике',
+        responses={200: WorkerDaySerializer(many=True)},
     )
     @action(detail=False, methods=['post'])
     def exchange(self, request):
@@ -927,10 +889,8 @@ class WorkerDayViewSet(BaseActiveNamedModelViewSet):
 
     @swagger_auto_schema(
         request_body=ExchangeSerializer,
-        operation_description='''
-        Метод для обмена подтвержденными рабочими сменами
-        ''',
-        responses={200:WorkerDaySerializer(many=True)},
+        operation_description='Метод для обмена подтвержденными рабочими сменами',
+        responses={200: WorkerDaySerializer(many=True)},
     )
     @action(detail=False, methods=['post'])
     def exchange_approved(self, request):
@@ -961,10 +921,10 @@ class WorkerDayViewSet(BaseActiveNamedModelViewSet):
     @swagger_auto_schema(
         request_body=UploadTimetableSerializer,
         responses={200: 'empty response'},
-        operation_description='''
+        operation_description="""
         Загружает плановое расписание в систему.\n
         Должен быть прикреплён файл с расписанием в формате excel в поле file.
-        ''',
+        """,
     )
     @action(detail=False, methods=['post'])
     @get_uploaded_file
@@ -980,9 +940,7 @@ class WorkerDayViewSet(BaseActiveNamedModelViewSet):
     @swagger_auto_schema(
         query_serializer=GenerateUploadTimetableExampleSerializer,
         responses={200: 'Шаблон расписания в формате excel.'},
-        operation_description='''
-            Возвращает шаблон для загрузки графика.\n
-            ''',
+        operation_description='Возвращает шаблон для загрузки графика.'
     )
     @action(detail=False, methods=['get'], filterset_class=None)
     def generate_upload_example(self, request):
@@ -1008,10 +966,10 @@ class WorkerDayViewSet(BaseActiveNamedModelViewSet):
     @swagger_auto_schema(
         request_body=UploadTimetableSerializer,
         responses={200: 'empty response'},
-        operation_description='''
+        operation_description="""
         Загружает фактическое расписание в систему.\n
         Должен быть прикреплён файл с расписанием в формате excel в поле file.
-        ''',
+        """
     )
     @action(detail=False, methods=['post'])
     @get_uploaded_file
@@ -1026,10 +984,8 @@ class WorkerDayViewSet(BaseActiveNamedModelViewSet):
 
     @swagger_auto_schema(
         query_serializer=DownloadSerializer,
-        responses={200:'Файл с расписанием в формате excel.'},
-        operation_description='''
-        Метод для скачивания графика работы сотрудников.
-        ''',
+        responses={200: 'Файл с расписанием в формате excel.'},
+        operation_description="Метод для скачивания графика работы сотрудников."
     )
     @action(detail=False, methods=['get'], filterset_class=None)
     def download_timetable(self, request):
@@ -1042,10 +998,8 @@ class WorkerDayViewSet(BaseActiveNamedModelViewSet):
 
     @swagger_auto_schema(
         query_serializer=DownloadSerializer,
-        responses={200:'Файл с табелем'},
-        operation_description='''
-        Метод для скачивания табеля для подразделения.
-        '''
+        responses={200: 'Файл с табелем'},
+        operation_description='Метод для скачивания табеля для подразделения.'
     )
     @action(detail=False, methods=['get'], filterset_class=None)
     def download_tabel(self, request):
@@ -1073,10 +1027,7 @@ class WorkerDayViewSet(BaseActiveNamedModelViewSet):
 
     @swagger_auto_schema(
         request_body=BlockOrUnblockWorkerDayWrapperSerializer,
-        responses={200: None},
-        operation_description='''
-            Заблокировать рабочий день.
-            '''
+        operation_description='Заблокировать рабочий день.'
     )
     @action(detail=False, methods=['post'], filterset_class=None)
     def block(self, request):
@@ -1094,10 +1045,7 @@ class WorkerDayViewSet(BaseActiveNamedModelViewSet):
 
     @swagger_auto_schema(
         request_body=BlockOrUnblockWorkerDayWrapperSerializer,
-        responses={200: None},
-        operation_description='''
-            Разблокировать рабочий день.
-            '''
+        operation_description='Разблокировать рабочий день.'
     )
     @action(detail=False, methods=['post'], filterset_class=None)
     def unblock(self, request):
@@ -1115,10 +1063,7 @@ class WorkerDayViewSet(BaseActiveNamedModelViewSet):
 
     @swagger_auto_schema(
         request_body=BatchBlockOrUnblockWorkerDaySerializer,
-        responses={200: None},
-        operation_description='''
-            Массово заблокировать/разблокировать рабочие дни (только в прошлом).
-            '''
+        operation_description='Массово заблокировать/разблокировать рабочие дни (только в прошлом).'
     )
     @action(
         detail=False,
@@ -1160,10 +1105,7 @@ class WorkerDayViewSet(BaseActiveNamedModelViewSet):
 
     @swagger_auto_schema(
         request_body=RecalcWdaysSerializer,
-        responses={200: None},
-        operation_description='''
-        Пересчет часов
-        '''
+        operation_description='Пересчет часов'
     )
     @action(detail=False, methods=['post'])
     def recalc(self, *args, **kwargs):
@@ -1192,10 +1134,7 @@ class WorkerDayViewSet(BaseActiveNamedModelViewSet):
 
     @swagger_auto_schema(
         query_serializer=OvertimesUndertimesReportSerializer,
-        responses={200: None},
-        operation_description='''
-        Скачать отчет о переработках/недоработках.
-        '''
+        operation_description='Скачать отчет о переработках/недоработках.'
     )
     @action(detail=False, methods=['get'], filterset_class=None)
     def overtimes_undertimes_report(self, request):
@@ -1217,10 +1156,7 @@ class WorkerDayViewSet(BaseActiveNamedModelViewSet):
 
     @swagger_auto_schema(
         request_body=ChangeListSerializer,
-        responses={200: None},
-        operation_description='''
-        Проставление типов дней на промежуток для сотрудника
-        '''
+        operation_description='Проставление типов дней на промежуток для сотрудника'
     )
     @action(detail=False, methods=['post'])
     def change_list(self, request):

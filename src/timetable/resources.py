@@ -5,12 +5,9 @@ from src.timetable.models import GroupWorkerDayPermission, WorkerDayPermission
 
 
 class GroupWorkerDayPermissionResource(resources.ModelResource):
-    group = Field(
-        attribute='group_id',
-    )
-    worker_day_permission = Field(
-        attribute='worker_day_permission_id',
-    )
+
+    group = Field(attribute='group_id')
+    worker_day_permission = Field(attribute='worker_day_permission_id')
 
     class Meta:
         model = GroupWorkerDayPermission

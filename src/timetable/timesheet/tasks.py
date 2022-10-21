@@ -61,6 +61,7 @@ def calc_timesheets(employee_id__in: list = None, dt_from=None, dt_to=None, rera
     
     logger.info('finish calc_timesheets')
 
+
 def recalc_timesheet_on_data_change(groupped_data):
     # запуск пересчета табеля на периоды для которых были изменены дни сотрудников,
     # но не нарушая ограничения CALC_TIMESHEET_PREV_MONTH_THRESHOLD_DAYS

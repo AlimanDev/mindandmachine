@@ -1,7 +1,5 @@
 class BaseBreakTimeSubtractor:
-    """
-    Базовый класс для алгоритма определения откуда вычитать время перерывов (из дневных или ночных часов)
-    """
+    """Базовый класс для алгоритма определения откуда вычитать время перерывов (из дневных или ночных часов)."""
 
     def __init__(self, break_time_seconds, total_seconds, night_seconds, round_to=2):
         self.break_time_seconds = break_time_seconds
