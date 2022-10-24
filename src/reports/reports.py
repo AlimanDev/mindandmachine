@@ -193,11 +193,11 @@ class TickReport(BaseRegisteredReport, DatesReportMixin):
             dt_to=self.dt_to
         ).generate(convert_to=format)
         return {
-            'name': f'tick_report_{self.dt_from}_{self.dt_to}.{format}',
+            'name': f'tick_report_{self.dt_from}_{self.dt_to}{self.shops_suffix}.{format}',
             'file': report,
             'type': f'application/{format}'
         }
-        
+
     @cached_property
     def report_data(self) -> QuerySet:
         qs = Tick.objects.filter(
@@ -217,3 +217,9 @@ class TickReport(BaseRegisteredReport, DatesReportMixin):
                 )
             )
         return qs
+
+    @property
+    def shops_suffix(self) -> str:
+        shops = self.context.get('shop_id__in', [])
+        shops = map(lambda id: str(id), shops)
+        return f'({", ".join(shops)})'

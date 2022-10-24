@@ -1,3 +1,4 @@
+import shutil
 from datetime import date, datetime, timedelta
 from typing import Iterable, Union
 
@@ -13,7 +14,8 @@ from src.reports.helpers import get_datatuple
 from src.reports.models import ReportConfig
 from src.reports.reports import TickReport
 from src.timetable.worker_day.stat import WorkersStatsGetter
-from src.util.emails import send_email
+from src.util.email import prepare_message_tick_report, send_email
+from src.util import files
 from .models import UserShopGroups, UserSubordinates, EmploymentStats
 
 
@@ -228,8 +230,7 @@ def tick_report(
         shop_id__in: Iterable[int] = None,
         employee_id__in: Iterable[int] = None,
         emails: Iterable[str] = None
-    ) -> dict:
-
+    ) -> Union[dict, str]:
     context = {
         'dt_from': dt_from,
         'dt_to': dt_to,
@@ -240,11 +241,23 @@ def tick_report(
     report = TickReport(network_id, context).get_file()
 
     if emails:
+        file = files.save_on_server(
+            report['file'],
+            report['name'],
+            directory=settings.REPORTS_ROOT,
+            serve_url=settings.REPORTS_URL
+        )
+        message = prepare_message_tick_report(file.url)
         send_email(
             subject=_('Tick report'),
-            to=emails,
-            attachments=((report['name'], report['file'], report['type']),)
+            body=message,
+            to=emails
         )
-        return f'Report "{report["name"]} sent to {", ".join(emails)}'
-    
+        return f'Report "{report["name"]} sent to {", ".join(emails)}' # for flower monitoring
+
     return report
+
+@app.task
+def delete_reports():
+    """Cleans up reports on the hard drive"""
+    shutil.rmtree(settings.REPORTS_ROOT)

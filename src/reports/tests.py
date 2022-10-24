@@ -1,6 +1,7 @@
-import json, pathlib
+import json, pathlib, shutil
 from calendar import monthrange
 from datetime import date, datetime, time, timedelta
+from unittest import mock
 
 import pandas as pd
 from dateutil.relativedelta import relativedelta
@@ -19,13 +20,13 @@ from src.base.tests.factories import EmployeeFactory, EmploymentFactory, GroupFa
     UserFactory, WorkerPositionFactory
 from src.recognition.models import Tick, TickPhoto, TickPoint
 from src.reports.models import ReportConfig, ReportType, Period, UserShopGroups, UserSubordinates, EmploymentStats
-from src.reports import tasks
 from src.timetable.models import TimesheetItem
 from src.reports.reports import PIVOT_TABEL
-from src.reports.tasks import cron_report, fill_user_shop_groups, fill_user_subordinates, fill_employments_stats
+from src.reports.tasks import cron_report, fill_user_shop_groups, fill_user_subordinates, fill_employments_stats, tick_report, delete_reports
 from src.timetable.models import ScheduleDeviations, WorkerDay, WorkerDayOutsourceNetwork, WorkerDayType
 from src.timetable.tests.factories import WorkerDayFactory
 from src.util.mixins.tests import TestsHelperMixin
+from src.util import files
 
 
 class TestReportConfig(APITestCase, TestsHelperMixin):
@@ -472,6 +473,11 @@ class TestReportsViewSet(TestsHelperMixin, APITestCase):
     def setUp(self):
         self.client.force_authenticate(user=self.user_dir)
 
+    @classmethod
+    def tearDownClass(cls):
+        shutil.rmtree(settings.REPORTS_ROOT)
+        super().tearDownClass()
+
     def test_report_pivot_tabel_get(self):
         response = self.client.get(f'/rest_api/report/pivot_tabel/?dt_from={self.dt - timedelta(1)}&dt_to={self.dt}')
         self.assertEqual(response.status_code, 200)
@@ -522,7 +528,8 @@ class TestReportsViewSet(TestsHelperMixin, APITestCase):
         self.assertCountEqual(list(df['Консолидированный отчет об отработанном времени'][3:6].values), [f'{self.position.name}', f'{self.position_outsource.name} ({self.network_outsource.name})', f'{self.position.name} ({self.network_outsource.name})'])
         self.assertCountEqual(list(df['Unnamed: 1'][3:6].values), ['Штат', 'Нештат', 'Нештат'])
 
-    @override_settings(CELERY_TASK_ALWAYS_EAGER=True, MEDIA_ROOT=settings.BASE_DIR)
+    @override_settings(MEDIA_ROOT=settings.BASE_DIR)
+    @mock.patch.object(tick_report, 'delay', tick_report)
     def test_tick_report(self):
         tickpoint = TickPoint.objects.create(
             shop=self.wd1.shop,
@@ -585,11 +592,23 @@ class TestReportsViewSet(TestsHelperMixin, APITestCase):
         res = self.client.get(self.get_url('Reports-tick'), query_params)
         self.assertEqual(res.status_code, status.HTTP_202_ACCEPTED)
         self.assertEqual(len(mail.outbox), 1)
-        file = mail.outbox[0].attachments[0]
-        self.assertIn('tick_report', file[0])
-        self.assertEqual(type(file[1]), bytes)
-        self.assertEqual(file[2], 'application/xlsx')
+        mail_text = mail.outbox[0].body
+        filename = f"tick_report_{query_params['dt_from']}_{query_params['dt_to']}({self.wd1.shop.id}).xlsx"
+        url = settings.REPORTS_URL + filename
+        self.assertTrue(url in mail_text)
+        self.assertTrue(pathlib.Path(settings.REPORTS_ROOT + filename).exists())
+        
+        query_params['with_biometrics'] = True
+        res = self.client.get(self.get_url('Reports-tick'), query_params)
+        self.assertEqual(res.status_code, status.HTTP_202_ACCEPTED)
+        self.assertEqual(len(mail.outbox), 2)
+        mail_text = mail.outbox[1].body
+        filename = f"tick_report_{query_params['dt_from']}_{query_params['dt_to']}({self.wd1.shop.id}).docx"
+        url = settings.REPORTS_URL + filename
+        self.assertTrue(url in mail_text)
+        self.assertTrue(pathlib.Path(settings.REPORTS_ROOT + filename).exists())
 
+        del query_params['with_biometrics']
         del query_params['emails']
         res = self.client.get(self.get_url('Reports-tick'), query_params)
         self.assertEqual(res.status_code, status.HTTP_200_OK)
@@ -610,6 +629,7 @@ class TestReportsViewSet(TestsHelperMixin, APITestCase):
         query_params['dt_to'] = self.wd1.dt - timedelta(30)
         res = self.client.get(self.get_url('Reports-tick'), query_params)
         self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+
 
 class TestScheduleDeviation(APITestCase, TestsHelperMixin):
     USER_USERNAME = "user1"
@@ -1051,3 +1071,13 @@ class TestFillReportsData(TestsHelperMixin, TestCase):
         fill_employments_stats()
         self.assertEqual(EmploymentStats.objects.filter(
             employment=self.employment_admin).count(), monthrange(self.dt_now.year, self.dt_now.month)[1])
+
+
+class TestTasks(APITestCase):
+    def test_save_delete_reports(self):
+        path = pathlib.Path(settings.REPORTS_ROOT)
+        files.save_on_server('test1', 'test-report.docx', settings.REPORTS_ROOT)
+        files.save_on_server('test2', 'test-report.xlsx', path)
+        self.assertTrue(path.exists())
+        delete_reports()
+        self.assertFalse(path.exists())
