@@ -535,7 +535,7 @@ REQUESTS_TIMEOUTS = {
     'send_doctors_schedule_to_mis': int(os.getenv('SEND_DOCTORS_SCHEDULE_TO_MIS_TIMEOUT', DEFAULT_REQUESTS_TIMEOUT)),
     'pbi_embed_service': int(os.getenv('PBI_EMBED_SERVICE_TIMEOUT', DEFAULT_REQUESTS_TIMEOUT)),
     'algo': int(os.getenv('ALGO_TIMEOUT', DEFAULT_REQUESTS_TIMEOUT)),
-    'converter': int(os.getenv('CONVERTER_TIMEOUT', DEFAULT_REQUESTS_TIMEOUT)),
+    'converter': int(os.getenv('CONVERTER_TIMEOUT', 300)),
     'mda_sync_orgstruct': (5, 300),
     'mda_sync_users': (5, 1800),
     'create_mda_user_to_shop_relation': (3, 5)
