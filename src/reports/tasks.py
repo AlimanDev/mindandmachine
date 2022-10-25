@@ -238,7 +238,17 @@ def tick_report(
         'shop_id__in': shop_id__in,
         'employee_id__in': employee_id__in,
     }
-    report = TickReport(network_id, context).get_file()
+    try:
+        report = TickReport(network_id, context).get_file()
+    except:
+        # notify clients about the error
+        if emails:
+            send_email(
+                subject=_('Tick report'),
+                body=_('There has been an error generating your report.\nPlease contact the technical support.'),
+                to=emails
+            )
+        raise
 
     if emails:
         file = files.save_on_server(
@@ -253,7 +263,7 @@ def tick_report(
             body=message,
             to=emails
         )
-        return f'Report "{report["name"]} sent to {", ".join(emails)}' # for flower monitoring
+        return f'Report {report["name"]} sent to {", ".join(emails)}' # for flower monitoring
 
     return report
 

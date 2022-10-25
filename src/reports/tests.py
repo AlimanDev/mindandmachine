@@ -475,7 +475,7 @@ class TestReportsViewSet(TestsHelperMixin, APITestCase):
 
     @classmethod
     def tearDownClass(cls):
-        shutil.rmtree(settings.REPORTS_ROOT)
+        shutil.rmtree(settings.REPORTS_ROOT, ignore_errors=True)
         super().tearDownClass()
 
     def test_report_pivot_tabel_get(self):
@@ -530,6 +530,7 @@ class TestReportsViewSet(TestsHelperMixin, APITestCase):
 
     @override_settings(MEDIA_ROOT=settings.BASE_DIR)
     @mock.patch.object(tick_report, 'delay', tick_report)
+    @mock.patch.object(TickPhoto, 'compress_image', lambda _: True)
     def test_tick_report(self):
         tickpoint = TickPoint.objects.create(
             shop=self.wd1.shop,
