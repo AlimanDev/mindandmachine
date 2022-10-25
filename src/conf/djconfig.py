@@ -6,10 +6,7 @@ config importance
 4. config
 """
 
-import enum
-import os
-import sys
-from decimal import Decimal
+import os, sys, pathlib
 from copy import deepcopy
 
 import environ
@@ -335,9 +332,11 @@ LOCALE_PATHS = [
 
 STATIC_ROOT = os.path.join(BASE_DIR, 'static/')
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media/')
+REPORTS_ROOT = os.path.join(MEDIA_ROOT, 'reports/')
 
 STATIC_URL = '/static/'
 MEDIA_URL = '/_i/media/'
+REPORTS_URL = MEDIA_URL + 'reports/'
 
 # compression, for less disk space
 TICK_PHOTO_QUALITY = int(os.getenv('TICK_PHOTO_QUALITY', 20))
@@ -692,6 +691,11 @@ BEAT_SCHEDULE = {
     },
     'task-set-prod-cal-cache-cur-and-next-month': {
         'task': 'src.celery.tasks.set_prod_cal_cache_cur_and_next_month',
+        'schedule': crontab(hour=0, minute=0),
+        'options': {'queue': BACKEND_QUEUE},
+    },
+    'task-delete_reports': {
+        'task': 'src.reports.tasks.delete_reports',
         'schedule': crontab(hour=0, minute=0),
         'options': {'queue': BACKEND_QUEUE},
     },

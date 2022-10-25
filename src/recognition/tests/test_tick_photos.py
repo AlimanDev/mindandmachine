@@ -13,6 +13,7 @@ from src.recognition.api.recognition import Recognition
 from src.events.models import EventType
 from src.notifications.models import EventEmailNotification
 
+@mock.patch.object(TickPhoto, 'compress_image', lambda _: True)
 class TestTickPhotos(TestsHelperMixin, APITestCase):
     @classmethod
     def setUpTestData(cls):

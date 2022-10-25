@@ -12,7 +12,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Django REST framework\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2022-10-18 14:40+0000\n"
+"POT-Creation-Date: 2022-10-25 14:51+0000\n"
 "PO-Revision-Date: 2017-08-03 14:58+0000\n"
 "Last-Translator: Grigory Mishchenko <grishkokot@gmail.com>\n"
 "Language-Team: Russian (http://www.transifex.com/django-rest-framework-1/"
@@ -452,11 +452,11 @@ msgstr ""
 "Невозможно определить группу доступа работника. Назначьте ему группу доступа "
 "либо должность, связанную с группой доступа."
 
-#: src/base/models.py:2204
+#: src/base/models.py:2209
 msgid "Opens and closes fields are required for workday type"
 msgstr "Время открытия и закрытия обязательно для рабочего типа дня"
 
-#: src/base/models.py:2327
+#: src/base/models.py:2332
 msgid "Work hours should be sum of day hours and night hours"
 msgstr "Рабочие часы должны равняться сумме дневных и ночных часов"
 
@@ -927,11 +927,20 @@ msgstr "Конец предыдущего года"
 msgid "Time period must be within one month."
 msgstr "Период должен быть в рамках одного месяца."
 
-#: src/reports/tasks.py:244 src/util/dg/ticks_report.py:26
+#: src/reports/tasks.py:247 src/reports/tasks.py:262
+#: src/util/dg/ticks_report.py:26
 msgid "Tick report"
 msgstr "Отчет по отметкам сотрудников"
 
-#: src/reports/tests.py:598 src/util/dg/ticks_report.py:34
+#: src/reports/tasks.py:248
+msgid ""
+"There has been an error generating your report.\n"
+"Please contact the technical support."
+msgstr ""
+"Произошла ошибка при формировании Вашего отчёта.\n"
+"Пожалуйста, обратитесь в техническую поддержку."
+
+#: src/reports/tests.py:618 src/util/dg/ticks_report.py:34
 msgid "Tick date and time"
 msgstr "Дата и время отметки"
 
@@ -2018,6 +2027,25 @@ msgstr "Время окончания смены, план, ч"
 msgid "Not implemented."
 msgstr "Не реализовано."
 
+#: src/util/email/messages.py:5
+msgid ""
+"Your employee monitoring report is ready to be downloaded.\n"
+"You can access it by the following link:\n"
+"\n"
+"{}\n"
+"\n"
+"Warning: the link will expire at the end of the business day. Please use "
+"employee monitoring generation form in the application to create a new "
+"version."
+msgstr ""
+"Ваш отчёт по отметкам сотрудников готов к загрузке.\n"
+"Вы можете скачать его по ссылке:\n"
+"\n"
+"{}\n"
+"\n"
+"Внимание: ссылка станет недействительной по окончанию рабочего дня. В случае "
+"необходимости воспользуйтесь формой для создания нового отчёта."
+
 #: src/util/upload.py:23
 msgid "No files were transferred."
 msgstr "Не было передано ни одного файла."
@@ -2025,6 +2053,9 @@ msgstr "Не было передано ни одного файла."
 #: src/util/upload.py:26
 msgid "The file was not uploaded."
 msgstr "Файл не был загружен."
+
+#~ msgid "Your report is available at the link:"
+#~ msgstr "Ваш отчёт доступен по ссылке:"
 
 #~ msgid "Format <DD HH:MM:SS>"
 #~ msgstr "Формат <ДД ЧЧ:ММ:СС>"
