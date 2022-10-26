@@ -10,9 +10,7 @@ from src.base.forms import CustomSelectWidget, DefaultOverrideAdminWidgetsForm
 
 
 class ExchangeSettingsForm(DefaultOverrideAdminWidgetsForm):
-    json_fields = [
-        'constraints',
-    ]
+    json_fields = ['constraints']
 
 
 def get_users(dt_from=None, dt_to=None):
@@ -22,10 +20,10 @@ def get_users(dt_from=None, dt_to=None):
     ).values_list('employee__user_id', flat=True)
     return User.objects.filter(id__in=user_ids)
 
+
 def get_shops():
-    return Shop.objects.filter(
-        Q(dttm_deleted__isnull=True) | Q(dttm_deleted__gte=date.today()),
-    )
+    return Shop.objects.filter(Q(dttm_deleted__isnull=True) | Q(dttm_deleted__gte=date.today()))
+
 
 class RecalsWhForm(forms.Form):
     def __init__(self, *args, **kwargs):
@@ -37,7 +35,8 @@ class RecalsWhForm(forms.Form):
 
     def recalc_wh(self, **kwargs):
         recalc_wdays.delay(**kwargs)
-    
+
+
 class RecalsTimesheetForm(forms.Form):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -48,8 +47,7 @@ class RecalsTimesheetForm(forms.Form):
     def recalc_timesheet(self, **kwargs):
         calc_timesheets.delay(**kwargs)
 
+
 class GroupWorkerDayPermissionForm(forms.ModelForm):
     class Meta:
-        widgets = {
-            'worker_day_permission': CustomSelectWidget,
-        }
+        widgets = {'worker_day_permission': CustomSelectWidget}

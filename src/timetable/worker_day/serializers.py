@@ -784,9 +784,15 @@ class ConfirmVacancyToWorkerSerializer(serializers.Serializer):
                 self.error_messages['employee_not_in_subordinates'].format(
                 employee=attrs['user'].fio),
             )
-        no_perm_to_reconfirm = self.context['view'].action == 'reconfirm_vacancy_to_worker' and\
-            not (vacancy.employee.user_id == user.id) and\
-            not WorkerDay._has_group_permissions(user, vacancy.employee_id, vacancy.dt)
+        try:
+            has_group_permission: bool = WorkerDay._has_group_permissions(user, vacancy.employee_id, vacancy.dt)
+        except ValidationError:
+            # Fired at the moment
+            has_group_permission: bool = True
+
+        no_perm_to_reconfirm = self.context['view'].action == 'reconfirm_vacancy_to_worker' and \
+            not vacancy.employee.user_id == user.id and not has_group_permission
+
         if no_perm_to_reconfirm:
             raise PermissionDenied(
                 self.error_messages['employee_not_in_subordinates'].format(

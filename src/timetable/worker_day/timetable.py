@@ -425,7 +425,7 @@ class BaseUploadDownloadTimeTable:
                 df = pd.read_excel(timetable_file, dtype=str)
             except KeyError:
                 raise ValidationError({"message": _('Failed to open active sheet.')})
-            ######################### сюда писать логику чтения из экселя ######################################################
+            ######################### сюда писать логику чтения из экселя ################################
 
             users_df = df[df.columns[:3]].drop_duplicates()
             number_column = df.columns[0]
