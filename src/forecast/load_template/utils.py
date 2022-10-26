@@ -231,7 +231,7 @@ def create_load_template_for_shop(shop_id, network_id):
     return load_template
 
 
-def apply_load_template(load_template_id, shop_id, dt_from=None):
+def apply_load_template(load_template_id, shop_id):
     '''
     Применяет шаблон нагрузки к магазину. 
     Создает типы операций, типы работ.
@@ -470,6 +470,7 @@ def prepare_load_template_request(load_template_id, shop_id, dt_from, dt_to):
             'dependences': relations.get(o.operation_type_name_id, {}),
             'const_value': o.const_value,
             'type': o.operation_type_name.do_forecast,
+            'duplicate_over': o.duplicate_over
         }
         for o in templates
     ]

@@ -31,15 +31,12 @@ def calculate_shops_load(load_template_id, dt_from, dt_to, shop_id=None):
             )
 
 
-
 @app.task
-def apply_load_template_to_shops(load_template_id, dt_from, shop_id=None):
-    if type(dt_from) == str:
-        dt_from = datetime.strptime(dt_from, settings.QOS_DATETIME_FORMAT).date()
+def apply_load_template_to_shops(load_template_id, shop_id=None):
     load_template = LoadTemplate.objects.get(pk=load_template_id)
     shops = [Shop.objects.get(pk=shop_id)] if shop_id else load_template.shops.all()
     for shop in shops:
-        apply_load_template(load_template_id, shop.id, dt_from)
+        apply_load_template(load_template_id, shop.id)
 
 
 @app.task

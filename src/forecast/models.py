@@ -122,12 +122,28 @@ class OperationTypeTemplate(AbstractModel):
         verbose_name_plural = 'Шаблоны типов операций'
         unique_together = ('load_template', 'operation_type_name')
 
+    class DuplicateOver(models.TextChoices):
+        NULL = None, _('Not specified')
+        YEAR = 'year', _('Year')
+        MONTH = 'month', _('Month')
+        WEEK = 'week', _('Week')
+        DAY = 'day', _('Day')
+
     load_template = models.ForeignKey(LoadTemplate, on_delete=models.CASCADE, related_name='operation_type_templates')
     operation_type_name = models.ForeignKey(OperationTypeName, on_delete=models.PROTECT)
     tm_from = models.TimeField(null=True, blank=True)
     tm_to = models.TimeField(null=True, blank=True)
     forecast_step = models.DurationField(default=timedelta(hours=1))
     const_value = models.FloatField(null=True, blank=True)
+    duplicate_over = models.CharField(
+        max_length=5,
+        default=DuplicateOver.NULL,
+        null=True,
+        blank=False,
+        choices=DuplicateOver.choices,
+        verbose_name=_('duplicate over'),
+        help_text=_('Period, that time series values need to be duplicated over. Signifies, that values should be treated as constant for this period.')
+    )
 
     def __str__(self):
         return 'id: {}, load_template: {}, operation_type_name: ({})'.format(
@@ -335,6 +351,7 @@ class OperationTypeRelation(AbstractModel):
             super().save(*args, **kwargs)
             if not self.type == self.TYPE_CHANGE_WORKLOAD_BETWEEN:
                 self.check_reverse_relation()
+
 
 class PeriodClientsManager(models.Manager):
     def shop_times_filter(self, shop, *args, weekday=False, dt_from=None, dt_to=None, **kwargs):

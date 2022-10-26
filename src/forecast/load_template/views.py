@@ -225,11 +225,10 @@ class LoadTemplateViewSet(BaseModelViewSet):
         data.is_valid(raise_exception=True)
         shop_id = data.validated_data.get('shop_id')
         load_template_id = data.validated_data.get('id')
-        dt_from = data.validated_data.get('dt_from')
         try:
-            apply_load_template_to_shops.delay(load_template_id, dt_from, shop_id=shop_id)
+            apply_load_template_to_shops.delay(load_template_id, shop_id=shop_id)
         except celery_exceptions.OperationalError:
-            apply_load_template_to_shops(load_template_id, dt_from, shop_id=shop_id)
+            apply_load_template_to_shops(load_template_id, shop_id=shop_id)
         
         return Response(status=200)
 

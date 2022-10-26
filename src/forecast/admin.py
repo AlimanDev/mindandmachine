@@ -1,4 +1,7 @@
-from django.contrib import admin
+from django.contrib import admin, messages
+from django.utils.translation import gettext_lazy as _
+from django.db.models.query import QuerySet
+
 from src.base.admin_filters import RelatedOnlyDropdownNameOrderedFilter
 from src.forecast.models import (
     PeriodClients,
@@ -11,6 +14,7 @@ from src.forecast.models import (
     Receipt,
 )
 from src.forecast.forms import LoadTemplateAdminForm
+from src.forecast.load_template import tasks
 
 
 @admin.register(OperationType)
@@ -94,6 +98,13 @@ class LoadTemplateAdmin(admin.ModelAdmin):
     search_fields = ('name',)
     form = LoadTemplateAdminForm
     change_list_template = 'load_template_change_list.html'
+    actions = ['apply_load_template']
+
+    @admin.action(description=_('Apply load templates to shops'))
+    def apply_load_template(self, request, queryset: QuerySet):
+        for load_template in queryset:
+            tasks.apply_load_template_to_shops.delay(load_template.id)
+        self.message_user(request, _('Applying load templates started'), messages.SUCCESS)
 
 
 @admin.register(OperationTypeTemplate)
@@ -136,7 +147,6 @@ class OperationTypeRelationAdmin(admin.ModelAdmin):
         if obj:
             return self.readonly_fields + ('base', 'depended', 'type')
         return self.readonly_fields
-
 
 
 @admin.register(Receipt)

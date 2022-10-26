@@ -12,7 +12,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Django REST framework\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2022-10-25 14:51+0000\n"
+"POT-Creation-Date: 2022-10-26 10:32+0000\n"
 "PO-Revision-Date: 2017-08-03 14:58+0000\n"
 "Last-Translator: Grigory Mishchenko <grishkokot@gmail.com>\n"
 "Language-Team: Russian (http://www.transifex.com/django-rest-framework-1/"
@@ -116,7 +116,7 @@ msgstr "Нет такого пользователя"
 msgid "Unable to log in with provided credentials."
 msgstr "Невозможно войти с предоставленными учетными данными."
 
-#: src/base/models.py:53 src/reports/models.py:48
+#: src/base/models.py:53 src/forecast/models.py:128 src/reports/models.py:48
 msgid "Month"
 msgstr "Месяц"
 
@@ -128,7 +128,7 @@ msgstr "Квартал"
 msgid "Half a year"
 msgstr "Пол года"
 
-#: src/base/models.py:56 src/reports/models.py:51
+#: src/base/models.py:56 src/forecast/models.py:127 src/reports/models.py:51
 msgid "Year"
 msgstr "Год"
 
@@ -591,12 +591,20 @@ msgstr ""
 msgid "For the '{}' strategy, you must select a period."
 msgstr "Для стратегии '{}' обязательно выбрать период."
 
-#: src/forecast/load_template/utils.py:540
+#: src/forecast/admin.py:103
+msgid "Apply load templates to shops"
+msgstr "Применить шаблоны нагрузки к магазинам"
+
+#: src/forecast/admin.py:107
+msgid "Applying load templates started"
+msgstr "Применение шаблонов нагрузки запущено"
+
+#: src/forecast/load_template/utils.py:541
 #, python-brace-format
 msgid "These operation types do not exist: {types}."
 msgstr "Данные типы операций не существуют: {types}."
 
-#: src/forecast/load_template/utils.py:545
+#: src/forecast/load_template/utils.py:546
 #, python-brace-format
 msgid ""
 "These operation types listed in dependencies, but not listed in operation "
@@ -605,23 +613,23 @@ msgstr ""
 "Данные типы операций есть в зависимостях, но отсутствуют в списке операций: "
 "{types}."
 
-#: src/forecast/load_template/utils.py:561
-#: src/forecast/load_template/utils.py:563
-#: src/forecast/load_template/utils.py:602 src/forecast/models.py:186
+#: src/forecast/load_template/utils.py:562
+#: src/forecast/load_template/utils.py:564
+#: src/forecast/load_template/utils.py:603 src/forecast/models.py:202
 msgid "Error in row {}."
 msgstr "Ошибка в строке {}."
 
-#: src/forecast/load_template/utils.py:561
+#: src/forecast/load_template/utils.py:562
 msgid "Timestep is required."
 msgstr "Шаг прогноза обязателен."
 
-#: src/forecast/load_template/utils.py:564
+#: src/forecast/load_template/utils.py:565
 #, python-brace-format
 msgid "Timestep {timestep} is not valid choice, choices are {timesteps}."
 msgstr ""
 "Шаг прогноза {timestep} не является валидным, следует выбрать из {timesteps}."
 
-#: src/forecast/load_template/utils.py:602
+#: src/forecast/load_template/utils.py:603
 msgid ""
 "Invalid days of week '{}', should be comma separated int in interfval from 0 "
 "to 6."
@@ -638,78 +646,102 @@ msgstr ""
 msgid "This field ins required"
 msgstr "Это поле обязательно."
 
-#: src/forecast/models.py:227
+#: src/forecast/models.py:126
+msgid "Not specified"
+msgstr "Не указано"
+
+#: src/forecast/models.py:129
+msgid "Week"
+msgstr "Неделя"
+
+#: src/forecast/models.py:130 src/reports/models.py:47
+msgid "Day"
+msgstr "День"
+
+#: src/forecast/models.py:144
+msgid "duplicate over"
+msgstr "дублировать с шагом"
+
+#: src/forecast/models.py:145
+msgid ""
+"Period, that time series values need to be duplicated over. Signifies, that "
+"values should be treated as constant for this period."
+msgstr ""
+"Период, на который должны быть продублированы значения временного ряда. "
+"Указывает, что значения следует понимать как постоянные в этом периоде."
+
+#: src/forecast/models.py:243
 msgid "max value"
 msgstr "максимальное значение"
 
-#: src/forecast/models.py:228
+#: src/forecast/models.py:244
 msgid "threshold"
 msgstr "порог"
 
-#: src/forecast/models.py:229
+#: src/forecast/models.py:245
 msgid "days of week"
 msgstr "дни недели"
 
-#: src/forecast/models.py:236
+#: src/forecast/models.py:252
 msgid "Formula required in relation {} -> {}"
 msgstr "Формула обязательна в отношении {} -> {}"
 
-#: src/forecast/models.py:243
+#: src/forecast/models.py:259
 msgid "For relation 'change workload between' {} are required."
 msgstr ""
 "Для отношения 'перекидывание нагрузки между типами работ' {} обязательны."
 
-#: src/forecast/models.py:252
+#: src/forecast/models.py:268
 msgid "Forecast type {} cannot be depended from {} with formula type."
 msgstr ""
 "Прогнозируемый тип {} не может зависеть от {} с типом расчета по формуле."
 
-#: src/forecast/models.py:258
+#: src/forecast/models.py:274
 msgid "Operation type {} cannot be depended from work type {}."
 msgstr "Тип операции {} не может зависеть от типа работ {}."
 
-#: src/forecast/models.py:263
+#: src/forecast/models.py:279
 msgid "Only forecast types can depend from feature serie."
 msgstr ""
 "Только прогнозируемые типы операций могут зависеть от операций для помощи в "
 "прогнозе."
 
-#: src/forecast/models.py:267
+#: src/forecast/models.py:283
 msgid "Feature serie {} cannot have dependences."
 msgstr "Тип операции для помощи в прогнозе {} не может иметь зависимостей."
 
-#: src/forecast/models.py:283
+#: src/forecast/models.py:299
 msgid "Demand model cannot depend on itself."
 msgstr "Циклическая зависимость: операция зависит сама от себя."
 
-#: src/forecast/models.py:290
+#: src/forecast/models.py:306
 msgid "Backward dependency already exists."
 msgstr "Уже существует обратная зависимость"
 
-#: src/forecast/models.py:297
+#: src/forecast/models.py:313
 msgid "Base and depended demand models cannot be the same."
 msgstr "Базовая и зависимая модели нагрузки не могут совпадать."
 
-#: src/forecast/models.py:300
+#: src/forecast/models.py:316
 msgid "Base and depended demand models cannot have different templates."
 msgstr "Базовая и зависимая модели не могут иметь разный шаблон нагрузки"
 
-#: src/forecast/models.py:306
+#: src/forecast/models.py:322
 msgid "Depended must have same or bigger forecast step, got {} -> {}"
 msgstr ""
 "Зависимая операция должна иметь одинаковый или больший шаг прогноза, имеется "
 "{} -> {}"
 
-#: src/forecast/models.py:318
+#: src/forecast/models.py:334
 #, python-brace-format
 msgid "Error in formula: {formula}."
 msgstr "Ошибка в формуле: {formula}"
 
-#: src/forecast/models.py:407
+#: src/forecast/models.py:424
 msgid "aggregation date and time"
 msgstr "дата и время агрегации"
 
-#: src/forecast/models.py:408
+#: src/forecast/models.py:425
 msgid "report (data file) date"
 msgstr "дата отчёта (файла с данными)"
 
@@ -888,10 +920,6 @@ msgstr "Сегодня у сотрудника нет рабочего дня в
 #: src/recognition/views.py:335 src/recognition/views.py:404
 msgid "The tick does not exist"
 msgstr "Отметка не существует"
-
-#: src/reports/models.py:47
-msgid "Day"
-msgstr "День"
 
 #: src/reports/models.py:55
 msgid "Today"
@@ -1170,36 +1198,34 @@ msgid ""
 "{error_str}. Обратитесь, пожалуйста, к администратору системы."
 msgstr ""
 
-#: src/timetable/models.py:469
+#: src/timetable/models.py:467
 msgid ""
 "Hours calculation based on average monthly value of the recommended norm"
 msgstr "Расчет часов на основе среднемесячного значения рекомендуемой нормы"
 
-#: src/timetable/models.py:470
+#: src/timetable/models.py:468
 msgid "Hours calculation based on production calendar norm"
 msgstr "Расчет часов на основе нормы по производственному календарю"
 
-#: src/timetable/models.py:471
-#, fuzzy
-#| msgid "Default settings"
+#: src/timetable/models.py:469
 msgid "Manual setting of hours"
 msgstr "Ручное проставление часов"
 
-#: src/timetable/models.py:472
+#: src/timetable/models.py:470
 msgid ""
 "Manual setting of hours or average monthly value of the recommended norm"
 msgstr ""
 "Ручное проставление часов или среднемесячное значение рекомендуемой нормы"
 
-#: src/timetable/models.py:552
+#: src/timetable/models.py:549
 msgid "Maximum number of hours for one date for employee"
 msgstr "Максимальное количество часов на одну дату у сотрудника"
 
-#: src/timetable/models.py:554
+#: src/timetable/models.py:551
 msgid "Norm settings are not configured (through position or employment)"
 msgstr "Настройки нормы не установлены (через должность или трудоустройство)"
 
-#: src/timetable/models.py:1163 src/timetable/worker_day/serializers.py:145
+#: src/timetable/models.py:1157 src/timetable/worker_day/serializers.py:145
 #: src/timetable/worker_day_permissions/checkers.py:87
 msgid ""
 "Can't create a working day in the schedule, since the user is not employed "
@@ -1208,111 +1234,109 @@ msgstr ""
 "Невозможно создать рабочий день, так как пользователь в этот период не "
 "трудоустроен"
 
-#: src/timetable/models.py:2190 src/timetable/models.py:2903
+#: src/timetable/models.py:2184 src/timetable/models.py:2897
 msgid "Fact"
 msgstr "Факт"
 
-#: src/timetable/models.py:2191
+#: src/timetable/models.py:2185
 msgid "Main"
 msgstr "Осн"
 
-#: src/timetable/models.py:2192
+#: src/timetable/models.py:2186
 msgid "Additional"
 msgstr "Доп"
 
-#: src/timetable/models.py:2201
-#, fuzzy
-#| msgid "Timetable"
+#: src/timetable/models.py:2195
 msgid "Planned timetable"
-msgstr "Расписание"
+msgstr "Планируемый график"
 
-#: src/timetable/models.py:2202
+#: src/timetable/models.py:2196
 msgid "Actual timetable"
 msgstr "Фактический график"
 
-#: src/timetable/models.py:2203
+#: src/timetable/models.py:2197
 msgid "Manual changes"
 msgstr "Ручные изменения"
 
-#: src/timetable/models.py:2204
+#: src/timetable/models.py:2198
 msgid "Determined by the system"
 msgstr "Определено системой"
 
-#: src/timetable/models.py:2388 src/timetable/models.py:2418
+#: src/timetable/models.py:2382 src/timetable/models.py:2412
 msgid "You have no active employment"
 msgstr "У вас нет активного трудоустройства"
 
-#: src/timetable/models.py:2847
+#: src/timetable/models.py:2841
 msgid "Automatic create vacancies"
 msgstr "Автоматически создавать вакансии"
 
-#: src/timetable/models.py:2849
+#: src/timetable/models.py:2843
 msgid "Automatic delete vacancies"
 msgstr "Автоматически удалять вакансии"
 
-#: src/timetable/models.py:2851
+#: src/timetable/models.py:2845
 msgid "Automatic check lack timegap"
 msgstr "Период, за который проверяем"
 
-#: src/timetable/models.py:2853
+#: src/timetable/models.py:2847
 msgid "Automatic holiday worker select timegap"
 msgstr "С какого дня выводить с выходного"
 
-#: src/timetable/models.py:2855
+#: src/timetable/models.py:2849
 msgid "Automatic exchange"
 msgstr "Включить автоматическую биржу смен"
 
-#: src/timetable/models.py:2857
+#: src/timetable/models.py:2851
 msgid "Max working hours"
 msgstr "Максимальное количество рабочих часов в месяц для вывода с выходного"
 
-#: src/timetable/models.py:2859
+#: src/timetable/models.py:2853
 msgid "Constraints"
 msgstr "Ограничения"
 
-#: src/timetable/models.py:2860
+#: src/timetable/models.py:2854
 msgid "Exclude positions"
 msgstr "Должности которые не участвуют в обмене сменами"
 
-#: src/timetable/models.py:2862
+#: src/timetable/models.py:2856
 msgid "Automatic create vacancy lack min"
 msgstr "Минимальная потребность в сотруднике при создании вакансии"
 
-#: src/timetable/models.py:2864
+#: src/timetable/models.py:2858
 msgid "Automatic delete vacancy lack max"
 msgstr "Максимальная потребность в сотруднике для удалении вакансии"
 
-#: src/timetable/models.py:2867
+#: src/timetable/models.py:2861
 msgid "Automatic worker select timegap"
 msgstr "Только автоназначение сотрудников"
 
-#: src/timetable/models.py:2869
+#: src/timetable/models.py:2863
 msgid "Automatic worker select timegap to"
 msgstr "Период за который делаем обмен сменами"
 
-#: src/timetable/models.py:2871
+#: src/timetable/models.py:2865
 msgid "Automatic worker select overflow min"
 msgstr "Дробное число, на какую долю сотрудник не занят, чтобы совершить обмен"
 
-#: src/timetable/models.py:2874
+#: src/timetable/models.py:2868
 msgid "Working shift min hours"
 msgstr "Минимальная длина смены"
 
-#: src/timetable/models.py:2875
+#: src/timetable/models.py:2869
 msgid "Working shift max hours"
 msgstr "Максимальная длина смены"
 
-#: src/timetable/models.py:2878
+#: src/timetable/models.py:2872
 msgid "Automatic worker select tree level"
 msgstr ""
 "Расстояние до родителя, в поддереве которого ищем сотрудников для "
 "автоназначения"
 
-#: src/timetable/models.py:2881
+#: src/timetable/models.py:2875
 msgid "Outsourcing companies"
 msgstr "Аутсорс компании"
 
-#: src/timetable/models.py:2882
+#: src/timetable/models.py:2876
 msgid ""
 "Outsourcing companies that will be able to respond to an automatically "
 "created vacancy"
@@ -1320,63 +1344,63 @@ msgstr ""
 "Аутсорс компании, которым можно будет откликаться на автоматически созданную "
 "вакансию"
 
-#: src/timetable/models.py:2902
+#: src/timetable/models.py:2896
 msgid "Plan"
 msgstr "План"
 
-#: src/timetable/models.py:2913
+#: src/timetable/models.py:2907
 msgid "Create"
 msgstr "Создание"
 
-#: src/timetable/models.py:2914
+#: src/timetable/models.py:2908
 msgid "Change"
 msgstr "Изменение"
 
-#: src/timetable/models.py:2916
+#: src/timetable/models.py:2910
 msgid "Remove"
 msgstr "Удаление"
 
-#: src/timetable/models.py:2917
+#: src/timetable/models.py:2911
 msgid "Approve"
 msgstr "Подтверждение"
 
-#: src/timetable/models.py:2942
+#: src/timetable/models.py:2936
 msgid "My shops employees"
 msgstr "Сотрудники моих магазинов"
 
-#: src/timetable/models.py:2943
+#: src/timetable/models.py:2937
 msgid "Subordinate employees"
 msgstr "Подчиненные сотрудники"
 
-#: src/timetable/models.py:2944
+#: src/timetable/models.py:2938
 msgid "Outsource network employees"
 msgstr "Сотрудники аутсорс сетей"
 
-#: src/timetable/models.py:2945
+#: src/timetable/models.py:2939
 msgid "My network employees"
 msgstr "Сотрудники сетей-клиентов"
 
-#: src/timetable/models.py:2955
+#: src/timetable/models.py:2949
 msgid "My shops"
 msgstr "Мои магазины"
 
-#: src/timetable/models.py:2956
+#: src/timetable/models.py:2950
 msgid "My network shops"
 msgstr "Магазины моей сети"
 
-#: src/timetable/models.py:2957
+#: src/timetable/models.py:2951
 msgid "Outsource network shops"
 msgstr "Магазины аутсорс сетей"
 
-#: src/timetable/models.py:2958
+#: src/timetable/models.py:2952
 msgid "Client network shops"
 msgstr "Магазине сетей-клиентов"
 
-#: src/timetable/models.py:2974
+#: src/timetable/models.py:2968
 msgid "Allow actions on vacancies"
 msgstr "Разрешены действия над вакансиями"
 
-#: src/timetable/models.py:2976
+#: src/timetable/models.py:2970
 msgid ""
 "Вакансией в данном случае является день, если он был явно создан как "
 "вакансия, либо если магазин в трудоустройстве не совпадает с магазином "
@@ -1406,7 +1430,7 @@ msgstr "Пересчет можно запускать только для 1 м�
 msgid "No shop found."
 msgstr "Магазин не найден."
 
-#: src/timetable/timesheet/views.py:182 src/timetable/worker_day/views.py:1185
+#: src/timetable/timesheet/views.py:182 src/timetable/worker_day/views.py:1127
 msgid "No employees satisfying the conditions."
 msgstr "Не найдено сотрудников удовлетворяющих условиям запроса."
 
@@ -1722,27 +1746,27 @@ msgstr ""
 "У вас нет прав на подтверждение защищенных рабочих дней ({protected_wdays}). "
 "Обратитесь, пожалуйста, к администратору системы."
 
-#: src/timetable/worker_day/views.py:493
+#: src/timetable/worker_day/views.py:469
 msgid "This vacancy does not exist or has already been approved."
 msgstr "Такой вакансии не существует или она уже подтверждена."
 
-#: src/timetable/worker_day/views.py:496
+#: src/timetable/worker_day/views.py:472
 msgid "You can not approve vacancy from other network."
 msgstr "Вы не можете подтвердить вакансию из другой сети."
 
-#: src/timetable/worker_day/views.py:556
+#: src/timetable/worker_day/views.py:528
 msgid "There is no such vacancy."
 msgstr "Такой вакансии не существует"
 
-#: src/timetable/worker_day/views.py:560
+#: src/timetable/worker_day/views.py:532
 msgid "The vacancy cannot be edited because it has already been responded."
 msgstr "Невозможно отредактировать вакансию, так как на неё уже откликнулись."
 
-#: src/timetable/worker_day/views.py:1065
+#: src/timetable/worker_day/views.py:1019
 msgid "{}_timesheet_for_shop_{}_from_{}.{}"
 msgstr "{}_табель_для_подразделения_{}_от_{}.{}"
 
-#: src/timetable/worker_day/views.py:1191
+#: src/timetable/worker_day/views.py:1133
 msgid "Hours recalculation started successfully."
 msgstr "Пересчет часов успешно запущен."
 

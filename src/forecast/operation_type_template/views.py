@@ -60,7 +60,6 @@ class OperationTypeTemplateSerializer(BaseModelSerializer):
         return super().update(instance, validated_data)
 
 
-
 class OperationTypeTemplateFilter(FilterSet):
 
     class Meta:
