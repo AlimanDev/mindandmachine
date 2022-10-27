@@ -10,4 +10,4 @@ You can access it by the following link:
 
 Warning: the link will expire at the end of the business day. Please use employee monitoring generation form in the application to create a new version."""
     ).format(url)
-    return message + '\n' + url
+    return message
