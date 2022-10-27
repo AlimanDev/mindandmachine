@@ -257,7 +257,7 @@ def tick_report(
             directory=settings.REPORTS_ROOT,
             serve_url=settings.REPORTS_URL
         )
-        message = prepare_message_tick_report(file.url)
+        message = prepare_message_tick_report(settings.EXTERNAL_HOST + file.url)
         send_email(
             subject=_('Tick report'),
             body=message,
