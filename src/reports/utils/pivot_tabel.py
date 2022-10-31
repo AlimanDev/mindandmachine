@@ -1,15 +1,27 @@
 import io
-from src.timetable.models import PlanAndFactHours
+
 import pandas as pd
 import numpy as np
-
+import xlsxwriter
 from django.http.response import HttpResponse
 from django.utils.encoding import escape_uri_path
+from django.utils.translation import gettext as _
+
+from src.timetable.models import PlanAndFactHours
+
+
+class Columns:
+    NETWORK = 0
+    SHOP = 1
+    WORK_TYPE = 2
+    TABEL_CODE = 3
+    FIO = 4
+    FIRST_DATE = 5
 
 class BasePivotTabel:
     fields_mapping = None
     values_field = None
-    index_fields = ['Сеть сотрудника', 'Подразделение', 'Тип работ', 'Табельный номер', 'ФИО']
+    index_fields = [_('Employee network'), _('Department'), _('Work type'), _('Tabel code'), _('Full name')]
     columns_fields = None
 
     def __init__(self):
@@ -25,38 +37,56 @@ class BasePivotTabel:
         if not len(df.values):
             return None
         table = pd.pivot_table(df, values=self.values_field, index=self.index_fields, columns=self.columns_fields, aggfunc=np.sum, fill_value=0)
-        table['Часов за период'] = table.sum(axis=1).values 
+        table[_('Hours in period')] = table.sum(axis=1).values
         table = np.round(
             table.append( 
-                table.sum().rename(('\n', '\n', '\n', 'Общий', 'итог')) 
+                table.sum().rename(('', '', '', '', _('TOTAL'))) 
             ), 
             2
         )
+        table = table.reset_index()
         output = io.BytesIO()
         writer = pd.ExcelWriter(output, engine='xlsxwriter')
         table.to_excel(
-            excel_writer=writer, sheet_name='Табель',
+            excel_writer=writer, sheet_name=_('Tabel'), index=False
         )
-        worksheet = writer.sheets['Табель']
-        cell_format = writer.book.add_format({
+        worksheet = writer.sheets[_('Tabel')]
+
+        base_format = {
             'valign': 'vcenter',
             'align': 'center',
             'text_wrap': True,
-        })
-        worksheet.set_column(0, 0, 15)
-        worksheet.set_column(1, 1, 20)
-        for r in range(len(table.values) + 1):
-            worksheet.set_row(r, None, cell_format)
-        worksheet.set_column(2, 2, 15)
-        worksheet.set_column(3, 3, 38)
-        worksheet.set_column(4, 4, 33)
-        worksheet.set_column(5, len(table.columns) + 3, 10, None)
-        worksheet.set_column(len(table.columns) + 4, len(table.columns) + 4, 23)
+        }
+        cell_format1 = writer.book.add_format(base_format)
+        for r in range(len(table.values)):
+            worksheet.set_row(r, None, cell_format1)
+        base_format['border'] = True
+        cell_format2 = writer.book.add_format(base_format)
+        worksheet.conditional_format(
+            xlsxwriter.utility.xl_range(1, Columns.NETWORK, len(table) - 1, Columns.FIRST_DATE),
+            {'type': 'no_errors', 'format': cell_format2}
+        )
+        worksheet.conditional_format(
+            xlsxwriter.utility.xl_range(1, Columns.FIRST_DATE, len(table) - 1, Columns.FIRST_DATE + df['dt'].nunique()),
+            {'type': 'no_blanks', 'format': cell_format2}
+        )
+        base_format.update({'border': False, 'bold': True})
+        cell_format3 = writer.book.add_format(base_format)
+        worksheet.set_row(0, None, cell_format3)
+        worksheet.set_row(len(table.values), None, cell_format3)
+
+        worksheet.set_column(Columns.NETWORK, Columns.NETWORK, 20)
+        worksheet.set_column(Columns.SHOP, Columns.SHOP, 20)
+        worksheet.set_column(Columns.WORK_TYPE, Columns.WORK_TYPE, 15)
+        worksheet.set_column(Columns.TABEL_CODE, Columns.TABEL_CODE, 38)
+        worksheet.set_column(Columns.FIO, Columns.FIO, 33)
+        worksheet.set_column(Columns.FIRST_DATE, len(table.columns) - 2, 10) # Dates
+        worksheet.set_column(len(table.columns) - 2, len(table.columns) - 1, 18) # Hours in period
         writer.book.close()
         output.seek(0)
         return output
 
-    def get_response(self, output_name='Сводный табель', **kwargs):
+    def get_response(self, output_name=_('Pivot tabel'), **kwargs):
         output = self.get_pivot_file(**kwargs)
 
         response = HttpResponse(

@@ -12,7 +12,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Django REST framework\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2022-10-26 10:32+0000\n"
+"POT-Creation-Date: 2022-10-28 16:57+0000\n"
 "PO-Revision-Date: 2017-08-03 14:58+0000\n"
 "Last-Translator: Grigory Mishchenko <grishkokot@gmail.com>\n"
 "Language-Team: Russian (http://www.transifex.com/django-rest-framework-1/"
@@ -968,11 +968,12 @@ msgstr ""
 "Произошла ошибка при формировании Вашего отчёта.\n"
 "Пожалуйста, обратитесь в техническую поддержку."
 
-#: src/reports/tests.py:618 src/util/dg/ticks_report.py:34
+#: src/reports/tests.py:617 src/util/dg/ticks_report.py:34
 msgid "Tick date and time"
 msgstr "Дата и время отметки"
 
 #: src/reports/utils/overtimes_undertimes.py:181
+#: src/reports/utils/pivot_tabel.py:24
 #: src/timetable/worker_day/timetable.py:722
 #: src/timetable/worker_day/timetable.py:757
 #: src/timetable/worker_day/timetable.py:763
@@ -1020,6 +1021,38 @@ msgstr "Переработки/недоработки: отработано ча
 #: src/reports/utils/overtimes_undertimes.py:192
 msgid "Planned work hours"
 msgstr "Плановое количество часов"
+
+#: src/reports/utils/pivot_tabel.py:24
+msgid "Employee network"
+msgstr "Сеть сотрудника"
+
+#: src/reports/utils/pivot_tabel.py:24
+msgid "Department"
+msgstr "Подразделение"
+
+#: src/reports/utils/pivot_tabel.py:24 src/util/dg/timesheet.py:371
+msgid "Work type"
+msgstr "Тип работ"
+
+#: src/reports/utils/pivot_tabel.py:24 src/util/dg/ticks_report.py:29
+msgid "Tabel code"
+msgstr "Табельный номер"
+
+#: src/reports/utils/pivot_tabel.py:40
+msgid "Hours in period"
+msgstr "Часов за период"
+
+#: src/reports/utils/pivot_tabel.py:43
+msgid "TOTAL"
+msgstr "ОБЩИЙ ИТОГ"
+
+#: src/reports/utils/pivot_tabel.py:51 src/reports/utils/pivot_tabel.py:53
+msgid "Tabel"
+msgstr "Табель"
+
+#: src/reports/utils/pivot_tabel.py:89
+msgid "Pivot tabel"
+msgstr "Сводный табель"
 
 #: src/tasks/serializers.py:22
 #, fuzzy, python-brace-format
@@ -1946,10 +1979,6 @@ msgstr "Декабрь"
 msgid "Employee"
 msgstr "ФИО сотрудника"
 
-#: src/util/dg/ticks_report.py:29
-msgid "Tabel code"
-msgstr "Табельный номер"
-
 #: src/util/dg/ticks_report.py:30
 msgid "Tick point"
 msgstr "Точка отметки"
@@ -2018,10 +2047,6 @@ msgstr "Итого дни"
 #: src/util/dg/timesheet.py:370
 msgid "Shop name"
 msgstr "Наименование ОП"
-
-#: src/util/dg/timesheet.py:371
-msgid "Work type"
-msgstr "Тип работ"
 
 #: src/util/dg/timesheet.py:372
 msgid "Fact, h"

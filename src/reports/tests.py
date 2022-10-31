@@ -334,7 +334,7 @@ class TestPivotTabelReportNotifications(TestsHelperMixin, APITestCase):
             self.assertEqual(list(df.loc[1, [first_date, second_date, 'Часов за период']].values), [10.75, 10.75, 21.50])
             self.assertEqual(list(df.loc[2, [first_date, second_date, 'Часов за период']].values), [10.75, 21.50, 32.25])
 
-
+@mock.patch.object(TickPhoto, 'compress_image', lambda _: True)
 class TestReportsViewSet(TestsHelperMixin, APITestCase):
     @classmethod
     def setUpTestData(cls):
@@ -530,7 +530,6 @@ class TestReportsViewSet(TestsHelperMixin, APITestCase):
 
     @override_settings(MEDIA_ROOT=settings.BASE_DIR)
     @mock.patch.object(tick_report, 'delay', tick_report)
-    @mock.patch.object(TickPhoto, 'compress_image', lambda _: True)
     def test_tick_report(self):
         tickpoint = TickPoint.objects.create(
             shop=self.wd1.shop,
