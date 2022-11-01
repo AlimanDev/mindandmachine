@@ -1,5 +1,6 @@
 from datetime import date
 from collections import OrderedDict
+from functools import reduce
 import io
 import pandas as pd
 from django.db.models import (
@@ -394,82 +395,56 @@ def schedule_deviation_report_response(dt_from, dt_to, *args, created_by_id=None
     return response
 
 def _get_extra_columns_dict(dt_from: date, dt_to: date) -> OrderedDict:
-    depth = 3 #глубина поиска родителей вверх по дереву магазинов
-    parent_lookups = tuple('__parent'*n for n in range(1, depth+1))
+    depth = 3 # Shop parent/child lookup depth
+    child_lookup1 = (Q(**{'__'.join(['child']*d): OuterRef('shop')}) for d in range(1, depth+1))      # 1 OuterRef
+    child_lookup1 = reduce(lambda x, y: x|y, child_lookup1)                                           # Q(child=OuterRef('shop')) | Q(child__child=OuterRef('shop')) | ...
+
+    region_sq = Subquery(Shop.objects.filter(child_lookup1, name__startswith='Регион').values('name')[:1])
+    region_manager_sq = _get_deep_employee_fio_subquery(
+        dt_from=dt_from,
+        dt_to=dt_to,
+        shop__name=OuterRef(OuterRef('region')),
+        position__name='Руководитель региона'
+    )
+
+    child_lookup2 = (Q(**{'__'.join(['child']*d): OuterRef(OuterRef(OuterRef('shop')))}) for d in range(1, depth+1))  # 3 OuterRefs
+    child_lookup2 = reduce(lambda x, y: x|y, child_lookup2)
+    shops_sq = Subquery(Shop.objects.filter(child_lookup2).values('id'))
+
+    supervisor_mentor_sq = _get_deep_employee_fio_subquery(
+        dt_from=dt_from,
+        dt_to=dt_to,
+        shop_id__in=shops_sq,
+        position__name='Супервайзер-наставник'
+    )
+
+    supervisor_sq = _get_deep_employee_fio_subquery(
+        dt_from=dt_from,
+        dt_to=dt_to,
+        shop_id__in=shops_sq,
+        position__name='Супервайзер'
+    )
+
     return OrderedDict((
-        #Название региона (shop_name)
-        ('region', Case(
-            *(When(
-                **{
-                    f'shop{pl}__name__startswith': 'Регион',
-                    'then': F(f'shop{pl}__name')
-                }
-            ) for pl in parent_lookups)
-        )),
-        #Руководитель региона (ФИО user)
-        ('region_manager', Case(
-            *(When(
-                **{
-                    f'shop{pl}__name__startswith': 'Регион', 
-                    'then': Subquery(
-                        User.objects.filter(
-                            employees__employments__in=Employment.objects.get_active(
-                                dt_from=dt_from,
-                                dt_to=dt_to,
-                                shop=OuterRef(OuterRef(f'shop{pl}')),
-                                position__name='Руководитель региона'
-                            )[:1]
-                        ).annotate(
-                            fio=Concat('last_name', Value(' '), 'first_name', Value(' '), 'middle_name')
-                        ).values(
-                            'fio'
-                        )[:1]
-                    )
-                }
-            ) for pl in parent_lookups)
-        )),
-        #Наставник супервайзера (ФИО user)
-        ('supervisor_mentor', Case(
-            *(When(
-                **{
-                    f'shop{pl}__name__startswith': 'Супервайзер-наставник', 
-                    'then': Subquery(
-                        User.objects.filter(
-                            employees__employments__in=Employment.objects.get_active(
-                                dt_from=dt_from,
-                                dt_to=dt_to,
-                                shop=OuterRef(OuterRef(f'shop{pl}')),
-                                position__name='Супервайзер-наставник'
-                            )[:1]
-                        ).annotate(
-                            fio=Concat('last_name', Value(' '), 'first_name', Value(' '), 'middle_name')
-                        ).values(
-                            'fio'
-                        )[:1]
-                    )
-                }
-            ) for pl in parent_lookups)
-        )),
-        #Супервайзер (ФИО user)
-        ('supervisor', Case(
-            *(When(
-                **{
-                    f'shop{pl}__name__startswith': 'СВ', 
-                    'then': Subquery(
-                        User.objects.filter(
-                            employees__employments__in=Employment.objects.get_active(
-                                dt_from=dt_from,
-                                dt_to=dt_to,
-                                shop=OuterRef(OuterRef(f'shop{pl}')),
-                                position__name='Супервайзер'
-                            )[:1]
-                        ).annotate(
-                            fio=Concat('last_name', Value(' '), 'first_name', Value(' '), 'middle_name')
-                        ).values(
-                            'fio'
-                        )[:1]
-                    )
-                }
-            ) for pl in parent_lookups)
-        ))
+        # Region name / Название региона (shop_name)
+        ('region', region_sq),
+        # Region managet (Full name of user) / Руководитель региона (ФИО user)
+        ('region_manager', region_manager_sq),
+        # Supervisor mentor (Full name of user) / Наставник супервайзера (ФИО user)
+        ('supervisor_mentor', supervisor_mentor_sq),
+        # Supervisor (Full name of user) / Супервайзер (ФИО user)
+        ('supervisor', supervisor_sq)
     ))    
+
+def _get_deep_employee_fio_subquery(**kwargs):
+    return Subquery(
+        User.objects.filter(
+            employees__employments__in=Employment.objects.get_active(
+                **kwargs
+            )[:1]
+        ).annotate(
+            fio=Concat('last_name', Value(' '), 'first_name', Value(' '), 'middle_name')
+        ).values(
+            'fio'
+        )[:1]
+    )
