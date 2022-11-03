@@ -201,16 +201,12 @@ class BatchUpdateOrCreateModelMixin:
 
     @classmethod
     def _pre_batch(cls, **kwargs):
-        """
-        Функция, которая будет вызвана перед созданием/удалением/изменением объектов
-        """
+        """Функция, которая будет вызвана перед созданием/удалением/изменением объектов."""
         pass
 
     @classmethod
     def _post_batch(cls, **kwargs):
-        """
-        Функция, которая будет вызвана после выполнения метода batch_update_or_create
-        """
+        """Функция, которая будет вызвана после выполнения метода batch_update_or_create."""
         pass
 
     @classmethod
@@ -374,7 +370,7 @@ class BatchUpdateOrCreateModelMixin:
                         diff_data.setdefault('created', []).append(
                             tuple(obj_deep_get(obj_to_create, *keys) for keys in diff_obj_keys))
 
-                update_fields_set = {"dttm_modified"}
+                update_fields_set = {'dttm_modified'}
                 if to_update_dict:
                     to_update = list(to_update_dict.values())
                     update_rel_objs_data = cls._pop_rel_objs_data(
@@ -442,9 +438,10 @@ class BatchUpdateOrCreateModelMixin:
                                 tuple(obj_deep_get(obj_to_delete, *keys) for keys in diff_obj_keys))
 
                 cls._pre_batch(
+                    user=user,
                     created_objs=objs_to_create, updated_objs=objs_to_update, deleted_objs=objs_to_delete,
                     diff_data=diff_data, stats=stats, model_options=model_options,
-                    delete_scope_filters=delete_scope_filters, user=user, diff_obj_keys=diff_obj_keys,
+                    delete_scope_filters=delete_scope_filters, diff_obj_keys=diff_obj_keys,
                     cached_data=cached_data, check_perms_extra_kwargs=check_perms_extra_kwargs,
                 )
 

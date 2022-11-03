@@ -155,7 +155,7 @@ class WorkType(AbstractActiveModel):
     min_workers_amount = models.IntegerField(default=0, blank=True, null=True)
     max_workers_amount = models.IntegerField(default=20, blank=True, null=True)
     preliminary_cost_per_hour = models.DecimalField(
-        'Предварительная стоимость работ за час', max_digits=8, 
+        'Предварительная стоимость работ за час', max_digits=8,
         decimal_places=2,
         null=True, blank=True,
     )
@@ -879,7 +879,7 @@ class WorkerDay(AbstractModel):
         ]
 
     @classmethod
-    def _get_grouped_perm_check_data(self, diff_data):
+    def _get_grouped_perm_check_data(cls, diff_data):
         """
         :param diff_data: список кортежей с данным полей из _get_diff_lookup_fields (важен порядок)
         :return: данные для проверка по мин. и по макс. дате (
@@ -1160,7 +1160,7 @@ class WorkerDay(AbstractModel):
     @classmethod
     def _get_skip_update_equality_fields(cls, existing_obj: 'WorkerDay', new_data: dict) -> list:
         skip_fields_list = ['created_by', 'last_edited_by', 'source']
-        #Код приходит только в интеграции с 1С, в таком случае не обновляем рабочие часы.
+        # Код приходит только в интеграции с 1С, в таком случае не обновляем рабочие часы.
         if existing_obj.type.is_dayoff and existing_obj.type.is_work_hours and new_data.get('code') and\
                 existing_obj.type.get_work_hours_method in [
                     WorkerDayType.GET_WORK_HOURS_METHOD_TYPE_MANUAL,
@@ -1322,7 +1322,7 @@ class WorkerDay(AbstractModel):
                             break_time = self._calc_break(
                                 breaks,
                                 dttm_work_start,
-                                dttm_work_end, 
+                                dttm_work_end,
                                 plan_approved=plan_approved if (plan_approved.dttm_work_start and plan_approved.dttm_work_end) else None
                             )
                     else:
@@ -1458,7 +1458,7 @@ class WorkerDay(AbstractModel):
 
     source = PositiveSmallIntegerField('Источник создания', choices=SOURCES, default=SOURCE_FAST_EDITOR)
     cost_per_hour = models.DecimalField(
-        'Стоимость работ за час', max_digits=8, 
+        'Стоимость работ за час', max_digits=8,
         decimal_places=2,
         null=True, blank=True,
     )
@@ -1526,7 +1526,7 @@ class WorkerDay(AbstractModel):
 
     def get_department(self):
         return self.shop
-    
+
     @classmethod
     def get_overlap_qs(cls, user_id=OuterRef('employee__user_id')):
         return cls.objects.filter(
@@ -1546,7 +1546,7 @@ class WorkerDay(AbstractModel):
             Q(
                 Q(dttm_work_start__lte=OuterRef('dttm_work_start')) &
                 Q(dttm_work_end__gte=OuterRef('dttm_work_end'))
-            ) | 
+            ) |
             Q(
                 Q(dttm_work_start__lte=OuterRef('dttm_work_start')) &
                 Q(dttm_work_end__isnull=True)
@@ -3102,7 +3102,7 @@ class ScheduleDeviations(PlanAndFactHoursAbstract):
     class Meta:
         managed = False
         db_table = 'timetable_schedule_deviations'
-    
+
     employment_shop = models.ForeignKey('base.Shop', on_delete=models.DO_NOTHING, related_name='employment_shops')
     position = models.ForeignKey('base.WorkerPosition', on_delete=models.DO_NOTHING)
     employment_shop_name = models.CharField(max_length=512)
