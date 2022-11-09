@@ -21,7 +21,6 @@ def is_config_exists(file_name):
     return os.path.isfile(os.path.join(BASE_DIR, 'src', 'conf', file_name))
 
 
-QOS_DEV_STATIC_ENABLED = False
 QOS_DEV_CSRF_DISABLED = False
 QOS_DEV_AUTOLOGIN_ENABLED = False
 QOS_DEV_AUTOLOGIN_USERNAME = None
@@ -36,7 +35,7 @@ QOS_CAMERA_KEY = '1'
 HOST = env.str('HOST', default='http://127.0.0.1:8000')
 EXTERNAL_HOST = env.str('EXTERNAL_HOST', default=HOST)
 TIMETABLE_IP = env.str('TIMETABLE_IP', default='127.0.0.1:5000')
-
+LOGIN_URL = '/' # redirect to login page (frontend)
 
 SECRET_KEY = '2p7d00y99lhyh1xno9fgk6jd4bl8xsmkm23hq4vj811ku60g7dsac8dee5rn'
 MDAUDIT_AUTHTOKEN_SALT = 'DLKAXGKFPP57B2NEQ4NLB2TLDT3QR20I7QKAGE8I'
@@ -335,7 +334,8 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media/')
 REPORTS_ROOT = os.path.join(MEDIA_ROOT, 'reports/')
 
 STATIC_URL = '/static/'
-MEDIA_URL = '/_i/media/'
+MEDIA_PATH = '/media/'
+MEDIA_URL = '/rest_api' + MEDIA_PATH
 REPORTS_URL = MEDIA_URL + 'reports/'
 
 # compression, for less disk space
