@@ -94,14 +94,13 @@ class ShopEfficiencyGetter:
 
     @cached_property
     def dttms(self):
-        dttms = [
+        return [
             datetime.datetime.combine(self.dt_from + datetime.timedelta(days=day), datetime.time(
                 hour=period * self.period_length_in_minutes // 60,
                 minute=period * self.period_length_in_minutes % 60))
             for day in range((self.dt_to - self.dt_from).days)
             for period in range(self.periods_in_day)
         ]
-        return dttms
 
     def _check_and_init_work_types(self):
         work_types = WorkType.objects.filter(shop_id=self.shop_id).order_by('id')

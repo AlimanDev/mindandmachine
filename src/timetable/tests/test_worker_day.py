@@ -746,6 +746,7 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
         1. план есть только на вчера
         2. происходят отметки сегодня, но ближайших план найден на вчера (факт крепится к вчерашнему дню)
         3. проиходит исправление плана -> факт должен перецепиться на сегодня
+        4. holidays deleted if there is workeday
         """
         self.network.run_recalc_fact_from_att_records_on_plan_approve = True
         self.network.save()
@@ -805,12 +806,55 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
 
         self.assertEqual(response.status_code, 200)
 
-        self.assertEqual(WorkerDay.objects.filter(is_fact=False, is_approved=False).count(), 2)
-        self.assertEqual(WorkerDay.objects.filter(is_fact=False, is_approved=True).count(), 2)
+        self.assertEqual(WorkerDay.objects.filter(is_fact=False, is_approved=False).count(), 1)
+        self.assertEqual(WorkerDay.objects.filter(is_fact=False, is_approved=True).count(), 1)
         self.assertEqual(WorkerDay.objects.filter(is_fact=True, is_approved=True).count(), 1)
 
         wd = WorkerDay.objects.filter(is_fact=True, is_approved=True).first()
         self.assertEqual(wd.dt, today)
+
+    def test_deleted_holidays_when_there_is_workday(self):
+        """Holidays deleted if there is workday."""
+        self.network.run_recalc_fact_from_att_records_on_plan_approve = True
+        self.network.save()
+        WorkerDay.objects.all().delete()
+        today = date.today()
+        WorkerDayFactory(
+            employee=self.employee2,
+            employment=self.employment2,
+            dt=today,
+            dttm_work_start=datetime.combine(today, time(14)),
+            dttm_work_end=datetime.combine(today, time(23)),
+            type_id=WorkerDay.TYPE_HOLIDAY,
+            shop=self.shop,
+            is_approved=True,
+            is_fact=False,
+        )
+        WorkerDayFactory(
+            employee=self.employee2,
+            employment=self.employment2,
+            dt=today,
+            dttm_work_start=datetime.combine(today, time(14)),
+            dttm_work_end=datetime.combine(today, time(23)),
+            type_id=WorkerDay.TYPE_WORKDAY,
+            is_approved=False,
+            is_fact=False,
+        )
+        self.assertEqual(WorkerDay.objects.count(), 2)
+
+        approve_data = {
+            'shop_id': self.shop.id,
+            'dt_from': today,
+            'dt_to': today,
+            'is_fact': False
+        }
+
+        with mock.patch.object(transaction, 'on_commit', lambda t: t()):
+            response = self.client.post(self.url_approve, self.dump_data(approve_data), content_type='application/json')
+
+        self.assertEqual(response.status_code, 200)
+
+        self.assertEqual(WorkerDay.objects.count(), 2)  # workday approve & workday not approve
 
     def test_empty_params(self):
         data = {

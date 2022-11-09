@@ -298,7 +298,7 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
             self.assertEqual(wd_from_db.last_edited_by_id, wd_from_db_not_approved.last_edited_by_id)
 
         for wd in wdscreated:
-            wd.type_id = WorkerDay.TYPE_HOLIDAY
+            wd.type_id = WorkerDay.TYPE_WORKDAY
             wd.save()  # чтобы произошел approve -- должны быть какие-то изменения
 
         # second approve
@@ -480,6 +480,7 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
             )
 
             # удаление рабочего дня -- отправляется
+            # update - выходной удаляется после подтверждения
             WorkerDayFactory(
                 employee=self.employee2,
                 employment=self.employment2,
@@ -562,53 +563,53 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
                         sorted(json_data, key=lambda i: (i['dt'], i['employee__user__username'])),
                         sorted([
                             {
-                                "dt": Converter.convert_date(wd_create1.dt),
-                                "employee__user__username": self.user2.username,
-                                "shop__code": self.shop.code,
-                                "dttm_work_start": Converter.convert_datetime(wd_create1.dttm_work_start),
-                                "dttm_work_end": Converter.convert_datetime(wd_create1.dttm_work_end),
-                                "action": "create"
+                                'dt': Converter.convert_date(wd_create1.dt),
+                                'employee__user__username': self.user2.username,
+                                'shop__code': self.shop.code,
+                                'dttm_work_start': Converter.convert_datetime(wd_create1.dttm_work_start),
+                                'dttm_work_end': Converter.convert_datetime(wd_create1.dttm_work_end),
+                                'action': 'create'
                             },
                             {
-                                "dt": Converter.convert_date(wd_create2.dt),
-                                "employee__user__username": self.user2.username,
-                                "shop__code": self.shop.code,
-                                "dttm_work_start": Converter.convert_datetime(wd_create2.dttm_work_start),
-                                "dttm_work_end": Converter.convert_datetime(wd_create2.dttm_work_end),
-                                "action": "create"
+                                'dt': Converter.convert_date(wd_create2.dt),
+                                'employee__user__username': self.user2.username,
+                                'shop__code': self.shop.code,
+                                'dttm_work_start': Converter.convert_datetime(wd_create2.dttm_work_start),
+                                'dttm_work_end': Converter.convert_datetime(wd_create2.dttm_work_end),
+                                'action': 'create'
                             },
                             {
-                                "dt": Converter.convert_date(wd_update.dt),
-                                "employee__user__username": self.user2.username,
-                                "shop__code": self.shop.code,
-                                "dttm_work_start": Converter.convert_datetime(wd_update.dttm_work_start),
-                                "dttm_work_end": Converter.convert_datetime(wd_update.dttm_work_end),
-                                "action": "update"
+                                'dt': Converter.convert_date(wd_update.dt),
+                                'employee__user__username': self.user2.username,
+                                'shop__code': self.shop.code,
+                                'dttm_work_start': Converter.convert_datetime(wd_update.dttm_work_start),
+                                'dttm_work_end': Converter.convert_datetime(wd_update.dttm_work_end),
+                                'action': 'update'
                             },
                             {
-                                "dt": Converter.convert_date(wd_create3.dt),
-                                "employee__user__username": self.user2.username,
-                                "shop__code": self.shop.code,
-                                "dttm_work_start": Converter.convert_datetime(wd_create3.dttm_work_start),
-                                "dttm_work_end": Converter.convert_datetime(wd_create3.dttm_work_end),
-                                "action": "create"
+                                'dt': Converter.convert_date(wd_create3.dt),
+                                'employee__user__username': self.user2.username,
+                                'shop__code': self.shop.code,
+                                'dttm_work_start': Converter.convert_datetime(wd_create3.dttm_work_start),
+                                'dttm_work_end': Converter.convert_datetime(wd_create3.dttm_work_end),
+                                'action': 'create'
                             },
                             {
-                                "dt": Converter.convert_date(wd_delete2.dt),
-                                "employee__user__username": self.user2.username,
-                                "shop__code": self.shop.code,
-                                "dttm_work_start": Converter.convert_datetime(wd_delete2.dttm_work_start),
-                                "dttm_work_end": Converter.convert_datetime(wd_delete2.dttm_work_end),
-                                "action": "delete"
+                                'dt': Converter.convert_date(wd_delete2.dt),
+                                'employee__user__username': self.user2.username,
+                                'shop__code': self.shop.code,
+                                'dttm_work_start': Converter.convert_datetime(wd_delete2.dttm_work_start),
+                                'dttm_work_end': Converter.convert_datetime(wd_delete2.dttm_work_end),
+                                'action': 'delete'
                             },
-                            {
-                                "dt": Converter.convert_date(wd_delete1.dt),
-                                "employee__user__username": self.user2.username,
-                                "shop__code": self.shop.code,
-                                "dttm_work_start": Converter.convert_datetime(wd_delete1.dttm_work_start),
-                                "dttm_work_end": Converter.convert_datetime(wd_delete1.dttm_work_end),
-                                "action": "delete"
-                            },
+                            # {
+                            #     'dt': Converter.convert_date(wd_delete1.dt),
+                            #     'employee__user__username': self.user2.username,
+                            #     'shop__code': self.shop.code,
+                            #     'dttm_work_start': Converter.convert_datetime(wd_delete1.dttm_work_start),
+                            #     'dttm_work_end': Converter.convert_datetime(wd_delete1.dttm_work_end),
+                            #     'action': 'delete'
+                            # },
                         ], key=lambda i: (i['dt'], i['employee__user__username']))
                     )
 

@@ -85,7 +85,7 @@ class WorkerDayApproveHelper:
             - work_type_ids
             - is_vacancy
 
-        Filtering type_id != H and check there are holidays in worksdays, are there - delete.
+        Filtering type_id != H and check there are holidays in workdays, are there - delete.
         :return:
         """
         workdays: pd.DataFrame = approved_workdays \
@@ -94,12 +94,15 @@ class WorkerDayApproveHelper:
         if len(workdays):
             holidays_workdays_for_delete_filter: Q = Q()
             for _, workday in workdays.iterrows():
+                if pd.isna(workday['employee_id']):
+                    continue
                 holidays_workdays_for_delete_filter |= Q(
                     type_id=WorkerDay.TYPE_HOLIDAY,
                     is_fact=False,  # Just for plan
                     **{field: workday.get(field) for field in ['code', 'employee_id', 'dt']}
                 )
-            WorkerDay.objects.filter(holidays_workdays_for_delete_filter).delete()
+            if holidays_workdays_for_delete_filter:
+                WorkerDay.objects.filter(holidays_workdays_for_delete_filter).delete()
 
     def run(self):
         from src.timetable.worker_day.views import WorkerDayViewSet
