@@ -40,5 +40,6 @@ junit.xml
 xunit.xml
 .pytest_cache/
 etc/compose/tests_mounts
+mounts
 docker-compose.yml
 .env

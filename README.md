@@ -2,135 +2,19 @@
 
 ## Installation
 
+Using Docker and Docker-Compose:
 
-### Option 1
-Alternative to docker and a preferred way of configuration if you actively participate in development is to run the application using python virtual environment.
-
-Before installing dependencies, you need to install system packages:
-
-```shell
-sudo apt-get install curl build-essential python3 python3-dev \
-    python3-venv \
-    graphviz \
-    libgraphviz-dev \
-    pkg-config \
-    unixodbc-dev \
-    libpq-dev \
-    gettext \
-    libgeos-dev \
-    cron \
-    logrotate \
-    libpq-dev
-```
-
-Create virtual environment in your project folder use:
-
-```shell
-python3 -m venv venv
-source venv/bin/activate
-```
-or
-```shell
-pip install virtualenv
-virtualenv venv
-source venv/bin/activate
-```
-
-Next install project dependencies:
-```shell
-pip install -r requirements.txt
-```
-
-*Infrastructure*
-
-The application need to use databases postgresql and redis in work. 
-These applications can be run in docker containers by commenting out services:
-- web
-- converter
-- celery
-- flower
-
-Run all the required supporting services using docker-compose.
-Please follow the steps:
-```
-- make sure docker, docker-compose is installed on your system
-- copy `sample-docker-compose.yml` to `docker-compose.yml` file
-- copy `sample.env` to `.env` file
-- update `.env` file properties if needed
-- run `docker-compose up` command from the terminal
-```
-
-Alternatively:
-
-Install postgresql and redis:
-```shell
-sudo apt-get install postgresql redis-server
-```
-
-Run application migrations to apply DB changes:
-```shell
-python manage.py migrate
-```
-
-And, run the server:
-```shell
-python manage.py runserver
-```
-
-If you need, you can run celery:
-```shell
-celery -A src.celery worker -n main -l INFO
-```
-
-And flower:
-
-```shell
-celery -A src.celery flower --conf=flowerconfig.py --port=5555 
-```
-
-
-*Problem with version of python 3.10*
-
-Problem 1
-
-> import lxml.etree
-> ImportError: /home/victor/projects/QoS_backend/venv/lib/python3.10/site-packages/lxml/etree.cpython-310-x86_64-linux-gnu.so: undefined symbol: _PyGen_Send
-
-Solution:
-```shell
-pip install lxml --upgrade
-```
-
-Problem 2
-
-> Encountered error while trying to install package.
-> -> uwsgi
-
-Solution:
-```shell
-pip install uwsgi --upgrade   # uwsgi version 2.0.20
-```
-
-Problem 3
-
-> ImportError: cannot import name 'Mapping' from 'collections'
-
-Solution:
-```shell
-pip install jinja2 tornado --upgrade
-```
-
-### Option 2
-Alternative to run application on os you can run application using docker and docker-compose.
-
-Please follow the following steps:
-- make sure docker, docker-compose is installed on your system
-- copy `sample-docker-compose.yml` to `docker-compose.yml` file
-- copy `sample.env` to `.env` file
-- update `.env` file properties if needed
-- run `docker-compose up` command from the terminal, or `docker compose` if compose installed as plugin
+- make sure Docker and Docker-Compose are installed
+- copy `sample.docker-compose.yml` to `docker-compose.yml`
+- copy `sample.local_settings_web.py` to `local_settings_web.py`. Configure as needed.
+- run `docker-compose up`
 
 That would build images for all the required by the application infrastructure and start application in development mode.
+
+## Restoring database backup
+
+- get a database backup (e.g. from a dev server or colleagues), copy it to `./etc/compose/tests_mounts/postgres_backups/`
+- run `docker-compose stop && docker-compose start postgres && docker-compose exec postgres restore file.sql.gz && docker-compose start`, replacing filename.
 
 
 ## ---------------------------- OLD Documentation separator -----------------------------------------
@@ -258,4 +142,122 @@ https://sphinxcontrib-napoleon.readthedocs.io/en/latest/example_google.html#exam
 1. для создания расписания указать параметры
 2. для биржи смены создать 1 модель
 3. создать группы доступов и сделать юзеров для перессылки ключей
+
+### Installation
+Alternative to docker and a preferred way of configuration if you actively participate in development is to run the application using python virtual environment.
+
+Before installing dependencies, you need to install system packages:
+
+```shell
+sudo apt-get install curl build-essential python3 python3-dev \
+    python3-venv \
+    graphviz \
+    libgraphviz-dev \
+    pkg-config \
+    unixodbc-dev \
+    libpq-dev \
+    gettext \
+    libgeos-dev \
+    cron \
+    logrotate \
+    libpq-dev
+```
+
+Create virtual environment in your project folder use:
+
+```shell
+python3 -m venv venv
+source venv/bin/activate
+```
+or
+```shell
+pip install virtualenv
+virtualenv venv
+source venv/bin/activate
+```
+
+Next install project dependencies:
+```shell
+pip install -r requirements.txt
+```
+
+*Infrastructure*
+
+The application need to use databases postgresql and redis in work. 
+These applications can be run in docker containers by commenting out services:
+- web
+- converter
+- celery
+- flower
+
+Run all the required supporting services using docker-compose.
+Please follow the steps:
+```
+- make sure docker, docker-compose is installed on your system
+- copy `sample-docker-compose.yml` to `docker-compose.yml` file
+- copy `sample.env` to `.env` file
+- update `.env` file properties if needed
+- run `docker-compose up` command from the terminal
+```
+
+Alternatively:
+
+Install postgresql and redis:
+```shell
+sudo apt-get install postgresql redis-server
+```
+
+Run application migrations to apply DB changes:
+```shell
+python manage.py migrate
+```
+
+And, run the server:
+```shell
+python manage.py runserver
+```
+
+If you need, you can run celery:
+```shell
+celery -A src.celery worker -n main -l INFO
+```
+
+And flower:
+
+```shell
+celery -A src.celery flower --conf=flowerconfig.py --port=5555 
+```
+
+
+*Problem with version of python 3.10*
+
+Problem 1
+
+> import lxml.etree
+> ImportError: /home/victor/projects/QoS_backend/venv/lib/python3.10/site-packages/lxml/etree.cpython-310-x86_64-linux-gnu.so: undefined symbol: _PyGen_Send
+
+Solution:
+```shell
+pip install lxml --upgrade
+```
+
+Problem 2
+
+> Encountered error while trying to install package.
+> -> uwsgi
+
+Solution:
+```shell
+pip install uwsgi --upgrade   # uwsgi version 2.0.20
+```
+
+Problem 3
+
+> ImportError: cannot import name 'Mapping' from 'collections'
+
+Solution:
+```shell
+pip install jinja2 tornado --upgrade
+```
+
 
