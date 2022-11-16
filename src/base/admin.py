@@ -173,6 +173,7 @@ class NetworkAdmin(admin.ModelAdmin):
             'fields': (
                 'allowed_interval_for_late_arrival',
                 'allowed_interval_for_early_departure',
+                'allowed_interval_for_late_departure',
                 'allowed_geo_distance_km',
                 'enable_camera_ticks',
                 'max_work_shift_seconds',

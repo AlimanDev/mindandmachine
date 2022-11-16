@@ -197,6 +197,7 @@ class TickPhoto(AbstractActiveModel):
         if self.image:
             return images.compress_image(self.image.path, quality)
 
+
 class TickPointToken(models.Model):
     key = models.CharField(gettext_lazy("Key"), max_length=40, primary_key=True)
     user = models.OneToOneField(

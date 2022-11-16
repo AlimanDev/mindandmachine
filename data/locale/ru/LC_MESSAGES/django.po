@@ -12,7 +12,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Django REST framework\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2022-10-28 16:57+0000\n"
+"POT-Creation-Date: 2022-11-09 12:08+0000\n"
 "PO-Revision-Date: 2017-08-03 14:58+0000\n"
 "Last-Translator: Grigory Mishchenko <grishkokot@gmail.com>\n"
 "Language-Team: Russian (http://www.transifex.com/django-rest-framework-1/"
@@ -33,76 +33,76 @@ msgstr "Базовые настройки"
 msgid "Time attendance settings"
 msgstr "Настройки УРВ"
 
-#: src/base/admin.py:184
+#: src/base/admin.py:185
 msgid "Time tracking settings"
 msgstr "Настройки суммированного учета рабочего времени"
 
-#: src/base/admin.py:194
+#: src/base/admin.py:195
 msgid "Vacancy settings"
 msgstr "Настройки биржи смен"
 
-#: src/base/admin.py:202
+#: src/base/admin.py:203
 msgid "Format settings"
 msgstr "Настройки форматов"
 
-#: src/base/admin.py:210
+#: src/base/admin.py:211
 msgid "Timetable settings"
 msgstr "Настройки графика"
 
-#: src/base/admin.py:216
+#: src/base/admin.py:217
 #, fuzzy
 #| msgid "Timetable settings"
 msgid "Timesheet settings"
 msgstr "Настройки табеля"
 
-#: src/base/admin.py:225
+#: src/base/admin.py:226
 msgid "Integration settings"
 msgstr "Настройки интеграции"
 
-#: src/base/admin.py:232
+#: src/base/admin.py:233
 msgid "Default settings"
 msgstr "Настройки по умолчанию"
 
-#: src/base/admin.py:233 src/base/admin.py:349
+#: src/base/admin.py:234 src/base/admin.py:350
 msgid "Other"
 msgstr "Прочее"
 
-#: src/base/admin.py:327
+#: src/base/admin.py:328
 msgid "Compress images"
 msgstr "Сжать изображения"
 
-#: src/base/admin.py:334
+#: src/base/admin.py:335
 msgid "Images compression has started"
 msgstr "Сжатие изображений запущено"
 
-#: src/base/admin.py:344
+#: src/base/admin.py:345
 msgid "Personal info"
 msgstr "Персональные данные"
 
-#: src/base/admin.py:345
+#: src/base/admin.py:346
 msgid "Permissions"
 msgstr "Доступы"
 
-#: src/base/admin.py:348
+#: src/base/admin.py:349
 msgid "Important dates"
 msgstr "Важные даты"
 
-#: src/base/admin.py:375
+#: src/base/admin.py:376
 #, python-format
 msgid "%(name)s object with primary key %(key)r does not exist."
 msgstr "%(name)s объект с ключом %(key)r не существует."
 
-#: src/base/admin.py:572
+#: src/base/admin.py:573
 #, python-format
 msgid "Add %s"
 msgstr "Добавить %s"
 
-#: src/base/admin.py:574
+#: src/base/admin.py:575
 #, python-format
 msgid "Change %s"
 msgstr "Измененить %s"
 
-#: src/base/admin.py:576
+#: src/base/admin.py:577
 #, python-format
 msgid "View %s"
 msgstr "Посмотреть %s"
@@ -191,10 +191,8 @@ msgid "Allowed interval for late_arrival"
 msgstr "Допустимый интервал для опоздания"
 
 #: src/base/models.py:148
-#, fuzzy
-#| msgid "Allowed interval for early departure"
 msgid "Allowed interval for late departure"
-msgstr "Допустимый интервал для раннего ухода"
+msgstr "Допустимый интервал для позднего ухода"
 
 #: src/base/models.py:150
 msgid "Allow workers confirm outsource vacancy"
@@ -856,11 +854,15 @@ msgstr ""
 "Сервис распознавания временно недоступен. Пожалуйста, обратитесь к "
 "администратору системы."
 
-#: src/recognition/models.py:63 src/timetable/attendance_records/views.py:32
+#: src/recognition/models.py:63 src/reports/reports.py:219
+#: src/reports/reports.py:299 src/reports/tests.py:754
+#: src/timetable/attendance_records/views.py:32
 msgid "Coming"
 msgstr "Приход"
 
-#: src/recognition/models.py:64 src/timetable/attendance_records/views.py:33
+#: src/recognition/models.py:64 src/reports/reports.py:222
+#: src/reports/reports.py:305 src/reports/tests.py:646
+#: src/timetable/attendance_records/views.py:33
 msgid "Leaving"
 msgstr "Уход"
 
@@ -876,15 +878,15 @@ msgstr "Конец перерыва"
 msgid "No type"
 msgstr "Нет типа"
 
-#: src/recognition/models.py:201
+#: src/recognition/models.py:202
 msgid "Key"
 msgstr "Ключ"
 
-#: src/recognition/models.py:206
+#: src/recognition/models.py:207
 msgid "Created"
 msgstr "Создан"
 
-#: src/recognition/models.py:231
+#: src/recognition/models.py:232
 msgid "Shop in tick point must be equal to shop in this record."
 msgstr "Магазин в точке отметки должен совпадать с магазином в записи."
 
@@ -951,12 +953,37 @@ msgstr "Конец предыдущей половины года"
 msgid "End of previous year"
 msgstr "Конец предыдущего года"
 
+#: src/reports/reports.py:218 src/reports/tests.py:697
+msgid "Arrival without plan"
+msgstr "Выход вне плана"
+
+#: src/reports/reports.py:221 src/reports/tests.py:756
+msgid "Late arrival"
+msgstr "Опоздание"
+
+#: src/reports/reports.py:224 src/reports/tests.py:648
+msgid "Early departure"
+msgstr "Ранний уход"
+
+#: src/reports/reports.py:226 src/reports/tests.py:771
+msgid "Late departure"
+msgstr "Поздний уход"
+
+#: src/reports/reports.py:237 src/reports/tests.py:632 src/reports/tests.py:696
+#: src/reports/tests.py:770
+msgid "Autotick"
+msgstr "Автоотметка"
+
+#: src/reports/reports.py:280 src/reports/tests.py:647 src/reports/tests.py:755
+msgid "Manual tick"
+msgstr "Ручная отметка"
+
 #: src/reports/serializers.py:63
 msgid "Time period must be within one month."
 msgstr "Период должен быть в рамках одного месяца."
 
 #: src/reports/tasks.py:247 src/reports/tasks.py:262
-#: src/util/dg/ticks_report.py:26
+#: src/util/dg/ticks_report.py:25
 msgid "Tick report"
 msgstr "Отчет по отметкам сотрудников"
 
@@ -968,7 +995,8 @@ msgstr ""
 "Произошла ошибка при формировании Вашего отчёта.\n"
 "Пожалуйста, обратитесь в техническую поддержку."
 
-#: src/reports/tests.py:617 src/util/dg/ticks_report.py:34
+#: src/reports/tests.py:621 src/reports/tests.py:686 src/reports/tests.py:744
+#: src/util/dg/ticks_report.py:35
 msgid "Tick date and time"
 msgstr "Дата и время отметки"
 
@@ -1034,7 +1062,7 @@ msgstr "Подразделение"
 msgid "Work type"
 msgstr "Тип работ"
 
-#: src/reports/utils/pivot_tabel.py:24 src/util/dg/ticks_report.py:29
+#: src/reports/utils/pivot_tabel.py:24 src/util/dg/ticks_report.py:30
 msgid "Tabel code"
 msgstr "Табельный номер"
 
@@ -1979,28 +2007,28 @@ msgstr "Декабрь"
 msgid "Employee"
 msgstr "ФИО сотрудника"
 
-#: src/util/dg/ticks_report.py:30
-msgid "Tick point"
-msgstr "Точка отметки"
+#: src/util/dg/ticks_report.py:29
+msgid "Outsource network"
+msgstr "Аутсорс-сеть"
 
 #: src/util/dg/ticks_report.py:31 src/util/dg/timesheet.py:365
 msgid "Shop"
 msgstr "Отделение"
 
-#: src/util/dg/ticks_report.py:32 src/util/dg/timesheet.py:369
-msgid "Shop code"
-msgstr "Код отделения"
-
-#: src/util/dg/ticks_report.py:33
+#: src/util/dg/ticks_report.py:32
 msgid "Tick type"
 msgstr "Тип отметки"
 
-#: src/util/dg/ticks_report.py:35
-msgid "Verified score"
-msgstr "Верификация"
+#: src/util/dg/ticks_report.py:33
+msgid "Tick kind"
+msgstr "Вид отметки"
+
+#: src/util/dg/ticks_report.py:34
+msgid "Violation"
+msgstr "Нарушение"
 
 #: src/util/dg/ticks_report.py:36
-msgid "Liveness"
+msgid "Photo quality"
 msgstr "Качество фото"
 
 #: src/util/dg/ticks_report.py:37
@@ -2043,6 +2071,10 @@ msgstr "Итого часы"
 #: src/util/dg/timesheet.py:367
 msgid "Total days"
 msgstr "Итого дни"
+
+#: src/util/dg/timesheet.py:369
+msgid "Shop code"
+msgstr "Код отделения"
 
 #: src/util/dg/timesheet.py:370
 msgid "Shop name"
@@ -2102,6 +2134,12 @@ msgstr "Не было передано ни одного файла."
 #: src/util/upload.py:26
 msgid "The file was not uploaded."
 msgstr "Файл не был загружен."
+
+#~ msgid "Verified score"
+#~ msgstr "Верификация"
+
+#~ msgid "Liveness"
+#~ msgstr "Качество фото"
 
 #~ msgid "Your report is available at the link:"
 #~ msgstr "Ваш отчёт доступен по ссылке:"

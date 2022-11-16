@@ -145,7 +145,7 @@ class Network(AbstractActiveModel):
     allowed_interval_for_late_arrival = models.DurationField(
         verbose_name=_('Allowed interval for late_arrival'), default=datetime.timedelta(seconds=0))
     allowed_interval_for_late_departure = models.DurationField(
-        verbose_name=_('Allowed interval for late departure'), default=datetime.timedelta(seconds=0))
+        verbose_name=_('Allowed interval for late departure'), default=datetime.timedelta(minutes=15))
     allow_workers_confirm_outsource_vacancy = models.BooleanField(
         verbose_name=_('Allow workers confirm outsource vacancy'), default=False)
     api_timesheet_lines_group_by = models.PositiveSmallIntegerField(

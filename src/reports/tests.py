@@ -4,6 +4,7 @@ from datetime import date, datetime, time, timedelta
 from unittest import mock
 
 import pandas as pd
+import numpy as np
 from dateutil.relativedelta import relativedelta
 from django.core import mail
 from django.core.cache import cache
@@ -445,6 +446,7 @@ class TestReportsViewSet(TestsHelperMixin, APITestCase):
         cls.network_outsource = NetworkFactory(name='Аутсорс-сеть', code='2')
         cls.user_outsource = UserFactory(email='user_outsource@example.com', network=cls.network_outsource)
         cls.employee_outsource = EmployeeFactory(user=cls.user_outsource, tabel_code='employee_outsource')
+        cls.employment_outsource = EmploymentFactory(employee=cls.employee_outsource)
         cls.position_outsource = WorkerPosition.objects.create(
             name='Должность сотрудника аутсорса',
             network=cls.network_outsource,
@@ -564,17 +566,19 @@ class TestReportsViewSet(TestsHelperMixin, APITestCase):
             image=str(path / '2.jpg'),
             type=TickPhoto.TYPE_LAST
         )
-        reference_list = [
-            self.wd1.employee.user.fio,
-            self.wd1.employee.tabel_code,
-            tickpoint.name,
-            tickpoint.shop.name,
-            tickpoint.shop.code,
-            tick.type_display,
-            pd.Timestamp(tick.dttm),
-            tick.verified_score,
-            tp1.liveness
-        ]
+
+        # Plan to check for violations
+        WorkerDay.objects.create(
+            dt=tick.dttm.date(),
+            is_approved=True,
+            is_fact=False,
+            dttm_work_start=tick.dttm, # No violations in Autotick
+            dttm_work_end=self.wd1.dttm_work_end + timedelta(hours=1), # Early leave in Manual tick
+            shop=tickpoint.shop,
+            employee=tick.employee,
+            employment=self.wd1.employment,
+            type_id=WorkerDay.TYPE_WORKDAY
+        )
 
         query_params = {
             'employee_id__in': [self.wd1.employee.id],
@@ -615,7 +619,37 @@ class TestReportsViewSet(TestsHelperMixin, APITestCase):
         self.assertEqual(res.headers['Content-Type'], 'application/xlsx')
         df = pd.read_excel(res.content)
         df[_('Tick date and time')] = df[_('Tick date and time')].dt.round(freq='s') #pandas reads datetime wrong
-        self.assertListEqual(reference_list, df.iloc[0][0:9].to_list())
+        df.replace({np.nan: None}, inplace=True)
+        # Actual Tick (Autotick)
+        self.assertListEqual(
+            df.iloc[0][0:9].to_list(),
+            [
+                tick.employee.user.fio,
+                None,
+                tick.employee.tabel_code,
+                tickpoint.shop.name,
+                tick.type_display,
+                _('Autotick'),
+                None,
+                pd.Timestamp(tick.dttm),
+                tp1.liveness
+            ]
+        )
+        # Manual Tick, pulled from WorkerDay if Tick not found
+        self.assertListEqual(
+            df.iloc[1][0:9].to_list(),
+            [
+                self.wd1.employee.user.fio,
+                None,
+                self.wd1.employee.tabel_code,
+                self.wd1.shop.name,
+                _('Leaving'),
+                _('Manual tick'),
+                _('Early departure'),
+                pd.Timestamp(self.wd1.dttm_work_end),
+                None
+            ]
+        )
 
         query_params['with_biometrics'] = True
         del query_params['employee_id__in']
@@ -629,6 +663,116 @@ class TestReportsViewSet(TestsHelperMixin, APITestCase):
         query_params['dt_to'] = self.wd1.dt - timedelta(30)
         res = self.client.get(self.get_url('Reports-tick'), query_params)
         self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+
+        # Arrival without plan
+        tick2 = Tick.objects.create(
+            dttm=self.wd1.dttm_work_start + timedelta(1),
+            user=self.wd1.employee.user,
+            employee=self.wd1.employee,
+            tick_point=tickpoint,
+            type=Tick.TYPE_COMING,
+            verified_score=0.5
+        )
+        query_params_no_plan = {
+            'employee_id__in': [self.wd1.employee.id],
+            'shop_id__in': [self.wd1.shop.id],
+            'dt_from': self.wd1.dt + timedelta(1),
+            'dt_to': self.wd1.dt + timedelta(1),
+        }
+        res = self.client.get(self.get_url('Reports-tick'), query_params_no_plan)
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(res.headers['Content-Type'], 'application/xlsx')
+        df = pd.read_excel(res.content)
+        df[_('Tick date and time')] = df[_('Tick date and time')].dt.round(freq='s') #pandas reads datetime wrong
+        df.replace({np.nan: None}, inplace=True)
+        self.assertListEqual(
+            df.iloc[0][0:9].to_list(),
+            [
+                tick2.employee.user.fio,
+                None,
+                tick2.employee.tabel_code,
+                tickpoint.shop.name,
+                tick2.type_display,
+                _('Autotick'),
+                _('Arrival without plan'),
+                pd.Timestamp(tick2.dttm),
+                None
+            ]
+        )
+
+        # Outsource
+        wd3 = WorkerDay.objects.create(
+            dt=tick.dttm.date(),
+            is_approved=True,
+            is_fact=True,
+            is_outsource=True,
+            dttm_work_start=self.wd1.dttm_work_start + timedelta(hours=1),  # Late coming in Manual tick
+            shop=tickpoint.shop,
+            employee=self.employee_outsource,
+            employment=self.employment_outsource,
+            type_id=WorkerDay.TYPE_WORKDAY
+        )
+        tick3 = Tick.objects.create(
+            dttm=self.wd1.dttm_work_end + timedelta(hours=1),   # Late leave in Manual tick
+            user=self.employee_outsource.user,
+            employee=self.employee_outsource,
+            tick_point=tickpoint,
+            type=Tick.TYPE_LEAVING
+        )
+        # Outsource plan
+        WorkerDay.objects.create(
+            dt=tick.dttm.date(),
+            is_approved=True,
+            is_fact=False,
+            dttm_work_start=self.wd1.dttm_work_start, 
+            dttm_work_end=self.wd1.dttm_work_end,
+            shop=tickpoint.shop,
+            employee=self.employee_outsource,
+            employment=self.employment_outsource,
+            type_id=WorkerDay.TYPE_WORKDAY
+        )
+        query_params_outsource = {
+            'employee_id__in': [self.employee_outsource.id],
+            'shop_id__in': [tickpoint.shop.id],
+            'dt_from': self.wd1.dt - timedelta(1),
+            'dt_to': self.wd1.dt,
+        }
+        res = self.client.get(self.get_url('Reports-tick'), query_params_outsource)
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(res.headers['Content-Type'], 'application/xlsx')
+        df = pd.read_excel(res.content)
+        df[_('Tick date and time')] = df[_('Tick date and time')].dt.round(freq='s') #pandas reads datetime wrong
+        df.replace({np.nan: None}, inplace=True)
+        # Actual Tick (Autotick)
+        self.assertListEqual(
+            df.iloc[0][0:9].to_list(),
+            [
+                wd3.employee.user.fio,
+                self.network_outsource.name,
+                wd3.employee.tabel_code,
+                wd3.shop.name,
+                _('Coming'),
+                _('Manual tick'),
+                _('Late arrival'),
+                pd.Timestamp(wd3.dttm_work_start),
+                None
+            ]
+        )
+        # Manual Tick, pulled from WorkerDay if Tick not found
+        self.assertListEqual(
+            df.iloc[1][0:9].to_list(),
+            [
+                tick3.user.fio,
+                self.network_outsource.name,
+                tick3.employee.tabel_code,
+                tick3.tick_point.shop.name,
+                tick3.type_display,
+                _('Autotick'),
+                _('Late departure'),
+                pd.Timestamp(tick3.dttm),
+                None
+            ]
+        )
 
 
 class TestScheduleDeviation(APITestCase, TestsHelperMixin):
@@ -741,7 +885,7 @@ class TestScheduleDeviation(APITestCase, TestsHelperMixin):
         wd_fact.dttm_work_start = datetime.combine(dt, time(9))
         wd_fact.dttm_work_end = datetime.combine(dt, time(20, 30))
         wd_fact.save()
-        self.assertHours(plan_work_hours=10.75, fact_work_hours=10.25, late_arrival_hours=1.0, late_arrival_count=1, late_departure_hours=0.5, late_departure_count=1, lost_work_hours=0.5, lost_work_hours_count=1)
+        self.assertHours(plan_work_hours=10.75, fact_work_hours=10.25, late_arrival_hours=1.0, late_arrival_count=1, late_departure_hours=0.25, late_departure_count=1, lost_work_hours=0.5, lost_work_hours_count=1)
         wd_plan.dttm_work_start = datetime.combine(dt, time(9))
         wd_plan.dttm_work_end = datetime.combine(dt, time(14))
         wd_plan.save()
@@ -784,10 +928,10 @@ class TestScheduleDeviation(APITestCase, TestsHelperMixin):
         wd_fact2.dttm_work_end = datetime.combine(dt, time(20, 30))
         wd_fact2.closest_plan_approved = wd_plan2
         wd_fact2.save()
-        self.assertHours(plan_work_hours=9.0, fact_work_hours=10.5, early_arrival_hours=1.0, early_arrival_count=2, late_departure_hours=0.5, late_departure_count=1)
+        self.assertHours(plan_work_hours=9.0, fact_work_hours=10.5, early_arrival_hours=1.0, early_arrival_count=2, late_departure_hours=0.25, late_departure_count=1)
         wd_fact.dttm_work_start = datetime.combine(dt, time(9, 30))
         wd_fact.save()
-        self.assertHours(plan_work_hours=9.0, fact_work_hours=9.5, early_arrival_hours=0.5, early_arrival_count=1, late_departure_hours=0.5, late_departure_count=1, late_arrival_count=1, late_arrival_hours=0.5, lost_work_hours_count=1, lost_work_hours=0.5)
+        self.assertHours(plan_work_hours=9.0, fact_work_hours=9.5, early_arrival_hours=0.5, early_arrival_count=1, late_departure_hours=0.25, late_departure_count=1, late_arrival_count=1, late_arrival_hours=0.5, lost_work_hours_count=1, lost_work_hours=0.5)
 
     def test_get_schedule_deviation(self):
         dt = date.today()
@@ -904,7 +1048,7 @@ class TestScheduleDeviation(APITestCase, TestsHelperMixin):
             (
                 (
                     self.shop.name, datetime.combine(dt, time(0, 0)), f'{self.user1.fio} ', '-', self.root_shop.name, 'штат', 
-                    self.position.name, 'Биржа смен', 10, 10.5, 4.5, 0.5, 1, 0.5, 1, 0, 0, 1, 2, 0, 0, 0, 0
+                    self.position.name, 'Биржа смен', 10, 10.5, 4.5, 0.5, 1, 0.5, 1, 0, 0, 0.5, 2, 0, 0, 0, 0
                 ),
                 (
                     self.shop2.name, datetime.combine(dt, time(0, 0)), f'{self.user2.fio} ', self.employee2.tabel_code, 

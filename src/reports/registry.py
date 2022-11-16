@@ -1,4 +1,4 @@
-from typing import Iterable
+from typing import Iterable, Union
 from django.utils.functional import cached_property
 from django.db.models import QuerySet
 
@@ -58,5 +58,5 @@ class BaseRegisteredReport(metaclass=ReportRegistryHolder):
         return []
 
     @cached_property
-    def report_data(self) -> QuerySet:
+    def report_data(self) -> Union[QuerySet, list]:
         return None

@@ -1,9 +1,14 @@
 from datetime import date, timedelta, datetime
+from copy import deepcopy
 
-from django.db.models import Q, Prefetch, QuerySet
+from django.db.models import Q, Prefetch, Case, When, Value, F, Exists, OuterRef
+from django.utils.translation import gettext as _
+
 from django.utils.functional import cached_property
 
+from src.base.models import Network
 from src.recognition.models import Tick, TickPhoto
+from src.timetable.models import WorkerDay
 from src.reports.registry import BaseRegisteredReport
 from src.util.dg.ticks_report import TicksOdsReportGenerator, TicksOdtReportGenerator
 
@@ -15,7 +20,7 @@ URV_STAT_V2 = 'urv_stat_v2'
 UNACCOUNTED_OVERTIME = 'unaccounted_overtime'
 OVERTIMES_UNDERTIMES = 'overtimes_undertimes'
 PIVOT_TABEL = 'pivot_tabel'
-SCHEDULE_DEVATION = 'schedule_devation'
+SCHEDULE_DEVIATION = 'schedule_deviation'
 TICK = 'tick'
 
 
@@ -104,7 +109,7 @@ class UrvStatV2Report(BaseRegisteredReport, DatesReportMixin):
         ).values_list('shop_id', flat=True))
 
 
-class UnaccountedOvertivmeReport(BaseRegisteredReport, DatesReportMixin):
+class UnaccountedOvertimeReport(BaseRegisteredReport, DatesReportMixin):
     name = 'Отчет по неучтенным переработкам'
     code = UNACCOUNTED_OVERTIME
 
@@ -151,14 +156,14 @@ class PivotTabelReport(BaseRegisteredReport, DatesReportMixin):
         }
 
 
-class ScheduleDevationReport(BaseRegisteredReport, DatesReportMixin):
+class ScheduleDeviationReport(BaseRegisteredReport, DatesReportMixin):
     name = 'Отчет по отклонениям от планового графика'
-    code = SCHEDULE_DEVATION
+    code = SCHEDULE_DEVIATION
 
     def get_file(self):
         from src.reports.utils.schedule_deviation import schedule_deviation_report
         dt_from, dt_to = self.get_dates(self.context)
-        title = f'Scedule_deviation_{dt_from}-{dt_to}.xlsx'
+        title = f'schedule_deviation_{dt_from}-{dt_to}.xlsx'
         return schedule_deviation_report(dt_from, dt_to, title, in_memory=True, shop_ids=self.context.get('shop_ids'))
 
     def get_recipients_shops(self):
@@ -177,9 +182,8 @@ class TickReport(BaseRegisteredReport, DatesReportMixin):
 
     def __init__(self, network_id: int, context: dict, *args, **kwargs):
         self.dt_from, self.dt_to = self.get_dates(context)
-        self.order_by = context.get('order_by', ['user__last_name', 'user__first_name', 'user__middle_name', 'dttm'])
         super().__init__(network_id, context, *args, **kwargs)
-    
+
     def get_file(self) -> dict:
         if self.context.get('with_biometrics'):
             Generator = TicksOdtReportGenerator
@@ -188,7 +192,7 @@ class TickReport(BaseRegisteredReport, DatesReportMixin):
             Generator = TicksOdsReportGenerator
             format = 'xlsx'
         report = Generator(
-            ticks_queryset=self.report_data,
+            ticks=self.report_data,
             dt_from=self.dt_from,
             dt_to=self.dt_to
         ).generate(convert_to=format)
@@ -199,11 +203,50 @@ class TickReport(BaseRegisteredReport, DatesReportMixin):
         }
 
     @cached_property
-    def report_data(self) -> QuerySet:
+    def report_data(self) -> list:
+        """
+        Autoticks + manual ticks. Checked against plan for violations, liveness_str attribute for Word/ODT format, 
+        sorted by fio (full name) and dttm.
+        """
+        all_ticks = list(self._get_ticks()) + list(self._get_wdays())
+        plan_wdays = self._get_plan_wdays()
+        for tick in all_ticks:
+            tick.liveness_str = f'{int(tick.min_liveness_prop * 100)}%' if tick.min_liveness_prop else None # to percentage (%)
+            tick.violation = None
+            # Multiple WorkerDays can be in one day
+            plans = tuple(filter(lambda wd: wd.employee_id == tick.employee_id and wd.dt == tick.dttm.date(), plan_wdays))
+            if not plans:
+                tick.violation = _('Arrival without plan')
+            else:
+                if len(plans) == 1:     # One plan found
+                    plan = plans[0]
+                else:                   # Multiple plans found, choosing the closest one
+                    plan = self._choose_closest_plan(plans, tick)
+
+                if tick.type_display == _('Coming') and plan.dttm_work_start:
+                    if tick.dttm - plan.dttm_work_start > self.network.allowed_interval_for_late_arrival:
+                        tick.violation = _('Late arrival')
+                elif tick.type_display == _('Leaving') and plan.dttm_work_end:
+                    if plan.dttm_work_end - tick.dttm > self.network.allowed_interval_for_early_departure:
+                        tick.violation = _('Early departure')
+                    elif tick.dttm - plan.dttm_work_end > self.network.allowed_interval_for_late_departure:
+                        tick.violation = _('Late departure')
+
+        all_ticks.sort(key=lambda tick: (tick.user.fio, tick.dttm))
+        return all_ticks
+
+    def _get_ticks(self) -> list:
+        """Normal Ticks (Autoticks)"""
         qs = Tick.objects.filter(
             dttm__gte=self.dt_from,
             dttm__lt=self.dt_to + timedelta(1)
-        ).order_by(*self.order_by)
+        ).annotate(
+            outsource_network=Case(When(~Q(user__network=F('tick_point__shop__network')), then=F('user__network__name'))),
+            tick_kind=Value(_('Autotick')),
+            shop_name=F('tick_point__shop__name'),
+        ).select_related(
+            'user', 'employee'
+        )
         if shops := self.context.get('shop_id__in'):
             qs = qs.filter(tick_point__shop_id__in=shops)
         if employees := self.context.get('employee_id__in'):
@@ -216,7 +259,97 @@ class TickReport(BaseRegisteredReport, DatesReportMixin):
                     to_attr='tickphotos_list',
                 )
             )
-        return qs
+        return list(qs)
+
+    def _get_wdays(self) -> list:
+        """"Manual" ticks, from WorkerDay model. When there is no Tick, but the WorkerDay is created by hand."""
+        qs = WorkerDay.objects.filter(
+            dt__range=(self.dt_from, self.dt_to),
+            is_approved=True,
+            is_fact=True,
+            type__is_dayoff=False
+        ).annotate(
+            tick_coming=Exists(
+                Tick.objects.filter(
+                dttm=OuterRef('dttm_work_start'),
+                employee=OuterRef('employee'),
+                tick_point__shop=OuterRef('shop'),
+                type=Tick.TYPE_COMING
+                )
+            ),
+            tick_leaving=Exists(
+                Tick.objects.filter(
+                dttm=OuterRef('dttm_work_end'),
+                employee=OuterRef('employee'),
+                tick_point__shop=OuterRef('shop'),
+                type=Tick.TYPE_LEAVING
+                )
+            ),
+            outsource_network=Case(When(~Q(employee__user__network=F('shop__network')), then=F('employee__user__network__name'))),
+            tick_kind=Value(_('Manual tick')),
+            shop_name=F('shop__name'),
+        ).exclude(
+            tick_coming=True,
+            tick_leaving=True
+        ).select_related(
+            'employee__user'
+        )
+        if shops := self.context.get('shop_id__in'):
+            qs = qs.filter(shop_id__in=shops)
+        if employees := self.context.get('employee_id__in'):
+            qs = qs.filter(employee_id__in=employees)
+
+        # Imitating some of the Tick fields
+        wdays = []
+        for wd in qs:
+            wd.min_liveness_prop = None
+            wd.user = wd.employee.user
+            if not wd.tick_coming and wd.dttm_work_start:
+                wd.type_display = _('Coming')
+                wd.dttm = wd.dttm_work_start
+                wdays.append(wd)
+            if not wd.tick_leaving and wd.dttm_work_end:
+                wd2 = deepcopy(wd)
+                wd2.dttm = wd2.dttm_work_end
+                wd2.type_display = _('Leaving')
+                wdays.append(wd2)
+        return  wdays
+
+    def _get_plan_wdays(self) -> tuple:
+        """
+        Approved plan WorkerDays to check Ticks for violations.
+        """
+        qs = WorkerDay.objects.filter(
+            dt__range=(self.dt_from, self.dt_to),
+            is_approved=True,
+            is_fact=False,
+            type__is_dayoff=False
+        )
+        if shops := self.context.get('shop_id__in'):
+            qs = qs.filter(shop_id__in=shops)
+        if employees := self.context.get('employee_id__in'):
+            qs = qs.filter(employee_id__in=employees)
+        return tuple(qs)
+
+    @staticmethod
+    def _choose_closest_plan(plans: tuple[WorkerDay], tick: Tick) -> WorkerDay:
+        """Returns WorkerDay whose dttm_work_start/dttm_work_end (depending on tick.type_display) is closest to tick.dttm"""
+        assert len(plans) > 1
+        dttm_attr = 'dttm_work_start' if tick.type_display == _('Coming') else 'dttm_work_end'
+        closest_plan = plans[0]
+        for wd in plans[1:]:
+            dttm_closest_plan = getattr(closest_plan, dttm_attr, None)
+            dttm_wd = getattr(wd, dttm_attr, None)
+            if dttm_wd and (
+                not dttm_closest_plan or                                    # wd has dttm, but previous plan doesn't
+                abs(tick.dttm - dttm_wd) < abs(tick.dttm - dttm_closest_plan)    # wd.dttm_work_... is closer to tick than previous plan's
+                ):
+                closest_plan = wd
+        return closest_plan
+
+    @cached_property
+    def network(self) -> Network:
+        return Network.objects.get(id=self.network_id)
 
     @property
     def shops_suffix(self) -> str:
