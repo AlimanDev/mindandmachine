@@ -870,7 +870,7 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
 
         response = self.client.put(f"{self.url}{self.worker_day_plan_not_approved.id}/", data, format='json')
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertEqual(response.json(), {'worker_day_details': ['Обязательное поле.']})
+        self.assertEqual(response.json(), {'worker_day_details': ['Это поле обязательно.']})
 
         data = {
             "shop_id": self.shop.id,
@@ -887,7 +887,7 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
 
         response = self.client.put(f"{self.url}{self.worker_day_plan_not_approved.id}/", data, format='json')
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertEqual(response.json(), {'dttm_work_start': ['Обязательное поле.']})
+        self.assertEqual(response.json(), {'dttm_work_start': ['Это поле обязательно.']})
 
     def test_copy_approved_to_fact_crossing(self):
         dt_now = date.today()

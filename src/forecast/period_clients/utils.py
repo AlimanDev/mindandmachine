@@ -1,138 +1,140 @@
+import logging
+from datetime import time, datetime
+from dateutil.parser import ParserError
+
 import pandas as pd
 import numpy as np
+from django.db import transaction
+from django.db.models import Q
+from django.utils.translation import gettext as _
 from rest_framework.response import Response
 from rest_framework.serializers import ValidationError
-from src.forecast.models import (
-    OperationType,
-    PeriodClients,
-    OperationTypeName,
-)
 
-from datetime import time, timedelta, datetime, date
-from dateutil.relativedelta import relativedelta
+from src.base.models import Shop
+from src.forecast.models import OperationType, PeriodClients
 from src.util.download import xlsx_method
-from django.apps import apps
-import json
-from django.db import transaction
-from django.utils.translation import gettext as _
-from src.base.models import (
-    Shop,
-)
-from src.timetable.models import (
-    WorkType,
-)
-
-from django.db.models import Q
 from src.util.models_converter import Converter
 
-def upload_demand_util_v1(df, shop_id, lang):
-    df = df[df.columns[:3]]
+logger = logging.getLogger('upload_demand')
 
-    work_types = df['Тип работ'].unique()
-
-    op_types = {
-        op.operation_type_name.name:op
-        for op in OperationType.objects.select_related('operation_type_name').filter(
-            operation_type_name__name__in=work_types,
-            shop_id=shop_id,
-        )
-    }
-
-    period_clients = []
-    period_clients_to_delete_ids = []
-    for work_type in work_types:
-        operation_type = op_types.get(work_type)
-        if not operation_type:
-            raise ValidationError(_('There is no such work type or it is not associated with the operation type {work_type}.').format(work_type=work_type))
-        work_type_df = df[df['Тип работ'] == work_type]
-        dttms = list(pd.to_datetime(work_type_df['Время']).dt.round('s'))
-        period_clients_to_delete_ids += list(PeriodClients.objects.filter(
-            operation_type__shop_id=shop_id,
-            operation_type__operation_type_name__name=work_type,
-            dttm_forecast__in=dttms,
-            type=PeriodClients.LONG_FORECASE_TYPE,
-        ).values_list('id', flat=True))
-        period_clients += [
-            PeriodClients(
-                operation_type=op_types[work_type],
-                value=data['Значение'],
-                dttm_forecast=data['Время'],
-                dt_report=data['Время'].date(),
-                type=PeriodClients.LONG_FORECASE_TYPE,
-            )
-            for _not_used, data in work_type_df.iterrows()
-        ]
-    
-    PeriodClients.objects.filter(id__in=period_clients_to_delete_ids).delete()
-    PeriodClients.objects.bulk_create(period_clients)
-
-    return Response()
-
-
-def upload_demand_util_v2(new_workload, shop_id, type=PeriodClients.LONG_FORECASE_TYPE):
-    new_workload.dttm = new_workload.dttm.dt.round('s')
-    dttm_min = new_workload.dttm.min()
-    dttm_max = new_workload.dttm.max()
-    op_types = {
-        op.operation_type_name.name:op
-        for op in OperationType.objects.select_related('operation_type_name').filter(
-            operation_type_name__name__in=set(new_workload.columns) - {'dttm'},
-            shop_id=shop_id,
-        )
-    }
-    period_clients = []
-    for operation_type in set(new_workload.columns) - {'dttm'}:
-        operation = op_types.get(operation_type)
-        if not operation:
-            raise ValidationError(_('There is no such operation type {operation_type}.').format(operation_type=operation_type))
-        period_clients.extend(
-            [
-                PeriodClients(
-                    dttm_forecast=row['dttm'],
-                    dt_report=row['dttm'].date(),
-                    operation_type=operation,
-                    type=type,
-                    value=row[operation_type]
-
-                ) for _not_used, row in new_workload[['dttm', operation_type]].iterrows()
-            ]
-        )
-    PeriodClients.objects.filter(
-        dttm_forecast__gte=dttm_min,
-        dttm_forecast__lte=dttm_max,
-        operation_type__in=op_types.values(),
-        type=type,
-    ).delete()
-    PeriodClients.objects.bulk_create(period_clients)
-    return Response()
-
-
-def upload_demand(demand_file, shop_id=None, type=PeriodClients.LONG_FORECASE_TYPE):
+def upload_demand(demand_file, shop_id: int = None, type: str = PeriodClients.LONG_FORECASE_TYPE) -> list[str]:
+    """
+    Upload demand from excel/csv to PeriodClients (instead of aggregating Receipts). Columns should map to OperationTypeNames.
+    `shop_code`s are taken from file or `shop_id` is used. The latter case will raise ValidationError if shop wasn't found.
+    Errors are collected and returned. Bad rows/shops will be skipped.
+    """
     try:
         df = pd.read_excel(demand_file, dtype=str)
     except:
         try:
             df = pd.read_csv(demand_file, dtype=str)
         except:
-            raise ValidationError(_("Files with this extension are not supported."))
-    with transaction.atomic():
-        operation_types = list(set(df.columns) - {'dttm', 'shop_code'})
-        df[operation_types] = df[operation_types].astype(float)
-        df.loc[:, 'dttm'] = pd.to_datetime(df.dttm).dt.round('s')
-        if 'shop_code' in df.columns:
-            shops = Shop.objects.filter(code__in=df.shop_code.unique())
-            for s in shops:
-                upload_demand_util_v2(df.loc[df.shop_code==s.code, set(df.columns) - {'shop_code'}], s.id, type)
-        else:
-            if not shop_id:
-                raise ValidationError(_("Shop id should be defined"))
+            raise ValidationError(_('Files with this extension are not supported.'))
+    operation_types = list(set(df.columns) - {'dttm', 'shop_code'})
 
-            upload_demand_util_v2(df, shop_id, type)
-    
-    return Response()
+    # Data validation and conversion
+    try:
+        df.loc[:, 'dttm'] = pd.to_datetime(df.dttm).dt.round('s')
+    except ParserError as e:
+        raise ValidationError(_('Incorrect datetime: {}').format(e.args[1]))
+    try:
+        df[operation_types] = df[operation_types].astype(float)
+    except ValueError as e:
+        raise ValidationError(_('Incorrect operation value: {}').format(e.args[0].split(":")[1]))
+
+    errors = []
+    if 'shop_code' in df.columns:
+        # Using shop_codes from file
+        for code in df.shop_code.unique():
+            if pd.isna(code):
+                errors.append(_('Empty shop code ignored'))
+                continue
+            try:
+                shop = Shop.objects.get(code=code)
+            except Shop.DoesNotExist:
+                errors.append(_('Shop with code {} not found').format(code))
+                continue
+            except Shop.MultipleObjectsReturned:
+                shops_names = Shop.objects.filter(code=code).values_list('name', flat=True)
+                errors.append(_('Multiple shops with code {} found: {}. Shops must have unique codes.').format(code, ', '.join(shops_names)))
+                continue
+
+            try:
+                errors += upload_demand_util_v2(df.loc[df.shop_code==code, set(df.columns) - {'shop_code'}], shop, type)
+            except Exception as e:
+                logger.exception(f'Unexpected error for shop {shop.name}: {str(e)}')
+                errors.append(_('Unexpected error for shop {}, please contact Technical support').format(shop.name))
+
+    elif shop_id:
+        # If no shop_code column, then use shop_id
+        try:
+            shop = Shop.objects.get(id=shop_id)
+        except Shop.DoesNotExist:
+            raise ValidationError(_('Shop with code {} not found').format(code))
+
+        try:
+            errors += upload_demand_util_v2(df, shop, type)
+        except Exception as e:
+            logger.exception(f'Unexpected error for shop {shop.name}: {str(e)}')
+            errors.append(_('Unexpected error for shop {}, please contact Technical support').format(shop.name))
+
+    else:
+        raise ValidationError(_('Shop id should be defined'))
+
+    return errors
+
+
+def upload_demand_util_v2(new_workload, shop: Shop, type=PeriodClients.LONG_FORECASE_TYPE) -> list[str]:
+    """
+    Save PeriodClients for each OperationType found for the shop. Delete previous ones.
+    Errors are collected and returned.
+    """
+    errors = set()
+    new_workload.dttm = new_workload.dttm.dt.round('s')
+    dttm_min = new_workload.dttm.min()
+    dttm_max = new_workload.dttm.max()
+    op_types = {
+        op.operation_type_name.name: op
+        for op in OperationType.objects.select_related('operation_type_name').filter(
+            operation_type_name__name__in=set(new_workload.columns) - {'dttm'},
+            shop=shop,
+        )
+    }
+    period_clients = []
+    for operation_type in set(new_workload.columns) - {'dttm'}:
+        operation = op_types.get(operation_type)
+        if not operation:
+            errors.add(_('No operation type {} for shop {}').format(operation_type, shop.name))
+            continue
+
+        for i, row in new_workload[['dttm', operation_type]].iterrows():
+            if pd.isnull(row['dttm']):
+                errors.add(_('No datetime on row {}').format(i+2))   # 1 for headers, 1 for indexing from 0
+                continue
+            if pd.isnull(row[operation_type]):
+                errors.add(_('No value on row {} for operation type {}').format(i+2, operation_type))
+                continue
+            period_clients.append(PeriodClients(
+                dttm_forecast=row['dttm'],
+                dt_report=row['dttm'].date(),
+                operation_type=operation,
+                type=type,
+                value=row[operation_type]
+            ))
+
+    with transaction.atomic():
+        PeriodClients.objects.filter(
+            dttm_forecast__gte=dttm_min,
+            dttm_forecast__lte=dttm_max,
+            operation_type__in=op_types.values(),
+            type=type,
+        ).delete()
+        PeriodClients.objects.bulk_create(period_clients)
+    return list(errors)
 
 
 def upload_demand_util_v3(operation_type_name, demand_file, index_col=None, type='F'):
+        # See src.forecast.period_clients.views.PeriodClientsViewSet.upload_demand. Potentially needs to be removed.
     if index_col:
         df = pd.read_excel(demand_file, index_col=index_col, dtype=str)
     else:
@@ -172,18 +174,6 @@ def upload_demand_util_v3(operation_type_name, demand_file, index_col=None, type
                 )
             )
     return Response(creates)
-
-
-def upload_demand_util(demand_file, shop_id, lang='ru'):
-    try:
-        df = pd.read_excel(demand_file)
-    except KeyError:
-        raise ValidationError(_('Failed to open active sheet.'))
-
-    if 'dttm' in df.columns:
-        return upload_demand_util_v2(df, shop_id)
-    
-    return upload_demand_util_v1(df, shop_id, lang)
 
 
 @xlsx_method

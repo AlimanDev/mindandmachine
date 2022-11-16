@@ -386,7 +386,8 @@ class PeriodClientsViewSet(BaseModelViewSet):
     def upload(self, request, file):
         data = UploadSerializer(data=request.data)
         data.is_valid(raise_exception=True)
-        return upload_demand(file, shop_id=data.validated_data.get('shop_id'), type=data.validated_data['type'])
+        errors = upload_demand(file, shop_id=data.validated_data.get('shop_id'), type=data.validated_data['type'])
+        return Response({'errors': errors})
 
     @swagger_auto_schema(
         request_body=UploadSerializer, 
@@ -399,6 +400,7 @@ class PeriodClientsViewSet(BaseModelViewSet):
     @action(detail=False, methods=['post'])
     @get_uploaded_file
     def upload_demand(self, request, file):
+        # Doesn't seem to be used in frontend. Potentially needs to be removed.
         data = UploadDemandSerializer(data=request.data)
         data.is_valid(raise_exception=True)
         return upload_demand_util_v3(OperationTypeName.objects.get(id=data.validated_data['operation_type_name_id']), file, type=data.validated_data['type'])

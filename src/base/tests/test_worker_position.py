@@ -111,7 +111,7 @@ class TestWorkerPositionAPI(TestsHelperMixin, APITestCase):
         resp = self.client.post(
             self.get_url('WorkerPosition-list'), data=self.dump_data(data), content_type='application/json')
         self.assertEqual(resp.status_code, 400)
-        self.assertEqual(resp.json()['code'], ['Значения поля должны быть уникальны.'])
+        self.assertEqual(resp.json()['code'], ['Это поле должно быть уникально.'])
 
     def test_create_and_update_with_put_by_code(self):
         data = {

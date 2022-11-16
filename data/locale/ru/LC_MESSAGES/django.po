@@ -12,7 +12,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Django REST framework\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2022-11-09 12:08+0000\n"
+"POT-Creation-Date: 2022-11-16 09:05+0000\n"
 "PO-Revision-Date: 2017-08-03 14:58+0000\n"
 "Last-Translator: Grigory Mishchenko <grishkokot@gmail.com>\n"
 "Language-Team: Russian (http://www.transifex.com/django-rest-framework-1/"
@@ -770,32 +770,57 @@ msgstr ""
 "Вы не можете указать постоянное значение, так как у данной операции есть "
 "зависимости."
 
-#: src/forecast/period_clients/utils.py:46
-#, python-brace-format
-msgid ""
-"There is no such work type or it is not associated with the operation type "
-"{work_type}."
-msgstr "Нет такого типа работ или он не связан с типом операций {work_type}"
-
-#: src/forecast/period_clients/utils.py:87
-#, python-brace-format
-msgid "There is no such operation type {operation_type}."
-msgstr "Нет такого типа операций {operation_type}."
-
-#: src/forecast/period_clients/utils.py:117 src/util/upload.py:28
+#: src/forecast/period_clients/utils.py:32 src/util/upload.py:28
 msgid "Files with this extension are not supported."
 msgstr "Файлы с таким расширением не поддерживается."
 
-#: src/forecast/period_clients/utils.py:128
+#: src/forecast/period_clients/utils.py:39
+msgid "Incorrect datetime: {}"
+msgstr "Некорректные дата и время: {}"
+
+#: src/forecast/period_clients/utils.py:43
+msgid "Incorrect operation value: {}"
+msgstr "Некорректное значение операции: {}"
+
+#: src/forecast/period_clients/utils.py:50
+msgid "Empty shop code ignored"
+msgstr "Проигнорирован пустой коды подразделения"
+
+#: src/forecast/period_clients/utils.py:55
+#: src/forecast/period_clients/utils.py:73
+msgid "Shop with code {} not found"
+msgstr "Подразделение с кодом {} не найдено"
+
+#: src/forecast/period_clients/utils.py:59
+msgid "Multiple shops with code {} found: {}. Shops must have unique codes."
+msgstr ""
+"Несколько подразделений с кодом {} найдено: {}. Подразделения должны иметь "
+"уникальные коды."
+
+#: src/forecast/period_clients/utils.py:66
+#: src/forecast/period_clients/utils.py:79
+msgid "Unexpected error for shop {}, please contact Technical support"
+msgstr ""
+"Непредвиденная ошибка для подразделения {}, пожалуйста обратитесь в "
+"Техническую поддержку"
+
+#: src/forecast/period_clients/utils.py:82
 msgid "Shop id should be defined"
 msgstr "ID магазина обязательно"
 
-#: src/forecast/period_clients/utils.py:181
-#: src/timetable/worker_day/timetable.py:427
-msgid "Failed to open active sheet."
-msgstr "Не удалось открыть активный лист."
+#: src/forecast/period_clients/utils.py:107
+msgid "No operation type {} for shop {}"
+msgstr "Нет типа операции {} у подразделения {}"
 
-#: src/forecast/period_clients/utils.py:217
+#: src/forecast/period_clients/utils.py:112
+msgid "No datetime on row {}"
+msgstr "Нет даты и времени в строке {}"
+
+#: src/forecast/period_clients/utils.py:115
+msgid "No value on row {} for operation type {}"
+msgstr "Нет значения в строке {} для типа операции {}"
+
+#: src/forecast/period_clients/utils.py:207
 msgid "Please select a period of no more than 90 days."
 msgstr "Выберите, пожалуйста, период не больше 90 дней."
 
@@ -854,14 +879,14 @@ msgstr ""
 "Сервис распознавания временно недоступен. Пожалуйста, обратитесь к "
 "администратору системы."
 
-#: src/recognition/models.py:63 src/reports/reports.py:219
-#: src/reports/reports.py:299 src/reports/tests.py:754
-#: src/timetable/attendance_records/views.py:32
+#: src/recognition/models.py:63 src/reports/reports.py:226
+#: src/reports/reports.py:308 src/reports/reports.py:338
+#: src/reports/tests.py:754 src/timetable/attendance_records/views.py:32
 msgid "Coming"
 msgstr "Приход"
 
-#: src/recognition/models.py:64 src/reports/reports.py:222
-#: src/reports/reports.py:305 src/reports/tests.py:646
+#: src/recognition/models.py:64 src/reports/reports.py:229
+#: src/reports/reports.py:314 src/reports/tests.py:646
 #: src/timetable/attendance_records/views.py:33
 msgid "Leaving"
 msgstr "Уход"
@@ -953,28 +978,28 @@ msgstr "Конец предыдущей половины года"
 msgid "End of previous year"
 msgstr "Конец предыдущего года"
 
-#: src/reports/reports.py:218 src/reports/tests.py:697
+#: src/reports/reports.py:219 src/reports/tests.py:697
 msgid "Arrival without plan"
 msgstr "Выход вне плана"
 
-#: src/reports/reports.py:221 src/reports/tests.py:756
+#: src/reports/reports.py:228 src/reports/tests.py:756
 msgid "Late arrival"
 msgstr "Опоздание"
 
-#: src/reports/reports.py:224 src/reports/tests.py:648
+#: src/reports/reports.py:231 src/reports/tests.py:648
 msgid "Early departure"
 msgstr "Ранний уход"
 
-#: src/reports/reports.py:226 src/reports/tests.py:771
+#: src/reports/reports.py:233 src/reports/tests.py:771
 msgid "Late departure"
 msgstr "Поздний уход"
 
-#: src/reports/reports.py:237 src/reports/tests.py:632 src/reports/tests.py:696
+#: src/reports/reports.py:245 src/reports/tests.py:632 src/reports/tests.py:696
 #: src/reports/tests.py:770
 msgid "Autotick"
 msgstr "Автоотметка"
 
-#: src/reports/reports.py:280 src/reports/tests.py:647 src/reports/tests.py:755
+#: src/reports/reports.py:289 src/reports/tests.py:647 src/reports/tests.py:755
 msgid "Manual tick"
 msgstr "Ручная отметка"
 
@@ -1572,7 +1597,7 @@ msgstr ""
 "Вы не можете отозвать вакансию, так как сотрудник уже вышел на данную "
 "вакансию."
 
-#: src/timetable/work_type/utils.py:111
+#: src/timetable/work_type/utils.py:110
 msgid "bad work_type_ids"
 msgstr "некорректное значение work_type_ids"
 
@@ -1701,6 +1726,10 @@ msgid ""
 msgstr ""
 "У сотрудника на строке {} с табельным номером {} в системе фамилия {}, а в "
 "файле {}."
+
+#: src/timetable/worker_day/timetable.py:427
+msgid "Failed to open active sheet."
+msgstr "Не удалось открыть активный лист."
 
 #: src/timetable/worker_day/timetable.py:561
 #, python-brace-format
@@ -2140,6 +2169,16 @@ msgstr "Файл не был загружен."
 
 #~ msgid "Liveness"
 #~ msgstr "Качество фото"
+
+#, python-brace-format
+#~ msgid ""
+#~ "There is no such work type or it is not associated with the operation "
+#~ "type {work_type}."
+#~ msgstr "Нет такого типа работ или он не связан с типом операций {work_type}"
+
+#, python-brace-format
+#~ msgid "There is no such operation type {operation_type}."
+#~ msgstr "Нет такого типа операций {operation_type}."
 
 #~ msgid "Your report is available at the link:"
 #~ msgstr "Ваш отчёт доступен по ссылке:"

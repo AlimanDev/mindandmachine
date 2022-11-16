@@ -6,3 +6,4 @@ etc/_old_code
 src/conf/djconfig_local.py
 .coverage
 etc/compose/tests_mounts/
+mounts

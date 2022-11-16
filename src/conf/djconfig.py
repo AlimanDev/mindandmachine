@@ -304,6 +304,7 @@ add_logger('import_jobs', extra_handlers=['mail_admins'])
 add_logger('export_jobs', extra_handlers=['mail_admins'])
 add_logger('api_log', extra_handlers=['mail_admins'])
 add_logger('diff_report')
+add_logger('upload_demand')
 
 # LOGGING USAGE:
 # import logging
