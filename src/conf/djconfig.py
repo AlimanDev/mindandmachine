@@ -6,7 +6,9 @@ config importance
 4. config
 """
 
-import os, sys, pathlib
+import os
+import pathlib
+import sys
 from copy import deepcopy
 
 import environ
@@ -88,6 +90,7 @@ INSTALLED_APPS = [
     'src.pbi',
     'mptt',
     'src.med_docs',
+    'src.etl',
 ]
 
 REST_FRAMEWORK = {
@@ -304,6 +307,8 @@ add_logger('import_jobs', extra_handlers=['mail_admins'])
 add_logger('export_jobs', extra_handlers=['mail_admins'])
 add_logger('api_log', extra_handlers=['mail_admins'])
 add_logger('diff_report')
+add_logger('forecast_receipts')
+add_logger('etl')
 add_logger('upload_demand')
 
 # LOGGING USAGE:
@@ -413,6 +418,7 @@ CELERY_IMPORTS = (
     'src.timetable.worker_day.tasks',
     'src.timetable.timesheet.tasks',
     'src.base.tasks',
+    'src.etl.tasks',
 )
 
 REDIS_HOST = env.str('REDIS_HOST', default='localhost')
@@ -719,3 +725,8 @@ if 'test' in sys.argv:
 
 if DEBUG:
     REST_FRAMEWORK['DEFAULT_RENDERER_CLASSES'].append('rest_framework.renderers.BrowsableAPIRenderer')
+
+
+# ETL 
+DEFAULT_RECEIPTS_GAP_AHEAD = 3
+DEFAULT_RECEIPTS_GAP_BEFORE = 3

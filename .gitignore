@@ -9,6 +9,7 @@ src/conf/djconfig_local.py
 src/conf/qosconfig_local.py
 static/
 media/
+mounts
 
 src/templates/test.html
 src/db/works/printer/test.xlsx

@@ -1,34 +1,23 @@
-from datetime import datetime, timedelta
 import json
 import os
-from celery.app.task import Task
-
+from datetime import datetime, timedelta
 from unittest import mock
+
+from celery.app.task import Task
 from django.conf import settings
 from django.db.models import Sum
 from django.test import TestCase, override_settings
 from freezegun import freeze_time
-
-from src.base.tests.factories import (
-    ShopFactory,
-    NetworkFactory,
-)
+from src.base.tests.factories import NetworkFactory, ShopFactory
 from src.exchange.models import (
-    ImportShopMappingStrategy,
     ImportHistDataStrategy,
     ImportJob,
+    ImportShopMappingStrategy,
     LocalFilesystemConnector,
 )
 from src.exchange.tasks import run_import_job
-from src.forecast.models import (
-    Receipt,
-    PeriodClients,
-    OperationTypeName,
-    OperationType,
-)
-from src.forecast.receipt.tasks import (
-    aggregate_timeserie_value,
-)
+from src.forecast.models import OperationType, OperationTypeName, PeriodClients, Receipt
+from src.forecast.receipt.tasks import aggregate_timeserie_value
 from src.integration.models import GenericExternalCode
 from src.util.mixins.tests import TestsHelperMixin
 
@@ -100,6 +89,7 @@ class TestPobedaImportData(TestsHelperMixin, TestCase):
         cls.import_purchases_strategy = ImportHistDataStrategy.objects.create(
             system_code='pobeda',
             data_type='purchases',
+            fix_date=True,
             filename_fmt='{data_type}_{year:04d}{month:02d}{day:02d}.csv',
             columns=[
                 'Номер магазина id',
@@ -122,6 +112,7 @@ class TestPobedaImportData(TestsHelperMixin, TestCase):
         cls.import_brak_strategy = ImportHistDataStrategy.objects.create(
             system_code='pobeda',
             data_type='brak',
+            fix_date=True,
             filename_fmt='{data_type}_{year:04d}{month:02d}{day:02d}.csv',
             columns=[
                 'Какой-то guid',
@@ -142,6 +133,7 @@ class TestPobedaImportData(TestsHelperMixin, TestCase):
         cls.import_delivery_strategy = ImportHistDataStrategy.objects.create(
             system_code='pobeda',
             data_type='delivery',
+            fix_date=True,
             filename_fmt='{data_type}_{year:04d}{month:02d}{day:02d}.csv',
             columns=[
                 'Какой-то guid',

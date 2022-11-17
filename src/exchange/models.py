@@ -1,10 +1,12 @@
+import datetime as dt
 import json
+import typing as tp
+
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from polymorphic.models import PolymorphicModel
-
 from src.base.models_abstract import AbstractModel
 from src.exchange.fs_engines.ftp import FtpEngine
 from src.exchange.fs_engines.local import LocalEngine
@@ -166,6 +168,7 @@ class ImportHistDataStrategy(ImportStrategy):
         verbose_name='Колонки, используемые для ключа',
         help_text='Если не указано, то в качестве ключа будет использоваться хэш всех колонок',
     )
+    fix_date = models.BooleanField(verbose_name='Нужно ли заменять дату внутри файла на ту, что в имени', default=False)
 
     class Meta:
         verbose_name = 'Стратегия импорта исторических данных'
@@ -185,6 +188,7 @@ class ImportHistDataStrategy(ImportStrategy):
             'dt_or_dttm_format': self.dt_or_dttm_format,
             'columns': self.columns,
             'receipt_code_columns': self.receipt_code_columns,
+            'fix_date': self.fix_date
         }
 
     def get_strategy_cls(self):
@@ -202,10 +206,16 @@ class ImportJob(BaseJob):
     def __str__(self):
         return f'{self.import_strategy}, {self.fs_connector}'
 
-    def run(self):
+    def run(
+        self,
+        date_from: tp.Optional[dt.date] = None,
+        date_to: tp.Optional[dt.date] = None,
+    ):
         strategy_cls = self.import_strategy.get_strategy_cls()
         strategy_cls_kwargs = self.import_strategy.get_strategy_cls_kwargs()
         strategy_cls_kwargs['fs_engine'] = self.fs_connector.get_fs_engine(base_path=self.base_path)
+        if (date_from is not None) and (date_to is not None):
+            strategy_cls_kwargs.update({'dt_from': date_from, 'dt_to': date_to,})
         strategy = strategy_cls(**strategy_cls_kwargs)
         return strategy.execute()
 

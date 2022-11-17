@@ -1,0 +1,106 @@
+version: '2.1'
+
+services:
+  redis:
+    image: redis:6.2.1
+    restart: unless-stopped
+    environment:
+      - ALLOW_EMPTY_PASSWORD=yes
+    volumes:
+      - ${MOUNT_FOLDER}/redis_data:/data
+    ports:
+      - "6379:6379"
+
+  converter:
+    image: eugenmayer/kontextwork-converter:production
+    restart: unless-stopped
+    volumes:
+      - ${MOUNT_FOLDER}/jod_converter_conf:/etc/app
+    ports:
+      - "8080:8080"
+
+  postgres:
+    build:
+      context: .
+      dockerfile: ./etc/compose/postgres/Dockerfile
+    restart: unless-stopped
+    volumes:
+      - ${MOUNT_FOLDER}/postgres:/var/lib/postgresql/data
+      - ${MOUNT_FOLDER}/postgres_backups:/backups
+    environment:
+      POSTGRES_DB: qos
+      POSTGRES_USER: qos
+      POSTGRES_PASSWORD: qos
+      POSTGRES_HOST: localhost
+      POSTGRES_PORT: 5432
+    ports:
+      - "5432:5432"
+  web:
+    build:
+      context: .
+      dockerfile: ./etc/compose/web/Dockerfile
+    # restart: unless-stopped
+    command: uwsgi --http :9090 --wsgi-file wsgi.py
+    volumes:
+      - ${MOUNT_FOLDER}/reports:/webapp/etc/reports
+      - ${MOUNT_FOLDER}/uwsgi:/uwsgi
+      - ${MOUNT_FOLDER}/logs:/webapp/logs
+      - ${MOUNT_FOLDER}/media:/webapp/media
+      - ${MOUNT_FOLDER}/static:/webapp/static
+      - ${MOUNT_FOLDER}/ipython_data:/root/.ipython/profile_default
+      - ./local_settings_web.py:/webapp/src/conf/djconfig_local.py
+      - ./:/webapp/
+    environment:
+      REDIS_HOST: redis
+      HOST: http://localhost:9090
+      DB_NAME: qos
+      DB_USER: qos
+      DB_PASSWORD: qos
+      DB_HOST: postgres
+      JOD_CONVERTER_URL: http://converter:8080
+      UWSGI_WORKERS: 1
+      UWSGI_THREADS: 1
+    depends_on:
+      - postgres
+      - redis
+    ports:
+      - "9090:9090"
+
+  celery:
+    build:
+      context: .
+      dockerfile: ./etc/compose/web/Dockerfile
+    command: celery -A src.celery worker -n main --max-tasks-per-child=100 --max-memory-per-child=25000 --loglevel=INFO --logfile=/webapp/logs/celery_main.log
+    volumes:
+      - ${MOUNT_FOLDER}/reports:/webapp/etc/reports
+      - ${MOUNT_FOLDER}/uwsgi:/uwsgi
+      - ${MOUNT_FOLDER}/logs:/webapp/logs
+      - ${MOUNT_FOLDER}/media:/webapp/media
+      - ${MOUNT_FOLDER}/static:/webapp/static
+      - ${MOUNT_FOLDER}/ipython_data:/root/.ipython/profile_default
+      - ./local_settings_web.py:/webapp/src/conf/djconfig_local.py
+    environment:
+      REDIS_HOST: redis
+      HOST: http://web:80
+      DB_NAME: qos
+      DB_USER: qos
+      DB_PASSWORD: qos
+      DB_HOST: postgres
+      JOD_CONVERTER_URL: http://converter:8080
+    depends_on:
+      - postgres
+      - redis
+
+  flower:
+    build:
+      context: .
+      dockerfile: ./etc/compose/web/Dockerfile
+    command: celery -A src.celery flower --conf=/webapp/flowerconfig.py --port=5555
+    volumes:
+      - ${MOUNT_FOLDER}/reports:/webapp/etc/reports
+      - ${MOUNT_FOLDER}/uwsgi:/uwsgi
+      - ${MOUNT_FOLDER}/logs:/webapp/logs
+    environment:
+      REDIS_HOST: redis
+    ports:
+      - "5555:5555"
