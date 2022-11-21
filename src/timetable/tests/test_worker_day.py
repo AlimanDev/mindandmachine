@@ -471,8 +471,6 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
 
     @override_settings(CELERY_TASK_ALWAYS_EAGER=True)
     def test_recalc_fact_from_records_after_approve(self):
-        self.network.run_recalc_fact_from_att_records_on_plan_approve = True
-        self.network.save()
         WorkerDay.objects.all().delete()
         dt = date.today()
         wd_plan1 = WorkerDay.objects.create(
@@ -531,8 +529,6 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
         1. Сначала нету плана -> 1 workeday в факте
         2. Добавляем план подтверждаем -> происходит пересчет факта на основе отметок, создается 2 wd в факте
         """
-        self.network.run_recalc_fact_from_att_records_on_plan_approve = True
-        self.network.save()
         WorkerDay.objects.all().delete()
 
         dt = date.today()
@@ -603,7 +599,6 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
         5.2. При выключенной настройке "Изменять ручные корректировки при пересчете факта на основе отметок (при подтверждения плана)"
             факт, скорректированный вручную, будет пропущен и останется 11:00-19:00
         """
-        self.network.run_recalc_fact_from_att_records_on_plan_approve = True
         self.network.only_fact_hours_that_in_approved_plan = True
         self.network.save()
         WorkerDay.objects.all().delete()
@@ -748,8 +743,6 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
         3. проиходит исправление плана -> факт должен перецепиться на сегодня
         4. holidays deleted if there is workeday
         """
-        self.network.run_recalc_fact_from_att_records_on_plan_approve = True
-        self.network.save()
         WorkerDay.objects.all().delete()
         today = date.today()
         yesterday = today - timedelta(days=1)
@@ -815,8 +808,6 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
 
     def test_deleted_holidays_when_there_is_workday(self):
         """Holidays deleted if there is workday."""
-        self.network.run_recalc_fact_from_att_records_on_plan_approve = True
-        self.network.save()
         WorkerDay.objects.all().delete()
         today = date.today()
         WorkerDayFactory(

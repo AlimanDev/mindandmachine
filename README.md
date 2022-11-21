@@ -13,8 +13,21 @@ That would build images for all the required by the application infrastructure a
 
 ## Restoring database backup
 
-- get a database backup (e.g. from a dev server or colleagues), copy it to `./etc/compose/tests_mounts/postgres_backups/`
+- get a database backup (e.g. from a dev server or colleagues), copy it to `./mounts/postgres_backups/`
 - run `docker-compose stop && docker-compose start postgres && docker-compose exec postgres restore file.sql.gz && docker-compose start`, replacing filename.
+
+
+## Testing
+Run tests:
+```
+docker-compose exec web ./manage.py test 
+```
+To run specific tests:
+```
+./manage.py test src.base.tests
+./manage.py test src.timetable.tests.test_worker_day.TestWorkerDay.test_create_and_approve
+```
+For local development, you can use `--keepdb` option to persist db and speed up testing
 
 
 ## ---------------------------- OLD Documentation separator -----------------------------------------
@@ -47,16 +60,6 @@ from etc.scripts import create_access_groups
 create_access_groups.main()
 ```
 
-
-Для запуска всех тестов:
-```
-./manage.py test 
-```
-Для запуска определенных тестов необходимо указывать путь, например:
-```
-./manage.py test src.main.demand.tests
-./manage.py test src.main.tablet.tests.TestTablet.test_get_cashiers_info
-```
 
 ## Generate doc
 ```

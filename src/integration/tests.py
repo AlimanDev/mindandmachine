@@ -1689,9 +1689,6 @@ class TestIntegration(TestsHelperMixin, APITestCase):
         self.admin_group.has_perm_to_approve_other_shop_days = True
         self.admin_group.save()
 
-        self.network.run_recalc_fact_from_att_records_on_plan_approve = True
-        self.network.save()
-
         dttm = datetime.combine(dt, time(16, 1))
 
         TestRequestMock.responses["/transaction/listAttTransaction"] = {

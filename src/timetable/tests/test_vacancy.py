@@ -418,7 +418,6 @@ class TestVacancy(TestsHelperMixin, APITestCase):
     @override_settings(CELERY_TASK_ALWAYS_EAGER=True)
     def test_approve_vacancy(self):
         self.shop.network.only_fact_hours_that_in_approved_plan = True
-        self.shop.network.run_recalc_fact_from_att_records_on_plan_approve = True
         self.shop.network.save()
         WorkerDay.objects.filter(id=self.vacancy.id).update(employee_id=None, is_approved=False)
         wd = WorkerDay.objects.create(

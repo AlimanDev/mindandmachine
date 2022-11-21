@@ -1,7 +1,6 @@
 import datetime
 import json
 from decimal import Decimal
-from typing import OrderedDict, Union
 
 import pandas as pd
 from dateutil.relativedelta import relativedelta
@@ -29,7 +28,7 @@ from django.utils.translation import gettext_lazy as _
 from model_utils import FieldTracker
 from rest_framework.exceptions import PermissionDenied, ValidationError
 
-from src.base.models import Shop, Employment, User, Network, Break, ProductionDay, Employee, Group
+from src.base.models import Shop, Employment, User, Network, Break, Employee, Group
 from src.base.models_abstract import AbstractModel, AbstractActiveModel, AbstractActiveNetworkSpecificCodeNamedModel, \
     AbstractActiveModelManager
 from src.events.signals import event_signal
@@ -470,7 +469,7 @@ class WorkerDayType(AbstractModel):
         (GET_WORK_HOURS_METHOD_TYPE_MANUAL_OR_MONTH_AVERAGE_SAWH_HOURS, _('Manual setting of hours or average monthly value of the recommended norm')),
     )
 
-    code = models.CharField(max_length=64, primary_key=True, verbose_name='Код', help_text='Первичный ключ')
+    code = models.CharField(max_length=64, primary_key=True, verbose_name=_('code'), help_text=_('Primary key'))
     name = models.CharField(max_length=64, verbose_name='Имя')
     short_name = models.CharField('Для отображения в ячейке', max_length=8)
     html_color = models.CharField(max_length=7)
@@ -2286,8 +2285,8 @@ class WorkerDayCashboxDetails(AbstractActiveModel):
 class ShopMonthStat(AbstractModel):
     class Meta(object):
         unique_together = (('shop', 'dt'),)
-        verbose_name = 'Статистика по магазину за месяц'
-        verbose_name_plural = 'Статистики по мгазинам за месяц'
+        verbose_name = _('Shop monthly statistics')
+        verbose_name_plural = _('Shops monthly statistics')
 
     READY = 'R'
     PROCESSING = 'P'
@@ -3074,7 +3073,6 @@ class PlanAndFactHoursAbstract(models.Model):
     @property
     def fact_work_hours_timedelta(self):
         return datetime.timedelta(seconds=int(self.fact_work_hours * 60 * 60))
-
 
 
 class PlanAndFactHours(PlanAndFactHoursAbstract):

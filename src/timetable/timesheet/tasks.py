@@ -72,14 +72,13 @@ def recalc_timesheet_on_data_change(groupped_data):
             dt_start, dt_end = get_month_range(year=dt.year, month_num=dt.month)
             if (dt_now - dt_end).days <= settings.CALC_TIMESHEET_PREV_MONTH_THRESHOLD_DAYS:
                 periods.add((dt_start, dt_end))
-        if periods:
-            for period_start, period_end in periods:
-                transaction.on_commit(
-                    lambda _employee_id=employee_id, _period_start=Converter.convert_date(period_start),
-                            _period_end=Converter.convert_date(period_end): calc_timesheets.apply_async(
-                        kwargs=dict(
-                            employee_id__in=[_employee_id],
-                            dt_from=_period_start,
-                            dt_to=_period_end,
-                        ))
-                    )
+        for period_start, period_end in periods:
+            transaction.on_commit(
+                lambda _employee_id=employee_id, _period_start=Converter.convert_date(period_start),
+                        _period_end=Converter.convert_date(period_end): calc_timesheets.apply_async(
+                    kwargs=dict(
+                        employee_id__in=[_employee_id],
+                        dt_from=_period_start,
+                        dt_to=_period_end,
+                    ))
+                )

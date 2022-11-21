@@ -41,10 +41,10 @@ class BaseJob(AbstractModel):
         abstract = True
 
 class LocalFilesystemConnector(BaseFilesystemConnector):
-    default_base_path = models.CharField(max_length=512, default=settings.BASE_DIR)
+    default_base_path = models.CharField(max_length=512, null=True, default=None)
 
     def get_fs_engine(self, base_path=None):
-        return LocalEngine(base_path=base_path or self.default_base_path)
+        return LocalEngine(base_path=base_path or self.default_base_path or settings.BASE_DIR)
 
     class Meta:
         verbose_name = 'Коннектор к локальной файловой системе'

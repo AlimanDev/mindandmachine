@@ -1,12 +1,13 @@
+import json, re
+from datetime import datetime
+
 from django.db import models
-from src.base import models as qos_models
 from django.urls import URLPattern, URLResolver
 from django.conf import settings
-
-import json
-from src.util.forms import IntegersList
 from django.core.exceptions import ValidationError
-import re
+
+from src.base import models as qos_models
+from src.util.forms import IntegersList
 
 
 class IntegerListField(models.TextField):
@@ -139,3 +140,6 @@ class OverrideBaseManager:
             model._meta.base_manager_name = prev_manager
             if "base_manager" in model._meta.__dict__:
                 del model._meta.__dict__["base_manager"]
+
+def current_year():
+    return datetime.now().year

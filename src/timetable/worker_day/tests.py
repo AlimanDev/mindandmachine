@@ -21,7 +21,6 @@ from src.tasks.models import Task
 from src.timetable.tests.factories import WorkerDayFactory
 from src.util.mixins.tests import TestsHelperMixin
 from src.util.models_converter import Converter
-from src.util.test import create_departments_and_users
 
 
 class TestWorkerDayStat(TestsHelperMixin, APITestCase):
@@ -348,6 +347,83 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
             self.assertEqual(wd_from_db.is_approved, True)
             self.assertIsNotNone(wd_from_db_not_approved)
             self.assertEqual(wd_from_db.work_hours, wd_from_db_not_approved.work_hours)
+
+    @override_settings(CELERY_TASK_ALWAYS_EAGER=True, CELERY_EAGER_PROPAGATES_EXCEPTIONS=True)
+    def test_approve_recalc_wh_and_tabel_for_outsource(self):
+        """Approving plan should run recalc of work hours (based on AttendanceRecords) and tabel (create TimesheetItem), for outsource and employees from other shops."""
+        self.create_outsource()
+
+        # Employee from other shop
+        wd_not_approved = WorkerDayFactory(
+            shop=self.shop,
+            employment=self.employment8,
+            employee=self.employee8,
+            dt=self.dt,
+            type_id=WorkerDay.TYPE_WORKDAY,
+            is_fact=False,
+            is_approved=False
+        )
+        AttendanceRecords.objects.create(
+            dt=wd_not_approved.dt,
+            dttm=wd_not_approved.dttm_work_start,
+            type=AttendanceRecords.TYPE_COMING,
+            user=self.user8,
+            employee=self.employee8,
+            shop=self.shop
+        )
+        AttendanceRecords.objects.create(
+            dt=wd_not_approved.dt,
+            dttm=wd_not_approved.dttm_work_end + timedelta(hours=1),
+            type=AttendanceRecords.TYPE_LEAVING,
+            user=self.user8,
+            employee=self.employee8,
+            shop=self.shop
+        )
+
+        # Outsource employee
+        wd_not_approved_out = WorkerDayFactory(
+            shop=self.shop,
+            employment=self.employment1_outsource,
+            employee=self.employee1_outsource,
+            dt=self.dt,
+            type_id=WorkerDay.TYPE_WORKDAY,
+            is_fact=False,
+            is_approved=False
+        )
+        AttendanceRecords.objects.create(
+            dt=wd_not_approved_out.dt,
+            dttm=wd_not_approved_out.dttm_work_start,
+            type=AttendanceRecords.TYPE_COMING,
+            user=self.user1_outsource,
+            employee=self.employee1_outsource,
+            shop=self.shop
+        )
+        AttendanceRecords.objects.create(
+            dt=wd_not_approved_out.dt,
+            dttm=wd_not_approved_out.dttm_work_end + timedelta(hours=1),
+            type=AttendanceRecords.TYPE_LEAVING,
+            user=self.user1_outsource,
+            employee=self.employee1_outsource,
+            shop=self.shop
+        )
+
+        data = {
+            'shop_id': self.shop.id,
+            'dt_from': self.dt,
+            'dt_to': self.dt,
+            'is_fact': False,
+        }
+        with self.captureOnCommitCallbacks(execute=True): # Actually run transaction.on_commit
+            response = self.client.post(f"{self.url_approve}", data)
+        self.assertEqual(response.status_code, 200)
+        wd_fact_approved = WorkerDay.objects.get(employee=self.employee8, is_approved=True, is_fact=True)
+        wd_fact_approved_out = WorkerDay.objects.get(employee=self.employee1_outsource, is_approved=True, is_fact=True)
+        self.assertTrue(wd_fact_approved.is_approved)
+        self.assertTrue(wd_fact_approved_out.is_approved)
+        self.assertTrue(wd_fact_approved.work_hours == wd_not_approved.work_hours + timedelta(hours=1))
+        self.assertTrue(wd_fact_approved_out.work_hours == wd_not_approved_out.work_hours + timedelta(hours=1))
+        self.assertTrue(TimesheetItem.objects.filter(shop=self.shop, employee=self.employee1_outsource).exists())
+        self.assertTrue(TimesheetItem.objects.filter(shop=self.shop, employee=self.employee8).exists())
 
     def test_cant_approve_protected_day_without_perm(self):
         data = {
@@ -835,6 +911,7 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
         res = self.client.post(f"{self.url_approve}", data, format='json')
         self.assertEqual(res.status_code, 200)
         self.assertTrue(WorkerDay.objects.filter(id=wd2.id, is_approved=True))
+
 
 class TestUploadDownload(TestsHelperMixin, APITestCase):
     USER_USERNAME = "user1"

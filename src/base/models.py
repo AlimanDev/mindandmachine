@@ -36,7 +36,7 @@ from src.base.models_abstract import (
     AbstractModel,
     AbstractActiveNetworkSpecificCodeNamedModel,
 )
-from src.base.models_utils import OverrideBaseManager
+from src.base.models_utils import OverrideBaseManager, current_year
 from src.conf.djconfig import QOS_TIME_FORMAT
 from src.util.mixins.qs import AnnotateValueEqualityQSMixin
 from src.util import images
@@ -255,9 +255,10 @@ class Network(AbstractActiveModel):
     prev_months_work_hours_source = models.PositiveSmallIntegerField(
         verbose_name='Источник рабочих часов за пред. месяцы уч. периода',
         choices=PREV_MONTHS_WORK_HOURS_SOURCE_CHOICES, default=WD_FACT_APPROVED)
-    run_recalc_fact_from_att_records_on_plan_approve = models.BooleanField(
-        default=True, verbose_name='Запускать пересчет факта на основе отметок при подтверждении плана',
-    )
+    # Doesn't seem to be used anywhere, probably the logic changed and setting was left here.
+    # run_recalc_fact_from_att_records_on_plan_approve = models.BooleanField(
+    #     default=True, verbose_name=_('Run recalculation of fact based on attendance records (ticks) on plan approve'),
+    # )
     rebuild_timetable_min_delta = models.IntegerField(default=2, verbose_name='Минимальное время для составления графика')
     round_work_hours_alg = models.PositiveSmallIntegerField(
         null=True, blank=True,
@@ -538,6 +539,7 @@ class ShopQuerySet(QuerySet):
             collector.collect(del_query)
             self.update(dttm_deleted=timezone.now())
 
+
 class ShopManager(TreeManager):
     def get_queryset(self):
         return super().get_queryset().filter(
@@ -545,8 +547,8 @@ class ShopManager(TreeManager):
         )
 
 
-# на самом деле это отдел
 class Shop(MPTTModel, AbstractActiveNetworkSpecificCodeNamedModel):
+    """Shop/department"""
     class Meta:
         # unique_together = ('parent', 'title')
         verbose_name = 'Отдел'
@@ -1039,6 +1041,7 @@ class Shop(MPTTModel, AbstractActiveNetworkSpecificCodeNamedModel):
             self.dttm_deleted = timezone.now()
             self.save()
         return self
+
 
 class EmploymentManager(models.Manager):
     def get_queryset(self):
@@ -2101,10 +2104,6 @@ class FunctionGroup(AbstractModel):
             self.access_type,
             self.func,
         )
-
-
-def current_year():
-    return datetime.datetime.now().year
 
 
 class SawhSettingsManager(models.Manager):

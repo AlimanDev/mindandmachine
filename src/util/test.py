@@ -626,7 +626,7 @@ def create_outsource(self, dt=None):
         'user1_outsource_password',
         first_name='Аут',
         last_name='Сорсович',
-        network=self.network,
+        network=self.network_outsource,
     )
     self.employee1_outsource = Employee.objects.create(user=self.user1_outsource)
     self.employment1_outsource = Employment.objects.create(
