@@ -1,0 +1,7 @@
+services:
+  vpn:
+    image: ubergarm/l2tp-ipsec-vpn-client
+    env_file: .env
+    privileged: true
+    network_mode: "host"
+    restart: unless-stopped

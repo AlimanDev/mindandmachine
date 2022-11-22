@@ -4,6 +4,7 @@
 
 .idea/
 __pycache__/
+*.iml
 
 src/conf/djconfig_local.py
 src/conf/qosconfig_local.py
