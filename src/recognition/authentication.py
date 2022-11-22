@@ -11,6 +11,14 @@ class TickPointTokenAuthentication(authentication.TokenAuthentication):
         self.raise_auth_exc = raise_auth_exc
         super(TickPointTokenAuthentication, self).__init__(**kwargs)
 
+    def authenticate(self, request):
+        # Cookie
+        if token := request.COOKIES.get('auth_token'):
+            return self.authenticate_credentials(token)
+
+        # Header
+        return super().authenticate(request)
+
     def authenticate_credentials(self, key):
         try:
             return super(TickPointTokenAuthentication, self).authenticate_credentials(key)

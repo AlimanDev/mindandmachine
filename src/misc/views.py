@@ -3,11 +3,13 @@ from rest_framework.response import Response
 from rest_framework.exceptions import ValidationError
 from rest_framework.serializers import Serializer, CharField, URLField
 from django.conf import settings
-from django.contrib.auth.decorators import login_required
 from django.views.static import serve
 import jwt
 import time
 from drf_yasg.utils import swagger_auto_schema
+
+from src.recognition.authentication import TickPointTokenAuthentication
+from .decorators import login_or_token_required
 
 class MetabaseURLSerialzier(Serializer):
     dashboard = CharField(default='worker_day', help_text='На данный момент доступно 2 дашборда: worker_day и indicator')
@@ -49,6 +51,6 @@ def metabase_url(request):
     iframeUrl = settings.METABASE_SITE_URL + "/embed/dashboard/" + token.decode("utf8") + "#bordered=false&titled=false&hide_parameters=shop_id,vacancy,dt,worker_id,employee_id,outsource,work_type_name,user_network"
     return Response({"url": iframeUrl})
 
-@login_required
+@login_or_token_required(auth_model=TickPointTokenAuthentication)
 def protected_serve(request, path, document_root=None, show_indexes=False):
     return serve(request, path, document_root, show_indexes)
