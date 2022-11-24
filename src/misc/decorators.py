@@ -1,3 +1,4 @@
+from typing import Iterable
 from functools import wraps
 from urllib.parse import urlparse
 
@@ -7,13 +8,14 @@ from django.contrib.auth.decorators import REDIRECT_FIELD_NAME
 from django.shortcuts import resolve_url
 
 
-def login_or_token_required(auth_model: BaseAuthentication, function=None, redirect_field_name=REDIRECT_FIELD_NAME, login_url=None):
+def login_or_auth_required(auth_models: Iterable[BaseAuthentication], function=None, redirect_field_name=REDIRECT_FIELD_NAME, login_url=None):
     """
-    Decorator for views that checks that the user is logged in or access_token in Cookies is valid, redirecting
-    to the log-in page if necessary.
+    Decorator for views that checks that the user is logged in, redirecting to the log-in page if necessary.
+    For each auth_model passed, `authenticate(request)` is called. If any return `True` - the request is considered authorized.
+    `access_token` in Cookies for TickPointTokenAuthentication, IP address of the tick_point for ShopIPAuthentication.
     """
     actual_decorator = user_passes_test(
-        lambda request: (request.user.is_authenticated or auth_model().authenticate(request)),
+        lambda request: (request.user.is_authenticated or any(auth_model().authenticate(request) for auth_model in auth_models)),
         login_url=login_url,
         redirect_field_name=redirect_field_name
     )
