@@ -129,6 +129,11 @@ def fill_city_coords_address_timezone_from_fias_code(shop_id):
                 shop.longitude = data.get('geo_lon')
                 update_fields.append('longitude')
             if data.get('geo_lat') and data.get('geo_lon'):
+                # tzwhere.tzwhere() prints a warning. Clogs up test results.
+                # VisibleDeprecationWarning: Creating an ndarray from ragged nested sequences (which is a list-or-tuple of lists-or-tuples-or ndarrays with different lengths or shapes) is deprecated. If you meant to do this, you must specify 'dtype=object' when creating the ndarray.
+                #   self.timezoneNamesToPolygons[tzname] = WRAP(polys)
+                # TODO: Package does not seem to be maintained, need to find a replacement.
+
                 tz = tzwhere.tzwhere()
                 timezone = tz.tzNameAt(float(data.get('geo_lat')), float(data.get('geo_lon')))
                 if timezone:

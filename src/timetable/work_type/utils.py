@@ -289,10 +289,14 @@ class ShopEfficiencyGetter:
                 work_hours_other_departments_for_dt = self.work_hours_other_departments_array[i]
                 work_hours_selected_department_for_dt = self.work_hours_selected_department_array[i]
 
+            predict_needs_for_dt_sum = predict_needs_for_dt.sum()
             covering = np.nan_to_num(
-                np.minimum(predict_needs_for_dt, wdays_array_for_dt).sum() / predict_needs_for_dt.sum())
+                np.minimum(predict_needs_for_dt, wdays_array_for_dt).sum() / predict_needs_for_dt_sum
+            ) if predict_needs_for_dt_sum else 0
+            wdays_array_for_dt_sum = wdays_array_for_dt.sum()
             deadtime = np.nan_to_num(
-                np.maximum(wdays_array_for_dt - predict_needs_for_dt, 0).sum() / wdays_array_for_dt.sum())
+                np.maximum(wdays_array_for_dt - predict_needs_for_dt, 0).sum() / wdays_array_for_dt_sum
+            ) if wdays_array_for_dt_sum else 0
             predict_hours = int((predict_needs_for_dt * self.period_length_in_minutes / 60).sum())
             graph_hours = int((wdays_array_for_dt * self.period_length_in_minutes / 60).sum())
             graph_hours_with_open_vacancies = int(
@@ -300,6 +304,7 @@ class ShopEfficiencyGetter:
             work_hours = np.nan_to_num(work_hours_for_dt).sum()
             work_days = np.nan_to_num(work_days_for_dt).sum()
             income = np.nan_to_num(income_for_dt).sum()
+            performance = np.nan_to_num(income / work_hours) if work_hours else 0
 
             day_stats.setdefault('covering', {})[dt_converted] = covering
             day_stats.setdefault('deadtime', {})[dt_converted] = deadtime
@@ -309,7 +314,7 @@ class ShopEfficiencyGetter:
             day_stats.setdefault('work_hours', {})[dt_converted] = work_hours
             day_stats.setdefault('work_days', {})[dt_converted] = work_days
             day_stats.setdefault('income', {})[dt_converted] = income
-            day_stats.setdefault('perfomance', {})[dt_converted] = np.nan_to_num(income / work_hours)
+            day_stats.setdefault('perfomance', {})[dt_converted] = performance
             if self.add_schedule_tabs_day_stats:
                 day_stats.setdefault('graph_hours_only_open_vacancies', {})[dt_converted] = int(
                     (wdays_with_only_open_vacancies_for_dt * self.period_length_in_minutes / 60).sum())

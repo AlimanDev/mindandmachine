@@ -23,10 +23,9 @@ Note:
         }
 """
 
-import json
+import json, logging
 # TODO разобраться с Event
 from datetime import timedelta, datetime, time
-from django.db.models.expressions import F
 
 import pandas
 from dateutil.relativedelta import relativedelta
@@ -52,7 +51,6 @@ from src.conf.djconfig import (
 )
 from src.timetable.exceptions import WorkTimeOverlap
 from src.timetable.models import (
-    ExchangeSettings,
     WorkerDay,
     WorkerDayCashboxDetails,
     WorkType,
@@ -62,6 +60,9 @@ from src.timetable.models import (
 )
 from src.timetable.timesheet.tasks import recalc_timesheet_on_data_change
 from src.timetable.work_type.utils import ShopEfficiencyGetter
+
+logger = logging.getLogger('vacancy')
+
 
 def search_candidates(vacancy, **kwargs):
     """
@@ -364,7 +365,7 @@ def do_shift_elongation(vacancy, max_working_hours):
         prev_dttm_start = worker_day.dttm_work_start
         prev_dttm_end = worker_day.dttm_work_end
         cancel_vacancy(vacancy.id)
-        print(
+        logger.info(
             f'shift elongation: vacancy {vacancy}, '
             f'{worker_day.dt}, prev {prev_dttm_start}-{prev_dttm_end}, '
             f'new {wd.dttm_work_start}-{wd.dttm_work_end}, '
@@ -920,7 +921,7 @@ def create_vacancies_and_notify(shop_id, work_type_id, dt_from=None, dt_to=None)
 
         if next_row.empty:
             continue
-        print(next_row)
+        logger.info(next_row)
 
         df_vacancies.loc[i,'next_index'] = next_row.index[0]
         df_vacancies.loc[i,'next'] = next_row[next_row.index[0]] - df_vacancies.dttm_to[i]
@@ -977,7 +978,7 @@ def create_vacancies_and_notify(shop_id, work_type_id, dt_from=None, dt_to=None)
                 dttm_from = dttm_to - shift
             if dttm_from < dttm_shop_opens:
                 dttm_from = dttm_shop_opens
-            print('create vacancy {} {} {}'.format(dttm_from, dttm_to, work_type_id))
+            logger.info('create vacancy {} {} {}'.format(dttm_from, dttm_to, work_type_id))
             create_vacancy(dttm_from, dttm_to, shop_id, work_type_id, outsources=outsources)
 
 
@@ -1031,10 +1032,10 @@ def cancel_vacancies(shop_id, work_type_id, dt_from=None, dt_to=None, approved=F
     for vacancy in vacancies:
         cond = (df_stat['dttm'] >= vacancy.dttm_work_start) & (df_stat['dttm'] <= vacancy.dttm_work_end)
         overflow = df_stat.loc[cond,'overflow'].apply(lambda x:  x if 1.0 > x > -1.0 else 1 if x >= 1 else -1).mean()
-        print('vacancy {} overflow {}'.format(vacancy, overflow))
+        logger.info('vacancy {} overflow {}'.format(vacancy, overflow))
         lack = 1-overflow
         if lack < exchange_settings.automatic_delete_vacancy_lack_max:
-            print ('cancel_vacancy overflow {} {} {}'.format(overflow, vacancy, vacancy.dttm_work_start))
+            logger.info('cancel_vacancy overflow {} {} {}'.format(overflow, vacancy, vacancy.dttm_work_start))
             cancel_vacancy(vacancy.id)
             df_stat.loc[cond,'overflow'] -= 1
 
@@ -1065,7 +1066,7 @@ def holiday_workers_exchange():
         for vacancy in vacancies:
             candidate = search_holiday_candidate(vacancy, max_working_hours, constraints, exclude_positions=exclude_positions)
             if candidate:
-                print(
+                logger.info(
                     f'holiday exchange: to_shop {shop.name}, '
                     f'vacancy {vacancy.work_types.first().work_type_name.name}, '
                     f'{vacancy.dt}, {vacancy.dttm_work_start}-{vacancy.dttm_work_end}, '
@@ -1171,8 +1172,8 @@ def workers_exchange():
 
             for vacancy in vacancies:
                 vacancy_lack = _lack_calc( df_shop_stat, work_type.id, vacancy.dttm_work_start, vacancy.dttm_work_end)
-                print ('lack: {}; vacancy: {}; work_type: {}'.format(vacancy_lack, vacancy, work_type))
-                dttm_from_workers = vacancy.dttm_work_start - timedelta(hours=4)
+                logger.info('lack: {}; vacancy: {}; work_type: {}'.format(vacancy_lack, vacancy, work_type))
+                # dttm_from_workers = vacancy.dttm_work_start - timedelta(hours=4)
                 if vacancy_lack > 0:
                     worker_days = list(WorkerDayCashboxDetails.objects.filter(
                         worker_day__dttm_work_start=vacancy.dttm_work_start,
@@ -1198,10 +1199,10 @@ def workers_exchange():
                         if worker_lack is None or lack < worker_lack:
                             worker_lack = lack
                             candidate_to_change = worker_day
-                    print ('worker lack: {}; wd_detail: {}; work type: {}'.format(worker_lack, worker_day, worker_day.work_type_id))
+                    logger.info('worker lack: {}; wd_detail: {}; work type: {}'.format(worker_lack, worker_day, worker_day.work_type_id))
                     if  worker_lack < -exchange_settings.automatic_worker_select_overflow_min:
                         user = candidate_to_change.worker_day.employee.user
-                        print('hard exchange date {} worker_lack {} vacancy_lack {} shop_to {} shop_from {} candidate_to_change {} to vac {} user {}'.format(
+                        logger.info('hard exchange date {} worker_lack {} vacancy_lack {} shop_to {} shop_from {} candidate_to_change {} to vac {} user {}'.format(
                             vacancy.dt, worker_lack, vacancy_lack,
                             work_type, candidate_to_change.work_type,
                             candidate_to_change, vacancy, user
@@ -1214,8 +1215,8 @@ def workers_exchange():
                             for detail in WorkerDayCashboxDetails.objects.filter(worker_day=candidate_worker_day)
                         }
                         #не удаляем candidate_to_change потому что создаем неподтвержденную вакансию
-                        print(confirm_vacancy(vacancy.id, user, employee_id=candidate_to_change.worker_day.employee_id, exchange=True))
-
+                        res = confirm_vacancy(vacancy.id, user, employee_id=candidate_to_change.worker_day.employee_id, exchange=True)
+                        logger.info(res)
                         if shop_to.email:
                             message = f'Это автоматическое уведомление для {shop_to.name} об изменениях в графике:\n\n' + \
                             f'К Вам был переведён сотрудник {user.last_name} {user.first_name}, ' + \

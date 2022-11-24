@@ -1,30 +1,30 @@
-import os
+import os, logging
+from datetime import datetime, timedelta, date
+
 import requests
 from django.db.models.expressions import Exists, OuterRef
 from django.utils.timezone import now
-from datetime import datetime, timedelta, date
-
-from src.integration.zkteco import ZKTeco
-
-
 from django.db.models import F, Max
 from django.db import transaction
+from django.conf import settings
+
+from src.celery.celery import app
 from src.base.models import (
     Employment,
     Shop,
     User,
 )
+from src.timetable.models import AttendanceRecords, WorkerDay
 from src.integration.models import (
     AttendanceArea,
     ExternalSystem,
     UserExternalCode,
     ShopExternalCode,
 )
-from src.timetable.models import AttendanceRecords, WorkerDay
+from src.integration.zkteco import ZKTeco
 
-from src.celery.celery import app
-from django.conf import settings
 
+logger = logging.getLogger('zkteco')
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "src.conf.djconfig")
 
@@ -34,7 +34,7 @@ def import_urv_zkteco():
     zkteco = ZKTeco()
     ext_system, _created = ExternalSystem.objects.get_or_create(code='zkteco')
     if _created:
-        print('Created external system with code \'zkteco\'')
+        logger.info('Created external system with code \'zkteco\'')
 
     max_date = AttendanceRecords.objects.aggregate(m=Max(F('dttm')))['m']
     if max_date:
@@ -73,7 +73,7 @@ def import_urv_zkteco():
                     code=event['pin'],
                     external_system=ext_system)
             except UserExternalCode.DoesNotExist:
-                print(f"User for event {event} does not exist")
+                logger.info(f"User for event {event} does not exist")
                 continue
             user_id = user_token.user_id
             dttm = datetime.strptime(event['eventTime'], "%Y-%m-%d %H:%M:%S")
@@ -98,7 +98,7 @@ def import_urv_zkteco():
                 if shop_token:
                     shop = shop_token.shop
                 else:
-                    print(f"Shop for event {event} does not exist")
+                    logger.info(f"Shop for event {event} does not exist")
                     continue
 
             users.setdefault(user_id, []).append((dttm, shop))
@@ -131,7 +131,7 @@ def export_workers_zkteco():
     zkteco=ZKTeco()
     ext_system, _created = ExternalSystem.objects.get_or_create(code='zkteco')
     if _created:
-        print('Created external system with code \'zkteco\'')
+        logger.info('Created external system with code \'zkteco\'')
     users = User.objects.all().exclude(userexternalcode__external_system=ext_system)
 
     for user in users:
@@ -150,7 +150,7 @@ def export_workers_zkteco():
         )
 
         if not shop_codes:
-            print(f'no external shop for {user}')
+            logger.info(f'no external shop for {user}')
             continue
 
         pin = user.id + settings.ZKTECO_USER_ID_SHIFT  # Чтобы не пересекалось с уже заведенными
@@ -161,16 +161,16 @@ def export_workers_zkteco():
                 external_system=ext_system,
                 code=pin
             )
-            print(f'Added user {user} to zkteco with ext code {user_code.code}')
+            logger.info(f'Added user {user} to zkteco with ext code {user_code.code}')
             if user.avatar:
                 zkteco.export_biophoto(user_code.code, user.avatar)
 
             for shop_code in shop_codes:
                 res_area = zkteco.add_personarea(user_code, shop_code.attendance_area)
                 if not('code' in res and res['code'] == 0):
-                    print(f'Error in {res_area} while set area for user {user} to zkteco')
+                    logger.info(f'Error in {res_area} while set area for user {user} to zkteco')
         else:
-            print(f'Error in {res} while saving user {user} to zkteco')
+            logger.info(f'Error in {res} while saving user {user} to zkteco')
 
 
 @app.task()
@@ -178,7 +178,7 @@ def delete_workers_zkteco():
     zkteco = ZKTeco()
     ext_system, _created = ExternalSystem.objects.get_or_create(code='zkteco')
     if _created:
-        print('Created external system with code \'zkteco\'')
+        logger.info('Created external system with code \'zkteco\'')
     users = User.objects.filter(userexternalcode__external_system=ext_system)
 
     dt_max = now().date()
@@ -228,14 +228,14 @@ def delete_workers_zkteco():
                 for shop_code in shop_codes:
                     res = zkteco.delete_personarea(user_code, shop_code.attendance_area)
                     if 'code' in res and res['code'] == 0:
-                        print(f"Delete area {shop_code.attendance_area} for fired user {e}")
+                        logger.info(f"Delete area {shop_code.attendance_area} for fired user {e}")
                     else:
                         succesfully_deleted = False
-                        print(f"Failed delete area {shop_code.attendance_area} for fired user {e}: {res}")
+                        logger.info(f"Failed delete area {shop_code.attendance_area} for fired user {e}: {res}")
                         break
                 if succesfully_deleted and not len(active_external_codes):
                     user_code.delete()
-                    print(f"Delete userexternalcode for fired user {user} {e}")
+                    logger.info(f"Delete userexternalcode for fired user {user} {e}")
 
 
 @app.task
@@ -243,7 +243,7 @@ def sync_att_area_zkteco():
     zkteco = ZKTeco()
     ext_system, _created = ExternalSystem.objects.get_or_create(code='zkteco')
     if _created:
-        print('Created external system with code \'zkteco\'')
+        logger.info('Created external system with code \'zkteco\'')
 
     page = 0
 
@@ -260,7 +260,7 @@ def sync_att_area_zkteco():
                     'name': area['name'],
                 }
             )
-            print(f"Sync attendance area {area.name} with code {area.code}")
+            logger.info(f"Sync attendance area {area.name} with code {area.code}")
 
 @app.task
 def export_or_delete_employment_zkteco(employment_id, prev_shop_id=None, prev_shop_code=None):
@@ -298,7 +298,7 @@ def export_or_delete_employment_zkteco(employment_id, prev_shop_id=None, prev_sh
                 )
                 res = zkteco.add_user(user_code.user, user_code.code)
                 if 'code' in res and res['code'] == 0:
-                    print(f'Added user {user_code.user} to zkteco with ext code {user_code.code}')
+                    logger.info(f'Added user {user_code.user} to zkteco with ext code {user_code.code}')
                     user = employment.employee.user
                     if user.avatar:
                         zkteco.export_biophoto(user_code.code, user.avatar)
@@ -315,12 +315,12 @@ def export_or_delete_employment_zkteco(employment_id, prev_shop_id=None, prev_sh
         if (prev_shop_id or not active_employments_in_shop) and shop_code and user_code and not shop_code.attendance_area_id in active_external_codes:
             res = zkteco.delete_personarea(user_code, shop_code.attendance_area)
             if 'code' in res and res['code'] == 0:
-                print(f"Delete area for fired user {user_code.user} {employment}")
+                logger.info(f"Delete area for fired user {user_code.user} {employment}")
                 if not prev_shop_id and not active_employments.exists():
                     user_code.delete()
-                    print(f"Delete userexternalcode for fired user {user_code.user}")
+                    logger.info(f"Delete userexternalcode for fired user {user_code.user}")
             else:
-                print(f"Failed delete area and userexternalcode for fired user {employment}: {res}")
+                logger.info(f"Failed delete area and userexternalcode for fired user {employment}: {res}")
 
 @app.task
 def export_user_biophoto(pin, encoded_photo):
@@ -340,4 +340,4 @@ def export_user_biophoto(pin, encoded_photo):
         params=params,
         timeout=settings.REQUESTS_TIMEOUTS['zkteco']
     )
-    print(f"Recieved from bio host: status {response.status_code}, body {response.content}")
+    logger.info(f"Recieved from bio host: status {response.status_code}, body {response.content}")
