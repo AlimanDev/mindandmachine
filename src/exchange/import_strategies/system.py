@@ -244,7 +244,8 @@ class ImportHistDataStrategy(BaseSystemImportStrategy):
                         dtt.year,
                         dtt.month,
                         dtt.day,
-                        dttm.hour,
+                        # https://mindandmachine.myjetbrains.com/youtrack/issue/RND-612/
+                        min(dttm.hour, 20),
                         dttm.minute,
                         dttm.second
                     )
@@ -274,7 +275,7 @@ class ImportHistDataStrategy(BaseSystemImportStrategy):
     def load_file(self,
                   dtt: dt.date,
                   filename: str,
-                  chunksize: int = 1000,
+                  chunksize: int = 10000,
                   bulk_chunk_size: int = 10000) -> tp.Set[str]:
 
         load_errors = set()
