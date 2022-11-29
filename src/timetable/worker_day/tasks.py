@@ -1,14 +1,16 @@
-from datetime import datetime
+from typing import Union, Iterable
+from datetime import datetime, date
 
 from django.conf import settings
 from django.db import transaction
 from django.db.models import Q
 
 from src.celery.celery import app
+from src.base.models import Employment, Shop
 from src.timetable.models import WorkerDay
 from src.timetable.utils import CleanWdaysHelper
 from src.timetable.worker_day.utils.utils import create_fact_from_attendance_records
-
+from src.util.time import DateTimeHelper
 
 @app.task
 def clean_wdays(**kwargs):
@@ -47,3 +49,39 @@ def recalc_fact_from_records(dt_from=None, dt_to=None, shop_ids=None, employee_d
         dt_to = datetime.strptime(dt_to, settings.QOS_DATETIME_FORMAT).date()
     create_fact_from_attendance_records(
         dt_from=dt_from, dt_to=dt_to, shop_ids=shop_ids, employee_days_list=employee_days_list)
+
+
+@app.task
+def batch_block_or_unblock(
+    dt_from: Union[str, datetime, date] = None,
+    dt_to: Union[str, datetime, date] = None,
+    is_blocked: bool = True,
+    shop_ids: Union[Iterable, None] = None,
+    network_id: Union[int, None] = None
+    ) -> int:
+    """Block/unblock WorkerDays (`is_blocked` field). Returns number of updated days."""
+    if dt_from and dt_to:
+        # covnert to `date` type
+        dt_from = DateTimeHelper.to_dt(dt_from)
+        dt_to = DateTimeHelper.to_dt(dt_to)
+    else:
+        # default to last month
+        dt_from, dt_to = DateTimeHelper.last_month_dt_pair()
+
+    q = Q(
+        is_blocked=not is_blocked,
+        dt__range=(dt_from, dt_to)
+    )
+    shops = Shop.objects.all()
+    if network_id:
+        shops = shops.filter(network_id=network_id)
+    if shop_ids:
+        shops = shops.filter(id__in=shop_ids)
+    employees = Employment.objects.get_active(
+        dt_from=dt_from,
+        dt_to=dt_to,
+        shop__in=shops
+    ).distinct('employee').values_list('employee', flat=True)
+    q &= Q(shop__in=shops) | Q(shop__isnull=True, employee__in=employees)
+    wds = WorkerDay.objects.filter(q)
+    return wds.update(is_blocked=is_blocked)

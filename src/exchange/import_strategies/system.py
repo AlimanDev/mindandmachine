@@ -6,10 +6,10 @@ import typing as tp
 import pandas as pd
 from django.contrib.contenttypes.models import ContentType
 from django.db import transaction
-from faker.providers.date_time import Provider as DateTimeProvider
 from src.base.models import Shop
 from src.forecast.models import Receipt
 from src.integration.models import ExternalSystem, GenericExternalCode
+from src.util.time import DateTimeHelper
 
 from .base import BaseImportStrategy
 
@@ -108,7 +108,6 @@ class ImportHistDataStrategy(BaseSystemImportStrategy):
                  columns: tp.Optional[tp.List[str]] = None,
                  receipt_code_columns: tp.Optional[tp.List[str]] = None,
                  **kwargs):
-        self._dt_provider = DateTimeProvider(generator=None)
         self.fix_date = fix_date
         self.system_code = system_code
         self.data_type = data_type
@@ -150,8 +149,8 @@ class ImportHistDataStrategy(BaseSystemImportStrategy):
         return self.filename_fmt.format(**kwargs)
 
     def get_dates_range(self):
-        dt_from = self._dt_provider._parse_date(self.dt_from)
-        dt_to = self._dt_provider._parse_date(self.dt_to)
+        dt_from = DateTimeHelper.to_dt(self.dt_from)
+        dt_to = DateTimeHelper.to_dt(self.dt_to)
         return list(pd.date_range(dt_from, dt_to).date)
 
     def get_dt_and_filename_pairs(self):
