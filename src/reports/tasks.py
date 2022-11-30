@@ -1,4 +1,4 @@
-import shutil
+import shutil, pathlib
 from datetime import date, datetime, timedelta
 from typing import Iterable, Union
 
@@ -270,4 +270,5 @@ def tick_report(
 @app.task
 def delete_reports():
     """Cleans up reports on the hard drive"""
-    shutil.rmtree(settings.REPORTS_ROOT)
+    if pathlib.Path(settings.REPORTS_ROOT).exists():
+        shutil.rmtree(settings.REPORTS_ROOT)
