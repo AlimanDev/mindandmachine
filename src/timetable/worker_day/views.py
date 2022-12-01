@@ -18,7 +18,7 @@ from rest_framework.serializers import ValidationError
 from src.base.pagination import LimitOffsetPaginationWithOptionalCount
 
 from src.base.exceptions import FieldError
-from src.base.models import Employment, Shop, Employee
+from src.base.models import Employment, Shop, Employee, Network
 from src.base.permissions import WdPermission
 from src.base.views_abstract import BaseActiveNamedModelViewSet
 from src.events.signals import event_signal
@@ -100,6 +100,17 @@ class WorkerDayViewSet(BaseActiveNamedModelViewSet):
     openapi_tags = ['WorkerDay']
     queryset = WorkerDay.objects.all()
     available_extra_fields = ['shop__name']
+
+    def perform_create(self, serializer):
+        network_id: int = self.request.user.network_id
+        if network_id:
+            network: Network = Network.objects.get(pk=network_id)
+            crop_work_hours: bool = network.crop_work_hours_by_shop_schedule
+        else:
+            crop_work_hours: bool = True
+        serializer.save(
+            crop_work_hours_by_shop_schedule=crop_work_hours,
+        )
 
     def get_queryset(self):
         queryset = super().get_queryset().filter(
