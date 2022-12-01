@@ -23,6 +23,7 @@ from src.timetable.models import (
 from src.timetable.tests.factories import WorkerDayFactory
 from src.timetable.worker_day.serializers import CopyApprovedSerializer
 from src.util.mixins.tests import TestsHelperMixin
+from src.util.time import DateTimeHelper
 
 
 class TestOutsource(TestsHelperMixin, APITestCase):
@@ -921,7 +922,7 @@ class TestOutsource(TestsHelperMixin, APITestCase):
         data = {
             'shop_id': self.client_shop.id,
             'dt_from': self.dt_now.replace(day=1),
-            'dt_to': self.dt_now.replace(month=self.dt_now.month+1, day=1) - timedelta(1),
+            'dt_to': DateTimeHelper.last_day_in_month(self.dt_now),
             'employee_id__in': [self.outsource_employee.id]
         }
         resp = self.client.post(self.get_url('Timesheet-recalc'), data=self.dump_data(data), content_type='application/json')

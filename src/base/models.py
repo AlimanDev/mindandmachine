@@ -1636,7 +1636,7 @@ class Employment(AbstractActiveModel):
         related_name='employments',
     )
 
-    tracker = FieldTracker(fields=['position', 'dt_hired', 'dt_fired', 'norm_work_hours', 'shop_id', 'sawh_settings_id'])
+    tracker = FieldTracker(fields=['position', 'dt_hired', 'dt_fired', 'norm_work_hours', 'shop_id', 'sawh_settings_id', 'dttm_deleted'])
 
     objects = EmploymentManager.from_queryset(EmploymentQuerySet)()
     objects_with_excluded = models.Manager.from_queryset(EmploymentQuerySet)()
@@ -1707,6 +1707,7 @@ class Employment(AbstractActiveModel):
 
         force_create_work_types = kwargs.pop('force_create_work_types', False)
         is_new = self.pk is None
+        recreated_from_deleted = self.tracker.has_changed('dttm_deleted') and self.dttm_deleted is None    # for AbstractActiveModel "new" can also be an updated record from DB that had `dttm_deleted`
         position_has_changed = self.tracker.has_changed('position')
         res = super().save(*args, **kwargs)
         # при создании трудоустройства или при смене должности проставляем типы работ по умолчанию
@@ -1717,7 +1718,7 @@ class Employment(AbstractActiveModel):
         if not is_new and position_has_changed:
             self.recalc_future_worker_days([self.id])
 
-        if (is_new or (self.tracker.has_changed('dt_hired') or self.tracker.has_changed('dt_fired'))) and \
+        if (is_new or recreated_from_deleted or (self.tracker.has_changed('dt_hired') or self.tracker.has_changed('dt_fired'))) and \
                 self.employee.user.network and self.employee.user.network.clean_wdays_on_employment_dt_change:
             from src.timetable.worker_day.tasks import clean_wdays
             from src.util.models_converter import Converter
@@ -1740,7 +1741,6 @@ class Employment(AbstractActiveModel):
                     'employee_id': self.employee_id,
                     'dt__gte': Converter.convert_date(dt__gte),
                 }
-
             transaction.on_commit(lambda: clean_wdays.delay(**kwargs))
 
         if (is_new or self.tracker.has_changed('dt_hired') or self.tracker.has_changed('dt_fired') or self.tracker.has_changed('shop_id')) and settings.ZKTECO_INTEGRATION:
