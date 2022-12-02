@@ -39,7 +39,7 @@ class PeriodClientsUpdateSerializer(PeriodClientsDeleteSerializer):
             raise serializers.ValidationError(_('Date start should be less then date end'))
 
         if self.validated_data.get('from_dttm') < datetime.now() and \
-            (self.validated_data.get('type') is 'L' or self.validated_data.get('type') is 'S'):
+            (self.validated_data.get('type') == 'L' or self.validated_data.get('type') == 'S'):
             raise serializers.ValidationError(_('It is impossible to change the demand forecast for the previous period')) # Нельзя изменить прогноз спроса за прошлый период
 
 
