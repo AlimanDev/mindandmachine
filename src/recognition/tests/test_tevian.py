@@ -2,7 +2,7 @@ import unittest
 
 from src.recognition.api.recognition import Tevian
 
-
+@unittest.skip('Tests external Tevian API instead of our code')
 class TestTevian(unittest.TestCase):
     @classmethod
     def setUpClass(self):
