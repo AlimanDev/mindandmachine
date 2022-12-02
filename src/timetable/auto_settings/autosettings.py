@@ -359,7 +359,7 @@ class AutoSettings:
                 if employment.is_fixed_hours:
                     availability_info = availabilities.get(employee_id, [])
                     if not (len(availability_info)):
-                        print(f'Warning! User {employee.user_id} {employee.user.last_name} {employee.user.first_name} with fixed hours, '
+                        algo_set_timetable_logger.info(f'Warning! User {employee.user_id} {employee.user.last_name} {employee.user.first_name} with fixed hours, '
                             f'but he does not have a set of shifts he can work on!'.encode('utf-8'))
                     mask = [0 for _ in range(len(availability_info))]
                     for info_day in availability_info:
