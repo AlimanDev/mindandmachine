@@ -5,9 +5,9 @@ from django.db import migrations
 
 def delete_worker_day_details_for_non_workday_types(apps, schema_editor):
     WorkerDayCashboxDetails = apps.get_model('timetable', 'WorkerDayCashboxDetails')
-    print('delete_worker_day_details_for_non_workday_types', WorkerDayCashboxDetails.objects.exclude(
+    WorkerDayCashboxDetails.objects.exclude(
         worker_day__type='W',
-    ).delete())
+    ).delete()
 
 
 class Migration(migrations.Migration):
