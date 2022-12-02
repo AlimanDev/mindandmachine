@@ -44,7 +44,8 @@ def exchange(data, error_messages):
             ).first()
         main_work_type_id = None
         if len(wd_source.worker_day_details_list):
-            main_work_type_id = getattr(EmploymentWorkType.objects.filter(employment_id=employment.id, priority=1).first(), 'work_type_id', None)
+            main_work_type_id = getattr(EmploymentWorkType.objects.filter(employment_id=employment.id, priority=1)
+                                        .first(), 'work_type_id', None)
         wd_data = dict(
             type_id=wd_source.type_id,
             dttm_work_start=wd_source.dttm_work_start,

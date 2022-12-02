@@ -1,9 +1,10 @@
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 
+from src.base.models import Network
 from src.timetable.models import (
     WorkerDayPermission,
-    WorkerDayType,
+    WorkerDayType, WorkerDay,
 )
 
 
@@ -46,3 +47,16 @@ def create_wd_perm(sender, instance, created, **kwargs):
             for graph_type, _ in WorkerDayPermission.GRAPH_TYPES
             for action, _ in WorkerDayPermission.ACTIONS
         ])
+
+
+@receiver(post_save, sender=WorkerDay)
+def set_crop_work_hours_to_networks_default(sender, instance, created, **kwargs):
+    if created:
+        try:
+            network_id = instance.shop.network_id or instance.employee.user.network_id
+            network = Network.objects.get(id=network_id)
+            crop_work_network = network.crop_work_hours_by_shop_schedule
+            instance.crop_work_hours_by_shop_schedule = crop_work_network
+            instance.save()
+        except AttributeError:
+            pass
