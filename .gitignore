@@ -11,7 +11,7 @@ src/conf/qosconfig_local.py
 static/
 media/
 mounts
-*.bak
+*.sh.bak
 src/templates/test.html
 src/db/works/printer/test.xlsx
 
