@@ -53,7 +53,6 @@ class TestCropSchedule(TestsHelperMixin, APITestCase):
                 if isinstance(work_start_h, int) else work_start_h,
             dttm_work_end=datetime.combine(self.dt_now, time(work_end_h, 00, 0))
                 if isinstance(work_end_h, int) else work_end_h,
-            crop_work_hours_by_shop_schedule=crop,
         )
         if bulk:
             wd_kwargs['need_count_wh'] = True

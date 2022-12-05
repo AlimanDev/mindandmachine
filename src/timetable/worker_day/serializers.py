@@ -176,7 +176,7 @@ class WorkerDaySerializer(ModelSerializerWithCreateOnlyFields, UnaccountedOverti
         fields = ['id', 'code', 'employee_id', 'shop_id', 'employment_id', 'type', 'dt', 'dttm_work_start', 'dttm_work_end',
                   'comment', 'is_approved', 'worker_day_details', 'is_fact', 'work_hours', 'parent_worker_day_id',
                   'is_outsource', 'is_vacancy', 'shop_code', 'user_login', 'username', 'created_by', 'last_edited_by',
-                  'crop_work_hours_by_shop_schedule', 'dttm_work_start_tabel', 'dttm_work_end_tabel', 'is_blocked',
+                  'dttm_work_start_tabel', 'dttm_work_end_tabel', 'is_blocked',
                   'employment_tabel_code', 'outsources', 'outsources_ids', 'unaccounted_overtime',
                   'closest_plan_approved_id', 'cost_per_hour', 'total_cost', 'tabel_code']
         read_only_fields = ['parent_worker_day_id', 'is_blocked', 'closest_plan_approved_id']
