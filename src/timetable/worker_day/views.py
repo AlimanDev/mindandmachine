@@ -18,7 +18,7 @@ from rest_framework.serializers import ValidationError
 from src.base.pagination import LimitOffsetPaginationWithOptionalCount
 
 from src.base.exceptions import FieldError
-from src.base.models import Employment, Shop, Employee, Network
+from src.base.models import Employment, Shop, Employee
 from src.base.permissions import WdPermission
 from src.base.views_abstract import BaseActiveNamedModelViewSet
 from src.events.signals import event_signal

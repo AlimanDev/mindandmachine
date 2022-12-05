@@ -1,10 +1,9 @@
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 
-from src.base.models import Network
 from src.timetable.models import (
     WorkerDayPermission,
-    WorkerDayType, WorkerDay,
+    WorkerDayType,
 )
 
 
