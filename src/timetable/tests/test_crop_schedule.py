@@ -13,6 +13,7 @@ from src.timetable.models import (
 )
 from src.util.mixins.tests import TestsHelperMixin
 
+
 class TestCropSchedule(TestsHelperMixin, APITestCase):
     @classmethod
     def setUpTestData(cls):
@@ -29,7 +30,9 @@ class TestCropSchedule(TestsHelperMixin, APITestCase):
         cls.shop.settings.breaks.save()
 
     def _test_crop_hours(
-            self, shop_open_h, shop_close_h, work_start_h, work_end_h, expected_work_h, bulk=False):
+            self, shop_open_h, shop_close_h, work_start_h, work_end_h, expected_work_h, bulk=False, crop=True):
+        self.shop.network.crop_work_hours_by_shop_schedule = crop
+        self.shop.network.save()
         self.shop.tm_open_dict = f'{{"all":"{shop_open_h}:00:00"}}' if isinstance(shop_open_h, int) else shop_open_h
         self.shop.tm_close_dict = f'{{"all":"{shop_close_h}:00:00"}}' if isinstance(shop_close_h, int) else shop_close_h
         self.shop.save()
@@ -78,15 +81,15 @@ class TestCropSchedule(TestsHelperMixin, APITestCase):
     def test_crop_work_hours_by_shop_schedule(self):
         # параметры: час откр. магазина, час закр. магазина, час начала работы, час конца работы, ожидаемое к-во часов
         self._test_crop_both_bulk_and_original_save(10, 20, 8, 21, 9)
-        self._test_crop_both_bulk_and_original_save(10, 20, 8, 21, 12)
+        self._test_crop_both_bulk_and_original_save(10, 20, 8, 21, 12, crop=False)
         self._test_crop_both_bulk_and_original_save(10, 20, 11, 19, 7)
-        self._test_crop_both_bulk_and_original_save(10, 20, 11, 19, 7)
+        self._test_crop_both_bulk_and_original_save(10, 20, 11, 19, 7, crop=False)
         self._test_crop_both_bulk_and_original_save(10, 22, 10, 23, 11)
-        self._test_crop_both_bulk_and_original_save(10, 22, 10, 23, 12)
+        self._test_crop_both_bulk_and_original_save(10, 22, 10, 23, 12, crop=False)
         self._test_crop_both_bulk_and_original_save(
             10, 23, 20, datetime.combine(self.dt_now + timedelta(days=1), time(3, 00, 0)), 2)
         self._test_crop_both_bulk_and_original_save(
-            10, 23, 20, datetime.combine(self.dt_now + timedelta(days=1), time(3, 00, 0)), 6)
+            10, 23, 20, datetime.combine(self.dt_now + timedelta(days=1), time(3, 00, 0)), 6, crop=False)
 
         # круглосуточный магазин или расписание не заполнено
         self._test_crop_both_bulk_and_original_save(
@@ -109,6 +112,7 @@ class TestCropSchedule(TestsHelperMixin, APITestCase):
             datetime.combine(self.dt_now, time(9, 46, 15)),
             datetime.combine(self.dt_now, time(21, 47, 23)),
             timedelta(seconds=39668),
+            crop=False
         )
 
         # todo: ночные смены (когда-нибудь)

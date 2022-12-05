@@ -460,7 +460,7 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
         self.assertEqual(
             response.json()['detail'],
             f'У вас нет прав на подтверждение защищенных рабочих дней '
-            f'({self.user2.last_name} {self.user2.first_name} ({self.user2.username}): {self.dt.strftime("%Y-%m-%d")}).'
+            f'({self.user2.last_name} {self.user2.first_name} ({self.user2.username}): {self.dt.strftime("%Y-%m-%d")}). '
             'Обратитесь, пожалуйста, к администратору системы.'
         )
 
