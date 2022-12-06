@@ -7,9 +7,10 @@ from rest_framework.test import APITestCase
 from rest_framework import status
 
 from src.base.models import Network
-from src.base.tests.factories import EmployeeFactory, EmploymentFactory, ShopFactory, UserFactory
+from src.base.tests.factories import EmployeeFactory, EmploymentFactory, ShopFactory
 from src.timetable.models import TimesheetItem, WorkerDay
 from src.timetable.tests.factories import WorkerDayFactory
+from src.util.time import DateTimeHelper
 from ._base import TestTimesheetMixin
 
 
@@ -134,7 +135,7 @@ class TestTimesheetApiView(TestTimesheetMixin, APITestCase):
         data = {
             'shop_id': self.shop.id,
             'dt_from': dt.replace(day=1),
-            'dt_to': dt.replace(month=dt.month+1, day=1) - timedelta(1),
+            'dt_to': DateTimeHelper.last_day_in_month(dt),
             'employee_id__in': [emp.employee.id]
         }
         resp = self.client.post(self.get_url('Timesheet-recalc'), data=self.dump_data(data), content_type='application/json')

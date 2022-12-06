@@ -1409,3 +1409,22 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
         self.assertEqual(res.status_code, status.HTTP_200_OK)
         wd.refresh_from_db()
         self.assertFalse(wd.employment)
+
+    @override_settings(CELERY_TASK_ALWAYS_EAGER=True)
+    @mock.patch.object(transaction, 'on_commit', lambda t: t())
+    def test_clean_wdays_after_employment_recreated_from_deleted(self):
+        """When `Employment` is recreated from deleted (as `AbstractActiveModel`), `clean_wdays` must be called to reattach `Employment` to `WorkerDay`"""
+        self.network.clean_wdays_on_employment_dt_change = True
+        self.network.save()
+        self.employment1.delete()
+        wd = WorkerDayFactory(
+            employment = None,
+            employee = self.employment1.employee,
+            dt = self.dt_now,
+            type_id=WorkerDay.TYPE_WORKDAY
+        )
+        self.assertFalse(wd.employment)
+        self.employment1.dttm_deleted = None
+        self.employment1.save()
+        wd.refresh_from_db()
+        self.assertTrue(wd.employment)
