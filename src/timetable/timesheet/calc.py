@@ -1,5 +1,4 @@
-import datetime
-import logging
+import datetime, logging
 
 import pandas as pd
 from dateutil.relativedelta import relativedelta
@@ -83,7 +82,12 @@ class TimesheetCalculator:
             'dt',
             'dttm_work_start_tabel',
             'dttm_work_end_tabel',
-        ).distinct()
+        ).distinct(                                 # Filter identical days (just in case, since there should not normally be any)
+            'employee_id',
+            'dt',
+            'dttm_work_start_tabel',
+            'dttm_work_end_tabel'
+        )
 
     def _get_empl_key(self, employee_id, dt):
         return dt
@@ -233,6 +237,11 @@ class TimesheetCalculator:
             Prefetch('work_types',
                      queryset=WorkType.objects.all().select_related('work_type_name', 'work_type_name__position'),
                      to_attr='work_types_list'),
+        ).distinct(                                 # Filter identical days (just in case, since there should not normally be any)
+            'employee_id',
+            'dt',
+            'dttm_work_start_tabel',
+            'dttm_work_end_tabel'
         )
         plan_wdays_dict = {}
         for wd in plan_wdays_qs:

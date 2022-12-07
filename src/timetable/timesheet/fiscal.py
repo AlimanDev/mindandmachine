@@ -4,7 +4,7 @@ from decimal import Decimal
 
 import pandas as pd
 from django.db import transaction
-from django.db.models import Prefetch, Subquery, OuterRef
+from django.db.models import Subquery, OuterRef
 
 from src.timetable.models import (
     Employment as EmploymentModel,
@@ -231,7 +231,7 @@ class Timesheet:
                         source=i.source or '',
                     )
                 )
-        TimesheetItemModel.objects.bulk_create(timesheet_items)
+        return TimesheetItemModel.objects.bulk_create(timesheet_items)
 
 
 class FiscalTimesheet:
