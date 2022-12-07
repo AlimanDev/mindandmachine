@@ -5,13 +5,13 @@
 .idea/
 __pycache__/
 *.iml
-
+*sh.bak
 src/conf/djconfig_local.py
 src/conf/qosconfig_local.py
 static/
 media/
 mounts
-*.sh.bak
+
 src/templates/test.html
 src/db/works/printer/test.xlsx
 
@@ -42,5 +42,6 @@ junit.xml
 xunit.xml
 .pytest_cache/
 etc/compose/tests_mounts
+mounts
 docker-compose.yml
 .env
