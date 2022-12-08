@@ -29,7 +29,6 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
     @classmethod
     def setUpTestData(cls):
         cls.create_departments_and_users()
-
         cls.dt = now().date()
         cls.worker_stat_url = '/rest_api/worker_day/worker_stat/'
         cls.url_approve = '/rest_api/worker_day/approve/'
@@ -45,9 +44,9 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
     def setUp(self):
         self.client.force_authenticate(user=self.user1)
 
-    def create_worker_day(self, type_id=WorkerDay.TYPE_WORKDAY, shop=None, dt=None, employee=None, employment=None, is_fact=False,
-                          is_approved=False, parent_worker_day=None, is_vacancy=False, is_blocked=False, dttm_work_start=None,
-                          dttm_work_end=None, last_edited_by_id=None):
+    def create_worker_day(self, type_id=WorkerDay.TYPE_WORKDAY, shop=None, dt=None, employee=None, employment=None,
+                          is_fact=False, is_approved=False, parent_worker_day=None, is_vacancy=False,
+                          is_blocked=False, dttm_work_start=None, dttm_work_end=None, last_edited_by_id=None):
         shop = shop if shop else self.shop
         employment = employment if employment else self.employment2
         if not type_id == WorkerDay.TYPE_WORKDAY:
@@ -221,12 +220,16 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
         }
 
         wds_not_changable = [
-            self.create_worker_day(type_id=WorkerDay.TYPE_HOLIDAY, shop=self.shop, dt=self.dt - timedelta(days=1)),
-            self.create_worker_day(type_id=WorkerDay.TYPE_HOLIDAY, shop=self.shop, dt=self.dt + timedelta(days=5)),
-            self.create_worker_day(type_id=WorkerDay.TYPE_HOLIDAY, shop=self.shop, dt=self.dt + timedelta(days=2), is_fact=True),
+            self.create_worker_day(type_id=WorkerDay.TYPE_HOLIDAY, shop=self.shop,
+                                   dt=self.dt - timedelta(days=1)),
+            self.create_worker_day(type_id=WorkerDay.TYPE_HOLIDAY, shop=self.shop,
+                                   dt=self.dt + timedelta(days=5)),
+            self.create_worker_day(type_id=WorkerDay.TYPE_HOLIDAY, shop=self.shop,
+                                   dt=self.dt + timedelta(days=2), is_fact=True),
             self.create_worker_day(shop=self.shop2, dt=self.dt),
             self.create_worker_day(shop=self.shop2, dt=self.dt + timedelta(days=3)),
-            self.create_worker_day(type_id=WorkerDay.TYPE_HOLIDAY, shop=self.shop, dt=self.dt + timedelta(days=2), is_fact=True, is_approved=True),
+            self.create_worker_day(type_id=WorkerDay.TYPE_HOLIDAY, shop=self.shop,
+                                   dt=self.dt + timedelta(days=2), is_fact=True, is_approved=True),
         ]
 
         response = self.client.post(f"{self.url_approve}", data, format='json')
@@ -239,9 +242,12 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
             self.assertEqual(wd_from_db.is_fact, wd.is_fact)
 
         wds4delete = [
-            self.create_worker_day(type_id=WorkerDay.TYPE_HOLIDAY, shop=self.shop, dt=self.dt + timedelta(days=1), is_approved=True),
-            self.create_worker_day(type_id=WorkerDay.TYPE_VACATION, shop=self.shop, dt=self.dt + timedelta(days=2), is_approved=True),
-            self.create_worker_day(type_id=WorkerDay.TYPE_SICK, shop=self.shop, dt=self.dt + timedelta(days=4), is_approved=True),
+            self.create_worker_day(type_id=WorkerDay.TYPE_HOLIDAY, shop=self.shop,
+                                   dt=self.dt + timedelta(days=1), is_approved=True),
+            self.create_worker_day(type_id=WorkerDay.TYPE_VACATION, shop=self.shop,
+                                   dt=self.dt + timedelta(days=2), is_approved=True),
+            self.create_worker_day(type_id=WorkerDay.TYPE_SICK, shop=self.shop,
+                                   dt=self.dt + timedelta(days=4), is_approved=True),
         ]
 
         wds4updating = [
@@ -264,7 +270,8 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
 
         for wd in wds4updating:
             wd_from_db = WorkerDay.objects.filter(id=wd.id).first()
-            wd_from_db_not_approved = WorkerDay.objects.filter(dt=wd.dt, employee_id=wd.employee_id, is_approved=False).first()
+            wd_from_db_not_approved = WorkerDay.objects.filter(dt=wd.dt, employee_id=wd.employee_id,
+                                                               is_approved=False).first()
             self.assertEqual(wd_from_db.is_approved, True)
             self.assertIsNotNone(wd_from_db_not_approved)
             self.assertEqual(wd_from_db.work_hours, wd_from_db_not_approved.work_hours)
@@ -278,9 +285,12 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
         }
         
         wds4updating = [
-            self.create_worker_day(type_id=WorkerDay.TYPE_SICK, shop=self.shop, dt=self.dt + timedelta(days=1), last_edited_by_id=self.user1.id),
-            self.create_worker_day(type_id=WorkerDay.TYPE_SICK, shop=self.shop, dt=self.dt + timedelta(days=2), last_edited_by_id=self.user2.id),
-            self.create_worker_day(type_id=WorkerDay.TYPE_VACATION, shop=self.shop, dt=self.dt + timedelta(days=4), last_edited_by_id=self.user3.id),
+            self.create_worker_day(type_id=WorkerDay.TYPE_SICK, shop=self.shop, dt=self.dt + timedelta(days=1),
+                                   last_edited_by_id=self.user1.id),
+            self.create_worker_day(type_id=WorkerDay.TYPE_SICK, shop=self.shop, dt=self.dt + timedelta(days=2),
+                                   last_edited_by_id=self.user2.id),
+            self.create_worker_day(type_id=WorkerDay.TYPE_VACATION, shop=self.shop, dt=self.dt + timedelta(days=4),
+                                   last_edited_by_id=self.user3.id),
         ]
 
         wdscreated = []
@@ -289,7 +299,8 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
 
         for wd in wds4updating:
             wd_from_db = WorkerDay.objects.filter(id=wd.id).first()
-            wd_from_db_not_approved = WorkerDay.objects.filter(dt=wd.dt, employee_id=wd.employee_id, is_approved=False).first()
+            wd_from_db_not_approved = WorkerDay.objects.filter(dt=wd.dt, employee_id=wd.employee_id,
+                                                               is_approved=False).first()
             wdscreated.append(wd_from_db_not_approved)
             self.assertEqual(wd_from_db.is_approved, True)
             self.assertIsNotNone(wd_from_db_not_approved)
@@ -305,7 +316,8 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
         self.assertEqual(response.status_code, 200)
         for wd in wdscreated:
             wd_from_db = WorkerDay.objects.filter(id=wd.id).first()
-            wd_from_db_not_approved = WorkerDay.objects.filter(dt=wd.dt, employee_id=wd.employee_id, is_approved=False).first()
+            wd_from_db_not_approved = WorkerDay.objects.filter(dt=wd.dt, employee_id=wd.employee_id,
+                                                               is_approved=False).first()
             self.assertEqual(wd_from_db.is_approved, True)
             self.assertIsNotNone(wd_from_db_not_approved)
             self.assertEqual(wd_from_db.work_hours, wd_from_db_not_approved.work_hours)
@@ -323,13 +335,17 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
         }
 
         wds_not_changable = [
-            self.create_worker_day(type_id=WorkerDay.TYPE_HOLIDAY, shop=self.shop, employment=self.employment2, employee=self.employee2, dt=self.dt),
-            self.create_worker_day(type_id=WorkerDay.TYPE_HOLIDAY, shop=self.shop, employment=self.employment3, employee=self.employee3, dt=self.dt),
+            self.create_worker_day(type_id=WorkerDay.TYPE_HOLIDAY, shop=self.shop,
+                                   employment=self.employment2, employee=self.employee2, dt=self.dt),
+            self.create_worker_day(type_id=WorkerDay.TYPE_HOLIDAY, shop=self.shop,
+                                   employment=self.employment3, employee=self.employee3, dt=self.dt),
         ]
 
         wds4updating = [
-            self.create_worker_day(type_id=WorkerDay.TYPE_SICK, shop=self.shop, employment=self.employment4, employee=self.employee4, dt=self.dt + timedelta(days=1)),
-            self.create_worker_day(type_id=WorkerDay.TYPE_SICK, shop=self.shop, employment=self.employment6, employee=self.employee6, dt=self.dt + timedelta(days=1)),
+            self.create_worker_day(type_id=WorkerDay.TYPE_SICK, shop=self.shop, employment=self.employment4,
+                                   employee=self.employee4, dt=self.dt + timedelta(days=1)),
+            self.create_worker_day(type_id=WorkerDay.TYPE_SICK, shop=self.shop, employment=self.employment6,
+                                   employee=self.employee6, dt=self.dt + timedelta(days=1)),
         ]
 
         response = self.client.post(f"{self.url_approve}", data, format='json')
@@ -343,14 +359,16 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
 
         for wd in wds4updating:
             wd_from_db = WorkerDay.objects.filter(id=wd.id).first()
-            wd_from_db_not_approved = WorkerDay.objects.filter(dt=wd.dt, employee_id=wd.employee_id, is_approved=False).first()
+            wd_from_db_not_approved = WorkerDay.objects.filter(dt=wd.dt, employee_id=wd.employee_id,
+                                                               is_approved=False).first()
             self.assertEqual(wd_from_db.is_approved, True)
             self.assertIsNotNone(wd_from_db_not_approved)
             self.assertEqual(wd_from_db.work_hours, wd_from_db_not_approved.work_hours)
 
     @override_settings(CELERY_TASK_ALWAYS_EAGER=True, CELERY_EAGER_PROPAGATES_EXCEPTIONS=True)
     def test_approve_recalc_wh_and_tabel_for_outsource(self):
-        """Approving plan should run recalc of work hours (based on AttendanceRecords) and tabel (create TimesheetItem), for outsource and employees from other shops."""
+        """Approving plan should run recalc of work hours (based on AttendanceRecords)
+        and tabel (create TimesheetItem), for outsource and employees from other shops."""
         self.create_outsource()
 
         # Employee from other shop
@@ -834,7 +852,7 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
                     'is_approved': False,
                     'dt': self.dt,
                     'type': WorkerDay.TYPE_VACATION,
-                    'work_hours': time(9) #должно игнорироваться            
+                    'work_hours': time(9)  # должно игнорироваться
                 }
             ],
             'options': {
@@ -857,7 +875,7 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
                     'is_approved': False,
                     'dt': self.dt,
                     'type': WorkerDay.TYPE_VACATION,
-                    'work_hours': time(9) #должно обновиться           
+                    'work_hours': time(9)  # должно обновиться
                 }
             ],
             'options': {
@@ -962,7 +980,8 @@ class TestUploadDownload(TestsHelperMixin, APITestCase):
         self.assertEqual(Employee.objects.filter(user=user).count(), 2)
         self.assertTrue(Employee.objects.filter(tabel_code='A23739').exists())
 
-    def _assertWorkerDay(self, tabel_code, dt, is_vacancy=False, work_type_id=None, type_id=WorkerDay.TYPE_WORKDAY, work_hours=None):
+    def _assertWorkerDay(self, tabel_code, dt, is_vacancy=False, work_type_id=None,
+                         type_id=WorkerDay.TYPE_WORKDAY, work_hours=None):
         wd = WorkerDay.objects.get(employee__tabel_code=tabel_code, dt=dt, is_fact=False, is_approved=False)
         self.assertEqual(wd.is_vacancy, is_vacancy)
         self.assertEqual(wd.type_id, type_id)
@@ -993,7 +1012,6 @@ class TestUploadDownload(TestsHelperMixin, APITestCase):
         self._assertWorkerDay('27665', '2020-04-15', work_hours=timedelta(hours=10), type_id=WorkerDay.TYPE_SICK)
         self._assertWorkerDay('26856', '2020-04-14', work_type_id=self.cashbox_work_type.id)
 
-
     def test_upload_timetable_leading_zeros(self):
         file = open('etc/scripts/timetable_leading_zeros.xlsx', 'rb')
         response = self.client.post(f'{self.url}upload/', {'shop_id': self.shop.id, 'file': file}, HTTP_ACCEPT_LANGUAGE='ru')
@@ -1014,7 +1032,11 @@ class TestUploadDownload(TestsHelperMixin, APITestCase):
     def test_upload_timetable_many_users(self):
         file = open('etc/scripts/timetable.xlsx', 'rb')
         with override_settings(UPLOAD_TT_CREATE_EMPLOYEE=False, UPLOAD_TT_MATCH_EMPLOYMENT=False):
-            response = self.client.post(f'{self.url}upload/', {'shop_id': self.shop.id, 'file': file}, HTTP_ACCEPT_LANGUAGE='ru')
+            response = self.client.post(
+                                        f'{self.url}upload/',
+                                        {'shop_id': self.shop.id, 'file': file},
+                                        HTTP_ACCEPT_LANGUAGE='ru'
+                                        )
         file.close()
         self.assertEqual(response.status_code, 200)
         self.assertEqual(WorkerDay.objects.filter(is_approved=False).count(), 181)
@@ -1028,7 +1050,11 @@ class TestUploadDownload(TestsHelperMixin, APITestCase):
     def test_upload_timetable_many_users_match_tabel_code(self):
         file = open('etc/scripts/timetable.xlsx', 'rb')
         with override_settings(UPLOAD_TT_CREATE_EMPLOYEE=False):
-            response = self.client.post(f'{self.url}upload/', {'shop_id': self.shop.id, 'file': file}, HTTP_ACCEPT_LANGUAGE='ru')
+            response = self.client.post(
+                                        f'{self.url}upload/',
+                                        {'shop_id': self.shop.id, 'file': file},
+                                        HTTP_ACCEPT_LANGUAGE='ru'
+                                    )
         file.close()
         self.assertEqual(response.status_code, 200)
         self.assertEqual(WorkerDay.objects.filter(is_approved=False).count(), 181)
@@ -1212,7 +1238,8 @@ class TestUploadDownload(TestsHelperMixin, APITestCase):
         self.network.timetable_format = 'row_format'
         self.network.save()
         file = open('etc/scripts/timetable_rows.xlsx', 'rb')
-        response = self.client.post(f'{self.url}upload/', {'shop_id': self.shop.id, 'file': file}, HTTP_ACCEPT_LANGUAGE='ru')
+        response = self.client.post(f'{self.url}upload/', {'shop_id': self.shop.id, 'file': file},
+                                    HTTP_ACCEPT_LANGUAGE='ru')
         file.close()
         self.assertEqual(response.status_code, 200)
         self.assertEqual(WorkerDay.objects.filter(is_approved=False, source=WorkerDay.SOURCE_UPLOAD).count(), 180)
@@ -1225,7 +1252,8 @@ class TestUploadDownload(TestsHelperMixin, APITestCase):
         self.network.add_users_from_excel = False
         self.network.save()
         with open('etc/scripts/timetable_users.xlsx', 'rb') as file:
-            response = self.client.post(f'{self.url}upload/', {'shop_id': self.shop.id, 'file': file}, HTTP_ACCEPT_LANGUAGE='ru')
+            response = self.client.post(f'{self.url}upload/', {'shop_id': self.shop.id, 'file': file},
+                                        HTTP_ACCEPT_LANGUAGE='ru')
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.json(), ['Сотрудник с табельным номером 23739 не существует в текущем магазине.'])
         user1 = User.objects.create(
@@ -1242,7 +1270,8 @@ class TestUploadDownload(TestsHelperMixin, APITestCase):
             shop=self.shop,
         )
         with open('etc/scripts/timetable_users.xlsx', 'rb') as file:
-            response = self.client.post(f'{self.url}upload/', {'shop_id': self.shop.id, 'file': file}, HTTP_ACCEPT_LANGUAGE='ru')
+            response = self.client.post(f'{self.url}upload/', {'shop_id': self.shop.id, 'file': file},
+                                        HTTP_ACCEPT_LANGUAGE='ru')
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.json(), ['Сотрудник с ФИО Петров Петр Петрович не существует в текущем магазине.'])
         user2 = User.objects.create(
@@ -1260,7 +1289,8 @@ class TestUploadDownload(TestsHelperMixin, APITestCase):
             shop=self.shop,
         )
         with open('etc/scripts/timetable_users.xlsx', 'rb') as file:
-            response = self.client.post(f'{self.url}upload/', {'shop_id': self.shop.id, 'file': file}, HTTP_ACCEPT_LANGUAGE='ru')
+            response = self.client.post(f'{self.url}upload/', {'shop_id': self.shop.id, 'file': file},
+                                        HTTP_ACCEPT_LANGUAGE='ru')
         self.assertEqual(response.status_code, 200)
         self.assertEqual(WorkerDay.objects.filter(is_approved=False).count(), 60)
         user1.refresh_from_db()
@@ -1303,10 +1333,14 @@ class TestCreateFactFromAttendanceRecords(TestsHelperMixin, APITestCase):
 
     def test_fact_create(self): 
         dt = date.today()
-        self.create_att_record(AttendanceRecords.TYPE_COMING, datetime.combine(dt, time(20, 56)), self.user1.id, self.employment1.shop_id, self.employment1.employee_id, terminal=False)
-        self.create_att_record(AttendanceRecords.TYPE_COMING, datetime.combine(dt + timedelta(1), time(0, 56)), self.user1.id, self.employment1.shop_id, self.employment1.employee_id, terminal=False)
-        self.create_att_record(AttendanceRecords.TYPE_COMING, datetime.combine(dt, time(20, 56)), self.user2.id, self.employment2.shop_id, self.employment2.employee_id,)
-        self.create_att_record(AttendanceRecords.TYPE_COMING, datetime.combine(dt + timedelta(1), time(0, 56)), self.user2.id, self.employment2.shop_id, self.employment2.employee_id,)
+        self.create_att_record(AttendanceRecords.TYPE_COMING, datetime.combine(dt, time(20, 56)),
+                               self.user1.id, self.employment1.shop_id, self.employment1.employee_id, terminal=False)
+        self.create_att_record(AttendanceRecords.TYPE_COMING, datetime.combine(dt + timedelta(1), time(0, 56)),
+                               self.user1.id, self.employment1.shop_id, self.employment1.employee_id, terminal=False)
+        self.create_att_record(AttendanceRecords.TYPE_COMING, datetime.combine(dt, time(20, 56)),
+                               self.user2.id, self.employment2.shop_id, self.employment2.employee_id,)
+        self.create_att_record(AttendanceRecords.TYPE_COMING, datetime.combine(dt + timedelta(1), time(0, 56)),
+                               self.user2.id, self.employment2.shop_id, self.employment2.employee_id,)
         self.assertEqual(WorkerDay.objects.filter(is_fact=True).count(), 8)
 
         self.create_worker_day(

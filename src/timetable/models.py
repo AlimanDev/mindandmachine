@@ -1262,7 +1262,7 @@ class WorkerDay(AbstractModel):
         if not self.type.is_dayoff and self.dttm_work_end and self.dttm_work_start:
             dttm_work_start = _dttm_work_start = self.dttm_work_start
             dttm_work_end = _dttm_work_end = self.dttm_work_end
-            if self.shop_id and self.shop.network.crop_work_hours_by_shop_schedule and self.crop_work_hours_by_shop_schedule:
+            if self.shop_id and self.shop.network.crop_work_hours_by_shop_schedule:
                 shop_schedule = self.shop.get_schedule(dt=self.dt)
                 if shop_schedule is None:
                     return dttm_work_start, dttm_work_end, datetime.timedelta(0)
@@ -1444,8 +1444,6 @@ class WorkerDay(AbstractModel):
         Network, through=WorkerDayOutsourceNetwork,
         help_text='Аутсорс сети, которые могут откликнуться на данную вакансию', blank=True,
     )
-    crop_work_hours_by_shop_schedule = models.BooleanField(
-        default=True, verbose_name='Обрезать рабочие часы по времени работы магазина')
     is_blocked = models.BooleanField(
         default=False,
         verbose_name='Защищенный день',
