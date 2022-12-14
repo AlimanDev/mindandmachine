@@ -1004,8 +1004,8 @@ msgid "Manual tick"
 msgstr "Ручная отметка"
 
 #: src/reports/serializers.py:63
-msgid "Time period must be within one month."
-msgstr "Период должен быть в рамках одного месяца."
+msgid "Time period must be within 31 days."
+msgstr "Период должен быть в рамках 31 дня."
 
 #: src/reports/tasks.py:247 src/reports/tasks.py:262
 #: src/util/dg/ticks_report.py:25

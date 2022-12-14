@@ -48,6 +48,7 @@ class ConsolidatedTimesheetReportSerializer(serializers.Serializer):
         attrs['group_by'] = attrs['group_by'].split('_')
         return attrs
 
+
 class TikReportSerializer(serializers.Serializer):
     dt_from = serializers.DateField()
     dt_to = serializers.DateField()
@@ -59,6 +60,6 @@ class TikReportSerializer(serializers.Serializer):
     def validate(self, data):
         if data['dt_to'] < data['dt_from']:
             raise serializers.ValidationError(_('Invalid time period.'))
-        if data['dt_to'].month != data['dt_from'].month:
-            raise serializers.ValidationError(_('Time period must be within one month.'))
+        if (data['dt_to']-data['dt_from']).days > 31:
+            raise serializers.ValidationError(_('Time period must be within 31 days.'))
         return data
