@@ -2021,6 +2021,7 @@ class FunctionGroup(AbstractModel):
         ('ShiftSchedule_batch_update_or_create', 'Массовое создание/обновление графиков работ (Создать/Обновить) (shift_schedule/batch_update_or_create/)'),
         ('ShiftScheduleInterval_batch_update_or_create', 'Массовое создание/обновление интервалов графиков работ сотрудников (Создать/Обновить) (shift_schedule/batch_update_or_create/)'),
         ('Shop', 'Отдел (department)'),
+        ('ShopIpAddress', 'список IP адресов магазина (shop_ip_address)'),
         ('Shop_stat', 'Статистика по отделам (Получить) (department/stat/)'),
         ('Shop_tree', 'Дерево отделов (Получить) (department/tree/)'),
         ('Shop_internal_tree', 'Дерево отделов сети пользователя (Получить) (department/internal_tree/)'),

@@ -7,7 +7,8 @@ from rest_framework import serializers
 
 from src.base.models import Shop, NetworkConnect
 from src.base.serializers import BaseModelSerializer
-from src.recognition.models import TickPoint, Tick, TickPhoto
+from src.recognition.models import TickPoint, Tick, TickPhoto, ShopIpAddress
+from src.recognition.wfm.serializers import ShopSerializer
 from src.timetable.models import User as WFMUser
 from src.util.drf.fields import RoundingDecimalField
 from src.util.utils import generate_user_token
@@ -169,3 +170,10 @@ class PostTickPhotoSerializer(BaseModelSerializer):
 class DownloadTickPhotoExcelSerializer(serializers.Serializer):
     dt_from = serializers.DateField(required=False)
     dt_to = serializers.DateField(required=False)
+
+
+class ShopIpAddressSerializer(BaseModelSerializer):
+
+    class Meta:
+        model = ShopIpAddress
+        fields = ['id', 'ip_address', 'shop']

@@ -16,7 +16,7 @@ from drf_yasg.utils import swagger_auto_schema
 from requests.exceptions import HTTPError
 from rest_framework import (
     exceptions,
-    permissions
+    permissions, status
 )
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.authtoken.views import ObtainAuthToken
@@ -25,7 +25,7 @@ from rest_framework.response import Response
 from rest_framework.pagination import LimitOffsetPagination
 
 from src.base.auth.authentication import CsrfExemptSessionAuthentication
-from src.base.models import User, Network
+from src.base.models import User, Network, Shop
 from src.base.permissions import Permission
 from src.base.views_abstract import BaseModelViewSet
 from src.base.serializers import NetworkSerializer
@@ -41,7 +41,7 @@ from src.recognition.serializers import (
     PostTickSerializer_point,
     PostTickSerializer_user,
     PostTickPhotoSerializer,
-    DownloadTickPhotoExcelSerializer,
+    DownloadTickPhotoExcelSerializer, ShopIpAddressSerializer,
 )
 from src.recognition.wfm.serializers import ShopSerializer
 from src.timetable.models import (
@@ -65,6 +65,7 @@ LATENESS_LAMBDA = {
     Tick.TYPE_COMING: lambda check_dttm, wd: check_dttm - wd.dttm_work_start,
     Tick.TYPE_LEAVING: lambda  check_dttm, wd: wd.dttm_work_end - check_dttm,
 }
+
 
 class HashSigninAuthToken(ObtainAuthToken):
     authentication_classes = ()
@@ -157,6 +158,7 @@ class TickPointAuthTickViewStrategy(TickViewStrategy):
         tick_point = self.view.request.user
         user_id = data['user_id']
         return user_id, data.get('employee_id'), tick_point
+
 
 class ShopIPAuthTickViewStrategy(TickPointAuthTickViewStrategy):
     def filter_qs(self, queryset):
@@ -377,7 +379,7 @@ class TickPhotoViewSet(BaseModelViewSet):
 
     @swagger_auto_schema(
         request_body=PostTickPhotoSerializer,
-        responses={201:TickPhotoSerializer},
+        responses={201: TickPhotoSerializer},
     )
     def create(self, request, **kwargs):
         """
@@ -575,7 +577,6 @@ class DownloadViolatorsReportAdminView(SuperuserRequiredMixin, FormView):
     template_name = 'download_violators.html'
     success_url = '/admin/recognition/tick/'
 
-
     def get(self, request):
         form = self.form_class(request.GET)
         if form.is_valid():
@@ -601,3 +602,26 @@ class DownloadViolatorsReportAdminView(SuperuserRequiredMixin, FormView):
 
         return context
 
+
+class ShopIpAddressViewSet(BaseModelViewSet):
+    permission_classes = [Permission]
+    serializer_class = ShopIpAddressSerializer
+
+    def get_object(self):
+        return ShopIpAddress.objects.get(pk=self.kwargs['pk'])
+
+    def get_queryset(self):
+        shop_id = self.request.GET.get('shop_id')
+        return ShopIpAddress.objects.filter(shop__id=shop_id)
+
+    def perform_create(self, serializer):
+        shop_id = self.request.data.get('shop')
+        shop = Shop.objects.get(id=shop_id)
+        ip_address = self.request.data.get('ip_address')
+        serializer.save(shop=shop, ip_address=ip_address)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        self.perform_destroy(instance)
+        return Response(status=status.HTTP_204_NO_CONTENT)
