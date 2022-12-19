@@ -144,6 +144,8 @@ class OperationTypeTemplate(AbstractModel):
         verbose_name=_('duplicate over'),
         help_text=_('Period, that time series values need to be duplicated over. Signifies, that values should be treated as constant for this period.')
     )
+    min_value = models.FloatField(null=True, blank=True)
+    max_value = models.FloatField(null=True, blank=True)
 
     def __str__(self):
         return 'id: {}, load_template: {}, operation_type_name: ({})'.format(
