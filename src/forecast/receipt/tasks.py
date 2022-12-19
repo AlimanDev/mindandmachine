@@ -191,10 +191,7 @@ def clean_timeserie_actions(
     dttm_now = datetime.now()
     if isinstance(data_types_to_process, str):
         data_types_to_process = json.loads(data_types_to_process)
-    if not isinstance(data_types_to_process, list):
-        raise TypeError(
-            f'invalid type for allowed data types, must be List[str], got {data_types_to_process}'
-        )
+
     if isinstance(dttm_for_delete, str):
         dttm_for_delete = datetime.strptime(dttm_for_delete, settings.QOS_DATETIME_FORMAT)
     for network in Network.objects.all():
