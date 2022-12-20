@@ -25,6 +25,7 @@ class BaseFilesystemConnector(PolymorphicModel):
         verbose_name = 'Коннектор к файловой системы'
         verbose_name_plural = 'Коннекторы к файловой системе'
 
+
 class BaseJob(AbstractModel):
     base_path = models.CharField(blank=True, max_length=512)
     fs_connector = models.ForeignKey(BaseFilesystemConnector, on_delete=models.CASCADE)
@@ -40,11 +41,9 @@ class BaseJob(AbstractModel):
     class Meta:
         abstract = True
 
+
 class LocalFilesystemConnector(BaseFilesystemConnector):
     default_base_path = models.CharField(max_length=512, null=True, default=None)
-
-    def get_fs_engine(self, base_path=None):
-        return LocalEngine(base_path=base_path or self.default_base_path or settings.BASE_DIR)
 
     class Meta:
         verbose_name = 'Коннектор к локальной файловой системе'
@@ -52,6 +51,9 @@ class LocalFilesystemConnector(BaseFilesystemConnector):
 
     def __str__(self):
         return self.name or f'local fs connector ({self.default_base_path})'
+
+    def get_fs_engine(self, base_path=None):
+        return LocalEngine(base_path=base_path or self.default_base_path or settings.BASE_DIR)
 
 
 class FtpFilesystemConnector(BaseFilesystemConnector):
@@ -61,6 +63,13 @@ class FtpFilesystemConnector(BaseFilesystemConnector):
     username = models.CharField(max_length=128)
     password = models.CharField(max_length=50)  # TODO: виджет пароля из from django import forms в админке
 
+    class Meta:
+        verbose_name = 'Коннектор к FTP'
+        verbose_name_plural = 'Коннекторы к FTP'
+
+    def __str__(self):
+        return self.name or f'ftp fs connector {self.host}:{self.port} ({self.default_base_path})'
+
     def get_fs_engine(self, base_path=None):
         return FtpEngine(
             base_path=base_path or self.default_base_path,
@@ -69,13 +78,6 @@ class FtpFilesystemConnector(BaseFilesystemConnector):
             username=self.username,
             password=self.password,
         )
-
-    class Meta:
-        verbose_name = 'Коннектор к FTP'
-        verbose_name_plural = 'Коннекторы к FTP'
-
-    def __str__(self):
-        return self.name or f'ftp fs connector {self.host}:{self.port} ({self.default_base_path})'
 
 
 class ImportStrategy(PolymorphicModel):

@@ -641,6 +641,12 @@ class Shop(MPTTModel, AbstractActiveNetworkSpecificCodeNamedModel):
             self.code,
         )
 
+    def __init__(self, *args, **kwargs):
+        parent_code = kwargs.pop('parent_code', None)
+        super().__init__(*args, **kwargs)
+        if parent_code:
+            self.parent = self._get_parent_or_400(parent_code)
+
     @property
     def is_active(self):
         dttm_now = timezone.now()
@@ -687,12 +693,6 @@ class Shop(MPTTModel, AbstractActiveNetworkSpecificCodeNamedModel):
             return Shop.objects.get(code=parent_code)
         except Shop.DoesNotExist:
             raise ValidationError(_('Shop with parent_code={code} not found').format(code=parent_code))
-
-    def __init__(self, *args, **kwargs):
-        parent_code = kwargs.pop('parent_code', None)
-        super().__init__(*args, **kwargs)
-        if parent_code:
-            self.parent = self._get_parent_or_400(parent_code)
 
     @property
     def director_code(self):
@@ -1297,16 +1297,6 @@ class User(DjangoAbstractUser, AbstractModel):
         verbose_name = 'Пользователь'
         verbose_name_plural = 'Пользователи'
 
-    def __str__(self):
-        # if self.shop and self.shop.parent:
-        #     ss_title = self.shop.parent.title
-        # else:
-        #     ss_title = None
-        return '{}, {}, {}, {}'.format(self.first_name, self.last_name, self.id, self.username)
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
     id = models.BigAutoField(primary_key=True)
     first_name = models.CharField(blank=True, max_length=30, verbose_name='first name')
     middle_name = models.CharField(max_length=64, blank=True, null=True)
@@ -1347,6 +1337,24 @@ class User(DjangoAbstractUser, AbstractModel):
     )
     ldap_login = models.CharField(max_length=150, null=True, blank=True)
 
+    def __str__(self):
+        # if self.shop and self.shop.parent:
+        #     ss_title = self.shop.parent.title
+        # else:
+        #     ss_title = None
+        return '{}, {}, {}, {}'.format(self.first_name, self.last_name, self.id, self.username)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    @property
+    def short_fio(self):
+        return self.get_short_fio()
+
+    @property
+    def fio(self):
+        return self.get_fio()
+
     def get_fio(self):
         """
         :return: Фамилия Имя Отчество (если есть)
@@ -1366,14 +1374,6 @@ class User(DjangoAbstractUser, AbstractModel):
         if self.middle_name:
             short_fio += f'{self.middle_name[0].upper()}.'
         return short_fio
-
-    @property
-    def short_fio(self):
-        return self.get_short_fio()
-
-    @property
-    def fio(self):
-        return self.get_fio()
 
     def get_active_employments(self, shop_id=None, dt_from=None, dt_to=None):
         q = Q(
@@ -1595,9 +1595,6 @@ class Employment(AbstractActiveModel):
         verbose_name = 'Трудоустройство'
         verbose_name_plural = 'Трудоустройства'
 
-    def __str__(self):
-        return '{}, {}, {}, {}, {}'.format(self.id, self.shop, self.employee, self.dt_hired, self.dt_fired)
-
     id = models.BigAutoField(primary_key=True)
     code = models.CharField(max_length=128, null=True, blank=True, unique=True)
     employee = models.ForeignKey('base.Employee', on_delete=models.CASCADE, related_name="employments")
@@ -1641,6 +1638,24 @@ class Employment(AbstractActiveModel):
     objects = EmploymentManager.from_queryset(EmploymentQuerySet)()
     objects_with_excluded = models.Manager.from_queryset(EmploymentQuerySet)()
 
+    def __init__(self, *args, **kwargs):
+        shop_code = kwargs.pop('shop_code', None)
+        username = kwargs.get('username', None)
+        user_id = kwargs.get('user_id', None)
+        position_code = kwargs.pop('position_code', None)
+        super().__init__(*args, **kwargs)
+        if shop_code:
+            self.shop = Shop.objects.get(code=shop_code)
+        if username and not user_id:
+            self.user = User.objects.get(username=username)
+            self.user_id = self.user.id
+
+        if position_code:
+            self.position = WorkerPosition.objects.get(code=position_code)
+
+    def __str__(self):
+        return '{}, {}, {}, {}, {}'.format(self.id, self.shop, self.employee, self.dt_hired, self.dt_fired)
+
     def has_permission(self, permission, method='GET'):
         groups = [self.function_group, self.position.group if self.position else None]
         if not any(groups):
@@ -1678,21 +1693,6 @@ class Employment(AbstractActiveModel):
             dt_now = timezone.now().date()
             recalc_timesheet_on_data_change({self.employee_id: [dt_now.replace(day=1) - datetime.timedelta(1), dt_now]})
             return res
-
-    def __init__(self, *args, **kwargs):
-        shop_code = kwargs.pop('shop_code', None)
-        username = kwargs.get('username', None)
-        user_id = kwargs.get('user_id', None)
-        position_code = kwargs.pop('position_code', None)
-        super().__init__(*args, **kwargs)
-        if shop_code:
-            self.shop = Shop.objects.get(code=shop_code)
-        if username and not user_id:
-            self.user = User.objects.get(username=username)
-            self.user_id = self.user.id
-
-        if position_code:
-            self.position = WorkerPosition.objects.get(code=position_code)
 
     @tracker
     def save(self, *args, **kwargs):

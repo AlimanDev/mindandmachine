@@ -22,13 +22,6 @@ class OperationTypeName(AbstractActiveNetworkSpecificCodeNamedModel):
         verbose_name = 'Название операции'
         verbose_name_plural = 'Названия операций'
 
-    def delete(self):
-        super(OperationTypeName, self).delete()
-        OperationType.objects.filter(operation_type_name__id=self.pk).update(
-            dttm_deleted=timezone.now()
-        )
-        return self
-
     FORECAST = 'H'
     FORECAST_FORMULA = 'F'
     FEATURE_SERIE = 'FS'
@@ -54,6 +47,13 @@ class OperationTypeName(AbstractActiveNetworkSpecificCodeNamedModel):
             self.do_forecast = self.FORECAST_FORMULA
         return super().save(*args, **kwargs)
 
+    def delete(self):
+        super(OperationTypeName, self).delete()
+        OperationType.objects.filter(operation_type_name__id=self.pk).update(
+            dttm_deleted=timezone.now()
+        )
+        return self
+
 
 class LoadTemplate(AbstractModel):
     class Meta:
@@ -75,9 +75,6 @@ class OperationType(AbstractActiveModel):
         verbose_name = 'Тип операции'
         verbose_name_plural = 'Типы операций'
         unique_together = ['shop', 'operation_type_name']
-
-    def __str__(self):
-        return 'id: {}, name: {}, work type: {}'.format(self.id, self.operation_type_name.name, self.work_type)
 
     READY = 'R'
     UPDATED = 'U'
@@ -106,6 +103,9 @@ class OperationType(AbstractActiveModel):
         super(OperationType, self).__init__(*args, **kwargs)
         if code:
             self.operation_type_name = OperationTypeName.objects.get(code=code)
+
+    def __str__(self):
+        return 'id: {}, name: {}, work type: {}'.format(self.id, self.operation_type_name.name, self.work_type)
 
     def save(self, *args, **kwargs):
         if hasattr(self, 'code'):
@@ -188,6 +188,10 @@ class OperationTypeRelation(AbstractModel):
             text += f' max_value: {self.max_value}, threshold: {self.threshold}, days_of_week: {self.days_of_week}'
         return text
 
+    def __init__(self, *args, **kwargs):
+        self.row = kwargs.pop('row', None)
+        super().__init__(*args, **kwargs)
+
     @cached_property
     def days_of_week_list(self):
         available_days_of_week = {0, 1, 2, 3, 4, 5, 6}
@@ -201,10 +205,6 @@ class OperationTypeRelation(AbstractModel):
         if row:
             row = _('Error in row {}.').format(row) + ' '
         return (row or '') + msg
-
-    def __init__(self, *args, **kwargs):
-        self.row = kwargs.pop('row', None)
-        super().__init__(*args, **kwargs)
 
     def get_relation_type(self):
         base = self.base
@@ -416,9 +416,6 @@ class PeriodClients(AbstractModel):
         unique_together = [
             ('dttm_forecast', 'operation_type', 'type'),
         ]
-    
-    def __str__(self):
-        return '{}, {}, {}, {}'.format(self.dttm_forecast, self.type, self.operation_type, self.value)
 
     id = models.BigAutoField(primary_key=True)
     dttm_forecast = models.DateTimeField(verbose_name=_('aggregation date and time'))
@@ -428,11 +425,13 @@ class PeriodClients(AbstractModel):
     value = models.FloatField(default=0)
     objects = PeriodClientsManager()
 
+    def __str__(self):
+        return '{}, {}, {}, {}'.format(self.dttm_forecast, self.type, self.operation_type, self.value)
+
 
 class Receipt(AbstractModel):
     """
     Событийная сущность, которая потом используется для аггрегации в PeriodClients
-
     изначально для чеков
     """
 

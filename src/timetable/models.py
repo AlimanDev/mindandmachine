@@ -88,14 +88,6 @@ class WorkTypeName(AbstractActiveNetworkSpecificCodeNamedModel):
         verbose_name = 'Название типа работ'
         verbose_name_plural = 'Названия типов работ'
 
-    def delete(self):
-        from src.forecast.models import OperationTypeName
-        super(WorkTypeName, self).delete()
-        WorkType.objects.qos_delete(work_type_name__id=self.pk)
-        otn = OperationTypeName.objects.filter(work_type_name_id=self.pk).first()
-        if otn:
-            otn.delete()
-        return self
 
     def __str__(self):
         return 'id: {}, name: {}, code: {}'.format(
@@ -103,6 +95,10 @@ class WorkTypeName(AbstractActiveNetworkSpecificCodeNamedModel):
             self.name,
             self.code,
         )
+
+    @classmethod
+    def get_work_type_names_dict(cls):
+        return {wtn.id: wtn for wtn in cls.objects.all()}
 
     def save(self, *args, **kwargs):
         from src.forecast.models import OperationTypeName
@@ -131,9 +127,14 @@ class WorkTypeName(AbstractActiveNetworkSpecificCodeNamedModel):
             defaults=defaults,
         )
 
-    @classmethod
-    def get_work_type_names_dict(cls):
-        return {wtn.id: wtn for wtn in cls.objects.all()}
+    def delete(self):
+        from src.forecast.models import OperationTypeName
+        super(WorkTypeName, self).delete()
+        WorkType.objects.qos_delete(work_type_name__id=self.pk)
+        otn = OperationTypeName.objects.filter(work_type_name_id=self.pk).first()
+        if otn:
+            otn.delete()
+        return self
 
 
 class WorkType(AbstractActiveModel):
@@ -141,9 +142,6 @@ class WorkType(AbstractActiveModel):
         verbose_name = 'Тип работ'
         verbose_name_plural = 'Типы работ'
         unique_together = ['shop', 'work_type_name']
-
-    def __str__(self):
-        return '{}, {}, {}, {}'.format(self.work_type_name.name, self.shop.name, self.shop.parent.name if self.shop.parent else '', self.id)
 
     id = models.BigAutoField(primary_key=True)
 
@@ -174,6 +172,9 @@ class WorkType(AbstractActiveModel):
         if code:
             self.work_type_name = WorkTypeName.objects.get(code=code)
 
+    def __str__(self):
+        return '{}, {}, {}, {}'.format(self.work_type_name.name, self.shop.name, self.shop.parent.name if self.shop.parent else '', self.id)
+
     def save(self, *args, **kwargs):
         from src.forecast.models import OperationType
         if hasattr(self, 'code'):
@@ -181,6 +182,7 @@ class WorkType(AbstractActiveModel):
         is_new = self.id is None
         super(WorkType, self).save(*args, **kwargs)
         update_or_create_kwargs = {}
+
         defaults = {
             'status': OperationType.UPDATED,
             'work_type_id': self.id,
@@ -217,9 +219,6 @@ class UserWeekdaySlot(AbstractModel):
         verbose_name = 'Пользовательский слот'
         verbose_name_plural = 'Пользовательские слоты'
 
-    def __str__(self):
-        return '{}, {}, {}, {}'.format(self.worker.last_name, self.slot.name, self.weekday, self.id)
-
     worker = models.ForeignKey(User, on_delete=models.PROTECT)
     shop = models.ForeignKey(Shop, blank=True, null=True, on_delete=models.PROTECT)
     employment = models.ForeignKey(Employment, on_delete=models.PROTECT, null=True)
@@ -227,11 +226,26 @@ class UserWeekdaySlot(AbstractModel):
     weekday = models.SmallIntegerField()  # 0 - monday, 6 - sunday
     is_suitable = models.BooleanField(default=True)
 
+    def __str__(self):
+        return '{}, {}, {}, {}'.format(self.worker.last_name, self.slot.name, self.weekday, self.id)
+
 
 class Slot(AbstractActiveNetworkSpecificCodeNamedModel):
     class Meta(AbstractActiveNetworkSpecificCodeNamedModel.Meta):
         verbose_name = 'Слот'
         verbose_name_plural = 'Слоты'
+
+    id = models.BigAutoField(primary_key=True)
+
+    name = models.CharField(max_length=128)
+
+    tm_start = models.TimeField(default=datetime.time(hour=7))
+    tm_end = models.TimeField(default=datetime.time(hour=23, minute=59, second=59))
+    shop = models.ForeignKey(Shop, on_delete=models.PROTECT) # todo delete this by cashbox_type
+    work_type = models.ForeignKey(WorkType, null=True, blank=True, on_delete=models.PROTECT)
+    workers_needed = models.IntegerField(default=1)
+
+    worker = models.ManyToManyField(User, through=UserWeekdaySlot)
 
     def __str__(self):
         if self.work_type:
@@ -247,18 +261,6 @@ class Slot(AbstractActiveNetworkSpecificCodeNamedModel):
             self.id
         )
 
-    id = models.BigAutoField(primary_key=True)
-
-    name = models.CharField(max_length=128)
-
-    tm_start = models.TimeField(default=datetime.time(hour=7))
-    tm_end = models.TimeField(default=datetime.time(hour=23, minute=59, second=59))
-    shop = models.ForeignKey(Shop, on_delete=models.PROTECT) # todo delete this by cashbox_type
-    work_type = models.ForeignKey(WorkType, null=True, blank=True, on_delete=models.PROTECT)
-    workers_needed = models.IntegerField(default=1)
-
-    worker = models.ManyToManyField(User, through=UserWeekdaySlot)
-
 
 class EmploymentWorkType(AbstractModel):
 
@@ -266,9 +268,6 @@ class EmploymentWorkType(AbstractModel):
 
         verbose_name = 'Информация по сотруднику-типу работ'
         unique_together = (('employment', 'work_type'),)
-
-    def __str__(self):
-        return '{}, {}, {}'.format(self.employment.employee.user.last_name, self.work_type.work_type_name.name, self.id)
 
     id = models.BigAutoField(primary_key=True)
 
@@ -289,6 +288,9 @@ class EmploymentWorkType(AbstractModel):
     # how many hours did he work
     duration = models.FloatField(default=0)
 
+    def __str__(self):
+        return '{}, {}, {}'.format(self.employment.employee.user.last_name, self.work_type.work_type_name.name, self.id)
+
     def get_department(self):
         return self.employment.shop
 
@@ -305,9 +307,6 @@ class WorkerConstraint(AbstractModel):
         verbose_name = 'Ограничения сотрудника'
         unique_together = (('employment', 'weekday', 'tm'),)
 
-    def __str__(self):
-        return '{} {}, {}, {}, {}'.format(self.employment.employee.user.last_name, self.employment.id, self.weekday, self.tm, self.id)
-
     id = models.BigAutoField(primary_key=True)
     shop = models.ForeignKey(Shop, blank=True, null=True, on_delete=models.PROTECT, related_name='worker_constraints')
     employment = models.ForeignKey(Employment, on_delete=models.PROTECT, related_name='worker_constraints')
@@ -318,6 +317,9 @@ class WorkerConstraint(AbstractModel):
 
     objects = WorkerConstraintManager()
     objects_with_excluded = models.Manager()
+
+    def __str__(self):
+        return '{} {}, {}, {}, {}'.format(self.employment.employee.user.last_name, self.employment.id, self.weekday, self.tm, self.id)
 
     def get_department(self):
         return self.employment.shop
@@ -792,6 +794,75 @@ class WorkerDay(AbstractModel):
         (RECALC_FACT_FROM_ATT_RECORDS, 'Пересчет факта на основе отметок'),
     ]
 
+    id = models.BigAutoField(primary_key=True, db_index=True)
+    code = models.CharField(max_length=256, null=True)
+    shop = models.ForeignKey(Shop, on_delete=models.PROTECT, null=True)
+
+    employee = models.ForeignKey(
+        'base.Employee', null=True, blank=True, on_delete=models.PROTECT, related_name='worker_days',
+        verbose_name='Сотрудник',
+    )
+    # DO_NOTHING т.к. в Employment.delete есть явная чистка рабочих дней для этого трудоустройства
+    employment = models.ForeignKey(Employment, on_delete=models.DO_NOTHING, null=True)
+
+    dt = models.DateField()  # todo: make immutable
+    dttm_work_start = models.DateTimeField(null=True, blank=True)
+    dttm_work_end = models.DateTimeField(null=True, blank=True)
+    dttm_work_start_tabel = models.DateTimeField(null=True, blank=True)
+    dttm_work_end_tabel = models.DateTimeField(null=True, blank=True)
+
+    type = models.ForeignKey('timetable.WorkerDayType', on_delete=models.PROTECT)
+
+    work_types = models.ManyToManyField(WorkType, through='WorkerDayCashboxDetails')
+
+    is_approved = models.BooleanField(default=False)
+    created_by = models.ForeignKey(User, on_delete=models.PROTECT, blank=True, null=True, related_name='user_created')
+    last_edited_by = models.ForeignKey(User, on_delete=models.PROTECT, blank=True, null=True, related_name='user_edited')
+
+    comment = models.TextField(null=True, blank=True)
+    parent_worker_day = models.ForeignKey(
+        'self', on_delete=models.SET_NULL, blank=True, null=True, related_name='child',
+        help_text='Используется в подтверждении рабочих дней для того, '
+                  'чтобы понимать каким днем из подтв. версии был порожден день в черновике, '
+                  'чтобы можно было сопоставить и создать детали рабочего дня')
+    work_hours = models.DurationField(default=datetime.timedelta(days=0))
+
+    is_fact = models.BooleanField(default=False)  # плановое или фактическое расписание
+    is_vacancy = models.BooleanField(default=False)  # вакансия ли это
+    dttm_added = models.DateTimeField(default=timezone.now)
+    canceled = models.BooleanField(default=False)
+    is_outsource = models.BooleanField(default=False, db_index=True)
+    outsources = models.ManyToManyField(
+        Network, through=WorkerDayOutsourceNetwork,
+        help_text='Аутсорс сети, которые могут откликнуться на данную вакансию', blank=True,
+    )
+    is_blocked = models.BooleanField(
+        default=False,
+        verbose_name='Защищенный день',
+        help_text='Доступен для изменения/подтверждения только определенным группам доступа (настраивается)',
+    )
+    closest_plan_approved = models.ForeignKey(
+        'self', null=True, blank=True, on_delete=models.SET_NULL, related_name='related_facts',
+        help_text='Используется в факте (и в черновике и подтв. версии) для связи с планом подтвержденным')
+
+    source = PositiveSmallIntegerField('Источник создания', choices=SOURCES, default=SOURCE_FAST_EDITOR)
+    cost_per_hour = models.DecimalField(
+        'Стоимость работ за час', max_digits=8,
+        decimal_places=2,
+        null=True, blank=True,
+    )
+
+    objects = WorkerDayManager.from_queryset(WorkerDayQuerySet)()  # исключает раб. дни у которых employment_id is null
+    objects_with_excluded = models.Manager.from_queryset(WorkerDayQuerySet)()
+
+    tracker = FieldTracker(fields=('work_hours', 'type',))
+
+    def __init__(self, *args, need_count_wh=False, **kwargs):
+        super().__init__(*args, **kwargs)
+        if need_count_wh:
+            self.dttm_work_start_tabel, self.dttm_work_end_tabel, self.work_hours = self._calc_wh()
+            self.work_hours = self._round_wh()
+
     def __str__(self):
         return '{}, {}, {}, {}, {}, {}, {}, {}'.format(
             self.employee.user.last_name if (self.employee and self.employee.user_id) else 'No worker',
@@ -806,6 +877,25 @@ class WorkerDay(AbstractModel):
 
     def __repr__(self):
         return self.__str__()
+
+    @property
+    def total_cost(self):
+        total_cost = None
+        if self.cost_per_hour:
+            total_cost = self.rounded_work_hours * float(self.cost_per_hour)
+        return total_cost
+
+    @property
+    def rounded_work_hours(self):
+        return round(self.work_hours.total_seconds() / 3600, 2)
+
+    @property
+    def is_plan(self):
+        return not self.is_fact
+
+    @property
+    def is_draft(self):
+        return not self.is_approved
 
     @classmethod
     def _get_batch_create_extra_kwargs(cls):
@@ -1396,94 +1486,6 @@ class WorkerDay(AbstractModel):
 
         return self.work_hours
 
-    def __init__(self, *args, need_count_wh=False, **kwargs):
-        super().__init__(*args, **kwargs)
-        if need_count_wh:
-            self.dttm_work_start_tabel, self.dttm_work_end_tabel, self.work_hours = self._calc_wh()
-            self.work_hours = self._round_wh()
-
-    id = models.BigAutoField(primary_key=True, db_index=True)
-    code = models.CharField(max_length=256, null=True)
-    shop = models.ForeignKey(Shop, on_delete=models.PROTECT, null=True)
-
-    employee = models.ForeignKey(
-        'base.Employee', null=True, blank=True, on_delete=models.PROTECT, related_name='worker_days',
-        verbose_name='Сотрудник',
-    )
-    # DO_NOTHING т.к. в Employment.delete есть явная чистка рабочих дней для этого трудоустройства
-    employment = models.ForeignKey(Employment, on_delete=models.DO_NOTHING, null=True)
-
-    dt = models.DateField()  # todo: make immutable
-    dttm_work_start = models.DateTimeField(null=True, blank=True)
-    dttm_work_end = models.DateTimeField(null=True, blank=True)
-    dttm_work_start_tabel = models.DateTimeField(null=True, blank=True)
-    dttm_work_end_tabel = models.DateTimeField(null=True, blank=True)
-
-    type = models.ForeignKey('timetable.WorkerDayType', on_delete=models.PROTECT)
-
-    work_types = models.ManyToManyField(WorkType, through='WorkerDayCashboxDetails')
-
-    is_approved = models.BooleanField(default=False)
-    created_by = models.ForeignKey(User, on_delete=models.PROTECT, blank=True, null=True, related_name='user_created')
-    last_edited_by = models.ForeignKey(User, on_delete=models.PROTECT, blank=True, null=True, related_name='user_edited')
-
-    comment = models.TextField(null=True, blank=True)
-    parent_worker_day = models.ForeignKey(
-        'self', on_delete=models.SET_NULL, blank=True, null=True, related_name='child',
-        help_text='Используется в подтверждении рабочих дней для того, '
-                  'чтобы понимать каким днем из подтв. версии был порожден день в черновике, '
-                  'чтобы можно было сопоставить и создать детали рабочего дня')
-    work_hours = models.DurationField(default=datetime.timedelta(days=0))
-
-    is_fact = models.BooleanField(default=False)  # плановое или фактическое расписание
-    is_vacancy = models.BooleanField(default=False)  # вакансия ли это
-    dttm_added = models.DateTimeField(default=timezone.now)
-    canceled = models.BooleanField(default=False)
-    is_outsource = models.BooleanField(default=False, db_index=True)
-    outsources = models.ManyToManyField(
-        Network, through=WorkerDayOutsourceNetwork,
-        help_text='Аутсорс сети, которые могут откликнуться на данную вакансию', blank=True,
-    )
-    is_blocked = models.BooleanField(
-        default=False,
-        verbose_name='Защищенный день',
-        help_text='Доступен для изменения/подтверждения только определенным группам доступа (настраивается)',
-    )
-    closest_plan_approved = models.ForeignKey(
-        'self', null=True, blank=True, on_delete=models.SET_NULL, related_name='related_facts',
-        help_text='Используется в факте (и в черновике и подтв. версии) для связи с планом подтвержденным')
-
-    source = PositiveSmallIntegerField('Источник создания', choices=SOURCES, default=SOURCE_FAST_EDITOR)
-    cost_per_hour = models.DecimalField(
-        'Стоимость работ за час', max_digits=8,
-        decimal_places=2,
-        null=True, blank=True,
-    )
-
-    objects = WorkerDayManager.from_queryset(WorkerDayQuerySet)()  # исключает раб. дни у которых employment_id is null
-    objects_with_excluded = models.Manager.from_queryset(WorkerDayQuerySet)()
-
-    tracker = FieldTracker(fields=('work_hours', 'type',))
-
-    @property
-    def total_cost(self):
-        total_cost = None
-        if self.cost_per_hour:
-            total_cost = self.rounded_work_hours * float(self.cost_per_hour)
-        return total_cost
-
-    @property
-    def rounded_work_hours(self):
-        return round(self.work_hours.total_seconds() / 3600, 2)
-
-    @property
-    def is_plan(self):
-        return not self.is_fact
-
-    @property
-    def is_draft(self):
-        return not self.is_approved
-
     @staticmethod
     def count_work_hours(dttm_work_start, dttm_work_end, break_time=0):
         work_hours = ((dttm_work_end - dttm_work_start).total_seconds() / 60)
@@ -1712,7 +1714,6 @@ class WorkerDay(AbstractModel):
 
             if closest_plan_approved.dttm_diff_min == closest_plan_approved.dttm_work_end_diff:
                 record_type = AttendanceRecords.TYPE_LEAVING
-
         return closest_plan_approved, record_type
 
     @classmethod
@@ -2298,13 +2299,6 @@ class ShopMonthStat(AbstractModel):
         (NOT_DONE, 'График не составлен'),
     ]
 
-    def __str__(self):
-        return 'id: {}, shop: {}, status: {}'.format(
-            self.id,
-            self.shop,
-            self.status
-        )
-
     id = models.BigAutoField(primary_key=True)
 
     shop = models.ForeignKey(Shop, on_delete=models.PROTECT, related_name='timetable')
@@ -2324,6 +2318,13 @@ class ShopMonthStat(AbstractModel):
     predict_needs = models.IntegerField(default=0, blank=True, null=True, verbose_name='Количество часов по нагрузке')
 
     task_id = models.CharField(max_length=256, null=True, blank=True)
+
+    def __str__(self):
+        return 'id: {}, shop: {}, status: {}'.format(
+            self.id,
+            self.shop,
+            self.status
+        )
 
     def get_department(self):
         return self.shop
@@ -2780,6 +2781,7 @@ class AttendanceRecords(AbstractModel):
                         getattr(closest_plan_approved, 'worker_day_details_list', []),
                         is_vacancy=getattr(closest_plan_approved, 'is_vacancy', False),
                     )
+                    type_id = None
                     fact_approved, _wd_created = WorkerDay.objects.update_or_create(
                         dt=self.dt,
                         employee_id=self.employee_id,
@@ -2792,7 +2794,8 @@ class AttendanceRecords(AbstractModel):
                             'type_id': closest_plan_approved.type_id if closest_plan_approved else WorkerDay.TYPE_WORKDAY,
                             self.TYPE_2_DTTM_FIELD[self.type]: self.dttm,
                             'is_vacancy': is_vacancy,
-                            'source': WorkerDay.RECALC_FACT_FROM_ATT_RECORDS if recalc_fact_from_att_records else WorkerDay.SOURCE_AUTO_FACT,
+                            'source': WorkerDay.RECALC_FACT_FROM_ATT_RECORDS if recalc_fact_from_att_records
+                            else WorkerDay.SOURCE_AUTO_FACT,
                             # TODO: пока не стал проставлять is_outsource, т.к. придется делать доп. действие в интерфейсе,
                             # чтобы посмотреть что за сотрудник при правке факта из отдела аутсорс-клиента
                             # 'is_outsource': active_user_empl.shop.network_id != self.shop.network_id,
@@ -2824,7 +2827,7 @@ class AttendanceRecords(AbstractModel):
 
 
 class ExchangeSettings(AbstractModel):
-    network = models.ForeignKey(Network, on_delete=models.PROTECT, null=True)
+
     default_constraints = {
         'second_day_before': 40,
         'second_day_after': 32,
@@ -2833,18 +2836,18 @@ class ExchangeSettings(AbstractModel):
         '1day_before': 40,
         '1day_after': 40,
     }
-
+    network = models.ForeignKey(Network, on_delete=models.PROTECT, null=True)
     # Создаем ли автоматически вакансии
     automatic_create_vacancies = models.BooleanField(default=False, verbose_name=_('Automatic create vacancies'))
     # Удаляем ли автоматически вакансии
     automatic_delete_vacancies = models.BooleanField(default=False, verbose_name=_('Automatic delete vacancies'))
     # Период, за который проверяем
     automatic_check_lack_timegap = models.DurationField(default=datetime.timedelta(days=7), verbose_name=_('Automatic check lack timegap'))
-    #с какого дня выводить с выходного
+    # с какого дня выводить с выходного
     automatic_holiday_worker_select_timegap = models.DurationField(default=datetime.timedelta(days=8), verbose_name=_('Automatic holiday worker select timegap'))
-    #включать ли автоматическую биржу смен
+    # включать ли автоматическую биржу смен
     automatic_exchange = models.BooleanField(default=False, verbose_name=_('Automatic exchange'))
-    #максимальное количество рабочих часов в месяц для вывода с выходного
+    # максимальное количество рабочих часов в месяц для вывода с выходного
     max_working_hours = models.IntegerField(default=192, verbose_name=_('Max working hours'))
 
     constraints = models.CharField(max_length=250, default=json.dumps(default_constraints), verbose_name=_('Constraints'))
@@ -2856,14 +2859,14 @@ class ExchangeSettings(AbstractModel):
 
     # Только автоназначение сотрудников
     automatic_worker_select_timegap = models.DurationField(default=datetime.timedelta(days=1), verbose_name=_('Automatic worker select timegap'))
-    #период за который делаем обмен сменами
+    # период за который делаем обмен сменами
     automatic_worker_select_timegap_to = models.DurationField(default=datetime.timedelta(days=2), verbose_name=_('Automatic worker select timegap to'))
     # Дробное число, на какую долю сотрудник не занят, чтобы совершить обмен
     automatic_worker_select_overflow_min = models.FloatField(default=0.8, verbose_name=_('Automatic worker select overflow min'))
 
     # Длина смены
-    working_shift_min_hours = models.DurationField(default=datetime.timedelta(hours=4), verbose_name=_('Working shift min hours')) # Минимальная длина смены
-    working_shift_max_hours = models.DurationField(default=datetime.timedelta(hours=12), verbose_name=_('Working shift max hours')) # Максимальная длина смены
+    working_shift_min_hours = models.DurationField(default=datetime.timedelta(hours=4), verbose_name=_('Working shift min hours'))
+    working_shift_max_hours = models.DurationField(default=datetime.timedelta(hours=12), verbose_name=_('Working shift max hours'))
 
     # Расстояние до родителя, в поддереве которого ищем сотрудников для автоназначения
     automatic_worker_select_tree_level = models.IntegerField(default=1, verbose_name=_('Automatic worker select tree level'))

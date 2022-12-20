@@ -53,6 +53,12 @@ class AbstractEventNotificationWithRecipients(AbstractEventNotification):
     class Meta:
         abstract = True
 
+    def __str__(self):
+        return '{}, {} получателей'.format(
+            self.event_type.name,
+            self.shops.count() + self.users.count(),
+        )
+
     def get_recipients(self, user_author_id: int, context: dict):
         """
         :param user_author_id:
@@ -136,12 +142,6 @@ class AbstractEventNotificationWithRecipients(AbstractEventNotification):
     
         return recipients
 
-    def __str__(self):
-        return '{}, {} получателей'.format(
-            self.event_type.name,
-            self.shops.count() + self.users.count(),
-        )
-
 
 class EventEmailNotification(AbstractEventNotificationWithRecipients):
     email_addresses = models.CharField(
@@ -161,6 +161,13 @@ class EventEmailNotification(AbstractEventNotificationWithRecipients):
     class Meta:
         verbose_name = 'Email оповещение о событиях'
         verbose_name_plural = 'Email оповещения о событиях'
+
+    def __str__(self):
+        return '{} получателей{}'.format(
+            self.event_type.name,
+            self.shops.count() + self.users.count()\
+            + (len(self.email_addresses.split(',')) if self.email_addresses else 0),
+        )
 
     def clean(self):
         if not (self.system_email_template or self.custom_email_template):
@@ -184,13 +191,6 @@ class EventEmailNotification(AbstractEventNotificationWithRecipients):
             subject = self.get_system_email_template_display()
 
         return subject
-
-    def __str__(self):
-        return '{} получателей{}'.format(
-            self.event_type.name,
-            self.shops.count() + self.users.count()\
-            + (len(self.email_addresses.split(',')) if self.email_addresses else 0),
-        )
 
 
 class EventOnlineNotification(AbstractEventNotificationWithRecipients):
