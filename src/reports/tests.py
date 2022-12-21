@@ -657,10 +657,10 @@ class TestReportsViewSet(TestsHelperMixin, APITestCase):
         self.assertEqual(res.status_code, status.HTTP_200_OK)
         self.assertEqual(res.headers['Content-Type'], 'application/docx')
 
-        query_params['dt_to'] = self.wd1.dt + timedelta(30)
+        query_params['dt_to'] = self.wd1.dt + timedelta(35)
         res = self.client.get(self.get_url('Reports-tick'), query_params)
         self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
-        query_params['dt_to'] = self.wd1.dt - timedelta(30)
+        query_params['dt_to'] = self.wd1.dt - timedelta(35)
         res = self.client.get(self.get_url('Reports-tick'), query_params)
         self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
 
