@@ -260,6 +260,11 @@ class Network(AbstractActiveModel):
     #     default=True, verbose_name=_('Run recalculation of fact based on attendance records (ticks) on plan approve'),
     # )
     rebuild_timetable_min_delta = models.IntegerField(default=2, verbose_name='Минимальное время для составления графика')
+    request_approve_with_tasks_check = models.BooleanField(
+        default=False,
+        verbose_name=_('Request approve: check if employee has any tasks'),
+        help_text=_('Will create an Event with different code (request_approve_with_tasks)')
+    ) # e.g. Orteka check if doctors have appointments already
     round_work_hours_alg = models.PositiveSmallIntegerField(
         null=True, blank=True,
         choices=ROUND_WORK_HOURS_ALG_CHOICES,

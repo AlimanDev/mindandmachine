@@ -7,13 +7,15 @@ from django.db import transaction
 from rest_framework.test import APITestCase
 
 from src.base.tests.factories import EmployeeFactory, EmploymentFactory, UserFactory
-from src.timetable.models import AttendanceRecords, EmploymentWorkType, GroupWorkerDayPermission, ShopMonthStat, TimesheetItem, WorkerDay, WorkerDayPermission
+from src.timetable.models import AttendanceRecords, EmploymentWorkType, GroupWorkerDayPermission, ShopMonthStat, WorkerDay, WorkerDayPermission
 from src.timetable.tests.factories import WorkerDayFactory
 from src.timetable.worker_day.tasks import recalc_fact_from_records
+from src.notifications.tasks import send_notifications_task
 from ._base import TestTimesheetMixin
 
 
 @freeze_time(datetime(2021, 6, 7, 10, 10, 10))
+@mock.patch.object(send_notifications_task, 'delay', send_notifications_task) # FakeDate in freezegun is not compatible with yaml serializer for celery tasks
 @mock.patch.object(transaction, 'on_commit', lambda t: t())
 @mock.patch('src.timetable.timesheet.tasks.calc_timesheets.apply_async')
 class TestRecalcOnDataChange(TestTimesheetMixin, APITestCase):

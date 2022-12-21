@@ -2,8 +2,8 @@ from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models import Q
 from django.template import loader as template_loader, Template
+from django.utils.translation import gettext_lazy as _
 
-from src.reports.models import ReportConfig
 from src.base.models import User, Employment, Shop
 from src.base.models_abstract import AbstractModel
 from src.events.registry import EventRegistryHolder
@@ -34,6 +34,9 @@ class AbstractEventNotificationWithRecipients(AbstractEventNotification):
         related_name='+',
     )
 
+    shop_parent = models.BooleanField(
+        default=False, verbose_name=_('Parent shop')
+    )
     shop_ancestors = models.BooleanField(
         default=False, verbose_name='Искать получателей среди пользователей магазинов предков')
     shop_descendants = models.BooleanField(
@@ -96,10 +99,12 @@ class AbstractEventNotificationWithRecipients(AbstractEventNotification):
         if shop_id:
             shop = Shop.objects.get(id=shop_id)
             shop_q = Q(shop=shop)
+            if self.shop_parent:
+                shop_q |= Q(shop=shop.parent)
+            elif self.shop_ancestors:
+                shop_q |= Q(shop__in=shop.get_ancestors())
             if self.shop_descendants:
                 shop_q |= Q(shop__in=shop.get_descendants())
-            if self.shop_ancestors:
-                shop_q |= Q(shop__in=shop.get_ancestors())
             recipients.extend(
                 list(User.objects.filter(
                     id__in=Employment.objects.get_active().filter(

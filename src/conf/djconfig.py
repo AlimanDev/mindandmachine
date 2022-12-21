@@ -398,6 +398,10 @@ QOS_DATE_FORMAT = '%Y-%m-%d'
 QOS_TIME_FORMAT = '%H:%M:%S'
 QOS_SHORT_TIME_FORMAT = '%H:%M'
 
+# For Django template language
+TEMPLATE_DATE_FORMAT = 'Y-m-d'
+TEMPLATE_TIME_FORMAT = 'H:i'
+
 IS_PUSH_ACTIVE = False  # отправляем ли пуши на телефон при уведомлениях
 
 ALLOWED_UPLOAD_EXTENSIONS = ['xlsx', 'xls']
@@ -426,7 +430,7 @@ CELERY_IMPORTS = (
 REDIS_HOST = env.str('REDIS_HOST', default='localhost')
 CELERY_BROKER_URL = 'redis://' + REDIS_HOST + ':6379'
 CELERY_RESULT_BACKEND = 'redis://' + REDIS_HOST + ':6379'
-CELERY_ACCEPT_CONTENT = ['application/json']
+CELERY_ACCEPT_CONTENT = ['application/json', 'application/x-yaml']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = TIME_ZONE

@@ -46,10 +46,13 @@ services:
       - ./mounts/reports:/webapp/etc/reports
       - ./mounts/uwsgi:/uwsgi
       - ./mounts/logs:/webapp/logs
+      - ./mounts/logs/uwsgi:/webapp/logs/uwsgi
       - ./mounts/media:/webapp/media
       - ./mounts/static:/webapp/static
       - ./mounts/ipython_data:/root/.ipython/profile_default
       - ./local_settings_web.py:/webapp/src/conf/djconfig_local.py
+      - ./data:/webapp/data                                         # DEV-ONLY: for i18n from container
+      - ./src:/webapp/src                                           # DEV-ONLY: mount code to not rebuild the container
     environment:
       REDIS_HOST: redis
       HOST: http://localhost:9090

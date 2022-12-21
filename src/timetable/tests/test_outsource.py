@@ -1,5 +1,4 @@
 from datetime import datetime, date, timedelta, time
-from re import M
 
 from django.core import mail
 from django.test import override_settings
@@ -9,7 +8,7 @@ from rest_framework import status
 from src.base.models import Shop, NetworkConnect, Network, User, Employee, Employment, Group, FunctionGroup
 from src.events.models import EventType
 from src.notifications.models.event_notification import EventEmailNotification
-from src.recognition.models import TickPoint, Tick
+from src.recognition.models import Tick
 from src.timetable.events import VACANCY_CONFIRMED_TYPE
 from src.timetable.models import ShopMonthStat, TimesheetItem
 from src.timetable.models import (
@@ -70,6 +69,7 @@ class TestOutsource(TestsHelperMixin, APITestCase):
             code='client',
         )
         cls.client_admin_group = Group.objects.create(name='Администратор client', code='client admin', network=cls.client_network)
+        cls.client_admin_group.subordinates.add(cls.client_admin_group)
         cls.outsource_admin_group = Group.objects.create(name='Администратор outsource', code='outsource admin', network=cls.outsource_network2)
         FunctionGroup.objects.bulk_create([
             FunctionGroup(
@@ -87,6 +87,7 @@ class TestOutsource(TestsHelperMixin, APITestCase):
             GroupWorkerDayPermission(
                 group=g,
                 worker_day_permission=wdp,
+                employee_type=GroupWorkerDayPermission.OUTSOURCE_NETWORK_EMPLOYEE
             ) 
             for g in [cls.client_admin_group, cls.outsource_admin_group]
             for wdp in WorkerDayPermission.objects.all()
@@ -765,16 +766,6 @@ class TestOutsource(TestsHelperMixin, APITestCase):
         wd.employee = self.employee1
         wd.employment = self.employment1
         wd.save()
-        GroupWorkerDayPermission.objects.create(
-            group=self.client_admin_group,
-            worker_day_permission=WorkerDayPermission.objects.get(
-                action=WorkerDayPermission.CREATE,
-                graph_type=WorkerDayPermission.PLAN,
-                wd_type_id=WorkerDay.TYPE_WORKDAY,
-            ),
-            employee_type=GroupWorkerDayPermission.OUTSOURCE_NETWORK_EMPLOYEE,
-            shop_type=GroupWorkerDayPermission.MY_NETWORK_SHOPS,
-        )
         response = self.client.post(
             f"/rest_api/worker_day/copy_approved/", 
             self.dump_data({"employee_ids": [self.employee1.id,], "dates": [dt_now,], "type": CopyApprovedSerializer.TYPE_PLAN_TO_PLAN}),
@@ -793,16 +784,6 @@ class TestOutsource(TestsHelperMixin, APITestCase):
         wd.employee = self.employee1
         wd.employment = self.employment1
         wd.save()
-        GroupWorkerDayPermission.objects.create(
-            group=self.client_admin_group,
-            worker_day_permission=WorkerDayPermission.objects.get(
-                action=WorkerDayPermission.CREATE,
-                graph_type=WorkerDayPermission.FACT,
-                wd_type_id=WorkerDay.TYPE_WORKDAY,
-            ),
-            employee_type=GroupWorkerDayPermission.OUTSOURCE_NETWORK_EMPLOYEE,
-            shop_type=GroupWorkerDayPermission.MY_NETWORK_SHOPS,
-        )
         response = self.client.post(
             f"/rest_api/worker_day/copy_approved/", 
             self.dump_data({"employee_ids": [self.employee1.id,], "dates": [dt_now,], "type": CopyApprovedSerializer.TYPE_PLAN_TO_FACT}),
@@ -820,16 +801,6 @@ class TestOutsource(TestsHelperMixin, APITestCase):
         wd.employee = self.employee1
         wd.employment = self.employment1
         wd.save()
-        GroupWorkerDayPermission.objects.create(
-            group=self.client_admin_group,
-            worker_day_permission=WorkerDayPermission.objects.get(
-                action=WorkerDayPermission.CREATE,
-                graph_type=WorkerDayPermission.PLAN,
-                wd_type_id=WorkerDay.TYPE_WORKDAY,
-            ),
-            employee_type=GroupWorkerDayPermission.OUTSOURCE_NETWORK_EMPLOYEE,
-            shop_type=GroupWorkerDayPermission.MY_NETWORK_SHOPS,
-        )
         response = self.client.post(
             f"/rest_api/worker_day/copy_range/", 
             self.dump_data({
@@ -859,18 +830,6 @@ class TestOutsource(TestsHelperMixin, APITestCase):
             employee=self.employee2,
             employment=self.employment2,
         )
-        for wd_type_id in [WorkerDay.TYPE_WORKDAY, WorkerDay.TYPE_HOLIDAY]:
-            for action in [WorkerDayPermission.CREATE, WorkerDayPermission.DELETE]:
-                GroupWorkerDayPermission.objects.create(
-                    group=self.client_admin_group,
-                    worker_day_permission=WorkerDayPermission.objects.get(
-                        action=action,
-                        graph_type=WorkerDayPermission.PLAN,
-                        wd_type_id=wd_type_id,
-                    ),
-                    employee_type=GroupWorkerDayPermission.OUTSOURCE_NETWORK_EMPLOYEE,
-                    shop_type=GroupWorkerDayPermission.MY_NETWORK_SHOPS,
-                )
         response = self.client.post(
             f"/rest_api/worker_day/exchange/", 
             self.dump_data({

@@ -2971,6 +2971,11 @@ class GroupWorkerDayPermission(AbstractModel):
                   'либо если магазин в трудоустройстве не совпадает с магазином выхода '
                   '(актуально для рабочий типов дней)'),
     )
+    allow_approve_first = models.BooleanField(
+        verbose_name=_('Allow approve first'),
+        default=True,
+        help_text=_("Orteka-specific. Turn off to forbid approving days that don't have parent_worker_day."),
+    )
     # need_closest_plan_approved = models.BooleanField(  # TODO: нужно?
     #     verbose_name='Нужен ближайший план',
     #     default=False, help_text='Актуально для создания, *изменения??? фактических записей')
@@ -2990,7 +2995,7 @@ class GroupWorkerDayPermission(AbstractModel):
         return f'{self.group.name} {self.worker_day_permission}'
 
     @classmethod
-    def get_perms_qs(cls, user, action, graph_type, wd_type_id, wd_dt, shop_id=None, is_vacancy=None):
+    def get_perms_qs(cls, user, action, graph_type, wd_type_id, shop_id=None, is_vacancy=None):
         kwargs = {}
         if is_vacancy:
             kwargs['allow_actions_on_vacancies'] = True

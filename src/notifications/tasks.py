@@ -1,24 +1,30 @@
-import json
 from django.conf import settings
 from django.template import Template, Context
 
-from src.base.models import Shop
+from src.base.models import Shop, User, Employee
 from src.celery.celery import app
 from .helpers import send_mass_html_mail, textify
 from .models import (
+    AbstractEventNotification,
     EventEmailNotification,
     EventOnlineNotification,
     EventWebhookNotification,
 )
 
 
-def enrich_context(context):
+def enrich_context(context:dict, user_id: int, event: AbstractEventNotification):
     if 'shop_id' in context:
         context['shop'] = Shop.objects.filter(id=context['shop_id']).first()
+    if 'employee_ids' in context:
+        context['employees'] = Employee.objects.filter(id__in=context['employee_ids']).prefetch_related('user')
     context['host'] = settings.EXTERNAL_HOST
+    context['author'] = User.objects.filter(id=user_id).first()
+    context['shop_name_form'] = event.event_type.network.settings_values_prop.get('shop_name_form', {})
+    context['DATE_FORMAT'] = settings.TEMPLATE_DATE_FORMAT
+    context['TIME_FORMAT'] = settings.TEMPLATE_TIME_FORMAT
 
 
-@app.task(time_limit=settings.EMAIL_TASK_TIMEOUT)
+@app.task(time_limit=settings.EMAIL_TASK_TIMEOUT, serializer='yaml') # YAML correctly serializes datetimes
 def send_event_email_notifications(event_email_notification_id: int, user_author_id: int, context: dict):
     event_email_notification = EventEmailNotification.objects.select_related(
         'event_type',
@@ -26,9 +32,8 @@ def send_event_email_notifications(event_email_notification_id: int, user_author
     ).get(
         id=event_email_notification_id,
     )
-    context['shop_name_form'] = event_email_notification.event_type.network.settings_values_prop.get('shop_name_form', {})
     template = event_email_notification.get_email_template()
-    enrich_context(context)
+    enrich_context(context, user_author_id, event_email_notification)
     subject = Template(event_email_notification.get_subject_template()).render(Context(context))
     datatuple = []
 
@@ -55,12 +60,13 @@ def send_event_email_notifications(event_email_notification_id: int, user_author
 
     if event_email_notification.email_addresses:
         emails = event_email_notification.email_addresses.split(',')
+        message_content = template.render(Context(context))
+        message_text = textify(message_content)
         for email in emails:
-            message_content = template.render(Context(context))
             datatuple.append(
                 (
                     subject,
-                    textify(message_content),
+                    message_text,
                     message_content,
                     None,
                     None,
@@ -71,17 +77,17 @@ def send_event_email_notifications(event_email_notification_id: int, user_author
     return send_mass_html_mail(datatuple=datatuple)
 
 
-@app.task
+@app.task(serializer='yaml')
 def send_online_notifications(online_notification_id, user_author_id, context):
     pass
 
 
-@app.task
+@app.task(serializer='yaml')
 def send_webhook_notifications(webhook_notification_id, user_author_id, context):
     pass
 
 
-@app.task
+@app.task(serializer='yaml')
 def send_notifications_task(**kwargs):
     event_email_notifications = EventEmailNotification.objects.filter(
         event_type__code=kwargs.get('event_code'),

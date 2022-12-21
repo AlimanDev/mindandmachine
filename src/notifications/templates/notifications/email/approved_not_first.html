@@ -1,0 +1,56 @@
+
+<p>Изменён ранее подтверждённый график
+
+<b>Изменивший:</b> {{ author.fio }}
+<b>{{ shop_name_form.singular.I | default:'магазин'|capfirst}}:</b> {{ shop.name }}
+<b>Тип:</b> {% if is_fact %}Факт{% else %}План{% endif %}
+
+</p>
+<table>
+    <tr>
+        <th>Сотрудник</th>
+        <th>Дата</th>
+        <th>До</th>
+        <th>После</th>
+    </tr>
+    {% for wd in wdays %}
+    <tr>
+        <td>
+            {{ wd.employee__user__last_name }} {{ wd.employee__user__first_name }} {{ wd.employee__user__middle_name }}
+        </td>
+        <td>
+            {{ wd.dt|date:DATE_FORMAT }}
+        </td>
+        <td>
+            {{ wd.parent_worker_day__type__name }}
+            {% if wd.parent_worker_day__dttm_work_start %}
+            <br>
+            {{ wd.parent_worker_day__dttm_work_start|date:TIME_FORMAT }} - {{ wd.parent_worker_day__dttm_work_end|date:TIME_FORMAT }}
+            {% else %}{% endif %}
+        </td>
+        <td>
+            {{ wd.type__name }}
+            {% if wd.dttm_work_start %}
+            <br>{{ wd.dttm_work_start|date:TIME_FORMAT }} - {{ wd.dttm_work_end|date:TIME_FORMAT }}
+            {% else %}{% endif %}
+        </td>
+    </tr>
+    {% endfor %}
+</table>
+
+<style>
+table, th, td {
+    /* border: 1px solid black; */
+    padding: 10px;
+    border-collapse: collapse;
+    text-align: center;
+}
+th {
+    background-color: black;
+    color: white;
+}
+tr:nth-child(even) {background-color: #f2f2f2;}
+p {
+    white-space:pre;
+}
+</style>

@@ -1,7 +1,11 @@
 from src.events.registry import BaseRegisteredEvent
+from django.utils.translation import gettext_lazy as _
+
 
 REQUEST_APPROVE_EVENT_TYPE = 'request_approve'
+REQUEST_APPROVE_WITH_TASKS_EVENT_TYPE = 'request_approve_with_tasks'
 APPROVE_EVENT_TYPE = 'approve'
+APPROVED_NOT_FIRST_EVENT = 'approved_not_first'
 VACANCY_CONFIRMED_TYPE = 'vacancy_confirmed'
 VACANCY_RECONFIRMED_TYPE = 'vacancy_reconfirmed'
 VACANCY_CREATED = 'vacancy_created'
@@ -14,6 +18,14 @@ class RequestApproveEvent(BaseRegisteredEvent):
     name = 'Запрос на подтверждение графика'
     code = REQUEST_APPROVE_EVENT_TYPE
 
+class RequestApproveWithTasksEvent(BaseRegisteredEvent):
+    """
+    Request approve of draft timetable and new days have tasks violations.
+    Example: a Task assigned to Employee at 10:00, but new WorkerDay changes dttm_work_start from 09:00 to 11:00.
+    The Task now falls outside the day, which is a violation, and would require a special approval.
+    """
+    name = _('Request approved with tasks')
+    code = REQUEST_APPROVE_WITH_TASKS_EVENT_TYPE
 
 class ApproveEvent(BaseRegisteredEvent):
     name = 'Подтверждение графика'
@@ -22,6 +34,13 @@ class ApproveEvent(BaseRegisteredEvent):
     def get_recipients(self):
         # TODO: добавить пользователей, для которых был подтвержден график
         return []
+
+
+class ApprovedNotFirstEvent(BaseRegisteredEvent):
+    """Orteka-specific"""
+    name = _('Worker days approved not first (have a parent day)')
+    code = APPROVED_NOT_FIRST_EVENT
+    write_history = False
 
 
 class VacancyConfirmedEvent(BaseRegisteredEvent):

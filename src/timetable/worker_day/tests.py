@@ -934,7 +934,7 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
             is_approved=True
         )
         wd2 = WorkerDay.objects.create(
-            shop=self.shop,
+            shop=self.employment1.shop,
             employee=self.employee1,
             employment=self.employment1,
             type_id=WorkerDay.TYPE_WORKDAY,
@@ -951,7 +951,7 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
             'dt_to': self.dt,
             'employee_ids': [self.employee1.id],
             'is_fact': True,
-            'shop_id': self.shop.id,
+            'shop_id': self.employment1.shop.id,
         }
         res = self.client.post(f"{self.url_approve}", data, format='json')
         self.assertEqual(res.status_code, 200)

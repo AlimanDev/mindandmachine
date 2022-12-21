@@ -1,9 +1,12 @@
-import pandas as pd
 from datetime import date, time, datetime, timedelta
+from unittest import mock
 
+import pandas as pd
+from django.db import transaction
 from django.utils.timezone import now
+from django.core import mail
+from django.test import override_settings
 from rest_framework.test import APITestCase
-from etc.scripts.fill_calendar import fill_days
 
 from src.base.tests.factories import (
     NetworkFactory,
@@ -25,7 +28,11 @@ from src.timetable.models import (
     GroupWorkerDayPermission,
 )
 from src.timetable.tests.factories import WorkerDayFactory
+from src.timetable.events import APPROVED_NOT_FIRST_EVENT
+from src.notifications.models.event_notification import EventEmailNotification
+from src.events.models import EventType
 from src.util.mixins.tests import TestsHelperMixin
+from etc.scripts.fill_calendar import fill_days
 
 
 class TestWorkerDayApprove(TestsHelperMixin, APITestCase):
@@ -47,6 +54,7 @@ class TestWorkerDayApprove(TestsHelperMixin, APITestCase):
         cls.shop = ShopFactory(network=cls.network, region=cls.region)
         cls.shop2 = ShopFactory(network=cls.network, region=cls.region)
         cls.group = GroupFactory(network=cls.network)
+        cls.group.subordinates.add(cls.group)
         cls.position = WorkerPositionFactory(network=cls.network, group=cls.group)
         cls.employment = EmploymentFactory(employee=cls.employee, shop=cls.shop, position=cls.position)
         cls.work_type_name = WorkTypeName.objects.create(name='Работа', network=cls.network)
@@ -647,3 +655,108 @@ class TestWorkerDayApprove(TestsHelperMixin, APITestCase):
         self.assertTrue(WorkerDay.objects.filter(id=plan_not_approved1.id).exists())
         self.assertTrue(self.similar_wday_exists(wd=plan_approved1))
         self.assertFalse(self.similar_wday_exists(wd=plan_approved2))
+
+    def test_approve_first_setting(self):
+        """Orteka-specific. Exclude days that don't have parent_worker_day. Setting in GroupWorkerDayPermission instance."""
+        wd_approved = WorkerDayFactory(
+            dt=self.today,
+            employee=self.employee,
+            employment=self.employment,
+            shop=self.shop,
+            type_id=WorkerDay.TYPE_BUSINESS_TRIP,
+            is_fact=False,
+            is_approved=True,
+        )
+        WorkerDayFactory(
+            dt=self.today,
+            employee=self.employee,
+            employment=self.employment,
+            shop=self.shop,
+            type_id=WorkerDay.TYPE_WORKDAY,
+            is_fact=False,
+            is_approved=False,
+            parent_worker_day=wd_approved
+        )
+        kwargs = {
+            'shop_id': self.shop.id,
+            'is_fact': False,
+            'dt_from': self.today,
+            'dt_to': self.today,
+            'wd_types': [WorkerDay.TYPE_WORKDAY]
+        }
+        self.plan_group_approve_wd_permission.allow_approve_first = False
+        self.plan_group_approve_wd_permission.save()
+
+        resp = self._approve(**kwargs)
+        self.assertEqual(resp.status_code, 200)
+        approved = WorkerDay.objects.filter(type_id=WorkerDay.TYPE_WORKDAY, is_approved=True)
+        self.assertTrue(approved.exists())
+        WorkerDay.objects.all().delete()
+
+        wd = WorkerDayFactory(
+            dt=self.today,
+            employee=self.employee,
+            employment=self.employment,
+            shop=self.shop,
+            type_id=WorkerDay.TYPE_WORKDAY,
+            is_fact=False,
+            is_approved=False,
+        )
+
+        resp = self._approve(**kwargs)
+        self.assertEqual(resp.status_code, 200)
+        self.assertFalse(WorkerDay.objects.filter(type_id=WorkerDay.TYPE_WORKDAY, is_approved=True).exists())
+        self.assertTrue(WorkerDay.objects.filter(id=wd.id).exists())    # unapproved day wasn't deleted
+
+    @override_settings(CELERY_TASK_ALWAYS_EAGER=True, CELERY_EAGER_PROPAGATES_EXCEPTIONS=True)
+    @mock.patch.object(transaction, 'on_commit', lambda t: t())
+    def test_approve_first_notification(self):
+        """Orteka-specific. Send "Approved not first" notification"""
+        wd_approved = WorkerDayFactory(
+            dt=self.today,
+            employee=self.employee,
+            employment=self.employment,
+            shop=self.shop,
+            type_id=WorkerDay.TYPE_BUSINESS_TRIP,
+            is_fact=False,
+            is_approved=True,
+        )
+        WorkerDayFactory(
+            dt=self.today,
+            employee=self.employee,
+            employment=self.employment,
+            shop=self.shop,
+            type_id=WorkerDay.TYPE_WORKDAY,
+            is_fact=False,
+            is_approved=False,
+            parent_worker_day=wd_approved
+        )
+        kwargs = {
+            'shop_id': self.shop.id,
+            'is_fact': False,
+            'dt_from': self.today,
+            'dt_to': self.today,
+            'wd_types': [WorkerDay.TYPE_WORKDAY]
+        }
+        self.plan_group_approve_wd_permission.allow_approve_first = False
+        self.plan_group_approve_wd_permission.save()
+
+        event_type = EventType.objects.create(
+            name='test',
+            network_id=self.network.id,
+            code=APPROVED_NOT_FIRST_EVENT
+        )
+        EventEmailNotification.objects.create(
+            email_addresses='example',
+            custom_email_template=r"{% for wd in wdays %}{{ wd.employee__user__last_name }}{% endfor %}",
+            event_type=event_type
+        )
+
+        resp = self._approve(**kwargs)
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(WorkerDay.objects.filter(
+            type_id=WorkerDay.TYPE_WORKDAY,
+            is_approved=True).exists()
+        )
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn(self.employee.user.last_name, mail.outbox[0].body)

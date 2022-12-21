@@ -9,6 +9,7 @@ from django.db import transaction, IntegrityError
 from django.db.models import Q
 from django.test import override_settings
 from django.utils.timezone import now
+from django.utils.translation import gettext as _
 from freezegun import freeze_time
 from rest_framework import status
 from rest_framework.test import APITestCase
@@ -2009,7 +2010,7 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
         self.assertEqual(
             resp.json(),
             {
-                "detail": "Невозможно создать рабочий день, так как пользователь в этот период не трудоустроен"
+                "detail": _('You are not employed during this period')
             },
         )
 

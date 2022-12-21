@@ -14,8 +14,6 @@ from django.db.models import (
     IntegerField, 
     ExpressionWrapper,
     BooleanField,
-    Case,
-    When
 )
 from django.db.models.functions import Coalesce, Extract, Cast, Concat
 from django.http.response import HttpResponse

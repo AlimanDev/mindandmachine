@@ -1,5 +1,5 @@
-import datetime
-import json
+import datetime, json
+from typing import Union
 from itertools import groupby
 
 import pandas as pd
@@ -13,26 +13,30 @@ from django.db.models.functions import Concat, Cast
 from django.db.models.query import Prefetch
 from django.utils import timezone
 from django.utils.functional import cached_property
+from django.utils.translation import gettext as _
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.serializers import ValidationError
 
 from src.base.models import Employment, Shop, Group
 from src.events.signals import event_signal
-from src.timetable.events import APPROVE_EVENT_TYPE
+from src.timetable.events import APPROVE_EVENT_TYPE, APPROVED_NOT_FIRST_EVENT
 from src.timetable.models import (
     WorkerDay,
+    WorkerDayQuerySet,
     WorkerDayCashboxDetails,
     ShopMonthStat,
     WorkerDayOutsourceNetwork,
     WorkerDayPermission,
+    GroupWorkerDayPermission,
     WorkerDayType,
-    Restriction,
+    Restriction
 )
 from src.timetable.timesheet.tasks import recalc_timesheet_on_data_change
 from src.timetable.vacancy.tasks import vacancies_create_and_cancel_for_shop
 from src.timetable.vacancy.utils import notify_vacancy_created
 from src.timetable.worker_day.tasks import recalc_wdays, recalc_fact_from_records
-from src.timetable.worker_day.utils.utils import check_worker_day_permissions
+from src.timetable.worker_day_permissions.checkers import BaseWdPermissionChecker
+from .utils import ERROR_MESSAGES
 
 
 class WorkerDayApproveHelper:
@@ -57,7 +61,7 @@ class WorkerDayApproveHelper:
         ).values_list('code', flat=True))
 
     @cached_property
-    def shop(self):
+    def shop(self) -> Union[Shop, None]:
         if self.shop_id:
             return Shop.objects.filter(id=self.shop_id).select_related('network').first()
 
@@ -105,19 +109,7 @@ class WorkerDayApproveHelper:
                 WorkerDay.objects.filter(holidays_workdays_for_delete_filter).delete()
 
     def run(self):
-        from src.timetable.worker_day.views import WorkerDayViewSet
         with transaction.atomic():
-            allowed_wd_perms = check_worker_day_permissions(
-                self.user,
-                self.shop_id,
-                WorkerDayPermission.APPROVE,
-                WorkerDayPermission.FACT if self.is_fact else WorkerDayPermission.PLAN,
-                self.wd_types,
-                self.dt_from,
-                self.dt_to,
-                WorkerDayViewSet.error_messages,
-                self.wd_types_dict,
-            )
             today = (datetime.datetime.now() + datetime.timedelta(hours=3)).date()
             employee_filter = {}
             if self.employee_ids:
@@ -133,22 +125,48 @@ class WorkerDayApproveHelper:
                 ).values_list('employee_id', flat=True)
 
             wd_types_grouped_by_limit = {}
-            if self.user:
-                for wd_type, limit_days_in_past, limit_days_in_future, employee_type, shop_type in allowed_wd_perms:
-                    # Filtering by types, which are passed
-                    if wd_type in self.wd_types:
-                        wd_types_grouped_by_limit.setdefault((limit_days_in_past, limit_days_in_future), []).append(wd_type)
+            if self.user and employee_ids:
+                group_wd_premissions = [] # store permission instances for later "Approved not first" filter. Orteka-specific.
+                for wd_type in self.wd_types:
+                    checker = BaseWdPermissionChecker(self.user)
+                    for employee_id in employee_ids:
+                        permission = checker.has_group_permission(
+                            employee_id=employee_id,
+                            shop_id=self.shop_id,
+                            action=WorkerDayPermission.APPROVE,
+                            graph_type=WorkerDayPermission.FACT if self.is_fact else WorkerDayPermission.PLAN,
+                            wd_type_id=wd_type,
+                            dt_from=self.dt_from,
+                            dt_to=self.dt_to,
+                            is_vacancy=False
+                        )
+                        if permission:
+                            group_wd_premissions.extend(checker.group_wd_permissions)
+                            wd_types_grouped_by_limit.setdefault(
+                                (
+                                    checker.group_wd_permissions[0].limit_days_in_past,
+                                    checker.group_wd_permissions[0].limit_days_in_future
+                                ), []
+                            ).append(wd_type)
+                        else:
+                            raise PermissionDenied(checker.err_message)
+                if not wd_types_grouped_by_limit:
+                    raise PermissionDenied(
+                        ERROR_MESSAGES['no_action_perm'].format(
+                            action_str=WorkerDayPermission.ACTIONS_DICT.get(WorkerDayPermission.APPROVE).lower()
+                            )
+                        )
             else:
                 for wd_type in self.wd_types:
                     wd_types_grouped_by_limit.setdefault((None, None), []).append(wd_type)
+            
             wd_types_q = Q()
             for (limit_days_in_past, limit_days_in_future), wd_types in wd_types_grouped_by_limit.items():
                 q = Q(type_id__in=wd_types)
-                if limit_days_in_past or limit_days_in_future:
-                    if limit_days_in_past:
-                        q &= Q(dt__gte=today - datetime.timedelta(days=limit_days_in_past))
-                    if limit_days_in_future:
-                        q &= Q(dt__lte=today + datetime.timedelta(days=limit_days_in_future))
+                if limit_days_in_past:
+                    q &= Q(dt__gte=today - datetime.timedelta(days=limit_days_in_past))
+                if limit_days_in_future:
+                    q &= Q(dt__lte=today + datetime.timedelta(days=limit_days_in_future))
                 wd_types_q |= q
 
             has_perm_to_approve_other_shop_days = self.user is None or Group.objects.filter(
@@ -245,11 +263,10 @@ class WorkerDayApproveHelper:
                 employee_days_q |= Q(employee_id=employee_id, dt__in=dates)
                 employee_days_set.add((employee_id, dates))
 
-            wdays_to_approve = WorkerDay.objects.filter(
+            wdays_to_approve: WorkerDayQuerySet = WorkerDay.objects.filter(
                 employee_days_q,
                 is_approved=False,
-                is_fact=self.is_fact,
-
+                is_fact=self.is_fact
             )
 
             if self.exclude_approve_q:
@@ -258,6 +275,10 @@ class WorkerDayApproveHelper:
             # Don't approve opened vacancies
             if not self.approve_open_vacs:
                 wdays_to_approve = wdays_to_approve.filter(employee_id__isnull=False)
+
+            # Orteka-specific.
+            if self.user and employee_ids:
+                wdays_to_approve = self._handle_approved_not_first(wdays_to_approve, group_wd_premissions)
 
             # если у пользователя нет группы с наличием прав на изменение защищенных дней, то проверяем,
             # что в списке подтверждаемых дней нет защищенных дней, если есть, то выдаем ошибку
@@ -288,7 +309,7 @@ class WorkerDayApproveHelper:
                     dates=StringAgg(Cast('dt', CharField()), delimiter=',', ordering='dt'),
                 ))
                 if protected_wdays:
-                    raise PermissionDenied(WorkerDayViewSet.error_messages['has_no_perm_to_approve_protected_wdays'].format(
+                    raise PermissionDenied(ERROR_MESSAGES['has_no_perm_to_approve_protected_wdays'].format(
                         protected_wdays=', '.join(
                             f'{d["employee_user_fio"]}: {d["dates"]}' for d in protected_wdays),
                     ))
@@ -393,9 +414,10 @@ class WorkerDayApproveHelper:
                     transaction.on_commit(
                         lambda f_json_data=json_data: send_doctors_schedule_to_mis.delay(json_data=f_json_data))
 
-            wdays_to_delete = WorkerDay.objects_with_excluded.filter(
+            wdays_to_delete: WorkerDayQuerySet = WorkerDay.objects_with_excluded.filter(
                 employee_days_q,
                 is_fact=self.is_fact,
+                is_approved=True
             ).exclude(
                 id__in=wdays_to_approve.values_list('id', flat=True),
             ).exclude(
@@ -412,9 +434,13 @@ class WorkerDayApproveHelper:
                     closest_plan_approved__in=wdays_to_delete,
                 ).delete()
 
-            wdays_to_delete.delete()
-            vacancies_to_approve = list(wdays_to_approve.filter(is_vacancy=True, employee_id__isnull=True))
-            wdays_to_approve.update(is_approved=True)
+            # Force evaluation
+            vacancies_to_approve = tuple(wdays_to_approve.filter(is_vacancy=True, employee_id__isnull=True))
+            wdays_to_delete_ids = tuple(wdays_to_delete.values_list('id', flat=True))
+            wdays_to_approve_ids = tuple(wdays_to_approve.values_list('id', flat=True))
+            WorkerDay.objects.filter(id__in=wdays_to_delete_ids).delete()
+            WorkerDay.objects.filter(id__in=wdays_to_approve_ids).update(is_approved=True)
+
             WorkerDay.set_closest_plan_approved(
                 q_obj=employee_days_q,
                 is_approved=True if self.is_fact else None,
@@ -435,10 +461,9 @@ class WorkerDayApproveHelper:
                 if wd_ids:
                     recalc_wdays(id__in=wd_ids)
 
-            approved_wds_list_qs = WorkerDay.objects.filter(
-                    employee_days_q,
-                    is_approved=True,
-                    is_fact=self.is_fact,
+            approved_wds_list = list(
+                WorkerDay.objects.filter(
+                    id__in=wdays_to_approve_ids
                 ).select_related(
                     'shop',
                     'employment',
@@ -452,9 +477,7 @@ class WorkerDayApproveHelper:
                         to_attr='outsources_list',
                     ),
                 ).distinct()
-            if self.exclude_approve_q:
-                approved_wds_list_qs = approved_wds_list_qs.exclude(self.exclude_approve_q)  # TODO: тест
-            approved_wds_list = list(approved_wds_list_qs)
+            )
 
             not_approved_wds_list = WorkerDay.objects.bulk_create(
                 [
@@ -584,3 +607,63 @@ class WorkerDayApproveHelper:
                 is_approved=True,
                 exc_cls=ValidationError,
             )
+
+    def _handle_approved_not_first(
+            self,
+            wdays_to_approve: WorkerDayQuerySet,
+            group_wd_premissions: list[GroupWorkerDayPermission]
+        ) -> WorkerDayQuerySet:
+        """
+        Orteka-specific. "Approved not first" filter.
+        Exclude days that have parent_worker_day.
+        Send notification to manager (УРС).
+        """
+        approved_first_q = Q()
+        not_first_types = set()
+        gwdp: GroupWorkerDayPermission
+        for gwdp in group_wd_premissions:
+            if not gwdp.allow_approve_first:
+                not_first_types.add(gwdp.worker_day_permission.wd_type.code)
+                approved_first_q |= Q(
+                    type=gwdp.worker_day_permission.wd_type,
+                    parent_worker_day__isnull=True
+                )
+        wdays_to_approve = wdays_to_approve.exclude(approved_first_q)
+
+        # Send notification. EventEmailNotification (or other notification type)
+        # will be used for templating, recipients etc.
+        if approved_first_q:
+            wdays_values = tuple(wdays_to_approve.filter(type_id__in=not_first_types).values(
+                'employee__user__first_name',
+                'employee__user__middle_name',
+                'employee__user__last_name',
+                'dt',
+                'dttm_work_start',
+                'dttm_work_end',
+                'type__name',
+                'parent_worker_day__dttm_work_start',
+                'parent_worker_day__dttm_work_end',
+                'parent_worker_day__type__name'
+            ).order_by(
+                'employee__user__last_name',
+                'employee__user__first_name',
+                'employee__user__middle_name',
+                'dt',
+                'parent_worker_day__dttm_work_start'
+            ))
+            if wdays_values:
+                context = {
+                    'is_fact': self.is_fact,
+                    'shop_id': self.shop.id,
+                    'wdays': wdays_values
+                }
+                transaction.on_commit(
+                    lambda: event_signal.send(
+                        sender=None,
+                        network_id=self.shop.network_id,
+                        event_code=APPROVED_NOT_FIRST_EVENT,
+                        user_author_id=self.user.id,
+                        context=context
+                    )
+                )
+        return wdays_to_approve

@@ -24,7 +24,7 @@ from src.base.views_abstract import BaseActiveNamedModelViewSet
 from src.events.signals import event_signal
 from src.reports.utils.overtimes_undertimes import overtimes_undertimes_xlsx
 from src.timetable.backends import MultiShopsFilterBackend
-from src.timetable.events import REQUEST_APPROVE_EVENT_TYPE
+from src.timetable.events import REQUEST_APPROVE_EVENT_TYPE, REQUEST_APPROVE_WITH_TASKS_EVENT_TYPE
 from src.timetable.filters import WorkerDayFilter, WorkerDayStatFilter, VacancyFilter
 from src.timetable.models import (
     WorkerDay,
@@ -63,7 +63,7 @@ from src.timetable.worker_day.tasks import recalc_wdays, batch_block_or_unblock
 from src.timetable.worker_day.timetable import get_timetable_generator_cls
 from src.timetable.worker_day.utils.approve import WorkerDayApproveHelper
 from src.timetable.worker_day.utils.utils import create_worker_days_range, exchange, \
-    copy_as_excel_cells
+    copy_as_excel_cells, ERROR_MESSAGES
 from src.util.dg.timesheet import get_tabel_generator_cls
 from src.util.models_converter import Converter
 from src.util.openapi.responses import (
@@ -73,26 +73,11 @@ from src.util.openapi.responses import (
     change_range_response_schema_dictionary,
 )
 from src.util.upload import get_uploaded_file
-from .stat import WorkersStatsGetter
+from src.timetable.worker_day.stat import WorkersStatsGetter
 
 
 class WorkerDayViewSet(BaseActiveNamedModelViewSet):
-    error_messages = {  # вынести из вьюсета
-        'worker_days_mismatch': _('Worker days mismatch.'),
-        'no_timetable': _("Workers don't have timetable."),
-        'cannot_delete': _('Cannot_delete approved version.'),
-        'na_worker_day_exists': _('Not approved version already exists.'),
-        'no_action_perm_for_wd_type': _('You do not have rights to {action_str} the day type "{wd_type_str}"'),
-        'wd_interval_restriction': _('You do not have the rights to {action_str} the type of day "{wd_type_str}" '
-                                               'on the selected dates. '
-                                               'You need to change the dates. '
-                                               'Allowed interval: {dt_interval}'),
-        'has_no_perm_to_approve_protected_wdays': _('You do not have rights to approve protected worker days ({protected_wdays}). '
-                                                   'Please contact your system administrator.'),
-        'no_such_user_in_network': _('There is no such user in your network.'),
-        'employee_not_in_subordinates': _('Employee {employee} is not your subordinate.'),
-    }
-
+    error_messages = ERROR_MESSAGES
     permission_classes = [WdPermission]  # временно из-за биржи смен vacancy  [FilteredListPermission]
     serializer_class = WorkerDaySerializer
     filterset_class = WorkerDayFilter
@@ -300,15 +285,29 @@ class WorkerDayViewSet(BaseActiveNamedModelViewSet):
         """Запрос на подтверждение графика."""
         serializer = RequestApproveSerializer(data=request.data, **kwargs)
         serializer.is_valid(raise_exception=True)
-        event_context = serializer.data.copy()
-        transaction.on_commit(lambda: event_signal.send(
+        event_context = dict(serializer.validated_data)
+        if self.request.user.network.request_approve_with_tasks_check and WorkerDay.check_tasks_violations(
+            is_fact=event_context['is_fact'],
+            is_approved=False, 
+            employee_id__in=event_context.get('employee_ids'),
+            employee_days_q=Q(
+                dt__range=(event_context['dt_from'], event_context['dt_to']),
+                shop_id=event_context['shop_id']
+            ),
+            raise_exc=False
+        ):
+            # check if draft days would break task violations
+            event_code = REQUEST_APPROVE_WITH_TASKS_EVENT_TYPE
+        else:
+            event_code = REQUEST_APPROVE_EVENT_TYPE
+        event_signal.send(
             sender=None,
             network_id=request.user.network_id,
-            event_code=REQUEST_APPROVE_EVENT_TYPE,
+            event_code=event_code,
             user_author_id=request.user.id,
             shop_id=serializer.data['shop_id'],
             context=event_context,
-        ))
+        )
         return Response({})
 
     @swagger_auto_schema(

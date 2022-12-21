@@ -1,1 +1,1 @@
-from .events import ApproveEvent, RequestApproveEvent, VacancyConfirmedEvent, VacancyCreatedEvent, VacancyDeletedEvent, VacancyEmployeeDeletedEvent, VacancyRefusedEvent, VacancyReconfirmedEvent
+from .events import ApproveEvent, ApprovedNotFirstEvent, RequestApproveEvent, RequestApproveWithTasksEvent, VacancyConfirmedEvent, VacancyCreatedEvent, VacancyDeletedEvent, VacancyEmployeeDeletedEvent, VacancyRefusedEvent, VacancyReconfirmedEvent

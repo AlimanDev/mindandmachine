@@ -1,6 +1,5 @@
 from src.events.registry import BaseRegisteredEvent
 
-from uuid import uuid4
 
 EMPLOYEE_NOT_CHECKED_IN = 'employee_not_checked_in'
 EMPLOYEE_NOT_CHECKED_OUT = 'employee_not_checked_out'

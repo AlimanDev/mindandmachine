@@ -3,15 +3,10 @@ from src.base.models_abstract import AbstractActiveModel
 from django.db import models
 from django.db.models.query import QuerySet
 from django.utils import timezone
-from mptt.models import MPTTModel
 
 from src.base.models_abstract import AbstractActiveModel
 from src.base.models_abstract import (
     AbstractActiveModel,
-    AbstractModel,
-    AbstractActiveNetworkSpecificCodeNamedModel,
-    NetworkSpecificModel,
-    AbstractCodeNamedModel,
 )
 
 

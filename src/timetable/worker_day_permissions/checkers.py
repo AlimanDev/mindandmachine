@@ -1,4 +1,4 @@
-import datetime
+from datetime import datetime, date, timedelta
 
 from django.conf import settings
 from django.db.models import Q, F
@@ -19,22 +19,25 @@ from src.timetable.models import (
     GroupWorkerDayPermission,
 )
 from .serializers import WsPermissionDataSerializer
+from src.util.models_converter import Converter
 
 
 class BaseWdPermissionChecker:
     action = None
 
-    def __init__(self, user, cached_data=None):
+    def __init__(self, user, cached_data=None, check_active_empl=True,):
         """
         :param user:
         :param cached_data:
             user_shops
             get_subordinated_group_ids
             wd_types_dict
+        :param check_active_empl: checks active employment
         """
         self.user = user
         self.cached_data = cached_data or {}
         self.err_message = None
+        self.check_active_empl = check_active_empl
 
     def _get_err_msg(self, action, wd_type_id, employee_id=None, shop_id=None, dt_interval=None):
         # рефакторинг
@@ -62,149 +65,155 @@ class BaseWdPermissionChecker:
 
         return err_msg
 
-    def has_permission(self):
-        raise NotImplementedError
+    def has_group_permission(self, employee_id, shop_id, action, graph_type, wd_type_id, dt_from, dt_to, is_vacancy):
+        if isinstance(dt_from, str):
+            dt_from = datetime.strptime(dt_from, settings.QOS_DATE_FORMAT).date()
+        if isinstance(dt_to, str):
+            dt_to = datetime.strptime(dt_to, settings.QOS_DATE_FORMAT).date()
 
-
-class BaseSingleWdPermissionChecker(BaseWdPermissionChecker):
-    def __init__(self, *args, check_active_empl=True, **kwargs):
-        """
-        :param check_active_empl: проверять наличие активного трудоустройства на дату дня
-        """
-        self.check_active_empl = check_active_empl
-        super(BaseSingleWdPermissionChecker, self).__init__(*args, **kwargs)
-
-    def _has_single_permission(self, employee_id, shop_id, action, graph_type, wd_type_id, wd_dt, is_vacancy):
-        from src.util.models_converter import Converter
         if employee_id and self.check_active_empl:
             active_empls = Employment.objects.get_active(
-                dt_from=wd_dt,
-                dt_to=wd_dt,
+                dt_from=dt_from,
+                dt_to=dt_to,
                 employee_id=employee_id,
             )
             if not active_empls.exists():
-                self.err_message = _(
-                    "Can't create a working day in the schedule, since the user is not employed during this period")
+                self.err_message = _("You are not employed during this period")
                 return False
 
-        user_shops = self.cached_data.get('user_shops') or self.user.get_shops(
+        self.user_shops = self.cached_data.get('user_shops') or self.user.get_shops(
             include_descendants=True).values_list('id', flat=True)
-        user_subordinated_group_ids = self.cached_data.get(
+        self.user_subordinated_group_ids = self.cached_data.get(
             'user_subordinated_group_ids') or Group.get_subordinated_group_ids(self.user)
 
-        gwdp = GroupWorkerDayPermission.get_perms_qs(
+        self.group_wd_permissions = GroupWorkerDayPermission.get_perms_qs(
             user=self.user,
             action=action,
             graph_type=graph_type,
             wd_type_id=wd_type_id,
-            wd_dt=wd_dt,
             is_vacancy=is_vacancy,
         ).order_by(
             F('limit_days_in_past').desc(nulls_first=True),
             F('limit_days_in_future').desc(nulls_first=True),
-        ).values_list(
-            'employee_type',
-            'shop_type',
-            'limit_days_in_past',
-            'limit_days_in_future',
         ).distinct()
-        if not gwdp:
+        if not self.group_wd_permissions:
             self.err_message = self._get_err_msg(action, wd_type_id)
             return False
 
-        if gwdp:
-            for employee_type, shop_type, limit_days_in_past, limit_days_in_future in gwdp:
-                employment_q = Q()
-                shop_q = Q()
-                # маппинг типа сотрудника и типа магазина к лукапу
-                if employee_id:
-                    employment_inner_q = Q()
-                    if employee_type == GroupWorkerDayPermission.SUBORDINATE_EMPLOYEE:
-                        employment_inner_q &= Q(
-                            employee_id=employee_id,
-                            employee_id__in=self.user.get_subordinates(
-                                dt=wd_dt,
-                                user_shops=user_shops,
-                                user_subordinated_group_ids=user_subordinated_group_ids,
-                            )
-                        )
-                    elif employee_type == GroupWorkerDayPermission.MY_SHOPS_ANY_EMPLOYEE:
-                        employment_inner_q &= Q(
-                            shop_id__in=user_shops,
-                        )
-                    elif employee_type == GroupWorkerDayPermission.MY_NETWORK_EMPLOYEE:
-                        employment_inner_q &= Q(
-                            employee__user__network_id=self.user.network_id,
-                            shop__network_id=self.user.network_id,
-                        )
-                    elif employee_type == GroupWorkerDayPermission.OUTSOURCE_NETWORK_EMPLOYEE:
-                        employment_inner_q &= Q(
-                            employee__user__network_id__in=NetworkConnect.objects.filter(
-                                client_id=self.user.network_id).values_list('outsourcing_id', flat=True),
-                        )
+        gwdp: GroupWorkerDayPermission
+        for gwdp in self.group_wd_permissions:
+            employment_q = self._get_employment_q(gwdp, employee_id, dt_from, dt_to)
+            shop_q = self._get_shop_q(gwdp, shop_id)
+            if (employment_q or not employee_id) and (shop_q or not shop_id):
+                has_perm = (not employee_id or Employment.objects.get_active(
+                    dt_from=dt_from,
+                    dt_to=dt_to,
+                    employee_id=employee_id,
+                    extra_q=employment_q,
+                ).exists()) and (not shop_id or Shop.objects.filter(
+                    shop_q,
+                    id=shop_id,
+                ).exists())
 
-                    if employment_inner_q:
-                        employment_q |= employment_inner_q
+                if has_perm:
+                    return self._check_time_limit(action, gwdp, wd_type_id, shop_id, dt_from, dt_to)
 
-                if shop_id:
-                    shop_inner_q = Q()
-                    if shop_type == GroupWorkerDayPermission.MY_SHOPS:
-                        shop_inner_q &= Q(
-                            id__in=user_shops,
-                        )
-                    elif shop_type == GroupWorkerDayPermission.MY_NETWORK_SHOPS:
-                        shop_inner_q &= Q(
-                            network_id=self.user.network_id,
-                        )
-                    elif shop_type == GroupWorkerDayPermission.OUTSOURCE_NETWORK_SHOPS:
-                        shop_inner_q &= Q(
-                            network_id__in=NetworkConnect.objects.filter(
-                                client_id=self.user.network_id).values_list('outsourcing_id', flat=True),
-                        )
-                    elif shop_type == GroupWorkerDayPermission.CLIENT_NETWORK_SHOPS:
-                        shop_inner_q &= Q(
-                            network_id__in=NetworkConnect.objects.filter(
-                                outsourcing_id=self.user.network_id).values_list('client_id', flat=True),
-                        )
+        self.err_message = self._get_err_msg(action, wd_type_id, employee_id=employee_id, shop_id=shop_id)
+        return False
 
-                    if shop_inner_q:
-                        shop_q |= shop_inner_q
+    def has_permission(self):
+        raise NotImplementedError
 
-                if (employment_q or not employee_id) and (shop_q or not shop_id):
-                    has_perm = (not employee_id or Employment.objects.get_active(
-                        dt_from=wd_dt,
-                        dt_to=wd_dt,
-                        employee_id=employee_id,
-                        extra_q=employment_q,
-                    ).exists()) and (not shop_id or Shop.objects.filter(
-                        shop_q,
-                        id=shop_id,
-                    ).exists())
+    def _get_employment_q(self, gwdp: GroupWorkerDayPermission, employee_id: int, dt_from: date, dt_to: date) -> Q:
+        """Lookup for employee_type"""
+        if not employee_id:
+            employment_q = Q()
+        elif gwdp.employee_type == GroupWorkerDayPermission.SUBORDINATE_EMPLOYEE:
+            employment_q = Q(
+                employee_id__in=self.user.get_subordinates(
+                    dt=dt_from,
+                    dt_to_shift=dt_to - dt_from,
+                    user_shops=self.user_shops,
+                    user_subordinated_group_ids=self.user_subordinated_group_ids,
+                )
+            )
+        elif gwdp.employee_type == GroupWorkerDayPermission.MY_SHOPS_ANY_EMPLOYEE:
+            employment_q = Q(
+                shop_id__in=self.user_shops,
+            )
+        elif gwdp.employee_type == GroupWorkerDayPermission.MY_NETWORK_EMPLOYEE:
+            employment_q = Q(
+                employee__user__network_id=self.user.network_id,
+                shop__network_id=self.user.network_id,
+            )
+        elif gwdp.employee_type == GroupWorkerDayPermission.OUTSOURCE_NETWORK_EMPLOYEE:
+            employment_q = Q(
+                employee__user__network_id__in=NetworkConnect.objects.filter(
+                    client_id=self.user.network_id).values_list('outsourcing_id', flat=True),
+            )
+        else:
+            employment_q = Q()
 
-                    if has_perm:
-                        if isinstance(wd_dt, str):
-                            wd_dt = datetime.datetime.strptime(wd_dt, settings.QOS_DATE_FORMAT).date()
-                        today = (datetime.datetime.now() + datetime.timedelta(
-                            hours=Shop.get_cached_tz_offset_by_shop_id(shop_id=shop_id) if shop_id else settings.CLIENT_TIMEZONE)).date()
-                        date_limit_in_past = None
-                        date_limit_in_future = None
-                        dt_from = wd_dt
-                        dt_to = wd_dt
-                        if limit_days_in_past is not None:
-                            date_limit_in_past = today - datetime.timedelta(days=limit_days_in_past)
-                        if limit_days_in_future is not None:
-                            date_limit_in_future = today + datetime.timedelta(days=limit_days_in_future)
-                        if date_limit_in_past or date_limit_in_future:
-                            if (date_limit_in_past and dt_from < date_limit_in_past) or \
-                                    (date_limit_in_future and dt_to > date_limit_in_future):
-                                dt_interval = f'с {Converter.convert_date(date_limit_in_past) or "..."} ' \
-                                              f'по {Converter.convert_date(date_limit_in_future) or "..."}'
-                                self.err_message = self._get_err_msg(action, wd_type_id, dt_interval=dt_interval)
-                                return False
-                        return True
+        return employment_q
 
-            self.err_message = self._get_err_msg(action, wd_type_id, employee_id=employee_id, shop_id=shop_id)
-            return False
+    def _get_shop_q(self, gwdp: GroupWorkerDayPermission, shop_id: int) -> Q:
+        """Lookup for shop_type"""
+        if not shop_id:
+            shop_q = Q()
+        elif gwdp.shop_type == GroupWorkerDayPermission.MY_SHOPS:
+            shop_q = Q(
+                id__in=self.user_shops,
+            )
+        elif gwdp.shop_type == GroupWorkerDayPermission.MY_NETWORK_SHOPS:
+            shop_q = Q(
+                network_id=self.user.network_id,
+            )
+        elif gwdp.shop_type == GroupWorkerDayPermission.OUTSOURCE_NETWORK_SHOPS:
+            shop_q = Q(
+                network_id__in=NetworkConnect.objects.filter(
+                    client_id=self.user.network_id).values_list('outsourcing_id', flat=True),
+            )
+        elif gwdp.shop_type == GroupWorkerDayPermission.CLIENT_NETWORK_SHOPS:
+            shop_q = Q(
+                network_id__in=NetworkConnect.objects.filter(
+                    outsourcing_id=self.user.network_id).values_list('client_id', flat=True),
+            )
+        else:
+            shop_q = Q()
+
+        return shop_q
+
+    def _check_time_limit(
+        self,
+        action: str,
+        gwdp: GroupWorkerDayPermission,
+        wd_type_id: int,
+        shop_id: int,
+        dt_from: date,
+        dt_to: date
+        ) -> bool :
+        """Check time limit"""
+        today = (datetime.now() + timedelta(
+            hours=Shop.get_cached_tz_offset_by_shop_id(shop_id=shop_id) if shop_id else settings.CLIENT_TIMEZONE)).date()
+        date_limit_in_past = None
+        date_limit_in_future = None
+        if gwdp.limit_days_in_past is not None:
+            date_limit_in_past = today - timedelta(days=gwdp.limit_days_in_past)
+        if gwdp.limit_days_in_future is not None:
+            date_limit_in_future = today + timedelta(days=gwdp.limit_days_in_future)
+        if date_limit_in_past or date_limit_in_future:
+            if (date_limit_in_past and dt_from < date_limit_in_past) or \
+                    (date_limit_in_future and dt_to > date_limit_in_future):
+                dt_interval = f'с {Converter.convert_date(date_limit_in_past) or "..."} ' \
+                                f'по {Converter.convert_date(date_limit_in_future) or "..."}'
+                self.err_message = self._get_err_msg(action, wd_type_id, dt_interval=dt_interval)
+                return False
+        return True
+
+
+class BaseSingleWdPermissionChecker(BaseWdPermissionChecker):
+    def _has_single_permission(self, employee_id, shop_id, action, graph_type, wd_type_id, wd_dt, is_vacancy):
+        return self.has_group_permission(employee_id, shop_id, action, graph_type, wd_type_id, dt_from=wd_dt, dt_to=wd_dt, is_vacancy=is_vacancy)
 
 
 class BaseSingleWdDataPermissionChecker(BaseSingleWdPermissionChecker):

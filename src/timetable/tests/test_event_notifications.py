@@ -1,6 +1,5 @@
-from datetime import date, datetime, timedelta, time
+from datetime import datetime, timedelta, time
 from unittest import mock
-from xlrd import open_workbook
 import pandas as pd
 
 from django_celery_beat.models import CrontabSchedule
@@ -18,18 +17,21 @@ from src.base.tests.factories import (
     NetworkFactory,
     EmployeeFactory,
 )
-from src.events.models import EventType
+from src.events.models import EventType, EventHistory
 from src.reports.models import ReportConfig, ReportType, Period
 from src.notifications.models import EventEmailNotification
-from src.timetable.events import REQUEST_APPROVE_EVENT_TYPE, APPROVE_EVENT_TYPE, VACANCY_CREATED
+from src.timetable.events import REQUEST_APPROVE_EVENT_TYPE, REQUEST_APPROVE_WITH_TASKS_EVENT_TYPE, APPROVE_EVENT_TYPE, VACANCY_CREATED
 from src.reports.reports import OVERTIMES_UNDERTIMES, UNACCOUNTED_OVERTIME
 from src.timetable.models import WorkerDay, WorkerDayCashboxDetails, WorkerDayPermission, GroupWorkerDayPermission
 from src.timetable.tests.factories import WorkerDayCashboxDetailsFactory, WorkerDayFactory
 from src.util.mixins.tests import TestsHelperMixin
 from src.util.models_converter import Converter
 from src.reports.tasks import cron_report
+from src.tasks.models import Task
+from src.forecast.models import OperationType, OperationTypeName
 
 
+@mock.patch.object(transaction, 'on_commit', lambda t: t())
 class TestRequestApproveEventNotifications(TestsHelperMixin, APITestCase):
     @classmethod
     def setUpTestData(cls):
@@ -74,17 +76,59 @@ class TestRequestApproveEventNotifications(TestsHelperMixin, APITestCase):
                 subject=subject,
             )
             event_email_notification.shop_groups.add(self.group_urs)
-            with mock.patch.object(transaction, 'on_commit', lambda t: t()):
-                resp = self.client.post(self.get_url('WorkerDay-request-approve'), data={
-                    'shop_id': self.shop.id,
-                    'is_fact': True,
-                    'dt_from': Converter.convert_date(self.dt_now),
-                    'dt_to': Converter.convert_date(self.dt_now),
-                })
+            resp = self.client.post(self.get_url('WorkerDay-request-approve'), data={
+                'shop_id': self.shop.id,
+                'is_fact': True,
+                'dt_from': Converter.convert_date(self.dt_now),
+                'dt_to': Converter.convert_date(self.dt_now),
+            })
             self.assertEqual(resp.status_code, status.HTTP_200_OK)
             self.assertEqual(len(mail.outbox), 1)
             self.assertEqual(mail.outbox[0].subject, subject)
             self.assertEqual(mail.outbox[0].to[0], self.user_urs.email)
+
+    def test_request_approve_with_tasks(self):
+        """If `network.request_approve_with_tasks_check` is `True` and
+        there are Tasks assigned to employee - create an Event with different code."""
+        wd = WorkerDayFactory(
+            type_id=WorkerDay.TYPE_WORKDAY,
+            is_fact=True,
+            is_approved=False,
+            dt=self.dt_now,
+            dttm_work_start=datetime.combine(self.dt_now, time(9)),
+            dttm_work_end=datetime.combine(self.dt_now, time(13)),
+            shop=self.shop
+        )
+        Task.objects.create(
+            employee=wd.employee,
+            dttm_start_time=datetime.combine(self.dt_now, time(14)),  # outside work hours
+            dttm_end_time=datetime.combine(self.dt_now, time(15)),
+            operation_type=OperationType.objects.create(
+                operation_type_name=OperationTypeName.objects.create(
+                    name='OTN',
+                    network=self.network
+                )
+            )
+        )
+        resp = self.client.post(self.get_url('WorkerDay-request-approve'), data={
+            'shop_id': self.shop.id,
+            'is_fact': True,
+            'dt_from': Converter.convert_date(self.dt_now),
+            'dt_to': Converter.convert_date(self.dt_now),
+        })
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertFalse(EventHistory.objects.filter(event_type__code=REQUEST_APPROVE_WITH_TASKS_EVENT_TYPE).exists())
+        
+        self.network.request_approve_with_tasks_check = True
+        self.network.save()
+        resp = self.client.post(self.get_url('WorkerDay-request-approve'), data={
+            'shop_id': self.shop.id,
+            'is_fact': True,
+            'dt_from': Converter.convert_date(self.dt_now),
+            'dt_to': Converter.convert_date(self.dt_now),
+        })
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertTrue(EventHistory.objects.filter(event_type__code=REQUEST_APPROVE_WITH_TASKS_EVENT_TYPE).exists())
 
 
 class TestApproveEventNotifications(TestsHelperMixin, APITestCase):
@@ -100,8 +144,21 @@ class TestApproveEventNotifications(TestsHelperMixin, APITestCase):
         cls.user_worker = UserFactory(email='worker@example.com', network=cls.network)
         cls.employee_worker = EmployeeFactory(user=cls.user_worker)
         cls.group_dir = GroupFactory(name='Директор', network=cls.network)
+        cls.group_dir.subordinates.add(cls.group_dir)
         cls.group_urs = GroupFactory(name='УРС', network=cls.network)
+        cls.group_urs.subordinates.add(cls.group_urs)
         cls.group_worker = GroupFactory(name='Сотрудник', network=cls.network)
+        cls.group_dir.subordinates.add(cls.group_worker)
+        cls.group_urs.subordinates.add(cls.group_worker)
+        FunctionGroup.objects.create(group=cls.group_dir, func='WorkerDay_approve', method='POST')
+        GroupWorkerDayPermission.objects.create(
+            group=cls.group_dir,
+            worker_day_permission=WorkerDayPermission.objects.get(
+                action=WorkerDayPermission.APPROVE,
+                graph_type=WorkerDayPermission.PLAN,
+                wd_type_id=WorkerDay.TYPE_WORKDAY,
+            ),
+        )
         FunctionGroup.objects.create(group=cls.group_urs, func='WorkerDay_approve', method='POST')
         GroupWorkerDayPermission.objects.create(
             group=cls.group_urs,
@@ -110,6 +167,7 @@ class TestApproveEventNotifications(TestsHelperMixin, APITestCase):
                 graph_type=WorkerDayPermission.PLAN,
                 wd_type_id=WorkerDay.TYPE_WORKDAY,
             ),
+            employee_type=GroupWorkerDayPermission.MY_NETWORK_EMPLOYEE
         )
         cls.employment_worker = EmploymentFactory(
             employee=cls.employee_worker, shop=cls.shop, function_group=cls.group_worker,
@@ -163,15 +221,6 @@ class TestApproveEventNotifications(TestsHelperMixin, APITestCase):
     def test_approve_notification_not_sent_to_event_author(self):
         with self.settings(CELERY_TASK_ALWAYS_EAGER=True):
             self.client.force_authenticate(user=self.user_dir)
-            FunctionGroup.objects.create(group=self.group_dir, func='WorkerDay_approve', method='POST')
-            GroupWorkerDayPermission.objects.create(
-                group=self.group_dir,
-                worker_day_permission=WorkerDayPermission.objects.get(
-                    action=WorkerDayPermission.APPROVE,
-                    graph_type=WorkerDayPermission.PLAN,
-                    wd_type_id=WorkerDay.TYPE_WORKDAY,
-                ),
-            )
             subject = 'График в магазине {{ shop.name }} был подтвержден'
             event_email_notification = EventEmailNotification.objects.create(
                 event_type=self.approve_event_type,
@@ -462,6 +511,7 @@ class TestSendUnaccountedReport(TestsHelperMixin, APITestCase):
             self.assertEqual(df1.to_dict('records'), data1)
             self.assertEqual(df2.to_dict('records'), data2)
 
+
 class TestOvertimesUndertimesReport(TestsHelperMixin, APITestCase):
     @classmethod
     def setUpTestData(cls):
@@ -588,8 +638,10 @@ class TestVacancyCreatedNotification(TestsHelperMixin, APITestCase):
         cls.employee_worker = EmployeeFactory(user=cls.user_worker)
         cls.employee_worker2 = EmployeeFactory(user=cls.user_worker2)
         cls.group_dir = GroupFactory(name='Директор', network=cls.network)
+        cls.group_dir.subordinates.add(cls.group_dir)
         cls.group_urs = GroupFactory(name='УРС', network=cls.network)
         cls.group_worker = GroupFactory(name='Сотрудник', network=cls.network)
+        cls.group_dir.subordinates.add(cls.group_worker)
         cls.employment_dir = EmploymentFactory(
             employee=cls.employee_dir, shop=cls.shop, function_group=cls.group_dir,
         )
