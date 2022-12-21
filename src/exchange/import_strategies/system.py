@@ -105,9 +105,29 @@ class ImportHistDataStrategy(BaseSystemImportStrategy):
                  dt_or_dttm_format: str,
                  csv_delimiter: str,
                  fix_date: bool = False,
+                 use_total_discounted_price:bool = False,
                  columns: tp.Optional[tp.List[str]] = None,
                  receipt_code_columns: tp.Optional[tp.List[str]] = None,
+                 remove_duplicates_columns: tp.Optional[tp.List[str]] = None,
                  **kwargs):
+        """
+        Parameters:
+            system_code: customer name
+            data_type: type of info (delivery/purchases/etc)
+            separated_file_for_each_shop: weird param. Don't use.
+            filename_fmt: filename format template
+            dt_from: diff in days from current date. Example current_date - dt_from (start date)
+            dt_to: diff in days from current date. Example current_date - dt_to (end date)
+            shop_num_column_name: alias name for shop_id
+            dt_or_dttm_column_name: operation date column name
+            dt_or_dttm_format: str
+            csv_delimiter: type of delimiter for csv files
+            fix_date: use date from filename or not
+            use_total_discounted_price: use only discounted total price? Important for purchases
+            columns: names for columns in a dataframe. Cause we have a raw dataframe without a header
+            receipt_code_columns: columns that define a unique code,
+            remove_duplicates_columns: columns that define the set for the unique object in the duplicate dropping procedure
+        """
         self.fix_date = fix_date
         self.system_code = system_code
         self.data_type = data_type
@@ -121,6 +141,8 @@ class ImportHistDataStrategy(BaseSystemImportStrategy):
         self.dt_or_dttm_format = dt_or_dttm_format
         self.columns = columns
         self.receipt_code_columns = receipt_code_columns
+        self.use_total_discounted_price = use_total_discounted_price
+        self.remove_duplicates_columns = remove_duplicates_columns
         self._init_cached_data()
         super(BaseSystemImportStrategy, self).__init__(**kwargs)
 
@@ -167,7 +189,6 @@ class ImportHistDataStrategy(BaseSystemImportStrategy):
     def execute(self):
         errors = set()
         dt_and_filename_pairs = self.get_dt_and_filename_pairs()
-
         for dt, filename in dt_and_filename_pairs:
             load_errors = self.load_file(dt, filename)
             if load_errors:
@@ -184,7 +205,6 @@ class ImportHistDataStrategy(BaseSystemImportStrategy):
         """
         encapsulate reading from file by chunks.
         It will be replaced with the appropriate class later"""
-
         with self.fs_engine.open_file(filename) as f:
             df_chunks = pd.read_csv(f, **read_csv_kwargs)
             for df in df_chunks:
@@ -280,6 +300,7 @@ class ImportHistDataStrategy(BaseSystemImportStrategy):
         load_errors = set()
         shops_id = set()
         objects = []
+        objects_unique_ids = [] # use it if a self.use_total_discounted_price is True
 
         read_csv_kwargs = {
             "dtype": str,
@@ -293,15 +314,41 @@ class ImportHistDataStrategy(BaseSystemImportStrategy):
 
         unused_cols = ["index", "shop_id", "updated_dttm", "dttm_error"]
 
+        def get_key(values): # glue few columns into one
+            return "_".join(map(str, values))
+
         try:
-            for df in self._get_csv_generator(filename, read_csv_kwargs):
+            for ix, df in enumerate(self._get_csv_generator(filename, read_csv_kwargs)):                
+                df["index"] = df.index.values
+
+                if self.use_total_discounted_price:
+                    df = df.drop_duplicates(subset=self.remove_duplicates_columns, keep='first')
+
+                    df = (
+                        df[
+                            ~(
+                                df[self.remove_duplicates_columns]
+                                .apply(get_key, axis=1)
+                                .isin(objects_unique_ids)
+                            )
+                        ]
+                        .reset_index(drop=True)
+                    )
+                    objects_unique_ids += (
+                        df[self.remove_duplicates_columns]
+                        .apply(get_key,axis=1)
+                        .unique()
+                        .tolist()
+                    )
+
+                    if not df.shape[0]:
+                        continue
 
                 # Hash generation is different in each python
                 # launch! Can only compare in receipts imported
                 # from the same task
 
                 df["receipt_code"] = df.apply(self._get_receipt_code, axis=1)
-                df["index"] = df.index.values
                 df['shop_id'] = (df[self.shop_num_column_name]
                                     .apply(self.get_shop_id_by_shop_num))
                 df["updated_dttm"] = (
@@ -314,6 +361,7 @@ class ImportHistDataStrategy(BaseSystemImportStrategy):
                 shops_id |= set(df.loc[~df['shop_id'].isna(), "shop_id"])
 
                 df_for_objects = df[(~df["shop_id"].isna()) & (~df["updated_dttm"].isna())]
+
                 if df_for_objects.shape[0]:
                     objects += (df_for_objects.apply(
                         lambda row: self._create_object(row, df.columns, unused_cols),
@@ -321,6 +369,7 @@ class ImportHistDataStrategy(BaseSystemImportStrategy):
 
                 # update sets with errors
                 df_shop_load_error = df.loc[df["shop_id"].isna(), self.shop_num_column_name]
+
                 if df_shop_load_error.shape[0]:
                     load_errors |= set(
                         df_shop_load_error.apply(
@@ -341,4 +390,3 @@ class ImportHistDataStrategy(BaseSystemImportStrategy):
         except (FileNotFoundError, PermissionError, *ftplib.all_errors) as e:
             load_errors.add(f'{e.__class__.__name__}: {str(e)}: {filename}')
         return load_errors
-

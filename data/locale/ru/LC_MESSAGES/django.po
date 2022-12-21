@@ -12,7 +12,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Django REST framework\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2022-12-21 14:19+0000\n"
+"POT-Creation-Date: 2022-12-21 17:14+0000\n"
 "PO-Revision-Date: 2017-08-03 14:58+0000\n"
 "Last-Translator: Grigory Mishchenko <grishkokot@gmail.com>\n"
 "Language-Team: Russian (http://www.transifex.com/django-rest-framework-1/"
@@ -593,7 +593,15 @@ msgid ""
 "поля наименования магазина в WFM-системе\" должно быть заполнено."
 msgstr ""
 
-#: src/exchange/models.py:265
+#: src/exchange/models.py:174
+msgid "Take into account the final discounted price in the object"
+msgstr "Использовать финальную цену со скидкой для объекта "
+
+#: src/exchange/models.py:177
+msgid "Columns that act as a key when taking the final discounted price"
+msgstr "Колонки, выступающие в качестве ключа для определения уникального объекта при рассмотрение цены со скидкой"
+
+#: src/exchange/models.py:271
 msgid "For the '{}' strategy, you must select a period."
 msgstr "Для стратегии '{}' обязательно выбрать период."
 
@@ -605,12 +613,12 @@ msgstr "Применить шаблоны нагрузки к магазинам
 msgid "Applying load templates started"
 msgstr "Применение шаблонов нагрузки запущено"
 
-#: src/forecast/load_template/utils.py:541
+#: src/forecast/load_template/utils.py:542
 #, python-brace-format
 msgid "These operation types do not exist: {types}."
 msgstr "Данные типы операций не существуют: {types}."
 
-#: src/forecast/load_template/utils.py:546
+#: src/forecast/load_template/utils.py:547
 #, python-brace-format
 msgid ""
 "These operation types listed in dependencies, but not listed in operation "
@@ -619,23 +627,23 @@ msgstr ""
 "Данные типы операций есть в зависимостях, но отсутствуют в списке операций: "
 "{types}."
 
-#: src/forecast/load_template/utils.py:562
-#: src/forecast/load_template/utils.py:564
-#: src/forecast/load_template/utils.py:603 src/forecast/models.py:206
+#: src/forecast/load_template/utils.py:563
+#: src/forecast/load_template/utils.py:565
+#: src/forecast/load_template/utils.py:604 src/forecast/models.py:206
 msgid "Error in row {}."
 msgstr "Ошибка в строке {}."
 
-#: src/forecast/load_template/utils.py:562
+#: src/forecast/load_template/utils.py:563
 msgid "Timestep is required."
 msgstr "Шаг прогноза обязателен."
 
-#: src/forecast/load_template/utils.py:565
+#: src/forecast/load_template/utils.py:566
 #, python-brace-format
 msgid "Timestep {timestep} is not valid choice, choices are {timesteps}."
 msgstr ""
 "Шаг прогноза {timestep} не является валидным, следует выбрать из {timesteps}."
 
-#: src/forecast/load_template/utils.py:603
+#: src/forecast/load_template/utils.py:604
 msgid ""
 "Invalid days of week '{}', should be comma separated int in interfval from 0 "
 "to 6."

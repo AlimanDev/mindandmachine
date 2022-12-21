@@ -1,29 +1,30 @@
-from rest_framework import serializers
-from src.forecast.models import (
-    OperationTypeTemplate, 
-    OperationType, 
-    PeriodClients, 
-    LoadTemplate, 
-    OperationTypeRelation,
-    OperationTypeName,
-)
-from src.base.models import Shop, ShopSchedule
-from src.timetable.models import WorkType
+import datetime
+import json
+
 # from src.main.demand.utils import create_predbills_request_function
 import numpy as np
-from django.utils import timezone
-import datetime
-from src.base.shop.serializers import ShopSerializer
-from django.db.models import F, Case, When, TimeField, Q, Max, Min
-from django.db.models.functions import Least, Greatest
-from django.db import transaction
-from django.utils.translation import gettext as _
-from src.conf.djconfig import HOST
-import json
 import pandas as pd
-from rest_framework.response import Response
-from src.util.download import xlsx_method
 from dateutil.relativedelta import relativedelta
+from django.db import transaction
+from django.db.models import Case, F, Max, Min, Q, TimeField, When
+from django.db.models.functions import Greatest, Least
+from django.utils import timezone
+from django.utils.translation import gettext as _
+from rest_framework import serializers
+from rest_framework.response import Response
+from src.base.models import Shop, ShopSchedule
+from src.base.shop.serializers import ShopSerializer
+from src.conf.djconfig import HOST
+from src.forecast.models import (
+    LoadTemplate,
+    OperationType,
+    OperationTypeName,
+    OperationTypeRelation,
+    OperationTypeTemplate,
+    PeriodClients,
+)
+from src.timetable.models import WorkType
+from src.util.download import xlsx_method
 
 
 ########################## Вспомогательные функции ##########################

@@ -160,9 +160,9 @@ class ImportHistDataStrategy(ImportStrategy):
         help_text='Если не указано, то будет использоваться 1 строка как названия колонок',
     )
     shop_num_column_name = models.CharField(
-        max_length=128, verbose_name='Ноименование колонки с номером магазина')
+        max_length=128, verbose_name='Наименование колонки с номером магазина')
     dt_or_dttm_column_name = models.CharField(
-        max_length=128, verbose_name='Ноименование колонки дата или дата+время')
+        max_length=128, verbose_name='Наименование колонки дата или дата+время')
     dt_or_dttm_format = models.CharField(
         max_length=128, verbose_name='Формат загрузки колонки дата или дата+время')
     receipt_code_columns = models.JSONField(
@@ -171,6 +171,10 @@ class ImportHistDataStrategy(ImportStrategy):
         help_text='Если не указано, то в качестве ключа будет использоваться хэш всех колонок',
     )
     fix_date = models.BooleanField(verbose_name='Нужно ли заменять дату внутри файла на ту, что в имени', default=False)
+    use_total_discounted_price = models.BooleanField(verbose_name=_('Take into account the final discounted price in the object'), default=False)
+    remove_duplicates_columns = models.JSONField(
+        null=True, blank=True,
+        verbose_name=_('Columns that act as a key when taking the final discounted price'))
 
     class Meta:
         verbose_name = 'Стратегия импорта исторических данных'
@@ -190,7 +194,9 @@ class ImportHistDataStrategy(ImportStrategy):
             'dt_or_dttm_format': self.dt_or_dttm_format,
             'columns': self.columns,
             'receipt_code_columns': self.receipt_code_columns,
-            'fix_date': self.fix_date
+            'fix_date': self.fix_date,
+            "use_total_discounted_price": self.use_total_discounted_price,
+            "remove_duplicates_columns": self.remove_duplicates_columns
         }
 
     def get_strategy_cls(self):

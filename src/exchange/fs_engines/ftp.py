@@ -1,8 +1,10 @@
-import tempfile, ftplib
+import ftplib
+import os
+import tempfile
 
 from django.conf import settings
-
 from src.base.exceptions import EnvLvlViolation
+
 from .base import FilesystemEngine
 
 
@@ -21,12 +23,16 @@ class FtpEngine(FilesystemEngine):
         return ftp
 
     def open_file(self, filename):
+        MEGABYTE = 1024
+        filesize = self.ftp.size(filename) / MEGABYTE
         tmp_f = tempfile.NamedTemporaryFile(mode='wb+')
-        try:
-            self.ftp.retrbinary(f'RETR {filename}', tmp_f.write)
-        except (*ftplib.all_errors,):
-            self.ftp = self._init_ftp() 
-            self.ftp.retrbinary(f'RETR {filename}', tmp_f.write)
+        sock = self.ftp.transfercmd('RETR ' + filename)
+        while True:
+            buff = sock.recv(MEGABYTE)
+            if not buff: 
+                break
+            tmp_f.write(buff)
+        sock.close()
         tmp_f.seek(0)
         return tmp_f
 

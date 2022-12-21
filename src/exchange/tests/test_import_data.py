@@ -90,6 +90,8 @@ class TestPobedaImportData(TestsHelperMixin, TestCase):
             system_code='pobeda',
             data_type='purchases',
             fix_date=True,
+            use_total_discounted_price=False,
+            remove_duplicates_columns=None,
             filename_fmt='{data_type}_{year:04d}{month:02d}{day:02d}.csv',
             columns=[
                 'Номер магазина id',
@@ -112,7 +114,9 @@ class TestPobedaImportData(TestsHelperMixin, TestCase):
         cls.import_brak_strategy = ImportHistDataStrategy.objects.create(
             system_code='pobeda',
             data_type='brak',
-            fix_date=True,
+            fix_date=False,
+            use_total_discounted_price=False,
+            remove_duplicates_columns=None,
             filename_fmt='{data_type}_{year:04d}{month:02d}{day:02d}.csv',
             columns=[
                 'Какой-то guid',
@@ -134,6 +138,8 @@ class TestPobedaImportData(TestsHelperMixin, TestCase):
             system_code='pobeda',
             data_type='delivery',
             fix_date=True,
+            use_total_discounted_price=False,
+            remove_duplicates_columns=None,
             filename_fmt='{data_type}_{year:04d}{month:02d}{day:02d}.csv',
             columns=[
                 'Какой-то guid',
