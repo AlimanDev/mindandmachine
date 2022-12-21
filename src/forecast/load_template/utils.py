@@ -470,7 +470,9 @@ def prepare_load_template_request(load_template_id, shop_id, dt_from, dt_to):
             'dependences': relations.get(o.operation_type_name_id, {}),
             'const_value': o.const_value,
             'type': o.operation_type_name.do_forecast,
-            'duplicate_over': o.duplicate_over
+            'duplicate_over': o.duplicate_over,
+            'min_value': o.min_value,
+            'max_value': o.max_value,
         }
         for o in templates
     ]
