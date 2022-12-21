@@ -266,8 +266,13 @@ class WorkerDayApproveHelper:
                 has_perm_to_change_protected_wdays=True,
             ).exists()
             if not has_permission_to_change_protected_wdays:
+                vacancy_q = Q(employee__isnull=False)       # Not an open vacancy
+                if self.approve_open_vacs:
+                    vacancy_q |= Q(shop_id=self.shop_id)    # An open vacancy in this shop.
                 protected_wdays = list(WorkerDay.objects.filter(
-                    employee_days_q, is_fact=self.is_fact,
+                    employee_days_q,
+                    vacancy_q,
+                    is_fact=self.is_fact,
                     is_blocked=True,
                 ).exclude(
                     id__in=wdays_to_approve.values_list('id', flat=True),

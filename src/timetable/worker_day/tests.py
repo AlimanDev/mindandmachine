@@ -485,6 +485,33 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
         self.assertFalse(WorkerDay.objects.filter(id=protected_day.id).exists())
         self.assertTrue(WorkerDay.objects.get(id=day_to_approve.id).is_approved)
 
+    def test_approval_protected_wdays_bug_with_vacancy_in_ahother_shop(self):
+        """Bug appeared when there was a vacancy in one shop and a blocked vacancy in another."""
+        data = {
+            'shop_id': self.shop.id,
+            'dt_from': self.dt,
+            'dt_to': self.dt,
+            'is_fact': False,
+        }
+        WorkerDay.objects.create(   # Open vacancy in the same shop
+            shop=self.shop,
+            dt=self.dt,
+            is_approved=True,
+            is_vacancy=True,
+            type_id=WorkerDay.TYPE_WORKDAY
+        )
+        WorkerDay.objects.create(   # Random blocked vacancy in another shop
+            shop=self.shop2,
+            dt=self.dt,
+            is_blocked=True,
+            is_approved=True,
+            is_vacancy=True,
+            type_id=WorkerDay.TYPE_WORKDAY
+        )
+        self.create_worker_day(shop=self.shop, dt=self.dt, type_id=WorkerDay.TYPE_HOLIDAY)
+        response = self.client.post(f"{self.url_approve}", data, format='json')
+        self.assertEqual(response.status_code, 200)
+
     def test_cant_approve_wdays_from_other_shops_without_perm(self):
         data = {
             'shop_id': self.shop.id,
