@@ -18,16 +18,7 @@ That would build images for all the required by the application infrastructure a
 
 
 ## Testing
-Run tests:
-```
-docker-compose exec web ./manage.py test 
-```
-To run specific tests:
-```
-./manage.py test src.base.tests
-./manage.py test src.timetable.tests.test_worker_day.TestWorkerDay.test_create_and_approve
-```
-For local development, you can use `--keepdb` option to persist db and speed up testing
+Standard Django testing framework is used. Run `./test.sh`. See comments in this script for some tips.
 
 
 ## ---------------------------- OLD Documentation separator -----------------------------------------
