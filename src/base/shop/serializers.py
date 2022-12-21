@@ -65,22 +65,23 @@ def serialize_shop(shop: Shop, request):
         if lat and lon and shop.latitude and shop.longitude:
             distance = round(geopy.distance.distance((lat, lon), (shop.latitude, shop.longitude)).km, 2)
     return {
-        'id': shop.id,
-        'name': shop.name,
-        'forecast_step_minutes': shop.forecast_step_minutes,
-        'tm_open_dict': shop.open_times,
-        'tm_close_dict': shop.close_times,
         'address': shop.address,
-        'timezone': str(six.text_type(shop.timezone)),
+        'area': shop.area,
         'code': shop.code,
-        'longitude': shop.longitude,
-        'latitude': shop.latitude,
-        'settings_id': shop.settings_id,
-        'load_template_id': shop.load_template_id,
-        'parent_id': shop.parent_id,
         'distance': distance,
-        'network_id': shop.network_id,
+        'forecast_step_minutes': shop.forecast_step_minutes,
+        'id': shop.id,
         'is_active': shop.is_active,
+        'latitude': shop.latitude,
+        'load_template_id': shop.load_template_id,
+        'longitude': shop.longitude,
+        'name': shop.name,
+        'network_id': shop.network_id,
+        'parent_id': shop.parent_id,
+        'settings_id': shop.settings_id,
+        'timezone': str(six.text_type(shop.timezone)),
+        'tm_close_dict': shop.close_times,
+        'tm_open_dict': shop.open_times,
     }
 
 
