@@ -1,19 +1,27 @@
-from rest_framework.test import APITestCase
 from unittest import mock
 from datetime import date, datetime, time, timedelta
+
+from rest_framework import status
+from rest_framework.test import APITestCase
 from django.test import override_settings
 from django.core import mail
-from django.conf import settings
+from django.utils.translation import gettext as _
+import requests
+
 from src.recognition.utils import check_duplicate_biometrics
 from src.recognition.events import DUPLICATE_BIOMETRICS
 from src.recognition.models import Tick, TickPhoto, UserConnecter
+from src.recognition.api.recognition import Recognition, Tevian
 from src.timetable.models import WorkerDay
 from src.util.mixins.tests import TestsHelperMixin
-from src.recognition.api.recognition import Recognition
+from src.util.mock import MockResponse, mock_request
 from src.events.models import EventType
 from src.notifications.models import EventEmailNotification
+from .factories import TickPointFactory
 
 @mock.patch.object(TickPhoto, 'compress_image', lambda _: True)
+@mock.patch.object(requests.sessions.Session, 'request', mock_request(status_code=status.HTTP_200_OK))
+@mock.patch.object(Tevian, 'login', lambda self: setattr(self, 'token', 'some_token'))
 class TestTickPhotos(TestsHelperMixin, APITestCase):
     @classmethod
     def setUpTestData(cls):
@@ -44,6 +52,14 @@ class TestTickPhotos(TestsHelperMixin, APITestCase):
         cls.employee3.save()
         cls.duplicate_biometrics_event, _created = EventType.objects.get_or_create(
             code=DUPLICATE_BIOMETRICS, network=cls.network)
+        cls.tick_point = TickPointFactory()
+        cls.tick = Tick.objects.create(
+            dttm=datetime.now(),
+            user=cls.user1,
+            employee=cls.employee1,
+            tick_point=cls.tick_point,
+            type=Tick.TYPE_COMING
+        )
 
     def setUp(self):
         self._set_authorization_token(self.user2.username)
@@ -101,18 +117,18 @@ class TestTickPhotos(TestsHelperMixin, APITestCase):
 
     def test_lateness(self):
         WorkerDay.objects.create(
-            dt=date.today(),
+            dt=self.dt,
             type_id=WorkerDay.TYPE_WORKDAY,
             employee=self.employee2,
             employment=self.employment2,
             shop=self.shop2,
             is_approved=True,
             is_vacancy=True,
-            dttm_work_start=datetime.combine(date.today(), time(10)),
-            dttm_work_end=datetime.combine(date.today(), time(20)),
+            dttm_work_start=datetime.combine(self.dt, time(10)),
+            dttm_work_end=datetime.combine(self.dt, time(20)),
         )
-        comming_time = datetime.combine(date.today(), time(9))
-        leaving_time = datetime.combine(date.today(), time(21))
+        comming_time = datetime.combine(self.dt, time(9))
+        leaving_time = datetime.combine(self.dt, time(21))
         tick_id = self._test_lateness(Tick.TYPE_COMING, TickPhoto.TYPE_FIRST, comming_time, None)
         self._test_lateness(Tick.TYPE_COMING, TickPhoto.TYPE_SELF, comming_time, -3600, tick_id=tick_id)
         self._test_lateness(Tick.TYPE_COMING, TickPhoto.TYPE_LAST, comming_time, None, tick_id=tick_id, assert_tick_lateness=False)
@@ -122,19 +138,79 @@ class TestTickPhotos(TestsHelperMixin, APITestCase):
         TickPhoto.objects.all().delete()
         Tick.objects.all().delete()
         WorkerDay.objects.filter(is_fact=True).delete()
-        comming_time = datetime.combine(date.today(), time(11))
-        leaving_time = datetime.combine(date.today(), time(19))
+        comming_time = datetime.combine(self.dt, time(11))
+        leaving_time = datetime.combine(self.dt, time(19))
         tick_id = self._test_lateness(Tick.TYPE_COMING, TickPhoto.TYPE_FIRST, comming_time, None)
         self._test_lateness(Tick.TYPE_COMING, TickPhoto.TYPE_SELF, comming_time, 3600, tick_id=tick_id)
         self._test_lateness(Tick.TYPE_COMING, TickPhoto.TYPE_LAST, comming_time, None, tick_id=tick_id, assert_tick_lateness=False)
         tick_id = self._test_lateness(Tick.TYPE_LEAVING, TickPhoto.TYPE_FIRST, leaving_time, None)
         self._test_lateness(Tick.TYPE_LEAVING, TickPhoto.TYPE_SELF, leaving_time, 3600, tick_id=tick_id)
         self._test_lateness(Tick.TYPE_LEAVING, TickPhoto.TYPE_LAST, leaving_time, None, tick_id=tick_id, assert_tick_lateness=False)
-        comming_time = datetime.combine(date.today() + timedelta(1), time(11))
-        leaving_time = datetime.combine(date.today() + timedelta(1), time(19))
+        comming_time = datetime.combine(self.dt + timedelta(1), time(11))
+        leaving_time = datetime.combine(self.dt + timedelta(1), time(19))
         tick_id = self._test_lateness(Tick.TYPE_COMING, TickPhoto.TYPE_FIRST, comming_time, None)
         self._test_lateness(Tick.TYPE_COMING, TickPhoto.TYPE_SELF, comming_time, None, tick_id=tick_id)
         self._test_lateness(Tick.TYPE_COMING, TickPhoto.TYPE_LAST, comming_time, None, tick_id=tick_id)
         tick_id = self._test_lateness(Tick.TYPE_LEAVING, TickPhoto.TYPE_FIRST, leaving_time, None)
         self._test_lateness(Tick.TYPE_LEAVING, TickPhoto.TYPE_SELF, leaving_time, None, tick_id=tick_id)
         self._test_lateness(Tick.TYPE_LEAVING, TickPhoto.TYPE_LAST, leaving_time, None, tick_id=tick_id)
+
+    def test_recognition_service_unavailable(self):
+        """
+        Creating TickPhoto when recognition service (e.g. Tevian) is unavailable.
+        TickPhoto's and Tick's verification_score and liveness must be set to 1.
+        """
+        # User has a reference photo
+        data = {
+            'tick_id': self.tick.id,
+            'dttm': self.tick.dttm,
+            'image': self.temp_photo,
+            'type': TickPhoto.TYPE_FIRST,
+        }
+        with mock.patch.object(Recognition, 'detect_and_match', mock.Mock(side_effect=requests.exceptions.HTTPError)):
+            response = self.client.post(self.get_url('TickPhoto-list'), data)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json().get('verified_score'), 1.0)
+        self.assertEqual(response.json().get('liveness'), 1.0)
+        self.tick.refresh_from_db()
+        self.assertEqual(self.tick.verified_score, 0)   # Only SELF photo's biometrics go to Tick
+        photo = TickPhoto.objects.get(tick_id=self.tick.id, type=TickPhoto.TYPE_FIRST)
+        self.assertEqual(photo.biometrics_check, False)
+
+        # User doesn't have a no reference new photo
+        data['image'] = self.temp_photo,
+        data['type'] =  TickPhoto.TYPE_SELF
+        UserConnecter.objects.all().delete()
+        with mock.patch.object(Recognition, 'identify', mock.Mock(side_effect=requests.exceptions.ConnectionError)):
+            response = self.client.post(self.get_url('TickPhoto-list'), data)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json().get('verified_score'), 1.0)
+        self.assertEqual(response.json().get('liveness'), 1.0)
+        self.tick.refresh_from_db()
+        self.assertEqual(self.tick.verified_score, 1.0)
+        self.assertEqual(self.tick.biometrics_check, False)
+        photo = TickPhoto.objects.get(tick_id=self.tick.id, type=TickPhoto.TYPE_SELF)
+        self.assertEqual(photo.biometrics_check, False)
+
+    def test_no_face_found(self):
+        data = {
+            'tick_id': self.tick.id,
+            'dttm': self.tick.dttm,
+            'image': self.temp_photo,
+            'type': TickPhoto.TYPE_SELF,
+        }
+        with mock.patch.object(
+            requests.Session,
+            'request',
+            mock_request(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                json_data={'message': 'no faces found on the image'}
+            )
+        ):
+            response = self.client.post(self.get_url('TickPhoto-list'), data)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.json().get('detail'), _('No faces found on the image.'))
+        self.tick.refresh_from_db()
+        self.assertEqual(self.tick.biometrics_check, False)
+        photo = TickPhoto.objects.get(tick_id=self.tick.id, type=TickPhoto.TYPE_SELF)
+        self.assertEqual(photo.biometrics_check, False)

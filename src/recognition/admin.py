@@ -92,6 +92,7 @@ class TickAdmin(admin.ModelAdmin):
         'dttm',
         'verified_score',
         'min_liveness_prop',
+        'biometrics_check',
         'image_tag_self',
         'image_tag_first',
         'image_tag_last',
@@ -104,6 +105,7 @@ class TickAdmin(admin.ModelAdmin):
         ('tick_point__shop', RelatedOnlyDropdownNameOrderedFilter),
         ('dttm', DateTimeRangeFilter),
         'type',
+        'biometrics_check',
         ('user', UserListFilter),
     ]
 
@@ -113,6 +115,7 @@ class TickAdmin(admin.ModelAdmin):
         'user',
         'tick_point'
     )
+    readonly_fields = ['biometrics_check']
 
     def get_queryset(self, request):
         return super(TickAdmin, self).get_queryset(request).prefetch_related(
@@ -212,11 +215,12 @@ class TickPhotoAdmin(admin.ModelAdmin):
     list_filter = [('liveness', RangeNumericFilter),
                    ('dttm', DateTimeRangeFilter),
                    'type',
+                   'biometrics_check',
                    ('tick__tick_point__shop', CustomRelatedOnlyDropdownFilter),
                    ('tick__user', PhotoUserListFilter),
                    ]
-    list_display = ['id', 'user', 'type', 'tick_point', 'liveness', 'verified_score', 'dttm', 'image_tag']
-    readonly_fields = ['image_tag', 'tick']
+    list_display = ['id', 'user', 'type', 'tick_point', 'liveness', 'verified_score', 'biometrics_check', 'dttm', 'image_tag']
+    readonly_fields = ['image_tag', 'tick', 'biometrics_check']
     list_select_related = ('tick__user', 'tick__tick_point')
     save_as = True
     actions = [compress_images]

@@ -77,6 +77,11 @@ class Tick(AbstractActiveModel):
     type = models.CharField(max_length=1, choices=RECORD_TYPES)
     lateness = models.DurationField(null=True)
     verified_score = models.FloatField(default=0)
+    biometrics_check = models.BooleanField(   # When biometrics service is unavailable, 
+        default=False,                        # verified_score and liveness are 1
+        verbose_name=_('biometrics_check'),
+        help_text=_('Was the biometrics service available')
+    )
     is_front = models.BooleanField(default=False)
 
     @staticmethod
@@ -188,6 +193,11 @@ class TickPhoto(AbstractActiveModel):
     lateness = models.DurationField(null=True)
     liveness = models.FloatField(null=True)
     is_front = models.BooleanField(default=False)
+    biometrics_check = models.BooleanField( # See Tick
+        default=False,
+        verbose_name=_('biometrics_check'),
+        help_text=_('Was the biometrics service available')
+    )
 
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)

@@ -312,6 +312,7 @@ add_logger('diff_report')
 add_logger('forecast_receipts')
 add_logger('etl')
 add_logger('upload_demand')
+add_logger('recognition')
 
 # LOGGING USAGE:
 # import logging

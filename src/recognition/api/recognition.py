@@ -11,13 +11,16 @@ user_id = recognition.identify(image)
 https://docs.facecloud.tevian.ru/#/user/post_api_v1_users
 """
 import logging
+from functools import cached_property
 
 from django.conf import settings
 from django.utils.translation import gettext as _
-from requests.exceptions import HTTPError
+from requests.exceptions import HTTPError, RequestException
 
+from src.recognition.models import Tick
 from src.base.exceptions import EnvLvlViolation
 from src.util.http import make_retry_session
+from .errors import RecognitionError
 
 logger = logging.getLogger('django')
 
@@ -30,14 +33,9 @@ TEVIAN_FR_THRESHOLD = settings.TEVIAN_FR_THRESHOLD
 
 
 class Recognition:
-    _partner = None
-
-    @property
+    @cached_property
     def partner(self):
-        if self._partner is None:
-            self._partner = globals()[settings.RECOGNITION_PARTNER]()
-
-        return self._partner
+        return globals()[settings.RECOGNITION_PARTNER]()
 
     def create_database(self, data):
         return self.partner.create_database(data)
@@ -62,6 +60,14 @@ class Recognition:
 
     def delete_person(self, partner_id):
         return self.partner.delete_person(partner_id)
+
+    def prepare_error_message(self, exception: Exception, tick: Tick) -> str:
+        if isinstance(exception, RequestException):
+            msg = 'Recognition service unavailable. \
+                    Setting verified_score and liveness to 1.'
+        else:
+            msg = f'Unknown error: {type(exception).__name__}.'
+        return msg + f' Provider: {settings.RECOGNITION_PARTNER}. Tick id: {tick.id}. User: {tick.user.fio}.'
 
 
 class Tevian:
@@ -299,17 +305,10 @@ class Tevian:
         except HTTPError as http_err:
             message = http_err.response.json()['message']
             if message == 'no faces found on the image':
-                message = _('No faces found on the image.')
-            else:
-                message = _('Recognition service is temporarily unavailable. Please contact your system administrator.')
-            logger.error(http_err, http_err.response.json()['message'])
-            raise HTTPError(message, response=response)
-        # except Exception as err:
-        #     print(f'Some error occurred: {err}')
-        # else:
+                raise RecognitionError(_('No faces found on the image.'))
+            raise
         res = response.json()
-        if 'data' in res:
-            return res['data']
+        if data := res.get('data'):
+            return data
 
-        logger.warning("Recognition error message {} for url {} {}".format(res, url, params))
-        return None
+        logger.warning(f'Recognition error message {res} for url {url} {params}')

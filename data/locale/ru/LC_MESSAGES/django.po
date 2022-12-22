@@ -12,7 +12,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Django REST framework\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2022-12-21 17:14+0000\n"
+"POT-Creation-Date: 2022-12-22 11:49+0000\n"
 "PO-Revision-Date: 2017-08-03 14:58+0000\n"
 "Last-Translator: Grigory Mishchenko <grishkokot@gmail.com>\n"
 "Language-Team: Russian (http://www.transifex.com/django-rest-framework-1/"
@@ -599,7 +599,9 @@ msgstr "Использовать финальную цену со скидкой
 
 #: src/exchange/models.py:177
 msgid "Columns that act as a key when taking the final discounted price"
-msgstr "Колонки, выступающие в качестве ключа для определения уникального объекта при рассмотрение цены со скидкой"
+msgstr ""
+"Колонки, выступающие в качестве ключа для определения уникального объекта "
+"при рассмотрение цены со скидкой"
 
 #: src/exchange/models.py:271
 msgid "For the '{}' strategy, you must select a period."
@@ -613,12 +615,12 @@ msgstr "Применить шаблоны нагрузки к магазинам
 msgid "Applying load templates started"
 msgstr "Применение шаблонов нагрузки запущено"
 
-#: src/forecast/load_template/utils.py:542
+#: src/forecast/load_template/utils.py:544
 #, python-brace-format
 msgid "These operation types do not exist: {types}."
 msgstr "Данные типы операций не существуют: {types}."
 
-#: src/forecast/load_template/utils.py:547
+#: src/forecast/load_template/utils.py:549
 #, python-brace-format
 msgid ""
 "These operation types listed in dependencies, but not listed in operation "
@@ -627,23 +629,23 @@ msgstr ""
 "Данные типы операций есть в зависимостях, но отсутствуют в списке операций: "
 "{types}."
 
-#: src/forecast/load_template/utils.py:563
 #: src/forecast/load_template/utils.py:565
-#: src/forecast/load_template/utils.py:604 src/forecast/models.py:206
+#: src/forecast/load_template/utils.py:567
+#: src/forecast/load_template/utils.py:606 src/forecast/models.py:208
 msgid "Error in row {}."
 msgstr "Ошибка в строке {}."
 
-#: src/forecast/load_template/utils.py:563
+#: src/forecast/load_template/utils.py:565
 msgid "Timestep is required."
 msgstr "Шаг прогноза обязателен."
 
-#: src/forecast/load_template/utils.py:566
+#: src/forecast/load_template/utils.py:568
 #, python-brace-format
 msgid "Timestep {timestep} is not valid choice, choices are {timesteps}."
 msgstr ""
 "Шаг прогноза {timestep} не является валидным, следует выбрать из {timesteps}."
 
-#: src/forecast/load_template/utils.py:604
+#: src/forecast/load_template/utils.py:606
 msgid ""
 "Invalid days of week '{}', should be comma separated int in interfval from 0 "
 "to 6."
@@ -684,78 +686,78 @@ msgstr ""
 "Период, на который должны быть продублированы значения временного ряда. "
 "Указывает, что значения следует понимать как постоянные в этом периоде."
 
-#: src/forecast/models.py:243
+#: src/forecast/models.py:245
 msgid "max value"
 msgstr "максимальное значение"
 
-#: src/forecast/models.py:244
+#: src/forecast/models.py:246
 msgid "threshold"
 msgstr "порог"
 
-#: src/forecast/models.py:245
+#: src/forecast/models.py:247
 msgid "days of week"
 msgstr "дни недели"
 
-#: src/forecast/models.py:252
+#: src/forecast/models.py:254
 msgid "Formula required in relation {} -> {}"
 msgstr "Формула обязательна в отношении {} -> {}"
 
-#: src/forecast/models.py:259
+#: src/forecast/models.py:261
 msgid "For relation 'change workload between' {} are required."
 msgstr ""
 "Для отношения 'перекидывание нагрузки между типами работ' {} обязательны."
 
-#: src/forecast/models.py:268
+#: src/forecast/models.py:270
 msgid "Forecast type {} cannot be depended from {} with formula type."
 msgstr ""
 "Прогнозируемый тип {} не может зависеть от {} с типом расчета по формуле."
 
-#: src/forecast/models.py:274
+#: src/forecast/models.py:276
 msgid "Operation type {} cannot be depended from work type {}."
 msgstr "Тип операции {} не может зависеть от типа работ {}."
 
-#: src/forecast/models.py:279
+#: src/forecast/models.py:281
 msgid "Only forecast types can depend from feature serie."
 msgstr ""
 "Только прогнозируемые типы операций могут зависеть от операций для помощи в "
 "прогнозе."
 
-#: src/forecast/models.py:283
+#: src/forecast/models.py:285
 msgid "Feature serie {} cannot have dependences."
 msgstr "Тип операции для помощи в прогнозе {} не может иметь зависимостей."
 
-#: src/forecast/models.py:299
+#: src/forecast/models.py:301
 msgid "Demand model cannot depend on itself."
 msgstr "Циклическая зависимость: операция зависит сама от себя."
 
-#: src/forecast/models.py:306
+#: src/forecast/models.py:308
 msgid "Backward dependency already exists."
 msgstr "Уже существует обратная зависимость"
 
-#: src/forecast/models.py:313
+#: src/forecast/models.py:315
 msgid "Base and depended demand models cannot be the same."
 msgstr "Базовая и зависимая модели нагрузки не могут совпадать."
 
-#: src/forecast/models.py:316
+#: src/forecast/models.py:318
 msgid "Base and depended demand models cannot have different templates."
 msgstr "Базовая и зависимая модели не могут иметь разный шаблон нагрузки"
 
-#: src/forecast/models.py:322
+#: src/forecast/models.py:324
 msgid "Depended must have same or bigger forecast step, got {} -> {}"
 msgstr ""
 "Зависимая операция должна иметь одинаковый или больший шаг прогноза, имеется "
 "{} -> {}"
 
-#: src/forecast/models.py:334
+#: src/forecast/models.py:336
 #, python-brace-format
 msgid "Error in formula: {formula}."
 msgstr "Ошибка в формуле: {formula}"
 
-#: src/forecast/models.py:421
+#: src/forecast/models.py:423
 msgid "aggregation date and time"
 msgstr "дата и время агрегации"
 
-#: src/forecast/models.py:422
+#: src/forecast/models.py:424
 msgid "report (data file) date"
 msgstr "дата отчёта (файла с данными)"
 
@@ -887,17 +889,9 @@ msgstr "Вы не можете выбрать пользователя и гру
 msgid "There are no reports available."
 msgstr "Нет доступных отчётов"
 
-#: src/recognition/api/recognition.py:302
+#: src/recognition/api/recognition.py:308
 msgid "No faces found on the image."
 msgstr "На фото не было найдено лицо."
-
-#: src/recognition/api/recognition.py:304
-msgid ""
-"Recognition service is temporarily unavailable. Please contact your system "
-"administrator."
-msgstr ""
-"Сервис распознавания временно недоступен. Пожалуйста, обратитесь к "
-"администратору системы."
 
 #: src/recognition/models.py:63 src/reports/reports.py:226
 #: src/reports/reports.py:308 src/reports/reports.py:338
@@ -923,15 +917,23 @@ msgstr "Конец перерыва"
 msgid "No type"
 msgstr "Нет типа"
 
-#: src/recognition/models.py:203
+#: src/recognition/models.py:82 src/recognition/models.py:198
+msgid "biometrics_check"
+msgstr "биометрическая проверка"
+
+#: src/recognition/models.py:83 src/recognition/models.py:199
+msgid "Was the biometrics service available"
+msgstr "Был ли доступен сервис биометрии"
+
+#: src/recognition/models.py:213
 msgid "Key"
 msgstr "Ключ"
 
-#: src/recognition/models.py:208
+#: src/recognition/models.py:218
 msgid "Created"
 msgstr "Создан"
 
-#: src/recognition/models.py:256
+#: src/recognition/models.py:266
 msgid "Shop in tick point must be equal to shop in this record."
 msgstr "Магазин в точке отметки должен совпадать с магазином в записи."
 
@@ -2228,6 +2230,9 @@ msgstr "Не было передано ни одного файла."
 #: src/util/upload.py:26
 msgid "The file was not uploaded."
 msgstr "Файл не был загружен."
+
+#~ msgid "Recognition service is temporarily unavailable"
+#~ msgstr "Сервис распознавания временно недоступен"
 
 #~ msgid "Ancestors search depth"
 #~ msgstr "Глубина поиска предков"

@@ -20,7 +20,7 @@ from src.timetable.models import ShopMonthStat, WorkerDay, WorkerDayCashboxDetai
 from src.timetable.tests.factories import WorkerDayFactory
 from src.util.mixins.tests import TestsHelperMixin
 from src.util.models_converter import Converter
-from src.util.test import MockResponse
+from src.util.mock import MockResponse
 
 @override_settings(CELERY_TASK_ALWAYS_EAGER=True)
 class TestAutoSettings(APITestCase, TestsHelperMixin):
@@ -418,7 +418,7 @@ class TestAutoSettings(APITestCase, TestsHelperMixin):
         self.network.rebuild_timetable_min_delta = -9999
         self.network.save()
 
-        with patch.object(requests, 'post', return_value=MockResponse()) as mock_post:
+        with patch.object(requests, 'post', return_value=MockResponse(json_data={'task_id': 1}, status_code=200)) as mock_post:
             response = self.client.post(
                 '/rest_api/auto_settings/create_timetable/',
                 {
@@ -1313,7 +1313,7 @@ class TestAutoSettings(APITestCase, TestsHelperMixin):
         dt_from = date(2021, 3, 25)
         dt_to = date(2021, 4, 5)
 
-        with patch.object(requests, 'post', return_value=MockResponse()):
+        with patch.object(requests, 'post', return_value=MockResponse(json_data={'task_id': 1}, status_code=200)):
             response = self.client.post(
                 '/rest_api/auto_settings/create_timetable/',
                 {

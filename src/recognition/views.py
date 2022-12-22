@@ -1,9 +1,8 @@
-import io
-import logging
+import io, logging
+from typing import Union
 from datetime import timedelta
 from uuid import UUID
 from django.db.models import Exists, OuterRef, Q
-from django.http import request
 
 import xlsxwriter
 from django.conf import settings
@@ -12,8 +11,10 @@ from django.utils.translation import gettext as _
 from django.utils.functional import cached_property
 from django.utils.timezone import now
 from django_filters.rest_framework import DjangoFilterBackend
+from django.views.generic.edit import FormView
+from django.db.models.fields.files import ImageFieldFile
 from drf_yasg.utils import swagger_auto_schema
-from requests.exceptions import HTTPError
+from requests.exceptions import RequestException
 from rest_framework import (
     exceptions,
     permissions, status
@@ -25,7 +26,7 @@ from rest_framework.response import Response
 from rest_framework.pagination import LimitOffsetPagination
 
 from src.base.auth.authentication import CsrfExemptSessionAuthentication
-from src.base.models import User, Network, Shop
+from src.base.models import User, Shop
 from src.base.permissions import Permission
 from src.base.views_abstract import BaseModelViewSet
 from src.base.serializers import NetworkSerializer
@@ -44,19 +45,18 @@ from src.recognition.serializers import (
     DownloadTickPhotoExcelSerializer, ShopIpAddressSerializer,
 )
 from src.recognition.wfm.serializers import ShopSerializer
+from src.recognition.forms import DownloadViolatorsReportForm
+from src.recognition.utils import check_duplicate_biometrics
 from src.timetable.models import (
     AttendanceRecords,
     WorkerDay,
     Employment,
 )
-from src.recognition.forms import DownloadViolatorsReportForm
-from src.recognition.utils import check_duplicate_biometrics
 from src.timetable.mixins import SuperuserRequiredMixin
-from django.views.generic.edit import FormView
-
 
 
 logger = logging.getLogger('django')
+logger_recognition = logging.getLogger('recognition')
 recognition = Recognition()
 
 USERS_WITH_SCHEDULE_ONLY = getattr(settings, 'USERS_WITH_SCHEDULE_ONLY', True)
@@ -396,9 +396,9 @@ class TickPhotoViewSet(BaseModelViewSet):
         serializer.is_valid(raise_exception=True)
 
         data = serializer.validated_data
-        tick_id = data['tick_id']
-        image = data['image']
-        type = data['type']
+        tick_id: int = data['tick_id']
+        image: ImageFieldFile = data['image']
+        tick_type: str = data['type']
 
         try:
             tick = Tick.objects.get(id=tick_id)
@@ -407,7 +407,7 @@ class TickPhotoViewSet(BaseModelViewSet):
         tick_point = tick.tick_point
 
         try:
-            tick_photo = TickPhoto.objects.get(tick_id=tick_id, type=type)
+            tick_photo = TickPhoto.objects.get(tick_id=tick_id, type=tick_type)
             return Response(TickPhotoSerializer(tick_photo).data)
         except TickPhoto.DoesNotExist:
             pass
@@ -424,47 +424,54 @@ class TickPhotoViewSet(BaseModelViewSet):
             image=image,
             tick_id=tick_id,
             dttm=check_time,
-            type=type,
+            type=tick_type,
             is_front=is_front
         )
 
         user_connecter = None
+        biometrics = None
         try:
             user_connecter = UserConnecter.objects.get(user_id=tick.user_id)
         except UserConnecter.DoesNotExist:
-            if type == TickPhoto.TYPE_SELF:
+            if tick_type == TickPhoto.TYPE_SELF:
+                tick.user.avatar = image
+                tick.user.save()
                 try:
-                    tick.user.avatar = image
-                    tick.user.save()
                     check_duplicate_biometrics(tick_photo.image, tick.user, tick.tick_point.shop_id)
                     partner_id = recognition.create_person({"id": tick.user_id})
-                    photo_id = recognition.upload_photo(partner_id, tick_photo.image)
-                except HTTPError as e:
-                    return Response({"error": str(e)}, e.response.status_code)
-
-                user_connecter = UserConnecter.objects.create(
-                    user_id=tick.user_id,
-                    partner_id=partner_id,
-                )
+                    recognition.upload_photo(partner_id, tick_photo.image)
+                except RequestException as e:
+                    msg = recognition.prepare_error_message(e, tick)
+                    logger_recognition.exception(msg)
+                    biometrics = {'score': 1, 'liveness': 1, 'biometrics_check': False}
+                else:
+                    user_connecter = UserConnecter.objects.create(
+                        user_id=tick.user_id,
+                        partner_id=partner_id,
+                    )
 
         if user_connecter:
             try:
-                res = recognition.detect_and_match(user_connecter.partner_id, tick_photo.image)
-            except HTTPError as e:
-                r = Response({"error": str(e)})
-                r.status_code = e.response.status_code
-                return r
-
-            tick_photo.verified_score = res['score']
-            tick_photo.liveness = res['liveness']
+                biometrics = recognition.detect_and_match(user_connecter.partner_id, tick_photo.image)
+                biometrics['biometrics_check'] = True
+            except RequestException as e:
+                msg = recognition.prepare_error_message(e, tick)
+                logger_recognition.exception(msg)
+                biometrics = {'score': 1, 'liveness': 1, 'biometrics_check': False}
+        
+        if biometrics:
+            tick_photo.verified_score: float = biometrics['score']
+            tick_photo.liveness: float = biometrics['liveness']
+            tick_photo.biometrics_check: bool = biometrics['biometrics_check']
             tick_photo.save()
-            if type == TickPhoto.TYPE_SELF:
-                tick.verified_score = tick_photo.verified_score
+            if tick_type == TickPhoto.TYPE_SELF:
+                tick.verified_score: float = tick_photo.verified_score
+                tick.biometrics_check: bool = tick_photo.biometrics_check
                 tick.save()
 
         data = TickPhotoSerializer(tick_photo).data
         data['lateness'] = None
-        if (type == TickPhoto.TYPE_SELF) and (tick_photo.verified_score > 0):
+        if (tick_type == TickPhoto.TYPE_SELF) and (tick_photo.verified_score > 0):
             record = AttendanceRecords.objects.create(
                 user_id=tick.user_id,
                 employee_id=tick.employee_id,
@@ -474,9 +481,9 @@ class TickPhotoViewSet(BaseModelViewSet):
                 type=tick.type,
             )
             if record.fact_wd and record.fact_wd.closest_plan_approved:
-                tick.lateness = LATENESS_LAMBDA.get(tick.type, lambda x, y: None)(tick.dttm, record.fact_wd.closest_plan_approved)
+                tick.lateness: timedelta = LATENESS_LAMBDA.get(tick.type, lambda x, y: None)(tick.dttm, record.fact_wd.closest_plan_approved)
                 tick.save()
-                data['lateness'] = tick.lateness.total_seconds() if tick.lateness else None
+                data['lateness']: Union[timedelta, None] = tick.lateness.total_seconds() if tick.lateness else None
         return Response(data)
 
     @swagger_auto_schema(

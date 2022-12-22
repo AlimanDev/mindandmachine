@@ -1,9 +1,9 @@
-import json
-import random
+import json, random, tempfile
 from calendar import Calendar
 from datetime import datetime, timedelta, time
 from unittest import mock
 
+from PIL import Image
 import pandas as pd
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import transaction
@@ -314,3 +314,11 @@ class TestsHelperMixin:
             type=type,
             terminal=terminal,
         )
+
+    @property
+    def temp_photo(self) -> tempfile._TemporaryFileWrapper:
+        image = Image.new('RGB', (1, 1))
+        file = tempfile.NamedTemporaryFile(suffix='.jpg')
+        image.save(file)
+        file.seek(0)
+        return file

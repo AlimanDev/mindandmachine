@@ -307,15 +307,6 @@ class LocalTestCase(LocalTestCaseAsserts, TestCase):
         return item.__class__.objects.get(pk=item.pk)
 
 
-class MockResponse:
-    """`requests` library."""
-    def json(self):
-        return {'task_id': 1}
-    
-    def raise_for_status(self):
-        pass
-
-
 def create_departments_and_users(self, dt=None):
     dt = dt or now().date() - relativedelta(months=1)
     self.network, _n_created = Network.objects.get_or_create(code='default', defaults=dict(name='По умолчанию'))
