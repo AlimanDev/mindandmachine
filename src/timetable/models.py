@@ -937,8 +937,8 @@ class WorkerDay(AbstractModel):
         }
         if user:
             kwargs['cached_data'] = {
-                'user_shops': list(user.get_shops(include_descendants=True).values_list('id', flat=True)),
-                'user_subordinated_group_ids': list(Group.get_subordinated_group_ids(user)),
+                '_user_shops_ids': list(user.get_shops(include_descendants=True).values_list('id', flat=True)),
+                '_user_subordinated_group_ids': list(Group.get_subordinated_group_ids(user)),
             }
         return kwargs
 
@@ -949,7 +949,7 @@ class WorkerDay(AbstractModel):
             user=user,
             wd_qs=delete_qs.exclude(employee__isnull=False, employment__isnull=True),
             cached_data={
-                'wd_types_dict': kwargs.get('wd_types_dict'),
+                '_wd_types_dict': kwargs.get('wd_types_dict'),
             },
         )
         if not perm_checker.has_permission():

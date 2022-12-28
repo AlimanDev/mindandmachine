@@ -111,28 +111,31 @@ class WorkerDayApproveHelper:
     def run(self):
         with transaction.atomic():
             today = (datetime.datetime.now() + datetime.timedelta(hours=3)).date()
-            employee_filter = {}
+            employment_filter = {}
             if self.employee_ids:
-                employee_filter['employee_id__in'] = self.employee_ids
-                employee_ids = self.employee_ids
+                employment_filter['employee_id__in'] = self.employee_ids
             if self.shop:
-                employee_ids = Employment.objects.get_active(
-                    network_id=self.shop.network_id,
-                    dt_from=self.dt_from,
-                    dt_to=self.dt_to,
-                    shop_id=self.shop_id,
-                    **employee_filter,
-                ).values_list('employee_id', flat=True)
+                employment_filter['shop'] = self.shop
+                employment_filter['network_id'] = self.shop.network_id
+            employments = tuple(Employment.objects.get_active(
+                dt_from=self.dt_from,
+                dt_to=self.dt_to,
+                **employment_filter,
+            ).select_related('employee', 'employee__user', 'shop'))
+            employee_ids = tuple(emp.employee_id for emp in employments)
 
             wd_types_grouped_by_limit = {}
             if self.user and employee_ids:
                 group_wd_premissions = [] # store permission instances for later "Approved not first" filter. Orteka-specific.
+                checker = BaseWdPermissionChecker(
+                    self.user,
+                    shop=self.shop,
+                    check_active_empl=False
+                )
                 for wd_type in self.wd_types:
-                    checker = BaseWdPermissionChecker(self.user)
-                    for employee_id in employee_ids:
+                    for employment in employments:
                         permission = checker.has_group_permission(
-                            employee_id=employee_id,
-                            shop_id=self.shop_id,
+                            employment=employment,
                             action=WorkerDayPermission.APPROVE,
                             graph_type=WorkerDayPermission.FACT if self.is_fact else WorkerDayPermission.PLAN,
                             wd_type_id=wd_type,
@@ -159,7 +162,7 @@ class WorkerDayApproveHelper:
             else:
                 for wd_type in self.wd_types:
                     wd_types_grouped_by_limit.setdefault((None, None), []).append(wd_type)
-            
+
             wd_types_q = Q()
             for (limit_days_in_past, limit_days_in_future), wd_types in wd_types_grouped_by_limit.items():
                 q = Q(type_id__in=wd_types)
@@ -178,14 +181,15 @@ class WorkerDayApproveHelper:
             if not has_perm_to_approve_other_shop_days:
                 shop_employees_q &= Q(type__is_dayoff=True) | Q(type_id=WorkerDay.TYPE_QUALIFICATION)
 
-            approve_condition: Q = Q(
+            approve_condition = Q(
                 wd_types_q,
                 Q(shop_id=self.shop_id) | shop_employees_q,
                 dt__lte=self.dt_to,
                 dt__gte=self.dt_from,
                 is_fact=self.is_fact,
-                **employee_filter,
             )
+            if self.employee_ids:
+                approve_condition &= Q(employee_id__in=employee_ids)
             columns = [
                 'code',
                 'employee_id',
