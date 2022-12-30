@@ -11,6 +11,7 @@ from src.timetable.models import (
     TimesheetItem as TimesheetItemModel,
     EmploymentWorkType,
 )
+from src.util.decorators import require_lock
 
 
 class TimesheetItem:
@@ -290,13 +291,14 @@ class FiscalTimesheet:
                     is_vacancy=fact_timesheet_item_dict.get('is_vacancy'),
                 ))
 
+    @transaction.atomic
+    @require_lock(TimesheetItemModel, 'EXCLUSIVE')
     def save(self):
-        with transaction.atomic():
-            TimesheetItemModel.objects.filter(
-                employee=self.employee,
-                dt__gte=self.dt_from,
-                dt__lte=self.dt_to,
-            ).delete()
-            self.fact_timesheet.save()
-            self.main_timesheet.save()
-            self.additional_timesheet.save()
+        TimesheetItemModel.objects.filter(
+            employee=self.employee,
+            dt__gte=self.dt_from,
+            dt__lte=self.dt_to,
+        ).delete()
+        self.fact_timesheet.save()
+        self.main_timesheet.save()
+        self.additional_timesheet.save()
