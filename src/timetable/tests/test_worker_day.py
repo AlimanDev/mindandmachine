@@ -336,7 +336,10 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
         self.assertDictEqual(
             response.json(),
             {
-                'detail': 'У вас нет прав на подтверждение типа дня "Рабочий день"'
+                'detail': _('You do not have rights to {action_str} the day type "{wd_type_str}"').format(
+                    action_str=WorkerDayPermission.ACTIONS_DICT['A'].lower(),
+                    wd_type_str=self.worker_day_plan_not_approved.type.name,
+                ) + f" {_('in department')} {self.shop.name}"
             }
         )
 
@@ -2010,7 +2013,7 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
         self.assertEqual(
             resp.json(),
             {
-                "detail": _('You are not employed during this period')
+                "detail": _("Can't create a working day in the schedule, since the user is not employed during this period")
             },
         )
 

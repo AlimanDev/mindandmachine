@@ -1,6 +1,4 @@
-import datetime
-import json
-import re
+import datetime, json, re
 from calendar import monthrange
 from decimal import Decimal
 
@@ -39,6 +37,7 @@ from src.base.models_abstract import (
 from src.base.models_utils import OverrideBaseManager, current_year
 from src.conf.djconfig import QOS_TIME_FORMAT
 from src.util.mixins.qs import AnnotateValueEqualityQSMixin
+from src.util.decorators import cached_method
 from src.util import images
 from src.timetable.timesheet import min_threshold_funcs
 
@@ -1184,7 +1183,7 @@ class Group(AbstractActiveNetworkSpecificCodeNamedModel):
     
     @classmethod
     def get_subordinated_group_ids(cls, user):
-        return list(cls.objects.filter(id__in=user.get_group_ids()).values_list('subordinates__id', flat=True).distinct())
+        return cls.objects.filter(id__in=user.get_group_ids()).values_list('subordinates__id', flat=True).distinct()
 
     @classmethod
     def check_has_perm_to_edit_group_objects(cls, group_from, group_to, user):
@@ -1409,6 +1408,7 @@ class User(DjangoAbstractUser, AbstractModel):
             shops = Shop.objects.get_queryset_descendants(shops, include_self=True)
         return shops
 
+    @cached_method
     def get_group_ids(self, shop_id=None):
         groups = self.get_active_employments(shop_id=shop_id).values_list('position__group_id', 'function_group_id')
         return list(set(list(map(lambda x: x[0], groups)) + list(map(lambda x: x[1], groups))))
