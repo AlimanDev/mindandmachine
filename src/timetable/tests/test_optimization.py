@@ -32,7 +32,7 @@ class TestWorkerDayApproveOptimization(TestsHelperMixin, APITestCase):
         settings.DEBUG = True
         reset_queries()
         ...some_code...
-        print(connection.queries))
+        print(connection.queries)
         print(len(connection.queries))
         ```
         """
