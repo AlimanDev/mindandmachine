@@ -39,7 +39,7 @@ class BaseWdPermissionChecker:
         :param cached_data:
             _user_shops_ids
             _user_subordinated_group_ids
-            _user_subordinates_ids: {(dt_to: date, dt_from: date): list[int]}
+            _user_subordinates_ids
             wd_types_dict
         """
         self.user = user
@@ -106,7 +106,7 @@ class BaseWdPermissionChecker:
         if gwdp.employee_type == GroupWorkerDayPermission.SUBORDINATE_EMPLOYEE:
             return employment.employee.id in self._user_subordinates_ids(dt_from, dt_to)
         elif gwdp.employee_type == GroupWorkerDayPermission.MY_SHOPS_ANY_EMPLOYEE:
-            return employment.employee.shop_id in self._user_shops_ids
+            return employment.shop_id in self._user_shops_ids
         elif gwdp.employee_type == GroupWorkerDayPermission.MY_NETWORK_EMPLOYEE:
             return employment.employee.user.network_id == self.user.network_id \
                 and employment.shop.network_id == self.user.network_id
@@ -201,7 +201,7 @@ class BaseWdPermissionChecker:
         return tuple(Group.get_subordinated_group_ids(self.user))
 
     @cached_method
-    def _user_subordinates_ids(self, dt_to: date, dt_from: date) -> tuple[int]:
+    def _user_subordinates_ids(self, dt_from: date, dt_to: date) -> tuple[int]:
         """Cached subordinates (by `dt_to` and `dt_from` pairs)"""
         return tuple(self.user.get_subordinates(
             dt=dt_from,
