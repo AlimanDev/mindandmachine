@@ -20,7 +20,6 @@ from src.base.models import (
     User as WFMUser
 )
 from src.recognition.authentication import ShopIPAuthentication, TickPointTokenAuthentication
-from src.recognition.models import ShopIpAddress, TickPoint
 from src.recognition.wfm.serializers import WfmWorkerDaySerializer, WorkShiftSerializer
 from src.timetable.models import WorkerDay
 from .filters import WorkShiftFilter

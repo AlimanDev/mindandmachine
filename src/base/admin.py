@@ -236,6 +236,7 @@ class NetworkAdmin(admin.ModelAdmin):
             'settings_values',
             'show_user_biometrics_block',
             'forbid_edit_employments_came_through_integration',
+            'forbid_edit_work_days_came_through_integration',
             'allow_creation_several_wdays_for_one_employee_for_one_date',
             'edit_manual_fact_on_recalc_fact_from_att_records',
             'set_closest_plan_approved_delta_for_manual_fact',

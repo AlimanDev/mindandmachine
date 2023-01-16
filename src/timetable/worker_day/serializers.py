@@ -2,7 +2,7 @@ from datetime import date, timedelta
 
 import pandas as pd
 from django.db import transaction
-from django.db.models import Q, Subquery, OuterRef
+from django.db.models import Q
 from django.db.models.expressions import RawSQL
 from django.utils.functional import cached_property
 from django.utils.translation import gettext_lazy as _
@@ -13,7 +13,6 @@ from src.base.exceptions import FieldError
 from src.base.models import Employment, User, Shop, Employee, Network
 from src.base.models import NetworkConnect
 from src.base.serializers import BaseModelSerializer, BaseSerializer, ModelSerializerWithCreateOnlyFields, NetworkListSerializer, UserShorSerializer, NetworkSerializer
-from src.base.shop.serializers import ShopListSerializer
 from src.conf.djconfig import QOS_DATE_FORMAT
 from src.timetable.models import (
     WorkerDay,
@@ -21,7 +20,6 @@ from src.timetable.models import (
     WorkType,
     WorkerDayType,
     TimesheetItem,
-    EmploymentWorkType,
 )
 
 
@@ -96,6 +94,7 @@ class WorkerDayListSerializer(BaseSerializer, UnaccountedOvertimeMixin):
     id = serializers.IntegerField()
     employee_id = serializers.IntegerField()
     shop_id = serializers.IntegerField()
+    code = serializers.CharField()
     employment_id = serializers.IntegerField()
     type = serializers.CharField(source='type_id')
     dt = serializers.DateField()
@@ -131,6 +130,7 @@ class WorkerDayListSerializer(BaseSerializer, UnaccountedOvertimeMixin):
             return obj.rounded_work_hours
 
         return obj.work_hours
+
 
 class WorkerDaySerializer(ModelSerializerWithCreateOnlyFields, UnaccountedOvertimeMixin):
     default_error_messages = {

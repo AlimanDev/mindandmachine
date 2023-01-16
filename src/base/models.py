@@ -219,6 +219,9 @@ class Network(AbstractActiveModel):
         default=True, verbose_name='Запрещать редактировать трудоустройства, пришедшие через интеграцию',
         help_text='У которых code не пустой',
     )
+    forbid_edit_work_days_came_through_integration = models.BooleanField(blank=True, null=True,
+        default=False, verbose_name=_('Forbid editing work days which came from integration'),
+    )
     get_position_from_work_type_name_in_calc_timesheet = models.BooleanField(
         default=False,
         verbose_name='Получать должность по типу работ при формировании фактического табеля',
@@ -1158,7 +1161,6 @@ class Group(AbstractActiveNetworkSpecificCodeNamedModel):
         default=False, verbose_name='Может изменять/подтверждать "защищенные" рабочие дни')
     has_perm_to_approve_other_shop_days = models.BooleanField(
         default=False, verbose_name='Может подтверждать дни из других подразделений')
-
     allowed_tabs = MultipleChoiceField(choices=CHOICE_ALLOWED_TABS)
 
     def __str__(self):

@@ -795,7 +795,7 @@ class WorkerDay(AbstractModel):
     ]
 
     id = models.BigAutoField(primary_key=True, db_index=True)
-    code = models.CharField(max_length=256, null=True)
+    code = models.CharField(max_length=256, null=True, blank=True)
     shop = models.ForeignKey(Shop, on_delete=models.PROTECT, null=True)
 
     employee = models.ForeignKey(

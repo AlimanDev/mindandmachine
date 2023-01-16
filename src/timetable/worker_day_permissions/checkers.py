@@ -6,6 +6,8 @@ from django.db.models import Q, F
 from django.utils.translation import gettext as _
 
 from django.utils.encoding import force_str
+from rest_framework.exceptions import PermissionDenied
+
 from src.base.models import (
     Shop,
     Group,
@@ -21,6 +23,7 @@ from src.timetable.models import (
 )
 from .serializers import WsPermissionDataSerializer
 from src.util.models_converter import Converter
+from ..worker_day.utils.utils import can_edit_worker_day
 from src.util.decorators import cached_method
 
 
@@ -62,7 +65,7 @@ class BaseWdPermissionChecker:
         dt_to: Union[date, str],
         is_vacancy: bool,
         employee_id: Union[int, None] = None,
-        employment: Union[int, None] = None
+        employment: Union[int, None] = None,
     ):
         if isinstance(dt_from, str):
             dt_from = datetime.strptime(dt_from, settings.QOS_DATE_FORMAT).date()
@@ -245,7 +248,7 @@ class BaseSingleWdPermissionChecker(BaseWdPermissionChecker):
             wd_type_id=wd_type_id,
             dt_from=wd_dt,
             dt_to=wd_dt,
-            is_vacancy=is_vacancy
+            is_vacancy=is_vacancy,
         )
 
 
@@ -260,7 +263,7 @@ class BaseSingleWdDataPermissionChecker(BaseSingleWdPermissionChecker):
             is_vacancy
         """
         self.wd_data = wd_data
-        super(BaseSingleWdDataPermissionChecker, self).__init__(*args, shop_id=wd_data.get('shop_id'), **kwargs)
+        super(BaseSingleWdDataPermissionChecker, self).__init__(*args, **kwargs, shop_id=wd_data.get('shop_id'))
 
     def _has_single_wd_data_permission(self):
         # рефакторинг
@@ -317,14 +320,30 @@ class CreateSingleWdPermissionChecker(BaseSingleWdDataPermissionChecker):
 class UpdateSingleWdPermissionChecker(BaseSingleWdDataPermissionChecker):
     action = WorkerDayPermission.UPDATE
 
+    def __init__(self, *args, wd_instance=None, **kwargs):
+        self.wd_instance = wd_instance
+        super(UpdateSingleWdPermissionChecker, self).__init__(*args, **kwargs)
+
     def has_permission(self):
+        if not self.wd_instance:
+            return True
+        if not can_edit_worker_day(self.wd_instance, self.user):
+            raise PermissionDenied(_('You do not have rights to change protected worker days.'))
         return self._has_single_wd_data_permission()
 
 
 class DeleteSingleWdDataPermissionChecker(BaseSingleWdDataPermissionChecker):
     action = WorkerDayPermission.DELETE
 
+    def __init__(self, *args, wd_instance=None, **kwargs):
+        self.wd_instance = wd_instance
+        super(DeleteSingleWdDataPermissionChecker, self).__init__(*args, **kwargs)
+
     def has_permission(self):
+        if not self.wd_instance:
+            return True
+        if not can_edit_worker_day(self.wd_instance, self.user):
+            raise PermissionDenied(_('You do not have rights to change protected worker days.'))
         return self._has_single_wd_data_permission()
 
 
@@ -343,6 +362,8 @@ class DeleteSingleWdPermissionChecker(BaseSingleWdPermissionChecker):
     def has_permission(self):
         if not self.wd_obj:
             return True
+        if not can_edit_worker_day(self.wd_obj, self.user):
+            raise PermissionDenied(_('You do not have rights to change protected worker days.'))
 
         return self._has_single_permission(
             employee_id=self.wd_obj.employee_id,

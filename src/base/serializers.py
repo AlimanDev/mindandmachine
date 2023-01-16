@@ -175,6 +175,7 @@ class NetworkSerializer(BaseModelSerializer):
             'biometry_in_tick_report',
             'unaccounted_overtime_threshold',
             'forbid_edit_employments_came_through_integration',
+            'forbid_edit_work_days_came_through_integration',
             'show_remaking_choice',
             'allow_creation_several_wdays_for_one_employee_for_one_date',
             'shop_name_form',
@@ -317,6 +318,7 @@ class AuthUserSerializer(UserSerializer):
     allowed_tabs = serializers.SerializerMethodField()
     subordinate_employee_ids = serializers.SerializerMethodField()
     self_employee_ids = serializers.SerializerMethodField()
+    group_perms = serializers.SerializerMethodField()
 
     network_employee_ids = serializers.SerializerMethodField()
 
@@ -333,6 +335,12 @@ class AuthUserSerializer(UserSerializer):
             allowed_tabs.extend(group.allowed_tabs)
 
         return list(set(allowed_tabs))
+
+    @staticmethod
+    def get_group_perms(obj: User):
+        group_perms = Group.objects.filter(id__in=obj.get_group_ids()).values('has_perm_to_change_protected_wdays',
+                                                                              'has_perm_to_approve_other_shop_days')
+        return {k: any(d[k] for d in group_perms) for k in group_perms[0]}
 
     @staticmethod
     def get_subordinate_employee_ids(user: User) -> List[int]:
@@ -358,7 +366,8 @@ class AuthUserSerializer(UserSerializer):
             'allowed_tabs',
             'subordinate_employee_ids',
             'self_employee_ids',
-            'network_employee_ids'
+            'network_employee_ids',
+            'group_perms',
         ]
 
 

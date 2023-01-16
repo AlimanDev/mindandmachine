@@ -3293,6 +3293,7 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
         plan_not_approved_qs = WorkerDay.objects.filter(is_fact=False, is_approved=False)
         self.assertEqual(plan_not_approved_qs.count(), 1)
         plan_not_approved_wday = plan_not_approved_qs.first()
+
         self.assertEqual(plan_not_approved_wday.work_hours, timedelta(seconds=60*60*10.5))
     
     def test_batch_work_hours_dayoff_work_hours_method_manual_or_calculated_as_average_sawh_hours(self):

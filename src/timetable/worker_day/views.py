@@ -12,6 +12,7 @@ from django.utils.translation import gettext_lazy as _
 from django_filters import utils
 from drf_yasg.utils import swagger_auto_schema
 from rest_framework.decorators import action
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.serializers import ValidationError
@@ -63,7 +64,7 @@ from src.timetable.worker_day.tasks import recalc_wdays, batch_block_or_unblock
 from src.timetable.worker_day.timetable import get_timetable_generator_cls
 from src.timetable.worker_day.utils.approve import WorkerDayApproveHelper
 from src.timetable.worker_day.utils.utils import create_worker_days_range, exchange, \
-    copy_as_excel_cells, ERROR_MESSAGES
+    copy_as_excel_cells, can_edit_worker_day, ERROR_MESSAGES
 from src.util.dg.timesheet import get_tabel_generator_cls
 from src.util.models_converter import Converter
 from src.util.openapi.responses import (
@@ -77,6 +78,23 @@ from src.timetable.worker_day.stat import WorkersStatsGetter
 
 
 class WorkerDayViewSet(BaseActiveNamedModelViewSet):
+
+    error_messages = {  # вынести из вьюсета
+        'worker_days_mismatch': _('Worker days mismatch.'),
+        'no_timetable': _("Workers don't have timetable."),
+        'cannot_delete': _('Cannot_delete approved version.'),
+        'na_worker_day_exists': _('Not approved version already exists.'),
+        'no_action_perm_for_wd_type': _('You do not have rights to {action_str} the day type "{wd_type_str}"'),
+        'wd_interval_restriction': _('You do not have the rights to {action_str} the type of day "{wd_type_str}" '
+                                               'on the selected dates. '
+                                               'You need to change the dates. '
+                                               'Allowed interval: {dt_interval}'),
+        'has_no_perm_to_approve_protected_wdays': _('You do not have rights to approve protected worker days ({protected_wdays}). '
+                                                   'Please contact your system administrator.'),
+        'no_such_user_in_network': _('There is no such user in your network.'),
+        'employee_not_in_subordinates': _('Employee {employee} is not your subordinate.'),
+    }
+
     error_messages = ERROR_MESSAGES
     permission_classes = [WdPermission]  # временно из-за биржи смен vacancy  [FilteredListPermission]
     serializer_class = WorkerDaySerializer
@@ -106,7 +124,7 @@ class WorkerDayViewSet(BaseActiveNamedModelViewSet):
     # не тот объект, который был изначально
     def update(self, request, *args, **kwargs):
         partial = kwargs.pop('partial', False)
-        instance = self.get_object()
+        instance: WorkerDay = self.get_object()
         serializer = self.get_serializer(instance, data=request.data, partial=partial)
         serializer.is_valid(raise_exception=True)
 
@@ -839,7 +857,7 @@ class WorkerDayViewSet(BaseActiveNamedModelViewSet):
         operation_description='Метод для удаления рабочих дней',
         responses={200: 'empty response'},
     )
-    @action(detail=False, methods=['post'])
+    @action(detail=False, methods=['post'])  # TODO: why is it post?
     def delete_worker_days(self, request):
         with transaction.atomic():
             data = DeleteWorkerDaysSerializer(data=request.data, context={'request': request})

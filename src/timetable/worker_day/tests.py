@@ -21,6 +21,7 @@ from src.tasks.models import Task
 from src.timetable.tests.factories import WorkerDayFactory
 from src.util.mixins.tests import TestsHelperMixin
 from src.util.models_converter import Converter
+from src.base.tests.factories import NetworkFactory
 
 
 class TestWorkerDayStat(TestsHelperMixin, APITestCase):
@@ -30,6 +31,7 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
     def setUpTestData(cls):
         cls.create_departments_and_users()
         cls.dt = now().date()
+        cls.worker_day_change_url = '/rest_api/worker_day/'
         cls.worker_stat_url = '/rest_api/worker_day/worker_stat/'
         cls.url_approve = '/rest_api/worker_day/approve/'
         cls.daily_stat_url = '/rest_api/worker_day/daily_stat/'
@@ -70,6 +72,19 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
             is_blocked=is_blocked,
             last_edited_by_id=last_edited_by_id,
         )
+
+    def create_put_data(self, worker_day) -> dict:
+        return self.dump_data({
+            "comment": worker_day.comment,
+            "dttm_work_end": worker_day.dttm_work_end,
+            "dttm_work_start": worker_day.dttm_work_start - timedelta(hours=5),
+            "is_fact": worker_day.is_fact,
+            "type": WorkerDay.TYPE_WORKDAY,
+            "worker_day_details": [{"work_part": 1, "work_type_id": self.work_type.id}],
+            'dt': worker_day.dt + timedelta(hours=1),
+            'employee_id': worker_day.employee_id,
+            'shop_id': worker_day.shop_id,
+        })
 
     def create_vacancy(self, shop=None, dt=None, is_approved=False, parent_worker_day=None):
         dt = dt if dt else self.dt
@@ -484,6 +499,58 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
 
         self.assertFalse(WorkerDay.objects.filter(id=protected_day.id).exists())
         self.assertTrue(WorkerDay.objects.get(id=day_to_approve.id).is_approved)
+
+    def test_cant_edit_integration_day_without_perm(self):
+        """ If network restricts editing days coming from integration, can't edit without permission"""
+        self.admin_group.has_perm_to_change_protected_wdays = False
+        self.admin_group.save()
+        self.network.forbid_edit_work_days_came_through_integration = True
+        self.network.save()
+        self.shop.network = self.network
+        self.shop.network.save()
+        protected_day: WorkerDay = self.create_worker_day(shop=self.shop, dt=self.dt,
+                                                          is_approved=False)
+        protected_day.code = "13131212"
+        protected_day.save()
+        put_url: str = f"{self.worker_day_change_url}{protected_day.id}/"
+        data = self.create_put_data(protected_day)
+        response = self.client.put(put_url, data, content_type='application/json')
+        self.assertEqual(response.status_code, 403)
+
+    def test_cant_change_blocked_day_without_perm(self):
+        self.admin_group.has_perm_to_change_protected_wdays = False
+        self.admin_group.save()
+        protected_day: WorkerDay = self.create_worker_day(shop=self.shop, dt=self.dt, is_blocked=True)
+        put_url: str = f"{self.worker_day_change_url}{protected_day.id}/"
+        data = self.create_put_data(protected_day)
+        response = self.client.put(put_url, data, content_type='application/json')
+        self.assertEqual(response.status_code, 403)
+
+    def test_can_change_blocked_day_with_perm(self):
+        self.admin_group.has_perm_to_change_protected_wdays = True
+        self.admin_group.save()
+        protected_day: WorkerDay = self.create_worker_day(shop=self.shop, dt=self.dt, is_blocked=True)
+        put_url: str = f"{self.worker_day_change_url}{protected_day.id}/"
+        data = self.create_put_data(protected_day)
+        response = self.client.put(put_url, data, content_type='application/json')
+        self.assertEqual(response.status_code, 200)
+
+    def test_cant_delete_blocked_day_without_perm(self):
+        self.admin_group.has_perm_to_change_protected_wdays = False
+        self.admin_group.save()
+        protected_day: WorkerDay = self.create_worker_day(shop=self.shop, dt=self.dt, is_blocked=True)
+        delete_url: str = f"{self.worker_day_change_url}{protected_day.id}/"
+        response = self.client.delete(delete_url)
+        self.assertEqual(response.status_code, 403)
+
+    def test_can_delete_blocked_day_with_perm(self):
+        self.admin_group.has_perm_to_change_protected_wdays = True
+        self.admin_group.save()
+        protected_day: WorkerDay = self.create_worker_day(shop=self.shop, dt=self.dt, is_blocked=True)
+        delete_url: str = f"{self.worker_day_change_url}{protected_day.id}/"
+        response = self.client.delete(delete_url)
+        self.assertEqual(response.status_code, 204)
+        self.assertFalse(WorkerDay.objects.filter(id=protected_day.id).exists())
 
     def test_approval_protected_wdays_bug_with_vacancy_in_ahother_shop(self):
         """Bug appeared when there was a vacancy in one shop and a blocked vacancy in another."""

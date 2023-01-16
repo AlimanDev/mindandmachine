@@ -14,10 +14,14 @@ from rest_framework.exceptions import ValidationError, PermissionDenied
 from src.base.models import (
     Employment,
     Group,
+    Shop,
+    User, Network,
 )
 from src.timetable.models import (
     AttendanceRecords,
     EmploymentWorkType,
+    WorkerDayPermission,
+    GroupWorkerDayPermission,
     WorkerDay,
     WorkerDayCashboxDetails,
 )
@@ -453,6 +457,22 @@ def create_worker_days_range(dates, type_id=WorkerDay.TYPE_WORKDAY, shop_id=None
 
         return created_wds
 
+
+def can_edit_worker_day(wd: WorkerDay, user: User) -> bool:
+    day_is_blocked: bool = wd.is_blocked
+    has_perm_to_change_protected_wdays: bool = Group.objects.filter(
+        id__in=user.get_group_ids(),
+        has_perm_to_change_protected_wdays=True,
+    ).exists()
+    if day_is_blocked and not has_perm_to_change_protected_wdays:
+        return False
+    day_is_from_integration: bool = bool(wd.code)  # from 1c if code is present
+    network: Network = user.network
+    if day_is_from_integration and network:
+        forbid_edit_integration_wd: bool = network.forbid_edit_work_days_came_through_integration
+        if forbid_edit_integration_wd and not has_perm_to_change_protected_wdays:
+            return False
+    return True
 
 # def check_worker_day_permissions(user, shop_id, action, graph_type, wd_types, dt_from, dt_to, error_messages, wd_types_dict, employee_id=None, is_vacancy=False):
 #     user_shops = list(user.get_shops(include_descendants=True).values_list('id', flat=True))

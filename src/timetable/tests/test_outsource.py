@@ -594,6 +594,7 @@ class TestOutsource(TestsHelperMixin, APITestCase):
                     'use_internal_exchange': True,
                     'unaccounted_overtime_threshold': 60,
                     'forbid_edit_employments_came_through_integration': True,
+                    'forbid_edit_work_days_came_through_integration': False,
                     'get_position_from_work_type_name_in_calc_timesheet': False,
                     'trust_tick_request': False,
                     'show_cost_for_inner_vacancies': False,
