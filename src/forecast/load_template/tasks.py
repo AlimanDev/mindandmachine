@@ -2,6 +2,7 @@ import requests
 import json
 from datetime import datetime, date, timedelta
 from dateutil.relativedelta import relativedelta
+import logging
 
 from django.core.serializers.json import DjangoJSONEncoder
 
@@ -11,6 +12,7 @@ from src.base.models import Shop
 from django.conf import settings
 from src.forecast.load_template.utils import prepare_load_template_request, apply_load_template
 
+logger = logging.getLogger('forecast_loadtemplate')
 
 @app.task
 def calculate_shops_load(load_template_id, dt_from, dt_to, shop_id=None):
@@ -40,13 +42,24 @@ def apply_load_template_to_shops(load_template_id, shop_id=None):
 
 
 @app.task
-def calculate_shop_load_at_night():
+def calculate_shop_load_at_night(start_time_policy: str = 'now'):
+    logger.info(f"start calculation at night with policy {start_time_policy}")
+
+    if start_time_policy == 'now':
+        dt_from = date.today()
+    elif start_time_policy == 'next_month_start':
+        dt_from = (date.today() + relativedelta(months=1)).replace(day=1)
+    else:
+        raise KeyError(f'got start day policy = {start_time_policy} which is not supported, only ["now", "next_month_start"]')
+    
+    dt_to = (dt_from + relativedelta(months=2)).replace(day=1) - timedelta(days=1)
+    logger.info(f"start calculation from {dt_from} to {dt_to}")
+
     if not settings.CALCULATE_LOAD_TEMPLATE:
         return
     templates = LoadTemplate.objects.filter(
         shops__isnull=False,
     ).distinct('id')
-    dt_now = date.today()
-    dt_to = (dt_now + relativedelta(months=2)).replace(day=1) - timedelta(days=1)
+    
     for template in templates:
-        calculate_shops_load(template.id, dt_now, dt_to)
+        calculate_shops_load(load_template_id=template.id, dt_from=dt_from, dt_to=dt_to)
