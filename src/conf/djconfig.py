@@ -313,6 +313,7 @@ add_logger('forecast_receipts')
 add_logger('etl')
 add_logger('upload_demand')
 add_logger('recognition')
+add_logger('forecast_loadtemplate')
 
 # LOGGING USAGE:
 # import logging
