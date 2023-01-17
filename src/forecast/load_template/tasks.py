@@ -87,6 +87,16 @@ def apply_load_template_to_shops(load_template_id, shop_id=None):
     for shop in shops:
         apply_load_template(load_template_id, shop.id)
 
+def process_json(s: str, annot: str = 'No annot') -> dict:
+    s = s.replace("\'", "\"")
+    try:
+        out = json.loads(s)
+    except Exception as e:
+        msg = f"wasnt able to create {annot} json from {df_from_kwargs!r}"
+        logger.error(msg)
+        logger.error(str(e))
+        raise TypeError(msg) from e
+    return out
 
 @app.task
 def calculate_shop_load_at_night(
@@ -117,19 +127,23 @@ def calculate_shop_load_at_night(
         )
         then data will be updated since start of next mont till end of next month
     """
-    df_from_kwargs = json.loads(df_from_kwargs)
-    df_to_kwargs = json.loads(df_to_kwargs)
+    
+    for policy, kwgrgs, annot in zip(
+        (dt_from_policy, df_from_kwargs, 'from',),
+        (dt_to_policy, df_to_kwargs, 'to',),
+    ):
+        logger.info(f"start calculation at night with {annot} policy {policy!r}")
+        logger.info(f"start calculation at night with {annot} kwargs {kwgrgs!r}")
+
+    df_from_kwargs = process_json(s=df_from_kwargs, annot='df_from_kwargs')
+    df_to_kwargs = process_json(s=df_to_kwargs, annot='df_to_kwargs')
 
     dt_from_factory = DateTimeProducerFactory.get_factory(frmt=dt_from_policy)
     dt_to_factory = DateTimeProducerFactory.get_factory(frmt=dt_to_policy)
 
-    logger.info(f"start calculation at night with start policy {dt_from_policy}")
-    logger.info(f"start calculation at night with finish policy {dt_to_policy}")
-
     dt_from = dt_from_factory.produce(**df_from_kwargs)
     dt_to = dt_to_factory.produce(**df_to_kwargs)
 
-    # dt_to = (dt_from + relativedelta(months=2)).replace(day=1) - timedelta(days=1)
     logger.info(f"start calculation from {dt_from} to {dt_to}")
 
     if not settings.CALCULATE_LOAD_TEMPLATE:
