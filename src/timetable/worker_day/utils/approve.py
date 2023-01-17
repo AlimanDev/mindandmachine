@@ -71,7 +71,7 @@ class WorkerDayApproveHelper:
 
     @staticmethod
     def remove_holidays(approved_workdays: pd.DataFrame):
-        """Removing holidays in approve time if this day is workday.
+        """Removing holidays in draft (not approved) calendar if there are other day types in the same draft.
 
         link: https://mindandmachine.myjetbrains.com/youtrack/issue/RND-521/Nekorrektnoe-sozdanie-smeny-podrabotchiku-esli-u-nego-vykhodnoi-den-v-osnovnom-grafike
 
@@ -103,6 +103,7 @@ class WorkerDayApproveHelper:
                 holidays_workdays_for_delete_filter |= Q(
                     type_id=WorkerDay.TYPE_HOLIDAY,
                     is_fact=False,  # Just for plan
+                    is_approved=False,
                     **{field: workday.get(field) for field in ['code', 'employee_id', 'dt']}
                 )
             if holidays_workdays_for_delete_filter:
@@ -215,6 +216,9 @@ class WorkerDayApproveHelper:
             ).values_list(*columns))
             draft_df = pd.DataFrame(draft_wdays, columns=columns).drop_duplicates()
 
+            if not self.is_fact:
+                self.remove_holidays(draft_df)
+
             approved_wdays_qs = WorkerDay.objects.filter(
                 approve_condition,
                 is_approved=True
@@ -242,7 +246,7 @@ class WorkerDayApproveHelper:
             approved_df = pd.DataFrame(approved_wdays, columns=columns)
 
             combined_dfs = pd.concat([draft_df, approved_df]).drop_duplicates(keep=False)
-            not self.is_fact and self.remove_holidays(combined_dfs)
+
             symmetric_difference = combined_dfs.astype(object)
             symmetric_difference.where(pd.notnull(symmetric_difference), None, inplace=True)
             employee_dt_pairs_list = list(
@@ -267,6 +271,13 @@ class WorkerDayApproveHelper:
                 employee_days_q |= Q(employee_id=employee_id, dt__in=dates)
                 employee_days_set.add((employee_id, dates))
 
+            # Orteka-specific.
+            if self.user and employee_ids:
+                employee_days_q = self._handle_approved_not_first(employee_days_q, group_wd_premissions)
+
+            if self.exclude_approve_q:
+                employee_days_q &= ~self.exclude_approve_q
+
             wdays_to_approve: WorkerDayQuerySet = WorkerDay.objects.filter(
                 employee_days_q,
                 is_approved=False,
@@ -279,10 +290,6 @@ class WorkerDayApproveHelper:
             # Don't approve opened vacancies
             if not self.approve_open_vacs:
                 wdays_to_approve = wdays_to_approve.filter(employee_id__isnull=False)
-
-            # Orteka-specific.
-            if self.user and employee_ids:
-                wdays_to_approve = self._handle_approved_not_first(wdays_to_approve, group_wd_premissions)
 
             # если у пользователя нет группы с наличием прав на изменение защищенных дней, то проверяем,
             # что в списке подтверждаемых дней нет защищенных дней, если есть, то выдаем ошибку
@@ -420,15 +427,11 @@ class WorkerDayApproveHelper:
 
             wdays_to_delete: WorkerDayQuerySet = WorkerDay.objects_with_excluded.filter(
                 employee_days_q,
-                is_fact=self.is_fact,
-                is_approved=True
-            ).exclude(
-                id__in=wdays_to_approve.values_list('id', flat=True),
+                is_approved=True,
+                is_fact=self.is_fact
             ).exclude(
                 employee_id__isnull=True,
             )
-            if self.exclude_approve_q:
-                wdays_to_delete = wdays_to_delete.exclude(self.exclude_approve_q)
 
             # If plan
             if not self.is_fact:
@@ -440,8 +443,13 @@ class WorkerDayApproveHelper:
 
             # Force evaluation
             vacancies_to_approve = tuple(wdays_to_approve.filter(is_vacancy=True, employee_id__isnull=True))
-            wdays_to_delete_ids = tuple(wdays_to_delete.values_list('id', flat=True))
             wdays_to_approve_ids = tuple(wdays_to_approve.values_list('id', flat=True))
+            wdays_to_delete_ids = tuple(
+                wdays_to_delete.exclude(
+                    id__in=wdays_to_approve_ids
+                ).values_list('id', flat=True)
+            )
+
             WorkerDay.objects.filter(id__in=wdays_to_delete_ids).delete()
             WorkerDay.objects.filter(id__in=wdays_to_approve_ids).update(is_approved=True)
 
@@ -614,9 +622,9 @@ class WorkerDayApproveHelper:
 
     def _handle_approved_not_first(
             self,
-            wdays_to_approve: WorkerDayQuerySet,
+            employee_days_q: Q,
             group_wd_premissions: list[GroupWorkerDayPermission]
-        ) -> WorkerDayQuerySet:
+        ) -> Q:
         """
         Orteka-specific. "Approved not first" filter.
         Exclude days that have parent_worker_day.
@@ -628,33 +636,38 @@ class WorkerDayApproveHelper:
         for gwdp in group_wd_premissions:
             if not gwdp.allow_approve_first:
                 not_first_types.add(gwdp.worker_day_permission.wd_type.code)
-                approved_first_q |= Q(
+                approved_first_q |= ~Q(
                     type=gwdp.worker_day_permission.wd_type,
                     parent_worker_day__isnull=True
                 )
-        wdays_to_approve = wdays_to_approve.exclude(approved_first_q)
-
         # Send notification. EventEmailNotification (or other notification type)
         # will be used for templating, recipients etc.
         if approved_first_q:
-            wdays_values = tuple(wdays_to_approve.filter(type_id__in=not_first_types).values(
-                'employee__user__first_name',
-                'employee__user__middle_name',
-                'employee__user__last_name',
-                'dt',
-                'dttm_work_start',
-                'dttm_work_end',
-                'type__name',
-                'parent_worker_day__dttm_work_start',
-                'parent_worker_day__dttm_work_end',
-                'parent_worker_day__type__name'
-            ).order_by(
-                'employee__user__last_name',
-                'employee__user__first_name',
-                'employee__user__middle_name',
-                'dt',
-                'parent_worker_day__dttm_work_start'
-            ))
+            employee_days_q &= approved_first_q
+            wdays_values = tuple(
+                WorkerDay.objects.filter(
+                    employee_days_q,
+                    is_approved=False,
+                    is_fact=self.is_fact
+                ).filter(type_id__in=not_first_types).values(
+                    'employee__user__first_name',
+                    'employee__user__middle_name',
+                    'employee__user__last_name',
+                    'dt',
+                    'dttm_work_start',
+                    'dttm_work_end',
+                    'type__name',
+                    'parent_worker_day__dttm_work_start',
+                    'parent_worker_day__dttm_work_end',
+                    'parent_worker_day__type__name'
+                ).order_by(
+                    'employee__user__last_name',
+                    'employee__user__first_name',
+                    'employee__user__middle_name',
+                    'dt',
+                    'parent_worker_day__dttm_work_start'
+                )
+            )
             if wdays_values:
                 context = {
                     'is_fact': self.is_fact,
@@ -670,4 +683,4 @@ class WorkerDayApproveHelper:
                         context=context
                     )
                 )
-        return wdays_to_approve
+        return employee_days_q
