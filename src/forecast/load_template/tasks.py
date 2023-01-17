@@ -122,7 +122,9 @@ def calculate_shop_load_at_night(
         # calculate_shop_load_at_night.apply(
             kwargs={
                 'dt_from_policy': 'month_start_with_offset',
-                'df_from_kwargs': '{"month_offset": 1, "day_offset": 0}'
+                'df_from_kwargs': '{"month_offset": 1, "day_offset": 0}',
+                'dt_to_policy': 'month_start_with_offset',
+                'df_to_kwargs': str = '{"month_offset": 2, "day_offset": -1}',
             }
         )
         then data will be updated since start of next mont till end of next month
