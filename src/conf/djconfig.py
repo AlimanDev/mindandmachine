@@ -635,11 +635,6 @@ BEAT_SCHEDULE = {
         'schedule': crontab(hour=1, minute=30),
         'options': {'queue': BACKEND_QUEUE}
     },
-    'task-calculate-shop-load-at-night': {
-        'task': 'src.forecast.load_template.tasks.calculate_shop_load_at_night',
-        'schedule': crontab(hour=0, minute=0),
-        'options': {'queue': BACKEND_QUEUE}
-    },
     'task-send-employee-not-checked-in-notification': {
         'task': 'src.celery.tasks.employee_not_checked',
         'schedule': crontab(minute='*/5'),

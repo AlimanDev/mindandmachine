@@ -98,6 +98,7 @@ def process_json(s: str, annot: str = 'No annot') -> dict:
         raise TypeError(msg) from e
     return out
 
+
 @app.task
 def calculate_shop_load_at_night(
     dt_from_policy: str = 'now',
