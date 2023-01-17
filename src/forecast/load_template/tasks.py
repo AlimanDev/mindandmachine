@@ -128,7 +128,7 @@ def calculate_shop_load_at_night(
         then data will be updated since start of next mont till end of next month
     """
     
-    for policy, kwgrgs, annot in zip(
+    for policy, kwgrgs, annot in (
         (dt_from_policy, df_from_kwargs, 'from',),
         (dt_to_policy, df_to_kwargs, 'to',),
     ):
@@ -137,6 +137,7 @@ def calculate_shop_load_at_night(
 
     df_from_kwargs = process_json(s=df_from_kwargs, annot='df_from_kwargs')
     df_to_kwargs = process_json(s=df_to_kwargs, annot='df_to_kwargs')
+
 
     dt_from_factory = DateTimeProducerFactory.get_factory(frmt=dt_from_policy)
     dt_to_factory = DateTimeProducerFactory.get_factory(frmt=dt_to_policy)
