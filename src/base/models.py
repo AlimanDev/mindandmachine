@@ -287,6 +287,9 @@ class Network(AbstractActiveModel):
         verbose_name='Отображать поле "стоимость работ" для внутренних вакансий',
         default=False
     )
+    show_restrict_editing_shifts_button = models.BooleanField(
+        default=False, verbose_name=_('Show restrict editing shifts button'),
+    )
     show_user_biometrics_block = models.BooleanField(
         default=False,
         verbose_name=_('Show user biometrics block'),

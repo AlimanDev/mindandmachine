@@ -2230,6 +2230,9 @@ msgstr "Не было передано ни одного файла."
 msgid "The file was not uploaded."
 msgstr "Файл не был загружен."
 
+msgid "Show restrict editing shifts button"
+msgstr "Показывать кнопку ограничения редактирования смен."
+
 #~ msgid "You are not employed during this period"
 #~ msgstr "Вы не трудоустройены в этот период"
 

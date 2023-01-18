@@ -169,6 +169,7 @@ class NetworkSerializer(BaseModelSerializer):
             'allowed_interval_for_early_departure',
             'default_stats',
             'show_tabel_graph',
+            'show_restrict_editing_shifts_button',
             'show_worker_day_tasks',
             'show_user_biometrics_block',
             'show_checkbox_for_inspection_version',

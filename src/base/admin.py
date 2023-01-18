@@ -244,6 +244,7 @@ class NetworkAdmin(admin.ModelAdmin):
             'rebuild_timetable_min_delta',
             'show_closed_shops_gap',
             'analytics_type',
+            'show_restrict_editing_shifts_button'
         )}),
     )
 
