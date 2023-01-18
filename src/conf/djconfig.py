@@ -313,6 +313,7 @@ add_logger('forecast_receipts')
 add_logger('etl')
 add_logger('upload_demand')
 add_logger('recognition')
+add_logger('forecast_loadtemplate')
 
 # LOGGING USAGE:
 # import logging
@@ -632,11 +633,6 @@ BEAT_SCHEDULE = {
     'task-fill-active-shops-schedule': {
         'task': 'src.base.shop.tasks.fill_active_shops_schedule',
         'schedule': crontab(hour=1, minute=30),
-        'options': {'queue': BACKEND_QUEUE}
-    },
-    'task-calculate-shop-load-at-night': {
-        'task': 'src.forecast.load_template.tasks.calculate_shop_load_at_night',
-        'schedule': crontab(hour=0, minute=0),
         'options': {'queue': BACKEND_QUEUE}
     },
     'task-send-employee-not-checked-in-notification': {

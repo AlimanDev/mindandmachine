@@ -2,14 +2,21 @@ import requests
 import json
 from datetime import datetime, date, timedelta
 from dateutil.relativedelta import relativedelta
+import logging
+from abc import ABC, abstractmethod
+from typing import Optional
 
 from django.core.serializers.json import DjangoJSONEncoder
 
 from src.celery.celery import app
+from src.util.jsons import process_single_quote_json
+from src.util.time import DateTimeProducerFactory
 from src.forecast.models import LoadTemplate
 from src.base.models import Shop
 from django.conf import settings
 from src.forecast.load_template.utils import prepare_load_template_request, apply_load_template
+
+logger = logging.getLogger('forecast_loadtemplate')
 
 
 @app.task
@@ -40,13 +47,75 @@ def apply_load_template_to_shops(load_template_id, shop_id=None):
 
 
 @app.task
-def calculate_shop_load_at_night():
+def calculate_shop_load_at_night(
+    dt_from_policy: str = 'now',
+    df_from_kwargs: str = '{}',
+    dt_to_policy: str = 'month_start_with_offset',
+    df_to_kwargs: str = '{"month_offset": 2, "day_offset": -1}',
+):
+    """ To start prediction for all load templates
+    
+    Args:
+        dt_from_policy (str): factory key for start date creation
+            avaliable: "now", "month_start_with_offset"
+        df_from_kwargs (str): json string of kwargs for policy
+        dt_to_policy (str): factory key for start date creation
+            avaliable: "now", "month_start_with_offset"
+        df_from_kwargs (str): json string of kwargs for policy
+
+    Example:
+        # 1
+        if run with no args then calculation will be done since today till end of next month
+        # 2
+        # calculate_shop_load_at_night.apply(
+            kwargs={
+                'dt_from_policy': 'month_start_with_offset',
+                'df_from_kwargs': '{"month_offset": 1, "day_offset": 0}',
+                'dt_to_policy': 'month_start_with_offset',
+                'df_to_kwargs': str = '{"month_offset": 2, "day_offset": -1}',
+            }
+        )
+        then data will be updated since start of next mont till end of next month
+    """
+
     if not settings.CALCULATE_LOAD_TEMPLATE:
-        return
+        raise ValueError(f"periodic calc disabled")
+    
+    for policy, kwgrgs, annot in (
+        (dt_from_policy, df_from_kwargs, 'from',),
+        (dt_to_policy, df_to_kwargs, 'to',),
+    ):
+        logger.info(
+            " ".join(
+                [
+                    f"start calculation at night with {annot}",
+                    f"policy {policy!r} and kwargs {kwgrgs!r}",
+                ]
+            ),
+        )
+    _annotation = 'from'
+    try:
+        _kwrgs = df_from_kwargs
+        df_from_kwargs = process_single_quote_json(_kwrgs)
+        _annotation = 'to'
+        _kwrgs = df_to_kwargs
+        df_to_kwargs = process_single_quote_json(s=df_to_kwargs)
+    except Exception as e:
+        msg = f"wasnt able to create {_annotation} json from {_kwrgs!r}"
+        logger.exception(msg)
+        raise TypeError(msg) from e
+
+    dt_from_factory = DateTimeProducerFactory.get_factory(frmt=dt_from_policy)
+    dt_to_factory = DateTimeProducerFactory.get_factory(frmt=dt_to_policy)
+
+    dt_from = dt_from_factory.produce(**df_from_kwargs)
+    dt_to = dt_to_factory.produce(**df_to_kwargs)
+
+    logger.info(f"start calculation from {dt_from} to {dt_to}")
+
     templates = LoadTemplate.objects.filter(
         shops__isnull=False,
     ).distinct('id')
-    dt_now = date.today()
-    dt_to = (dt_now + relativedelta(months=2)).replace(day=1) - timedelta(days=1)
+    
     for template in templates:
-        calculate_shops_load(template.id, dt_now, dt_to)
+        calculate_shops_load(load_template_id=template.id, dt_from=dt_from, dt_to=dt_to)

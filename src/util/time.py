@@ -1,6 +1,8 @@
 from typing import Union
 from datetime import date, datetime, timedelta
 import calendar
+from abc import ABC, abstractmethod
+from dateutil.relativedelta import relativedelta
 
 from faker.providers.date_time import Provider
 
@@ -37,3 +39,47 @@ class DateTimeHelper:
     def last_day_in_month(cls, dt: date) -> date:
         """Last day in current month"""
         return cls.first_day_next_month(dt) - timedelta(1)
+
+
+class BaseDateTimeProducer(ABC):
+    @abstractmethod
+    def produce(self, **kwargs) -> datetime:
+        ...
+
+
+class NowDateTimeProducer(BaseDateTimeProducer):
+
+    def produce(self, **kwargs) -> date:
+        return date.today()
+
+
+class MonthOffsetTimeProducer(BaseDateTimeProducer):
+
+    def produce(self, **kwargs) -> date:
+        try:
+            month_offset =int(kwargs['month_offset'])
+        except KeyError as exc:
+            raise KeyError(
+                'MonthOffsetTimeProducer.produce requires month_offset as int kwarg'
+            ) from exc
+        try:
+            day_offset =int(kwargs['day_offset'])
+        except KeyError as exc:
+            raise KeyError(
+                'MonthOffsetTimeProducer.produce requires day_offset as int kwarg'
+            ) from exc
+        out = (date.today() + relativedelta(months=month_offset)).replace(day=1)
+        out += timedelta(days=day_offset)
+        return  out
+
+
+class DateTimeProducerFactory:
+    @staticmethod
+    def get_factory(frmt: str) -> BaseDateTimeProducer:
+        if frmt == 'now':
+            out = NowDateTimeProducer()
+        elif frmt == 'month_start_with_offset':
+            out = MonthOffsetTimeProducer()
+        else:
+            raise KeyError(f'Date time producer of {frmt} is not supported')
+        return out
