@@ -775,6 +775,14 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
                                 'action': 'update'
                             },
                             {
+                                'dt': Converter.convert_date(wd_delete1.dt),
+                                'employee__user__username': self.user2.username,
+                                'shop__code': self.shop.code,
+                                'dttm_work_start': Converter.convert_datetime(wd_delete1.dttm_work_start),
+                                'dttm_work_end': Converter.convert_datetime(wd_delete1.dttm_work_end),
+                                'action': 'delete'
+                            },
+                            {
                                 'dt': Converter.convert_date(wd_create3.dt),
                                 'employee__user__username': self.user2.username,
                                 'shop__code': self.shop.code,
@@ -790,14 +798,6 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
                                 'dttm_work_end': Converter.convert_datetime(wd_delete2.dttm_work_end),
                                 'action': 'delete'
                             },
-                            # {
-                            #     'dt': Converter.convert_date(wd_delete1.dt),
-                            #     'employee__user__username': self.user2.username,
-                            #     'shop__code': self.shop.code,
-                            #     'dttm_work_start': Converter.convert_datetime(wd_delete1.dttm_work_start),
-                            #     'dttm_work_end': Converter.convert_datetime(wd_delete1.dttm_work_end),
-                            #     'action': 'delete'
-                            # },
                         ], key=lambda i: (i['dt'], i['employee__user__username']))
                     )
 

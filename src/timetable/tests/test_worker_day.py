@@ -741,10 +741,9 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
 
     def test_fact_date_fixed_after_plan_approve(self):
         """
-        1. план есть только на вчера
-        2. происходят отметки сегодня, но ближайших план найден на вчера (факт крепится к вчерашнему дню)
-        3. проиходит исправление плана -> факт должен перецепиться на сегодня
-        4. holidays deleted if there is workeday
+        1. Yesterday plan.
+        2. Attendance/Ticks happen today, but the closest plan is yesterday (fact is attached to yesterday)
+        3. Correction of plan happens -> fact must be reassigned to today
         """
         WorkerDay.objects.all().delete()
         today = date.today()
@@ -802,31 +801,33 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
 
         self.assertEqual(response.status_code, 200)
 
-        self.assertEqual(WorkerDay.objects.filter(is_fact=False, is_approved=False).count(), 1)
-        self.assertEqual(WorkerDay.objects.filter(is_fact=False, is_approved=True).count(), 1)
+        self.assertEqual(WorkerDay.objects.filter(is_fact=False, is_approved=False).count(), 2)
+        self.assertEqual(WorkerDay.objects.filter(is_fact=False, is_approved=True).count(), 2)
         self.assertEqual(WorkerDay.objects.filter(is_fact=True, is_approved=True).count(), 1)
 
         wd = WorkerDay.objects.filter(is_fact=True, is_approved=True).first()
         self.assertEqual(wd.dt, today)
 
-    def test_deleted_holidays_when_there_is_workday(self):
-        """Holidays deleted if there is workday."""
+    @mock.patch.object(transaction, 'on_commit', lambda t: t())
+    def test_approve_delete_holidays_when_other_day_types(self):
+        """
+        Tests `src.timetable.worker_day.utils.approve.WorkerDayApproveHelper.remove_holidays` 
+        deleting draft holidays if there are other day types in the same draft.
+        """
         WorkerDay.objects.all().delete()
         today = date.today()
         WorkerDayFactory(
             employee=self.employee2,
             employment=self.employment2,
             dt=today,
-            dttm_work_start=datetime.combine(today, time(14)),
-            dttm_work_end=datetime.combine(today, time(23)),
             type_id=WorkerDay.TYPE_HOLIDAY,
-            shop=self.shop,
-            is_approved=True,
+            is_approved=False,
             is_fact=False,
         )
         WorkerDayFactory(
             employee=self.employee2,
             employment=self.employment2,
+            shop=self.employment2.shop,
             dt=today,
             dttm_work_start=datetime.combine(today, time(14)),
             dttm_work_end=datetime.combine(today, time(23)),
@@ -834,7 +835,6 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
             is_approved=False,
             is_fact=False,
         )
-        self.assertEqual(WorkerDay.objects.count(), 2)
 
         approve_data = {
             'shop_id': self.shop.id,
@@ -842,13 +842,11 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
             'dt_to': today,
             'is_fact': False
         }
-
-        with mock.patch.object(transaction, 'on_commit', lambda t: t()):
-            response = self.client.post(self.url_approve, self.dump_data(approve_data), content_type='application/json')
-
+        response = self.client.post(self.url_approve, self.dump_data(approve_data), content_type='application/json')
         self.assertEqual(response.status_code, 200)
-
-        self.assertEqual(WorkerDay.objects.count(), 2)  # workday approve & workday not approve
+        self.assertEqual(WorkerDay.objects.filter(is_approved=True, type_id=WorkerDay.TYPE_WORKDAY).count(), 1)
+        self.assertEqual(WorkerDay.objects.filter(is_approved=False, type_id=WorkerDay.TYPE_WORKDAY).count(), 1)
+        self.assertFalse(WorkerDay.objects.filter(type_id=WorkerDay.TYPE_HOLIDAY).exists())
 
     def test_empty_params(self):
         data = {
