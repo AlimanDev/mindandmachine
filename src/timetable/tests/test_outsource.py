@@ -576,6 +576,7 @@ class TestOutsource(TestsHelperMixin, APITestCase):
                     'allow_to_manually_set_is_vacancy': False,
                     'enable_camera_ticks': False,
                     'show_worker_day_additional_info': False,
+                    'show_restrict_editing_shifts_button': False,
                     'allowed_interval_for_late_arrival': '00:00:00',
                     'allowed_interval_for_early_departure': '00:00:00',
                     'biometry_in_tick_report': False,
