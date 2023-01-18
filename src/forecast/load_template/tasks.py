@@ -9,56 +9,14 @@ from typing import Optional
 from django.core.serializers.json import DjangoJSONEncoder
 
 from src.celery.celery import app
+from src.util.jsons import process_single_quote_json
+from src.util.time import DateTimeProducerFactory
 from src.forecast.models import LoadTemplate
 from src.base.models import Shop
 from django.conf import settings
 from src.forecast.load_template.utils import prepare_load_template_request, apply_load_template
 
 logger = logging.getLogger('forecast_loadtemplate')
-
-
-class BaseDateTimeProducer(ABC):
-    @abstractmethod
-    def produce(self, **kwargs) -> datetime:
-        ...
-
-
-class NowDateTimeProducer(BaseDateTimeProducer):
-
-    def produce(self, **kwargs) -> date:
-        return date.today()
-
-
-class MonthOffsetTimeProducer(BaseDateTimeProducer):
-
-    def produce(self, **kwargs) -> date:
-        try:
-            month_offset =int(kwargs['month_offset'])
-        except KeyError:
-            raise KeyError(
-                'MonthOffsetTimeProducer.produce requires month_offset as int kwarg'
-            )
-        try:
-            day_offset =int(kwargs['day_offset'])
-        except KeyError:
-            raise KeyError(
-                'MonthOffsetTimeProducer.produce requires day_offset as int kwarg'
-            )
-        out = (date.today() + relativedelta(months=month_offset)).replace(day=1)
-        out += timedelta(days=day_offset)
-        return  out
-
-
-class DateTimeProducerFactory:
-    @staticmethod
-    def get_factory(frmt: str) -> BaseDateTimeProducer:
-        if frmt == 'now':
-            out = NowDateTimeProducer()
-        elif frmt == 'month_start_with_offset':
-            out = MonthOffsetTimeProducer()
-        else:
-            raise KeyError(f'Date time producer of {frmt} is not supported')
-        return out
 
 
 @app.task
@@ -86,17 +44,6 @@ def apply_load_template_to_shops(load_template_id, shop_id=None):
     shops = [Shop.objects.get(pk=shop_id)] if shop_id else load_template.shops.all()
     for shop in shops:
         apply_load_template(load_template_id, shop.id)
-
-def process_json(s: str, annot: str = 'No annot') -> dict:
-    s = s.replace("\'", "\"")
-    try:
-        out = json.loads(s)
-    except Exception as e:
-        msg = f"wasnt able to create {annot} json from {df_from_kwargs!r}"
-        logger.error(msg)
-        logger.error(str(e))
-        raise TypeError(msg) from e
-    return out
 
 
 @app.task
@@ -130,17 +77,33 @@ def calculate_shop_load_at_night(
         )
         then data will be updated since start of next mont till end of next month
     """
+
+    if not settings.CALCULATE_LOAD_TEMPLATE:
+        raise ValueError(f"periodic calc disabled")
     
     for policy, kwgrgs, annot in (
         (dt_from_policy, df_from_kwargs, 'from',),
         (dt_to_policy, df_to_kwargs, 'to',),
     ):
-        logger.info(f"start calculation at night with {annot} policy {policy!r}")
-        logger.info(f"start calculation at night with {annot} kwargs {kwgrgs!r}")
-
-    df_from_kwargs = process_json(s=df_from_kwargs, annot='df_from_kwargs')
-    df_to_kwargs = process_json(s=df_to_kwargs, annot='df_to_kwargs')
-
+        logger.info(
+            " ".join(
+                [
+                    f"start calculation at night with {annot}",
+                    f"policy {policy!r} and kwargs {kwgrgs!r}",
+                ]
+            ),
+        )
+    _annotation = 'from'
+    try:
+        _kwrgs = df_from_kwargs
+        df_from_kwargs = process_single_quote_json(_kwrgs)
+        _annotation = 'to'
+        _kwrgs = df_to_kwargs
+        df_to_kwargs = process_single_quote_json(s=df_to_kwargs)
+    except Exception as e:
+        msg = f"wasnt able to create {_annotation} json from {_kwrgs!r}"
+        logger.exception(msg)
+        raise TypeError(msg) from e
 
     dt_from_factory = DateTimeProducerFactory.get_factory(frmt=dt_from_policy)
     dt_to_factory = DateTimeProducerFactory.get_factory(frmt=dt_to_policy)
@@ -150,9 +113,6 @@ def calculate_shop_load_at_night(
 
     logger.info(f"start calculation from {dt_from} to {dt_to}")
 
-    if not settings.CALCULATE_LOAD_TEMPLATE:
-        logger.info(f"periodic calc disabled")
-        return
     templates = LoadTemplate.objects.filter(
         shops__isnull=False,
     ).distinct('id')
