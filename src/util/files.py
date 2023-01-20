@@ -4,7 +4,7 @@ from typing import Union
 from django.core.files import File
 
 
-def save_on_server(contents: Union[io.BytesIO, str], filename: str, directory: Union[str, Path], serve_url: Union[str, None] = None) -> File:
+def save_on_server(contents: Union[str, bytes, io.BytesIO], filename: str, directory: Union[str, Path], serve_url: Union[str, None] = None) -> File:
     """
     Save a file on server's hard drive.
     The directory and parents will be created, if they don't exist already.
@@ -14,6 +14,8 @@ def save_on_server(contents: Union[io.BytesIO, str], filename: str, directory: U
     directory = Path(directory)
     directory.mkdir(exist_ok=True, parents=True)
     full_path = directory / filename
+    if isinstance(contents, io.BytesIO):
+        contents = contents.read()
     mode = 'wb' if isinstance(contents, bytes) else 'w'
     with open(full_path, mode) as f:
         f.write(contents)

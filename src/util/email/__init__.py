@@ -5,4 +5,4 @@ General-purpose email module.
 """
 
 from .sending import send_email
-from .messages import prepare_message_tick_report
+from .messages import prepare_message_for_report, report_error_message

@@ -1,3 +1,4 @@
+import celery
 from rest_framework.decorators import action
 from rest_framework.exceptions import NotFound
 from rest_framework.viewsets import ViewSet
@@ -17,7 +18,6 @@ from src.reports.serializers import (
 )
 from src.reports.utils.consolidated_timesheet_report import ConsolidatedTimesheetReportGenerator
 from src.reports.utils.pivot_tabel import PlanAndFactPivotTabel
-from src.reports.utils.schedule_deviation import schedule_deviation_report_response
 from src.util.http import prepare_response
 
 class ReportsViewSet(ViewSet):
@@ -76,19 +76,41 @@ class ReportsViewSet(ViewSet):
 
     @action(detail=False, methods=['get'])
     def schedule_deviation(self, request: Request):
-        data = ReportFilterSerializer(data=request.query_params)
-        data.is_valid(raise_exception=True)
-        data = data.validated_data
-        filters = {}
-        filters = self._add_filter(data, filters, 'employee_ids', 'employee_id__in')
-        filters = self._add_filter(data, filters, 'user_ids', 'worker_id__in')
-        filters = self._add_filter(data, filters, 'is_vacancy', 'is_vacancy')
-        filters = self._add_filter(data, filters, 'is_outsource', 'is_outsource')
-        filters = self._add_filter(data, filters, 'network_ids', 'worker__network_id__in')
-        filters = self._add_filter(data, filters, 'work_type_name', 'work_type_name__in')
+        '''
+        Schedule deviation report, with email support.
 
-        return schedule_deviation_report_response(data['dt_from'], data['dt_to'], created_by_id=request.user.id,
-                                                  shop_ids=data.get('shop_ids'), **filters)
+        GET /rest_api/report/schedule_deviation
+
+        :params
+            dt_from: QOS_DATE_FORMAT, required=True
+            dt_to: QOS_DATE_FORMAT, required=True
+            shop_ids: list[int], required=True
+            employee_id__in: list[int], required=True
+            worker_id__in: list[int], required=True
+            is_vacancy: list[int], required=True
+            is_outsource: list[int], required=True
+            worker__network_id__in: list[int], required=True
+            work_type_name__in: list[int], required=True
+            emails: list[str], required=False
+        :return
+            content_type: 'application/xlsx' | None (email)
+        '''
+        serializer = ReportFilterSerializer(data=request.query_params)
+        serializer.is_valid(raise_exception=True)
+        kwargs = serializer.validated_data
+
+        # Move filter fields to a separate dict
+        filter_fields = (
+            'employee_id__in', 'worker_id__in', 'is_vacancy',
+            'is_outsource', 'worker__network_id__in', 'work_type_name__in'
+        )
+        kwargs['filters']= {}
+        for field in filter_fields:
+            if field in kwargs:
+                kwargs['filters'][field] = kwargs.pop(field)
+        kwargs['user_id'] = request.user.id
+        kwargs['network_id'] = request.user.network.id
+        return self._generate_report(tasks.schedule_deviation_report, kwargs)
 
     @action(detail=False, methods=['get'])
     def tick(self, request: Request):
@@ -105,7 +127,7 @@ class ReportsViewSet(ViewSet):
             with_biometrics: bool, default=False
             emails: list[str], required=False
         :return
-            content_type: 'application/xlsx' | 'application/docx'
+            content_type: 'application/xlsx' | 'application/docx' | None (email)
         '''
         serializer = TikReportSerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)
@@ -115,14 +137,22 @@ class ReportsViewSet(ViewSet):
             serializer.validated_data.pop('emails', None)
             serializer.validated_data.pop('with_biometrics', None)
 
-        if serializer.validated_data.get('emails'):
+        serializer.validated_data['network_id'] = request.user.network_id
+        return self._generate_report(tasks.tick_report, serializer.validated_data)
+
+    def _generate_report(self, task: celery.Task, kwargs: dict) -> HttpResponse:
+        """
+        Decides whether to generate report in-memory (call task function directly)
+        or to launch task in background, sending the report via email.
+        """
+        if kwargs.get('emails'):
             #celery serializes date as dttm, for some reason
-            serializer.validated_data['dt_from'] = serializer.validated_data['dt_from'].strftime(settings.QOS_DATE_FORMAT) 
-            serializer.validated_data['dt_to'] = serializer.validated_data['dt_to'].strftime(settings.QOS_DATE_FORMAT)
-            tasks.tick_report.delay(**serializer.validated_data, network_id=request.user.network_id)
+            kwargs['dt_from'] = kwargs['dt_from'].strftime(settings.QOS_DATE_FORMAT) 
+            kwargs['dt_to'] = kwargs['dt_to'].strftime(settings.QOS_DATE_FORMAT)
+            task.delay(**kwargs)
             return Response(status=status.HTTP_202_ACCEPTED)
         else:
-            report = tasks.tick_report(**serializer.validated_data, network_id=request.user.network_id)
+            report = task(**kwargs)
             return HttpResponse(
                 report['file'],
                 content_type=report['type'],
@@ -130,4 +160,3 @@ class ReportsViewSet(ViewSet):
                 'Content-Disposition': f'attachment; filename="{report["name"]}"'
                 }
             )
-

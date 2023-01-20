@@ -4,18 +4,17 @@ from typing import Iterable, Union
 
 from django.conf import settings
 from django.db.models import Q
+from django.utils.translation import gettext_lazy as _
 from django_celery_beat.models import CrontabSchedule
-from django.utils.translation import gettext as _
 
 from src.base.models import Employment, Shop, User, Network
 from src.celery.celery import app
 from src.notifications.helpers import send_mass_html_mail
 from src.reports.helpers import get_datatuple
 from src.reports.models import ReportConfig
-from src.reports.reports import TickReport
+from src.reports.reports import TickReport, ScheduleDeviationReport
+from src.reports.utils.decorators import mailable_report
 from src.timetable.worker_day.stat import WorkersStatsGetter
-from src.util.email import prepare_message_tick_report, send_email
-from src.util import files
 from .models import UserShopGroups, UserSubordinates, EmploymentStats
 
 
@@ -221,15 +220,37 @@ def fill_employments_stats(prev_acc_period=False, curr_acc_period=True, next_acc
                 if employment_stats_to_create:
                     EmploymentStats.objects.bulk_create(employment_stats_to_create, batch_size=1000)
 
+
+@app.task(time_limit=settings.TIME_LIMITS['schedule_deviation_report']) #accounting for possible email timeout and large data
+@mailable_report(_('Schedule deviation report'))
+def schedule_deviation_report(
+        dt_from: Union[str, date],
+        dt_to: Union[str, date],
+        network_id: int,
+        shop_id__in: list[int] = None,
+        filters: dict = {},
+        user_id: int = None
+    ) -> Union[dict, str]:
+    context = {
+        'dt_from': dt_from,
+        'dt_to': dt_to,
+        'created_by_id': user_id,
+        'shop_id__in': shop_id__in,
+        'network_id': network_id,
+        'filters': filters
+    }
+    return ScheduleDeviationReport(network_id, context).get_file()
+
+
 @app.task(time_limit=settings.TIME_LIMITS['tick_report']) #accounting for possible email timeout and large data
+@mailable_report(_('Tick report'))
 def tick_report(
         dt_from: Union[str, date],
         dt_to: Union[str, date],
         network_id: int,
         with_biometrics: bool = False,
         shop_id__in: Iterable[int] = None,
-        employee_id__in: Iterable[int] = None,
-        emails: Iterable[str] = None
+        employee_id__in: Iterable[int] = None
     ) -> Union[dict, str]:
     context = {
         'dt_from': dt_from,
@@ -238,34 +259,8 @@ def tick_report(
         'shop_id__in': shop_id__in,
         'employee_id__in': employee_id__in,
     }
-    try:
-        report = TickReport(network_id, context).get_file()
-    except:
-        # notify clients about the error
-        if emails:
-            send_email(
-                subject=_('Tick report'),
-                body=_('There has been an error generating your report.\nPlease contact the technical support.'),
-                to=emails
-            )
-        raise
+    return TickReport(network_id, context).get_file()
 
-    if emails:
-        file = files.save_on_server(
-            report['file'],
-            report['name'],
-            directory=settings.REPORTS_ROOT,
-            serve_url=settings.REPORTS_URL
-        )
-        message = prepare_message_tick_report(settings.EXTERNAL_HOST + file.url)
-        send_email(
-            subject=_('Tick report'),
-            body=message,
-            to=emails
-        )
-        return f'Report {report["name"]} sent to {", ".join(emails)}' # for flower monitoring
-
-    return report
 
 @app.task
 def delete_reports():

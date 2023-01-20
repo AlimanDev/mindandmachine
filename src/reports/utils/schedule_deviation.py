@@ -16,8 +16,6 @@ from django.db.models import (
     BooleanField,
 )
 from django.db.models.functions import Coalesce, Extract, Cast, Concat
-from django.http.response import HttpResponse
-from django.utils.encoding import escape_uri_path
 import xlsxwriter
 from src.base.models import Employment, Shop, User
 
@@ -30,7 +28,13 @@ from src.timetable.models import (
 )
 
 
-def schedule_deviation_report(dt_from, dt_to, *args, title=None, in_memory=False, created_by_id=None, shop_ids=None, **kwargs):
+def schedule_deviation_report(
+    dt_from: date,
+    dt_to: date,
+    created_by_id=None,
+    shop_ids=None,
+    filters: dict = {}
+) -> bytes:
 
     shop_object = 'все'
     user_created = 'автоматически'
@@ -40,10 +44,7 @@ def schedule_deviation_report(dt_from, dt_to, *args, title=None, in_memory=False
         user_created = User.objects.get(id=created_by_id)
         user_created_fio = user_created.get_fio()
 
-    if not title:
-        title = f'Schedule_deviation_{dt_from}-{dt_to}'
-
-    qs = ScheduleDeviations.objects.filter(dt__gte=dt_from, dt__lte=dt_to).filter(*args, **kwargs)
+    qs = ScheduleDeviations.objects.filter(dt__gte=dt_from, dt__lte=dt_to).filter(**filters)
     unapplied_vacancies = WorkerDay.objects.get_plan_approved(dt__gte=dt_from, dt__lte=dt_to, employee_id__isnull=True, type__is_dayoff=False).annotate(
         work_type_name=Coalesce(
             Subquery(
@@ -66,10 +67,10 @@ def schedule_deviation_report(dt_from, dt_to, *args, title=None, in_memory=False
         wd_type_id=F('type_id'),
     )
 
-    if "work_type_name__in" in kwargs:
-        unapplied_vacancies = unapplied_vacancies.filter(work_type_name__in=kwargs['work_type_name__in'])
-    if "is_outsource" in kwargs:
-        unapplied_vacancies = unapplied_vacancies.filter(is_outsource=kwargs['is_outsource'])
+    if "work_type_name__in" in filters:
+        unapplied_vacancies = unapplied_vacancies.filter(work_type_name__in=filters['work_type_name__in'])
+    if "is_outsource" in filters:
+        unapplied_vacancies = unapplied_vacancies.filter(is_outsource=filters['is_outsource'])
 
     if shop_ids:
         qs = qs.filter(
@@ -234,11 +235,8 @@ def schedule_deviation_report(dt_from, dt_to, *args, title=None, in_memory=False
 
     columns = {column:i for i, column in enumerate(columns_list)}
 
-    if in_memory:
-        output = io.BytesIO()
-        workbook = xlsxwriter.Workbook(output, {'in_memory': True})
-    else:
-        workbook = xlsxwriter.Workbook(title)
+    output = io.BytesIO()
+    workbook = xlsxwriter.Workbook(output, {'in_memory': True})
 
     worksheet = workbook.add_worksheet(f'{dt_from}-{dt_to}')
 
@@ -374,23 +372,8 @@ def schedule_deviation_report(dt_from, dt_to, *args, title=None, in_memory=False
         worksheet.write_number(11 + i, columns['lost_count'], row.lost_work_hours_count, def_format)
 
     workbook.close()
-    if in_memory:
-        output.seek(0)
-        return {
-            'name': title,
-            'file': output,
-            'type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        }
-
-def schedule_deviation_report_response(dt_from, dt_to, *args, created_by_id=None, shop_ids=None, **kwargs):
-    output = schedule_deviation_report(dt_from, dt_to, in_memory=True, created_by_id=created_by_id, shop_ids=shop_ids, **kwargs)
-
-    response = HttpResponse(
-        output['file'],
-        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-    )
-    response['Content-Disposition'] = f'attachment; filename="{escape_uri_path(output["name"])}.xlsx"'
-    return response
+    output.seek(0)
+    return output
 
 def _get_extra_columns_dict(dt_from: date, dt_to: date) -> OrderedDict:
     depth = 3 # Shop parent/child lookup depth
