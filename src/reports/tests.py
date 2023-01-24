@@ -1041,7 +1041,7 @@ class TestScheduleDeviation(APITestCase, TestsHelperMixin):
                 for name in ['Аутсорс сеть 1', 'Аутсорс сеть 2']
             ]
         )
-        report = self.client.get(f'/rest_api/report/schedule_deviation/?dt_from={dt}&dt_to={dt+timedelta(1)}&shop_ids={self.shop.id}')
+        report = self.client.get(f'/rest_api/report/schedule_deviation/?dt_from={dt}&dt_to={dt+timedelta(1)}&shop_id__in={self.shop.id}')
         data = tuple(map(lambda x: tuple(x), pd.read_excel(report.content).fillna('').iloc[10:, 1:].values))
         self.assertCountEqual(
             data,

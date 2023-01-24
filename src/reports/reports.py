@@ -10,6 +10,7 @@ from src.base.models import Network
 from src.recognition.models import Tick, TickPhoto
 from src.timetable.models import WorkerDay
 from src.reports.registry import BaseRegisteredReport
+from src.reports.utils.schedule_deviation import schedule_deviation_report
 from src.util.dg.ticks_report import TicksOdsReportGenerator, TicksOdtReportGenerator
 
 
@@ -160,18 +161,27 @@ class ScheduleDeviationReport(BaseRegisteredReport, DatesReportMixin):
     name = 'Отчет по отклонениям от планового графика'
     code = SCHEDULE_DEVIATION
 
-    def get_file(self):
-        from src.reports.utils.schedule_deviation import schedule_deviation_report
+    def get_file(self) -> dict:
         dt_from, dt_to = self.get_dates(self.context)
-        title = f'schedule_deviation_{dt_from}-{dt_to}.xlsx'
-        return schedule_deviation_report(dt_from, dt_to, title, in_memory=True, shop_ids=self.context.get('shop_ids'))
+        report = schedule_deviation_report(
+            dt_from,
+            dt_to,
+            created_by_id=self.context.get('created_by_id'),
+            shop_ids=self.context.get('shop_id__in'),
+            filters=self.context.get('filters')
+        )
+        return {
+            'name': f'Schedule_deviation_{dt_from}-{dt_to}.xlsx',
+            'file': report,
+            'type': f'application/xlsx'
+        }
 
     def get_recipients_shops(self):
         from src.timetable.models import PlanAndFactHours
         dt_from, dt_to = self.get_dates(self.context)
         data = PlanAndFactHours.objects.filter(Q(fact_work_hours__gt=0) | Q(plan_work_hours__gt=0), dt__gte=dt_from, dt__lte=dt_to)
-        if self.context.get('shop_ids', []):
-            data = data.filter(shop_id__in=self.context.get('shop_ids', []))
+        if self.context.get('shop_id__in', []):
+            data = data.filter(shop_id__in=self.context.get('shop_id__in', []))
         
         return set(data.values_list('shop_id', flat=True))
 
