@@ -21,7 +21,7 @@ def _get_calc_periods(dt_hired=None, dt_fired=None, dt_from=None, dt_to=None):
     dt_fired = dt_fired or datetime.date.max
 
     periods = set()
-    if (dt_from is None and dt_to is None):
+    if dt_from is None and dt_to is None:
         dt_now = timezone.now().date()
 
         if dt_now.day <= settings.CALC_TIMESHEET_PREV_MONTH_THRESHOLD_DAYS:

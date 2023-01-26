@@ -568,7 +568,6 @@ class WorkerDayApproveHelper:
                         shop_id=self.shop_id,
                         exc_cls=ValidationError,
                     )
-
                 transaction.on_commit(
                     lambda: recalc_fact_from_records(employee_days_list=list(employee_days_set)))
 

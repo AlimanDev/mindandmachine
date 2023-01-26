@@ -104,11 +104,6 @@ class TestRecalcOnDataChange(TestTimesheetMixin, APITestCase):
         )
 
     def test_recalc_on_employment_update(self, _calc_timesheets_apply_async):
-        self.employment_worker.dt_fired = date(2021, 6, 10)
-        self.employment_worker.save()
-
-        self._test_recalc_called(_calc_timesheets_apply_async.call_args_list, [self.employee_worker.id])
-        _calc_timesheets_apply_async.reset_mock()
         with override_settings(CALC_TIMESHEET_PREV_MONTH_THRESHOLD_DAYS=20):
             self.employment_worker.dt_fired = date(2021, 6, 11)
             self.employment_worker.save()

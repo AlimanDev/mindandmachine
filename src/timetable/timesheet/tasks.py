@@ -27,7 +27,6 @@ def calc_timesheets(employee_id__in: list = None, dt_from=None, dt_to=None, rera
     logger.info('start calc_timesheets')
 
     calc_periods = _get_calc_periods(dt_from=dt_from, dt_to=dt_to)
-
     if employee_id__in:
         qs = Employee.objects.filter(id__in=employee_id__in).select_related('user__network')
     else:
@@ -63,15 +62,12 @@ def calc_timesheets(employee_id__in: list = None, dt_from=None, dt_to=None, rera
 
 
 def recalc_timesheet_on_data_change(groupped_data):
-    # запуск пересчета табеля на периоды для которых были изменены дни сотрудников,
-    # но не нарушая ограничения CALC_TIMESHEET_PREV_MONTH_THRESHOLD_DAYS
-    dt_now = timezone.now().date()
+    # recalculate timesheet for period when employees' workdays changed
     for employee_id, dates in groupped_data.items():
         periods = set()
         for dt in dates:
             dt_start, dt_end = get_month_range(year=dt.year, month_num=dt.month)
-            if (dt_now - dt_end).days <= settings.CALC_TIMESHEET_PREV_MONTH_THRESHOLD_DAYS:
-                periods.add((dt_start, dt_end))
+            periods.add((dt_start, dt_end))
         for period_start, period_end in periods:
             transaction.on_commit(
                 lambda _employee_id=employee_id, _period_start=Converter.convert_date(period_start),
