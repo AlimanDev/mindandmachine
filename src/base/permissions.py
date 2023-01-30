@@ -1,9 +1,7 @@
-from django.conf import settings
 from django.db.models import ObjectDoesNotExist, Q
 from django.utils.translation import gettext_lazy as _
 from rest_framework import permissions
 from rest_framework.exceptions import ValidationError, NotFound
-
 from src.base.models import Employment, Shop
 from src.timetable.models import WorkerDay
 from src.timetable.worker_day.serializers import WorkerDaySerializer
@@ -20,7 +18,6 @@ VIEW_FUNC_ACTIONS = {
     'update': 'PUT',
     'destroy': 'DELETE'
 }
-
 
 def get_view_func(request, view):
     """
@@ -101,8 +98,8 @@ class WdPermission(Permission):
                 wd_data = WorkerDaySerializer(wd_instance).data
 
                 # TODO: опционально или на постоянку такую логику оставить?
-                if wd_data['type'] != request.data.get('type') or wd_data['shop_id'] != request.data.get('shop_id') or \
-                        wd_data['dt'] != request.data.get('dt'):
+                if wd_data['type'] != request.data.get('type') or (wd_instance.shop and wd_data['shop_id'] != request.data['shop_id'])\
+                        or wd_data['dt'] != request.data.get('dt'):
                     if request.user.network.settings_values_prop.get('check_delete_single_wd_perm_on_update', True):
                         perm_checker = DeleteSingleWdPermissionChecker(user=request.user, wd_id=wd_id)
                         has_delete_permission = self._has_perm(perm_checker)
@@ -118,7 +115,7 @@ class WdPermission(Permission):
                 else:
                     perm_checker = UpdateSingleWdPermissionChecker(user=request.user, wd_data=wd_data,
                                                                    wd_instance=wd_instance)
-                    return self._has_perm(perm_checker)
+                return self._has_perm(perm_checker)
             elif view_action == 'destroy':
                 wd_id = view.kwargs['pk']
                 perm_checker = DeleteSingleWdPermissionChecker(
