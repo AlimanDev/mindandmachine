@@ -24,7 +24,7 @@ def enrich_context(context:dict, user_id: int, event: AbstractEventNotification)
     context['TIME_FORMAT'] = settings.TEMPLATE_TIME_FORMAT
 
 
-@app.task(time_limit=settings.EMAIL_TASK_TIMEOUT, serializer='yaml') # YAML correctly serializes datetimes
+@app.task(time_limit=settings.TIME_LIMITS['send_event_email_notifications'], serializer='yaml') # YAML correctly serializes datetimes
 def send_event_email_notifications(event_email_notification_id: int, user_author_id: int, context: dict):
     event_email_notification = EventEmailNotification.objects.select_related(
         'event_type',
