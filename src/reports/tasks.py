@@ -259,6 +259,7 @@ def tick_report(
         'shop_id__in': shop_id__in,
         'employee_id__in': employee_id__in,
     }
+    context = {key: value for key, value in context.items() if value is not None} # remove None values
     return TickReport(network_id, context).get_file()
 
 
