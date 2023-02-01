@@ -18,7 +18,7 @@ from src.timetable.worker_day.stat import WorkersStatsGetter
 from .models import UserShopGroups, UserSubordinates, EmploymentStats
 
 
-@app.task(time_limit=settings.EMAIL_TASK_TIMEOUT)
+@app.task(time_limit=settings.TIME_LIMITS['send_report_emails'])
 def send_report_emails(report_config_id: int, zone: str):
     report_config = ReportConfig.objects.select_related(
         'report_type',

@@ -211,7 +211,6 @@ EMAIL_HOST = 'mndndm.gate.sendsay.ru'
 EMAIL_HOST_USER = 'mindandmachine.mindandmachine@smtpgate'
 EMAIL_HOST_PASSWORD = 'Si8gePhue3oMoh'
 EMAIL_TIMEOUT = 10 #seconds, django setting
-EMAIL_TASK_TIMEOUT = EMAIL_TIMEOUT #celery task setting
 COMPANY_NAME = 'not-specified' #для отображения в статистике рассылок через SMTP
 
 SFTP_IP = '212.109.194.87'
@@ -541,6 +540,9 @@ X_FRAME_OPTIONS = 'SAMEORIGIN'
 TIME_LIMITS = {
     'tick_report': int(os.getenv('TICK_REPORT_TIME_LIMIT', 300)),
     'schedule_deviation_report': int(os.getenv('CONSOLIDATED_TIMESHEET_REPORT_TIME_LIMIT', 300)),
+    'send_notify_email': int(os.getenv('SEND_NOTIFY_EMAIL_TIMEOUT', 10)),
+    'send_event_email_notifications': int(os.getenv('SEND_EVENT_EMAIL_NOTIFICATIONS_TIMEOUT', 300)),
+    'send_report_emails': int(os.getenv('SEND_REPORT_EMAILS_TIMEOUT', 300))
 }
 
 # Timeouts for external requests (seconds). Either an integer, or tuple for separate connection and read timeouts
