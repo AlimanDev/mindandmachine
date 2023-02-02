@@ -335,6 +335,7 @@ class TestPivotTabelReportNotifications(TestsHelperMixin, APITestCase):
             self.assertEqual(list(df.loc[1, [first_date, second_date, 'Часов за период']].values), [10.75, 10.75, 21.50])
             self.assertEqual(list(df.loc[2, [first_date, second_date, 'Часов за период']].values), [10.75, 21.50, 32.25])
 
+
 @mock.patch.object(TickPhoto, 'compress_image', lambda _: True)
 class TestReportsViewSet(TestsHelperMixin, APITestCase):
     @classmethod
@@ -1048,7 +1049,7 @@ class TestScheduleDeviation(APITestCase, TestsHelperMixin):
             (
                 (
                     self.shop.name, datetime.combine(dt, time(0, 0)), f'{self.user1.fio} ', '-', self.root_shop.name, 'штат', 
-                    self.position.name, 'Биржа смен', 10, 10.5, 4.5, 0.5, 1, 0.5, 1, 0, 0, 0.5, 2, 0, 0, 0, 0
+                    self.position.name, 'Биржа смен', 11, 12, 4.5, 0.5, 1, 0.5, 1, 0, 0, 0.5, 2, 0, 0, 0, 0
                 ),
                 (
                     self.shop2.name, datetime.combine(dt, time(0, 0)), f'{self.user2.fio} ', self.employee2.tabel_code, 
