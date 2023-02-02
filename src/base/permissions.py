@@ -98,7 +98,7 @@ class WdPermission(Permission):
                 wd_data = WorkerDaySerializer(wd_instance).data
 
                 # TODO: опционально или на постоянку такую логику оставить?
-                if wd_data['type'] != request.data.get('type') or (wd_instance.shop and wd_data['shop_id'] != request.data['shop_id'])\
+                if wd_data['type'] != request.data.get('type') or (wd_instance.shop and wd_data.get('shop_id') != request.data.get('shop_id'))\
                         or wd_data['dt'] != request.data.get('dt'):
                     if request.user.network.settings_values_prop.get('check_delete_single_wd_perm_on_update', True):
                         perm_checker = DeleteSingleWdPermissionChecker(user=request.user, wd_id=wd_id)
