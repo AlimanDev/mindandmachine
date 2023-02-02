@@ -539,7 +539,7 @@ X_FRAME_OPTIONS = 'SAMEORIGIN'
 # time limits for celery tasks
 TIME_LIMITS = {
     'tick_report': int(os.getenv('TICK_REPORT_TIME_LIMIT', 300)),
-    'schedule_deviation_report': int(os.getenv('CONSOLIDATED_TIMESHEET_REPORT_TIME_LIMIT', 300)),
+    'schedule_deviation_report': int(os.getenv('SCHEDULE_DEVIATION_REPORT_TIME_LIMIT', 300)),
     'send_notify_email': int(os.getenv('SEND_NOTIFY_EMAIL_TIMEOUT', 10)),
     'send_event_email_notifications': int(os.getenv('SEND_EVENT_EMAIL_NOTIFICATIONS_TIMEOUT', 300)),
     'send_report_emails': int(os.getenv('SEND_REPORT_EMAILS_TIMEOUT', 300))
