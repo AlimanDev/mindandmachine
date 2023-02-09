@@ -115,6 +115,7 @@ class WdPermission(Permission):
                 else:
                     perm_checker = UpdateSingleWdPermissionChecker(user=request.user, wd_data=wd_data,
                                                                    wd_instance=wd_instance)
+
                 return self._has_perm(perm_checker)
             elif view_action == 'destroy':
                 wd_id = view.kwargs['pk']

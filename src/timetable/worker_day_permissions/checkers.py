@@ -2,7 +2,7 @@ from datetime import datetime, date, timedelta
 from typing import Union
 
 from django.conf import settings
-from django.db.models import Q, F
+from django.db.models import F
 from django.utils.translation import gettext as _
 
 from django.utils.encoding import force_str
@@ -104,7 +104,7 @@ class BaseWdPermissionChecker:
     def has_permission(self):
         raise NotImplementedError
 
-    def _check_employment_perm(self, gwdp: GroupWorkerDayPermission, employment: Employment, dt_from: date, dt_to: date) -> Q:
+    def _check_employment_perm(self, gwdp: GroupWorkerDayPermission, employment: Employment, dt_from: date, dt_to: date) -> bool:
         """Check for employee_type"""
         if gwdp.employee_type == GroupWorkerDayPermission.SUBORDINATE_EMPLOYEE:
             return employment.employee.id in self._user_subordinates_ids(dt_from, dt_to)
