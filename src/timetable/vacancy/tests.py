@@ -1819,7 +1819,7 @@ class TestVacancyNotification(APITestCase, TestsHelperMixin):
                 graph_type=WorkerDayPermission.PLAN,
                 wd_type_id=WorkerDay.TYPE_WORKDAY,
             ),
-            employee_type=GroupWorkerDayPermission.OUTSOURCE_NETWORK_EMPLOYEE,
+            employee_type=GroupWorkerDayPermission.OTHER_SHOP_OR_NETWORK_EMPLOYEE,
             shop_type=GroupWorkerDayPermission.MY_NETWORK_SHOPS,
         )
         response = self.client.delete(

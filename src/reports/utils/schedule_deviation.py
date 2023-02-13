@@ -163,7 +163,7 @@ def __calc_day_work_hours(row, work_days):
     override_skip = False
     last_name = row.worker_fio.split(' ')[0]
     kwargs = {
-        'dt': row["dt"], 'shop__name': row["shop_name"],
+        'dt': row["dt"].date(), 'shop__name': row["shop_name"],
          'employee__user__last_name': last_name, 'type': WorkerDay.TYPE_WORKDAY,
         }
     work_shifts = [w for w in work_days if all(item in w.items() for item in kwargs.items())]

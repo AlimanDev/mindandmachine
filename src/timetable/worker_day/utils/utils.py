@@ -41,7 +41,8 @@ ERROR_MESSAGES = {
     'has_no_perm_to_approve_protected_wdays': _('You do not have rights to approve protected worker days ({protected_wdays}). '
                                                 'Please contact your system administrator.'),
     'no_such_user_in_network': _('There is no such user in your network.'),
-    'employee_not_in_subordinates': _('Employee {employee} is not your subordinate.')
+    'employee_not_in_subordinates': _('Employee {employee} is not your subordinate.'),
+    'no_wd_types': _('No day types to {action_str}')
 }
 
 

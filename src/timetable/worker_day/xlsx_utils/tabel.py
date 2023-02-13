@@ -239,7 +239,6 @@ class Tabel_xlsx(Xlsx_base):
             diff_h += 24
         if (breaks is not None) and len(breaks):
             i = 0
-            # print(breaks, diff_h)
             while (len(breaks) > i) and not (breaks[i][0] <= diff_h < breaks[i][1]):
                 i += 1
             if len(breaks) == i:
@@ -260,7 +259,6 @@ class Tabel_xlsx(Xlsx_base):
             # day_hs = self._time2hours(tm_start, night_edges[0])
             night_hs = int(self._time2hours(night_edges[0], tm_end) if (night_edges[0] < tm_end) or (
                         night_edges[1] >= tm_end) else 0)
-            # print(night_hs, night_edges[0] < tm_end, night_edges[1] >= tm_end)
         return total, night_hs
 
     def fill_table(self, workdays, employments, triplets, working_hours, row_s, col_s):

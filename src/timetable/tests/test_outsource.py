@@ -87,7 +87,7 @@ class TestOutsource(TestsHelperMixin, APITestCase):
             GroupWorkerDayPermission(
                 group=g,
                 worker_day_permission=wdp,
-                employee_type=GroupWorkerDayPermission.OUTSOURCE_NETWORK_EMPLOYEE
+                employee_type=GroupWorkerDayPermission.OTHER_SHOP_OR_NETWORK_EMPLOYEE
             ) 
             for g in [cls.client_admin_group, cls.outsource_admin_group]
             for wdp in WorkerDayPermission.objects.all()
@@ -194,7 +194,7 @@ class TestOutsource(TestsHelperMixin, APITestCase):
         not_created = self._create_vacancy(
             dt_now, datetime.combine(dt_now, time(8)), datetime.combine(dt_now, time(20)), is_outsource=False)
         self.assertEqual(not_created.json(),
-                         {'detail': 'У вас нет прав на создание типа дня "Рабочий день" в подразделении Магазин'})
+                         {'detail': 'У вас нет прав на создание типа дня "Рабочий день" в подразделении Магазин (Вакансии)'})
 
     def test_can_create_vacancy_with_shop_from_other_network_but_from_outsource_client(self):
         dt_now = self.dt_now

@@ -4,6 +4,7 @@ from typing import Union
 from django.conf import settings
 from django.db.models import F
 from django.utils.translation import gettext as _
+from django.utils.functional import cached_property
 
 from django.utils.encoding import force_str
 from rest_framework.exceptions import PermissionDenied
@@ -60,7 +61,7 @@ class BaseWdPermissionChecker:
         self,
         action: str,
         graph_type: str,
-        wd_type_id: int,
+        wd_type_id: str,
         dt_from: Union[date, str],
         dt_to: Union[date, str],
         is_vacancy: bool,
@@ -88,7 +89,7 @@ class BaseWdPermissionChecker:
 
         self.group_wd_permissions = self._get_group_wd_permissions(action, graph_type, wd_type_id, is_vacancy)
         if not self.group_wd_permissions:
-            self.err_message = self._get_err_msg(action, wd_type_id)
+            self.err_message = self._get_err_msg(action, wd_type_id, is_vacancy=is_vacancy)
             return False
 
         gwdp: GroupWorkerDayPermission
@@ -97,8 +98,8 @@ class BaseWdPermissionChecker:
                 and (not self.shop or self._check_shop_perm(gwdp))
 
             if has_perm:
-                return self._check_time_limit(action, gwdp, wd_type_id, dt_from, dt_to)
-        self.err_message = self._get_err_msg(action, wd_type_id, employee=employment.employee if employment else None)
+                return self._check_time_limit(action, gwdp, wd_type_id, dt_from, dt_to, is_vacancy=is_vacancy)
+        self.err_message = self._get_err_msg(action, wd_type_id, employee=employment.employee if employment else None, is_vacancy=is_vacancy)
         return False
 
     def has_permission(self):
@@ -113,10 +114,13 @@ class BaseWdPermissionChecker:
         elif gwdp.employee_type == GroupWorkerDayPermission.MY_NETWORK_EMPLOYEE:
             return employment.employee.user.network_id == self.user.network_id \
                 and employment.shop.network_id == self.user.network_id
-        elif gwdp.employee_type == GroupWorkerDayPermission.OUTSOURCE_NETWORK_EMPLOYEE:
-            return employment.employee.user.network_id in NetworkConnect.objects.filter(
-                client_id=self.user.network_id
-            ).values_list('outsourcing_id', flat=True)
+        elif gwdp.employee_type == GroupWorkerDayPermission.OTHER_SHOP_OR_NETWORK_EMPLOYEE:
+            if self.user.network_id == employment.employee.user.network_id: # Same network, different shop
+                return employment.shop_id not in self._user_shops_ids
+            else:                                                           # Outsource network
+                return employment.employee.user.network_id in NetworkConnect.objects.filter(
+                    client_id=self.user.network_id
+                ).values_list('outsourcing_id', flat=True)
         else:
             raise ValueError(f'Unknown GroupWorkerDayPermission.employee_type {gwdp.employee_type}')
 
@@ -143,7 +147,8 @@ class BaseWdPermissionChecker:
         gwdp: GroupWorkerDayPermission,
         wd_type_id: int,
         dt_from: date,
-        dt_to: date
+        dt_to: date,
+        is_vacancy: bool
     ) -> bool :
         """Check time limit"""
         today = (datetime.now() + timedelta(
@@ -159,7 +164,7 @@ class BaseWdPermissionChecker:
                     (date_limit_in_future and dt_to > date_limit_in_future):
                 dt_interval = f'с {Converter.convert_date(date_limit_in_past) or "..."} ' \
                                 f'по {Converter.convert_date(date_limit_in_future) or "..."}'
-                self.err_message = self._get_err_msg(action, wd_type_id, dt_interval=dt_interval)
+                self.err_message = self._get_err_msg(action, wd_type_id, dt_interval=dt_interval, is_vacancy=is_vacancy)
                 return False
         return True
 
@@ -168,7 +173,7 @@ class BaseWdPermissionChecker:
         self,
         action: str,
         graph_type: str,
-        wd_type_id: int,
+        wd_type_id: str,
         is_vacancy: bool
     ):
         """Cached group wd premissions (by arguments)."""
@@ -184,13 +189,11 @@ class BaseWdPermissionChecker:
             F('limit_days_in_future').desc(nulls_first=True),
         ).distinct()
 
-    @property
-    @cached_method
+    @cached_property
     def _wd_types_dict(self):
         return WorkerDayType.get_wd_types_dict()
 
-    @property
-    @cached_method
+    @cached_property
     def _user_shops_ids(self) -> tuple[int]:
         return tuple(
             self.user.get_shops(
@@ -198,8 +201,7 @@ class BaseWdPermissionChecker:
             ).values_list('id', flat=True)
         )
 
-    @property
-    @cached_method
+    @cached_property
     def _user_subordinated_group_ids(self) -> tuple[int]:
         return tuple(Group.get_subordinated_group_ids(self.user))
 
@@ -213,7 +215,7 @@ class BaseWdPermissionChecker:
             user_subordinated_group_ids=self._user_subordinated_group_ids,   
         ).values_list('id', flat=True))
 
-    def _get_err_msg(self, action, wd_type_id, employee=None, dt_interval=None):
+    def _get_err_msg(self, action, wd_type_id, employee=None, dt_interval=None, is_vacancy=False):
         # рефакторинг
         from src.timetable.worker_day.views import WorkerDayViewSet
         wd_type_display_str = self._wd_types_dict.get(wd_type_id).name
@@ -235,7 +237,9 @@ class BaseWdPermissionChecker:
                 err_msg += f" {for_employee_text} {employee.user.short_fio}"
             if self.shop:
                 err_msg += f" {in_department_text} {self.shop.name}"
-
+        if is_vacancy:
+            vacancies = force_str(_('Vacancies'))
+            err_msg += f" ({vacancies})"
         return err_msg
 
 

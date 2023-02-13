@@ -1470,7 +1470,7 @@ class TestAditionalFunctions(TestsHelperMixin, APITestCase):
             resp_data,
             {
                 "detail": "У вас нет прав на создание типа дня \"Рабочий день\""
-                          " для сотрудника Иванов И. в подразделении Shop2"
+                          " для сотрудника Иванов И. в подразделении Shop2 (Вакансии)"
             }
         )
         GroupWorkerDayPermission.objects.create(
@@ -1480,7 +1480,7 @@ class TestAditionalFunctions(TestsHelperMixin, APITestCase):
                 graph_type=WorkerDayPermission.PLAN,
                 wd_type_id=WorkerDay.TYPE_WORKDAY,
             ),
-            employee_type=GroupWorkerDayPermission.OUTSOURCE_NETWORK_EMPLOYEE,
+            employee_type=GroupWorkerDayPermission.OTHER_SHOP_OR_NETWORK_EMPLOYEE,
             shop_type=GroupWorkerDayPermission.MY_SHOPS,
         )
         resp = self.client.post(url, data, format='json')

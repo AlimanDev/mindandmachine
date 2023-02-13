@@ -1,3 +1,5 @@
+from unittest import skip
+
 from datetime import datetime, time, date, timedelta
 from dateutil.relativedelta import relativedelta
 from django.conf import settings
@@ -1654,7 +1656,6 @@ class TestIntegration(TestsHelperMixin, APITestCase):
                 )
                 self.assertTrue(UserExternalCode.objects.filter(external_system=self.ext_system, user=self.user1).exists())
 
-
     def test_worker_not_exported_for_fired_person(self):
         ShopExternalCode.objects.create(
             attendance_area=self.att_area,
@@ -1671,6 +1672,7 @@ class TestIntegration(TestsHelperMixin, APITestCase):
                 self.assertEqual(mock_request.request.call_args_list, [])
                 self.assertFalse(UserExternalCode.objects.filter(external_system=self.ext_system, user=self.user1).exists())
 
+    @skip('RND-720. Approve logic changes: approving in one shop will not affect days in another')
     def test_fact_not_duplicated_on_approve(self):
         dt = date.today()
         WorkerDay.objects.all().delete()
@@ -1719,7 +1721,6 @@ class TestIntegration(TestsHelperMixin, APITestCase):
 
         with patch('src.integration.zkteco.requests', new_callable=TestRequestMock):
             import_urv_zkteco()
-        
         self.assertEqual(AttendanceRecords.objects.count(), 1)
         self.assertEqual(AttendanceRecords.objects.first().shop_id, self.shop.id)
         
@@ -1772,7 +1773,6 @@ class TestIntegration(TestsHelperMixin, APITestCase):
                 content_type='application/json',
             )
             self.assertEqual(response.status_code, 201)
-
             self.assertEqual(fact_wdays.count(), 1)
             self.assertEqual(plan_wdays.count(), 1)
 
@@ -1788,7 +1788,6 @@ class TestIntegration(TestsHelperMixin, APITestCase):
                 content_type='application/json',
             )
             self.assertEqual(response.status_code, 200)
-
             self.assertEqual(plan_wdays.count(), 2)
             self.assertEqual(fact_wdays.count(), 2)
 

@@ -1,11 +1,10 @@
-import datetime
-import uuid
+import datetime, uuid
 from contextlib import contextmanager
 from typing import TypeVar
 
 from dateutil.relativedelta import relativedelta
 from django.db import connection
-from django.db.models import Value, F, CharField, Subquery, OuterRef
+from django.db.models import Value, F, CharField
 from django.db.models.functions import Concat
 from django.test import TestCase
 from django.utils.timezone import now
@@ -21,6 +20,7 @@ from src.base.models import (
     ShopSettings,
     User,
     Network,
+    NetworkConnect,
     Break,
     Employee,
 )
@@ -33,11 +33,9 @@ from src.timetable.models import (
     AttendanceRecords,
     Slot,
     ShopMonthStat,
-    WorkerDayCashboxDetails,
     EmploymentWorkType,
     WorkType,
     WorkTypeName,
-    WorkerDay,
     UserWeekdaySlot,
     WorkerDayPermission,
     GroupWorkerDayPermission,
@@ -364,8 +362,7 @@ def create_departments_and_users(self, dt=None):
         GroupWorkerDayPermission(
             group=self.chief_group,
             worker_day_permission=wdp,
-        ) for wdp in WorkerDayPermission.objects.filter(
-            action__in=[WorkerDayPermission.CREATE, WorkerDayPermission.UPDATE, WorkerDayPermission.DELETE])
+        ) for wdp in WorkerDayPermission.objects.all()
     )
 
     # employee
@@ -599,8 +596,17 @@ def create_departments_and_users(self, dt=None):
         s.refresh_from_db()
 
 def create_outsource(self, dt=None):
+    if not hasattr(self, 'network'):
+        raise Exception('create_outsource called before create_departments_and_users')
+
     dt = dt or now().date() - relativedelta(months=1)
     self.network_outsource = Network.objects.create(code='outsource', name='Аутсорс-сеть')
+    NetworkConnect.objects.create(
+        client=self.network,
+        outsourcing=self.network_outsource,
+        allow_assign_employements_from_outsource=True,
+        allow_choose_shop_from_client_for_employement=True
+    )
     self.region_outsource = Region.objects.create(
         network=self.network_outsource,
         name='Аутсорс-регион',
@@ -625,7 +631,15 @@ def create_outsource(self, dt=None):
         employee=self.employee1_outsource,
         shop=self.shop_outsource,
     )
-    
+
+    GroupWorkerDayPermission.objects.bulk_create(
+        GroupWorkerDayPermission(
+            group=self.admin_group,
+            worker_day_permission=wdp,
+            employee_type=GroupWorkerDayPermission.OTHER_SHOP_OR_NETWORK_EMPLOYEE,
+        ) for wdp in WorkerDayPermission.objects.all()
+    )
+
 # def create_camera_cashbox_stat(camera_cashbox_obj, dttm, queue):
 #     CameraCashboxStat.objects.create(
 #         camera_cashbox=camera_cashbox_obj,

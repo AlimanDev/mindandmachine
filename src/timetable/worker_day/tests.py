@@ -134,9 +134,6 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
         vnawd3 = self.create_vacancy(dt=dt3, parent_worker_day=vawd3)
         vna1wd3 = self.create_vacancy(dt=dt3)
 
-        # print(vnawd3.__dict__)
-        # print(vna1wd3.__dict__)
-
         pnawd3 = self.create_worker_day(
             employee=self.employee3,
             employment=self.employment3,
@@ -298,7 +295,7 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
             'dt_to': self.dt + timedelta(days=4),
             'is_fact': False,
         }
-        
+
         wds4updating = [
             self.create_worker_day(type_id=WorkerDay.TYPE_SICK, shop=self.shop, dt=self.dt + timedelta(days=1),
                                    last_edited_by_id=self.user1.id),
@@ -324,6 +321,7 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
 
         for wd in wdscreated:
             wd.type_id = WorkerDay.TYPE_WORKDAY
+            wd.shop = self.shop
             wd.save()  # чтобы произошел approve -- должны быть какие-то изменения
 
         # second approve
@@ -460,14 +458,14 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
 
     def test_cant_approve_protected_day_without_perm(self):
         data = {
-            'shop_id': self.shop.id,
+            'shop_id': self.shop2.id,
             'dt_from': self.dt,
             'dt_to': self.dt,
             'is_fact': False,
         }
 
-        self.create_worker_day(shop=self.shop2, dt=self.dt, is_blocked=True, is_approved=True)
-        self.create_worker_day(shop=self.shop2, dt=self.dt, type_id=WorkerDay.TYPE_HOLIDAY)
+        protected_day = self.create_worker_day(shop=self.shop2, dt=self.dt, is_blocked=True, is_approved=True)
+        day_to_approve = self.create_worker_day(shop=self.shop2, dt=self.dt, dttm_work_end=protected_day.dttm_work_end + timedelta(hours=1))
 
         response = self.client.post(f"{self.url_approve}", data, format='json')
 
@@ -475,7 +473,7 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
         self.assertEqual(
             response.json()['detail'],
             f'У вас нет прав на подтверждение защищенных рабочих дней '
-            f'({self.user2.last_name} {self.user2.first_name} ({self.user2.username}): {self.dt.strftime("%Y-%m-%d")}). '
+            f'({self.user2.last_name} {self.user2.first_name}: {self.dt.strftime("%Y-%m-%d")}). '
             'Обратитесь, пожалуйста, к администратору системы.'
         )
 
@@ -484,19 +482,18 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
         self.admin_group.save()
 
         data = {
-            'shop_id': self.shop.id,
+            'shop_id': self.shop2.id,
             'dt_from': self.dt,
             'dt_to': self.dt,
             'is_fact': False,
         }
 
         protected_day = self.create_worker_day(shop=self.shop2, dt=self.dt, is_blocked=True, is_approved=True)
-        day_to_approve = self.create_worker_day(shop=self.shop2, dt=self.dt, type_id=WorkerDay.TYPE_HOLIDAY)
-
+        day_to_approve = self.create_worker_day(shop=self.shop2, dt=self.dt, dttm_work_end=protected_day.dttm_work_end + timedelta(hours=1))
         response = self.client.post(f"{self.url_approve}", data, format='json')
 
         self.assertEqual(response.status_code, 200)
-
+        self.assertEqual(response.data, 1)
         self.assertFalse(WorkerDay.objects.filter(id=protected_day.id).exists())
         self.assertTrue(WorkerDay.objects.get(id=day_to_approve.id).is_approved)
 
@@ -686,11 +683,11 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
 
             # не рабочие дни -- не отправляется
             WorkerDayFactory(
-                employee=self.employee2,
+                employee=self.employee2, employment=self.employment2,
                 type_id=WorkerDay.TYPE_HOLIDAY, shop=self.shop, dt=self.dt + timedelta(days=2), is_approved=False,
             )
             WorkerDayFactory(
-                employee=self.employee2,
+                employee=self.employee2, employment=self.employment2,
                 type_id=WorkerDay.TYPE_VACATION, shop=self.shop, dt=self.dt + timedelta(days=2), is_approved=True,
             )
 
@@ -1023,6 +1020,115 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
         res = self.client.post(f"{self.url_approve}", data, format='json')
         self.assertEqual(res.status_code, 200)
         self.assertTrue(WorkerDay.objects.filter(id=wd2.id, is_approved=True))
+
+    def test_approve_symmetric_difference(self):
+        """Approve only draft WorkerDays that actually have any changes, not all."""
+        params = {
+            'shop': self.root_shop,
+            'employee': self.employee1,
+            'employment': self.employment1,
+            'type_id': WorkerDay.TYPE_WORKDAY,
+            'is_fact': False,
+            'dttm_work_start': datetime.combine(self.dt, time(9))
+        }
+        dt2 = self.dt + timedelta(1)
+        #Identical days
+        wd1 = WorkerDay.objects.create(
+            is_approved=False,
+            dt=self.dt,
+            dttm_work_end=datetime.combine(self.dt, time(18)),
+            **params
+        )
+        wd2 = WorkerDay.objects.create(
+            is_approved=True,
+            dt=self.dt,
+            dttm_work_end=datetime.combine(self.dt, time(18)),
+            **params
+        )
+        #Changes in draft
+        wd3 = WorkerDay.objects.create(
+            is_approved=False,
+            dt=dt2,
+            dttm_work_end=datetime.combine(dt2, time(20)),
+            **params
+        )
+        wd4 = WorkerDay.objects.create(
+            is_approved=True,
+            dt=dt2,
+            dttm_work_end=datetime.combine(dt2, time(18)),
+            **params
+        )
+        data = {
+            'dt_from': self.dt,
+            'dt_to': dt2,
+            'employee_ids': [self.employee1.id],
+            'is_fact': False,
+            'shop_id': self.root_shop.id,
+        }
+        res = self.client.post(f"{self.url_approve}", data, format='json')
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(WorkerDay.objects.filter(id__in=(wd2.id, wd3.id), is_approved=True).count(), 2)
+        self.assertTrue(WorkerDay.objects.filter(id=wd1.id, is_approved=False).exists())
+        self.assertFalse(WorkerDay.objects.filter(id=wd4.id).exists())
+        self.assertTrue(WorkerDay.objects.filter(dt=dt2, is_approved=False).count(), 1)
+
+    def test_approve_outsource(self):
+        """Approving outsource workers with/without specifying 'employee_ids'"""
+        self.create_outsource()
+        wd = WorkerDay.objects.create(
+            shop=self.shop,
+            employee=self.employee1_outsource,
+            employment=self.employment1_outsource,
+            type_id=WorkerDay.TYPE_WORKDAY,
+            dt=self.dt,
+            dttm_work_start=datetime.combine(self.dt, time(9)),
+            dttm_work_end=datetime.combine(self.dt, time(18)),
+            is_fact=False,
+            is_approved=False
+        )
+        data = {
+            'dt_from': self.dt,
+            'dt_to': self.dt,
+            'employee_ids': [self.employee1_outsource.id],
+            'is_fact': False,
+            'shop_id': self.shop.id,
+        }
+        res = self.client.post(f"{self.url_approve}", data, format='json')
+        self.assertEqual(res.status_code, 200)
+        self.assertTrue(WorkerDay.objects.filter(id=wd.id, is_approved=True).exists())
+
+        WorkerDay.objects.all().delete()
+        wd.save() # reset to draft
+        del data['employee_ids']
+        res = self.client.post(f"{self.url_approve}", data, format='json')
+        self.assertEqual(res.status_code, 200)
+        self.assertTrue(WorkerDay.objects.filter(id=wd.id, is_approved=True).exists())
+
+    def test_approve_delete_day_if_draft_empty(self):
+        """
+        If draft WorkerDay doesn't exist - this is treated as deleting a day.
+        Approval logic should delete approved day.
+        """
+        wd = WorkerDay.objects.create(
+            is_approved=True,
+            dt=self.dt,
+            shop=self.root_shop,
+            employee=self.employee1,
+            employment=self.employment1,
+            type_id=WorkerDay.TYPE_WORKDAY,
+            is_fact=False,
+        )
+        data = {
+            'dt_from': self.dt,
+            'dt_to': self.dt,
+            'employee_ids': [self.employee1.id],
+            'is_fact': False,
+            'shop_id': self.root_shop.id,
+        }
+        res = self.client.post(f"{self.url_approve}", data, format='json')
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.data, 0)
+        self.assertFalse(WorkerDay.objects.filter(id=wd.id).exists())
 
 
 class TestUploadDownload(TestsHelperMixin, APITestCase):

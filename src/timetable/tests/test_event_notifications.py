@@ -670,6 +670,14 @@ class TestVacancyCreatedNotification(TestsHelperMixin, APITestCase):
                 wd_type=WorkerDay.TYPE_WORKDAY,
             ),
         )
+        GroupWorkerDayPermission.objects.create(
+            group=cls.group_dir,
+            worker_day_permission=WorkerDayPermission.objects.get(
+                action=WorkerDayPermission.DELETE,
+                graph_type=WorkerDayPermission.PLAN,
+                wd_type=WorkerDay.TYPE_WORKDAY,
+            ),
+        )
         cls.dt = datetime.now().date()
         cls.not_approved_plan = cls._create_worker_day(cls.employment_worker, datetime.combine(cls.dt, time(8)), datetime.combine(cls.dt, time(14)), shop_id=cls.shop.id, is_approved=False)
         cls.not_approved_vacancy = cls._create_worker_day(

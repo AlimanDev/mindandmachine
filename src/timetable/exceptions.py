@@ -117,3 +117,10 @@ class SawhSettingsIsNotSetRestrictionViolated(Exception):
                 'Не настроена норма часов у сотрудников: {error_str}. Обратитесь, пожалуйста, к администратору системы.').format(
             error_str=error_str
         )
+
+class ApprovalError(Exception):
+    """General approval error"""
+    pass
+
+class NothingToApprove(ApprovalError):
+    pass

@@ -1,4 +1,5 @@
 import logging
+from datetime import date
 
 from django.conf import settings
 from django.utils import timezone
@@ -61,7 +62,7 @@ def calc_timesheets(employee_id__in: list = None, dt_from=None, dt_to=None, rera
     logger.info('finish calc_timesheets')
 
 
-def recalc_timesheet_on_data_change(groupped_data):
+def recalc_timesheet_on_data_change(groupped_data: dict[int, tuple[date]]):
     # recalculate timesheet for period when employees' workdays changed
     for employee_id, dates in groupped_data.items():
         periods = set()

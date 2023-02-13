@@ -1,5 +1,5 @@
 from datetime import date, time, datetime, timedelta
-from unittest import mock
+from unittest import mock, skip
 
 import pandas as pd
 from django.db import transaction
@@ -78,6 +78,13 @@ class TestWorkerDayApprove(TestsHelperMixin, APITestCase):
         cls.fact_group_approve_wd_permission = GroupWorkerDayPermission.objects.create(
             group=cls.group,
             worker_day_permission=cls.fact_approve_wd_permission,
+        )
+        # Delete and update permissions are needed for approving (overwriting existing approved days)
+        GroupWorkerDayPermission.objects.bulk_create(
+            GroupWorkerDayPermission(
+                group=cls.group,
+                worker_day_permission=wd_permission,
+            ) for wd_permission in WorkerDayPermission.objects.filter(action__in=(WorkerDayPermission.DELETE, WorkerDayPermission.UPDATE))
         )
 
     def setUp(self) -> None:
@@ -356,40 +363,10 @@ class TestWorkerDayApprove(TestsHelperMixin, APITestCase):
         self.assertEqual(WorkerDay.objects.filter(is_fact=False, is_approved=True).count(), 3)
         self.assertEqual(WorkerDay.objects.filter(is_fact=False, is_approved=False).count(), 3)
 
-    # def test_approved_version_not_deleted_when_there_is_no_draft_data(self):
-    #     plan_approved_today = WorkerDayFactory(
-    #         dt=self.today,
-    #         employee=self.employee,
-    #         employment=self.employment,
-    #         shop=self.shop,
-    #         type_id=WorkerDay.TYPE_WORKDAY,
-    #         is_fact=False,
-    #         is_approved=True,
-    #         dttm_work_start=datetime.combine(self.today, time(10)),
-    #         dttm_work_end=datetime.combine(self.today, time(22)),
-    #         last_edited_by=self.user,
-    #         cashbox_details__work_type=self.work_type,
-    #     )
-    #
-    #     resp = self._approve(
-    #         self.shop.id,
-    #         is_fact=False,
-    #         dt_from=self.today,
-    #         dt_to=self.today,
-    #         wd_types=[WorkerDay.TYPE_WORKDAY],
-    #     )
-    #     self.assertEqual(resp.status_code, 200)
-    #
-    #     self.assertTrue(WorkerDay.objects.filter(id=plan_approved_today.id).exists())
-    #     self.assertEqual(WorkerDay.objects.filter(is_fact=False, is_approved=True).count(), 1)
-    #     self.assertEqual(WorkerDay.objects.filter(is_fact=False, is_approved=False).count(), 0)
-
     def test_approve_wdays_for_different_shops(self):
         """
-        1. В черновике 1 интервал в своем магазине, другой интервал в чужом магазине (вакансия)
-        2. Директор магазина подтверждает график в своем магазине,
-            сейчас подтвердяться оба дня (и в своем магазине и в чужом)
-            TODO: продумать более гибкие настройки/правила подтверждения?
+        1. 2 draft WorkerDays in different shops.
+        2. Approving for 1 shop should only approve 1 of those days.
         """
         plan_not_approved_today1 = WorkerDayFactory(
             dt=self.today,
@@ -430,8 +407,8 @@ class TestWorkerDayApprove(TestsHelperMixin, APITestCase):
         plan_not_approved_today1.refresh_from_db()
         self.assertTrue(plan_not_approved_today1.is_approved)
         plan_not_approved_today2.refresh_from_db()
-        self.assertTrue(plan_not_approved_today2.is_approved)
-        self.assertEqual(WorkerDay.objects.filter(is_fact=False, is_approved=True).count(), 2)
+        self.assertFalse(plan_not_approved_today2.is_approved)
+        self.assertEqual(WorkerDay.objects.filter(is_fact=False, is_approved=True).count(), 1)
         for wd in WorkerDay.objects.filter(is_fact=False, is_approved=True):
             self.assertEqual(WorkerDayCashboxDetails.objects.filter(worker_day=wd).count(), 1)
         self.assertEqual(WorkerDay.objects.filter(is_fact=False, is_approved=False).count(), 2)
@@ -447,6 +424,7 @@ class TestWorkerDayApprove(TestsHelperMixin, APITestCase):
             type_id=WorkerDay.TYPE_WORKDAY,
             is_fact=False,
             is_approved=False,
+            is_vacancy=True,
             dttm_work_start=datetime.combine(self.today, time(10)),
             dttm_work_end=datetime.combine(self.today, time(20)),
             cashbox_details__work_type=self.work_type,
@@ -476,6 +454,7 @@ class TestWorkerDayApprove(TestsHelperMixin, APITestCase):
             type_id=WorkerDay.TYPE_WORKDAY,
             is_fact=False,
             is_approved=False,
+            is_vacancy=True,
             dttm_work_start=datetime.combine(self.today, time(10)),
             dttm_work_end=datetime.combine(self.today, time(20)),
             cashbox_details__work_type=self.work_type,
@@ -488,6 +467,7 @@ class TestWorkerDayApprove(TestsHelperMixin, APITestCase):
             type_id=WorkerDay.TYPE_WORKDAY,
             is_fact=False,
             is_approved=False,
+            is_vacancy=True,
             dttm_work_start=datetime.combine(self.today, time(10)),
             dttm_work_end=datetime.combine(self.today, time(20)),
             cashbox_details__work_type=self.work_type,
@@ -610,6 +590,7 @@ class TestWorkerDayApprove(TestsHelperMixin, APITestCase):
         self.assertFalse(WorkerDay.objects.filter(pk=approved.id).exists())
         self.assertTrue(WorkerDay.objects.filter(parent_worker_day_id=not_approved_vacancy.id).exists())
 
+    @skip('RND-720 - approve logic changed. Such days are overwritten.')
     def test_approve_only_specific_worker_day_types(self):
         plan_not_approved1 = WorkerDayFactory(
             dt=self.today,
@@ -760,3 +741,45 @@ class TestWorkerDayApprove(TestsHelperMixin, APITestCase):
         )
         self.assertEqual(len(mail.outbox), 1)
         self.assertIn(self.employee.user.last_name, mail.outbox[0].body)
+
+    def test_approve_second_shift_in_another_shop(self):
+        same_fields = {
+            'dt': self.today,
+            'employee': self.employee,
+            'employment': self.employment,
+            'type_id': WorkerDay.TYPE_WORKDAY,
+            'is_fact': False
+        }
+        wd_approved = WorkerDayFactory(
+            is_approved=True,
+            shop=self.shop,
+            dttm_work_start=datetime.combine(self.today, time(9)),
+            dttm_work_end=datetime.combine(self.today, time(18)),
+            **same_fields
+        )
+        WorkerDayFactory(
+            is_approved=False,
+            shop=self.shop,
+            dttm_work_start=datetime.combine(self.today, time(9)),
+            dttm_work_end=datetime.combine(self.today, time(18)),
+            **same_fields
+        )
+        # Draft second shift in another shop
+        wd_draft_2 = WorkerDayFactory(
+            is_approved=False,
+            shop=self.shop2,
+            dttm_work_start=datetime.combine(self.today, time(18)),
+            dttm_work_end=datetime.combine(self.today, time(22)),
+            **same_fields
+        )
+        kwargs = {
+            'shop_id': self.shop2.id,
+            'is_fact': False,
+            'dt_from': self.today,
+            'dt_to': self.today,
+            'wd_types': [WorkerDay.TYPE_WORKDAY]
+        }
+        resp = self._approve(**kwargs)
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.data, 1) # 2 days approved
+        self.assertEqual(WorkerDay.objects.filter(id__in=(wd_approved.id, wd_draft_2.id), is_approved=True).count(), 2)

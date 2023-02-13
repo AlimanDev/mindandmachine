@@ -1414,7 +1414,7 @@ class User(DjangoAbstractUser, AbstractModel):
         return shops
 
     @cached_method
-    def get_group_ids(self, shop_id=None):
+    def get_group_ids(self, shop_id=None) -> list[int]:
         groups = self.get_active_employments(shop_id=shop_id).values_list('position__group_id', 'function_group_id')
         return list(set(list(map(lambda x: x[0], groups)) + list(map(lambda x: x[1], groups))))
 

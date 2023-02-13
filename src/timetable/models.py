@@ -852,8 +852,8 @@ class WorkerDay(AbstractModel):
         null=True, blank=True,
     )
 
-    objects = WorkerDayManager.from_queryset(WorkerDayQuerySet)()  # исключает раб. дни у которых employment_id is null
-    objects_with_excluded = models.Manager.from_queryset(WorkerDayQuerySet)()
+    objects: WorkerDayManager = WorkerDayManager.from_queryset(WorkerDayQuerySet)()  # исключает раб. дни у которых employment_id is null
+    objects_with_excluded: models.Manager = models.Manager.from_queryset(WorkerDayQuerySet)()
 
     tracker = FieldTracker(fields=('work_hours', 'type',))
 
@@ -896,6 +896,10 @@ class WorkerDay(AbstractModel):
     @property
     def is_draft(self):
         return not self.is_approved
+
+    @property
+    def is_open_vacancy(self) -> bool:
+        return bool(self.is_vacancy and not self.employee_id)
 
     @classmethod
     def _get_batch_create_extra_kwargs(cls):
@@ -1114,10 +1118,9 @@ class WorkerDay(AbstractModel):
                 )
             WorkerDayApproveHelper(
                 user=kwargs.get('user'),
-                any_draft_wd_exists=False,
                 exclude_approve_q=exclude_approve_q,
                 **serializer.validated_data,
-            ).run()
+            ).approve()
 
     @classmethod
     def _post_batch(cls, **kwargs):
@@ -2929,13 +2932,13 @@ class WorkerDayPermission(AbstractModel):
 class GroupWorkerDayPermission(AbstractModel):
     MY_SHOPS_ANY_EMPLOYEE = 1
     SUBORDINATE_EMPLOYEE = 2
-    OUTSOURCE_NETWORK_EMPLOYEE = 3
+    OTHER_SHOP_OR_NETWORK_EMPLOYEE = 3
     MY_NETWORK_EMPLOYEE = 4
 
     EMPLOYEE_TYPE_CHOICES = (
         (MY_SHOPS_ANY_EMPLOYEE, _('My shops employees')),  # с трудоустройством в моем магазине
         (SUBORDINATE_EMPLOYEE, _('Subordinate employees')),  # с трудоустройством в моем магазине
-        (OUTSOURCE_NETWORK_EMPLOYEE, _('Outsource network employees')),  # без трудоустройства в моем магазине и из сети, аутсорсящей сеть пользователя, соверщающего действие
+        (OTHER_SHOP_OR_NETWORK_EMPLOYEE, _('Other shop or network employees')),  # без трудоустройства в моем магазине и из сети, аутсорсящей сеть пользователя, соверщающего действие
         (MY_NETWORK_EMPLOYEE, _('My network employees')),
     )
     EMPLOYEE_TYPE_CHOICES_REVERSED_DICT = {v: k for k, v in dict(EMPLOYEE_TYPE_CHOICES).items()}

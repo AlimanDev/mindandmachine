@@ -12,7 +12,6 @@ from django.utils.translation import gettext_lazy as _
 from django_filters import utils
 from drf_yasg.utils import swagger_auto_schema
 from rest_framework.decorators import action
-from rest_framework.exceptions import PermissionDenied
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.serializers import ValidationError
@@ -339,8 +338,8 @@ class WorkerDayViewSet(BaseActiveNamedModelViewSet):
         serializer = WorkerDayApproveSerializer(data=request.data, **kwargs)
         serializer.is_valid(raise_exception=True)
         wd_approve_helper = WorkerDayApproveHelper(user=self.request.user, **serializer.validated_data)
-        wd_approve_helper.run()
-        return Response()
+        approved_count = wd_approve_helper.approve()
+        return Response(approved_count)
 
     @swagger_auto_schema(
         operation_description='Возвращает статистику по сотрудникам',

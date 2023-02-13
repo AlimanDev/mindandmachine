@@ -8,6 +8,7 @@ import pandas as pd
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import transaction
 from django.urls import reverse
+from rest_framework.response import Response
 
 from src.base.models import Employment, FunctionGroup
 from src.recognition.models import TickPoint
@@ -214,7 +215,7 @@ class TestsHelperMixin:
             )
         return resp
 
-    def _approve(self, shop_id, is_fact, dt_from, dt_to, wd_types=None, employee_ids=None, approve_open_vacs=False):
+    def _approve(self, shop_id, is_fact, dt_from, dt_to, wd_types=None, employee_ids=None, approve_open_vacs=False) -> Response:
         approve_data = {
             'shop_id': shop_id,
             'is_fact': is_fact,

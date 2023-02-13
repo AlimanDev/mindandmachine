@@ -1,5 +1,9 @@
 from functools import wraps
 
+from django.db import connection, reset_queries
+from django.conf import settings
+
+
 def cached_method(func):
     """
     Cached method call. Per arguments, that must be hashable.
@@ -52,3 +56,22 @@ def require_lock(model, lock):
             return func(*args, **kwargs)
         return wrapper
     return require_lock_decorator
+
+
+def print_queries(func):
+    """
+    Decorator that prints DB queries of a function. Only for testing.
+    """
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        debug = settings.DEBUG
+        settings.DEBUG = True
+        reset_queries()
+        result = func(*args, **kwargs)
+        count = len(connection.queries)
+        print(f'Function: {func.__name__}. Queries: {count}.')
+        if count:
+            print('\n'.join(f'{i}. {query["sql"]}' for i, query in enumerate(connection.queries, start=1)))
+        settings.DEBUG = debug
+        return result
+    return wrapper
