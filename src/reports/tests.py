@@ -1049,19 +1049,19 @@ class TestScheduleDeviation(APITestCase, TestsHelperMixin):
             (
                 (
                     self.shop.name, datetime.combine(dt, time(0, 0)), f'{self.user1.fio} ', '-', self.root_shop.name, 'штат', 
-                    self.position.name, 'Биржа смен', 11, 12, 4.5, 0.5, 1, 0.5, 1, 0, 0, 0.5, 2, 0, 0, 0, 0
+                    self.position.name, 'Биржа смен', 11, 10.5, 4.5, 0.5, 1, 0.5, 1, 0, 0, 0.5, 2, 0, 0
                 ),
                 (
                     self.shop2.name, datetime.combine(dt, time(0, 0)), f'{self.user2.fio} ', self.employee2.tabel_code, 
-                    self.shop.name, 'штат', '-', 'Биржа смен', 8.75, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8.75, 1
+                    self.shop.name, 'штат', '-', 'Биржа смен', 8.75, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8.75, 1
                 ),
                 (
                     self.shop.name, datetime.combine(dt, time(0, 0)), '-', '-', '-', 'штат', 'Грузчик', 'Биржа смен', 
-                    8.75, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8.75, 1
+                    8.75, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8.75, 1
                 ),
                 (
                     self.shop.name, datetime.combine(dt, time(0, 0)), '-', '-', 'Аутсорс сеть 1', 'не штат', 'Грузчик', 
-                    'Биржа смен', 8.75, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8.75, 1
+                    'Биржа смен', 8.75, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8.75, 1
                 ),
             )
         )

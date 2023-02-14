@@ -18,8 +18,6 @@ from django.db.models import (
 )
 from django.db.models.functions import Coalesce, Extract, Cast, Concat
 import xlsxwriter
-from django.http import HttpResponse
-from django.utils.encoding import escape_uri_path
 
 from src.base.models import Employment, Shop, User
 
@@ -73,7 +71,6 @@ columns_df = [
     'late_departure_hours',
     'late_departure_count',
     'fact_without_plan_work_hours',
-    'fact_without_plan_count',
     'lost_work_hours',
     'lost_work_hours_count',
     'wd_type_id',
@@ -110,10 +107,11 @@ table_columns = [
     {'col_name': 'early_departure_count', 'col_title': 'Ранний уход с работы количество раз', 'type': int, 'col_width': 13},
     {'col_name': 'late_departure_hours', 'col_title': 'Поздний уход с работы часы', 'type': int, 'col_width': 13},
     {'col_name': 'late_departure_count', 'col_title': 'Поздний уход с работы_количество раз', 'type': int, 'col_width': 14},
-    {'col_name': 'fact_without_plan_hours', 'col_title': 'Выход на работу вне плана часы', 'type': int, 'col_width': 11},
-    {'col_name': 'fact_without_plan_count', 'col_title': 'Выход на работу вне плана количество раз', 'type': int, 'col_width': 13},
     {'col_name': 'lost_hours', 'col_title': 'Потерянное время часы', 'type': int, 'col_width': 14},
     {'col_name': 'lost_count', 'col_title': 'Потерянное время количество раз', 'type': int, 'col_width': 17},
+    {'col_name': 'unplanned_work_shifts_one_tick_count', 'col_title': 'Выходы вне плана с одной отметкой, кол-во раз', 'type': int, 'col_width': 13, 'is_extra': True},
+    {'col_name': 'unplanned_work_shifts_hours', 'col_title': 'Выходы вне плана с двумя отметками, часы', 'type': int, 'col_width': 13, 'is_extra': True},
+    {'col_name': 'unplanned_work_shifts_count', 'col_title': 'Выходы вне плана с двумя отметками, кол-во раз', 'type': int, 'col_width': 13, 'is_extra': True},
 ]
 
 def _remove_duplicate_days(output):
@@ -169,38 +167,53 @@ def __calc_day_work_hours(row, work_days):
     work_shifts = [w for w in work_days if all(item in w.items() for item in kwargs.items())]
     work_shifts_fact = [x for x in work_shifts if x['is_fact']]
     work_shifts_plan = [x for x in work_shifts if not x['is_fact']]
-
+    planned_dates = [x['dt'] for x in work_shifts_plan]
+    unplanned_work_shifts_count = 0
+    unplanned_work_shifts_one_tick_count = 0
+    unplanned_work_shifts_hours = 0
     delta_work_hours_plan = delta_work_hours_fact= 0
     if len(work_shifts_fact) > 1:
+        hours_fact = 0
         for shift in work_shifts_fact:
-            if not shift['dttm_work_start'] or not shift['dttm_work_end']:
-                hours_fact = 0
-            else:
+            if (not shift['dttm_work_start'] and shift["dttm_work_end"]) or (shift['dttm_work_start'] and not shift['dttm_work_end']):
+                if shift["dt"] not in planned_dates:
+                    unplanned_work_shifts_one_tick_count += 1
+            elif shift['dttm_work_start'] and shift['dttm_work_end']:
                 hours_fact = shift["dttm_work_end"]- shift["dttm_work_start"]
-            delta_work_hours_fact += hours_fact.total_seconds() / 3600
+                if shift["dt"] not in planned_dates :
+                    unplanned_work_shifts_count += 1
+                    unplanned_work_shifts_hours += hours_fact.total_seconds() / 3600
+            if isinstance(hours_fact, pd.Timedelta):
+                delta_work_hours_fact += hours_fact.total_seconds() / 3600
     else:
-        if isinstance(row.dttm_work_end_fact, int):
+        if row.dttm_work_end_fact and isinstance(row.dttm_work_end_fact, int):
             row.dttm_work_end_fact = pd.Timestamp(row.dttm_work_end_fact)
-        if isinstance(row.dttm_work_start_fact, int):
+        if row.dttm_work_start_fact and isinstance(row.dttm_work_start_fact, int):
             row.dttm_work_start_fact = pd.Timestamp(row.dttm_work_start_fact)
-        delta_work_hours_fact = row.dttm_work_end_fact - row.dttm_work_start_fact
+        if row.dttm_work_end_fact and row.dttm_work_start_fact:
+            delta_work_hours_fact = row.dttm_work_end_fact - row.dttm_work_start_fact
         if isinstance(delta_work_hours_fact, pd.Timedelta):
             delta_work_hours_fact = delta_work_hours_fact.total_seconds() / 3600
+        if row["dt"] not in planned_dates:
+            if (not row.dttm_work_start_fact and row.dttm_work_end_fact) or (row.dttm_work_start_fact and not row.dttm_work_end_fact):
+                unplanned_work_shifts_one_tick_count += 1
+            elif row.dttm_work_start_fact and row.dttm_work_end_fact:
+                unplanned_work_shifts_count += 1
+                unplanned_work_shifts_hours += delta_work_hours_fact
     if len(work_shifts_plan) > 1:
         for shift in work_shifts_plan:
-            hours_plan = shift["dttm_work_end"]- shift["dttm_work_start"]
-            delta_work_hours_plan += hours_plan.total_seconds() / 3600
+            if shift['dttm_work_start'] and shift['dttm_work_end']:
+                hours_plan = shift["dttm_work_end"]- shift["dttm_work_start"]
+                delta_work_hours_plan += hours_plan.total_seconds() / 3600
 
-    fact_without_plan_hours = max(row.fact_without_plan_work_hours, delta_work_hours_fact)
     plan_work_hours = max(row.plan_work_hours, delta_work_hours_plan)
     if len([x for x in work_shifts_plan if x['type'] == WorkerDay.TYPE_WORKDAY]):  # if at least one workday in plan, don't merge rows as doubled
         override_skip = True
-    return fact_without_plan_hours, plan_work_hours, override_skip
+    return plan_work_hours, override_skip, unplanned_work_shifts_one_tick_count, unplanned_work_shifts_hours, unplanned_work_shifts_count
 
 
 def __check_duplicate_row(prev_row, cur_row):
     """Check if there is a duplicate row in the table"""
-    # check_cols = ["Дата", "ФИО сотрудника",  "Закрепленная компания/магазин"]
     check_cols = ["dt", "worker_fio", "user_network"]
     return prev_row[check_cols].equals(cur_row[check_cols]) and not prev_row["wd_type_id"] == cur_row["wd_type_id"]
 
@@ -211,21 +224,21 @@ def _write_data_rows(worksheet, df, columns, include_extra_columns, wd_types_dic
     for i, row in df.iterrows():
         if skip_wd_type:
             adjust_row += 1
-        fact_without_plan_hours, plan_work_hours, override_skip = __calc_day_work_hours(row, work_days)
+        plan_work_hours, override_skip,\
+        unplanned_work_shifts_one_tick_count, unplanned_work_shifts_hours, unplanned_work_shifts_count = __calc_day_work_hours(row, work_days)
         if prev_row is not None and __check_duplicate_row(prev_row, row) and not override_skip:
             i -= 1
             skip_wd_type = True
         else:
             skip_wd_type = False
         row_num: int = 11 + i - adjust_row
-        fact_work_hours = max(row.fact_work_hours, fact_without_plan_hours)
+        fact_work_hours = max(row.fact_work_hours, unplanned_work_shifts_hours)
         worker_day_type = wd_types_dict[row.wd_type_id].name
         work_type = row.work_type_name if (row.is_outsource or row.worker_fio == '-') else row.position_name
         network_shop = row.user_network if row.is_outsource else row.employment_shop_name
         is_outsource = 'не штат' if row.is_outsource else 'штат'
         if (row.is_outsource or row.shop_name != row.employment_shop_name) and row.wd_type_id == WorkerDay.TYPE_WORKDAY:
             worker_day_type = "Биржа смен"
-        fact_without_plan_hours = round(fact_without_plan_hours, 2) if row.fact_without_plan_count != 0 else 0
 
         worksheet.write_number(row_num, columns['number'], i + 1 - adjust_row, def_format)
         if include_extra_columns:
@@ -253,10 +266,12 @@ def _write_data_rows(worksheet, df, columns, include_extra_columns, wd_types_dic
         worksheet.write_number(row_num, columns['early_departure_count'], row.early_departure_count, def_format)
         worksheet.write_number(row_num, columns['late_departure_hours'], round(row.late_departure_hours, 2), def_format)
         worksheet.write_number(row_num, columns['late_departure_count'], row.late_departure_count, def_format)
-        worksheet.write_number(row_num, columns['fact_without_plan_hours'], fact_without_plan_hours, def_format)
-        worksheet.write_number(row_num, columns['fact_without_plan_count'], row.fact_without_plan_count, def_format)
         worksheet.write_number(row_num, columns['lost_hours'], round(row.lost_work_hours, 2), def_format)
         worksheet.write_number(row_num, columns['lost_count'], row.lost_work_hours_count, def_format)
+        if include_extra_columns:
+            worksheet.write_number(row_num, columns['unplanned_work_shifts_one_tick_count'], round(unplanned_work_shifts_one_tick_count, 2), def_format)
+            worksheet.write_number(row_num, columns['unplanned_work_shifts_hours'], round(unplanned_work_shifts_hours, 2), def_format)
+            worksheet.write_number(row_num, columns['unplanned_work_shifts_count'], round(unplanned_work_shifts_count, 2), def_format)
         prev_row = row
 
 def create_data_frame(qs, unapplied_vacancies, extra_columns, include_extra_columns) -> pd.DataFrame:
@@ -295,7 +310,6 @@ def create_data_frame(qs, unapplied_vacancies, extra_columns, include_extra_colu
                 'late_departure_hours',
                 'late_departure_count',
                 'fact_without_plan_work_hours',
-                'fact_without_plan_count',
                 'lost_work_hours',
                 'lost_work_hours_count',
                 'dttm_work_start_fact',
