@@ -209,6 +209,11 @@ class TickPhoto(AbstractActiveModel):
             return images.compress_image(self.image.path, quality)
 
 
+class TickPointTokenManager(models.Manager):
+    """Pulls often required related fields in the same auth request"""
+    def get_queryset(self):
+        return super().get_queryset().select_related('user__shop__network')
+
 class TickPointToken(models.Model):
     key = models.CharField(gettext_lazy("Key"), max_length=40, primary_key=True)
     user = models.OneToOneField(
@@ -216,6 +221,8 @@ class TickPointToken(models.Model):
         on_delete=models.CASCADE,
     )
     created = models.DateTimeField(gettext_lazy("Created"), auto_now_add=True)
+
+    objects = TickPointTokenManager()
 
     def __str__(self):
         return self.key
@@ -252,7 +259,7 @@ class ShopIpAddress(models.Model):
         tick_point = self.tick_point
         if not tick_point:
             shop_id = self.shop_id
-            tick_point = TickPoint.objects.filter(shop_id=shop_id, dttm_deleted__isnull=True).first()
+            tick_point = TickPoint.objects.select_related('shop__network').filter(shop_id=shop_id, dttm_deleted__isnull=True).first()
             if tick_point is None:
                 tick_point = TickPoint.objects.create(
                     name=f'autocreate tickpoint {shop_id}', 

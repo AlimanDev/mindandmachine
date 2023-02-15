@@ -42,7 +42,7 @@ class ShopIPAuthentication(authentication.BaseAuthentication):
 
     def authenticate_credentials(self, ip):
         
-        shop_ip = ShopIpAddress.objects.filter(ip_address=ip).first()
+        shop_ip = ShopIpAddress.objects.select_related('tick_point__shop__network').filter(ip_address=ip).first()
 
         if not shop_ip:
             return None

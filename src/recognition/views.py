@@ -270,7 +270,7 @@ class TickViewSet(BaseModelViewSet):
 
         # Проверка на принадлежность пользователя правильному магазину
         employment = Employment.objects.get_active(
-            request.user.network.id,
+            request.user.network_id,
             dttm_from.date(), dttm_from.date(),
             shop_id=tick_point.shop_id,
             **employee_lookup,
@@ -401,7 +401,7 @@ class TickPhotoViewSet(BaseModelViewSet):
         tick_type: str = data['type']
 
         try:
-            tick = Tick.objects.get(id=tick_id)
+            tick = Tick.objects.select_related('user', 'tick_point__shop').get(id=tick_id)
         except Tick.DoesNotExist as e:
             return Response({"error": _('The tick does not exist')}, 404)
         tick_point = tick.tick_point
