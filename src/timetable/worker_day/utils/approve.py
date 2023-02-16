@@ -263,6 +263,8 @@ class WorkerDayApproveHelper:
             WorkerDay.objects.filter(
                 self.approve_condition,
                 is_approved=True,
+            ).exclude(
+                is_vacancy=True, employee_id__isnull=True    # don't delete open vacs
             ).annotate(
                 work_type_ids=StringAgg(
                     Cast('work_types', CharField()),
@@ -353,7 +355,7 @@ class WorkerDayApproveHelper:
             is_approved=True,
             is_fact=self.is_fact
         ).exclude(
-            employee_id__isnull=True                # don't delete open vacancies
+            is_vacancy=True, employee_id__isnull=True                # don't delete open vacancies
         )
         if self.shop:
             wdays = wdays.filter(Q(shop=self.shop) | Q(shop__isnull=True))  # don't delete days in other shops
