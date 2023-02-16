@@ -807,6 +807,7 @@ class WorkerDayApproveHelper:
     def _check_restrictions(self):
         Restriction.check_restrictions(
             employee_days_q=self.employee_days_q,
+            is_fact=self.is_fact,
             is_approved=True,
             exc_cls=ValidationError,
         )

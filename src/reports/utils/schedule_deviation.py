@@ -194,7 +194,7 @@ def __calc_day_work_hours(row, work_days):
             delta_work_hours_fact = row.dttm_work_end_fact - row.dttm_work_start_fact
         if isinstance(delta_work_hours_fact, pd.Timedelta):
             delta_work_hours_fact = delta_work_hours_fact.total_seconds() / 3600
-        if row["dt"] not in planned_dates:
+        if row["dt"].date not in planned_dates:
             if (not row.dttm_work_start_fact and row.dttm_work_end_fact) or (row.dttm_work_start_fact and not row.dttm_work_end_fact):
                 unplanned_work_shifts_one_tick_count += 1
             elif row.dttm_work_start_fact and row.dttm_work_end_fact:
