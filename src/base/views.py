@@ -68,7 +68,7 @@ from src.integration.models import UserExternalCode
 from src.integration.zkteco import ZKTeco
 from src.recognition.api.recognition import Recognition
 from src.recognition.models import UserConnecter
-from src.timetable.worker_day.tasks import recalc_wdays
+from src.timetable.worker_day.tasks import recalc_work_hours
 from .filter_backends import EmployeeFilterBackend
 
 
@@ -446,7 +446,7 @@ class ShopScheduleViewSet(UpdateorCreateViewSet):
             shop_id=self.kwargs.get('department_pk'),
             dt=self.kwargs.get('dt'),
         )
-        recalc_wdays.delay(
+        recalc_work_hours.delay(
             shop_id=self.kwargs.get('department_pk'),
             dt__gte=self.kwargs.get('dt'),
             dt__lte=self.kwargs.get('dt'),

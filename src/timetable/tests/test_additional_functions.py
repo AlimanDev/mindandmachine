@@ -4,6 +4,7 @@ from unittest import mock
 
 from dateutil.relativedelta import relativedelta
 from django.db import transaction
+from django.test import override_settings
 from rest_framework import status
 from rest_framework.test import APITestCase
 
@@ -1344,6 +1345,7 @@ class TestAditionalFunctions(TestsHelperMixin, APITestCase):
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.json(), {'employee_id': 'Это поле обязательно.'})
 
+    @override_settings(CELERY_TASK_ALWAYS_EAGER=True, CELERY_EAGER_PROPAGATES_EXCEPTIONS=True)
     def test_recalc(self):
         today = date.today()
         wd = WorkerDayFactory(
@@ -1369,22 +1371,25 @@ class TestAditionalFunctions(TestsHelperMixin, APITestCase):
             'dt_from': today,
             'dt_to': today,
         }
-        with self.settings(CELERY_TASK_ALWAYS_EAGER=True):
-            resp = self.client.post(
-                path=self.get_url('WorkerDay-recalc'),
-                data=self.dump_data(data), content_type='application/json',
-            )
+        resp = self.client.post(
+            path=self.get_url('WorkerDay-recalc'),
+            data=self.dump_data(data), content_type='application/json',
+        )
+        self.assertEqual(resp.status_code, 200)
         self.assertContains(resp, 'Пересчет часов успешно запущен.', status_code=200)
         wd.refresh_from_db()
         self.assertEqual(wd.work_hours, timedelta(hours=8))
 
+        # other employee 
         data['employee_id__in'] = [self.employee8.id]
-        with self.settings(CELERY_TASK_ALWAYS_EAGER=True):
-            resp2 = self.client.post(
-                path=self.get_url('WorkerDay-recalc'),
-                data=self.dump_data(data), content_type='application/json',
-            )
-        self.assertContains(resp2, 'Не найдено сотрудников удовлетворяющих условиям запроса.', status_code=400)
+        WorkerDay.objects.update(work_hours=timedelta(0))
+        resp2 = self.client.post(
+            path=self.get_url('WorkerDay-recalc'),
+            data=self.dump_data(data), content_type='application/json',
+        )
+        self.assertEqual(resp2.status_code, 200)
+        wd.refresh_from_db()
+        self.assertEqual(wd.work_hours, timedelta(hours=0))
 
     def test_duplicate_for_multiple_wdays_on_one_date(self):
         self.network.allow_creation_several_wdays_for_one_employee_for_one_date = True

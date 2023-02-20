@@ -14,14 +14,11 @@ from rest_framework.exceptions import ValidationError, PermissionDenied
 from src.base.models import (
     Employment,
     Group,
-    Shop,
     User, Network,
 )
 from src.timetable.models import (
     AttendanceRecords,
     EmploymentWorkType,
-    WorkerDayPermission,
-    GroupWorkerDayPermission,
     WorkerDay,
     WorkerDayCashboxDetails,
 )

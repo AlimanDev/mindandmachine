@@ -19,25 +19,26 @@ def clean_wdays(**kwargs):
 
 
 @app.task
-def recalc_wdays(**kwargs):
-    wdays_qs = WorkerDay.objects.filter(
+@transaction.atomic
+def recalc_work_hours(**filters):
+    """Recalculate `work_hours` and `dttm_work_start/end_tabel` of `WorkerDays`. `kwargs` - arguments for `filter()`"""
+    # TODO: rewrite to in-memory work_hours calculation, save once in bulk_update.
+    wdays = WorkerDay.objects.filter(
         Q(type__is_dayoff=False) | Q(type__is_dayoff=True, type__is_work_hours=True),
-        **kwargs,
+        **filters
     ).order_by(
-        'is_fact', 'is_approved',  # сначала план, потом факт
-    )
-    for wd_id in wdays_qs.values_list('id', flat=True):
-        with transaction.atomic():
-            wd_obj = WorkerDay.objects.filter(id=wd_id).select_for_update().first()
-            if wd_obj:
-                wd_obj.save(
-                    recalc_fact=False,
-                    update_fields=[
-                        'work_hours',
-                        'dttm_work_start_tabel',
-                        'dttm_work_end_tabel',
-                    ],
-                )
+        'is_fact', 'is_approved'  # plan, then fact
+    ).select_for_update()
+    wd: WorkerDay
+    for wd in wdays:
+        wd.save(
+            recalc_fact=False,
+            update_fields=[
+                'work_hours',
+                'dttm_work_start_tabel',
+                'dttm_work_end_tabel',
+            ]
+        )
 
 
 @app.task

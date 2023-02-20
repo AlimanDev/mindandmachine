@@ -4,7 +4,7 @@ from django.conf import settings
 from django.db.models import Case, When, Sum, Value, IntegerField
 
 from src.base.models import ProductionDay
-from src.timetable.worker_day.xlsx_utils.colors import *
+from src.timetable.worker_day.utils.xlsx_utils.colors import *
 from src.util.models_converter import Converter
 
 

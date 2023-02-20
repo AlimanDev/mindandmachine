@@ -31,7 +31,7 @@ from src.timetable.models import (
     WorkerDayType,
 )
 from src.timetable.tests.factories import WorkerDayFactory
-from src.timetable.worker_day.tasks import recalc_wdays
+from src.timetable.worker_day.tasks import recalc_work_hours
 from ._base import TestTimesheetMixin
 
 
@@ -1164,7 +1164,7 @@ class TestPobedaDivider(TestTimesheetMixin, TestCase):
             get_work_hours_method=WorkerDayType.GET_WORK_HOURS_METHOD_TYPE_MANUAL_OR_MONTH_AVERAGE_SAWH_HOURS,
         )
 
-        recalc_wdays()
+        recalc_work_hours()
 
         self._calc_timesheets(reraise_exc=True, dttm_now=datetime(2021, 6, 15, 10, 10, 10))
         self.assertEqual(holiday_qs.count(), 1)
@@ -1177,7 +1177,7 @@ class TestPobedaDivider(TestTimesheetMixin, TestCase):
             get_work_hours_method=WorkerDayType.GET_WORK_HOURS_METHOD_TYPE_MANUAL_OR_MONTH_AVERAGE_SAWH_HOURS,
         )
 
-        recalc_wdays()
+        recalc_work_hours()
 
         self._calc_timesheets(reraise_exc=True, dttm_now=datetime(2021, 6, 15, 10, 10, 10))
         self.assertEqual(vacation_qs.count(), 5)

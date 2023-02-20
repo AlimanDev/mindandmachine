@@ -5,7 +5,7 @@ from rest_framework.test import APITestCase
 from src.timetable.models import (
     WorkerDay,
 )
-from src.timetable.worker_day.utils.approve import WorkerDayApproveHelper
+from src.timetable.worker_day.services.approve import WorkerDayApproveService
 from src.util.mixins.tests import TestsHelperMixin
 
 
@@ -53,6 +53,6 @@ class TestWorkerDayApproveOptimization(TestsHelperMixin, APITestCase):
         }
         settings.DEBUG = True
         with self.assertNumQueries(QUERY_COUNT):
-            count = WorkerDayApproveHelper(**kwargs).approve()
+            count = WorkerDayApproveService(**kwargs).approve()
             self.assertEqual(count, WORKERDAYS_COUNT)
         self.assertEqual(WorkerDay.objects.filter(is_approved=True).count(), WORKERDAYS_COUNT)

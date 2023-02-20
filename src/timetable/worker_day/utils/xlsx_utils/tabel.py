@@ -7,7 +7,7 @@ from src.timetable.models import (
     WorkerDay,
     WorkerDayType,
 )
-from src.timetable.worker_day.xlsx_utils.colors import *
+from src.timetable.worker_day.utils.xlsx_utils.colors import *
 from src.util.colors import get_contrast_color
 from src.util.dg.helpers import MONTH_NAMES
 from .base_class import Xlsx_base

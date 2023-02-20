@@ -59,11 +59,11 @@ from src.timetable.worker_day.serializers import (
     RecalcWdaysSerializer,
 )
 from src.timetable.worker_day.stat import count_daily_stat
-from src.timetable.worker_day.tasks import recalc_wdays, batch_block_or_unblock
+from src.timetable.worker_day.tasks import recalc_work_hours, batch_block_or_unblock
 from src.timetable.worker_day.timetable import get_timetable_generator_cls
-from src.timetable.worker_day.utils.approve import WorkerDayApproveHelper
+from src.timetable.worker_day.services.approve import WorkerDayApproveService
 from src.timetable.worker_day.utils.utils import create_worker_days_range, exchange, \
-    copy_as_excel_cells, can_edit_worker_day, ERROR_MESSAGES
+    copy_as_excel_cells, ERROR_MESSAGES
 from src.util.dg.timesheet import get_tabel_generator_cls
 from src.util.models_converter import Converter
 from src.util.openapi.responses import (
@@ -73,6 +73,7 @@ from src.util.openapi.responses import (
     change_range_response_schema_dictionary,
 )
 from src.util.upload import get_uploaded_file
+from src.util.time import DateTimeHelper
 from src.timetable.worker_day.stat import WorkersStatsGetter
 
 
@@ -337,7 +338,7 @@ class WorkerDayViewSet(BaseActiveNamedModelViewSet):
         kwargs = {'context': self.get_serializer_context()}
         serializer = WorkerDayApproveSerializer(data=request.data, **kwargs)
         serializer.is_valid(raise_exception=True)
-        wd_approve_helper = WorkerDayApproveHelper(user=self.request.user, **serializer.validated_data)
+        wd_approve_helper = WorkerDayApproveService(user=self.request.user, **serializer.validated_data)
         approved_count = wd_approve_helper.approve()
         return Response(approved_count)
 
@@ -522,7 +523,7 @@ class WorkerDayViewSet(BaseActiveNamedModelViewSet):
                     q_obj=Q(employee_id=vacancy.employee_id, dt=vacancy.dt),
                     delta_in_secs=vacancy.shop.network.set_closest_plan_approved_delta_for_manual_fact,
                 )
-                transaction.on_commit(lambda: recalc_wdays.delay(
+                transaction.on_commit(lambda: recalc_work_hours.delay(
                     id__in=list(WorkerDay.objects.filter(closest_plan_approved=parent_id).values_list('id', flat=True))))
                 recalc_timesheet_on_data_change(
                     {
@@ -579,7 +580,7 @@ class WorkerDayViewSet(BaseActiveNamedModelViewSet):
         if not is_fact and is_approved:
             related_fact_ids = list(to_delete_qs.values_list('related_facts__id', flat=True))
             if related_fact_ids:
-                transaction.on_commit(lambda: recalc_wdays.delay(id__in=related_fact_ids))
+                transaction.on_commit(lambda: recalc_work_hours.delay(id__in=related_fact_ids))
         deleted = to_delete_qs.delete()
 
         wdays_to_create = []
@@ -1110,28 +1111,16 @@ class WorkerDayViewSet(BaseActiveNamedModelViewSet):
         operation_description='Пересчет часов'
     )
     @action(detail=False, methods=['post'])
-    def recalc(self, *args, **kwargs):
+    def recalc(self, request: Request):
         serializer = RecalcWdaysSerializer(
-            data=self.request.data, context=self.get_serializer_context())
-        serializer.is_valid(raise_exception=True)
-        employee_filter = {}
-        if serializer.validated_data.get('employee_id__in'):
-            employee_filter['employee_id__in'] = serializer.validated_data['employee_id__in']
-        employee_ids = Employment.objects.get_active(
-            Shop.objects.get(id=serializer.validated_data['shop_id']).network_id,
-            dt_from=serializer.validated_data['dt_from'],
-            dt_to=serializer.validated_data['dt_to'],
-            shop_id=serializer.validated_data['shop_id'],
-            **employee_filter,
-        ).values_list('employee_id', flat=True)
-        employee_ids = list(employee_ids)
-        if not employee_ids:
-            raise ValidationError({'detail': _('No employees satisfying the conditions.')})
-        recalc_wdays.delay(
-            employee_id__in=employee_ids,
-            dt__gte=serializer.data['dt_from'],
-            dt__lte=serializer.data['dt_to'],
+            data=request.data, context=self.get_serializer_context()
         )
+        serializer.is_valid(raise_exception=True)
+        filters = serializer.validated_data.copy()
+        dt_from = DateTimeHelper.to_dt_str(filters.pop('dt_from'))
+        dt_to = DateTimeHelper.to_dt_str(filters.pop('dt_to'))
+        filters['dt__range'] = (dt_from, dt_to)
+        recalc_work_hours.delay(**filters)
         return Response({'detail': _('Hours recalculation started successfully.')})
 
     @swagger_auto_schema(

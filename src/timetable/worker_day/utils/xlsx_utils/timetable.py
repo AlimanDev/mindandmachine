@@ -15,8 +15,8 @@ from src.timetable.models import (
     WorkerDay,
     WorkerDayType,
 )
-from src.timetable.worker_day.xlsx_utils.colors import *
-from src.timetable.worker_day.xlsx_utils.tabel import Tabel_xlsx
+from src.timetable.worker_day.utils.xlsx_utils.colors import *
+from src.timetable.worker_day.utils.xlsx_utils.tabel import Tabel_xlsx
 from src.util.dg.helpers import MONTH_NAMES
 
 

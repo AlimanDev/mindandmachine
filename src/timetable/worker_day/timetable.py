@@ -37,7 +37,7 @@ from src.timetable.models import (
     WorkerDayCashboxDetails,
 )
 from src.timetable.worker_day.stat import WorkersStatsGetter
-from src.timetable.worker_day.xlsx_utils.timetable import Timetable_xlsx
+from src.timetable.worker_day.utils.xlsx_utils.timetable import Timetable_xlsx
 
 SKIP_SYMBOLS = ['NAN', '']
 DIVIDERS = ['-', '.', ',', '\n', '\r', ' ']

@@ -1077,7 +1077,7 @@ class WorkerDay(AbstractModel):
 
     @classmethod
     def _approve_delete_scope_filters_wdays(cls, **kwargs):
-        from src.timetable.worker_day.utils.approve import WorkerDayApproveHelper
+        from src.timetable.worker_day.services.approve import WorkerDayApproveService
         from src.timetable.worker_day.serializers import WorkerDayApproveSerializer
         delete_scope_filters = kwargs.get('delete_scope_filters', {})
         employee_ids = []
@@ -1116,7 +1116,7 @@ class WorkerDay(AbstractModel):
                     type__in=allowed_wd_types_dict.get(wd_type_id, []),
                     dt__in=dates,
                 )
-            WorkerDayApproveHelper(
+            WorkerDayApproveService(
                 user=kwargs.get('user'),
                 exclude_approve_q=exclude_approve_q,
                 **serializer.validated_data,

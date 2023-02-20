@@ -766,11 +766,11 @@ class Shop(MPTTModel, AbstractActiveNetworkSpecificCodeNamedModel):
     def _handle_schedule_change(self):
         from src.util.models_converter import Converter
         from src.base.shop.tasks import fill_shop_schedule
-        from src.timetable.worker_day.tasks import recalc_wdays
+        from src.timetable.worker_day.tasks import recalc_work_hours
         dt_now = datetime.datetime.now().date()
         ch = chain(
             fill_shop_schedule.si(shop_id=self.id, dt_from=Converter.convert_date(dt_now)),
-            recalc_wdays.si(
+            recalc_work_hours.si(
                 shop_id=self.id,
                 dt__gte=Converter.convert_date(dt_now),
                 dt__lte=Converter.convert_date(dt_now + datetime.timedelta(days=90))),
@@ -2226,10 +2226,10 @@ class ShopSchedule(AbstractModel):
         recalc_wdays = kwargs.pop('recalc_wdays', False)
 
         if recalc_wdays and any(self.tracker.has_changed(f) for f in ['opens', 'closes', 'type']):
-            from src.timetable.worker_day.tasks import recalc_wdays
+            from src.timetable.worker_day.tasks import recalc_work_hours
             from src.util.models_converter import Converter
             dt_str = Converter.convert_date(self.dt)
-            recalc_wdays.delay(
+            recalc_work_hours.delay(
                 shop_id=self.shop_id,
                 dt__gte=dt_str,
                 dt__lte=dt_str,

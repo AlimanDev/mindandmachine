@@ -3,7 +3,7 @@ from django import forms
 from django.db.models import Q
 from datetime import date, timedelta
 from src.base.models import User, Shop, Employment
-from src.timetable.worker_day.tasks import recalc_wdays
+from src.timetable.worker_day.tasks import recalc_work_hours
 from src.timetable.timesheet.tasks import calc_timesheets
 from django.contrib.admin.widgets import AdminDateWidget, FilteredSelectMultiple
 from src.base.forms import CustomSelectWidget, DefaultOverrideAdminWidgetsForm
@@ -34,7 +34,7 @@ class RecalsWhForm(forms.Form):
         self.fields['shops'] = forms.ModelMultipleChoiceField(queryset=get_shops(), label='Магазины', required=False, widget=FilteredSelectMultiple('Отделы', is_stacked=False))
 
     def recalc_wh(self, **kwargs):
-        recalc_wdays.delay(**kwargs)
+        recalc_work_hours.delay(**kwargs)
 
 
 class RecalsTimesheetForm(forms.Form):

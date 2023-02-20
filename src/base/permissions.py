@@ -83,7 +83,7 @@ class WdPermission(Permission):
             return has_permission
 
         view_action = view.action.lower()
-        if view_action in ['create', 'update', 'destroy']:  # TODO: approve? -- для подтверждения конкретного рабочего дня
+        if view_action in ['create', 'update', 'destroy']:
             if view_action == 'create':
                 wd_data = request.data
                 self._set_is_vacancy(wd_data=wd_data)

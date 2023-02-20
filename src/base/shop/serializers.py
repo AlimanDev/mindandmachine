@@ -15,7 +15,7 @@ from src.base.serializers import BaseModelSerializer, BaseSerializer
 from src.conf.djconfig import QOS_TIME_FORMAT
 from src.util.drf.fields import RoundingDecimalField
 from src.util.models_converter import Converter
-from src.timetable.worker_day.tasks import recalc_wdays
+from src.timetable.worker_day.tasks import recalc_work_hours
 
 POSSIBLE_KEYS = [
     '0', '1', '2', '3', '4', '5', '6', 'all',
@@ -207,7 +207,7 @@ class ShopSerializer(BaseModelSerializer):
                         )
                     )
                     dt_str = Converter.convert_date(sch_dict['dt'])
-                    recalc_wdays.delay(
+                    recalc_work_hours.delay(
                         shop_id=instance.id,
                         dt__gte=dt_str,
                         dt__lte=dt_str,

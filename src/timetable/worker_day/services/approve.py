@@ -16,6 +16,7 @@ from django.utils.translation import gettext as _
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.serializers import ValidationError
 
+from src.abstract.services.service import Service
 from src.base.models import Employment, Shop, Group
 from src.celery.tasks import send_doctors_schedule_to_mis
 from src.events.signals import event_signal
@@ -33,13 +34,13 @@ from src.timetable.models import (
 from src.timetable.timesheet.tasks import recalc_timesheet_on_data_change
 from src.timetable.vacancy.tasks import vacancies_create_and_cancel_for_shop
 from src.timetable.vacancy.utils import notify_vacancy_created
-from src.timetable.worker_day.tasks import recalc_wdays, recalc_fact_from_records
+from src.timetable.worker_day.tasks import recalc_work_hours, recalc_fact_from_records
 from src.timetable.worker_day_permissions.checkers import BaseWdPermissionChecker
 from src.timetable.exceptions import ApprovalError, NothingToApprove
-from .utils import ERROR_MESSAGES
+from src.timetable.worker_day.utils.utils import ERROR_MESSAGES
 
 
-class WorkerDayApproveHelper:
+class WorkerDayApproveService(Service):
     # To compare draft to approved days for changes
     DIFFERENCE_FIELDS = (
         'code',
@@ -848,7 +849,7 @@ class WorkerDayApproveHelper:
             ).values_list('id', flat=True)
         )
         if to_recalc_ids:
-            recalc_wdays(id__in=to_recalc_ids)
+            recalc_work_hours(id__in=to_recalc_ids)
 
     def _update_shop_stat(self):
         """Mark ShopMonthStat as approved"""

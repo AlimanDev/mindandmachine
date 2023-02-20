@@ -5,7 +5,7 @@ from src.integration.models import UserExternalCode
 from src.recognition.models import Tick
 from src.timetable.models import WorkerDay, AttendanceRecords
 from src.timetable.timesheet.tasks import calc_timesheets
-from src.timetable.worker_day.tasks import recalc_wdays
+from src.timetable.worker_day.tasks import recalc_work_hours
 UserExternalCode.objects.filter(user_id=179).delete()  # РЦ user_id 179 -- Галиев
 User.objects.filter(~Exists(Employment.objects.filter(employee__user_id=OuterRef('id')))).delete()
 wdays_qs = WorkerDay.objects.annotate(tn_len=Length('employee__tabel_code')).filter(tn_len=10).select_related(
@@ -82,6 +82,6 @@ load_shift_schedule('/home/wonder/Downloads/Telegram Desktop/РЦ_графики
 load_shift_schedule_intervals('/home/wonder/Downloads/Telegram Desktop/РЦ_графики_сотрудников_интервальный_2.xlsx')
 # load_shift_schedule('/home/wonder/Downloads/Telegram Desktop/АТЛ_графики 20211101-2.xlsx', from_dt=date(2021, 11, 1))
 # load_shift_schedule_intervals('/home/wonder/Downloads/Telegram Desktop/АТЛ_графики_сотрудников_интервальный_2.xlsx')
-recalc_wdays(dt__gte='2021-11-01', dt__lte='2021-12-31', type__is_dayoff=False)
+recalc_work_hours(dt__gte='2021-11-01', dt__lte='2021-12-31', type__is_dayoff=False)
 calc_timesheets(dt_from='2021-11-01', dt_to='2021-11-30')
 calc_timesheets(dt_from='2021-12-01', dt_to='2021-12-31')

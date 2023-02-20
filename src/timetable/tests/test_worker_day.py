@@ -806,7 +806,7 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
     @mock.patch.object(transaction, 'on_commit', lambda t: t())
     def test_approve_delete_holidays_when_other_day_types(self):
         """
-        Tests `src.timetable.worker_day.utils.approve.WorkerDayApproveHelper.remove_holidays` 
+        Tests `src.timetable.worker_day.services.approve.WorkerDayApproveService.remove_holidays` 
         deleting draft holidays if there are other day types in the same draft.
         """
         WorkerDay.objects.all().delete()

@@ -1,9 +1,9 @@
 from typing import Union
 from datetime import date, datetime, timedelta
-import calendar
 from abc import ABC, abstractmethod
 from dateutil.relativedelta import relativedelta
 
+from django.conf import settings
 from faker.providers.date_time import Provider
 
 
@@ -18,6 +18,12 @@ class DateTimeHelper:
     def to_dt(cls, date: Union[str, datetime, date]) -> date:
         """Converts relative date str to date (e.g. `-1d`, `today`, `now`, `+3m`), datetime to date. Date is unchanged."""
         return cls.provider._parse_date(date)
+
+    @staticmethod
+    def to_dt_str(date: Union[str, datetime, date]) -> str:
+        if isinstance(date, str):
+            return date
+        return date.strftime(settings.QOS_DATE_FORMAT)
 
     @staticmethod
     def last_month_dt_pair() -> tuple[date, date]:
