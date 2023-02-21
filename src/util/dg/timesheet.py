@@ -1,7 +1,6 @@
 import os
 from datetime import datetime
 from decimal import Decimal
-
 from django.conf import settings
 from django.db.models import (
     Subquery, OuterRef, Q,
@@ -39,7 +38,7 @@ class T13WdTypeMapper(BaseWdTypeMapper):
 class BaseTimesheetDataGetter:
     wd_type_mapper_cls = DummyWdTypeMapper
 
-    def __init__(self, shop, dt_from, dt_to, timesheet_type=TimesheetItem.TIMESHEET_TYPE_FACT, wd_types_dict=None):
+    def __init__(self, shop, dt_from, dt_to, timesheet_types=tuple(TimesheetItem.TIMESHEET_TYPE_FACT), wd_types_dict=None):
         self.year = dt_from.year
         self.month = dt_from.month
 
@@ -47,7 +46,7 @@ class BaseTimesheetDataGetter:
         self.shop = shop
         self.dt_from = dt_from
         self.dt_to = dt_to
-        self.timesheet_type = timesheet_type
+        self.timesheet_type = timesheet_types
         self.wd_types_dict = wd_types_dict or WorkerDayType.get_wd_types_dict()
 
     @cached_property
@@ -61,7 +60,7 @@ class BaseTimesheetDataGetter:
         timesheet_qs = TimesheetItem.objects.filter(
             dt__gte=self.dt_from,
             dt__lte=self.dt_to,
-            timesheet_type=self.timesheet_type,
+            timesheet_type__in=self.timesheet_type,
         ).select_related(
             'day_type',
         )
@@ -100,7 +99,6 @@ class BaseTimesheetDataGetter:
             timesheet_qs = timesheet_qs.filter(wdays_q)
         else:
             timesheet_qs = TimesheetItem.objects.none()
-
         return timesheet_qs.select_related(
             'employee__user',
             'shop',
@@ -161,6 +159,58 @@ class T13TimesheetDataGetter(BaseTimesheetDataGetter):
     def get_position_name(self, e, ts_items):
         return e.position.name if e.position else ''
 
+    @staticmethod
+    def has_add_non_null_workday(wds):
+        for wd in wds:
+            if wd.timesheet_type == TimesheetItem.TIMESHEET_TYPE_ADDITIONAL and (wd.day_hours + wd.night_hours):
+                return True
+        return False
+
+    def _make_user_data_row(self, wds, empls, users, num,
+                           first_half_month_wdays, second_half_month_wdays,
+                           first_half_month_whours, second_half_month_whours, employee_id):
+        days = {}
+        ts_type = None
+        for wd in wds:
+            day_key = _get_day_key(wd.dt.day)
+            day_data = days.setdefault(day_key, {})
+            self.set_day_data(day_data, wd)
+            days[day_key] = day_data
+            if wd.timesheet_type and not ts_type:
+                ts_type = wd.timesheet_type
+            if not wd.day_type.is_dayoff or (wd.day_type.is_dayoff and wd.day_type.is_work_hours):
+                if wd.dt.day <= 15:  # первая половина месяца
+                    first_half_month_wdays.add(wd.dt)
+                    first_half_month_whours += wd.day_hours + wd.night_hours
+                else:
+                    second_half_month_wdays.add(wd.dt)
+                    second_half_month_whours += wd.day_hours + wd.night_hours
+        e = sorted(empls.get(employee_id), key=lambda x: x.dt_fired or datetime.max.date(), reverse=True)[0]
+        full_month_whours = first_half_month_whours + second_half_month_whours
+
+        user_data = {
+            'num': num,
+            'last_name': e.employee.user.last_name,
+            'tabel_code': e.employee.tabel_code,
+            'fio_and_position': e.get_short_fio_and_position(),
+            'fio': e.employee.user.fio,
+            'position': self.get_position_name(e, wds),
+            'shop': self.get_shop_name(e, wds),
+            'timesheet_type': str(dict(TimesheetItem.TIMESHEET_TYPE_CHOICES)[ts_type]) if ts_type else '',
+            'days': days,
+            'first_half_month_wdays': len(first_half_month_wdays),
+            'first_half_month_whours': first_half_month_whours,
+            'second_half_month_wdays': len(second_half_month_wdays),
+            'second_half_month_whours': second_half_month_whours,
+            'full_month_wdays': len(first_half_month_wdays) + len(second_half_month_wdays),
+            'full_month_whours': full_month_whours,
+        }
+        if full_month_whours == 0 and not len([x for x in days if x]):
+            return users, num
+        users.append(user_data)
+        num += 1
+        return users, num
+
     def get_data(self):
         def _get_active_empl(wd, empls):
             active_empls = list(filter(
@@ -188,7 +238,6 @@ class T13TimesheetDataGetter(BaseTimesheetDataGetter):
         ).order_by('-is_equal_shops')
         for e in empls_qs:
             empls.setdefault(e.employee_id, []).append(e)
-
         num = 1
 
         users = []
@@ -205,39 +254,18 @@ class T13TimesheetDataGetter(BaseTimesheetDataGetter):
             first_half_month_whours = 0
             second_half_month_wdays = set()
             second_half_month_whours = 0
-            days = {}
-            for wd in wds:
-                day_key = _get_day_key(wd.dt.day)
-                day_data = days.setdefault(day_key, {})
-                self.set_day_data(day_data, wd)
-                days[day_key] = day_data
-                if not wd.day_type.is_dayoff or (wd.day_type.is_dayoff and wd.day_type.is_work_hours):
-                    if wd.dt.day <= 15:  # первая половина месяца
-                        first_half_month_wdays.add(wd.dt)
-                        first_half_month_whours += wd.day_hours + wd.night_hours
-                    else:
-                        second_half_month_wdays.add(wd.dt)
-                        second_half_month_whours += wd.day_hours + wd.night_hours
-            e = sorted(empls.get(employee_id), key=lambda x: x.dt_fired or datetime.max.date(), reverse=True)[0]
-            user_data = {
-                'num': num,
-                'last_name': e.employee.user.last_name,
-                'tabel_code': e.employee.tabel_code,
-                'fio_and_position': e.get_short_fio_and_position(),
-                'fio': e.employee.user.fio,
-                'position': self.get_position_name(e, wds),
-                'shop': self.get_shop_name(e, wds),
-                'days': days,
-                'first_half_month_wdays': len(first_half_month_wdays),
-                'first_half_month_whours': first_half_month_whours,
-                'second_half_month_wdays': len(second_half_month_wdays),
-                'second_half_month_whours': second_half_month_whours,
-                'full_month_wdays': len(first_half_month_wdays) + len(second_half_month_wdays),
-                'full_month_whours': first_half_month_whours + second_half_month_whours,
-            }
-            users.append(user_data)
-            num += 1
-
+            has_awd = set(self.timesheet_type) == {TimesheetItem.TIMESHEET_TYPE_MAIN, TimesheetItem.TIMESHEET_TYPE_ADDITIONAL}\
+                      and self.has_add_non_null_workday(wds)
+            wds_additional = None
+            if has_awd:
+                wds_additional = list(filter(lambda wd: wd.timesheet_type == TimesheetItem.TIMESHEET_TYPE_ADDITIONAL, wds))
+                wds = list(filter(lambda wd: wd.timesheet_type != TimesheetItem.TIMESHEET_TYPE_ADDITIONAL, wds))
+            users, num = self._make_user_data_row(wds, empls, users, num, first_half_month_wdays, second_half_month_wdays,
+                                                  first_half_month_whours, second_half_month_whours, employee_id)
+            if has_awd:
+                users, num = self._make_user_data_row(wds_additional, empls, users, num,
+                                                      first_half_month_wdays, second_half_month_wdays,
+                                                      first_half_month_whours, second_half_month_whours, employee_id)
         work_hours_sum = 0
         work_days_sum = 0
         for user_data in users:
@@ -314,7 +342,7 @@ class BaseTimesheetGenerator(BaseDocGenerator):
 
     tabel_data_getter_cls = None
 
-    def __init__(self, shop, dt_from, dt_to, timesheet_type=TimesheetItem.TIMESHEET_TYPE_FACT):
+    def __init__(self, shop, dt_from, dt_to, timesheet_types=TimesheetItem.TIMESHEET_TYPE_FACT):
         """
         :param shop: Подразделение, для сотрудников которого будет составляться табель
         :param dt_from: Дата от
@@ -329,7 +357,7 @@ class BaseTimesheetGenerator(BaseDocGenerator):
         self.shop = shop
         self.dt_from = dt_from
         self.dt_to = dt_to
-        self.timesheet_type = timesheet_type
+        self.timesheet_type = timesheet_types
 
     def get_template_path(self):
         raise NotImplementedError
@@ -365,6 +393,7 @@ class BaseTimesheetGenerator(BaseDocGenerator):
                 'shop': _('Shop'),
                 'total_hours': _('Total hours'),
                 'total_days': _('Total days'),
+                'timesheet_type': _('Timesheet type'),
                 'date': _('Date'),
                 'shop_code': _('Shop code'),
                 'shop_name': _('Shop name'),
@@ -384,7 +413,7 @@ class BaseTimesheetGenerator(BaseDocGenerator):
         raise NotImplementedError
 
     def get_tabel_data(self):
-        table_data_getter = self.tabel_data_getter_cls(self.shop, self.dt_from, self.dt_to, timesheet_type=self.timesheet_type)
+        table_data_getter = self.tabel_data_getter_cls(self.shop, self.dt_from, self.dt_to, timesheet_types=self.timesheet_type)
         return table_data_getter.get_data()
 
 

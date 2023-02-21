@@ -687,8 +687,8 @@ class DownloadTabelSerializer(serializers.Serializer):
     dt_to = serializers.DateField(format=QOS_DATE_FORMAT)
     shop_id = serializers.IntegerField()
     convert_to = serializers.ChoiceField(required=False, choices=['pdf', 'xlsx'], default='xlsx')
-    tabel_type = serializers.ChoiceField(
-        required=False, choices=TimesheetItem.TIMESHEET_TYPE_CHOICES, default=TimesheetItem.TIMESHEET_TYPE_FACT)
+    tabel_type = serializers.MultipleChoiceField(
+        required=False, choices=TimesheetItem.TIMESHEET_TYPE_CHOICES, default=[TimesheetItem.TIMESHEET_TYPE_FACT])
 
 
 class BlockOrUnblockWorkerDaySerializer(serializers.ModelSerializer):

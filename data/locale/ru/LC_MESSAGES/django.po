@@ -2269,6 +2269,10 @@ msgstr "Не было передано ни одного файла."
 msgid "The file was not uploaded."
 msgstr "Файл не был загружен."
 
+#: src/timetable/timesheet/views.py:406
+msgid "Timesheet type"
+msgstr "Вид табеля"
+
 #~ msgid "You do not have rights to {action_str} open vacancies"
 #~ msgstr "У вас нет прав на {action_str} открытых вакансий"
 

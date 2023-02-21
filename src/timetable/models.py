@@ -2184,7 +2184,7 @@ class TimesheetItem(AbstractModel):
     TIMESHEET_TYPE_CHOICES = (
         (TIMESHEET_TYPE_FACT, _('Fact')),  # все оплачиваемые часы
         (TIMESHEET_TYPE_MAIN, _('Main')),  # рабочие часы, которые идут в осн. табель
-        (TIMESHEET_TYPE_ADDITIONAL, _('Additional')),  # рабочие часы, которые идут в доп. табель
+        (TIMESHEET_TYPE_ADDITIONAL, _('Additional')), # рабочие часы, которые идут в доп. табель
     )
 
     SOURCE_TYPE_PLAN = 'P'

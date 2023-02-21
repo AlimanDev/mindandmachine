@@ -1028,13 +1028,13 @@ class WorkerDayViewSet(BaseActiveNamedModelViewSet):
         convert_to = serializer.validated_data.get('convert_to')
         timesheet_type = serializer.validated_data.get('tabel_type')
         tabel_generator_cls = get_tabel_generator_cls(tabel_format=shop.network.download_tabel_template)
-        tabel_generator = tabel_generator_cls(shop, dt_from, dt_to, timesheet_type=timesheet_type)
+        tabel_generator = tabel_generator_cls(shop, dt_from, dt_to, timesheet_types=timesheet_type)
         response = HttpResponse(
             tabel_generator.generate(convert_to=shop.network.convert_tabel_to or convert_to),
             content_type='application/octet-stream',
         )
         filename = _('{}_timesheet_for_shop_{}_from_{}.{}').format(
-            dict(TimesheetItem.TIMESHEET_TYPE_CHOICES).get(timesheet_type, ''),
+            '_'.join(str(name) for type, name in TimesheetItem.TIMESHEET_TYPE_CHOICES if type in timesheet_type),
             shop.code,
             timezone.now().strftime("%Y-%m-%d"),
             shop.network.convert_tabel_to or convert_to,
