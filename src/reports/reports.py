@@ -218,7 +218,7 @@ class TickReport(BaseRegisteredReport, DatesReportMixin):
         Autoticks + manual ticks. Checked against plan for violations, liveness_str attribute for Word/ODT format, 
         sorted by fio (full name) and dttm.
         """
-        all_ticks = list(self._get_ticks()) + list(self._get_wdays())
+        all_ticks: list[Tick] = self._get_ticks() + self._get_wdays()
         plan_wdays = self._get_plan_wdays()
         for tick in all_ticks:
             tick.liveness_str = f'{int(tick.min_liveness_prop * 100)}%' if tick.min_liveness_prop else None # to percentage (%)
@@ -232,6 +232,8 @@ class TickReport(BaseRegisteredReport, DatesReportMixin):
                     plan = plans[0]
                 else:                   # Multiple plans found, choosing the closest one
                     plan = self._choose_closest_plan(plans, tick)
+                    if tick.tick_kind == _('Manual tick'):
+                        self._manual_tick_to_auto(plan, plans, tick)
 
                 if tick.type_display == _('Coming') and plan.dttm_work_start:
                     if tick.dttm - plan.dttm_work_start > self.network.allowed_interval_for_late_arrival:
@@ -356,6 +358,26 @@ class TickReport(BaseRegisteredReport, DatesReportMixin):
                 ):
                 closest_plan = wd
         return closest_plan
+
+    @staticmethod
+    def _manual_tick_to_auto(closet_plan: WorkerDay, plans: tuple[WorkerDay], tick: Tick):
+        """
+        Multiple plan WorkerDays (back-to-back, with `dttm_work_end==dttm_work_start`)
+        may have only 2 fact Ticks (1 for arrival and 1 for departure).
+        The rest of fact WorkerDays in between should be considered 'autoticks', and not 'manual' as usual.
+        """
+        if tick.type_display == _('Coming'):
+            closest_plan_attr = 'dttm_work_start'
+            plans_attr = 'dttm_work_end'
+        else:
+            closest_plan_attr = 'dttm_work_end'
+            plans_attr = 'dttm_work_start'
+        if any(map(
+            lambda wd: closet_plan.id != wd.id and \
+            getattr(wd, plans_attr) == getattr(closet_plan, closest_plan_attr)
+        , plans)):
+            tick.tick_kind=_('Autotick')
+
 
     @cached_property
     def network(self) -> Network:

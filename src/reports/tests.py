@@ -775,6 +775,78 @@ class TestReportsViewSet(TestsHelperMixin, APITestCase):
             ]
         )
 
+    @mock.patch.object(tick_report, 'delay', tick_report)
+    def test_tick_report_manual_ticks_in_multiple_shifts(self):
+        """`TickReport._manual_tick_to_auto` should count 'manual' ticks in back-to-back WorkerDays as 'autotick'"""
+        WorkerDay.objects.all().delete()
+        tickpoint = TickPoint.objects.create(
+            shop=self.shop,
+            network=self.network,
+            name='tickpoint'
+        )
+        same_params = {
+            'dt': self.dt,
+            'is_approved': True,
+            'shop': self.shop,
+            'employee': self.employee_worker,
+            'employment': self.employment_worker,
+            'type_id': WorkerDay.TYPE_WORKDAY
+        }
+        dttm_base = datetime.combine(self.dt, time(8))
+        for i in range(3):
+            # Plan to check against
+            dttm_start = dttm_base + timedelta(hours=i)
+            dttm_end = dttm_base + timedelta(hours=i+1)
+            WorkerDay.objects.create(   # Plan
+                dttm_work_start=dttm_start,
+                dttm_work_end=dttm_end,
+                is_fact=False,
+                **same_params
+            )
+            WorkerDay.objects.create(   # Fact
+                dttm_work_start=dttm_start,
+                dttm_work_end=dttm_end,
+                is_fact=True,
+                **same_params
+            )
+        # Ticks only on the first and last dttms
+        same_params_ticks = {
+            'user': self.employee_worker.user,
+            'employee': self.employee_worker,
+            'tick_point': tickpoint,
+            'verified_score': 1
+        }
+        Tick.objects.create(
+            type=Tick.TYPE_COMING,
+            dttm=dttm_base,
+            **same_params_ticks
+        )
+        Tick.objects.create(
+            type=Tick.TYPE_LEAVING,
+            dttm=dttm_base+timedelta(hours=3),
+            **same_params_ticks
+        )
+
+        query_params = {
+            'employee_id__in': [self.employee_worker.id],
+            'shop_id__in': [self.shop.id],
+            'dt_from': self.dt,
+            'dt_to': self.dt,
+        }
+        res = self.client.get(self.get_url('Reports-tick'), query_params)
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        df = pd.read_excel(res.content)
+        self.assertEqual(len(df[df[_('Tick kind')] == _('Autotick')]), 6)
+        self.assertEqual(len(df[df[_('Tick kind')] == _('Manual tick')]), 0)
+
+        # Move 3rd day to a later time -> it's not connected back-to-back with 2nd day -> tick type will be 'manual'
+        WorkerDay.objects.filter(dttm_work_start=dttm_base+timedelta(hours=2)).update(dttm_work_start=dttm_base+timedelta(hours=2, minutes=10))
+        res = self.client.get(self.get_url('Reports-tick'), query_params)
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        df = pd.read_excel(res.content)
+        self.assertEqual(len(df[df[_('Tick kind')] == _('Autotick')]), 4)
+        self.assertEqual(len(df[df[_('Tick kind')] == _('Manual tick')]), 2)
+
 
 class TestScheduleDeviation(APITestCase, TestsHelperMixin):
     USER_USERNAME = "user1"
