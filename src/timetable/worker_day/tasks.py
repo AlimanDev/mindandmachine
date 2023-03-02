@@ -4,6 +4,7 @@ from datetime import datetime, date
 from django.conf import settings
 from django.db import transaction
 from django.db.models import Q
+from django.db.utils import OperationalError
 
 from src.celery.celery import app
 from src.base.models import Employment, Shop
@@ -18,7 +19,7 @@ def clean_wdays(**kwargs):
     clean_wdays_helper.run()
 
 
-@app.task
+@app.task(autoretry_for=(OperationalError,), max_retries=3) # psycopg2.errors.DeadlockDetected is reraised by Django as OperationalError
 @transaction.atomic
 def recalc_work_hours(**filters):
     """Recalculate `work_hours` and `dttm_work_start/end_tabel` of `WorkerDays`. `kwargs` - arguments for `filter()`"""
