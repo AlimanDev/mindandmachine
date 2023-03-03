@@ -71,13 +71,14 @@ class WorkerDayFilter(FilterSet):
     class Meta:
         model = WorkerDay
         fields = {
-            # 'shop_id':['exact'],
+            'shop_id':['exact'],
             'employee_id': ['exact'],
             'employee__tabel_code': ['in', 'exact'],
             'dt': ['gte', 'lte', 'exact', 'range'],
             'is_approved': ['exact'],
             'is_fact': ['exact'],
             'type': ['in', 'exact'],
+            'type__is_dayoff': ['exact']
         }
 
 
