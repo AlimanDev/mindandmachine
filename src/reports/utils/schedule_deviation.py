@@ -1,3 +1,4 @@
+import datetime
 from datetime import date
 from collections import OrderedDict
 from functools import reduce
@@ -155,7 +156,7 @@ def _stylize_sheet(worksheet, columns, header_format, include_extra_columns=Fals
 
 
 
-def __calc_day_work_hours(row, work_days):
+def __calc_day_work_hours(row, work_days, fact_hours_must_be_planned):
     """fact_without_plan won't show true value if network setting only_fact_hours_that_in_approved_plan is True
     to get correct value we need to calculate it manually"""
     override_skip = False
@@ -183,7 +184,14 @@ def __calc_day_work_hours(row, work_days):
                 if shift["dt"] not in planned_dates :
                     unplanned_work_shifts_count += 1
                     unplanned_work_shifts_hours += hours_fact.total_seconds() / 3600
-            if isinstance(hours_fact, pd.Timedelta):
+                elif fact_hours_must_be_planned:
+                    # trim hours_fact to hours_plan
+                    hours_plan_end = work_shifts_plan[planned_dates.index(shift["dt"])]["dttm_work_end"]
+                    hours_plan_start = work_shifts_plan[planned_dates.index(shift["dt"])]["dttm_work_start"]
+                    work_end = hours_plan_end if shift["dttm_work_end_fact"] > hours_plan_end else shift["dttm_work_end_fact"]
+                    work_start = hours_plan_start if shift["dttm_work_start_fact"] < hours_plan_start else shift["dttm_work_start_fact"]
+                    hours_fact = work_end - work_start
+            if isinstance(hours_fact, (pd.Timedelta, datetime.timedelta)):
                 delta_work_hours_fact += hours_fact.total_seconds() / 3600
     else:
         if row.dttm_work_end_fact and isinstance(row.dttm_work_end_fact, int):
@@ -191,8 +199,15 @@ def __calc_day_work_hours(row, work_days):
         if row.dttm_work_start_fact and isinstance(row.dttm_work_start_fact, int):
             row.dttm_work_start_fact = pd.Timestamp(row.dttm_work_start_fact)
         if row.dttm_work_end_fact and row.dttm_work_start_fact:
-            delta_work_hours_fact = row.dttm_work_end_fact - row.dttm_work_start_fact
-        if isinstance(delta_work_hours_fact, pd.Timedelta):
+            work_end = row.dttm_work_end_fact
+            work_start = row.dttm_work_start_fact
+            if fact_hours_must_be_planned:
+                hours_plan_end = work_shifts_plan[planned_dates.index(row["dt"])]["dttm_work_end"]
+                hours_plan_start = work_shifts_plan[planned_dates.index(row["dt"])]["dttm_work_start"]
+                work_end = hours_plan_end if row["dttm_work_end_fact"] > hours_plan_end else row["dttm_work_end_fact"]
+                work_start = hours_plan_start if row["dttm_work_start_fact"] < hours_plan_start else row["dttm_work_start_fact"]
+            delta_work_hours_fact = work_end - work_start
+        if isinstance(delta_work_hours_fact, (pd.Timedelta, datetime.timedelta)):
             delta_work_hours_fact = delta_work_hours_fact.total_seconds() / 3600
         if row["dt"].date not in planned_dates:
             if (not row.dttm_work_start_fact and row.dttm_work_end_fact) or (row.dttm_work_start_fact and not row.dttm_work_end_fact):
@@ -217,7 +232,8 @@ def __check_duplicate_row(prev_row, cur_row):
     check_cols = ["dt", "worker_fio", "user_network"]
     return prev_row[check_cols].equals(cur_row[check_cols]) and not prev_row["wd_type_id"] == cur_row["wd_type_id"]
 
-def _write_data_rows(worksheet, df, columns, include_extra_columns, wd_types_dict, date_format, def_format, work_days):
+def _write_data_rows(worksheet, df, columns, include_extra_columns, wd_types_dict, date_format, def_format, work_days,
+                     fact_hours_must_be_planned):
     df["dt"] = pd.to_datetime(df["dt"], format="%Y-%m-%d")
     prev_row = skip_wd_type = None
     adjust_row = 0
@@ -225,14 +241,13 @@ def _write_data_rows(worksheet, df, columns, include_extra_columns, wd_types_dic
         if skip_wd_type:
             adjust_row += 1
         plan_work_hours, override_skip,\
-        unplanned_work_shifts_one_tick_count, unplanned_work_shifts_hours, unplanned_work_shifts_count = __calc_day_work_hours(row, work_days)
+        unplanned_work_shifts_one_tick_count, unplanned_work_shifts_hours, unplanned_work_shifts_count = __calc_day_work_hours(row, work_days, fact_hours_must_be_planned)
         if prev_row is not None and __check_duplicate_row(prev_row, row) and not override_skip:
             i -= 1
             skip_wd_type = True
         else:
             skip_wd_type = False
         row_num: int = 11 + i - adjust_row
-        fact_work_hours = max(row.fact_work_hours, unplanned_work_shifts_hours)
         worker_day_type = wd_types_dict[row.wd_type_id].name
         work_type = row.work_type_name if (row.is_outsource or row.worker_fio == '-') else row.position_name
         network_shop = row.user_network if row.is_outsource else row.employment_shop_name
@@ -256,7 +271,7 @@ def _write_data_rows(worksheet, df, columns, include_extra_columns, wd_types_dic
         if not skip_wd_type:  # overwriting whole row besides this column
             worksheet.write_string(row_num, columns['worker_day_type'], worker_day_type, def_format)
         worksheet.write_number(row_num, columns['plan_work_hours'], round(plan_work_hours, 2), def_format)
-        worksheet.write_number(row_num, columns['fact_work_hours'], round(fact_work_hours, 2), def_format)
+        worksheet.write_number(row_num, columns['fact_work_hours'], round(row.fact_work_hours, 2), def_format)
         worksheet.write_number(row_num, columns['manual_hours'], round(row.fact_manual_work_hours, 2), def_format)
         worksheet.write_number(row_num, columns['late_arrival_hours'], round(row.late_arrival_hours, 2), def_format)
         worksheet.write_number(row_num, columns['late_arrival_count'], row.late_arrival_count, def_format)
@@ -388,14 +403,17 @@ def schedule_deviation_report(dt_from, dt_to, created_by_id=None, shop_ids=None,
     user_created_fio = ''
     work_days = WorkerDay.objects.select_related(
              'type', 'employee', 'employee__user').filter(dt__gte=dt_from, dt__lte=dt_to, is_approved=True,)
+    fact_hours_must_be_planned = False
     if shop_ids:
         work_days = work_days.select_related('shop').filter(shop_id__in=shop_ids)
+
     work_days = work_days.values('dt', 'shop__name', 'employee__user__last_name',
                       'type', 'dttm_work_start', 'dttm_work_end', 'dttm_work_start_tabel',
                       'dttm_work_end_tabel', 'is_fact'
                     )
     if created_by_id:
         user_created = User.objects.get(id=created_by_id)
+        fact_hours_must_be_planned = user_created.network.only_fact_hours_that_in_approved_plan
         user_created_fio = user_created.get_fio()
     qs, unapplied_vacancies, shop_object = _filter_query(dt_from, dt_to, shop_ids, filters=filters)
 
@@ -427,7 +445,8 @@ def schedule_deviation_report(dt_from, dt_to, created_by_id=None, shop_ids=None,
 
     _write_header(worksheet, dt_from, dt_to, shop_object, user_created_fio)
     _stylize_sheet(worksheet, columns, header_format, include_extra_columns)
-    _write_data_rows(worksheet, df, columns, include_extra_columns, wd_types_dict, date_format, def_format, list(work_days))
+    _write_data_rows(worksheet, df, columns, include_extra_columns, wd_types_dict, date_format, def_format, list(work_days),
+                     fact_hours_must_be_planned)
     workbook.close()
     output.seek(0)
     return output
