@@ -12,7 +12,7 @@ from freezegun import freeze_time
 from rest_framework.test import APITestCase
 from rest_framework import status
 
-from src.base.tests.factories import EmploymentFactory, WorkerPositionFactory
+from src.base.tests.factories import EmploymentFactory, WorkerPositionFactory, UserFactory, EmployeeFactory
 from src.base.models import Group, WorkerPosition, Employment, Break, ApiLog, SAWHSettings
 from src.celery.tasks import delete_inactive_employment_groups
 from src.timetable.models import WorkTypeName, EmploymentWorkType, WorkerDay
@@ -71,7 +71,7 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
             'dt_hired': (timezone.now() - timedelta(days=500)).strftime('%Y-%m-%d'),
             'shop_id': self.shop.id,
             'employee_id': self.employee2.id,
-            'tabel_code': '',
+            'tabel_code': None,
         }
 
         resp = self.client.post(
@@ -161,7 +161,9 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
             'norm_work_hours': 123.0,
         }
 
-        employment_id = self._create_employment().json()['id']
+        resp = self._create_employment()
+        self.assertEqual(resp.status_code, 201)
+        employment_id = resp.json()['id']
 
         resp = self.client.put(
             path=self.get_url('Employment-detail', pk=employment_id),
@@ -897,7 +899,7 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
                 'employee_id',
             ],
             'delete_scope_filters': {
-                'dt_hired__lte': (dt_now + relativedelta(months=1)).replace(day=1) - timedelta(days=1),
+                'dt_hired__lte': (dt_now + relativedelta(months=1)).replace(day=1),
                 'dt_fired__gte_or_isnull': dt_now.replace(day=1),
             }
         }
@@ -1287,6 +1289,51 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
         employments_count_after = Employment.objects.filter(code__isnull=False).count()
         self.assertEqual(employments_count_before, employments_count_after)
         self.assertFalse(Employment.objects.filter(code='e_new').exists())
+
+    @override_settings(CELERY_TASK_ALWAYS_EAGER=True)
+    @mock.patch.object(transaction, 'on_commit', lambda t: t())
+    def test_batch_update_or_create_related_employee_and_user(self):
+        """Employee should be updated/created (by tabel_code or user), User should not be created/updated - throws an error."""
+        user1 = UserFactory(username='username1')
+        user2 = UserFactory(username='username2')
+        employee = EmployeeFactory(user=user1, tabel_code='tabel_code1')
+        employment = EmploymentFactory(employee=employee, code='code1')
+        data = {
+            "data": [
+                {
+                    "code": "code1",
+                    "shop_code": self.shop.code,
+                    "position_code": self.worker_position.code,
+                    "username": user2.username,
+                    "dt_hired": self.dt_now,
+                    "dt_fired": self.dt_now + timedelta(10),
+                    "tabel_code": employee.tabel_code,
+                }
+            ],
+            "options": {"by_code": True, "delete_scope_fields_list": ["employee_id"]}
+        }
+        # Employee
+        resp = self.client.post(self.get_url('Employment-batch-update-or-create'), self.dump_data(data), content_type='application/json')
+        self.assertEqual(resp.status_code, 200)
+        self.assertDictEqual(
+            resp.json(),
+            {
+                "stats": {
+                    "Employment": {
+                        "updated": 1
+                    }
+                }
+            }
+        )
+        employment = Employment.objects.select_related('employee__user').get(code='code1')
+        self.assertEqual(employment.employee_id, employee.id)
+        self.assertEqual(employment.employee.user.id, user2.id)
+
+        # User
+        username = 'not_a_real_user'
+        data['data'][0]['username'] = username
+        resp = self.client.post(self.get_url('Employment-batch-update-or-create'), self.dump_data(data), content_type='application/json')
+        self.assertContains(resp, username, status_code=400)
 
     def test_has_permission_through_position_when_group_set(self):
         position = WorkerPosition.objects.create(

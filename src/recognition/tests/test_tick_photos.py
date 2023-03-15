@@ -49,7 +49,7 @@ class TestTickPhotos(TestsHelperMixin, APITestCase):
         cls.dt = date.today()
         cls.employee1.tabel_code = 'A00001'
         cls.employee1.save()
-        cls.employee3.tabel_code = 'A00001'
+        cls.employee3.tabel_code = 'A00002'
         cls.employee3.save()
         cls.duplicate_biometrics_event, _created = EventType.objects.get_or_create(
             code=DUPLICATE_BIOMETRICS, network=cls.network)

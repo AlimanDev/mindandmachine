@@ -1584,14 +1584,11 @@ class EmploymentQuerySet(AnnotateValueEqualityQSMixin, QuerySet):
 class Employee(AbstractModel):
     code = models.CharField(max_length=128, null=True, blank=True, unique=True)
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="employees")
-    tabel_code = models.CharField(max_length=64, null=True, blank=True)
+    tabel_code = models.CharField(max_length=64, null=True, unique=True, default=None)
 
     class Meta:
         verbose_name = 'Сотрудник'
         verbose_name_plural = 'Сотрудники'
-        unique_together = (
-            ('tabel_code', 'user'),
-        )
 
     def __str__(self):
         s = self.user.fio
@@ -1645,8 +1642,8 @@ class Employment(AbstractActiveModel):
 
     tracker = FieldTracker(fields=['position', 'dt_hired', 'dt_fired', 'norm_work_hours', 'shop_id', 'sawh_settings_id', 'dttm_deleted'])
 
-    objects = EmploymentManager.from_queryset(EmploymentQuerySet)()
-    objects_with_excluded = models.Manager.from_queryset(EmploymentQuerySet)()
+    objects: EmploymentManager = EmploymentManager.from_queryset(EmploymentQuerySet)()
+    objects_with_excluded: models.Manager = models.Manager.from_queryset(EmploymentQuerySet)()
 
     def __init__(self, *args, **kwargs):
         shop_code = kwargs.pop('shop_code', None)

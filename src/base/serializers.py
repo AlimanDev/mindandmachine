@@ -12,7 +12,7 @@ from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 from rest_framework.fields import empty
-from rest_framework.validators import UniqueValidator, UniqueTogetherValidator
+from rest_framework.validators import UniqueValidator
 
 from src.base.fields import CurrentUserNetwork, UserworkShop
 from src.base.models import (
@@ -289,13 +289,6 @@ class EmployeeSerializer(BaseNetworkSerializer):
     class Meta:
         model = Employee
         fields = ['id', 'user', 'user_id', 'tabel_code', 'has_shop_employment', 'from_another_network']
-        validators = [
-            UniqueTogetherValidator(
-                queryset=Employee.objects,
-                fields=['user_id', 'tabel_code'],
-                message=_('The employee\'s tabel code must be unique'),
-            )
-        ]
 
     def __init__(self, *args, user_source=None, **kwargs):
         super(EmployeeSerializer, self).__init__(*args, **kwargs)
@@ -483,7 +476,7 @@ class EmploymentSerializer(BaseModelSerializer):
     username = serializers.CharField(required=False, source='employee.user.username')
     dt_hired = serializers.DateField(required=True)
     dt_fired = serializers.DateField(required=False, default=None, allow_null=True)
-    tabel_code = serializers.CharField(required=False, source='employee.tabel_code', allow_blank=True, allow_null=True)
+    tabel_code = serializers.CharField(required=False, source='employee.tabel_code', allow_null=True)
     is_active = serializers.BooleanField(read_only=True)
     sawh_settings_id = serializers.IntegerField(required=False, allow_null=True)
 
@@ -530,10 +523,12 @@ class EmploymentSerializer(BaseModelSerializer):
                     network_id=self.context['request'].user.network_id, **user_kwargs,
                 ))
                 if len(users) == 1:
-                    employee, _employee_created = Employee.objects.get_or_create(
-                        user=users[0],
-                        tabel_code=tabel_code,
-                    )
+                    # Lookup Employee by tabel_code (if passed) or by user, update/create if necessary
+                    lookup = {'tabel_code': tabel_code} if tabel_code else {'user': users[0]}
+                    employee, _employee_created = Employee.objects.update_or_create(
+                        **lookup,
+                        defaults={'user': users[0], 'tabel_code': tabel_code}
+                    )                        
                     attrs['employee_id'] = employee.id
                 else:
                     if user:
