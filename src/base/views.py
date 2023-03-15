@@ -36,7 +36,7 @@ from src.base.models import (
     Group,
     Break,
     ShopSchedule,
-    Employee,
+    Employee, Region,
 )
 from src.base.permissions import Permission
 from src.base.serializers import (
@@ -56,7 +56,7 @@ from src.base.serializers import (
     BreakSerializer,
     ShopScheduleSerializer,
     EmployeeSerializer,
-    EmployeeShiftScheduleQueryParamsSerializer,
+    EmployeeShiftScheduleQueryParamsSerializer, RegionSerializer,
 )
 from src.base.shift_schedule.utils import get_shift_schedule
 from src.base.views_abstract import (
@@ -473,3 +473,17 @@ class ContentBlockViewSet(ReadOnlyModelViewSet):
             filters['code'] = self.request.query_params.get('code')
         
         return ContentBlock.objects.filter(**filters)
+
+
+class RegionViewSet(BaseActiveNamedModelViewSet):
+    permission_classes = [Permission]
+    serializer_class = RegionSerializer
+    pagination_class = LimitOffsetPagination
+    filterset_class = BaseActiveNamedModelFilter
+    openapi_tags = ['Region',]
+
+    def get_queryset(self):
+        return Region.objects.filter(
+            Q(dttm_deleted__isnull=True) | Q(dttm_deleted__gte=timezone.now()),
+            network_id=self.request.user.network_id,
+        )

@@ -82,6 +82,7 @@ def serialize_shop(shop: Shop, request):
         'timezone': str(six.text_type(shop.timezone)),
         'tm_close_dict': shop.close_times,
         'tm_open_dict': shop.open_times,
+        'region_id': shop.region_id,
     }
 
 

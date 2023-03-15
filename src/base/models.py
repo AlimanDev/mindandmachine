@@ -2086,6 +2086,7 @@ class FunctionGroup(AbstractModel):
         ('ShopMonthStat_status', 'Статус составления графика (Получить) (shop_month_stat/status/)'),
         ('ShopSettings', 'Настройки автосоставления (shop_settings)'),
         ('ShopSchedule', 'Расписание магазина (schedule)'),
+        ('Region', 'Список регионов (Получить) (region)'),
         ('VacancyBlackList', 'Черный список для вакансий (vacancy_black_list)'),
     )
 

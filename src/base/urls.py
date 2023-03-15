@@ -20,7 +20,7 @@ from src.base.views import (
     GroupViewSet,
     BreakViewSet,
     ShopScheduleViewSet,
-    EmployeeViewSet,
+    EmployeeViewSet, RegionViewSet,
 )
 from .sawhsettings.views import SAWHSettingsViewSet
 from .shift_schedule.views import (
@@ -56,6 +56,7 @@ router.register(r'shift_schedule', ShiftScheduleViewSet, basename='ShiftSchedule
 router.register(r'shift_schedule_interval', ShiftScheduleIntervalViewSet, basename='ShiftScheduleInterval')
 router.register(r'content_block', ContentBlockViewSet, basename='ContentBlock')
 router.register(r'sawh_settings', SAWHSettingsViewSet, basename='SAWHSettings')
+router.register(r'region', RegionViewSet, basename='Region')
 
 employment_nested_router = routers.NestedSimpleRouter(router, r'employment', lookup='employment')
 shop_nested_router = routers.NestedSimpleRouter(router, r'department', lookup='department')

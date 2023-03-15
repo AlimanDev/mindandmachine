@@ -29,7 +29,7 @@ from src.base.models import (
     Break,
     ShopSchedule,
     Employee,
-    SAWHSettings,
+    SAWHSettings, Region,
 )
 from src.timetable.serializers import EmploymentWorkTypeSerializer, EmploymentWorkTypeListSerializer
 from src.timetable.worker_constraint.serializers import WorkerConstraintSerializer, WorkerConstraintListSerializer
@@ -777,3 +777,9 @@ class ContentBlockSerializer(BaseModelSerializer):
     class Meta:
         model = ContentBlock
         fields = ['name', 'code', 'body']
+
+
+class RegionSerializer(BaseModelSerializer):
+    class Meta:
+        model = Region
+        fields = ['id', 'name', 'code', 'network_id']
