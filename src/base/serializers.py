@@ -331,9 +331,11 @@ class AuthUserSerializer(UserSerializer):
         return list(set(allowed_tabs))
 
     @staticmethod
-    def get_group_perms(obj: User):
+    def get_group_perms(obj: User) -> dict:
         group_perms = Group.objects.filter(id__in=obj.get_group_ids()).values('has_perm_to_change_protected_wdays',
                                                                               'has_perm_to_approve_other_shop_days')
+        if not group_perms:
+            return {'has_perm_to_change_protected_wdays': False, 'has_perm_to_approve_other_shop_days': False}
         return {k: any(d[k] for d in group_perms) for k in group_perms[0]}
 
     @staticmethod
