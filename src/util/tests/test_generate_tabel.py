@@ -1,8 +1,8 @@
 import uuid
 from calendar import monthrange
 from datetime import datetime
+from unittest import skip
 
-import pytest
 from django.test import TestCase
 
 from src.base.models import Employment
@@ -11,7 +11,7 @@ from src.util.dg.timesheet import T13TimesheetGenerator, CustomT13TimesheetGener
 from src.util.mixins.tests import TestsHelperMixin
 
 
-@pytest.mark.skip(reason="For manual tests")
+@skip("For manual tests")
 class TestGenerateTabel(TestsHelperMixin, TestCase):
     @classmethod
     def setUpTestData(cls):

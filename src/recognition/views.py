@@ -200,6 +200,9 @@ class TickViewSet(BaseModelViewSet):
         raise NotImplementedError
 
     def get_serializer_class(self):
+        if getattr(self, 'swagger_fake_view', False):   # for schema generation metadata
+            return TickSerializer
+
         if self.request.method == 'POST' or self.request.method == 'PUT':
             return self.strategy.get_serializer_class()
         else:

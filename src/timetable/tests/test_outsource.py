@@ -868,7 +868,7 @@ class TestOutsource(TestsHelperMixin, APITestCase):
         response = self.client.get(f'/rest_api/worker_day/vacancy/?limit=10&offset=0&outsourcing_network_id__in={self.outsource_network.id},{self.outsource_network2.id}')
         self.assertEqual(len(response.json()['results']), 4)
 
-    @override_settings(CELERY_TASK_ALWAYS_EAGER=True, CELERY_EAGER_PROPAGATES_EXCEPTIONS=True)
+    @override_settings(CELERY_TASK_ALWAYS_EAGER=True, CELERY_TASK_EAGER_PROPAGATES=True)
     def test_recalc_timesheet_with_outsource(self):
         WorkerDayFactory(
             shop=self.client_shop,

@@ -1,12 +1,15 @@
-import datetime, uuid
+import datetime, uuid, logging, warnings
 from contextlib import contextmanager
 from typing import TypeVar
+from unittest import mock
 
 from dateutil.relativedelta import relativedelta
+from django.conf import settings
 from django.db import connection
 from django.db.models import Value, F, CharField
 from django.db.models.functions import Concat
 from django.test import TestCase
+from django.test.runner import DiscoverRunner
 from django.utils.timezone import now
 from requests import Response
 
@@ -40,6 +43,17 @@ from src.timetable.models import (
     WorkerDayPermission,
     GroupWorkerDayPermission,
 )
+from src.recognition.models import TickPhoto
+
+
+class TestRunner(DiscoverRunner):
+    """Custom test runner. Put all general mocks/fixes here."""
+    @mock.patch.object(User, 'compress_image', lambda _: True)
+    @mock.patch.object(TickPhoto, 'compress_image', lambda _: True)
+    def run_tests(self, test_labels, extra_tests=None, **kwargs):
+        logging.disable(settings.TEST_LOG_LEVEL)   # Don't show logging messages
+        warnings.filterwarnings("ignore")          # Don't show warnings
+        return super().run_tests(test_labels, extra_tests, **kwargs)
 
 
 class LocalTestCaseAsserts(TestCase):

@@ -84,7 +84,7 @@ def cron_report():
     for report in reports:
         send_report_emails.delay(
             report_config_id=report.id,
-            zone=report.cron.timezone.zone,
+            zone=report.cron.timezone.key,
         )
 
 

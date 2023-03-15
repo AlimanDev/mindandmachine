@@ -54,7 +54,7 @@ class AttendanceRecordsViewSet(BaseModelViewSet):
             _('Date and time of the record'),
         ))
         output = io.BytesIO()
-        writer = pd.ExcelWriter(output, engine='xlsxwriter')
+        writer = pd.ExcelWriter(output, engine='xlsxwriter') # TODO: move to openpyxl
         df.to_excel(writer, sheet_name=_('Records'), index=False)
         writer.save()
         output.seek(0)

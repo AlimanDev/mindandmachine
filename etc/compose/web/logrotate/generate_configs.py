@@ -1,19 +1,6 @@
 import os
 
 LOG_DIRS = {
-    '/webapp/logs/uwsgi/': 
-''' {
-    size 10M
-    rotate 100000
-    maxage 90
-    missingok
-    compress
-    delaycompress
-    copytruncate
-    notifempty
-    create 0640 root root
-}
-''',
     '/webapp/logs/':
 ''' {
     size 100M

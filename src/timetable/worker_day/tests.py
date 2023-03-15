@@ -378,7 +378,7 @@ class TestWorkerDayStat(TestsHelperMixin, APITestCase):
             self.assertIsNotNone(wd_from_db_not_approved)
             self.assertEqual(wd_from_db.work_hours, wd_from_db_not_approved.work_hours)
 
-    @override_settings(CELERY_TASK_ALWAYS_EAGER=True, CELERY_EAGER_PROPAGATES_EXCEPTIONS=True)
+    @override_settings(CELERY_TASK_ALWAYS_EAGER=True, CELERY_TASK_EAGER_PROPAGATES=True)
     def test_approve_recalc_wh_and_tabel_for_outsource(self):
         """Approving plan should run recalc of work hours (based on AttendanceRecords)
         and tabel (create TimesheetItem), for outsource and employees from other shops."""

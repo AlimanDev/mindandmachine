@@ -1,10 +1,6 @@
 from django.conf.urls import include
 from django.urls import re_path
-from rest_auth.views import LoginView
-from rest_auth.views import (
-    LogoutView,
-    PasswordChangeView
-)
+from dj_rest_auth.views import LoginView, LogoutView, PasswordChangeView
 from rest_framework_nested import routers
 
 from src.base.auth.views import (
@@ -32,7 +28,7 @@ from .shift_schedule.views import (
     ShiftScheduleIntervalViewSet,
 )
 
-rest_auth_urls = [
+auth_urls = [
     re_path(r'^login/$', LoginView.as_view(), name='rest_login'),
     re_path(r'^logout/$', LogoutView.as_view(), name='rest_logout'),
     re_path(r'^password/change/$', PasswordChangeView.as_view(), name='rest_password_change'),
@@ -68,7 +64,7 @@ shop_nested_router.register(r'schedule', ShopScheduleViewSet, basename='ShopSche
 # Wire up our API using automatic URL routing.
 # Additionally, we include login URLs for the browsable API.
 urlpatterns = [
-    re_path(r'^auth/', include((rest_auth_urls, 'auth'), namespace='auth')),
+    re_path(r'^auth/', include((auth_urls, 'auth'), namespace='auth')),
     re_path(r'^', include(router.urls)),
     re_path(r'^api-auth/', include('rest_framework.urls', namespace='rest_framework')),
     re_path(r'^', include(shop_nested_router.urls)),

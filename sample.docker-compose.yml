@@ -40,12 +40,11 @@ services:
     build:
       context: .
       dockerfile: ./etc/compose/web/Dockerfile
-    command: uwsgi --http :9090 --wsgi-file wsgi.py
+    command: gunicorn -w 1 # DEV
+    # command: /commands/web.sh -w 1 #PROD
     volumes:
       - ./mounts/reports:/webapp/etc/reports
-      - ./mounts/uwsgi:/uwsgi
       - ./mounts/logs:/webapp/logs
-      - ./mounts/logs/uwsgi:/webapp/logs/uwsgi
       - ./mounts/media:/webapp/media
       - ./mounts/static:/webapp/static
       - ./mounts/ipython_data:/root/.ipython/profile_default
@@ -60,14 +59,12 @@ services:
       DB_PASSWORD: qos
       DB_HOST: postgres
       JOD_CONVERTER_URL: http://converter:8080
-      UWSGI_WORKERS: 1
-      UWSGI_THREADS: 1
     depends_on:
       - postgres
       - redis
       - converter
     ports:
-      - "9090:9090"
+      - "9090:80"
 
   celery:
     build:
@@ -76,7 +73,6 @@ services:
     command: celery -A src.celery worker -n main --max-tasks-per-child=100 --max-memory-per-child=25000 --loglevel=INFO --logfile=/webapp/logs/celery_main.log
     volumes:
       - ./mounts/reports:/webapp/etc/reports
-      - ./mounts/uwsgi:/uwsgi
       - ./mounts/logs:/webapp/logs
       - ./mounts/media:/webapp/media
       - ./mounts/static:/webapp/static
@@ -101,7 +97,6 @@ services:
     command: celery -A src.celery flower --conf=/webapp/flowerconfig.py --port=5555
     volumes:
       - ./mounts/reports:/webapp/etc/reports
-      - ./mounts/uwsgi:/uwsgi
       - ./mounts/logs:/webapp/logs
     environment:
       REDIS_HOST: redis

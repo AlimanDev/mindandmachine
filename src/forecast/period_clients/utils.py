@@ -34,7 +34,7 @@ def upload_demand(demand_file, shop_id: int = None, type: str = PeriodClients.LO
 
     # Data validation and conversion
     try:
-        df.loc[:, 'dttm'] = pd.to_datetime(df.dttm).dt.round('s')
+        df['dttm'] = pd.to_datetime(df.dttm).dt.round('s')
     except ParserError as e:
         raise ValidationError(_('Incorrect datetime: {}').format(e.args[1]))
     try:

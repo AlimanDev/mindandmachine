@@ -48,7 +48,7 @@ def metabase_url(request):
     }
     token = jwt.encode(payload, settings.METABASE_SECRET_KEY, algorithm="HS256")
 
-    iframeUrl = settings.METABASE_SITE_URL + "/embed/dashboard/" + token.decode("utf8") + "#bordered=false&titled=false&hide_parameters=shop_id,vacancy,dt,worker_id,employee_id,outsource,work_type_name,user_network"
+    iframeUrl = settings.METABASE_SITE_URL + "/embed/dashboard/" + token + "#bordered=false&titled=false&hide_parameters=shop_id,vacancy,dt,worker_id,employee_id,outsource,work_type_name,user_network"
     return Response({"url": iframeUrl})
 
 @login_or_auth_required(auth_models=(TickPointTokenAuthentication, ShopIPAuthentication))

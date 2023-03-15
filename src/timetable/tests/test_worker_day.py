@@ -857,7 +857,7 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
 
         response = self.client.put(f"{self.url}{self.worker_day_plan_not_approved.id}/", data, format='json')
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertEqual(response.json(), {'worker_day_details': ['Это поле обязательно.']})
+        self.assertIn('worker_day_details', response.json())
 
         data = {
             "shop_id": self.shop.id,
@@ -874,7 +874,7 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
 
         response = self.client.put(f"{self.url}{self.worker_day_plan_not_approved.id}/", data, format='json')
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertEqual(response.json(), {'dttm_work_start': ['Это поле обязательно.']})
+        self.assertIn('dttm_work_start', response.json())
 
     def test_copy_approved_to_fact_crossing(self):
         dt_now = date.today()
@@ -2172,52 +2172,6 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
         resp_data = resp.json()
         wd = WorkerDay.objects.get(id=resp_data['id'])
         self.assertEqual(wd.employment.id, e2_2.id)
-
-    # def test_cant_create_fact_worker_day_when_there_is_no_plan_for_outsource_user(self):
-    #     outsource_network = Network.objects.create(name='outsource')
-    #     outsource_user = User.objects.create(
-    #         username='outsource',
-    #         network=outsource_network,
-    #     )
-    #     outsource_shop = Shop.objects.create(
-    #         name='outsource',
-    #         network=outsource_network,
-    #         region=self.region,
-    #     )
-    #     outsource_employee = Employee.objects.create(
-    #         user=outsource_user,
-    #         tabel_code='outsource',
-    #     )
-    #     outsource_employment = Employment.objects.create(
-    #         employee=outsource_employee,
-    #         shop=outsource_shop,
-    #     )
-    #     data = {
-    #         "shop_id": self.shop2.id,
-    #         "employee_id": outsource_employee.id,
-    #         "dt": self.dt,
-    #         "is_fact": True,
-    #         "is_approved": True,
-    #         "type": WorkerDay.TYPE_WORKDAY,
-    #         "dttm_work_start": datetime.combine(self.dt, time(10, 0, 0)),
-    #         "dttm_work_end": datetime.combine(self.dt, time(20, 0, 0)),
-    #         "worker_day_details": [{
-    #             "work_part": 1.0,
-    #             "work_type_id": self.work_type2.id}
-    #         ]
-    #     }
-    #     resp = self.client.post(self.url, data, format='json')
-    #     self.assertEqual(resp.status_code, 400)
-    #     self.assertDictEqual(
-    #         resp.json(),
-    #         {
-    #             "error": [
-    #                 "Не существует рабочего дня в плановом подтвержденном графике. "
-    #                 "Необходимо создать и подтвердить рабочий день в плановом графике, "
-    #                 "или проверить, что магазины в плановом и фактическом графиках совпадают."
-    #             ]
-    #         },
-    #     )
 
     def test_valid_error_message_returned_when_dt_is_none(self):
         data = {

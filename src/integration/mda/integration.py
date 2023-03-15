@@ -224,7 +224,7 @@ class MdaIntegrationHelper:
         shops_df = pd.DataFrame(data['shops'])
         users_df = pd.DataFrame(self._get_users_data(threshold_seconds=threshold_seconds))
 
-        writer = pd.ExcelWriter(export_path or output, engine='xlsxwriter')
+        writer = pd.ExcelWriter(export_path or output, engine='xlsxwriter') # TODO: move to openpyxl
 
         divisions_df.to_excel(writer, sheet_name='Дивизионы')
         regions_df.to_excel(writer, sheet_name='Регионы')

@@ -181,7 +181,6 @@ class WorkerDayAdmin(admin.ModelAdmin):
 
 @admin.register(WorkerDayCashboxDetails)
 class WorkerDayCashboxDetailsAdmin(admin.ModelAdmin):
-    # todo: нет нормального отображения для конкретного pk(скорее всего из-за harakiri time в настройках uwsgi)
     list_display = ('worker_last_name', 'shop_title', 'worker_day_dt', 'on_work_type', 'id')
     search_fields = ('worker_day__employee__user__last_name', 'worker_day__shop__name', 'id')
     list_filter = (('worker_day__shop', RelatedOnlyDropdownNameOrderedFilter),)

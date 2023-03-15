@@ -336,7 +336,6 @@ class TestPivotTabelReportNotifications(TestsHelperMixin, APITestCase):
             self.assertEqual(list(df.loc[2, [first_date, second_date, 'Часов за период']].values), [10.75, 21.50, 32.25])
 
 
-@mock.patch.object(TickPhoto, 'compress_image', lambda _: True)
 class TestReportsViewSet(TestsHelperMixin, APITestCase):
     @classmethod
     def setUpTestData(cls):

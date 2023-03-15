@@ -288,7 +288,7 @@ class ImportHistDataStrategy(BaseSystemImportStrategy):
             "code": row['receipt_code'],
             "dttm": row["updated_dttm"],
             "shop_id": row["shop_id"],
-            "info": row[set(all_columns) - set(unused_columns)].to_json(),
+            "info": row[list(set(all_columns) - set(unused_columns))].to_json(),
         }
 
     def load_file(self,

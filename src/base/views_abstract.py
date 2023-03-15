@@ -1,5 +1,5 @@
 from django.http.response import Http404
-from django.db.models import F
+from django.db.models import F, Manager
 from rest_framework import serializers
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -108,6 +108,8 @@ class BaseModelViewSet(ApiLogMixin, BatchUpdateOrCreateViewMixin, ModelViewSet):
     http_method_names = ['get', 'post', 'put', 'delete']
     available_extra_fields = []
     def _get_available_extra_fields(self, request):
+        if request is None:
+            return []
         extra_fields = request.query_params.get('extra_fields') or request.data.get('extra_fields') or []
         if extra_fields:
             extra_fields = set(map(lambda x: x.strip(), extra_fields.split(',')))
@@ -123,7 +125,9 @@ class BaseModelViewSet(ApiLogMixin, BatchUpdateOrCreateViewMixin, ModelViewSet):
         return manager
 
     def get_queryset(self):
-        manager = self.get_manager()
+        manager: Manager = self.get_manager()
+        if getattr(self, 'swagger_fake_view', False):   # for schema generation metadata
+            return manager.none()
         available_extra_fields = self._get_available_extra_fields(self.request)
 
         return manager.annotate(
@@ -131,7 +135,12 @@ class BaseModelViewSet(ApiLogMixin, BatchUpdateOrCreateViewMixin, ModelViewSet):
                 extra_field: F(extra_field) for extra_field in available_extra_fields
             }
         )
-    
+
+    def get_serializer_class(self):
+        if getattr(self, 'swagger_fake_view', False):   # for schema generation metadata
+            return serializers.Serializer
+        return super().get_serializer_class()
+
     def get_serializer_context(self):
         context = super().get_serializer_context()
         context['extra_fields'] = self._get_available_extra_fields(self.request)

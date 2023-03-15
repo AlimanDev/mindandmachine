@@ -1145,7 +1145,7 @@ def workers_exchange():
             df_stat['dttm'] = pandas.to_datetime(df_stat.dttm, format=QOS_DATETIME_FORMAT)
             # df_stat['shop_id'] = shop.id
             df_stat['work_type_id'] = work_type.id
-            df_shop_stat = df_shop_stat.append(df_stat)
+            df_shop_stat = pandas.concat([df_shop_stat, df_stat])
 
     if not len(df_shop_stat):
         return

@@ -1,9 +1,12 @@
 from datetime import datetime, timedelta
+from unittest import mock
 
-import pandas as pd
+from dadata import Dadata
 from django.conf import settings
 from django.db.models import Q
+import pandas as pd
 from tzwhere import tzwhere
+import numpy
 
 from src.base.models import ShopSchedule, Shop
 from src.celery.celery import app
@@ -109,42 +112,47 @@ def fill_shop_city_from_coords(shop_id):
 @app.task
 def fill_city_coords_address_timezone_from_fias_code(shop_id):
     shop = Shop.objects.filter(id=shop_id).first()
-    if shop and shop.fias_code and settings.DADATA_TOKEN:
-        from dadata import Dadata
-        dadata = Dadata(settings.DADATA_TOKEN)
-        result = dadata.find_by_id("address", shop.fias_code)
-        if result and result[0].get('data'):
-            update_fields = []
-            if result[0].get('value'):
-                shop.address = result[0].get('value')
-                update_fields.append('address')
-            data = result[0].get('data')
-            if data.get('city'):
-                shop.city = result[0]['data']['city']
-                update_fields.append('city')
-            if data.get('geo_lat'):
-                shop.latitude = data.get('geo_lat')
-                update_fields.append('latitude')
-            if data.get('geo_lon'):
-                shop.longitude = data.get('geo_lon')
-                update_fields.append('longitude')
-            if data.get('geo_lat') and data.get('geo_lon'):
+    if not (shop and shop.fias_code and settings.DADATA_TOKEN):
+        return
+    dadata = Dadata(settings.DADATA_TOKEN)
+    result = dadata.find_by_id("address", shop.fias_code)
+    if result and result[0].get('data'):
+        update_fields = []
+        if result[0].get('value'):
+            shop.address = result[0].get('value')
+            update_fields.append('address')
+        data = result[0].get('data')
+        if data.get('city'):
+            shop.city = result[0]['data']['city']
+            update_fields.append('city')
+        if data.get('geo_lat'):
+            shop.latitude = data.get('geo_lat')
+            update_fields.append('latitude')
+        if data.get('geo_lon'):
+            shop.longitude = data.get('geo_lon')
+            update_fields.append('longitude')
+        if data.get('geo_lat') and data.get('geo_lon'):
                 # tzwhere.tzwhere() prints a warning. Clogs up test results.
                 # VisibleDeprecationWarning: Creating an ndarray from ragged nested sequences (which is a list-or-tuple of lists-or-tuples-or ndarrays with different lengths or shapes) is deprecated. If you meant to do this, you must specify 'dtype=object' when creating the ndarray.
                 #   self.timezoneNamesToPolygons[tzname] = WRAP(polys)
-                # TODO: Package does not seem to be maintained, need to find a replacement.
 
-                tz = tzwhere.tzwhere()
-                timezone = tz.tzNameAt(float(data.get('geo_lat')), float(data.get('geo_lon')))
-                if timezone:
-                    shop.timezone = timezone
-                else:
-                    tz = tzwhere.tzwhere(forceTZ=True)
-                    timezone = tz.tzNameAt(float(data.get('geo_lat')), float(data.get('geo_lon')), forceTZ=True)
-                    shop.timezone = timezone
+                # Update:
+                # tzwhere.tzwhere() now fails.
+                # File "/usr/local/lib/python3.11/site-packages/tzwhere/tzwhere.py", line 62, in __init__
+                #     self.timezoneNamesToPolygons[tzname] = WRAP(polys)
+                #                                         ^^^^^^^^^^^
+                # ValueError: setting an array element with a sequence. The requested array has an inhomogeneous shape after 2 dimensions. The detected shape was (1, 2) + inhomogeneous part.
+
+                # Adhoc fix with mock
+                # TODO: Package does not seem to be maintained, need to find a replacement.
+                with mock.patch('tzwhere.tzwhere.WRAP', tuple):
+                    with mock.patch('tzwhere.tzwhere.COLLECTION_TYPE', tuple):
+                        tz = tzwhere.tzwhere(forceTZ=True)
+                        timezone = tz.tzNameAt(float(data.get('geo_lat')), float(data.get('geo_lon')), forceTZ=True)
+                        shop.timezone = timezone
                 update_fields.append('timezone')
-            if update_fields:
-                shop.save(update_fields=update_fields)
+        if update_fields:
+            shop.save(update_fields=update_fields)
 
 
 @app.task

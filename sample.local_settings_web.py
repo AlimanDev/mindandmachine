@@ -17,9 +17,10 @@ EMAIL_HOST = 'mailhog.mindandmachine.ru'
 EMAIL_PORT = 1025
 EMAIL_USE_TLS = False
 
-# CELERY_TIMEZONE = 'Europe/Moscow'
+TIME_ZONE = 'Europe/Moscow'
+CELERY_TIMEZONE = TIME_ZONE
 
 #SET_USER_PASSWORD_AS_LOGIN=True
 #FISCAL_SHEET_DIVIDER_ALIAS = 'nahodka'
 
-#COMPANY_NAME = 'company'
+COMPANY_NAME = 'company'

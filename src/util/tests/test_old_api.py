@@ -1,9 +1,7 @@
 from unittest import skip
 
-import pytest
 
-
-@pytest.mark.skip(reason="Старое апи. Не используется")
+@skip("Старое апи. Не используется")
 class TestApiMethod:
     def auth(self, username):
         self.client.post(

@@ -10,6 +10,8 @@ class CurrentUserNetwork:
     requires_context = True
 
     def __call__(self, serializer_field):
+        if not serializer_field.context['request']:   # for schema generation metadata
+            return 1
         return serializer_field.context['request'].user.network_id
 
 
@@ -18,6 +20,8 @@ class UserworkShop:
     requires_context = True
 
     def __call__(self, serializer_field):
+        if not serializer_field.context['request']:   # for schema generation metadata
+            return 1
         from src.base.models import Employment
         now_day = timezone.now().date()
         employment =  Employment.objects.filter(

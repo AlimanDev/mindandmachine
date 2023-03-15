@@ -6,6 +6,7 @@ from dadata import Dadata
 from dateutil.relativedelta import relativedelta
 from django.db import transaction
 from django.db.models.deletion import ProtectedError
+from django.test import override_settings
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.serializers import ValidationError
@@ -531,50 +532,51 @@ class TestDepartment(TestsHelperMixin, APITestCase):
         shop.refresh_from_db(fields=['city'])
         self.assertEqual(shop.city, 'city_name')
 
+    @mock.patch.object(transaction, 'on_commit', lambda t: t())
+    @override_settings(
+        CELERY_TASK_ALWAYS_EAGER=True,
+        CELERY_TASK_EAGER_PROPAGATES=True,
+        DADATA_TOKEN='dummy',
+        FILL_SHOP_CITY_COORDS_ADDRESS_TIMEZONE_FROM_FIAS_CODE=True
+    )
     def test_city_coords_address_timezone_filled_from_dadata_by_fias_code(self):
-        with self.settings(
-                CELERY_TASK_ALWAYS_EAGER=True,
-                DADATA_TOKEN='dummy',
-                FILL_SHOP_CITY_COORDS_ADDRESS_TIMEZONE_FROM_FIAS_CODE=True
-        ):
-            with mock.patch.object(transaction, 'on_commit', lambda t: t()):
-                with mock.patch.object(Dadata, 'find_by_id') as mock_find_by_id:
-                    mock_find_by_id.return_value = [
-                        {
-                            "data": {
-                                "city": "Новосибирск",
-                                "geo_lat": "55.0286283",
-                                "geo_lon": "82.9102479",
-                            },
-                            "value": "г Новосибирск, ул Ленина, д 15",
-                        },
-                    ]
-                    shop = Shop.objects.create(
-                        parent=self.reg_shop1,
-                        name='New shop',
-                        tm_open_dict='{"all":"07:00:00"}',
-                        tm_close_dict='{"all":"23:00:00"}',
-                        region=self.region,
-                        settings=self.shop_settings,
-                        network=self.network,
-                        city=None,
-                        address='новосибирск ленина 15',
-                        fias_code='',
-                    )
-                    mock_find_by_id.assert_not_called()
-                    shop.refresh_from_db()
-                    self.assertEqual(shop.city, None)
+        find_by_id_data = [
+            {
+                "data": {
+                    "city": "Новосибирск",
+                    "geo_lat": "55.0286283",
+                    "geo_lon": "82.9102479",
+                },
+                "value": "г Новосибирск, ул Ленина, д 15",
+            },
+        ]
+        with mock.patch.object(Dadata, 'find_by_id', return_value=find_by_id_data) as mock_find_by_id:
+            shop = Shop.objects.create(
+                parent=self.reg_shop1,
+                name='New shop',
+                tm_open_dict='{"all":"07:00:00"}',
+                tm_close_dict='{"all":"23:00:00"}',
+                region=self.region,
+                settings=self.shop_settings,
+                network=self.network,
+                city=None,
+                address='новосибирск ленина 15',
+                fias_code='',
+            )
+            mock_find_by_id.assert_not_called()
+            shop.refresh_from_db()
+            self.assertEqual(shop.city, None)
 
-                    shop.fias_code = '09d9d44f-044b-4b9a-97b0-c70f0e327e9f'
-                    shop.save()
-                    mock_find_by_id.assert_called_once_with("address", "09d9d44f-044b-4b9a-97b0-c70f0e327e9f")
+            shop.fias_code = '09d9d44f-044b-4b9a-97b0-c70f0e327e9f'
+            shop.save()
+            mock_find_by_id.assert_called_once_with("address", "09d9d44f-044b-4b9a-97b0-c70f0e327e9f")
 
         shop.refresh_from_db()
         self.assertEqual(shop.city, 'Новосибирск')
         self.assertEqual(shop.latitude, Decimal('55.0286283'))
         self.assertEqual(shop.longitude, Decimal('82.9102479'))
         self.assertEqual(shop.address, 'г Новосибирск, ул Ленина, д 15')
-        self.assertEqual(shop.timezone.zone, 'Asia/Novosibirsk')
+        self.assertEqual(shop.timezone.key, 'Asia/Novosibirsk')
 
     def test_get_outsource_shops_tree(self):
         def _create_shop(name, network, parent=None):

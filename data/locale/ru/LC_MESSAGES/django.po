@@ -12,7 +12,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Django REST framework\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2023-02-08 16:03+0000\n"
+"POT-Creation-Date: 2023-03-10 15:32+0300\n"
 "PO-Revision-Date: 2017-08-03 14:58+0000\n"
 "Last-Translator: Grigory Mishchenko <grishkokot@gmail.com>\n"
 "Language-Team: Russian (http://www.transifex.com/django-rest-framework-1/"
@@ -479,7 +479,7 @@ msgstr "Рабочие часы должны равняться сумме дн�
 msgid "Not found worker day with id={wd_id}"
 msgstr "Не найден рабочей день с id={wd_id}"
 
-#: src/base/permissions.py:142
+#: src/base/permissions.py:143
 msgid "shop_id should be defined"
 msgstr "Произошла ошибка. Попробуйте перезагрузить страницу."
 
@@ -898,18 +898,19 @@ msgid "There are no reports available."
 msgstr "Нет доступных отчётов"
 
 #: src/recognition/api/recognition.py:308
-#: src/recognition/tests/test_tick_photos.py:212
+#: src/recognition/tests/test_tick_photos.py:213
 msgid "No faces found on the image."
 msgstr "На фото не было найдено лицо."
 
-#: src/recognition/models.py:63 src/reports/reports.py:236
-#: src/reports/reports.py:318 src/reports/reports.py:348
-#: src/reports/tests.py:755 src/timetable/attendance_records/views.py:32
+#: src/recognition/models.py:63 src/reports/reports.py:238
+#: src/reports/reports.py:320 src/reports/reports.py:350
+#: src/reports/reports.py:369 src/reports/tests.py:754
+#: src/timetable/attendance_records/views.py:32
 msgid "Coming"
 msgstr "Приход"
 
-#: src/recognition/models.py:64 src/reports/reports.py:239
-#: src/reports/reports.py:324 src/reports/tests.py:647
+#: src/recognition/models.py:64 src/reports/reports.py:241
+#: src/reports/reports.py:326 src/reports/tests.py:646
 #: src/timetable/attendance_records/views.py:33
 msgid "Leaving"
 msgstr "Уход"
@@ -934,15 +935,15 @@ msgstr "биометрическая проверка"
 msgid "Was the biometrics service available"
 msgstr "Был ли доступен сервис биометрии"
 
-#: src/recognition/models.py:213
+#: src/recognition/models.py:218
 msgid "Key"
 msgstr "Ключ"
 
-#: src/recognition/models.py:218
+#: src/recognition/models.py:223
 msgid "Created"
 msgstr "Создан"
 
-#: src/recognition/models.py:266
+#: src/recognition/models.py:273
 msgid "Shop in tick point must be equal to shop in this record."
 msgstr "Магазин в точке отметки должен совпадать с магазином в записи."
 
@@ -963,7 +964,7 @@ msgstr ""
 msgid "A session is already open for this tick point"
 msgstr "Для этой точки уже открыта сессия"
 
-#: src/recognition/views.py:294
+#: src/recognition/views.py:297
 msgid ""
 "You do not have an active employment at the moment, the action can not be "
 "performed, please refer to your management"
@@ -971,11 +972,11 @@ msgstr ""
 "У вас нет трудоустройства на текущий момент, действие выполнить невозможно, "
 "пожалуйста, обратитесь к вашему руководству"
 
-#: src/recognition/views.py:310
+#: src/recognition/views.py:313
 msgid "Today, the employee does not have a working day in this shop"
 msgstr "Сегодня у сотрудника нет рабочего дня в данном магазине"
 
-#: src/recognition/views.py:337 src/recognition/views.py:406
+#: src/recognition/views.py:340 src/recognition/views.py:409
 msgid "The tick does not exist"
 msgstr "Отметка не существует"
 
@@ -1009,30 +1010,33 @@ msgstr "Конец предыдущей половины года"
 msgid "End of previous year"
 msgstr "Конец предыдущего года"
 
-#: src/reports/reports.py:229 src/reports/tests.py:698
+#: src/reports/reports.py:229 src/reports/tests.py:697
 msgid "Arrival without plan"
 msgstr "Выход вне плана"
 
-#: src/reports/reports.py:238 src/reports/tests.py:757
+#: src/reports/reports.py:235 src/reports/reports.py:301
+#: src/reports/tests.py:647 src/reports/tests.py:755 src/reports/tests.py:839
+#: src/reports/tests.py:847
+msgid "Manual tick"
+msgstr "Ручная отметка"
+
+#: src/reports/reports.py:240 src/reports/tests.py:756
 msgid "Late arrival"
 msgstr "Опоздание"
 
-#: src/reports/reports.py:241 src/reports/tests.py:649
+#: src/reports/reports.py:243 src/reports/tests.py:648
 msgid "Early departure"
 msgstr "Ранний уход"
 
-#: src/reports/reports.py:243 src/reports/tests.py:772
+#: src/reports/reports.py:245 src/reports/tests.py:771
 msgid "Late departure"
 msgstr "Поздний уход"
 
-#: src/reports/reports.py:255 src/reports/tests.py:633 src/reports/tests.py:697
-#: src/reports/tests.py:771
+#: src/reports/reports.py:257 src/reports/reports.py:379
+#: src/reports/tests.py:632 src/reports/tests.py:696 src/reports/tests.py:770
+#: src/reports/tests.py:838 src/reports/tests.py:846
 msgid "Autotick"
 msgstr "Автоотметка"
-
-#: src/reports/reports.py:299 src/reports/tests.py:648 src/reports/tests.py:756
-msgid "Manual tick"
-msgstr "Ручная отметка"
 
 #: src/reports/serializers.py:82
 msgid "Time period must be within 31 days."
@@ -1046,17 +1050,22 @@ msgstr "Отчет по отклонениям"
 msgid "Tick report"
 msgstr "Отчёт по отметкам сотрудников"
 
-#: src/reports/tests.py:622 src/reports/tests.py:687 src/reports/tests.py:745
+#: src/reports/tests.py:621 src/reports/tests.py:686 src/reports/tests.py:744
 #: src/util/dg/ticks_report.py:35
 msgid "Tick date and time"
 msgstr "Дата и время отметки"
+
+#: src/reports/tests.py:838 src/reports/tests.py:839 src/reports/tests.py:846
+#: src/reports/tests.py:847 src/util/dg/ticks_report.py:33
+msgid "Tick kind"
+msgstr "Вид отметки"
 
 #: src/reports/utils/overtimes_undertimes.py:181
 #: src/reports/utils/pivot_tabel.py:24
 #: src/timetable/worker_day/timetable.py:722
 #: src/timetable/worker_day/timetable.py:757
 #: src/timetable/worker_day/timetable.py:763
-#: src/timetable/worker_day/timetable.py:808 src/util/dg/timesheet.py:354
+#: src/timetable/worker_day/timetable.py:808 src/util/dg/timesheet.py:382
 msgid "Full name"
 msgstr "ФИО"
 
@@ -1065,7 +1074,7 @@ msgstr "ФИО"
 #: src/timetable/worker_day/timetable.py:721
 #: src/timetable/worker_day/timetable.py:757
 #: src/timetable/worker_day/timetable.py:763
-#: src/timetable/worker_day/timetable.py:806 src/util/dg/timesheet.py:357
+#: src/timetable/worker_day/timetable.py:806 src/util/dg/timesheet.py:385
 msgid "Employee id"
 msgstr "Табельный номер"
 
@@ -1109,7 +1118,7 @@ msgstr "Сеть сотрудника"
 msgid "Department"
 msgstr "Подразделение"
 
-#: src/reports/utils/pivot_tabel.py:24 src/util/dg/timesheet.py:371
+#: src/reports/utils/pivot_tabel.py:24 src/util/dg/timesheet.py:400
 msgid "Work type"
 msgstr "Тип работ"
 
@@ -1353,7 +1362,7 @@ msgstr "Максимальное количество часов на одну �
 msgid "Norm settings are not configured (through position or employment)"
 msgstr "Настройки нормы не установлены (через должность или трудоустройство)"
 
-#: src/timetable/models.py:1249 src/timetable/tests/test_worker_day.py:2001
+#: src/timetable/models.py:1249 src/timetable/tests/test_worker_day.py:2009
 #: src/timetable/worker_day/serializers.py:145
 #: src/timetable/worker_day_permissions/checkers.py:87
 msgid ""
@@ -1579,7 +1588,7 @@ msgstr "Пересчет можно запускать только для 1 м�
 msgid "No shop found."
 msgstr "Магазин не найден."
 
-#: src/timetable/timesheet/views.py:182 src/timetable/worker_day/views.py:1129
+#: src/timetable/timesheet/views.py:182
 msgid "No employees satisfying the conditions."
 msgstr "Не найдено сотрудников удовлетворяющих условиям запроса."
 
@@ -1739,17 +1748,22 @@ msgid "Shop or employees should be defined."
 msgstr "Для получения отчета нужно передать магазин или сотрудников."
 
 #: src/timetable/worker_day/serializers.py:768
-#: src/timetable/worker_day/utils/utils.py:44
-#: src/timetable/worker_day/views.py:94
+#: src/timetable/worker_day/utils/utils.py:41
+#: src/timetable/worker_day/views.py:95
 #, python-brace-format
 msgid "Employee {employee} is not your subordinate."
 msgstr "Сотрудник {employee} не является Вашим подчиненным."
 
 #: src/timetable/worker_day/serializers.py:769
-#: src/timetable/worker_day/utils/utils.py:43
-#: src/timetable/worker_day/views.py:93
+#: src/timetable/worker_day/utils/utils.py:40
+#: src/timetable/worker_day/views.py:94
 msgid "There is no such user in your network."
 msgstr "В вашей сети нет такого пользователя."
+
+#: src/timetable/worker_day/services/approve.py:95
+#, python-brace-format
+msgid "No shop found for id {shop_id}"
+msgstr "Не найден магазин с id {shop_id}"
 
 #: src/timetable/worker_day/timetable.py:71
 msgid "There are no active work types in this shop."
@@ -1818,7 +1832,7 @@ msgstr "Расписание_для_подразделения_{}_от_{}.xlsx"
 #: src/timetable/worker_day/timetable.py:723
 #: src/timetable/worker_day/timetable.py:757
 #: src/timetable/worker_day/timetable.py:763
-#: src/timetable/worker_day/timetable.py:810 src/util/dg/timesheet.py:364
+#: src/timetable/worker_day/timetable.py:810 src/util/dg/timesheet.py:392
 msgid "Position"
 msgstr "Должность"
 
@@ -1827,7 +1841,7 @@ msgstr "Должность"
 msgid "Timetable"
 msgstr "Расписание"
 
-#: src/timetable/worker_day/timetable.py:812 src/util/dg/timesheet.py:368
+#: src/timetable/worker_day/timetable.py:812 src/util/dg/timesheet.py:397
 msgid "Date"
 msgstr "Дата"
 
@@ -1852,44 +1866,39 @@ msgstr ""
 "У сотрудника {user.first_name} {user.last_name} в строке {i} неправильное "
 "значение: {value}."
 
-#: src/timetable/worker_day/utils/approve.py:94
-#, python-brace-format
-msgid "No shop found for id {shop_id}"
-msgstr "Не найден магазин с id {shop_id}"
-
-#: src/timetable/worker_day/utils/utils.py:31
-#: src/timetable/worker_day/views.py:82
+#: src/timetable/worker_day/utils/utils.py:28
+#: src/timetable/worker_day/views.py:83
 msgid "Worker days mismatch."
 msgstr "Рабочие дни сотрудников не совпадают."
 
-#: src/timetable/worker_day/utils/utils.py:32
-#: src/timetable/worker_day/views.py:83
+#: src/timetable/worker_day/utils/utils.py:29
+#: src/timetable/worker_day/views.py:84
 msgid "Workers don't have timetable."
 msgstr "Отсутствует расписание у сотрудников."
 
-#: src/timetable/worker_day/utils/utils.py:33
-#: src/timetable/worker_day/views.py:84
+#: src/timetable/worker_day/utils/utils.py:30
+#: src/timetable/worker_day/views.py:85
 msgid "Cannot_delete approved version."
 msgstr "Нельзя удалить подтвержденную версию."
 
-#: src/timetable/worker_day/utils/utils.py:34
-#: src/timetable/worker_day/views.py:85
+#: src/timetable/worker_day/utils/utils.py:31
+#: src/timetable/worker_day/views.py:86
 msgid "Not approved version already exists."
 msgstr "У расписания уже есть неподтвержденная версия."
 
-#: src/timetable/worker_day/utils/utils.py:35
-#: src/timetable/worker_day/views.py:86
+#: src/timetable/worker_day/utils/utils.py:32
+#: src/timetable/worker_day/views.py:87
 #, python-brace-format
 msgid "You do not have rights to {action_str} the day type \"{wd_type_str}\""
 msgstr "У вас нет прав на {action_str} типа дня \"{wd_type_str}\""
 
-#: src/timetable/worker_day/utils/utils.py:36
+#: src/timetable/worker_day/utils/utils.py:33
 #, python-brace-format
 msgid "You do not have rights to {action_str}"
 msgstr "У вас нет прав на {action_str}"
 
-#: src/timetable/worker_day/utils/utils.py:37
-#: src/timetable/worker_day/views.py:87
+#: src/timetable/worker_day/utils/utils.py:34
+#: src/timetable/worker_day/views.py:88
 #, python-brace-format
 msgid ""
 "You do not have the rights to {action_str} the type of day \"{wd_type_str}\" "
@@ -1899,8 +1908,8 @@ msgstr ""
 "У вас нет прав на {action_str} типа дня \"{wd_type_str}\" в выбранные даты. "
 "Необходимо изменить даты. Разрешенный интервал: {dt_interval}"
 
-#: src/timetable/worker_day/utils/utils.py:41
-#: src/timetable/worker_day/views.py:91
+#: src/timetable/worker_day/utils/utils.py:38
+#: src/timetable/worker_day/views.py:92
 #, python-brace-format
 msgid ""
 "You do not have rights to approve protected worker days ({protected_wdays}). "
@@ -1909,13 +1918,13 @@ msgstr ""
 "У вас нет прав на подтверждение защищенных рабочих дней ({protected_wdays}). "
 "Обратитесь, пожалуйста, к администратору системы."
 
-#: src/timetable/worker_day/utils/utils.py:45
+#: src/timetable/worker_day/utils/utils.py:42
 #, python-brace-format
 msgid "No day types to {action_str}"
 msgstr "Нет типов дней на {action_str}"
 
-#: src/timetable/worker_day/utils/utils.py:273
-#: src/timetable/worker_day/utils/utils.py:416
+#: src/timetable/worker_day/utils/utils.py:270
+#: src/timetable/worker_day/utils/utils.py:413
 msgid ""
 "It is not possible to create days on the selected dates. Please check "
 "whether the employee has active employment."
@@ -1923,145 +1932,145 @@ msgstr ""
 "Невозможно создать дни в выбранные даты. Пожалуйста, проверьте наличие "
 "активного трудоустройства у сотрудника."
 
-#: src/timetable/worker_day/views.py:485
-msgid "This vacancy does not exist or has already been approved."
-msgstr "Такой вакансии не существует или она уже подтверждена."
-
-#: src/timetable/worker_day/views.py:488
-msgid "You can not approve vacancy from other network."
-msgstr "Вы не можете подтвердить вакансию из другой сети."
-
-#: src/timetable/worker_day/views.py:544
-msgid "There is no such vacancy."
-msgstr "Такой вакансии не существует"
-
-#: src/timetable/worker_day/views.py:548
-msgid "The vacancy cannot be edited because it has already been responded."
-msgstr "Невозможно отредактировать вакансию, так как на неё уже откликнулись."
-
-#: src/timetable/worker_day/views.py:1035
-msgid "{}_timesheet_for_shop_{}_from_{}.{}"
-msgstr "{}_табель_для_подразделения_{}_от_{}.{}"
-
-#: src/timetable/worker_day/views.py:1135
-msgid "Hours recalculation started successfully."
-msgstr "Пересчет часов успешно запущен."
-
-#: src/timetable/worker_day/xlsx_utils/timetable.py:128
+#: src/timetable/worker_day/utils/xlsx_utils/timetable.py:128
 msgid "Employee work timetable for"
 msgstr "График работы сотрудников на"
 
-#: src/timetable/worker_day/xlsx_utils/timetable.py:142
+#: src/timetable/worker_day/utils/xlsx_utils/timetable.py:142
 msgid "signature"
 msgstr "подпись"
 
-#: src/timetable/worker_day/xlsx_utils/timetable.py:142
+#: src/timetable/worker_day/utils/xlsx_utils/timetable.py:142
 msgid "transcript"
 msgstr "расшифровка"
 
-#: src/timetable/worker_day/xlsx_utils/timetable.py:145
+#: src/timetable/worker_day/utils/xlsx_utils/timetable.py:145
 msgid "Created by: "
 msgstr "Составил: "
 
-#: src/timetable/worker_day/xlsx_utils/timetable.py:149
+#: src/timetable/worker_day/utils/xlsx_utils/timetable.py:149
 msgid "full name"
 msgstr "ФИО"
 
-#: src/timetable/worker_day/xlsx_utils/timetable.py:150
+#: src/timetable/worker_day/utils/xlsx_utils/timetable.py:150
 msgid "POSITION"
 msgstr "ДОЛЖНОСТЬ"
 
-#: src/timetable/worker_day/xlsx_utils/timetable.py:155
+#: src/timetable/worker_day/utils/xlsx_utils/timetable.py:155
 msgid "From"
 msgstr "С"
 
-#: src/timetable/worker_day/xlsx_utils/timetable.py:156
+#: src/timetable/worker_day/utils/xlsx_utils/timetable.py:156
 msgid "To"
 msgstr "По"
 
-#: src/timetable/worker_day/xlsx_utils/timetable.py:166
-#: src/util/dg/timesheet.py:362
+#: src/timetable/worker_day/utils/xlsx_utils/timetable.py:166
+#: src/util/dg/timesheet.py:390
 msgid "Days"
 msgstr "Дни"
 
-#: src/timetable/worker_day/xlsx_utils/timetable.py:170
-#: src/util/dg/timesheet.py:363
+#: src/timetable/worker_day/utils/xlsx_utils/timetable.py:170
+#: src/util/dg/timesheet.py:391
 msgid "Hours"
 msgstr "Часы"
 
-#: src/timetable/worker_day/xlsx_utils/timetable.py:174
+#: src/timetable/worker_day/utils/xlsx_utils/timetable.py:174
 msgid "the rate of hours per month"
 msgstr "норма часов на месяц"
 
-#: src/timetable/worker_day/xlsx_utils/timetable.py:178
+#: src/timetable/worker_day/utils/xlsx_utils/timetable.py:178
 msgid "overtime"
 msgstr "переработка"
 
-#: src/timetable/worker_day/xlsx_utils/timetable.py:181
+#: src/timetable/worker_day/utils/xlsx_utils/timetable.py:181
 msgid "date"
 msgstr "дата"
 
-#: src/timetable/worker_day/xlsx_utils/timetable.py:185
+#: src/timetable/worker_day/utils/xlsx_utils/timetable.py:185
 msgid "I have read the work schedule."
 msgstr "С графиком работы ознакомлен."
 
-#: src/timetable/worker_day/xlsx_utils/timetable.py:190
+#: src/timetable/worker_day/utils/xlsx_utils/timetable.py:190
 msgid "H"
 msgstr "В"
 
-#: src/timetable/worker_day/xlsx_utils/timetable.py:194
+#: src/timetable/worker_day/utils/xlsx_utils/timetable.py:194
 msgid "V"
 msgstr "ОТ"
 
-#: src/timetable/worker_day/xlsx_utils/timetable.py:332
+#: src/timetable/worker_day/utils/xlsx_utils/timetable.py:332
 msgid "On print"
 msgstr "На печать"
 
-#: src/timetable/worker_day/xlsx_utils/timetable.py:350
-#: src/timetable/worker_day/xlsx_utils/timetable.py:351
+#: src/timetable/worker_day/utils/xlsx_utils/timetable.py:350
+#: src/timetable/worker_day/utils/xlsx_utils/timetable.py:351
 msgid "Sun"
 msgstr "Вс"
 
-#: src/timetable/worker_day/xlsx_utils/timetable.py:351
+#: src/timetable/worker_day/utils/xlsx_utils/timetable.py:351
 msgid "Mon"
 msgstr "Пн"
 
-#: src/timetable/worker_day/xlsx_utils/timetable.py:351
+#: src/timetable/worker_day/utils/xlsx_utils/timetable.py:351
 msgid "Tue"
 msgstr "Вт"
 
-#: src/timetable/worker_day/xlsx_utils/timetable.py:351
+#: src/timetable/worker_day/utils/xlsx_utils/timetable.py:351
 msgid "Wed"
 msgstr "Ср"
 
-#: src/timetable/worker_day/xlsx_utils/timetable.py:351
+#: src/timetable/worker_day/utils/xlsx_utils/timetable.py:351
 msgid "Thu"
 msgstr "Чт"
 
-#: src/timetable/worker_day/xlsx_utils/timetable.py:351
+#: src/timetable/worker_day/utils/xlsx_utils/timetable.py:351
 msgid "Fri"
 msgstr "Пт"
 
-#: src/timetable/worker_day/xlsx_utils/timetable.py:351
+#: src/timetable/worker_day/utils/xlsx_utils/timetable.py:351
 msgid "Sat"
 msgstr "Сб"
 
-#: src/timetable/worker_day/xlsx_utils/timetable.py:451
+#: src/timetable/worker_day/utils/xlsx_utils/timetable.py:451
 msgid "Descriptions"
 msgstr "Обозначения"
 
-#: src/timetable/worker_day/xlsx_utils/timetable.py:468
+#: src/timetable/worker_day/utils/xlsx_utils/timetable.py:468
 msgid "Abbreviation"
 msgstr "Сокращение"
 
-#: src/timetable/worker_day/xlsx_utils/timetable.py:469
-#: src/timetable/worker_day/xlsx_utils/timetable.py:472
+#: src/timetable/worker_day/utils/xlsx_utils/timetable.py:469
+#: src/timetable/worker_day/utils/xlsx_utils/timetable.py:472
 msgid "Description"
 msgstr "Обозначение"
 
-#: src/timetable/worker_day/xlsx_utils/timetable.py:471
+#: src/timetable/worker_day/utils/xlsx_utils/timetable.py:471
 msgid "Color of day of week"
 msgstr "Цвет дня недели"
+
+#: src/timetable/worker_day/views.py:486
+msgid "This vacancy does not exist or has already been approved."
+msgstr "Такой вакансии не существует или она уже подтверждена."
+
+#: src/timetable/worker_day/views.py:489
+msgid "You can not approve vacancy from other network."
+msgstr "Вы не можете подтвердить вакансию из другой сети."
+
+#: src/timetable/worker_day/views.py:545
+msgid "There is no such vacancy."
+msgstr "Такой вакансии не существует"
+
+#: src/timetable/worker_day/views.py:549
+msgid "The vacancy cannot be edited because it has already been responded."
+msgstr "Невозможно отредактировать вакансию, так как на неё уже откликнулись."
+
+#: src/timetable/worker_day/views.py:1036
+msgid "{}_timesheet_for_shop_{}_from_{}.{}"
+msgstr "{}_табель_для_подразделения_{}_от_{}.{}"
+
+#: src/timetable/worker_day/views.py:1124
+msgid "Hours recalculation started successfully."
+msgstr "Пересчет часов успешно запущен."
 
 #: src/timetable/worker_day_permissions/checkers.py:234
 msgid "for employee"
@@ -2137,17 +2146,13 @@ msgstr "ФИО сотрудника"
 msgid "Outsource network"
 msgstr "Аутсорс-сеть"
 
-#: src/util/dg/ticks_report.py:31 src/util/dg/timesheet.py:365
+#: src/util/dg/ticks_report.py:31 src/util/dg/timesheet.py:393
 msgid "Shop"
 msgstr "Отделение"
 
 #: src/util/dg/ticks_report.py:32
 msgid "Tick type"
 msgstr "Тип отметки"
-
-#: src/util/dg/ticks_report.py:33
-msgid "Tick kind"
-msgstr "Вид отметки"
 
 #: src/util/dg/ticks_report.py:34
 msgid "Violation"
@@ -2161,72 +2166,76 @@ msgstr "Качество фото"
 msgid "Photo"
 msgstr "Фото"
 
-#: src/util/dg/timesheet.py:352
+#: src/util/dg/timesheet.py:380
 msgid "Tabel for {} {}y"
 msgstr "Табель учета рабочего времени за {} {}г"
 
-#: src/util/dg/timesheet.py:355
+#: src/util/dg/timesheet.py:383
 msgid "Number in order"
 msgstr "Номер по порядку"
 
-#: src/util/dg/timesheet.py:356
+#: src/util/dg/timesheet.py:384
 msgid "Last name, initials, position (specialty, profession)"
 msgstr "Фамилия, инициалы, должность (специальность, профессия)"
 
-#: src/util/dg/timesheet.py:358
+#: src/util/dg/timesheet.py:386
 msgid ""
 "Notes on attendance and non-attendance at work on the dates of the month"
 msgstr "Отметки о явках и неявках на работу по числам месяца"
 
-#: src/util/dg/timesheet.py:359
+#: src/util/dg/timesheet.py:387
 msgid "Worked out for"
 msgstr "Отработано за"
 
-#: src/util/dg/timesheet.py:360
+#: src/util/dg/timesheet.py:388
 msgid "half of the month (I, II)"
 msgstr "половину месяца (I, II)"
 
-#: src/util/dg/timesheet.py:361
+#: src/util/dg/timesheet.py:389
 msgid "month"
 msgstr "месяц"
 
-#: src/util/dg/timesheet.py:366
+#: src/util/dg/timesheet.py:394
 msgid "Total hours"
 msgstr "Итого часы"
 
-#: src/util/dg/timesheet.py:367
+#: src/util/dg/timesheet.py:395
 msgid "Total days"
 msgstr "Итого дни"
 
-#: src/util/dg/timesheet.py:369
+#: src/util/dg/timesheet.py:396
+msgid "Timesheet type"
+msgstr "Вид табеля"
+
+#: src/util/dg/timesheet.py:398
 msgid "Shop code"
 msgstr "Код отделения"
 
-#: src/util/dg/timesheet.py:370
+#: src/util/dg/timesheet.py:399
 msgid "Shop name"
 msgstr "Наименование ОП"
 
-#: src/util/dg/timesheet.py:372
+#: src/util/dg/timesheet.py:401
 msgid "Fact, h"
 msgstr "Факт, ч"
 
-#: src/util/dg/timesheet.py:373
+#: src/util/dg/timesheet.py:402
 msgid "Plan, h"
 msgstr "План, ч"
 
-#: src/util/dg/timesheet.py:374
+#: src/util/dg/timesheet.py:403
 msgid "Shift start time, fact, h"
 msgstr "Время начала смены, факт, ч"
 
-#: src/util/dg/timesheet.py:375
+#: src/util/dg/timesheet.py:404
 msgid "Shift end time, fact, h"
 msgstr "Время окончания смены, факт, ч"
 
-#: src/util/dg/timesheet.py:376
+#: src/util/dg/timesheet.py:405
 msgid "Shift start time, plan, h"
 msgstr "Время начала смены, план, ч"
 
-#: src/util/dg/timesheet.py:377
+#: src/util/dg/timesheet.py:406
 msgid "Shift end time, plan, h"
 msgstr "Время окончания смены, план, ч"
 
@@ -2268,10 +2277,6 @@ msgstr "Не было передано ни одного файла."
 #: src/util/upload.py:26
 msgid "The file was not uploaded."
 msgstr "Файл не был загружен."
-
-#: src/timetable/timesheet/views.py:406
-msgid "Timesheet type"
-msgstr "Вид табеля"
 
 #~ msgid "You do not have rights to {action_str} open vacancies"
 #~ msgstr "У вас нет прав на {action_str} открытых вакансий"

@@ -290,8 +290,8 @@ def create_data_frame(qs, unapplied_vacancies, extra_columns, include_extra_colu
         )
     )
     if unapplied_vacancies:
-        df = df.append(
-            pd.DataFrame(unapplied_vacancies).rename({'is_outsource_allowed': 'is_outsource'}, axis=1),
+        df = pd.concat(
+            [df, pd.DataFrame(unapplied_vacancies).rename({'is_outsource_allowed': 'is_outsource'}, axis=1)],
             ignore_index=True,
         )
 

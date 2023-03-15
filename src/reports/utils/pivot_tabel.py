@@ -39,7 +39,7 @@ class BasePivotTabel:
         table = pd.pivot_table(df, values=self.values_field, index=self.index_fields, columns=self.columns_fields, aggfunc=np.sum, fill_value=0)
         table[_('Hours in period')] = table.sum(axis=1).values
         table = np.round(
-            table.append( 
+            table.append(                                           # TODO: rewrite to pd.concat somehow (pivot_table does not seem to concat here correctly)
                 table.sum().rename(('', '', '', '', _('TOTAL'))) 
             ), 
             2

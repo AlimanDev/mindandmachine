@@ -6,9 +6,7 @@ config importance
 4. config
 """
 
-import os
-import pathlib
-import sys
+import os, sys, logging
 from copy import deepcopy
 
 import environ
@@ -52,6 +50,7 @@ MDA_PUBLIC_API_AUTH_TOKEN = 'dummy'
 DEBUG = env.bool('DJANGO_DEBUG', default=True)
 
 ALLOWED_HOSTS = ['*']
+CSRF_TRUSTED_ORIGINS = ['http://*.mindandmachine.ru', 'https://*.mindandmachine.ru', 'http://*.workestra.ai', 'https://*.workestra.ai']
 
 INSTALLED_APPS = [
     'django_light',
@@ -67,8 +66,7 @@ INSTALLED_APPS = [
     'django_filters',
     'django_admin_listfilter_dropdown',
     'rangefilter',
-    'admin_numeric_filter',
-    'rest_auth',
+    'dj_rest_auth',
     'rest_framework.authtoken',
     'django_json_widget',
     'src',
@@ -77,7 +75,6 @@ INSTALLED_APPS = [
     'src.timetable',
     'django_celery_beat',
     'src.celery',
-    'fcm_django',
     'src.recognition',
     'src.integration',
     'src.events',
@@ -111,17 +108,6 @@ REST_FRAMEWORK = {
     ],
 }
 OLD_PASSWORD_FIELD_ENABLED = True
-
-FCM_DJANGO_SETTINGS = {
-    "FCM_SERVER_KEY": "AAAAoJJLEXM:APA91bHcdiVZxmJE26xjLgYHmmVF03BgEt5r05uJN0kITq_buvZKI26jxGQP-qNAA2FjJdYNI21n_ECtBiisVlIZnCxaF8csG3AW5AXB1BoQiBsn4PlXLFOr1XcxA0cMD3pbwCifWGb0",
-    # true if you want to have only one active device per registered user at a time
-    # default: False
-    "ONE_DEVICE_PER_USER": False,
-    # devices to which notifications cannot be sent,
-    # are deleted upon receiving error response from FCM
-    # default: False
-    "DELETE_INACTIVE_DEVICES": False,
-}
 
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
@@ -569,8 +555,17 @@ CACHES = {
     },
 }
 
+# ETL
+DEFAULT_RECEIPTS_GAP_AHEAD = 3
+DEFAULT_RECEIPTS_GAP_BEFORE = 3
+
+# Testing
+TEST_RUNNER = 'src.util.test.TestRunner'    # High-level mocks
+TEST_LOG_LEVEL = logging.CRITICAL
+
+
 if is_config_exists('djconfig_local.py'):
-    from .djconfig_local import *
+    from .djconfig_local import *   # type: ignore
 
 if not ENV_LVL:
     ENV_LVL = ENV_LVL_TEST if DEBUG else ENV_LVL_PROD
@@ -731,8 +726,3 @@ if 'test' in sys.argv:
 
 if DEBUG:
     REST_FRAMEWORK['DEFAULT_RENDERER_CLASSES'].append('rest_framework.renderers.BrowsableAPIRenderer')
-
-
-# ETL 
-DEFAULT_RECEIPTS_GAP_AHEAD = 3
-DEFAULT_RECEIPTS_GAP_BEFORE = 3

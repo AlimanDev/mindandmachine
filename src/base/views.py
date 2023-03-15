@@ -9,7 +9,7 @@ from django.utils import timezone
 from django.utils.translation import gettext as _
 from drf_yasg.utils import swagger_auto_schema
 from requests.exceptions import HTTPError
-from rest_auth.views import UserDetailsView
+from dj_rest_auth.views import UserDetailsView
 from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied
@@ -237,6 +237,8 @@ class EmployeeViewSet(UpdateorCreateViewSet):
     openapi_tags = ['Employee', ]
 
     def get_serializer(self, *args, **kwargs):
+        if getattr(self, 'swagger_fake_view', False):   # for schema generation metadata
+            return super().get_serializer()
         if self.action == 'list':
             kwargs['user_source'] = 'employee_user'
         return super(EmployeeViewSet, self).get_serializer(*args, **kwargs)

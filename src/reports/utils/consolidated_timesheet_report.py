@@ -202,7 +202,7 @@ class ConsolidatedTimesheetReportGenerator:
         df = df.apply(pd.to_numeric, errors='ignore', downcast='float')
         df.loc['Total'] = df.sum(numeric_only=True, axis=0).replace(0, '')
         output = io.BytesIO()
-        writer = pd.ExcelWriter(output, engine='xlsxwriter')
+        writer = pd.ExcelWriter(output, engine='xlsxwriter') # TODO: move to openpyxl
         df.to_excel(
             excel_writer=writer, sheet_name=sheet_name, index=False, startrow=3,
         )

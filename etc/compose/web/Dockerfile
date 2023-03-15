@@ -1,9 +1,5 @@
-ARG PYTHON_VERSION=3.9.9-slim-buster
-
-FROM python:${PYTHON_VERSION} as python
-
 # Python build stage
-FROM python as python-build-stage
+FROM python:3.11.2 as python-build-stage
 
 ARG BUILD_ENVIRONMENT=production
 
@@ -23,16 +19,15 @@ RUN apt-get update && apt-get install --no-install-recommends -y \
 
 COPY ./requirements.txt .
 
-RUN pip install --upgrade pip==21.3.1
+RUN pip install --upgrade pip==23.0.1
 
 # Create Python Dependency and Sub-Dependency Wheels.
 RUN --mount=type=cache,target=/root/.cache \
   pip wheel --wheel-dir /usr/src/app/wheels  \
   -r requirements.txt
 
-
 # Python 'run' stage
-FROM python as python-run-stage
+FROM python:3.11.2-slim-buster as python-run-stage
 
 ARG BUILD_ENVIRONMENT=production
 ARG APP_HOME=/webapp
@@ -75,14 +70,8 @@ COPY ./etc/compose/web/commands/ /commands
 RUN sed -i 's/\r$//g' /commands/*
 RUN chmod +x -R /commands
 
-
-COPY ./etc/compose/web/uwsgi.ini /webapp/uwsgi.ini
-
 COPY ./etc/compose/web/logrotate/cron /cron.txt
 COPY ./etc/compose/web/logrotate/generate_configs.py /generate_configs.py
-
-ENV UWSGI_WORKERS 4
-ENV UWSGI_THREADS 1
 
 # copy application code to WORKDIR
 COPY . ${APP_HOME}

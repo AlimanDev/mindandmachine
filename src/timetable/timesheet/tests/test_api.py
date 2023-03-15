@@ -117,7 +117,7 @@ class TestTimesheetApiView(TestTimesheetMixin, APITestCase):
             self.get_url('Timesheet-recalc'), data=self.dump_data(data), content_type='application/json')
         self.assertContains(resp, 'Не найдено сотрудников удовлетворяющих условиям запроса.', status_code=400)
 
-    @override_settings(CELERY_TASK_ALWAYS_EAGER=True, CELERY_EAGER_PROPAGATES_EXCEPTIONS=True)
+    @override_settings(CELERY_TASK_ALWAYS_EAGER=True, CELERY_TASK_EAGER_PROPAGATES=True)
     def test_recalc_timesheet_employee_from_another_shop(self):
         self.add_group_perm(self.group_worker, 'Timesheet_recalc', 'POST')
         dt = date.today()

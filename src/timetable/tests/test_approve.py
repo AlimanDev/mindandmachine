@@ -689,7 +689,7 @@ class TestWorkerDayApprove(TestsHelperMixin, APITestCase):
         self.assertFalse(WorkerDay.objects.filter(type_id=WorkerDay.TYPE_WORKDAY, is_approved=True).exists())
         self.assertTrue(WorkerDay.objects.filter(id=wd.id).exists())    # unapproved day wasn't deleted
 
-    @override_settings(CELERY_TASK_ALWAYS_EAGER=True, CELERY_EAGER_PROPAGATES_EXCEPTIONS=True)
+    @override_settings(CELERY_TASK_ALWAYS_EAGER=True, CELERY_TASK_EAGER_PROPAGATES=True)
     @mock.patch.object(transaction, 'on_commit', lambda t: t())
     def test_approve_first_notification(self):
         """Orteka-specific. Send "Approved not first" notification"""

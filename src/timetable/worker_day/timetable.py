@@ -467,7 +467,7 @@ class BaseUploadDownloadTimeTable:
 
     def generate_upload_example(self, *args):
         output = io.BytesIO()
-        writer = pd.ExcelWriter(output, engine='xlsxwriter')
+        writer = pd.ExcelWriter(output, engine='xlsxwriter') # TODO: move to openpyxl
         workbook, name = self._generate_upload_example(writer, *args)
         workbook.close()
         output.seek(0)

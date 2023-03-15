@@ -827,8 +827,8 @@ class ApiLogAdmin(admin.ModelAdmin):
     list_filter = (
         'view_func',
         'http_method',
-        ('user', RelatedOnlyDropdownLastNameOrderedFilter),
         'response_status_code',
+        ('user', RelatedOnlyDropdownLastNameOrderedFilter),
     )
     search_fields = ('url_kwargs', 'request_data')
     raw_id_fields = ('user',)

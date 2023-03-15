@@ -9,7 +9,7 @@ def xlsx_method(func):
     @wraps(func)
     def wrapper(request, *args, **kwargs):
         output = io.BytesIO()
-        workbook = pd.ExcelWriter(output, engine='xlsxwriter')
+        workbook = pd.ExcelWriter(output, engine='xlsxwriter') # TODO: move to openpyxl
         workbook, name = func(request, workbook, *args, **kwargs)
 
         if name != 'error':

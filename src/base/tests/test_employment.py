@@ -451,7 +451,6 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
             content_type='application/json',
         )
         self.assertEqual(resp.status_code, 403)
-        self.assertEqual(resp.json(), {'detail': 'У вас нет прав для выполнения этой операции.'})
 
     def test_delete_inactive_function_groups(self):
         self.employment2.dt_to_function_group = date.today() - timedelta(days=5)

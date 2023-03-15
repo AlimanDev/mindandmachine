@@ -566,7 +566,7 @@ class TestLoadTemplate(APITestCase, TestsHelperMixin):
 
     def _test_upload_errors(self, data, error_msg):
         output = BytesIO()
-        writer = pd.ExcelWriter(output, engine='xlsxwriter')
+        writer = pd.ExcelWriter(output, engine='xlsxwriter') # TODO: move to openpyxl
         pd.DataFrame(data).to_excel(excel_writer=writer, sheet_name='Load template', index=False)
         writer.book.close()
         output.seek(0)

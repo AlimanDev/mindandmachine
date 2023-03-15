@@ -168,7 +168,7 @@ class BatchUpdateOrCreateModelMixin:
         deleted_df = pd.DataFrame(diff_data.get('deleted', []), dtype=str, columns=diff_headers)
         skipped_df = pd.DataFrame(diff_data.get('skipped', []), dtype=str, columns=diff_headers)
         output = io.BytesIO()
-        writer = pd.ExcelWriter(output, engine='xlsxwriter')
+        writer = pd.ExcelWriter(output, engine='xlsxwriter')  # TODO: move to openpyxl
         created_df.to_excel(writer, index=False, sheet_name='Создано')
         before_update_df.to_excel(writer, index=False, sheet_name='До изменений')
         after_update_df.to_excel(writer, index=False, sheet_name='После изменений')

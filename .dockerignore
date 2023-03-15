@@ -1,9 +1,14 @@
+.vscode/
+.github/
+__pycache__/
 tmp/
 venv/
+etc/_old_code/
+mounts/
+media/
+docs/
 
-*.log
-etc/_old_code
 src/conf/djconfig_local.py
-.coverage
-etc/compose/tests_mounts/
-mounts
+docker-compose.yml
+*.log
+sample.*

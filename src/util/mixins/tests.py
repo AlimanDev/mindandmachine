@@ -278,7 +278,7 @@ class TestsHelperMixin:
 
     @staticmethod
     def save_df_as_excel(df, filename):
-        writer = pd.ExcelWriter(filename, engine='xlsxwriter')
+        writer = pd.ExcelWriter(filename, engine='xlsxwriter') # TODO: move to openpyxl
         df.to_excel(writer)
         writer.save()
 

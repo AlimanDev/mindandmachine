@@ -22,6 +22,8 @@ class TaskViewSet(UpdateorCreateViewSet):
     openapi_tags = ['Task', ]
 
     def get_queryset(self):
+        if getattr(self, 'swagger_fake_view', False):   # for schema generation metadata
+            return super().get_manager().none()
         return super().get_manager().filter(
             operation_type__shop__network_id=self.request.user.network_id,
         ).select_related(

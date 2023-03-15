@@ -8,18 +8,19 @@ from django.core import mail
 from django.utils.translation import gettext as _
 import requests
 
+from src.base.models import User
 from src.recognition.utils import check_duplicate_biometrics
 from src.recognition.events import DUPLICATE_BIOMETRICS
 from src.recognition.models import Tick, TickPhoto, UserConnecter
 from src.recognition.api.recognition import Recognition, Tevian
 from src.timetable.models import WorkerDay
 from src.util.mixins.tests import TestsHelperMixin
-from src.util.mock import MockResponse, mock_request
+from src.util.mock import mock_request
 from src.events.models import EventType
 from src.notifications.models import EventEmailNotification
 from .factories import TickPointFactory
 
-@mock.patch.object(TickPhoto, 'compress_image', lambda _: True)
+
 @mock.patch.object(requests.sessions.Session, 'request', mock_request(status_code=status.HTTP_200_OK))
 @mock.patch.object(Tevian, 'login', lambda self: setattr(self, 'token', 'some_token'))
 class TestTickPhotos(TestsHelperMixin, APITestCase):
