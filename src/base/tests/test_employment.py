@@ -16,11 +16,12 @@ from src.base.tests.factories import EmploymentFactory, WorkerPositionFactory
 from src.base.models import Group, WorkerPosition, Employment, Break, ApiLog, SAWHSettings
 from src.celery.tasks import delete_inactive_employment_groups
 from src.timetable.models import WorkTypeName, EmploymentWorkType, WorkerDay
-from src.timetable.tests.factories import WorkerDayFactory
+from src.timetable.tests.factories import WorkerDayFactory, WorkTypeFactory, EmploymentWorkTypeFactory, WorkTypeNameFactory
 from src.util.mixins.tests import TestsHelperMixin
 from src.util.models_converter import Converter
 
 
+@override_settings(CELERY_TASK_ALWAYS_EAGER=True, CELERY_TASK_EAGER_PROPAGATES=True)
 class TestEmploymentAPI(TestsHelperMixin, APITestCase):
     @classmethod
     def setUpTestData(cls):
@@ -332,54 +333,53 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
         self._test_get_empls(check_length=8)
         self._test_get_empls(extra_params={'mine': True}, check_length=1)
 
+    @mock.patch.object(transaction, 'on_commit', lambda t: t())
     def test_empls_cleaned_in_wdays_without_active_employment(self):
-        with self.settings(CELERY_TASK_ALWAYS_EAGER=True):
-            dt = datetime.now().date()
-            self.employment2.employee.user.network.clean_wdays_on_employment_dt_change = True
-            self.employment2.employee.user.network.save()
+        dt = datetime.now().date()
+        self.employment2.employee.user.network.clean_wdays_on_employment_dt_change = True
+        self.employment2.employee.user.network.save()
 
-            wd1 = WorkerDay.objects.create(
-                shop=self.shop,
-                employee=self.employee2,
-                employment=self.employment2,
-                dt=dt + timedelta(days=50),
-                is_fact=False,
-                type_id=WorkerDay.TYPE_WORKDAY,
-                dttm_work_start=datetime.combine(dt, time(8, 0, 0)),
-                dttm_work_end=datetime.combine(dt, time(20, 0, 0)),
-                is_approved=True,
-            )
-            wd2 = WorkerDay.objects.create(
-                shop=self.shop,
-                employee=self.employee2,
-                employment=self.employment2,
-                dt=dt + timedelta(days=25),
-                is_fact=False,
-                type_id=WorkerDay.TYPE_WORKDAY,
-                dttm_work_start=datetime.combine(dt, time(8, 0, 0)),
-                dttm_work_end=datetime.combine(dt, time(20, 0, 0)),
-                is_approved=True,
-            )
-            wd_holiday = WorkerDay.objects.create(
-                shop=self.shop,
-                employee=self.employee2,
-                employment=self.employment2,
-                dt=dt + timedelta(days=20),
-                is_fact=False,
-                type_id=WorkerDay.TYPE_HOLIDAY,
-                is_approved=True,
-            )
-            wd_count_before_save = WorkerDay.objects.count()
-            self.employment2.dt_hired = dt
-            self.employment2.dt_fired = dt + timedelta(days=30)
-            with mock.patch.object(transaction, 'on_commit', lambda t: t()):
-                self.employment2.save()
-            self.assertTrue(WorkerDay.objects_with_excluded.filter(id=wd1.id).exists())
-            wd1.refresh_from_db()
-            self.assertIsNone(wd1.employment_id)
-            self.assertTrue(WorkerDay.objects.filter(id=wd2.id).exists())
-            self.assertTrue(WorkerDay.objects.filter(id=wd_holiday.id).exists())
-            self.assertEqual(WorkerDay.objects_with_excluded.count(), wd_count_before_save)
+        wd1 = WorkerDay.objects.create(
+            shop=self.shop,
+            employee=self.employee2,
+            employment=self.employment2,
+            dt=dt + timedelta(days=50),
+            is_fact=False,
+            type_id=WorkerDay.TYPE_WORKDAY,
+            dttm_work_start=datetime.combine(dt, time(8, 0, 0)),
+            dttm_work_end=datetime.combine(dt, time(20, 0, 0)),
+            is_approved=True,
+        )
+        wd2 = WorkerDay.objects.create(
+            shop=self.shop,
+            employee=self.employee2,
+            employment=self.employment2,
+            dt=dt + timedelta(days=25),
+            is_fact=False,
+            type_id=WorkerDay.TYPE_WORKDAY,
+            dttm_work_start=datetime.combine(dt, time(8, 0, 0)),
+            dttm_work_end=datetime.combine(dt, time(20, 0, 0)),
+            is_approved=True,
+        )
+        wd_holiday = WorkerDay.objects.create(
+            shop=self.shop,
+            employee=self.employee2,
+            employment=self.employment2,
+            dt=dt + timedelta(days=20),
+            is_fact=False,
+            type_id=WorkerDay.TYPE_HOLIDAY,
+            is_approved=True,
+        )
+        wd_count_before_save = WorkerDay.objects.count()
+        self.employment2.dt_hired = dt
+        self.employment2.dt_fired = dt + timedelta(days=30)
+        self.employment2.save()
+        self.assertTrue(WorkerDay.objects_with_excluded.filter(id=wd1.id).exists())
+        wd1.refresh_from_db()
+        self.assertIsNone(wd1.employment_id)
+        self.assertTrue(WorkerDay.objects.filter(id=wd2.id).exists())
+        self.assertTrue(WorkerDay.objects.filter(id=wd_holiday.id).exists())
+        self.assertEqual(WorkerDay.objects_with_excluded.count(), wd_count_before_save)
 
     def test_change_function_group_tmp(self):
         self.admin_group.subordinates.add(self.chief_group)
@@ -550,71 +550,69 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
         self.network.clean_wdays_on_employment_dt_change = True
         self.network.save()
 
-        with self.settings(CELERY_TASK_ALWAYS_EAGER=True):
-            with mock.patch.object(transaction, 'on_commit', lambda t: t()):
-                put_data1 = {
-                    'position_id': self.worker_position.id,
-                    'dt_hired': date(2021, 1, 1).strftime('%Y-%m-%d'),
-                    'dt_fired': date(2021, 5, 25).strftime('%Y-%m-%d'),
-                    'shop_id': self.shop2.id,
-                    'employee_id': self.employee2.id,
-                    'code': 'code1',
-                    'by_code': True,
-                }
-                resp1_put = self.client.put(
-                    path=self.get_url('Employment-detail', 'code1'),
-                    data=self.dump_data(put_data1),
-                    content_type='application/json',
-                )
-                self.assertEqual(resp1_put.status_code, 201)
-                empl1 = Employment.objects.get(id=resp1_put.json()['id'])
-                self.assertEqual(empl1.code, 'code1')
-                put_data2 = {
-                    'position_id': self.worker_position.id,
-                    'dt_hired': date(2021, 1, 1).strftime('%Y-%m-%d'),
-                    'dt_fired': date(2021, 5, 25).strftime('%Y-%m-%d'),
-                    'shop_id': self.shop2.id,
-                    'employee_id': self.employee2.id,
-                    'code': 'code2',
-                    'by_code': True,
-                }
-                resp2_put = self.client.put(
-                    path=self.get_url('Employment-detail', 'code2'),
-                    data=self.dump_data(put_data2),
-                    content_type='application/json',
-                )
-                self.assertEqual(resp2_put.status_code, 201)
-                empl2 = Employment.objects.get(id=resp2_put.json()['id'])
-                self.assertEqual(empl2.code, 'code2')
+        put_data1 = {
+            'position_id': self.worker_position.id,
+            'dt_hired': date(2021, 1, 1).strftime('%Y-%m-%d'),
+            'dt_fired': date(2021, 5, 25).strftime('%Y-%m-%d'),
+            'shop_id': self.shop2.id,
+            'employee_id': self.employee2.id,
+            'code': 'code1',
+            'by_code': True,
+        }
+        resp1_put = self.client.put(
+            path=self.get_url('Employment-detail', 'code1'),
+            data=self.dump_data(put_data1),
+            content_type='application/json',
+        )
+        self.assertEqual(resp1_put.status_code, 201)
+        empl1 = Employment.objects.get(id=resp1_put.json()['id'])
+        self.assertEqual(empl1.code, 'code1')
+        put_data2 = {
+            'position_id': self.worker_position.id,
+            'dt_hired': date(2021, 1, 1).strftime('%Y-%m-%d'),
+            'dt_fired': date(2021, 5, 25).strftime('%Y-%m-%d'),
+            'shop_id': self.shop2.id,
+            'employee_id': self.employee2.id,
+            'code': 'code2',
+            'by_code': True,
+        }
+        resp2_put = self.client.put(
+            path=self.get_url('Employment-detail', 'code2'),
+            data=self.dump_data(put_data2),
+            content_type='application/json',
+        )
+        self.assertEqual(resp2_put.status_code, 201)
+        empl2 = Employment.objects.get(id=resp2_put.json()['id'])
+        self.assertEqual(empl2.code, 'code2')
 
-                wd = WorkerDayFactory(
-                    dt=date(2021, 1, 1),
-                    employee=self.employee2,
-                    employment=empl1,
-                    shop=self.shop2,
-                    type_id=WorkerDay.TYPE_WORKDAY,
-                    is_fact=False,
-                    is_approved=True,
-                )
+        wd = WorkerDayFactory(
+            dt=date(2021, 1, 1),
+            employee=self.employee2,
+            employment=empl1,
+            shop=self.shop2,
+            type_id=WorkerDay.TYPE_WORKDAY,
+            is_fact=False,
+            is_approved=True,
+        )
 
-                resp2_delete = self.client.delete(
-                    path=self.get_url('Employment-detail', 'code2'),
-                    data=self.dump_data({'by_code': True}),
-                    content_type='application/json',
-                )
-                self.assertEqual(resp2_delete.status_code, 204)
-                wd.refresh_from_db()
-                self.assertEqual(wd.employment_id, empl1.id)
+        resp2_delete = self.client.delete(
+            path=self.get_url('Employment-detail', 'code2'),
+            data=self.dump_data({'by_code': True}),
+            content_type='application/json',
+        )
+        self.assertEqual(resp2_delete.status_code, 204)
+        wd.refresh_from_db()
+        self.assertEqual(wd.employment_id, empl1.id)
 
-                # при повтором put для empl с тем же code -- признак удаленности должен пропасть
-                resp2_put2 = self.client.put(
-                    path=self.get_url('Employment-detail', 'code2'),
-                    data=self.dump_data(put_data2),
-                    content_type='application/json',
-                )
-                self.assertEqual(resp2_put2.status_code, 200)
-                empl2.refresh_from_db()
-                self.assertEqual(empl2.dttm_deleted, None)
+        # при повтором put для empl с тем же code -- признак удаленности должен пропасть
+        resp2_put2 = self.client.put(
+            path=self.get_url('Employment-detail', 'code2'),
+            data=self.dump_data(put_data2),
+            content_type='application/json',
+        )
+        self.assertEqual(resp2_put2.status_code, 200)
+        empl2.refresh_from_db()
+        self.assertEqual(empl2.dttm_deleted, None)
 
     def test_delete_employment_with_filter_delete(self):
         """
@@ -648,7 +646,6 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
         Employment.objects.filter(id=empl1.id).delete()
         wd.refresh_from_db()
         self.assertEqual(wd.employment_id, None)
-
 
     def _test_get_employment_ordered_by_position(self, ordering):
         self.wp1 = WorkerPosition.objects.create(
@@ -888,7 +885,6 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
         self._test_update_group_permissions(None, 200, None)
         self.admin_group.subordinates.clear()
 
-    @override_settings(CELERY_TASK_ALWAYS_EAGER=True)
     @mock.patch.object(transaction, 'on_commit', lambda t: t())
     def test_batch_update_or_create(self):
         Employment.objects.filter(employee=self.employee2, code__isnull=True).delete()
@@ -1315,29 +1311,27 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
     def test_worker_day_restored_after_employment_creation(self):
         self.network.clean_wdays_on_employment_dt_change = True
         self.network.save()
-        with self.settings(CELERY_TASK_ALWAYS_EAGER=True):
-            wd = WorkerDayFactory(
-                dt=date(2021, 1, 1),
+        wd = WorkerDayFactory(
+            dt=date(2021, 1, 1),
+            employee=self.employee2,
+            employment=self.employment2,
+            shop=self.shop2,
+            type_id=WorkerDay.TYPE_WORKDAY,
+            is_fact=False,
+            is_approved=True,
+        )
+        Employment.objects.delete()
+        wd.refresh_from_db()
+        self.assertIsNone(wd.employment_id)
+        with self.captureOnCommitCallbacks(execute=True) as callbacks:
+            e = Employment.objects.create(
+                shop=self.shop,
                 employee=self.employee2,
-                employment=self.employment2,
-                shop=self.shop2,
-                type_id=WorkerDay.TYPE_WORKDAY,
-                is_fact=False,
-                is_approved=True,
+                function_group=self.employee_group,
             )
-            Employment.objects.delete()
-            wd.refresh_from_db()
-            self.assertIsNone(wd.employment_id)
-            with self.captureOnCommitCallbacks(execute=True) as callbacks:
-                e = Employment.objects.create(
-                    shop=self.shop,
-                    employee=self.employee2,
-                    function_group=self.employee_group,
-                )
-            wd.refresh_from_db()
-            self.assertEqual(wd.employment_id, e.id)
+        wd.refresh_from_db()
+        self.assertEqual(wd.employment_id, e.id)
 
-    @override_settings(CELERY_TASK_ALWAYS_EAGER=True)
     def test_worker_day_reattachment_to_employment_in_batch_update_or_create_bug(self):
         """
         1C integration bug. If you first delete an existing `Employment` (`dttm_deleted` is added),
@@ -1409,7 +1403,6 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
         wd.refresh_from_db()
         self.assertFalse(wd.employment)
 
-    @override_settings(CELERY_TASK_ALWAYS_EAGER=True)
     @mock.patch.object(transaction, 'on_commit', lambda t: t())
     def test_clean_wdays_after_employment_recreated_from_deleted(self):
         """When `Employment` is recreated from deleted (as `AbstractActiveModel`), `clean_wdays` must be called to reattach `Employment` to `WorkerDay`"""
@@ -1427,3 +1420,41 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
         self.employment1.save()
         wd.refresh_from_db()
         self.assertTrue(wd.employment)
+
+    @mock.patch.object(transaction, 'on_commit', lambda t: t())
+    def test_fix_work_types_after_employment_change(self):
+        """Tests src.timetable.worker_day.services.fix.FixWdaysService.fix_work_types"""
+        self.employment2.employee.user.network.clean_wdays_on_employment_dt_change = True
+        self.employment2.employee.user.network.save()
+        wd = WorkerDay.objects.create(
+            dt=date.today(),
+            shop=self.shop,
+            employee=self.employee2,
+            employment=self.employment2,
+            type_id=WorkerDay.TYPE_WORKDAY
+        )
+        wd.work_types.set((WorkTypeFactory(shop=self.shop),)) # random WorkType
+
+        # create low and high priority types, link it to Employment
+        work_type_low = WorkTypeFactory(shop=self.shop, priority=1, work_type_name=WorkTypeNameFactory(name='low'))
+        EmploymentWorkTypeFactory(employment=self.employment2, work_type=work_type_low)
+        work_type_high = WorkTypeFactory(shop=self.shop, priority=2, work_type_name=WorkTypeNameFactory(name='high'))
+        EmploymentWorkTypeFactory(employment=self.employment2, work_type=work_type_high)
+        self.assertEqual(self.employment2.work_types.count(), 2)
+
+        # trigger Employment changes
+        self.employment2.dt_hired -= timedelta(1)
+        self.employment2.save()
+
+        # work_types were pulled from Employment
+        wd.refresh_from_db()
+        self.assertTrue(wd.work_types.filter(id=work_type_high.id).exists())
+        self.assertFalse(wd.work_types.filter(id=work_type_low.id).exists())
+
+        # Should be idempotent
+        self.employment2.dt_hired -= timedelta(1)
+        self.employment2.save()
+
+        wd.refresh_from_db()
+        self.assertTrue(wd.work_types.filter(id=work_type_high.id).exists())
+        self.assertFalse(wd.work_types.filter(id=work_type_low.id).exists())

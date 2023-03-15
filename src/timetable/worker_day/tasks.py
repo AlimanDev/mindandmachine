@@ -9,14 +9,14 @@ from django.db.utils import OperationalError
 from src.celery.celery import app
 from src.base.models import Employment, Shop
 from src.timetable.models import WorkerDay
-from src.timetable.utils import CleanWdaysHelper
+from src.timetable.worker_day.services.fix import FixWdaysService
 from src.timetable.worker_day.utils.utils import create_fact_from_attendance_records
 from src.util.time import DateTimeHelper
 
+
 @app.task
 def clean_wdays(**kwargs):
-    clean_wdays_helper = CleanWdaysHelper(**kwargs)
-    clean_wdays_helper.run()
+    return FixWdaysService(**kwargs).run()
 
 
 @app.task(autoretry_for=(OperationalError,), max_retries=3) # psycopg2.errors.DeadlockDetected is reraised by Django as OperationalError
