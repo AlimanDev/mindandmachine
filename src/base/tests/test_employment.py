@@ -4,6 +4,7 @@ from unittest import mock
 from django.test import override_settings
 
 import pandas as pd
+import pytz
 from dateutil.relativedelta import relativedelta
 from django.core import mail
 from django.db import transaction
@@ -1505,3 +1506,20 @@ class TestEmploymentAPI(TestsHelperMixin, APITestCase):
         wd.refresh_from_db()
         self.assertTrue(wd.work_types.filter(id=work_type_high.id).exists())
         self.assertFalse(wd.work_types.filter(id=work_type_low.id).exists())
+
+    @override_settings(TIME_ZONE='UTC')
+    def test_employment_is_active_shop_aware(self):
+        """Employment.is_active should be aware of shops timezone."""
+        today = timezone.now().date()
+        self.employment1.dt_hired = today
+        self.employment1.dt_fired = None
+
+        dttm = datetime.combine(today, time()) - timedelta(hours=1)  # yesterday 23:00
+        with mock.patch.object(timezone, 'now', lambda: dttm):
+            # yesterday in UTC, not employed
+            self.employment1.shop.timezone = pytz.timezone('UTC')
+            self.assertFalse(self.employment1.is_active())
+
+            # today in another timezone, already employed
+            self.employment1.shop.timezone = pytz.timezone('Europe/Moscow') # GMT +3
+            self.assertTrue(self.employment1.is_active())

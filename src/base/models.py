@@ -1768,9 +1768,14 @@ class Employment(AbstractActiveModel):
         return res
 
     def is_active(self, dt=None):
-        dt = dt or timezone.now().date()
+        if not dt:
+            # convert naive server time (TIME_ZONE) to shops naive time, to compare with naive employment times
+            dt = timezone.make_naive(
+                timezone.make_aware(timezone.now()),
+                self.shop.timezone
+            ).date()
         return (self.dt_hired is None or self.dt_hired <= dt) and (self.dt_fired is None or self.dt_fired >= dt)
-    
+
     @staticmethod
     def create_or_update_work_types(employments):
         from src.timetable.models import EmploymentWorkType, WorkType
