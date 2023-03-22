@@ -98,7 +98,7 @@ table_columns = [
     {'col_name': 'work_type', 'col_title': 'Должность/вид работ', 'type': str, 'col_width': 18},
     {'col_name': 'worker_day_type', 'col_title': 'Тип дня', 'type': str, 'col_width': 18},
     {'col_name': 'plan_work_hours', 'col_title': 'План', 'type': int, 'col_width': 9},
-    {'col_name': 'fact_work_hours', 'col_title': 'Факт', 'type': int, 'col_width': 9},
+    {'col_name': 'fact_work_hours', 'col_title': 'Отработанные часы в табеле', 'type': int, 'col_width': 14},
     {'col_name': 'manual_hours', 'col_title': 'Скорректировано вручную', 'type': int, 'col_width': 18},
     {'col_name': 'late_arrival_hours', 'col_title': 'Опоздание часы', 'type': int, 'col_width': 13},
     {'col_name': 'late_arrival_count', 'col_title': 'Опоздания кол-во раз', 'type': int, 'col_width': 11},
@@ -173,24 +173,37 @@ def __calc_day_work_hours(row, work_days, fact_hours_must_be_planned):
     unplanned_work_shifts_one_tick_count = 0
     unplanned_work_shifts_hours = 0
     delta_work_hours_plan = delta_work_hours_fact= 0
+    def __is_planned(wd):
+        for x in work_shifts_fact:
+            if isinstance(wd['dt'], str):
+                wd_dt = datetime.datetime.strptime(wd['dt'], '%Y-%m-%d %H:%M:%S').date()
+            else:
+                wd_dt = wd['dt']
+            if x['dt'] == wd_dt:
+                return bool(x["closest_plan_approved__id"])
+        return False
+
+
     if len(work_shifts_fact) > 1:
         hours_fact = 0
         for shift in work_shifts_fact:
             if (not shift['dttm_work_start'] and shift["dttm_work_end"]) or (shift['dttm_work_start'] and not shift['dttm_work_end']):
-                if shift["dt"] not in planned_dates:
+                if shift["dt"] not in planned_dates and not __is_planned(shift):
                     unplanned_work_shifts_one_tick_count += 1
             elif shift['dttm_work_start'] and shift['dttm_work_end']:
                 hours_fact = shift["dttm_work_end"]- shift["dttm_work_start"]
-                if shift["dt"] not in planned_dates :
+                if shift["dt"] not in planned_dates and not __is_planned(shift):
                     unplanned_work_shifts_count += 1
                     unplanned_work_shifts_hours += hours_fact.total_seconds() / 3600
                 elif fact_hours_must_be_planned:
                     # trim hours_fact to hours_plan
-                    hours_plan_end = work_shifts_plan[planned_dates.index(shift["dt"])]["dttm_work_end"]
-                    hours_plan_start = work_shifts_plan[planned_dates.index(shift["dt"])]["dttm_work_start"]
-                    work_end = hours_plan_end if shift["dttm_work_end_fact"] > hours_plan_end else shift["dttm_work_end_fact"]
-                    work_start = hours_plan_start if shift["dttm_work_start_fact"] < hours_plan_start else shift["dttm_work_start_fact"]
-                    hours_fact = work_end - work_start
+                    if shift["dt"] in planned_dates:
+                        shift_plan = work_shifts_plan[planned_dates.index(shift["dt"])]
+                        hours_plan_end = shift_plan["dttm_work_end"]
+                        hours_plan_start = shift_plan["dttm_work_start"]
+                        work_end = hours_plan_end if shift["dttm_work_end"] > hours_plan_end else shift["dttm_work_end"]
+                        work_start = hours_plan_start if shift["dttm_work_start"] < hours_plan_start else shift["dttm_work_start"]
+                        hours_fact = work_end - work_start
             if isinstance(hours_fact, (pd.Timedelta, datetime.timedelta)):
                 delta_work_hours_fact += hours_fact.total_seconds() / 3600
     else:
@@ -202,14 +215,16 @@ def __calc_day_work_hours(row, work_days, fact_hours_must_be_planned):
             work_end = row.dttm_work_end_fact
             work_start = row.dttm_work_start_fact
             if fact_hours_must_be_planned:
-                hours_plan_end = work_shifts_plan[planned_dates.index(row["dt"])]["dttm_work_end"]
-                hours_plan_start = work_shifts_plan[planned_dates.index(row["dt"])]["dttm_work_start"]
-                work_end = hours_plan_end if row["dttm_work_end_fact"] > hours_plan_end else row["dttm_work_end_fact"]
-                work_start = hours_plan_start if row["dttm_work_start_fact"] < hours_plan_start else row["dttm_work_start_fact"]
-            delta_work_hours_fact = work_end - work_start
+                if row["dt"] in planned_dates:
+                    row_planned = work_shifts_plan[planned_dates.index(row["dt"])]
+                    hours_plan_end = row_planned["dttm_work_end"]
+                    hours_plan_start = row_planned["dttm_work_start"]
+                    work_end = hours_plan_end if work_end > hours_plan_end else work_end
+                    work_start = hours_plan_start if work_start < hours_plan_start else work_start
+                delta_work_hours_fact = work_end - work_start
         if isinstance(delta_work_hours_fact, (pd.Timedelta, datetime.timedelta)):
             delta_work_hours_fact = delta_work_hours_fact.total_seconds() / 3600
-        if row["dt"].date not in planned_dates:
+        if not __is_planned(row):
             if (not row.dttm_work_start_fact and row.dttm_work_end_fact) or (row.dttm_work_start_fact and not row.dttm_work_end_fact):
                 unplanned_work_shifts_one_tick_count += 1
             elif row.dttm_work_start_fact and row.dttm_work_end_fact:
@@ -409,10 +424,10 @@ def schedule_deviation_report(dt_from, dt_to, created_by_id=None, shop_ids=None,
 
     work_days = work_days.values('dt', 'shop__name', 'employee__user__last_name',
                       'type', 'dttm_work_start', 'dttm_work_end', 'dttm_work_start_tabel',
-                      'dttm_work_end_tabel', 'is_fact'
+                      'dttm_work_end_tabel', 'is_fact', 'closest_plan_approved__id'
                     )
     if created_by_id:
-        user_created = User.objects.get(id=created_by_id)
+        user_created = User.objects.select_related('network').get(id=created_by_id)
         fact_hours_must_be_planned = user_created.network.only_fact_hours_that_in_approved_plan
         user_created_fio = user_created.get_fio()
     qs, unapplied_vacancies, shop_object = _filter_query(dt_from, dt_to, shop_ids, filters=filters)
