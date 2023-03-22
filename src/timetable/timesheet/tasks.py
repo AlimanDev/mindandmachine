@@ -1,8 +1,6 @@
 import logging
 from datetime import date
 
-from django.conf import settings
-from django.utils import timezone
 from django.db import transaction
 
 from src.base.models import Employee, Employment

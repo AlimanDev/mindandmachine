@@ -825,31 +825,25 @@ class WorkerDayApproveService(Service):
             if self.shop:
                 self._update_shop_stat()
                 self._create_and_cancel_vacancies()
-        if not self.to_approve_wdays:
-            return
-        self._set_closest_plan_approved()
-        if not self.is_fact:
-            self._recalc_fact_from_records()    # after _set_closest_plan_approved
-        self._create_draft()
+        if self.to_approve_wdays:
+            self._set_closest_plan_approved()
+            if not self.is_fact:
+                self._recalc_fact_from_records()    # after _set_closest_plan_approved
+            self._create_draft()
+            self._delete_cache()
         self._recalc_timesheet()
-        self._delete_cache()
 
     def _recalc_work_hours(self):
         """For plan, recalc work hours in manual fact changes"""
-        if not self.to_approve_wdays:
-            return
-        to_recalc_ids = tuple(
-            WorkerDay.objects.filter(
-                self.condition,
-                last_edited_by__isnull=False,
-                is_fact=True,
-                type__is_dayoff=False,
-                dttm_work_start__isnull=False,
-                dttm_work_end__isnull=False,
-            ).values_list('id', flat=True)
-        )
-        if to_recalc_ids:
-            recalc_work_hours(id__in=to_recalc_ids)
+        to_recalc_ids = WorkerDay.objects.filter(
+            self.condition,
+            last_edited_by__isnull=False,
+            is_fact=True,
+            type__is_dayoff=False,
+            dttm_work_start__isnull=False,
+            dttm_work_end__isnull=False,
+        ).values_list('id', flat=True)
+        recalc_work_hours(id__in=to_recalc_ids)
 
     def _update_shop_stat(self):
         """Mark ShopMonthStat as approved"""
@@ -946,7 +940,7 @@ class WorkerDayApproveService(Service):
         )
 
     def _recalc_timesheet(self):
-        recalc_timesheet_on_data_change(self.employee_days_dict)
+        recalc_timesheet_on_data_change(self.changes_dict)
 
     def _delete_cache(self):
         # TODO: research how this works

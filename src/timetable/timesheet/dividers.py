@@ -3,7 +3,6 @@ import logging
 from decimal import Decimal
 
 import pandas as pd
-from django.conf import settings
 from django.db.models import Q, Subquery, OuterRef, Sum
 from django.utils import timezone
 from django.utils.functional import cached_property
