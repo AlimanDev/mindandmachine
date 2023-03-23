@@ -846,6 +846,63 @@ class TestReportsViewSet(TestsHelperMixin, APITestCase):
         self.assertEqual(len(df[df[_('Tick kind')] == _('Autotick')]), 4)
         self.assertEqual(len(df[df[_('Tick kind')] == _('Manual tick')]), 2)
 
+    @mock.patch.object(tick_report, 'delay', tick_report)
+    def test_tick_report_json(self):
+        tickpoint = TickPoint.objects.create(
+            shop=self.wd1.shop,
+            network=self.wd1.shop.network,
+            name='tickpoint'
+        )
+        tick = Tick.objects.create(
+            dttm=self.wd1.dttm_work_start,
+            user=self.wd1.employee.user,
+            employee=self.wd1.employee,
+            tick_point=tickpoint,
+            type=Tick.TYPE_COMING,
+            verified_score=0.5
+        )
+
+        # Plan to check for violations
+        WorkerDay.objects.create(
+            dt=tick.dttm.date(),
+            is_approved=True,
+            is_fact=False,
+            dttm_work_start=tick.dttm,
+            dttm_work_end=self.wd1.dttm_work_end + timedelta(hours=1), # Early leave
+            shop=tickpoint.shop,
+            employee=tick.employee,
+            employment=self.wd1.employment,
+            type_id=WorkerDay.TYPE_WORKDAY
+        )
+
+        self.user_dir.network.biometry_in_tick_report = True
+        self.user_dir.network.save()
+
+        query_params = {
+            'employee_id__in': [self.wd1.employee.id],
+            'shop_id__in': [self.wd1.shop.id],
+            'dt_from': self.wd1.dt - timedelta(1),
+            'dt_to': self.wd1.dt,
+            'format': 'json'
+        }
+
+        res = self.client.get(self.get_url('Reports-tick'), query_params)
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        data = res.json()
+        self.assertEqual(len(data), 2)
+        self.assertEqual(data[0]['id'], tick.id)
+        self.assertEqual(data[1]['id'], self.wd1.id)
+
+        query_params['emails'] = ['example@example.com']
+        res = self.client.get(self.get_url('Reports-tick'), query_params)
+        self.assertEqual(res.status_code, status.HTTP_202_ACCEPTED)
+        self.assertEqual(len(mail.outbox), 1)
+        mail_text = mail.outbox[0].body
+        filename = f"tick_report_{query_params['dt_from']}_{query_params['dt_to']}({self.wd1.shop.id}).json"
+        url = settings.REPORTS_URL + filename
+        self.assertTrue(url in mail_text)
+        self.assertTrue(pathlib.Path(settings.REPORTS_ROOT + filename).exists())
+
 
 class TestScheduleDeviation(APITestCase, TestsHelperMixin):
     USER_USERNAME = "user1"

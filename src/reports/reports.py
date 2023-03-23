@@ -1,5 +1,6 @@
 from datetime import date, timedelta, datetime
 from copy import deepcopy
+from unittest.mock import Mock
 
 from django.db.models import Q, Prefetch, Case, When, Value, F, Exists, OuterRef
 from django.utils.translation import gettext as _
@@ -11,7 +12,7 @@ from src.recognition.models import Tick, TickPhoto
 from src.timetable.models import WorkerDay
 from src.reports.registry import BaseRegisteredReport
 from src.reports.utils.schedule_deviation import schedule_deviation_report
-from src.util.dg.ticks_report import TicksOdsReportGenerator, TicksOdtReportGenerator
+from src.util.dg.ticks_report import BaseTicksReportGenerator, TicksOdsReportGenerator, TicksOdtReportGenerator, TicksJsonReportGenerator
 
 
 URV_STAT = 'urv_stat'
@@ -189,28 +190,35 @@ class ScheduleDeviationReport(BaseRegisteredReport, DatesReportMixin):
 class TickReport(BaseRegisteredReport, DatesReportMixin):
     name = 'Отчёт об отметках сотрудников'
     code = TICK
+    generators = {
+        'docx': TicksOdtReportGenerator,
+        'xlsx': TicksOdsReportGenerator,
+        'json': TicksJsonReportGenerator
+    }
 
     def __init__(self, network_id: int, context: dict, *args, **kwargs):
         self.dt_from, self.dt_to = self.get_dates(context)
         super().__init__(network_id, context, *args, **kwargs)
 
     def get_file(self) -> dict:
-        if self.context.get('with_biometrics'):
-            Generator = TicksOdtReportGenerator
-            format = 'docx'
-        else:
-            Generator = TicksOdsReportGenerator
-            format = 'xlsx'
+        Generator: BaseTicksReportGenerator = self.generators[self.format]
         report = Generator(
             ticks=self.report_data,
             dt_from=self.dt_from,
             dt_to=self.dt_to
-        ).generate(convert_to=format)
+        ).generate_report()
         return {
-            'name': f'tick_report_{self.dt_from}_{self.dt_to}{self.shops_suffix}.{format}',
+            'name': f'tick_report_{self.dt_from}_{self.dt_to}{self.shops_suffix}.{self.format}',
             'file': report,
-            'type': f'application/{format}'
+            'type': f'application/{self.format}'
         }
+
+    @cached_property
+    def format(self) -> str:
+        with_biometrics = self.context.get('with_biometrics')
+        _format = self.context.get('format', 'docx' if with_biometrics else 'xlsx')
+        assert _format != 'docx' or with_biometrics # don't render docx without photos
+        return _format
 
     @cached_property
     def report_data(self) -> list:
@@ -251,13 +259,14 @@ class TickReport(BaseRegisteredReport, DatesReportMixin):
         """Normal Ticks (Autoticks)"""
         qs = Tick.objects.filter(
             dttm__gte=self.dt_from,
-            dttm__lt=self.dt_to + timedelta(1)
+            dttm__lt=self.dt_to + timedelta(1),
+            employee__isnull=False
         ).annotate(
             outsource_network=Case(When(~Q(user__network=F('tick_point__shop__network')), then=F('user__network__name'))),
             tick_kind=Value(_('Autotick')),
             shop_name=F('tick_point__shop__name'),
         ).select_related(
-            'user', 'employee'
+            'user', 'employee__user'
         )
         if shops := self.context.get('shop_id__in'):
             qs = qs.filter(tick_point__shop_id__in=shops)
@@ -271,6 +280,8 @@ class TickReport(BaseRegisteredReport, DatesReportMixin):
                     to_attr='tickphotos_list',
                 )
             )
+        if self.format == 'json':
+            qs = qs.select_related('tick_point__shop')
         return list(qs)
 
     def _get_wdays(self) -> list:
@@ -279,7 +290,8 @@ class TickReport(BaseRegisteredReport, DatesReportMixin):
             dt__range=(self.dt_from, self.dt_to),
             is_approved=True,
             is_fact=True,
-            type__is_dayoff=False
+            type__is_dayoff=False,
+            employee__isnull=False
         ).annotate(
             tick_coming=Exists(
                 Tick.objects.filter(
@@ -310,10 +322,14 @@ class TickReport(BaseRegisteredReport, DatesReportMixin):
             qs = qs.filter(shop_id__in=shops)
         if employees := self.context.get('employee_id__in'):
             qs = qs.filter(employee_id__in=employees)
+        if self.format == 'json':
+            qs = qs.select_related('shop')
 
         # Imitating some of the Tick fields
         wdays = []
         for wd in qs:
+            wd.tick_point = Mock()
+            wd.tick_point.shop = wd.shop
             wd.min_liveness_prop = None
             wd.user = wd.employee.user
             if not wd.tick_coming and wd.dttm_work_start:

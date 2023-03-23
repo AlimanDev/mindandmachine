@@ -74,6 +74,7 @@ class TikReportSerializer(serializers.Serializer):
     employee_id__in = serializers.ListField(child=serializers.IntegerField(min_value=1), required=False)
     with_biometrics = serializers.BooleanField(default=False)
     emails = serializers.ListField(child=serializers.EmailField(), required=False)
+    format = serializers.ChoiceField(('docx', 'xlsx', 'json'), required=False)
 
     def validate(self, data):
         if data['dt_to'] < data['dt_from']:

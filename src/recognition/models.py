@@ -214,6 +214,7 @@ class TickPointTokenManager(models.Manager):
     def get_queryset(self):
         return super().get_queryset().select_related('user__shop__network')
 
+
 class TickPointToken(models.Model):
     key = models.CharField(gettext_lazy("Key"), max_length=40, primary_key=True)
     user = models.OneToOneField(

@@ -245,12 +245,13 @@ def schedule_deviation_report(
 @app.task(time_limit=settings.TIME_LIMITS['tick_report']) #accounting for possible email timeout and large data
 @mailable_report(_('Tick report'))
 def tick_report(
-        dt_from: Union[str, date],
-        dt_to: Union[str, date],
+        dt_from: str | date,
+        dt_to: str | date,
         network_id: int,
         with_biometrics: bool = False,
         shop_id__in: Iterable[int] = None,
-        employee_id__in: Iterable[int] = None
+        employee_id__in: Iterable[int] = None,
+        format: str | None = None
     ) -> Union[dict, str]:
     context = {
         'dt_from': dt_from,
@@ -258,6 +259,7 @@ def tick_report(
         'with_biometrics': with_biometrics,
         'shop_id__in': shop_id__in,
         'employee_id__in': employee_id__in,
+        'format': format
     }
     context = {key: value for key, value in context.items() if value is not None} # remove None values
     return TickReport(network_id, context).get_file()

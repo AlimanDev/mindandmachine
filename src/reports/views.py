@@ -120,14 +120,15 @@ class ReportsViewSet(ViewSet):
         GET /rest_api/report/tick
 
         :params
-            dt_from: QOS_DATE_FORMAT, required=True
-            dt_to: QOS_DATE_FORMAT, required=True
+            dt_from: str (in QOS_DATE_FORMAT), required=True
+            dt_to: str (in QOS_DATE_FORMAT), required=True
             shop_id__in: list[int], required=True
             employee_id__in: list[int], required=False
             with_biometrics: bool, default=False
             emails: list[str], required=False
+            format: str, choices=['docx', 'xlsx', 'json'], required=False
         :return
-            content_type: 'application/xlsx' | 'application/docx' | None (email)
+            content_type: 'application/xlsx' | 'application/docx' | 'application/json' | None (email)
         '''
         serializer = TikReportSerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)
@@ -153,6 +154,10 @@ class ReportsViewSet(ViewSet):
             return Response(status=status.HTTP_202_ACCEPTED)
         else:
             report = task(**kwargs)
+
+            if report['type'] == 'application/json':
+                return HttpResponse(report['file'], content_type=report['type'])
+
             return HttpResponse(
                 report['file'],
                 content_type=report['type'],
