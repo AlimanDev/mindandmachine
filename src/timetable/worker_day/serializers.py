@@ -374,8 +374,6 @@ class WorkerDaySerializer(ModelSerializerWithCreateOnlyFields, UnaccountedOverti
             attrs['outsources'] = outsources
         else:
             attrs['outsources'] = []
-
-        self._create_update_clean(attrs, instance=self.instance)
         return attrs
 
     def _create_update_clean(self, validated_data, instance=None):

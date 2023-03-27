@@ -2689,7 +2689,7 @@ class TestWorkerDay(TestsHelperMixin, APITestCase):
         self.assertDictEqual(
             resp.json(),
             {
-                "detail": f"У вас нет прав на создание типа дня \"Рабочий день\" для сотрудника {self.user2.short_fio} в подразделении Shop1 (Вакансии)"
+                "detail": f"У вас нет прав на создание типа дня \"Рабочий день\" для сотрудника {self.user2.short_fio} в подразделении Shop1"
             }
         )
         self.assertEqual(WorkerDay.objects.count(), 2)

@@ -155,7 +155,7 @@ class TestIsVacancySetting(TestsHelperMixin, APITestCase):
         worker_day.is_vacancy = False
         worker_day.save()
 
-        # setted because of work type
+        # set because of work type
 
         worker_day_data = deepcopy(worker_day_data_init)
         worker_day_data['worker_day_details'][0]['work_type_id'] = self.additional_work_type.id
@@ -168,7 +168,7 @@ class TestIsVacancySetting(TestsHelperMixin, APITestCase):
 
         self.assertEqual(response.status_code, 200)
         worker_day.refresh_from_db()
-        self.assertTrue(worker_day.is_vacancy)
+        self.assertFalse(worker_day.is_vacancy)
         worker_day.delete()
 
         # batch
@@ -211,7 +211,7 @@ class TestIsVacancySetting(TestsHelperMixin, APITestCase):
         self.assertEqual(response.status_code, 200)
 
         worker_day.refresh_from_db()
-        self.assertTrue(worker_day.is_vacancy)
+        self.assertFalse(worker_day.is_vacancy)
         worker_day.is_vacancy = False
         worker_day.save()
 
@@ -231,7 +231,7 @@ class TestIsVacancySetting(TestsHelperMixin, APITestCase):
         self.assertEqual(response.status_code, 200)
 
         worker_day.refresh_from_db()
-        self.assertTrue(worker_day.is_vacancy)
+        self.assertFalse(worker_day.is_vacancy)
 
     def test_is_vacancy_with_copy_as_excel_cells(self):
         created_wds, _ = copy_as_excel_cells(
