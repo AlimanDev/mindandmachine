@@ -21,15 +21,24 @@ def clean_wdays(**kwargs):
 
 @app.task(autoretry_for=(OperationalError,), max_retries=3) # psycopg2.errors.DeadlockDetected is reraised by Django as OperationalError
 @transaction.atomic
-def recalc_work_hours(**filters):
+def recalc_work_hours(*q_objects, **filters) -> int:
     """Recalculate `work_hours` and `dttm_work_start/end_tabel` of `WorkerDays`. `kwargs` - arguments for `filter()`"""
     # TODO: rewrite to in-memory work_hours calculation, save once in bulk_update.
     wdays = WorkerDay.objects.filter(
+        *q_objects,
         Q(type__is_dayoff=False) | Q(type__is_dayoff=True, type__is_work_hours=True),
         **filters
     ).order_by(
         'is_fact', 'is_approved'  # plan, then fact
-    ).select_for_update()
+    ).select_related(
+        'type',
+        'shop__network',
+        'shop__settings__breaks',
+        'employment__position__breaks',
+        'employment__position__network',
+        'employee__user__network',
+        'closest_plan_approved'
+    )
     wd: WorkerDay
     for wd in wdays:
         wd.save(
@@ -40,6 +49,7 @@ def recalc_work_hours(**filters):
                 'dttm_work_end_tabel',
             ]
         )
+    return len(wdays)
 
 
 @app.task

@@ -820,13 +820,14 @@ class WorkerDayApproveService(Service):
     def _post_approve_actions(self):
         """Various things to be done after approval"""
         if not self.is_fact:
-            if self.user and self.user.network.only_fact_hours_that_in_approved_plan:
-                self._recalc_work_hours()
             if self.shop:
                 self._update_shop_stat()
                 self._create_and_cancel_vacancies()
         if self.to_approve_wdays:
             self._set_closest_plan_approved()
+        if not self.is_fact:
+            self._recalc_work_hours()
+        if self.to_approve_wdays:
             if not self.is_fact:
                 self._recalc_fact_from_records()    # after _set_closest_plan_approved
             self._create_draft()
@@ -834,16 +835,12 @@ class WorkerDayApproveService(Service):
         self._recalc_timesheet()
 
     def _recalc_work_hours(self):
-        """For plan, recalc work hours in manual fact changes"""
-        to_recalc_ids = WorkerDay.objects.filter(
-            self.condition,
-            last_edited_by__isnull=False,
+        recalc_work_hours(
+            self.changes_q,
             is_fact=True,
-            type__is_dayoff=False,
             dttm_work_start__isnull=False,
-            dttm_work_end__isnull=False,
-        ).values_list('id', flat=True)
-        recalc_work_hours(id__in=to_recalc_ids)
+            dttm_work_end__isnull=False
+        )
 
     def _update_shop_stat(self):
         """Mark ShopMonthStat as approved"""

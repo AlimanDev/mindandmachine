@@ -26,7 +26,7 @@ class TestWorkerDayApproveOptimization(TestsHelperMixin, APITestCase):
         Correct `QUERY_COUNT` as needed when you change approve logic.
         For checking specific parts of the code use decorator at `src.util.decorators.print_queries`.
         """
-        QUERY_COUNT = 35
+        QUERY_COUNT = 38
         WORKERDAYS_COUNT = 20
         for dt in (self.today + timedelta(i) for i in range(WORKERDAYS_COUNT)):
             WorkerDay.objects.create(
