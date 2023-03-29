@@ -6,7 +6,6 @@ Using Docker and Docker Compose:
 
 - make sure Docker and Docker Compose are installed
 - copy `sample.docker-compose.yml` to `docker-compose.yml`
-- copy `sample.local_settings_web.py` to `local_settings_web.py`. Configure as needed.
 - run `docker compose up`
 
 That would build images for all the required by the application infrastructure and start application in development mode.
