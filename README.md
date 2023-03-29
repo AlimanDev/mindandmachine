@@ -22,6 +22,7 @@ Standard Django testing framework is used. Run `./test.sh`. See comments in this
 Alternatively, run `docker compose exec web ./manage.py test`
 
 ## Migrations
+
 `docker-compose exec web ./manage.py makemigrations`
 Migrate command is hardcoded in `./etc/compose/web/commands/web.sh`
 
