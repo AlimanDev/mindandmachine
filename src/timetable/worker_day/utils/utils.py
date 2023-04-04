@@ -472,6 +472,45 @@ def can_edit_worker_day(wd: WorkerDay, user: User) -> bool:
             return False
     return True
 
+
+def time_is_in_range(time, time_range) -> bool:
+    if time_range[0] <= time_range[1]:
+        return time_range[0] <= time <= time_range[1]
+    else:
+        return time_range[0] <= time or time <= time_range[1]
+
+
+def time_intersection(datetime_range: (datetime, datetime), time_range: (datetime.time, datetime.time)) -> \
+        (datetime.time, datetime.time) or None:
+    """Finds an intersection between datetime range and time(usually night hours) range"""
+    start_date = datetime_range[0].date()
+    end_date = datetime_range[1].date()
+    check_double = False
+    if time_is_in_range(datetime_range[0].time(), time_range):
+        end_time_in_range = time_is_in_range(datetime_range[1].time(), time_range)
+        if not end_time_in_range:
+            second_boundary = time_range[1]
+        else:
+            second_boundary = min(datetime_range[1].time(), time_range[1]) if end_date > start_date \
+            else datetime_range[1].time()
+        inter = datetime_range[0].time(), second_boundary
+        if datetime_range[1].time() > time_range[0] != datetime_range[0].time():
+            check_double = True
+    elif time_is_in_range(datetime_range[1].time(), time_range):
+        inter = max(datetime_range[0].time(), time_range[0]), datetime_range[1].time()
+    elif end_date > start_date:
+       inter = time_range
+    else:
+        inter = None
+    if check_double:
+        first_boundary = datetime_range[1].replace(hour=time_range[0].hour, minute=time_range[0].minute)
+        second_boundary = datetime_range[1]
+        second_inter = time_intersection([first_boundary, second_boundary], time_range)
+        inter = inter[0], inter[1].replace(hour=time_range[1].hour, minute=time_range[1].minute)
+        return inter, second_inter
+    inter = inter if inter and not inter[0] == inter[1] else None
+    return inter
+
 # def check_worker_day_permissions(user, shop_id, action, graph_type, wd_types, dt_from, dt_to, error_messages, wd_types_dict, employee_id=None, is_vacancy=False):
 #     user_shops = list(user.get_shops(include_descendants=True).values_list('id', flat=True))
 #     get_subordinated_group_ids = Group.get_subordinated_group_ids(user)

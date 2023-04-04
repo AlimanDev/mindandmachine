@@ -47,7 +47,6 @@ from src.timetable.exceptions import (
 )
 from src.util.commons import obj_deep_get
 from src.util.mixins.qs import AnnotateValueEqualityQSMixin
-from src.util.time import _time_to_float
 
 
 class WorkerManager(UserManager):
@@ -1262,33 +1261,35 @@ class WorkerDay(AbstractModel):
         return skip_fields_list
 
     def calc_day_and_night_work_hours(self, work_hours=None, work_start=None, work_end=None):
+        from src.timetable.worker_day.utils.utils import time_intersection
+        from src.timetable.worker_day.utils.xlsx_utils.tabel import time2hours
         from src.util.models_converter import Converter
         # TODO: нужно учитывать работу в праздничные дни? -- сейчас is_celebration в ProductionDay всегда False
-
         if self.type.is_dayoff:
             return 0.0, 0.0, 0.0
-
         work_hours = (work_hours or self.work_hours)
         if work_hours > datetime.timedelta(0):
             work_seconds = work_hours.seconds
         else:
             return 0.0, 0.0, 0.0
-
         work_start = work_start or self.dttm_work_start_tabel or self.dttm_work_start
         work_end = work_end or self.dttm_work_end_tabel or self.dttm_work_end
         if not (work_start and work_end):
             return 0.0, 0.0, 0.0
-
+        break_time_seconds = 0
+        if self.type.subtract_breaks:
+            break_time_seconds = self._calc_break(self._get_breaks(), work_start, work_end,
+                                                  plan_approved=self.closest_plan_approved) * 60
         work_hours = round(work_seconds / 3600, 2)
-
         night_edges = [Converter.parse_time(t) for t in Network.DEFAULT_NIGHT_EDGES]
         if self.shop and self.shop.network:
-            night_edges = self.shop.network.night_edges_tm_list
-
-        if work_end.time() <= night_edges[0] and work_start.date() == work_end.date():
+            night_edges = (self.shop.network.night_time_start, self.shop.network.night_time_end)
+        intersection_workday_nighttime = time_intersection([work_start, work_end], night_edges)
+        if not intersection_workday_nighttime:
             work_hours_day = work_hours
             return work_hours, work_hours_day, 0.0
-        if work_start.time() >= night_edges[0] and work_end.time() <= night_edges[1]:
+        elif not isinstance(intersection_workday_nighttime[0], tuple) \
+                and time2hours(*intersection_workday_nighttime) == work_hours+break_time_seconds/3600:
             work_hours_night = work_hours
             return work_hours, 0.0, work_hours_night
 
@@ -1296,27 +1297,16 @@ class WorkerDay(AbstractModel):
         round_wh_alg_func = None
         if network and network.round_work_hours_alg is not None:
             round_wh_alg_func = Network.ROUND_WH_ALGS.get(network.round_work_hours_alg)
-
-        if work_start.time() > night_edges[0] or work_start.time() < night_edges[1]:
-            tm_start = _time_to_float(work_start.time())
+        if not isinstance(intersection_workday_nighttime[0], tuple):
+            night_worktime_hours = time2hours(*intersection_workday_nighttime)
         else:
-            tm_start = _time_to_float(night_edges[0])
-        if work_end.time() > night_edges[0] or work_end.time() < night_edges[1]:
-            tm_end = _time_to_float(work_end.time())
-        else:
-            tm_end = _time_to_float(night_edges[1])
-
-        night_seconds = (tm_end - tm_start if tm_end > tm_start else 24 - (tm_start - tm_end)) * 60 * 60
-
+            night_worktime_hours = time2hours(*intersection_workday_nighttime[0]) + \
+                                   time2hours(*intersection_workday_nighttime[1])
+        night_seconds = night_worktime_hours * 60 * 60
         if round_wh_alg_func:
             night_seconds = round_wh_alg_func(night_seconds / 3600) * 3600
 
-        break_time_seconds = 0
-        if self.type.subtract_breaks:
-            break_time_seconds = self._calc_break(self._get_breaks(), work_start, work_end, plan_approved=self.closest_plan_approved) * 60
-
         total_seconds = (work_seconds + break_time_seconds)
-
         break_time_subtractor_alias = None
         if network:
             break_time_subtractor_alias = network.settings_values_prop.get('break_time_subtractor')
