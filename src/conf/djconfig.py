@@ -32,7 +32,7 @@ UPLOAD_TT_CREATE_EMPLOYEE = True
 
 QOS_CAMERA_KEY = '1'
 
-HOST = env.str('HOST', default='http://127.0.0.1:8000')
+HOST = env.str('HOST', default='http://127.0.0.1:9090')
 EXTERNAL_HOST = env.str('EXTERNAL_HOST', default=HOST)
 TIMETABLE_IP = env.str('TIMETABLE_IP', default='127.0.0.1:5000')
 LOGIN_URL = '/' # redirect to login page (frontend)
@@ -50,7 +50,7 @@ MDA_PUBLIC_API_AUTH_TOKEN = 'dummy'
 DEBUG = env.bool('DJANGO_DEBUG', default=True)
 
 ALLOWED_HOSTS = ['*']
-CSRF_TRUSTED_ORIGINS = ['http://*.mindandmachine.ru', 'https://*.mindandmachine.ru', 'http://*.workestra.ai', 'https://*.workestra.ai']
+CSRF_TRUSTED_ORIGINS = ['http://*.mindandmachine.ru', 'https://*.mindandmachine.ru', 'http://*.workestra.ai', 'https://*.workestra.ai', 'https://localhost:11111']
 
 INSTALLED_APPS = [
     'django_light',
@@ -148,8 +148,8 @@ DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
         'NAME': env.str('DB_NAME', default='qos'),
-        'USER': env.str('DB_USER', default='root'),
-        'PASSWORD': env.str('DB_PASSWORD', default='root'),
+        'USER': env.str('DB_USER', default='postgres'),
+        'PASSWORD': env.str('DB_PASSWORD', default='postgres'),
         'HOST': env.str('DB_HOST', default='localhost'),
         'PORT': '5432',
     }
