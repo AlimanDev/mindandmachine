@@ -374,7 +374,7 @@ class WorkerPositionViewSet(UpdateorCreateViewSet):
             )
         ).filter(
             network_filter,
-        )
+        ).filter(dttm_deleted__isnull=True)
         include_allowed_sawh_settings = self.request.query_params.get('include_allowed_sawh_settings')
         if include_allowed_sawh_settings and bool(distutils.util.strtobool(include_allowed_sawh_settings)):
             qs = qs.prefetch_related(

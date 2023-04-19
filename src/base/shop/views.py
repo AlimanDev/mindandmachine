@@ -166,18 +166,19 @@ class ShopViewSet(UpdateorCreateViewSet):
             network_id=user.network_id,
             employee__user=user,
         )
-
-        shops = self.filter_queryset(self.get_queryset())
-        shops = shops.filter(id__in=employments.values_list('shop_id', flat=True))
-        if not only_top:
-            now = datetime.datetime.now()
-            shops = Shop.objects.get_queryset_descendants(shops, include_self=True).filter(
-                Q(dttm_deleted__isnull=True) | Q(dttm_deleted__gte=now),
-                Q(dt_closed__isnull=True) |
-                Q(dt_closed__gt=now.today() - datetime.timedelta(days=user.network.show_closed_shops_gap)),
-            ).order_by('level', 'name')
-
-        return Response(get_tree(shops))
+        now = datetime.datetime.now()
+        root_shops = self.get_queryset().filter(
+            Q(dttm_deleted__isnull=True) | Q(dttm_deleted__gte=now),
+            Q(dt_closed__isnull=True) |
+            Q(dt_closed__gt=now.today() - datetime.timedelta(days=user.network.show_closed_shops_gap)),
+        )
+        e_shops = []
+        for empl in employments:
+            e_shops.append(empl.shop.id)
+        e_shops = list(set(e_shops))
+        root_shops = root_shops.filter(id__in=e_shops)
+        result_tree = self._get_tree(root_shops, user)
+        return Response(result_tree)
 
     @swagger_auto_schema(responses=tree_response_schema_dict)
     @action(detail=False, methods=['get'])
