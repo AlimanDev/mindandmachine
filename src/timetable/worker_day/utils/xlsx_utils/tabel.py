@@ -11,6 +11,21 @@ from src.timetable.worker_day.utils.xlsx_utils.colors import *
 from src.util.colors import get_contrast_color
 from src.util.dg.helpers import MONTH_NAMES
 from .base_class import Xlsx_base
+from ..utils import time_is_in_range, time_intersection
+
+
+def time2hours(tm_start, tm_end, breaks=None):
+    diff_h = (tm_end.hour - tm_start.hour) + (tm_end.minute - tm_start.minute) / 60
+    if diff_h < 0:
+        diff_h += 24
+    if (breaks is not None) and len(breaks):
+        i = 0
+        while (len(breaks) > i) and not (breaks[i][0] <= diff_h < breaks[i][1]):
+            i += 1
+        if len(breaks) == i:
+            i -= 1
+        diff_h -= breaks[i][2]
+    return diff_h
 
 
 class Tabel_xlsx(Xlsx_base):
@@ -233,32 +248,21 @@ class Tabel_xlsx(Xlsx_base):
 
         # add right info
 
-    def _time2hours(self, tm_start, tm_end, breaks=None):
-        diff_h = (tm_end.hour - tm_start.hour) + (tm_end.minute - tm_start.minute) / 60
-        if diff_h < 0:
-            diff_h += 24
-        if (breaks is not None) and len(breaks):
-            i = 0
-            while (len(breaks) > i) and not (breaks[i][0] <= diff_h < breaks[i][1]):
-                i += 1
-            if len(breaks) == i:
-                i -= 1
-            diff_h -= breaks[i][2]
-        return diff_h
-
-    def _count_time(self, tm_start, tm_end, hours=None, breaks=None, night_edges=None):
-        if (night_edges is None) and (hours is not None):
-            night_edges = (
-                datetime.time(22, 0),
-                datetime.time(6, 0),
-            )
-
-        total = str(int(self._time2hours(tm_start, tm_end, breaks) + 0.75))
+    def _count_time(self, tm_start, tm_end, breaks=None):
+        night_time_start = self.shop.network.night_time_start
+        night_time_end = self.shop.network.night_time_end
+        total = str(int(time2hours(tm_start, tm_end, breaks) + 0.75))
         night_hs = 'all'
-        if night_edges[0] > tm_start:
-            # day_hs = self._time2hours(tm_start, night_edges[0])
-            night_hs = int(self._time2hours(night_edges[0], tm_end) if (night_edges[0] < tm_end) or (
-                        night_edges[1] >= tm_end) else 0)
+        if time_is_in_range(tm_start, [night_time_start, night_time_end]):
+            # day_hs = self._time2hours(tm_start, night_time_boundaries[0])
+            interscetion = time_intersection([tm_start, tm_end], [night_time_start, night_time_end])
+            if interscetion is not None:
+                if isinstance(interscetion[0], tuple):  # if we have double intersection
+                    night_hs = time2hours(*interscetion[0]) + time2hours(*interscetion[1])
+                else:
+                    night_hs = time2hours(*interscetion)
+            else:
+                night_hs = 0
         return total, night_hs
 
     def fill_table(self, workdays, employments, triplets, working_hours, row_s, col_s):
@@ -280,7 +284,7 @@ class Tabel_xlsx(Xlsx_base):
                 if (it < n_workdays) and (workdays[it].employment_id == employment.id) and (day + 1 == workdays[it].dt.day):
                     wd = workdays[it]
                     if wd.type == WorkerDay.TYPE_WORKDAY:
-                        total_h, night_h = self._count_time(wd.dttm_work_start.time(), wd.dttm_work_end.time(), (0, 0), current_triplet)
+                        total_h, night_h = self._count_time(wd.dttm_work_start.time(), wd.dttm_work_end.time(), current_triplet)
                         if night_h == 'all':  # night_work
                             wd.type = 'night_work'
                         if (type(night_h) != str) and (night_h > 0):

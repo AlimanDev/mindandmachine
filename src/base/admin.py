@@ -223,6 +223,8 @@ class NetworkAdmin(admin.ModelAdmin):
             'timesheet_max_hours_threshold',
             'timesheet_min_hours_threshold',
             'timesheet_divider_sawh_hours_key',
+            'night_time_start',
+            'night_time_end'
         )}),
         (_('Integration settings'), {'fields': (
             'api_timesheet_lines_group_by',

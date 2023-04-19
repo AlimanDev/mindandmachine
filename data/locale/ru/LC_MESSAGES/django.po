@@ -2278,6 +2278,14 @@ msgstr "Не было передано ни одного файла."
 msgid "The file was not uploaded."
 msgstr "Файл не был загружен."
 
+#: src/base/models:252
+msgid "Night time start"
+msgstr "Начало ночного времени"
+
+#: src/base/models:253
+msgid "Night time end"
+msgstr "Окончание ночного времени"
+
 #~ msgid "You do not have rights to {action_str} open vacancies"
 #~ msgstr "У вас нет прав на {action_str} открытых вакансий"
 

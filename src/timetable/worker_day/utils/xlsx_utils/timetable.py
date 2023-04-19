@@ -55,7 +55,8 @@ def fmt3(**kwargs):
 class Timetable_xlsx(Tabel_xlsx):
     wd_type_field = 'type'
     work_hours_field = 'rounded_work_hours'
-    def __init__(self, *args,  for_inspection=False, **kwargs):
+
+    def __init__(self, *args,  for_inspection=False,  **kwargs):
         super().__init__(*args, **kwargs)
         self.day_type = {
             'font_size': self._font_size(14, 7),
@@ -66,7 +67,6 @@ class Timetable_xlsx(Tabel_xlsx):
             'border': 1,
             'text_wrap': True,
         }
-
         self.additional_fields_settings = dict(
             timetable_add_work_days_field=self.shop.network.settings_values_prop.get(
                 'timetable_add_work_days_field', True),
@@ -81,6 +81,7 @@ class Timetable_xlsx(Tabel_xlsx):
             timetable_add_vacation_count_field=self.shop.network.settings_values_prop.get(
                 'timetable_add_vacation_count_field', False),
         )
+
         self.additional_fields_count = sum(self.additional_fields_settings.values())
         if for_inspection:
             self.wd_type_field = 'day_type'

@@ -249,6 +249,8 @@ class Network(AbstractActiveModel):
     max_work_shift_seconds = models.PositiveIntegerField(
         verbose_name=_('Maximum shift length (in seconds)'), default=3600 * 16)
     need_symbol_for_vacancy = models.BooleanField(default=False, verbose_name=_('Need symbol for vacancy')) # Whether the worker identificator is needed, to apply for a vacancy
+    night_time_start = models.TimeField(default=datetime.time(22, 0),  verbose_name=_('Night time start'))
+    night_time_end = models.TimeField(default=datetime.time(6, 0), verbose_name=_('Night time end'))
     okpo = models.CharField(blank=True, null=True, max_length=15, verbose_name=_('OKPO code'))
     only_fact_hours_that_in_approved_plan = models.BooleanField(
         default=False,
