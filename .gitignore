@@ -4,6 +4,7 @@ tmp/
 venv/
 media/
 mounts/
+.idea
 
 src/conf/djconfig_local.py
 docker-compose.yml

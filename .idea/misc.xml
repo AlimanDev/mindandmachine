@@ -1,7 +1,13 @@
+<<<<<<< HEAD
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="MarkdownSettingsMigration">
     <option name="stateVersion" value="1" />
   </component>
   <component name="ProjectRootManager" version="2" project-jdk-name="Python 3.10.6 WSL (Ubuntu): (/home/th/Projects/legacy-main-backend/venv/bin/python)" project-jdk-type="Python SDK" />
+=======
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ProjectRootManager" version="2" project-jdk-name="/usr/bin/python3.10 (6)" project-jdk-type="Python SDK" />
+>>>>>>> 5233f283402de15d5d403daf5eea3693fc838030
 </project>
