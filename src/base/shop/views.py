@@ -179,7 +179,6 @@ class ShopViewSet(UpdateorCreateViewSet):
         root_shops = root_shops.filter(id__in=e_shops)
         result_tree = self._get_tree(root_shops, user)
         return Response(result_tree)
-<<<<<<< HEAD
 
     def _get_tree(self, shops, user):
         result = []
@@ -201,8 +200,6 @@ class ShopViewSet(UpdateorCreateViewSet):
                 'children': result_children,
             })
         return result
-=======
->>>>>>> 5233f283402de15d5d403daf5eea3693fc838030
 
     @swagger_auto_schema(responses=tree_response_schema_dict)
     @action(detail=False, methods=['get'])
