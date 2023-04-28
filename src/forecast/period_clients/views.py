@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime, timedelta
 from rest_framework import serializers, status
 from rest_framework.response import Response
@@ -18,6 +19,7 @@ from src.util.upload import get_uploaded_file
 from src.base.views_abstract import BaseModelViewSet
 from drf_yasg.utils import swagger_auto_schema
 
+logger = logging.getLogger('forecast_period_clients')
 
 # Serializers define the API representation.
 class PeriodClientsDeleteSerializer(serializers.Serializer):
@@ -192,6 +194,8 @@ class PeriodClientsViewSet(BaseModelViewSet):
     def get_queryset(self):
         return self.filter_queryset(PeriodClients.objects.all())
 
+    
+
     @swagger_auto_schema(
         request_body=PeriodClientsCreateSerializer, 
         responses={201:'empty response'},
@@ -203,16 +207,38 @@ class PeriodClientsViewSet(BaseModelViewSet):
         data = PeriodClientsCreateSerializer(data=request.data)
         data.is_valid(raise_exception=True)
         data = data.validated_data['data']
-        # данные от алгоритма
-        if data.get('status', False):
-            if data.get('status') == Shop.LOAD_TEMPLATE_READY:
-                create_demand(data)
-            Shop.objects.filter(id=data.get('shop_id')).update(load_template_status=data.get('status'))
-        else:
-        # данные от клиента
-            create_demand(data)
-        return Response(status=status.HTTP_201_CREATED)
+        received_res_status = data.get('status', False)
+        message = ""
 
+        if shop_id := data.get('shop_id'):
+            lookup = { 'id':  shop_id}
+        elif shop_code := data.get('shop_code'):
+            lookup = { 'code':  shop_code}
+        else:
+            raise serializers.ValidationError(
+                '"shop_id" or "shop_code" not found in "data"'
+            )
+
+        try:
+            if (received_res_status in [False, Shop.LOAD_TEMPLATE_READY]):
+                create_demand(data)
+                response_code = status.HTTP_201_CREATED
+            else:
+                response_code = status.HTTP_200_OK
+        except Exception as e:
+            received_res_status = Shop.LOAD_TEMPLATE_ERROR
+            response_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+            logger.exception(e)
+            message = repr(e)
+        if data.get('status', False):
+            (
+                Shop
+                .objects
+                .filter(load_template_status__isnull=False, **lookup)
+                .exclude(load_template_status='')
+                .update(load_template_status=received_res_status)
+            )
+        return Response([message], status=response_code,)
 
     @swagger_auto_schema(
         request_body=PeriodClientsUpdateSerializer, 

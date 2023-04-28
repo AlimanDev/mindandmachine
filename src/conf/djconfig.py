@@ -299,6 +299,7 @@ add_logger('etl')
 add_logger('upload_demand')
 add_logger('recognition')
 add_logger('forecast_loadtemplate')
+add_logger('forecast_period_clients')
 
 # LOGGING USAGE:
 # import logging
