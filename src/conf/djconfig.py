@@ -6,10 +6,13 @@ config importance
 4. config
 """
 
-import os, sys, logging
+import logging
+import os
+import sys
 from copy import deepcopy
 
 import environ
+
 from celery.schedules import crontab
 
 env = environ.Env()
@@ -50,7 +53,14 @@ MDA_PUBLIC_API_AUTH_TOKEN = 'dummy'
 DEBUG = env.bool('DJANGO_DEBUG', default=True)
 
 ALLOWED_HOSTS = ['*']
-CSRF_TRUSTED_ORIGINS = ['http://*.mindandmachine.ru', 'https://*.mindandmachine.ru', 'http://*.workestra.ai', 'https://*.workestra.ai', 'https://localhost:11111']
+CSRF_TRUSTED_ORIGINS = [
+    'http://*.mindandmachine.ru',
+    'https://*.mindandmachine.ru',
+    'http://*.workestra.ai',
+    'https://*.workestra.ai',
+    'https://localhost:11111',
+    'http://127.0.0.1:11111',
+]
 
 INSTALLED_APPS = [
     'django_light',
@@ -566,7 +576,7 @@ TEST_LOG_LEVEL = logging.CRITICAL
 
 
 if is_config_exists('djconfig_local.py'):
-    from .djconfig_local import *   # type: ignore
+    from .djconfig_local import *  # type: ignore
 
 if not ENV_LVL:
     ENV_LVL = ENV_LVL_TEST if DEBUG else ENV_LVL_PROD

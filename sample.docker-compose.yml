@@ -40,25 +40,27 @@ services:
     build:
       context: .
       dockerfile: ./etc/compose/web/Dockerfile
-    command: gunicorn -w 1 # DEV
-    # command: /commands/web.sh -w 1 #PROD
+    command: /bin/bash -c "python manage.py collectstatic --noinput && gunicorn -w 1"
     volumes:
       - ./mounts/reports:/webapp/etc/reports
       - ./mounts/logs:/webapp/logs
       - ./mounts/media:/webapp/media
       - ./mounts/static:/webapp/static
       - ./mounts/ipython_data:/root/.ipython/profile_default
-      - ./sample.local_settings_web.py:/webapp/src/conf/djconfig_local.py # PROD-ONLY: change to a configured local_settings_web.py
-      - ./data:/webapp/data                                               # DEV-ONLY: for i18n from container
-      - ./src:/webapp/src                                                 # DEV-ONLY: mount code to not rebuild the container
+      # - ./sample.local_settings_web.py:/webapp/src/conf/djconfig_local.py # PROD-ONLY: change to a configured local_settings_web.py
+      - ./data:/webapp/data # DEV-ONLY: for i18n from container
+      - ./src:/webapp/src
     environment:
       REDIS_HOST: redis
-      HOST: http://localhost:9090
+      HOST: http://web:80
       DB_NAME: qos
       DB_USER: qos
       DB_PASSWORD: qos
       DB_HOST: postgres
       JOD_CONVERTER_URL: http://converter:8080
+      UWSGI_WORKERS: 4
+      UWSGI_THREADS: 1
+      DEBUG: 1
     depends_on:
       - postgres
       - redis
@@ -73,6 +75,7 @@ services:
     command: celery -A src.celery worker -n main --max-tasks-per-child=100 --max-memory-per-child=25000 --loglevel=INFO --logfile=/webapp/logs/celery_main.log
     volumes:
       - ./mounts/reports:/webapp/etc/reports
+      - ./mounts/uwsgi:/uwsgi
       - ./mounts/logs:/webapp/logs
       - ./mounts/media:/webapp/media
       - ./mounts/static:/webapp/static
@@ -97,8 +100,23 @@ services:
     command: celery -A src.celery flower --conf=/webapp/flowerconfig.py --port=5555
     volumes:
       - ./mounts/reports:/webapp/etc/reports
+      - ./mounts/uwsgi:/uwsgi
       - ./mounts/logs:/webapp/logs
     environment:
       REDIS_HOST: redis
     ports:
       - "5555:5555"
+
+  nginx:
+    build:
+      context: .
+      dockerfile: ./etc/compose/nginx/Dockerfile
+    depends_on:
+      - web
+    ports:
+      - "11111:80"
+    volumes:
+      - ./mounts/uwsgi:/uwsgi
+      - ./mounts/logs/nginx:/var/log/nginx
+      - ./mounts/media:/webapp/media:ro
+      - ./mounts/static:/webapp/static:ro
