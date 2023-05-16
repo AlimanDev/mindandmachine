@@ -40,7 +40,7 @@ services:
     build:
       context: .
       dockerfile: ./etc/compose/web/Dockerfile
-    command: /bin/bash -c "python manage.py collectstatic --noinput && gunicorn -w 1"
+    command: /bin/bash -c "python manage.py collectstatic --noinput && gunicorn -w 2"
     volumes:
       - ./mounts/reports:/webapp/etc/reports
       - ./mounts/logs:/webapp/logs
@@ -61,6 +61,7 @@ services:
       UWSGI_WORKERS: 4
       UWSGI_THREADS: 1
       DEBUG: 1
+      DEV_NGINX_PORT: ${DEV_NGINX_PORT}
     depends_on:
       - postgres
       - redis
@@ -114,7 +115,7 @@ services:
     depends_on:
       - web
     ports:
-      - "11111:80"
+      - ${DEV_NGINX_PORT}:80
     volumes:
       - ./mounts/uwsgi:/uwsgi
       - ./mounts/logs/nginx:/var/log/nginx

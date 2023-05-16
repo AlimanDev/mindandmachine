@@ -6,9 +6,7 @@ config importance
 4. config
 """
 
-import logging
-import os
-import sys
+import os, sys, logging
 from copy import deepcopy
 
 import environ
@@ -58,9 +56,16 @@ CSRF_TRUSTED_ORIGINS = [
     'https://*.mindandmachine.ru',
     'http://*.workestra.ai',
     'https://*.workestra.ai',
-    'https://localhost:11111',
-    'http://127.0.0.1:11111',
 ]
+
+DEV_NGINX_PORT = os.getenv("DEV_NGINX_PORT")
+if DEV_NGINX_PORT is not None:
+    CSRF_TRUSTED_ORIGINS.extend(
+        (
+            f'https://localhost:{DEV_NGINX_PORT}',
+            f'http://127.0.0.1:{DEV_NGINX_PORT}',
+        )
+    )
 
 INSTALLED_APPS = [
     'django_light',
@@ -576,7 +581,7 @@ TEST_LOG_LEVEL = logging.CRITICAL
 
 
 if is_config_exists('djconfig_local.py'):
-    from .djconfig_local import *  # type: ignore
+    from .djconfig_local import *   # type: ignore
 
 if not ENV_LVL:
     ENV_LVL = ENV_LVL_TEST if DEBUG else ENV_LVL_PROD
