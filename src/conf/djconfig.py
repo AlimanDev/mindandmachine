@@ -6,7 +6,9 @@ config importance
 4. config
 """
 
-import os, sys, logging
+import logging
+import os
+import sys
 from copy import deepcopy
 
 import environ
@@ -581,7 +583,7 @@ TEST_LOG_LEVEL = logging.CRITICAL
 
 
 if is_config_exists('djconfig_local.py'):
-    from .djconfig_local import *   # type: ignore
+    from .djconfig_local import *  # type: ignore
 
 if not ENV_LVL:
     ENV_LVL = ENV_LVL_TEST if DEBUG else ENV_LVL_PROD

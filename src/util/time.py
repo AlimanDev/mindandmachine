@@ -1,8 +1,8 @@
-from typing import Union
-from datetime import date, datetime, timedelta
+import typing as tp
 from abc import ABC, abstractmethod
-from dateutil.relativedelta import relativedelta
+from datetime import date, datetime, timedelta
 
+from dateutil.relativedelta import relativedelta
 from django.conf import settings
 from faker.providers.date_time import Provider
 
@@ -53,19 +53,22 @@ class DateTimeHelper:
         return cls.first_day_next_month(dt) - timedelta(1)
 
 
-class BaseDateTimeProducer(ABC):
+class BaseDateProducer(ABC):
+    def __init__(self, **kwrgs):
+        ...
+
     @abstractmethod
-    def produce(self, **kwargs) -> datetime:
+    def produce(self, **kwargs) -> date:
         ...
 
 
-class NowDateTimeProducer(BaseDateTimeProducer):
+class NowDateTimeProducer(BaseDateProducer):
 
     def produce(self, **kwargs) -> date:
         return date.today()
 
 
-class MonthOffsetTimeProducer(BaseDateTimeProducer):
+class MonthOffsetTimeProducer(BaseDateProducer):
 
     def produce(self, **kwargs) -> date:
         try:
@@ -83,15 +86,30 @@ class MonthOffsetTimeProducer(BaseDateTimeProducer):
         out = (date.today() + relativedelta(months=month_offset)).replace(day=1)
         out += timedelta(days=day_offset)
         return  out
+    
+
+class PredefinedDateProducer(BaseDateProducer):
+    def __init__(self, d: str, **kwargs):
+        self.d = datetime.strptime(d, settings.QOS_DATE_FORMAT)
+    def produce(self, **kwargs) -> date:
+        return self.d
 
 
-class DateTimeProducerFactory:
+class DateProducerFactory:
     @staticmethod
-    def get_factory(frmt: str) -> BaseDateTimeProducer:
-        if frmt == 'now':
-            out = NowDateTimeProducer()
-        elif frmt == 'month_start_with_offset':
-            out = MonthOffsetTimeProducer()
+    def get_factory(frmt: str, class_kwargs: tp.Optional[dict] = None) -> BaseDateProducer:
+        if class_kwargs is None:
+            class_kwargs = dict()
+        
+        if frmt in DT_FACTORIES:
+            out = DT_FACTORIES[frmt](**class_kwargs)
         else:
             raise KeyError(f'Date time producer of {frmt} is not supported')
         return out
+
+
+DT_FACTORIES = {
+    "now": NowDateTimeProducer,
+    "month_start_with_offset": MonthOffsetTimeProducer,
+    "predefined": PredefinedDateProducer
+}
