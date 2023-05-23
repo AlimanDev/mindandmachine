@@ -6,6 +6,7 @@ from datetime import timedelta, time
 import io
 import pandas
 from rest_framework.test import APITestCase
+from rest_framework import status
 
 from src.forecast.models import (
     PeriodClients,
@@ -13,6 +14,7 @@ from src.forecast.models import (
     OperationTypeName,
     WorkType,
 )
+from src.base.models import Shop
 from src.forecast.period_clients.utils import create_demand
 from src.timetable.models import (
     WorkTypeName,
@@ -691,5 +693,9 @@ class TestDemand(APITestCase, TestsHelperMixin):
         }
 
         response = self.client.post(self.url, test_data)
-        self.assertEqual(response.status_code, 400)
-        self.assertEqual(response.json(), ['Operation type with code non_existent does not exist in shop Shop1'])
+        self.assertEqual(response.status_code, status.HTTP_500_INTERNAL_SERVER_ERROR)
+        msg = "ValidationError('Operation type with code non_existent does not exist in shop Shop1')"
+        self.assertEqual(response.json(), [msg])
+
+        shop_m = Shop.objects.filter(id=self.shop.id).values()[0]
+        self.assertEqual(shop_m['load_template_status'], Shop.LOAD_TEMPLATE_ERROR)

@@ -1,20 +1,20 @@
-import requests
 import json
-from datetime import datetime, date, timedelta
-from dateutil.relativedelta import relativedelta
 import logging
-from abc import ABC, abstractmethod
-from typing import Optional
+from datetime import datetime
 
+import requests
+from django.conf import settings
 from django.core.serializers.json import DjangoJSONEncoder
 
-from src.celery.celery import app
-from src.util.jsons import process_single_quote_json
-from src.util.time import DateTimeProducerFactory
-from src.forecast.models import LoadTemplate
 from src.base.models import Shop
-from django.conf import settings
-from src.forecast.load_template.utils import prepare_load_template_request, apply_load_template
+from src.celery.celery import app
+from src.forecast.load_template.utils import (
+    apply_load_template,
+    prepare_load_template_request,
+)
+from src.forecast.models import LoadTemplate
+from src.util.jsons import process_single_quote_json
+from src.util.time import DateProducerFactory
 
 logger = logging.getLogger('forecast_loadtemplate')
 
@@ -105,8 +105,8 @@ def calculate_shop_load_at_night(
         logger.exception(msg)
         raise TypeError(msg) from e
 
-    dt_from_factory = DateTimeProducerFactory.get_factory(frmt=dt_from_policy)
-    dt_to_factory = DateTimeProducerFactory.get_factory(frmt=dt_to_policy)
+    dt_from_factory = DateProducerFactory.get_factory(frmt=dt_from_policy)
+    dt_to_factory = DateProducerFactory.get_factory(frmt=dt_to_policy)
 
     dt_from = dt_from_factory.produce(**df_from_kwargs)
     dt_to = dt_to_factory.produce(**df_to_kwargs)
