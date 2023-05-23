@@ -1,0 +1,86 @@
+@startuml
+'https://plantuml.com/class-diagram
+
+left to right direction
+
+package Сейчас {
+    package _abstract {}
+    package _base {
+        package _auth {}
+        package _middleware {}
+        package _shift_shedule {}
+        package _shop {}
+        package _models {}
+        package _views {}
+        package _urls {}
+    }
+    package _celery {}
+    package _conf {}
+    package _etl {}
+    package _events {}
+    package _forecast {}
+    package _integration {}
+    package _notifications {}
+    package _pbi {}
+    package _recognition {}
+    package _reports {}
+    package _timetable {}
+    package _util {}
+}
+
+
+package ДолжноБыть {
+    package interfaces {
+        package API {
+            package shop_api {}
+            package timetable_api {}
+            package reports_api {}
+            package users_api {}
+            package recognition_api {}
+        }
+    }
+
+    package application {
+        package shop {
+            class ShopService {}
+            package shop_models {}
+        }
+        package employments {
+            class EmploymentsService {}
+            package employments_models {}
+        }
+        package timetable {
+            class TimeTableService {}
+            package timetable_models {}
+        }
+        package users {
+            class UsersService {}
+            package users_models {}
+        }
+        package recognition {
+            class RecognitionService {}
+            package recognition_models {}
+        }
+
+        package adapters_interfaces {
+            class IPbi {}
+            class IFileStorage {}
+        }
+    }
+
+    package adapters {
+        package Pbi(IPbi) {}
+        package FileStorage(IPbi) {}
+    }
+
+    package project {
+        class Settings {}
+        class Container {}
+    }
+
+    adapters --> application
+    interfaces --> application
+}
+
+
+@enduml

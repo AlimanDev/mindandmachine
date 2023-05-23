@@ -1,0 +1,97 @@
+@startuml
+'https://plantuml.com/class-diagram
+
+package Сейчас {
+    package Shops_ {
+        class Views_ {
+            + Shops CRUD
+            + get_all()
+            + get_tree()
+            + Employments CRUD
+            + WorkerPosition CRUD
+        }
+
+        package models_ {
+            class Shop(Model)_ {
+                + setters()
+                + save()
+                + delete()
+            }
+
+            class Employment(Model)_ {
+                + setters()
+                + save()
+                + delete()
+            }
+        }
+
+        package utils_ {
+            class SomeUtilsForShops_ {}
+            class SomeUtilsForEmployments_ {}
+        }
+
+        package tasks_ {
+            class Tasks_ {
+                + fill_shop_schedule()
+                + fill_shop_city_from_coords()
+                + fill_city_coords_address_timezone_from_fias_code()
+                + fill_active_shops_schedule()
+            }
+        }
+
+        Views_ --> models_
+        Views_ ---> utils_
+        Views_ ---> tasks_
+
+        utils_ <--> tasks_
+        utils_ <--> models_
+        tasks_ --> models_
+    }
+}
+
+
+package ДолжноБыть {
+    package Shops {
+        class Views {
+            + ...
+        }
+
+        package tasks {
+            class Tasks {
+                + ...
+            }
+        }
+
+        package models {
+            class Shop(Model) {
+                + setters()
+                + save()
+                + delete()
+            }
+
+            class Employment(Model) {
+                + setters()
+                + save()
+                + delete()
+            }
+        }
+
+        class ShopsService {
+            + CRUDs for modules
+            + set_shop_schedule
+            + set_shop_city_from_coords
+            + set_city_coords_address_timezone_from_fias_code
+            + set_active_shops
+            + get_all()
+            + get_tree()
+        }
+
+        Views --> ShopsService
+        tasks --> ShopsService
+
+        ShopsService --> models
+    }
+
+}
+
+@enduml

@@ -476,7 +476,7 @@ class ContentBlockViewSet(ReadOnlyModelViewSet):
 
 
 class RegionViewSet(BaseActiveNamedModelViewSet):
-    # permission_classes = [Permission]
+    permission_classes = [Permission]
     serializer_class = RegionSerializer
     pagination_class = LimitOffsetPagination
     filterset_class = BaseActiveNamedModelFilter

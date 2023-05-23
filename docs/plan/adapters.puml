@@ -1,0 +1,35 @@
+@startuml
+'https://plantuml.com/class-diagram
+
+package application {
+    class ShopService {
+        + create_shop(**data)
+        + update_shop_data(**data)
+        + get_shops_tree(**data)
+    }
+
+    abstract class IFileStorage {
+        + save_file()
+    }
+
+    abstract class IPbi {
+        + get_embed_params_for_single_report()
+    }
+}
+
+package interfaces {
+    package API {
+        class ShopViewSet {}
+    }
+}
+
+package adapters {
+    class Pbi(IPbi) {
+        + get_embed_params_for_single_report()
+    }
+}
+
+interfaces --> application
+interfaces --> adapters
+
+@enduml
