@@ -549,11 +549,14 @@ class TestVacancy(TestsHelperMixin, APITestCase):
         )
         response = self.client.put(
             f'/rest_api/worker_day/{vacancy.id}/',
-            {
-                "dt": vacancy.dt,
-                "is_fact": False,
-                "type": WorkerDay.TYPE_EMPTY,
-            }
+            self.dump_data(
+                {
+                    "dt": vacancy.dt,
+                    "is_fact": False,
+                    "type": WorkerDay.TYPE_EMPTY,
+                }
+            ),
+            content_type='application/json',
         )
         self.assertEqual(response.status_code, 200)
         vacancy.refresh_from_db()
