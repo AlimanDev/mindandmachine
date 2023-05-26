@@ -37,7 +37,7 @@ def create_mda_user_to_shop_relation(username, shop_code, debug_info=None):
 
 
 @app.task
-def sync_mda_user_to_shop_relation(dt=None, delay_sec=0.01):
+def sync_mda_user_to_shop_relation(dt=None, delay_sec=0.01, **kwargs):
     dt = dt or now().today()
     wdays = WorkerDay.objects.annotate_value_equality(
         'is_equal_shops', 'shop_id', F('employment__shop_id'),
@@ -47,6 +47,7 @@ def sync_mda_user_to_shop_relation(dt=None, delay_sec=0.01):
         is_fact=False, is_approved=True,
         shop__isnull=False, employee__isnull=False, employment__isnull=False,
         dt=dt,
+        **kwargs,
     ).values('employee__user__username', 'shop__code').distinct()
     for wd in wdays:
         create_mda_user_to_shop_relation(username=wd['employee__user__username'], shop_code=wd['shop__code'])

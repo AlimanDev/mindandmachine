@@ -2,6 +2,7 @@ import datetime
 
 import pandas as pd
 from dateutil.relativedelta import relativedelta
+from django.conf import settings
 from django.db import transaction
 from django.db.models import OuterRef, Q, F, Exists
 from django.db.models.query import Prefetch
@@ -22,6 +23,7 @@ from src.base.models import Employment, Shop, Employee
 from src.base.permissions import WdPermission
 from src.base.views_abstract import BaseActiveNamedModelViewSet
 from src.events.signals import event_signal
+from src.integration.mda.tasks import sync_mda_user_to_shop_relation
 from src.reports.utils.overtimes_undertimes import overtimes_undertimes_xlsx
 from src.timetable.backends import MultiShopsFilterBackend
 from src.timetable.events import REQUEST_APPROVE_EVENT_TYPE, REQUEST_APPROVE_WITH_TASKS_EVENT_TYPE
@@ -340,6 +342,9 @@ class WorkerDayViewSet(BaseActiveNamedModelViewSet):
         serializer.is_valid(raise_exception=True)
         wd_approve_helper = WorkerDayApproveService(user=self.request.user, **serializer.validated_data)
         approved_count = wd_approve_helper.approve()
+        if settings.MDA_SYNC_USER_TO_SHOP_DAILY and not request.data['is_fact']:
+            filter_kwargs = {'shop_id': request.data['shop_id']}
+            sync_mda_user_to_shop_relation.delay(**filter_kwargs)  # чтобы отправлять в МДА срочные выходы на работу сегодняшнего дня
         return Response(approved_count)
 
     @swagger_auto_schema(

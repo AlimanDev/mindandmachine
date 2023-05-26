@@ -687,7 +687,7 @@ BEAT_SCHEDULE = {
     },
     'task-sync-mda-user-to-shop-relation': {
         'task': 'src.integration.mda.tasks.sync_mda_user_to_shop_relation',
-        'schedule': crontab(hour=4, minute=30),
+        'schedule': crontab(hour=7, minute=30),
         'options': {'queue': BACKEND_QUEUE},
         'enabled': MDA_SYNC_USER_TO_SHOP_DAILY,
     },
