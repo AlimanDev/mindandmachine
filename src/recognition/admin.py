@@ -1,9 +1,11 @@
 import io
 
 import xlsxwriter
+from admin_numeric_filter.admin import RangeNumericFilter
 from django.contrib import admin
 from django.contrib.auth.models import Group
-from django.db.models import Prefetch
+from django.db.models import Prefetch, Min, Q
+from django.db.models.functions import Coalesce
 from django.http import HttpResponse
 from django.utils.html import format_html
 from django.utils.timezone import now
@@ -16,6 +18,17 @@ from src.timetable.models import User, Employment
 from src.util.dg.ticks_report import TicksOdsReportGenerator, TicksOdtReportGenerator
 
 admin.site.unregister(Group)
+
+
+class TickMinLivenessFilter(RangeNumericFilter):
+    title = 'Min liveness'
+    parameter_name = 'min_liveness'
+
+    def queryset(self, request, queryset):
+        queryset = queryset.annotate(
+            min_liveness=Coalesce(Min('tickphoto__liveness', filter=Q(tickphoto__liveness__gt=0)), 0.0),
+        )
+        return super(TickMinLivenessFilter, self).queryset(request, queryset)
 
 
 class UserListFilter(CustomRelatedOnlyDropdownFilter):
@@ -88,6 +101,7 @@ class TickAdmin(admin.ModelAdmin):
     ]
 
     list_filter = [
+        ('tickphoto__liveness', TickMinLivenessFilter),
         ('tick_point__shop', RelatedOnlyDropdownNameOrderedFilter),
         ('dttm', DateTimeRangeFilter),
         'type',
@@ -198,7 +212,8 @@ class TickAdmin(admin.ModelAdmin):
 class TickPhotoAdmin(admin.ModelAdmin):
     raw_id_fields = ("tick",)
 
-    list_filter = [('dttm', DateTimeRangeFilter),
+    list_filter = [('liveness', RangeNumericFilter),
+                   ('dttm', DateTimeRangeFilter),
                    'type',
                    'biometrics_check',
                    ('tick__tick_point__shop', CustomRelatedOnlyDropdownFilter),
