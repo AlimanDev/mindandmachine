@@ -83,6 +83,7 @@ INSTALLED_APPS = [
     'django_filters',
     'django_admin_listfilter_dropdown',
     'rangefilter',
+    'admin_numeric_filter',
     'dj_rest_auth',
     'rest_framework.authtoken',
     'django_json_widget',
