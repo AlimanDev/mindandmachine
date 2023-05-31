@@ -1,6 +1,7 @@
 import json
 import logging
 from datetime import datetime
+from http import HTTPStatus
 
 import requests
 from django.conf import settings
@@ -19,6 +20,12 @@ from src.util.time import DateProducerFactory
 logger = logging.getLogger('forecast_loadtemplate')
 
 
+def set_shop_lt_status(shop_id: int, status: str):
+    shop = Shop.objects.get(id=shop_id)
+    shop.load_template_status = status
+    shop.save()
+
+
 @app.task
 def calculate_shops_load(load_template_id, dt_from, dt_to, shop_id=None):
     if type(dt_from) == str:
@@ -28,7 +35,16 @@ def calculate_shops_load(load_template_id, dt_from, dt_to, shop_id=None):
     load_template = LoadTemplate.objects.get(pk=load_template_id)
     shops = [load_template.shops.get(pk=shop_id)] if shop_id else load_template.shops.all()
     for shop in shops:
-        data = prepare_load_template_request(load_template_id, shop.id, dt_from, dt_to)
+        # set status to disable triggering this shop again
+        if shop.load_template_status == Shop.LOAD_TEMPLATE_PROCESS:
+            continue
+        set_shop_lt_status(shop_id=shop.id, status=Shop.LOAD_TEMPLATE_PROCESS)
+        data = prepare_load_template_request(
+            load_template_id,
+            shop.id,
+            dt_from,
+            dt_to,
+        )
         if not (data is None):
             data = json.dumps(data, cls=DjangoJSONEncoder)
             response = requests.post(
@@ -36,6 +52,14 @@ def calculate_shops_load(load_template_id, dt_from, dt_to, shop_id=None):
                 data=data,
                 timeout=settings.REQUESTS_TIMEOUTS['algo']
             )
+
+            # if for some reason (validation error) the request is not ok
+            # set status to Shop.LOAD_TEMPLATE_ERROR
+            if response.status_code != HTTPStatus.OK:
+                set_shop_lt_status(shop_id=shop.id, status=Shop.LOAD_TEMPLATE_ERROR)
+
+
+
 
 
 @app.task
