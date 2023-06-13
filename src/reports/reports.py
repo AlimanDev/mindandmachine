@@ -2,7 +2,7 @@ from datetime import date, timedelta, datetime
 from copy import deepcopy
 from unittest.mock import Mock
 
-from django.db.models import Q, Prefetch, Case, When, Value, F, Exists, OuterRef
+from django.db.models import Q, Prefetch, Case, When, Value, F, Exists, OuterRef, QuerySet
 from django.utils.translation import gettext as _
 
 from django.utils.functional import cached_property
@@ -196,7 +196,8 @@ class TickReport(BaseRegisteredReport, DatesReportMixin):
         'json': TicksJsonReportGenerator
     }
 
-    def __init__(self, network_id: int, context: dict, *args, **kwargs):
+    def __init__(self, network_id: int, context: dict, qs: QuerySet = None, *args, **kwargs):
+        self.qs = qs
         self.dt_from, self.dt_to = self.get_dates(context)
         super().__init__(network_id, context, *args, **kwargs)
 
@@ -217,7 +218,7 @@ class TickReport(BaseRegisteredReport, DatesReportMixin):
     def format(self) -> str:
         with_biometrics = self.context.get('with_biometrics')
         _format = self.context.get('format', 'docx' if with_biometrics else 'xlsx')
-        assert _format != 'docx' or with_biometrics # don't render docx without photos
+        assert _format != 'docx' or with_biometrics  # don't render docx without photos
         return _format
 
     @cached_property
@@ -226,8 +227,10 @@ class TickReport(BaseRegisteredReport, DatesReportMixin):
         Autoticks + manual ticks. Checked against plan for violations, liveness_str attribute for Word/ODT format, 
         sorted by fio (full name) and dttm.
         """
-        all_ticks: list[Tick] = self._get_ticks() + self._get_wdays()
+        all_ticks: list[Tick] = self._get_ticks()
         plan_wdays = self._get_plan_wdays()
+        if not self.qs:
+            all_ticks += self._get_wdays()
         for tick in all_ticks:
             tick.liveness_str = f'{int(tick.min_liveness_prop * 100)}%' if tick.min_liveness_prop else None # to percentage (%)
             tick.violation = None
@@ -257,9 +260,12 @@ class TickReport(BaseRegisteredReport, DatesReportMixin):
 
     def _get_ticks(self) -> list:
         """Normal Ticks (Autoticks)"""
-        qs = Tick.objects.filter(
-            dttm__gte=self.dt_from,
-            dttm__lt=self.dt_to + timedelta(1),
+        qs: QuerySet
+        if self.qs:  # Если предоставлен qs, то нам не нужно фильтровать по датам
+            qs = self.qs
+        else:
+            qs = Tick.objects.filter(dttm__gte=self.dt_from, dttm__lt=self.dt_to + timedelta(1))
+        qs = qs.filter(
             employee__isnull=False
         ).annotate(
             outsource_network=Case(When(~Q(user__network=F('tick_point__shop__network')), then=F('user__network__name'))),
@@ -348,11 +354,17 @@ class TickReport(BaseRegisteredReport, DatesReportMixin):
         Approved plan WorkerDays to check Ticks for violations.
         """
         qs = WorkerDay.objects.filter(
-            dt__range=(self.dt_from, self.dt_to),
             is_approved=True,
             is_fact=False,
             type__is_dayoff=False
         )
+        if self.qs:  # Если предоставлен qs в класс, то нужны планы на конкретные дни
+            dts = [tick.dttm.date() for tick in self.qs]
+            ids = [tick.employee_id for tick in self.qs]
+            qs = qs.filter(dt__in=dts, employee_id__in=ids)
+        else:
+            qs = qs.filter(dt__range=(self.dt_from, self.dt_to))
+
         if shops := self.context.get('shop_id__in'):
             qs = qs.filter(shop_id__in=shops)
         if employees := self.context.get('employee_id__in'):

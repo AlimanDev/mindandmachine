@@ -14,6 +14,7 @@ from rangefilter.filter import DateTimeRangeFilter
 from src.base.admin_filters import CustomRelatedOnlyDropdownFilter, RelatedOnlyDropdownLastNameOrderedFilter, RelatedOnlyDropdownNameOrderedFilter
 from src.base.admin import compress_images
 from src.recognition.models import ShopIpAddress, TickPoint, Tick, TickPhoto, UserConnecter
+from src.reports.reports import TickReport
 from src.timetable.models import User, Employment
 from src.util.dg.ticks_report import TicksOdsReportGenerator, TicksOdtReportGenerator
 
@@ -118,27 +119,23 @@ class TickAdmin(admin.ModelAdmin):
     readonly_fields = ['biometrics_check']
 
     def get_queryset(self, request):
-        return super(TickAdmin, self).get_queryset(request).prefetch_related(
-            Prefetch(
-                'tickphoto_set',
-                queryset=TickPhoto.objects.filter(),
-                to_attr='tickphotos_list',
-            )
-        )
+        return super(TickAdmin, self).get_queryset(request)
 
     def ticks_report_xlsx(self, request, queryset):
-        generator = TicksOdsReportGenerator(ticks_queryset=queryset)
-        content = generator.generate(convert_to='xlsx')
-        response = HttpResponse(content, content_type='application/octet-stream')
-        response['Content-Disposition'] = 'attachment; filename="ticks_report.xlsx"'
-        return response
+        report = TickReport(network_id=request.user.network_id, context={'format': 'xlsx'},
+                            qs=queryset).get_file()
+        headers = {
+            'Content-Disposition': f'attachment; filename="{report["name"]}"'
+        }
+        return HttpResponse(report['file'], content_type=report['type'], headers=headers)
 
     def ticks_report_docx(self, request, queryset):
-        generator = TicksOdtReportGenerator(ticks_queryset=queryset)
-        content = generator.generate(convert_to='docx')
-        response = HttpResponse(content, content_type='application/octet-stream')
-        response['Content-Disposition'] = 'attachment; filename="ticks_report.docx"'
-        return response
+        report = TickReport(network_id=request.user.network_id, context={'format': 'docx', 'with_biometrics': 'True'},
+                            qs=queryset).get_file()
+        headers = {
+            'Content-Disposition': f'attachment; filename="{report["name"]}"'
+        }
+        return HttpResponse(report['file'], content_type=report['type'], headers=headers)
 
     # aa: fixme: remove, not working
     def download_old(self, request, queryset):

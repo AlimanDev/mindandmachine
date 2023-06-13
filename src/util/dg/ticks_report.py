@@ -47,12 +47,14 @@ class BaseFileTicksReportGenerator(BaseDocGenerator, BaseTicksReportGenerator):
         }
         return data
 
+
 class TicksOdsReportGenerator(BaseFileTicksReportGenerator):
     def get_template_path(self) -> str:
         return os.path.join(settings.BASE_DIR, 'src/util/dg/templates/ticks_report.ods')
 
     def generate_report(self):
         return super().generate(convert_to='xlsx')
+
 
 class TicksOdtReportGenerator(BaseFileTicksReportGenerator):
     def get_template_path(self) -> str:
