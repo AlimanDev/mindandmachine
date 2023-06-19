@@ -19,6 +19,8 @@ env = environ.Env()
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+environ.Env.read_env(os.path.join(BASE_DIR, '.env'))
+
 
 def is_config_exists(file_name):
     return os.path.isfile(os.path.join(BASE_DIR, 'src', 'conf', file_name))
@@ -53,12 +55,12 @@ MDA_PUBLIC_API_AUTH_TOKEN = 'dummy'
 DEBUG = env.bool('DJANGO_DEBUG', default=True)
 
 ALLOWED_HOSTS = ['*']
-CSRF_TRUSTED_ORIGINS = [
+CSRF_TRUSTED_ORIGINS = env.list('CSRF_TRUSTED_ORIGINS', default=[
     'http://*.mindandmachine.ru',
     'https://*.mindandmachine.ru',
     'http://*.workestra.ai',
     'https://*.workestra.ai',
-]
+])
 
 DEV_NGINX_PORT = os.getenv("DEV_NGINX_PORT")
 if DEV_NGINX_PORT is not None:
@@ -169,7 +171,7 @@ DATABASES = {
         'USER': env.str('DB_USER', default='postgres'),
         'PASSWORD': env.str('DB_PASSWORD', default='postgres'),
         'HOST': env.str('DB_HOST', default='localhost'),
-        'PORT': '5432',
+        'PORT': env.str('DB_PORT', default='5432'),
     }
 }
 
