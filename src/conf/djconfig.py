@@ -59,7 +59,9 @@ CSRF_TRUSTED_ORIGINS = env.list('CSRF_TRUSTED_ORIGINS', default=[
     'http://*.mindandmachine.ru',
     'https://*.mindandmachine.ru',
     'http://*.workestra.ai',
-    'https://*.workestra.ai',
+    'https://*.workestra.ai'
+    'http://*.mindm.ru',
+    'https://*.mindm.ru',
 ])
 
 DEV_NGINX_PORT = os.getenv("DEV_NGINX_PORT")
