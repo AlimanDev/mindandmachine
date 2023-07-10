@@ -545,7 +545,9 @@ class EmploymentSerializer(BaseModelSerializer):
             else:
                 self.fail('no_position', amount=len(positions), code=position['code'])
 
-        if (attrs.get('shop_id') is None) and ('code' in attrs.get('shop', {})):
+        if getattr(self.context['request'], 'by_code', False) and self.context['request'].user.network.ignore_shop_code_when_updating_employment_via_api:
+            attrs.pop('shop_id', None)
+        elif (attrs.get('shop_id') is None) and ('code' in attrs.get('shop', {})):
             shop = attrs.pop('shop')
             shops = list(Shop.objects.filter(code=shop['code'], network_id=self.context['request'].user.network_id))
             if len(shops) == 1:
@@ -563,6 +565,12 @@ class EmploymentSerializer(BaseModelSerializer):
                 raise serializers.ValidationError(self.error_messages['no_network_connect'])
         elif self.instance:
             shop = self.instance.shop
+        elif self.context['batch'] and attrs.get('code'):
+            employment = Employment.objects.filter(code=attrs['code']).first()
+            if employment:
+                attrs['shop_id'] = employment.shop_id
+            else:
+                raise ValidationError({'shop_id': self.error_messages['required']})
         else:
             raise ValidationError({'shop_id': self.error_messages['required']})
         
