@@ -324,7 +324,7 @@ add_logger('forecast_period_clients')
 
 LANGUAGE_CODE = 'ru-RU'
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = env.str('TIME_ZONE', default='UTC')
 
 USE_I18N = True
 
