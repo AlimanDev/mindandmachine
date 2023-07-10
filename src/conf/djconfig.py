@@ -53,6 +53,7 @@ CSRF_TRUSTED_ORIGINS = env.list('CSRF_TRUSTED_ORIGINS', default=[
     'https://*.workestra.ai',
     'http://*.mindm.ru',
     'https://*.mindm.ru',
+    'https://localhost:11111',
 ])
 
 DEV_NGINX_PORT = os.getenv("DEV_NGINX_PORT")
@@ -72,6 +73,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+
     'drf_yasg',
     'corsheaders',
     'rest_framework',
@@ -82,23 +84,24 @@ INSTALLED_APPS = [
     'dj_rest_auth',
     'rest_framework.authtoken',
     'django_json_widget',
+    'django_celery_beat',
+    'import_export',
+    'polymorphic',
+    'mptt',
+
     'src',
     'src.apps.base',
     'src.apps.forecast',
     'src.apps.timetable',
-    'django_celery_beat',
     'src.adapters.celery',
     'src.apps.recognition',
     'src.apps.integration',
     'src.apps.events',
     'src.apps.notifications',
     'src.apps.reports',
-    'import_export',
     'src.apps.tasks',
-    'polymorphic',
     'src.apps.exchange',
     'src.adapters.pbi',
-    'mptt',
     'src.apps.med_docs',
     'src.common.etl',
 ]
@@ -414,18 +417,18 @@ METABASE_SECRET_KEY = env.str('METABASE_SECRET_KEY', default='secret-key')
 
 CELERY_IMPORTS = (
     'src.adapters.celery.tasks',
+    'src.adapters.mda.tasks',
     'src.apps.integration.tasks',
-    'src.apps.integration.mda.tasks',
     'src.apps.base.shop.tasks',
     'src.apps.events.tasks',
-    'src.forecast.load_template.tasks',
-    'src.forecast.receipt.tasks',
-    'src.timetable.shop_month_stat.tasks',
-    'src.timetable.vacancy.tasks',
-    'src.timetable.worker_day.tasks',
-    'src.timetable.timesheet.tasks',
+    'src.apps.forecast.load_template.tasks',
+    'src.apps.forecast.receipt.tasks',
+    'src.apps.timetable.shop_month_stat.tasks',
+    'src.apps.timetable.vacancy.tasks',
+    'src.apps.timetable.worker_day.tasks',
+    'src.apps.timetable.timesheet.tasks',
     'src.apps.base.tasks',
-    'src.etl.tasks',
+    'src.common.etl.tasks',
 )
 
 REDIS_HOST = env.str('REDIS_HOST', default='localhost')
