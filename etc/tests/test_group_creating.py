@@ -1,7 +1,7 @@
 from django.test import TestCase
 
 from etc.scripts.create_access_groups import update_group_functions
-from src.base.models import (
+from src.apps.base.models import (
     Group,
     FunctionGroup,
     Network,

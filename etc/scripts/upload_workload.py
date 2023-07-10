@@ -1,8 +1,8 @@
 import pandas as pd
-from src.base.models import (
+from src.apps.base.models import (
     Shop,
 )
-from src.forecast.models import (
+from src.apps.forecast.models import (
     OperationType,
     PeriodClients,
 

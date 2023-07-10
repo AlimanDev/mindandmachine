@@ -1,4 +1,4 @@
-from src.celery.tasks import send_notify_email
+from src.adapters.celery.tasks import send_notify_email
 
 
 def send_email(message, send2user_ids, title=None, file=None, html_content=None):

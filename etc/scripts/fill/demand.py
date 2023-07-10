@@ -3,7 +3,7 @@ from datetime import time, datetime, timedelta, date
 from dateutil.relativedelta import relativedelta
 from django.db import transaction
 
-from src.forecast.models import (
+from src.apps.forecast.models import (
     OperationType,
     PeriodClients,
 )

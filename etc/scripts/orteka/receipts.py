@@ -4,8 +4,8 @@ from datetime import datetime
 import pandas as pd
 from django.db.models import OuterRef, Exists
 
-from src.base.models import Employment
-from src.forecast.models import Receipt
+from src.apps.base.models import Employment
+from src.apps.forecast.models import Receipt
 
 
 def strip_val(val):

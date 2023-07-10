@@ -6,7 +6,7 @@ from django.db import transaction
 
 from etc.scripts import fill_calendar
 from etc.scripts.create_access_groups import password_generator, update_group_functions
-from src.base.models import (
+from src.apps.base.models import (
     Shop,
     Region,
     User,
@@ -16,11 +16,11 @@ from src.base.models import (
     Network,
 )
 from src.conf.djconfig import BASE_DIR
-from src.forecast.models import (
+from src.apps.forecast.models import (
     OperationType,
     OperationTypeName,
 )
-from src.timetable.models import (
+from src.apps.timetable.models import (
     WorkType,
     WorkTypeName,
     ExchangeSettings,

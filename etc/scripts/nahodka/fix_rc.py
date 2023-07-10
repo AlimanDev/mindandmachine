@@ -1,11 +1,11 @@
 from django.db.models import Q, Exists, OuterRef
 from django.db.models.functions import Length
-from src.base.models import Employment, Employee, User
-from src.integration.models import UserExternalCode
-from src.recognition.models import Tick
-from src.timetable.models import WorkerDay, AttendanceRecords
-from src.timetable.timesheet.tasks import calc_timesheets
-from src.timetable.worker_day.tasks import recalc_work_hours
+from src.apps.base.models import Employment, Employee, User
+from src.apps.integration.models import UserExternalCode
+from src.apps.recognition.models import Tick
+from src.apps.timetable.models import WorkerDay, AttendanceRecords
+from src.apps.timetable.timesheet.tasks import calc_timesheets
+from src.apps.timetable.worker_day.tasks import recalc_work_hours
 UserExternalCode.objects.filter(user_id=179).delete()  # РЦ user_id 179 -- Галиев
 User.objects.filter(~Exists(Employment.objects.filter(employee__user_id=OuterRef('id')))).delete()
 wdays_qs = WorkerDay.objects.annotate(tn_len=Length('employee__tabel_code')).filter(tn_len=10).select_related(

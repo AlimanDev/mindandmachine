@@ -1,7 +1,7 @@
 from datetime import date, datetime, timedelta, time
 import pandas as pd
-from src.timetable.models import WorkerDay, WorkerDayCashboxDetails, WorkType
-from src.base.models import Employment, Shop, WorkerPosition
+from src.apps.timetable.models import WorkerDay, WorkerDayCashboxDetails, WorkType
+from src.apps.base.models import Employment, Shop, WorkerPosition
 from django.db import transaction
 
 

@@ -6,20 +6,20 @@ from random import randint
 import numpy as np
 from datetime import time, datetime
 from dateutil.relativedelta import relativedelta
-from src.base.models import (
+from src.apps.base.models import (
     User,
     Shop,
     Group,
     Region,
     FunctionGroup,
 )
-from src.forecast.models import (
+from src.apps.forecast.models import (
     OperationType,
     PeriodClients,
     OperationTypeName,
 
 )
-from src.timetable.models import (
+from src.apps.timetable.models import (
     ExchangeSettings,
     WorkerDay,
     WorkerConstraint,
@@ -33,7 +33,7 @@ from src.timetable.models import (
 )
 
 from etc.scripts import fill_calendar
-from src.util.models_converter import (
+from src.common.models_converter import (
     WorkerDayConverter,
 )
 

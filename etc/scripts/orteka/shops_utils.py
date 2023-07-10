@@ -1,7 +1,7 @@
 import pandas as pd
-from src.base.models import Shop
-from src.forecast.models import OperationType, OperationTypeName, PeriodClients
-from src.timetable.models import WorkType, WorkTypeName
+from src.apps.base.models import Shop
+from src.apps.forecast.models import OperationType, OperationTypeName, PeriodClients
+from src.apps.timetable.models import WorkType, WorkTypeName
 from django.db.models import Q
 from django.utils import timezone
 

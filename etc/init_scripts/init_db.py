@@ -16,7 +16,7 @@ if __name__ == "__main__":
 
 import json
 from datetime import time, datetime, timedelta, date
-from src.base.models import (
+from src.apps.base.models import (
     Shop,
     Region,
     User,
@@ -25,11 +25,11 @@ from src.base.models import (
     Network,
     Employee
 )
-from src.forecast.models import (
+from src.apps.forecast.models import (
     OperationType,
     PeriodClients,
 )
-from src.timetable.models import (
+from src.apps.timetable.models import (
     WorkType,
     WorkTypeName,
     ExchangeSettings,

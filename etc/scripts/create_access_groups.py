@@ -10,7 +10,7 @@
 
 
 from uuid import uuid4
-from src.base.models import Group, FunctionGroup, Network
+from src.apps.base.models import Group, FunctionGroup, Network
 import pandas as pd
 
 

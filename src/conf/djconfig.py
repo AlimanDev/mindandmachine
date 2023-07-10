@@ -1,11 +1,3 @@
-"""
-config importance
-1. djconfig_local (the most important)
-2. djconfig
-3. config_local
-4. config
-"""
-
 import logging
 import os
 import sys
@@ -30,10 +22,9 @@ QOS_DEV_CSRF_DISABLED = False
 QOS_DEV_AUTOLOGIN_ENABLED = False
 QOS_DEV_AUTOLOGIN_USERNAME = None
 QOS_DEV_AUTOLOGIN_PASSWORD = None
-# переменная указывающая как матчить табельный номер при загрузке расписания (через User или через Employment)
-UPLOAD_TT_MATCH_EMPLOYMENT = True
-# создаем employee при загрузке или двух разных юзеров, фикс для граната
-UPLOAD_TT_CREATE_EMPLOYEE = True
+
+UPLOAD_TT_MATCH_EMPLOYMENT = True  # переменная указывающая как матчить табельный номер при загрузке расписания (через User или через Employment)
+UPLOAD_TT_CREATE_EMPLOYEE = True  # создаем employee при загрузке или двух разных юзеров, фикс для граната
 
 QOS_CAMERA_KEY = '1'
 
@@ -59,7 +50,7 @@ CSRF_TRUSTED_ORIGINS = env.list('CSRF_TRUSTED_ORIGINS', default=[
     'http://*.mindandmachine.ru',
     'https://*.mindandmachine.ru',
     'http://*.workestra.ai',
-    'https://*.workestra.ai'
+    'https://*.workestra.ai',
     'http://*.mindm.ru',
     'https://*.mindm.ru',
 ])
@@ -92,30 +83,30 @@ INSTALLED_APPS = [
     'rest_framework.authtoken',
     'django_json_widget',
     'src',
-    'src.base',
-    'src.forecast',
-    'src.timetable',
+    'src.apps.base',
+    'src.apps.forecast',
+    'src.apps.timetable',
     'django_celery_beat',
-    'src.celery',
-    'src.recognition',
-    'src.integration',
-    'src.events',
-    'src.notifications',
-    'src.reports',
+    'src.adapters.celery',
+    'src.apps.recognition',
+    'src.apps.integration',
+    'src.apps.events',
+    'src.apps.notifications',
+    'src.apps.reports',
     'import_export',
-    'src.tasks',
+    'src.apps.tasks',
     'polymorphic',
-    'src.exchange',
-    'src.pbi',
+    'src.apps.exchange',
+    'src.adapters.pbi',
     'mptt',
-    'src.med_docs',
-    'src.etl',
+    'src.apps.med_docs',
+    'src.common.etl',
 ]
 
 REST_FRAMEWORK = {
     'DEFAULT_FILTER_BACKENDS': ['django_filters.rest_framework.DjangoFilterBackend'],
     'DEFAULT_AUTHENTICATION_CLASSES': [
-        'src.base.auth.authentication.WFMSessionAuthentication',
+        'src.apps.base.authentication.WFMSessionAuthentication',
         'rest_framework.authentication.BasicAuthentication',
     ],
     'DEFAULT_RENDERER_CLASSES': [
@@ -138,20 +129,20 @@ MIDDLEWARE = [
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.locale.LocaleMiddleware',
     'django.middleware.common.CommonMiddleware',
-    'src.util.csrf.CsrfMiddleware',
+    'src.common.csrf.CsrfMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'sesame.middleware.AuthenticationMiddleware',
     # 'src.main.auth.middleware.JWTAuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
-    'src.base.middleware.clickjacking.XFrameOptionsMiddleware',
+    'src.apps.base.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
-ROOT_URLCONF = 'src.urls'
+ROOT_URLCONF = 'src.conf.urls'
 
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [os.path.join(BASE_DIR, 'src/templates')],
+        'DIRS': [os.path.join(BASE_DIR, 'src/conf/templates')],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -164,12 +155,12 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = 'wsgi.application'
+WSGI_APPLICATION = 'wsgi.app'
 
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': env.str('DB_NAME', default='qos'),
+        'NAME': env.str('DB_NAME', default='pobeda'),
         'USER': env.str('DB_USER', default='postgres'),
         'PASSWORD': env.str('DB_PASSWORD', default='postgres'),
         'HOST': env.str('DB_HOST', default='localhost'),
@@ -372,9 +363,9 @@ REDOC_SETTINGS = {
 SWAGGER_SETTINGS = {
     'TAGS_SORTER': 'alpha',
     'OPERATIONS_SORTER': 'alpha',
-    'DEFAULT_AUTO_SCHEMA_CLASS': "src.util.openapi.auto_schema.WFMAutoSchema",
+    'DEFAULT_AUTO_SCHEMA_CLASS': "src.common.openapi.auto_schema.WFMAutoSchema",
     'DEFAULT_FIELD_INSPECTORS': [
-        'src.util.openapi.inspectors.OverrideExampleInspector',
+        'src.common.openapi.inspectors.OverrideExampleInspector',
         'drf_yasg.inspectors.CamelCaseJSONFilter',
         'drf_yasg.inspectors.ReferencingSerializerInspector',
         'drf_yasg.inspectors.RelatedFieldInspector',
@@ -422,18 +413,18 @@ METABASE_SITE_URL = env.str('METABASE_SITE_URL', default='metabase-url')
 METABASE_SECRET_KEY = env.str('METABASE_SECRET_KEY', default='secret-key')
 
 CELERY_IMPORTS = (
-    'src.celery.tasks',
-    'src.integration.tasks',
-    'src.integration.mda.tasks',
-    'src.base.shop.tasks',
-    'src.events.tasks',
+    'src.adapters.celery.tasks',
+    'src.apps.integration.tasks',
+    'src.apps.integration.mda.tasks',
+    'src.apps.base.shop.tasks',
+    'src.apps.events.tasks',
     'src.forecast.load_template.tasks',
     'src.forecast.receipt.tasks',
     'src.timetable.shop_month_stat.tasks',
     'src.timetable.vacancy.tasks',
     'src.timetable.worker_day.tasks',
     'src.timetable.timesheet.tasks',
-    'src.base.tasks',
+    'src.apps.base.tasks',
     'src.etl.tasks',
 )
 
@@ -583,7 +574,7 @@ DEFAULT_RECEIPTS_GAP_AHEAD = 3
 DEFAULT_RECEIPTS_GAP_BEFORE = 3
 
 # Testing
-TEST_RUNNER = 'src.util.test.TestRunner'    # High-level mocks
+TEST_RUNNER = 'src.common.test.TestRunner'  # High-level mocks
 TEST_LOG_LEVEL = logging.CRITICAL
 
 
@@ -611,7 +602,7 @@ CELERY_ROUTES = {
 
 BEAT_SCHEDULE = {
     # 'task-update_worker_month_stat': {
-    #     'task': 'src.celery.tasks.update_worker_month_stat',
+    #     'task': 'src.adapters.celery.tasks.update_worker_month_stat',
     #     'schedule': crontab(day_of_month='1,15', hour=0, minute=0),
     #     'options': {'queue': BACKEND_QUEUE}
     # },
@@ -642,27 +633,27 @@ BEAT_SCHEDULE = {
         'options': {'queue': BACKEND_QUEUE}
     },
     'task-trigger-cron-report': {
-        'task': 'src.reports.tasks.cron_report',
+        'task': 'src.apps.reports.tasks.cron_report',
         'schedule': crontab(minute='*/1'),
         'options': {'queue': BACKEND_QUEUE}
     },
     'task-delete-inactive-employment-group': {
-        'task': 'src.celery.tasks.delete_inactive_employment_groups',
+        'task': 'src.adapters.celery.tasks.delete_inactive_employment_groups',
         'schedule': crontab(hour=0),
         'options': {'queue': BACKEND_QUEUE}
     },
     'task-fill-active-shops-schedule': {
-        'task': 'src.base.shop.tasks.fill_active_shops_schedule',
+        'task': 'src.apps.base.shop.tasks.fill_active_shops_schedule',
         'schedule': crontab(hour=1, minute=30),
         'options': {'queue': BACKEND_QUEUE}
     },
     'task-send-employee-not-checked-in-notification': {
-        'task': 'src.celery.tasks.employee_not_checked',
+        'task': 'src.adapters.celery.tasks.employee_not_checked',
         'schedule': crontab(minute='*/5'),
         'options': {'queue': BACKEND_QUEUE}
     },
     'task-auto-delete-biometrics': {
-        'task': 'src.celery.tasks.auto_delete_biometrics',
+        'task': 'src.adapters.celery.tasks.auto_delete_biometrics',
         'schedule': crontab(hour=0, minute=0),
         'options': {'queue': BACKEND_QUEUE}
     },
@@ -671,62 +662,62 @@ BEAT_SCHEDULE = {
         'schedule': crontab(hour=3, minute=15),
         'options': {'queue': BACKEND_QUEUE}
     },
-    'task-clean-api-log': {
-        'task': 'src.base.tasks.clean_api_log',
+    'task-clean-tevian-log': {
+        'task': 'src.apps.base.tasks.clean_api_log',
         'schedule': crontab(hour=3, minute=46),
         'options': {'queue': BACKEND_QUEUE}
     },
     'task-sync-mda-data-all-time': {
-        'task': 'src.integration.mda.tasks.sync_mda_data',
+        'task': 'src.apps.integration.mda.tasks.sync_mda_data',
         'schedule': crontab(hour=4, minute=59),
         'options': {'queue': BACKEND_QUEUE},
         'kwargs': {'threshold_seconds': None},
         'enabled': MDA_SYNC_DEPARTMENTS,
     },
     'task-sync-mda-data-last-changes': {
-        'task': 'src.integration.mda.tasks.sync_mda_data',
+        'task': 'src.apps.integration.mda.tasks.sync_mda_data',
         'schedule': crontab(minute=49),
         'options': {'queue': BACKEND_QUEUE},
         'kwargs': {'threshold_seconds': MDA_SYNC_DEPARTMENTS_THRESHOLD_SECONDS},
         'enabled': MDA_SYNC_DEPARTMENTS,
     },
     'task-sync-mda-user-to-shop-relation': {
-        'task': 'src.integration.mda.tasks.sync_mda_user_to_shop_relation',
+        'task': 'src.apps.integration.mda.tasks.sync_mda_user_to_shop_relation',
         'schedule': crontab(hour=7, minute=30),
         'options': {'queue': BACKEND_QUEUE},
         'enabled': MDA_SYNC_USER_TO_SHOP_DAILY,
     },
     'task-import-urv-zkteco': {
-        'task': 'src.integration.tasks.import_urv_zkteco',
+        'task': 'src.apps.integration.tasks.import_urv_zkteco',
         'schedule': crontab(minute='*/5'),
         'options': {'queue': BACKEND_QUEUE},
         'enabled': ZKTECO_INTEGRATION,
     },
     'task-export-workers-zkteco': {
-        'task': 'src.integration.tasks.export_workers_zkteco',
+        'task': 'src.apps.integration.tasks.export_workers_zkteco',
         'schedule': crontab(minute=0),
         'options': {'queue': BACKEND_QUEUE},
         'enabled': ZKTECO_INTEGRATION,
     },
     'task-delete-workers-zkteco': {
-        'task': 'src.integration.tasks.delete_workers_zkteco',
+        'task': 'src.apps.integration.tasks.delete_workers_zkteco',
         'schedule': crontab(minute=0),
         'options': {'queue': BACKEND_QUEUE},
         'enabled': ZKTECO_INTEGRATION,
     },
     'task-sync-attendance-areas-zkteco': {
-        'task': 'src.integration.tasks.sync_att_area_zkteco',
+        'task': 'src.apps.integration.tasks.sync_att_area_zkteco',
         'schedule': crontab(hour=0, minute=0),
         'options': {'queue': BACKEND_QUEUE},
         'enabled': ZKTECO_INTEGRATION,
     },
     'task-set-prod-cal-cache-cur-and-next-month': {
-        'task': 'src.celery.tasks.set_prod_cal_cache_cur_and_next_month',
+        'task': 'src.adapters.celery.tasks.set_prod_cal_cache_cur_and_next_month',
         'schedule': crontab(hour=0, minute=0),
         'options': {'queue': BACKEND_QUEUE},
     },
     'task-delete_reports': {
-        'task': 'src.reports.tasks.delete_reports',
+        'task': 'src.apps.reports.tasks.delete_reports',
         'schedule': crontab(hour=0, minute=0),
         'options': {'queue': BACKEND_QUEUE},
     },

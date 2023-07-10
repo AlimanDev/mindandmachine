@@ -5,7 +5,7 @@ from django.db.models import Q, OuterRef, F, Exists, Prefetch, DurationField
 from django.db.models.functions import Cast
 from django.db.utils import IntegrityError
 
-from src.timetable.models import WorkType, WorkerDay, AttendanceRecords, WorkerDayCashboxDetails
+from src.apps.timetable.models import WorkType, WorkerDay, AttendanceRecords, WorkerDayCashboxDetails
 
 
 def fix_plan_night_shifts(**kwargs):

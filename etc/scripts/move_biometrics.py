@@ -1,5 +1,5 @@
-from src.recognition.api.recognition import Recognition
-from src.recognition.models import UserConnecter
+from src.adapters.tevian.recognition import Recognition
+from src.apps.recognition.models import UserConnecter
 
 def move_biometrics(user_ids=[], delete_before_create=False):
     connecters = UserConnecter.objects.select_related('user')

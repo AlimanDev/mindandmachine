@@ -1,7 +1,7 @@
 import pandas as pd
 from datetime import timedelta, datetime, time
-from src.forecast.models import OperationTypeName, OperationTypeTemplate, PeriodClients, OperationType
-from src.base.models import Shop
+from src.apps.forecast.models import OperationTypeName, OperationTypeTemplate, PeriodClients, OperationType
+from src.apps.base.models import Shop
 from django.db import transaction
 
 def fill_empty_values_with_zero(operation_type_name_ids=[], dttm_from=None, dttm_to=None, shop_ids=[]):
