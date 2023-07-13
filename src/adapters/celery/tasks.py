@@ -1,5 +1,7 @@
 import json
 import logging
+import os
+import shutil
 from datetime import date, timedelta, datetime
 
 import requests
@@ -16,6 +18,8 @@ from src.apps.base.models import (
     Employment,
 )
 from src.adapters.celery.celery import app
+from src.apps.recognition.models import TickPhoto
+from src.common.models_converter import Converter
 from src.conf.djconfig import DEFAULT_FROM_EMAIL, URV_DELETE_BIOMETRICS_DAYS_AFTER_FIRED, COMPANY_NAME
 from src.apps.events.signals import event_signal
 from src.apps.recognition.events import EMPLOYEE_NOT_CHECKED_IN, EMPLOYEE_NOT_CHECKED_OUT
@@ -274,6 +278,24 @@ def auto_delete_biometrics():
         except HTTPError:
             return
     UserConnecter.objects.filter(user_id__in=deleted_uc).delete()
+
+
+@app.task
+def auto_hard_delete_tick_photos():
+    date_to_delete_before = date.today() - relativedelta(months=2)
+
+    TickPhoto.objects.filter(dttm__lte=date_to_delete_before).delete()
+
+    user_photo_path = os.path.join(settings.MEDIA_ROOT, 'user_photo/')
+
+    for folder_name in os.listdir(user_photo_path):
+        folder_path = os.path.join(user_photo_path, folder_name)
+        try:
+            if os.path.isdir(folder_path) and Converter.parse_date(folder_name) < date_to_delete_before:
+                shutil.rmtree(folder_path)
+        except ValueError:
+            pass
+
 
 
 @app.task

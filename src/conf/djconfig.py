@@ -724,6 +724,11 @@ BEAT_SCHEDULE = {
         'schedule': crontab(hour=0, minute=0),
         'options': {'queue': BACKEND_QUEUE},
     },
+    'task-auto-hard-delete-tick-photos': {
+        'task': 'src.adapters.celery.tasks.auto_hard_delete_tick_photos',
+        'schedule': crontab(day_of_month='1', hour=4, minute=0),
+        'options': {'queue': BACKEND_QUEUE},
+    },
 }
 
 CELERY_BEAT_SCHEDULE = deepcopy(BEAT_SCHEDULE)
