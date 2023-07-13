@@ -549,11 +549,17 @@ class EmploymentSerializer(BaseModelSerializer):
             attrs.pop('shop_id', None)
         elif (attrs.get('shop_id') is None) and ('code' in attrs.get('shop', {})):
             shop = attrs.pop('shop')
-            shops = list(Shop.objects.filter(code=shop['code'], network_id=self.context['request'].user.network_id))
-            if len(shops) == 1:
-                attrs['shop_id'] = shops[0].id
-            else:
-                self.fail('no_shop', amount=len(shops), code=shop['code'])
+            if self.context['request'].user.network.ignore_shop_code_when_updating_employment_via_api:
+                employment = list(Employment.objects.filter(code=attrs['code'], shop__network_id=self.context['request'].user.network_id))
+                if len(employment) == 1:
+                    attrs['shop_id'] = employment[0].shop_id
+
+            if attrs.get('shop_id') is None:
+                shops = list(Shop.objects.filter(code=shop['code'], network_id=self.context['request'].user.network_id))
+                if len(shops) == 1:
+                    attrs['shop_id'] = shops[0].id
+                else:
+                    self.fail('no_shop', amount=len(shops), code=shop['code'])
         if attrs.get('shop_id'):
             shop = Shop.objects.get(id=attrs['shop_id'])
             connector = NetworkConnect.objects.filter(
