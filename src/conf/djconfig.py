@@ -54,6 +54,7 @@ CSRF_TRUSTED_ORIGINS = env.list('CSRF_TRUSTED_ORIGINS', default=[
     'http://*.mindm.ru',
     'https://*.mindm.ru',
     'https://localhost:11111',
+    'http://localhost:8080',
 ])
 
 DEV_NGINX_PORT = os.getenv("DEV_NGINX_PORT")
@@ -163,7 +164,7 @@ WSGI_APPLICATION = 'wsgi.app'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': env.str('DB_NAME', default='pobeda'),
+        'NAME': env.str('DB_NAME', default='postgres'),
         'USER': env.str('DB_USER', default='postgres'),
         'PASSWORD': env.str('DB_PASSWORD', default='postgres'),
         'HOST': env.str('DB_HOST', default='localhost'),

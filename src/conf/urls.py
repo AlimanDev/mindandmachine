@@ -15,6 +15,9 @@ from src.interfaces.api.views.recognition import DownloadViolatorsReportAdminVie
 from src.interfaces.api.views.timetable import RecalcTimesheetAdminView, RecalcWhAdminView
 from src.common.openapi.auto_schema import WFMOpenAPISchemaGenerator, WFMIntegrationAPISchemaGenerator
 
+from src.interfaces.frontend_api import urls as frontend_api_urls
+
+
 api_urlpatterns = [
     path('v1/', include('src.interfaces.api.urls.recognition')),  # time attendance tevian urls
 ]
@@ -38,8 +41,11 @@ urlpatterns = [
         task_urls.urlpatterns +
         reports_urls.urlpatterns +
         timetable_api.urlpatterns +
-        med_docs_urls.urlpatterns,
+        med_docs_urls.urlpatterns
     )),
+    path('rest_api/v2/', include(
+        frontend_api_urls.urlpatterns
+    ))
 ]
 
 if DEBUG:
