@@ -463,7 +463,8 @@ class EmploymentSerializer(BaseModelSerializer):
         "no_position": _("There is {amount} models of position with code: {code}."),
         "no_network_connect": _("You are not allowed to choose shops from other network."),
         "bad_network_shop_position": _("Network of shop and position should be equal."),
-        "dt_fired_cant_be_less_than_dt_hired": _("Дата увольнения не может быть меньше даты начала трудоустройства."),  # Employment end date cannot be less than employment start date
+        "dt_fired_cant_be_less_than_dt_hired": _("Дата увольнения не может быть меньше даты начала трудоустройства."),
+        # Employment end date cannot be less than employment start date
     }
 
     position_id = serializers.IntegerField(required=False)
@@ -487,8 +488,9 @@ class EmploymentSerializer(BaseModelSerializer):
         fields = [
             'id', 'user_id', 'shop_id', 'position_id', 'is_fixed_hours', 'dt_hired', 'dt_fired',
             'salary', 'week_availability', 'norm_work_hours', 'min_time_btw_shifts',
-            'shift_hours_length_min', 'shift_hours_length_max', 'auto_timetable', 'tabel_code', 'is_ready_for_overworkings',
-            'dt_new_week_availability_from', 'is_visible', 'is_visible_other_shops',  'worker_constraints', 'work_types',
+            'shift_hours_length_min', 'shift_hours_length_max', 'auto_timetable', 'tabel_code',
+            'is_ready_for_overworkings',
+            'dt_new_week_availability_from', 'is_visible', 'is_visible_other_shops', 'worker_constraints', 'work_types',
             'shop_code', 'position_code', 'username', 'code', 'function_group_id', 'dt_to_function_group',
             'employee_id', 'is_active', 'sawh_settings_id',
         ]
@@ -500,7 +502,8 @@ class EmploymentSerializer(BaseModelSerializer):
             }
         }
         timetable_fields = [
-            'function_group_id', 'is_fixed_hours', 'salary', 'week_availability', 'norm_work_hours', 'shift_hours_length_min', 
+            'function_group_id', 'is_fixed_hours', 'salary', 'week_availability', 'norm_work_hours',
+            'shift_hours_length_min',
             'shift_hours_length_max', 'min_time_btw_shifts', 'is_ready_for_overworkings',
             'is_visible', 'is_visible_other_shops',
         ]
@@ -530,7 +533,7 @@ class EmploymentSerializer(BaseModelSerializer):
                     employee, _employee_created = Employee.objects.update_or_create(
                         **lookup,
                         defaults={'user': users[0], 'tabel_code': tabel_code}
-                    )                        
+                    )
                     attrs['employee_id'] = employee.id
                 else:
                     if user:
@@ -539,7 +542,8 @@ class EmploymentSerializer(BaseModelSerializer):
 
         if (attrs.get('shop_id') is None) and ('code' in attrs.get('position', {})):
             position = attrs.pop('position', None)
-            positions = list(WorkerPosition.objects.filter(code=position['code'], network_id=self.context['request'].user.network_id))
+            positions = list(WorkerPosition.objects.filter(code=position['code'],
+                                                           network_id=self.context['request'].user.network_id))
             if len(positions) == 1:
                 attrs['position_id'] = positions[0].id
             else:
@@ -547,11 +551,18 @@ class EmploymentSerializer(BaseModelSerializer):
 
         if (attrs.get('shop_id') is None) and ('code' in attrs.get('shop', {})):
             shop = attrs.pop('shop')
-            shops = list(Shop.objects.filter(code=shop['code'], network_id=self.context['request'].user.network_id))
-            if len(shops) == 1:
-                attrs['shop_id'] = shops[0].id
-            else:
-                self.fail('no_shop', amount=len(shops), code=shop['code'])
+            if self.context['request'].user.network.ignore_shop_code_when_updating_employment_via_api:
+                employment = list(Employment.objects.filter(code=attrs['code'],
+                                                            shop__network_id=self.context['request'].user.network_id))
+                if len(employment) == 1:
+                    attrs['shop_id'] = employment[0].shop_id
+
+            if attrs.get('shop_id') is None:
+                shops = list(Shop.objects.filter(code=shop['code'], network_id=self.context['request'].user.network_id))
+                if len(shops) == 1:
+                    attrs['shop_id'] = shops[0].id
+                else:
+                    self.fail('no_shop', amount=len(shops), code=shop['code'])
         if attrs.get('shop_id'):
             shop = Shop.objects.get(id=attrs['shop_id'])
             connector = NetworkConnect.objects.filter(
@@ -565,7 +576,7 @@ class EmploymentSerializer(BaseModelSerializer):
             shop = self.instance.shop
         else:
             raise ValidationError({'shop_id': self.error_messages['required']})
-        
+
         if attrs.get('position_id'):
             position = WorkerPosition.objects.get(id=attrs['position_id'])
             if shop.network_id != position.network_id:
@@ -598,8 +609,9 @@ class EmploymentSerializer(BaseModelSerializer):
             self.fields.pop('worker_constraints')
 
         if self.context.get('view') and self.context['view'].action in ['list', 'retrieve']:
-            self.fields['work_types'] = EmploymentWorkTypeSerializer(many=True, read_only=True, source='work_types_list')
-        
+            self.fields['work_types'] = EmploymentWorkTypeSerializer(many=True, read_only=True,
+                                                                     source='work_types_list')
+
         if self.context.get('view') and self.context['view'].action == 'timetable':
             exclude_fields = set(self.Meta.fields).difference(set(self.Meta.timetable_fields))
             for f in exclude_fields:
@@ -631,8 +643,9 @@ class EmploymentSerializer(BaseModelSerializer):
         if instance.position_id != validated_data.get('position_id', instance.position_id):
             user = self.context['request'].user
             position_from = WorkerPosition.objects.filter(id=instance.position_id).first()
-            position_to =  WorkerPosition.objects.filter(id=validated_data.get('position_id')).first()
-            Group.check_has_perm_to_edit_group_objects(position_from.group_id if position_from else None, position_to.group_id if position_to else None, user)
+            position_to = WorkerPosition.objects.filter(id=validated_data.get('position_id')).first()
+            Group.check_has_perm_to_edit_group_objects(position_from.group_id if position_from else None,
+                                                       position_to.group_id if position_to else None, user)
         for field in ('is_visible', 'is_visible_other_shops'):
             if getattr(instance, field) != validated_data.get(field, True):
                 Employment.objects.filter(
