@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.conf.urls import include
 from django.contrib import admin
 from django.urls import path, re_path
@@ -64,6 +65,7 @@ schema_view = get_schema_view(
    public=True,
    permission_classes=[permissions.IsAdminUser,],
    generator_class=WFMOpenAPISchemaGenerator,
+   url=settings.EXTERNAL_HOST,
 )
 integration_schema_view = get_schema_view(
    openapi.Info(
