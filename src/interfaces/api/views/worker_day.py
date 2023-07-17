@@ -103,12 +103,14 @@ class WorkerDayViewSet(BaseActiveNamedModelViewSet):
     filterset_class = WorkerDayFilter
     filter_backends = [MultiShopsFilterBackend]
     openapi_tags = ['WorkerDay']
-    queryset = WorkerDay.objects.all()
+    queryset = WorkerDay.objects_with_excluded.all()
     available_extra_fields = ['shop__name']
 
     def get_queryset(self):
         queryset = super().get_queryset().filter(
             canceled=False,
+        ).exclude(
+            employment_id__isnull=True, employee_id__isnull=False
         ).select_related(
             'last_edited_by',
         ).prefetch_related(Prefetch('outsources', to_attr='outsources_list'))

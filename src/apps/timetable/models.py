@@ -391,7 +391,8 @@ class WorkerDayQuerySet(AnnotateValueEqualityQSMixin, QuerySet):
 
 class WorkerDayManager(models.Manager):
     def get_queryset(self):
-        return super().get_queryset().exclude(employment_id__isnull=True, employee_id__isnull=False)
+        return super().get_queryset().filter(dt_not_actual__isnull=True).exclude(
+            employment_id__isnull=True, employee_id__isnull=False)
 
     def qos_current_version(self, approved_only=False):
         if approved_only:
@@ -829,6 +830,7 @@ class WorkerDay(AbstractModel):
     is_fact = models.BooleanField(default=False)  # плановое или фактическое расписание
     is_vacancy = models.BooleanField(default=False)  # вакансия ли это
     dttm_added = models.DateTimeField(default=timezone.now)
+    dt_not_actual = models.DateField(null=True, blank=True)  # если не Null день не отображается в шопе и не учитывается в расчетах
     canceled = models.BooleanField(default=False)
     is_outsource = models.BooleanField(default=False, db_index=True)
     outsources = models.ManyToManyField(

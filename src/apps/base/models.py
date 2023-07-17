@@ -1687,9 +1687,11 @@ class Employment(AbstractActiveModel):
 
     def delete(self, **kwargs):
         from src.apps.timetable.models import WorkerDay
-        from src.apps.timetable.worker_day.tasks import clean_wdays
+        from src.apps.timetable.worker_day.tasks import clean_wdays, task_set_worker_days_dt_not_actual
         from src.apps.integration.tasks import export_or_delete_employment_zkteco
         from src.apps.timetable.timesheet.tasks import recalc_timesheet_on_data_change
+        from src.common.models_converter import Converter
+
         with transaction.atomic():
             wdays_ids = list(WorkerDay.objects.filter(employment=self).values_list('id', flat=True))
             WorkerDay.objects.filter(employment=self).update(employment_id=None)
@@ -1699,6 +1701,13 @@ class Employment(AbstractActiveModel):
             if settings.ZKTECO_INTEGRATION:
                 transaction.on_commit(lambda: export_or_delete_employment_zkteco.delay(self.id))
             transaction.on_commit(lambda: cache.delete_pattern(f"prod_cal_*_*_{self.employee_id}"))
+            transaction.on_commit(lambda: task_set_worker_days_dt_not_actual.delay(
+                deleted_employments=[{'id': self.id,
+                                      'employee_id': self.employee_id,
+                                      'shop_id': self.shop_id,
+                                      'dt_hired': Converter.convert_date(self.dt_hired),
+                                      'dt_fired': Converter.convert_date(self.dt_fired)}, ]
+            ))
             dt_now = timezone.now().date()
             recalc_timesheet_on_data_change({self.employee_id: [dt_now.replace(day=1) - datetime.timedelta(1), dt_now]})
             return res
@@ -1706,6 +1715,9 @@ class Employment(AbstractActiveModel):
     @tracker
     def save(self, *args, **kwargs):
         from src.apps.integration.tasks import export_or_delete_employment_zkteco
+        from src.apps.timetable.worker_day.tasks import clean_wdays, task_set_worker_days_dt_not_actual
+        from src.common.models_converter import Converter
+
         if hasattr(self, 'shop_code'):
             self.shop = Shop.objects.get(code=self.shop_code)
         if hasattr(self, 'username'):
@@ -1729,8 +1741,6 @@ class Employment(AbstractActiveModel):
 
         if (is_new or recreated_from_deleted or (self.tracker.has_changed('dt_hired') or self.tracker.has_changed('dt_fired'))) and \
                 self.employee.user.network and self.employee.user.network.clean_wdays_on_employment_dt_change:
-            from src.apps.timetable.worker_day.tasks import clean_wdays
-            from src.common.models_converter import Converter
             kwargs = {}
             if is_new:
                 kwargs = {
@@ -1766,6 +1776,50 @@ class Employment(AbstractActiveModel):
                 from src.apps.timetable.timesheet.tasks import recalc_timesheet_on_data_change
                 dt_now = timezone.now().date()
                 recalc_timesheet_on_data_change({self.employee_id: [dt_now.replace(day=1) - datetime.timedelta(1), dt_now]})
+        employments_for_set_worker_days_not_actual = {
+            'created': [],
+            'shop_changed': [],
+            'position_changed': [],
+            'dt_fired_changed': []
+        }
+
+        if is_new:
+            employments_for_set_worker_days_not_actual['created'].append(
+                {'id': self.id,
+                 'employee_id': self.employee_id,
+                 'shop_id': self.shop_id,
+                 'dt_fired': Converter.convert_date(self.dt_fired)}
+            )
+        if not is_new and self.tracker.has_changed('position'):
+            employments_for_set_worker_days_not_actual['position_changed'].append(
+                {'id': self.id,
+                 'employee_id': self.employee_id,
+                 'shop_id': self.shop_id,
+                 'dt_fired': Converter.convert_date(self.dt_fired)}
+            )
+        if not is_new and self.tracker.has_changed('shop_id'):
+            employments_for_set_worker_days_not_actual['shop_changed'].append(
+                {'id': self.id,
+                 'employee_id': self.employee_id,
+                 'shop_id': self.shop_id,
+                 'dt_fired': Converter.convert_date(self.dt_fired)}
+            )
+        if not is_new and self.tracker.has_changed('dt_fired'):
+            employments_for_set_worker_days_not_actual['dt_fired_changed'].append(
+                {'id': self.id,
+                 'employee_id': self.employee_id,
+                 'shop_id': self.shop_id,
+                 'dt_fired': Converter.convert_date(self.dt_fired)}
+            )
+
+        if self.employee.user.network and self.employee.user.network.clean_wdays_on_employment_dt_change:
+            transaction.on_commit(lambda: task_set_worker_days_dt_not_actual.delay(
+                created_employments=employments_for_set_worker_days_not_actual['created'],
+                shop_changed_employments=employments_for_set_worker_days_not_actual['shop_changed'],
+                position_changed_employments=employments_for_set_worker_days_not_actual['position_changed'],
+                dt_fired_changed_employments=employments_for_set_worker_days_not_actual['dt_fired_changed']
+            ))
+
 
         return res
 
@@ -1876,7 +1930,7 @@ class Employment(AbstractActiveModel):
     def _post_batch(cls, **kwargs):
         """This function call after batch_update_or_create method."""
         from src.apps.integration.tasks import export_or_delete_employment_zkteco
-        from src.apps.timetable.worker_day.tasks import clean_wdays
+        from src.apps.timetable.worker_day.tasks import clean_wdays, task_set_worker_days_dt_not_actual
         from src.common.models_converter import Converter
         created_objs = kwargs.get('created_objs', [])
         updated_objs = kwargs.get('updated_objs', [])
@@ -1893,6 +1947,14 @@ class Employment(AbstractActiveModel):
 
         employments_create_or_update_work_types = []
         employments_for_recalc_wh_in_future = []
+        employments_for_set_worker_days_not_actual = {
+            'created': [],
+            'shop_changed': [],
+            'position_changed': [],
+            'dt_fired': [],
+            'deleted': []
+        }
+
         clean_wdays_kwargs = {
             'employee_id__in': [],
             'dt__gte': datetime.date.today(),
@@ -1901,10 +1963,18 @@ class Employment(AbstractActiveModel):
         zkteco_data = []
         created_employment: Employment
         for created_employment in created_objs:
+            employee_id = created_employment.employee_id
             employments_create_or_update_work_types.append(created_employment)
-            employees_for_clear_cache.add(created_employment.employee_id)
-            if employee_network.get(created_employment.employee_id) and employee_network.get(created_employment.employee_id).clean_wdays_on_employment_dt_change:
-                clean_wdays_kwargs['employee_id__in'].append(created_employment.employee_id)
+            employees_for_clear_cache.add(employee_id)
+            if employee_network.get(employee_id) and employee_network.get(
+                    employee_id).clean_wdays_on_employment_dt_change:
+                clean_wdays_kwargs['employee_id__in'].append(employee_id)
+                employments_for_set_worker_days_not_actual['created'].append(
+                    {'id': created_employment.id,
+                     'employee_id': employee_id,
+                     'shop_id': created_employment.shop_id,
+                     'dt_fired': Converter.convert_date(created_employment.dt_fired)}
+                )
                 if created_employment.dt_hired:
                     clean_wdays_kwargs['dt__gte'] = min(clean_wdays_kwargs['dt__gte'], created_employment.dt_hired)
             if created_employment.sawh_settings_id is None and \
@@ -1922,12 +1992,37 @@ class Employment(AbstractActiveModel):
             dt_hired_changed = before_update[i][5] != after_update[i][5]
             dt_fired_changed = before_update[i][6] != after_update[i][6]
             employee_id = updated_employment.employee_id
+            need_to_clean_work_days: bool = employee_network.get(employee_id) and employee_network.get(
+                employee_id).clean_wdays_on_employment_dt_change
+
+            if shop_changed and need_to_clean_work_days:
+                employments_for_set_worker_days_not_actual['shop_changed'].append(
+                    {'id': updated_employment.id,
+                     'employee_id': employee_id,
+                     'shop_id': updated_employment.shop_id,
+                     'dt_fired': Converter.convert_date(updated_employment.dt_fired)}
+                )
 
             if position_changed:
                 employments_create_or_update_work_types.append(updated_employment)
                 employments_for_recalc_wh_in_future.append(updated_employment.id)
-            
-            if (dt_hired_changed or dt_fired_changed) and employee_network.get(employee_id) and employee_network.get(employee_id).clean_wdays_on_employment_dt_change:
+                if need_to_clean_work_days:
+                    employments_for_set_worker_days_not_actual['position_changed'].append(
+                        {'id': updated_employment.id,
+                         'employee_id': employee_id,
+                         'shop_id': updated_employment.shop_id,
+                         'dt_fired': Converter.convert_date(updated_employment.dt_fired)}
+                    )
+
+            if dt_fired_changed and need_to_clean_work_days:
+                employments_for_set_worker_days_not_actual['dt_fired'].append(
+                    {'id': updated_employment.id,
+                     'employee_id': employee_id,
+                     'shop_id': updated_employment.shop_id,
+                     'dt_fired': Converter.convert_date(updated_employment.dt_fired)}
+                )
+
+            if (dt_hired_changed or dt_fired_changed) and need_to_clean_work_days:
                 clean_wdays_kwargs['employee_id__in'].append(employee_id)
                 clean_wdays_kwargs['dt__gte'] = min(
                     clean_wdays_kwargs['dt__gte'], 
@@ -1941,11 +2036,20 @@ class Employment(AbstractActiveModel):
                 zkteco_data.append({'id': updated_employment.id, 'prev_shop_code': before_update[i][1] if shop_changed else None})
 
         for deleted_employment in deleted_objs:
-            employees_for_clear_cache.add(deleted_employment.employee_id)
-            if employee_network.get(deleted_employment.employee_id) and employee_network.get(deleted_employment.employee_id).clean_wdays_on_employment_dt_change:
-                clean_wdays_kwargs['employee_id__in'].append(deleted_employment.employee_id)
+            employee_id = deleted_employment.employee_id
+            employees_for_clear_cache.add(employee_id)
+            if employee_network.get(employee_id) and employee_network.get(employee_id).clean_wdays_on_employment_dt_change:
+                clean_wdays_kwargs['employee_id__in'].append(employee_id)
                 if deleted_employment.dt_hired:
                     clean_wdays_kwargs['dt__gte'] = min(clean_wdays_kwargs['dt__gte'], deleted_employment.dt_hired)
+
+                employments_for_set_worker_days_not_actual['deleted'].append(
+                    {'id': deleted_employment.id,
+                     'employee_id': employee_id,
+                     'shop_id': deleted_employment.shop_id,
+                     'dt_hired': Converter.convert_date(deleted_employment.dt_hired),
+                     'dt_fired': Converter.convert_date(deleted_employment.dt_fired)}
+                )
 
             if settings.ZKTECO_INTEGRATION:
                 zkteco_data.append({'id': deleted_employment.id})
@@ -1958,6 +2062,16 @@ class Employment(AbstractActiveModel):
         transaction.on_commit(
             lambda: clean_wdays.delay(
                 **clean_wdays_kwargs,
+            )
+        )
+
+        transaction.on_commit(
+            lambda: task_set_worker_days_dt_not_actual.delay(
+                created_employments=employments_for_set_worker_days_not_actual['created'],
+                shop_changed_employments=employments_for_set_worker_days_not_actual['shop_changed'],
+                position_changed_employments=employments_for_set_worker_days_not_actual['position_changed'],
+                dt_fired_changed_employments=employments_for_set_worker_days_not_actual['dt_fired'],
+                deleted_employments=employments_for_set_worker_days_not_actual['deleted']
             )
         )
         transaction.on_commit(
