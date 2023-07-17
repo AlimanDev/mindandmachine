@@ -102,6 +102,7 @@ class WorkerDayListSerializer(BaseSerializer, UnaccountedOvertimeMixin):
     dttm_work_end = serializers.DateTimeField(default=None)
     dttm_work_start_tabel = serializers.DateTimeField(default=None)
     dttm_work_end_tabel = serializers.DateTimeField(default=None)
+    dt_not_actual = serializers.DateField(required=False)
     comment = serializers.CharField()
     is_approved = serializers.BooleanField()
     is_vacancy = serializers.BooleanField()
@@ -154,6 +155,7 @@ class WorkerDaySerializer(ModelSerializerWithCreateOnlyFields, UnaccountedOverti
     parent_worker_day_id = serializers.IntegerField(required=False, read_only=True)
     dttm_work_start = serializers.DateTimeField(default=None)
     dttm_work_end = serializers.DateTimeField(default=None)
+    dt_not_actual = serializers.DateField(required=False)
     type = serializers.CharField(required=True, source='type_id')
     shop_code = serializers.CharField(required=False)
     user_login = serializers.CharField(required=False, read_only=True)
@@ -176,7 +178,7 @@ class WorkerDaySerializer(ModelSerializerWithCreateOnlyFields, UnaccountedOverti
         fields = ['id', 'code', 'employee_id', 'shop_id', 'employment_id', 'type', 'dt', 'dttm_work_start', 'dttm_work_end',
                   'comment', 'is_approved', 'worker_day_details', 'is_fact', 'work_hours', 'parent_worker_day_id',
                   'is_outsource', 'is_vacancy', 'shop_code', 'user_login', 'username', 'created_by', 'last_edited_by',
-                  'dttm_work_start_tabel', 'dttm_work_end_tabel', 'is_blocked',
+                  'dttm_work_start_tabel', 'dttm_work_end_tabel', 'dt_not_actual', 'is_blocked',
                   'employment_tabel_code', 'outsources', 'outsources_ids', 'unaccounted_overtime',
                   'closest_plan_approved_id', 'cost_per_hour', 'total_cost', 'tabel_code']
         read_only_fields = ['parent_worker_day_id', 'is_blocked', 'closest_plan_approved_id']
