@@ -554,8 +554,10 @@ class ShopQuerySet(QuerySet):
 
 class ShopManager(TreeManager):
     def get_queryset(self):
+        today = timezone.now().date()
         return super().get_queryset().filter(
-            models.Q(dttm_deleted__date__gt=timezone.now().date()) | models.Q(dttm_deleted__isnull=True)
+            models.Q(dttm_deleted__isnull=True) & models.Q(dt_closed__isnull=True) |
+            models.Q(dttm_deleted__date__gt=today) | models.Q(dt_closed__gt=today)
         )
 
 
