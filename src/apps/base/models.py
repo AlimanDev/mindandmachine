@@ -1819,7 +1819,8 @@ class Employment(AbstractActiveModel):
                 created_employments=employments_for_set_worker_days_not_actual['created'],
                 shop_changed_employments=employments_for_set_worker_days_not_actual['shop_changed'],
                 position_changed_employments=employments_for_set_worker_days_not_actual['position_changed'],
-                dt_fired_changed_employments=employments_for_set_worker_days_not_actual['dt_fired_changed']
+                dt_fired_changed_employments=employments_for_set_worker_days_not_actual['dt_fired_changed'],
+                deleted_employments=[]
             ))
 
 

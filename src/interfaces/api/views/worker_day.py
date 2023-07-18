@@ -107,7 +107,7 @@ class WorkerDayViewSet(BaseActiveNamedModelViewSet):
     available_extra_fields = ['shop__name']
 
     def get_queryset(self):
-        queryset = super().get_queryset().filter(
+        queryset = self.queryset.filter(
             canceled=False,
         ).exclude(
             employment_id__isnull=True, employee_id__isnull=False

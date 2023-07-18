@@ -92,7 +92,6 @@ def task_set_worker_days_dt_not_actual(created_employments: List,
             WorkerDay.objects_with_excluded.filter(employment_id=employment['id'],
                                                    dt__gt=today,
                                                    is_vacancy=False)\
-                .exclude(shop_id=employment['shop_id'])\
                 .update(dt_not_actual=today + timedelta(1))
 
         for employment in position_changed_employments:
