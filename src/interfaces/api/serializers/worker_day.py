@@ -249,8 +249,6 @@ class WorkerDaySerializer(ModelSerializerWithCreateOnlyFields, UnaccountedOverti
         if wd_type_obj.is_dayoff:
             attrs['dttm_work_start'] = None
             attrs['dttm_work_end'] = None
-            attrs['shop_id'] = None
-            attrs.pop('shop_code', None)
         elif not (attrs.get('dttm_work_start') and attrs.get('dttm_work_end')):
             messages = {}
             for k in 'dttm_work_start', 'dttm_work_end':
