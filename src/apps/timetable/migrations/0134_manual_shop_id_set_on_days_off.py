@@ -2,13 +2,17 @@
 # Проставляем всем имеющимся выходным shop_id
 from django.core.paginator import Paginator
 from django.db import migrations
+import datetime
 
 
 def set_shop_id_on_days_off(apps, schema_editor):
     WorkerDay = apps.get_model('timetable', 'WorkerDay')
-    wds_qs = WorkerDay.objects.select_related('employment').filter(shop_id__isnull=True, employment__isnull=False)
+    this_year = datetime.datetime(2023, 1, 1)
+    wds_qs = WorkerDay.objects.select_related('employment').filter(shop_id__isnull=True,
+                                                                   employment__isnull=False,
+                                                                   dt__gte=this_year).order_by('id')
 
-    paginator = Paginator(wds_qs, 1000)
+    paginator = Paginator(wds_qs, 2000)
 
     for page_number in paginator.page_range:
         page = paginator.page(page_number)
