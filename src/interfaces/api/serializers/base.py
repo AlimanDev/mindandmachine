@@ -97,6 +97,7 @@ class NetworkSerializer(BaseModelSerializer):
     analytics_iframe = serializers.SerializerMethodField()
     show_employee_shift_schedule_tab = serializers.SerializerMethodField()
     allow_to_manually_set_is_vacancy = serializers.SerializerMethodField()
+    hide_recalculate_timesheet_and_work_hours = serializers.SerializerMethodField()
 
     def get_default_stats(self, obj: Network):
         default_stats = json.loads(obj.settings_values).get('default_stats', {})
@@ -153,6 +154,9 @@ class NetworkSerializer(BaseModelSerializer):
     def get_allow_to_manually_set_is_vacancy(self, obj: Network):
         return obj.settings_values_prop.get('allow_to_manually_set_is_vacancy', False)
 
+    def get_hide_recalculate_timesheet_and_work_hours(self, obj:Network):
+        return obj.settings_values_prop.get('hide_recalculate_timesheet_and_work_hours', False)
+
     class Meta:
         model = Network
         fields = [
@@ -185,6 +189,7 @@ class NetworkSerializer(BaseModelSerializer):
             'show_cost_for_inner_vacancies',
             'use_internal_exchange',
             'show_employee_shift_schedule_tab',
+            'hide_recalculate_timesheet_and_work_hours',
             'rebuild_timetable_min_delta',
             'analytics_iframe',
             'analytics_type',
