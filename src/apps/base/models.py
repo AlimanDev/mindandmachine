@@ -1695,6 +1695,9 @@ class Employment(AbstractActiveModel):
         from src.common.models_converter import Converter
 
         with transaction.atomic():
+            transaction.on_commit(lambda: task_set_worker_days_dt_not_actual.delay(
+                deleted_employments=[{'id': self.id}]
+            ))
             wdays_ids = list(WorkerDay.objects.filter(employment=self).values_list('id', flat=True))
             WorkerDay.objects.filter(employment=self).update(employment_id=None)
             if self.employee.user.network.clean_wdays_on_employment_dt_change:
@@ -1703,13 +1706,6 @@ class Employment(AbstractActiveModel):
             if settings.ZKTECO_INTEGRATION:
                 transaction.on_commit(lambda: export_or_delete_employment_zkteco.delay(self.id))
             transaction.on_commit(lambda: cache.delete_pattern(f"prod_cal_*_*_{self.employee_id}"))
-            transaction.on_commit(lambda: task_set_worker_days_dt_not_actual.delay(
-                deleted_employments=[{'id': self.id,
-                                      'employee_id': self.employee_id,
-                                      'shop_id': self.shop_id,
-                                      'dt_hired': Converter.convert_date(self.dt_hired),
-                                      'dt_fired': Converter.convert_date(self.dt_fired)}, ]
-            ))
             dt_now = timezone.now().date()
             recalc_timesheet_on_data_change({self.employee_id: [dt_now.replace(day=1) - datetime.timedelta(1), dt_now]})
             return res
@@ -1816,13 +1812,12 @@ class Employment(AbstractActiveModel):
 
         if self.employee.user.network and self.employee.user.network.clean_wdays_on_employment_dt_change:
             transaction.on_commit(lambda: task_set_worker_days_dt_not_actual.delay(
-                created_employments=employments_for_set_worker_days_not_actual['created'],
-                shop_changed_employments=employments_for_set_worker_days_not_actual['shop_changed'],
-                position_changed_employments=employments_for_set_worker_days_not_actual['position_changed'],
+                # created_employments=employments_for_set_worker_days_not_actual['created'],
+                # shop_changed_employments=employments_for_set_worker_days_not_actual['shop_changed'],
+                # position_changed_employments=employments_for_set_worker_days_not_actual['position_changed'],
                 dt_fired_changed_employments=employments_for_set_worker_days_not_actual['dt_fired_changed'],
                 deleted_employments=[]
             ))
-
 
         return res
 
@@ -2070,9 +2065,9 @@ class Employment(AbstractActiveModel):
 
         transaction.on_commit(
             lambda: task_set_worker_days_dt_not_actual.delay(
-                created_employments=employments_for_set_worker_days_not_actual['created'],
-                shop_changed_employments=employments_for_set_worker_days_not_actual['shop_changed'],
-                position_changed_employments=employments_for_set_worker_days_not_actual['position_changed'],
+                # created_employments=employments_for_set_worker_days_not_actual['created'],
+                # shop_changed_employments=employments_for_set_worker_days_not_actual['shop_changed'],
+                # position_changed_employments=employments_for_set_worker_days_not_actual['position_changed'],
                 dt_fired_changed_employments=employments_for_set_worker_days_not_actual['dt_fired'],
                 deleted_employments=employments_for_set_worker_days_not_actual['deleted']
             )

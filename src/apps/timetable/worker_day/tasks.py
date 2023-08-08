@@ -73,37 +73,34 @@ def recalc_fact_from_records(dt_from=None, dt_to=None, shop_ids=None, employee_d
 
 
 @app.task
-def task_set_worker_days_dt_not_actual(created_employments: List,
-                                       shop_changed_employments: List,
-                                       position_changed_employments: List,
-                                       dt_fired_changed_employments: List,
-                                       deleted_employments: List):
+def task_set_worker_days_dt_not_actual(dt_fired_changed_employments: List, deleted_employments: List):
 
     today = datetime.today()
 
     with transaction.atomic():
-        for employment in created_employments:
-            WorkerDay.objects_with_excluded.filter(employee_id=employment['employee_id'],
-                                                   dt__gte=employment['dt_fired'],
-                                                   is_vacancy=False)\
-                .update(dt_not_actual=employment['dt_fired'])
-
-        for employment in shop_changed_employments:
-            WorkerDay.objects_with_excluded.filter(employment_id=employment['id'],
-                                                   dt__gt=today,
-                                                   is_vacancy=False)\
-                .update(dt_not_actual=today + timedelta(1))
-
-        for employment in position_changed_employments:
-            WorkerDay.objects_with_excluded.filter(employment_id=employment['id'],
-                                                   dt__gt=today,
-                                                   is_vacancy=False)\
-                .update(dt_not_actual=today + timedelta(1))
+        # for employment in created_employments:
+        #     WorkerDay.objects_with_excluded.filter(employee_id=employment['employee_id'],
+        #                                            dt__gte=employment['dt_fired'],
+        #                                            is_vacancy=False)\
+        #         .update(dt_not_actual=employment['dt_fired'])
+        #
+        # for employment in shop_changed_employments:
+        #     WorkerDay.objects_with_excluded.filter(employment_id=employment['id'],
+        #                                            dt__gt=today,
+        #                                            is_vacancy=False)\
+        #         .update(dt_not_actual=today + timedelta(1))
+        #
+        # for employment in position_changed_employments:
+        #     WorkerDay.objects_with_excluded.filter(employment_id=employment['id'],
+        #                                            dt__gt=today,
+        #                                            is_vacancy=False)\
+        #         .update(dt_not_actual=today + timedelta(1))
 
         for employment in dt_fired_changed_employments:
             WorkerDay.objects_with_excluded.filter(employment_id=employment['id'],
                                                    dt_not_actual__isnull=False,
-                                                   dt__lt=employment['dt_fired'])\
+                                                   dt__lt=employment['dt_fired'],
+                                                   is_vacancy=False)\
                 .update(dt_not_actual=None)
 
             WorkerDay.objects_with_excluded.filter(employment_id=employment['id'],
@@ -113,10 +110,8 @@ def task_set_worker_days_dt_not_actual(created_employments: List,
 
         for employment in deleted_employments:
             WorkerDay.objects_with_excluded.filter(employment_id=employment['id'],
-                                                   dt_not_actual__isnull=False,
-                                                   dt__gte=employment['dt_fired'],
-                                                   dt__lte=employment['dt_hired'])\
-                .update(dt_not_actual=None)
+                                                   is_vacancy=False)\
+                .update(dt_not_actual=today)
 
 
 @app.task
