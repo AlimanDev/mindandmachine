@@ -352,6 +352,7 @@ class WorkerPositionViewSet(UpdateorCreateViewSet):
         include_clients = self.request.query_params.get('include_clients')
         include_outsources = self.request.query_params.get('include_outsources')
         network_filter = Q(network_id=self.request.user.network_id)
+
         if include_clients:
             network_filter |= Q(
                 network_id__in=NetworkConnect.objects.filter(
@@ -374,7 +375,7 @@ class WorkerPositionViewSet(UpdateorCreateViewSet):
             )
         ).filter(
             network_filter,
-        ).filter(dttm_deleted__isnull=True)
+        )
         include_allowed_sawh_settings = self.request.query_params.get('include_allowed_sawh_settings')
         if include_allowed_sawh_settings and bool(distutils.util.strtobool(include_allowed_sawh_settings)):
             qs = qs.prefetch_related(

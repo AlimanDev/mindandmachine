@@ -680,7 +680,7 @@ class WorkerPositionSerializer(BaseNetworkSerializer):
 
     class Meta:
         model = WorkerPosition
-        fields = ['id', 'name', 'network_id', 'code', 'breaks_id', 'group_id', 'is_active']
+        fields = ['id', 'name', 'network_id', 'code', 'breaks_id', 'group_id', 'is_active', ]
 
     def __init__(self, *args, **kwargs):
         super(WorkerPositionSerializer, self).__init__(*args, **kwargs)
