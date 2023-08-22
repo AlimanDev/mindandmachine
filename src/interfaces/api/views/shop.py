@@ -109,7 +109,7 @@ class ShopViewSet(UpdateorCreateViewSet):
         #     shops = Shop.objects.get_queryset_descendants(shops, include_self=True)
         shops_filter = Q(network_id=user.network_id)
         if include_possible_clients:
-            shops_filter |= Q(network_id__in=NetworkConnect.objects.filter(outsourcing_id=user.network_id, allow_choose_shop_from_client_for_employement=True).values_list('client_id', flat=True))
+            shops_filter |= Q(network_id__in=NetworkConnect.objects.filter(outsourcing_id=user.network_id).values_list('client_id', flat=True))
         else:
             if include_clients:
                 shops_filter |= Q(network_id__in=NetworkConnect.objects.filter(outsourcing_id=user.network_id).values_list('client_id', flat=True))

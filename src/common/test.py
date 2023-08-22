@@ -617,9 +617,7 @@ def create_outsource(self, dt=None):
     self.network_outsource = Network.objects.create(code='outsource', name='Аутсорс-сеть')
     NetworkConnect.objects.create(
         client=self.network,
-        outsourcing=self.network_outsource,
-        allow_assign_employements_from_outsource=True,
-        allow_choose_shop_from_client_for_employement=True
+        outsourcing=self.network_outsource
     )
     self.region_outsource = Region.objects.create(
         network=self.network_outsource,

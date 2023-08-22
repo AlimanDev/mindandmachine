@@ -573,7 +573,6 @@ class EmploymentSerializer(BaseModelSerializer):
             connector = NetworkConnect.objects.filter(
                 outsourcing_id=self.context['request'].user.network_id,
                 client_id=shop.network_id,
-                allow_choose_shop_from_client_for_employement=True,
             )
             if not (shop.network_id == self.context['request'].user.network_id) and not connector.exists():
                 raise serializers.ValidationError(self.error_messages['no_network_connect'])

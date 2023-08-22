@@ -35,8 +35,6 @@ class TimesheetViewSet(BaseModelViewSet):
 
     def get_queryset(self):
         allowed_networks = list(NetworkConnect.objects.filter(
-            Q(allow_assign_employements_from_outsource=True) |
-            Q(allow_choose_shop_from_client_for_employement=True),
             client_id=self.request.user.network_id,
         ).values_list('outsourcing_id', flat=True)) + [self.request.user.network_id]
         qs = TimesheetItem.objects.filter(
