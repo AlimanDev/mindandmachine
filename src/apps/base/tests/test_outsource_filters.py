@@ -97,8 +97,8 @@ class TestOutsource(TestsHelperMixin, APITestCase):
             network=cls.outsource_network,
         )
         
-        cls.network_connect = NetworkConnect.objects.create(client=cls.client_network, outsourcing=cls.outsource_network, allow_assign_employements_from_outsource=True, allow_choose_shop_from_client_for_employement=True)
-        cls.network_connect2 = NetworkConnect.objects.create(client=cls.client_network, outsourcing=cls.outsource_network2, allow_assign_employements_from_outsource=True, allow_choose_shop_from_client_for_employement=True)
+        cls.network_connect = NetworkConnect.objects.create(client=cls.client_network, outsourcing=cls.outsource_network)
+        cls.network_connect2 = NetworkConnect.objects.create(client=cls.client_network, outsourcing=cls.outsource_network2)
         cls.dt_now = date.today()
 
     def setUp(self):
@@ -173,7 +173,6 @@ class TestOutsource(TestsHelperMixin, APITestCase):
         )
         self.assertEqual(create_employment_response.status_code, 400)
         self.assertEqual(create_employment_response.json(),  {'non_field_errors': ['Сети магазина и должности должны совпадать.']})
-        self.network_connect.allow_choose_shop_from_client_for_employement = False
         self.network_connect.save()
         create_employment_response = self.client.post(
             '/rest_api/employment/', 
@@ -191,16 +190,13 @@ class TestOutsource(TestsHelperMixin, APITestCase):
         self.assertEqual(len(list(filter(lambda x: x['id'] == self.client_position.id, positions.json()))), 0)
         shops = self.client.get('/rest_api/department/?include_possible_clients=true')
         self.assertEqual(len(shops.json()), 6)
-        self.network_connect.allow_choose_shop_from_client_for_employement = True
         self.network_connect.save()
 
     def test_client_does_not_see_employees_from_outsource_network(self):
-        self.network_connect.allow_assign_employements_from_outsource = False
         self.network_connect.save()
         employees = self.client.get('/rest_api/employee/')
         self.assertEqual(len(employees.json()), 1)
         self.assertEqual(len(list(filter(lambda x: x['id'] == self.employee2.id, employees.json()))), 0)
-        self.network_connect.allow_assign_employements_from_outsource = True
         self.network_connect.save()
 
     def test_client_can_create_worker_day_to_employee_from_other_network_in_own_shop(self):
@@ -301,8 +297,6 @@ class TestOutsource(TestsHelperMixin, APITestCase):
             calc_timesheets(employee_id__in=[self.employee1.id], reraise_exc=True)
         response = self.client.get('/rest_api/timesheet/')
         self.assertTrue(len(response.json()) > 0)
-        self.network_connect.allow_assign_employements_from_outsource = False
-        self.network_connect.allow_choose_shop_from_client_for_employement = False
         self.network_connect.save()
         response = self.client.get('/rest_api/timesheet/')
         self.assertEqual(len(response.json()), 0)
@@ -360,8 +354,6 @@ class TestOutsource(TestsHelperMixin, APITestCase):
     def test_client_can_get_outsource_user(self):
         response = self.client.get(f'/rest_api/user/?id={self.user1.id}')
         self.assertEqual(len(response.json()), 1)
-        self.network_connect.allow_assign_employements_from_outsource = False
-        self.network_connect.allow_choose_shop_from_client_for_employement = False
         self.network_connect.save()
         response = self.client.get(f'/rest_api/user/?id={self.user1.id}')
         self.assertEqual(len(response.json()), 0)
@@ -453,11 +445,6 @@ class TestOutsource(TestsHelperMixin, APITestCase):
             self.assertTrue(bool(self.user1.avatar))
 
     def test_client_can_change_outsource_biometrics(self):
-        NetworkConnect.objects.update(
-            allow_assign_employements_from_outsource=False, 
-            allow_choose_shop_from_client_for_employement=False,
-        )
-        
         self._test_add_biometrics()
         self._test_delete_biometrics()
 

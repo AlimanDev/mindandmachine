@@ -135,12 +135,7 @@ class UserViewSet(UpdateorCreateViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        additional_networks_filter = Q(allow_assign_employements_from_outsource=True)\
-            | Q(allow_choose_shop_from_client_for_employement=True)
-        if self.action in ['add_biometrics', 'delete_biometrics'] and user.network.settings_values_prop.get('allow_change_outsource_biometrics', True):
-            additional_networks_filter = Q()
         allowed_networks = list(NetworkConnect.objects.filter(
-            additional_networks_filter,
             client_id=user.network_id,
         ).values_list('outsourcing_id', flat=True)) + [user.network_id]
         return User.objects.filter(
@@ -250,12 +245,6 @@ class EmployeeViewSet(UpdateorCreateViewSet):
             outsource_networks_qs = NetworkConnect.objects.filter(
                 client_id=self.request.user.network_id,
             ).values_list('outsourcing_id', flat=True)
-            # рефакторинг
-            other_deps_employees_with_wd_in_curr_shop = self.request.query_params.get(
-                'other_deps_employees_with_wd_in_curr_shop')
-            if not (other_deps_employees_with_wd_in_curr_shop and bool(
-                distutils.util.strtobool(other_deps_employees_with_wd_in_curr_shop))):
-                outsource_networks_qs = outsource_networks_qs.filter(allow_assign_employements_from_outsource=True)
             network_filter |= Q(
                 user__network_id__in=outsource_networks_qs
             )
@@ -356,14 +345,13 @@ class WorkerPositionViewSet(UpdateorCreateViewSet):
         if include_clients:
             network_filter |= Q(
                 network_id__in=NetworkConnect.objects.filter(
-                    outsourcing_id=self.request.user.network_id, 
-                    allow_choose_shop_from_client_for_employement=True,
+                    outsourcing_id=self.request.user.network_id,
                 ).values_list('client_id', flat=True)
             )
         if include_outsources:
             network_filter |= Q(
                 network_id__in=NetworkConnect.objects.filter(
-                    client_id=self.request.user.network_id, 
+                    client_id=self.request.user.network_id,
                 ).values_list('outsourcing_id', flat=True)
             )
         now = timezone.now()
