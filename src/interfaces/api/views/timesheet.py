@@ -34,11 +34,8 @@ class TimesheetViewSet(BaseModelViewSet):
         return TimesheetItemSerializer
 
     def get_queryset(self):
-        allowed_networks = list(NetworkConnect.objects.filter(
-            client_id=self.request.user.network_id,
-        ).values_list('outsourcing_id', flat=True)) + [self.request.user.network_id]
         qs = TimesheetItem.objects.filter(
-            employee__user__network_id__in=allowed_networks,
+            employee__user__network_id__in=self.request.user.network_id,
         )
         if self.request.query_params.get('by_code'):
             qs = qs.select_related(
