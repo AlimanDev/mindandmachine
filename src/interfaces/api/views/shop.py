@@ -95,9 +95,7 @@ class ShopViewSet(UpdateorCreateViewSet):
         определяет права доступа к магазинам.
         """
         user = self.request.user
-        only_top = self.request.query_params.get('only_top')
         include_clients = self.request.query_params.get('include_clients')
-        include_possible_clients = self.request.query_params.get('include_possible_clients')
         include_outsources = self.request.query_params.get('include_outsources')
 
         # aa: fixme: refactor code
@@ -108,13 +106,11 @@ class ShopViewSet(UpdateorCreateViewSet):
         # if not only_top:
         #     shops = Shop.objects.get_queryset_descendants(shops, include_self=True)
         shops_filter = Q(network_id=user.network_id)
-        if include_possible_clients:
+
+        if include_clients:
             shops_filter |= Q(network_id__in=NetworkConnect.objects.filter(outsourcing_id=user.network_id).values_list('client_id', flat=True))
-        else:
-            if include_clients:
-                shops_filter |= Q(network_id__in=NetworkConnect.objects.filter(outsourcing_id=user.network_id).values_list('client_id', flat=True))
-            if include_outsources:
-                shops_filter |= Q(network_id__in=NetworkConnect.objects.filter(client_id=user.network_id).values_list('outsourcing_id', flat=True))
+        if include_outsources:
+            shops_filter |= Q(network_id__in=NetworkConnect.objects.filter(client_id=user.network_id).values_list('outsourcing_id', flat=True))
 
         return super().get_queryset().filter(shops_filter).order_by('level', 'name')
 
