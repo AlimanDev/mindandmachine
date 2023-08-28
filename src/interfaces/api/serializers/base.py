@@ -581,11 +581,6 @@ class EmploymentSerializer(BaseModelSerializer):
         else:
             raise ValidationError({'shop_id': self.error_messages['required']})
 
-        if attrs.get('position_id'):
-            position = WorkerPosition.objects.get(id=attrs['position_id'])
-            if shop.network_id != position.network_id:
-                raise serializers.ValidationError(self.error_messages['bad_network_shop_position'])
-
         descrease_dt_fired_cond = getattr(self.context['request'], 'by_code', False) and self.context[
             'request'].user.network.descrease_employment_dt_fired_in_api and 'dt_hired' in attrs and attrs['dt_fired']
         if descrease_dt_fired_cond:
