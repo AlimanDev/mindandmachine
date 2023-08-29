@@ -5,7 +5,7 @@ from django.utils.translation import gettext_lazy as _
 from django.db.models import Q
 from rest_framework import serializers
 
-from src.apps.base.models import Shop, NetworkConnect
+from src.apps.base.models import Shop, NetworkConnect, Employee
 from src.interfaces.api.serializers.base import BaseModelSerializer
 from src.apps.recognition.models import TickPoint, Tick, TickPhoto, ShopIpAddress
 from src.apps.timetable.models import User as WFMUser
@@ -94,6 +94,12 @@ class PostTickSerializer_point(BaseModelSerializer):
     user_id = serializers.IntegerField()
     employee_id = serializers.IntegerField(required=False)
     dttm = serializers.DateTimeField(required=False)
+
+    def validate(self, attrs):
+        if attrs['employee_id'] is None and attrs['user_id']:
+            employee = Employee.objects.filter(user_id=attrs['user_id']).order_by('-id').first()
+            if employee:
+                attrs['employee_id'] = employee.id
 
     class Meta:
         model = Tick
