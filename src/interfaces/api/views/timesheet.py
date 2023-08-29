@@ -35,7 +35,7 @@ class TimesheetViewSet(BaseModelViewSet):
 
     def get_queryset(self):
         qs = TimesheetItem.objects.filter(
-            employee__user__network_id__in=self.request.user.network_id,
+            employee__user__network_id=self.request.user.network_id,
         )
         if self.request.query_params.get('by_code'):
             qs = qs.select_related(

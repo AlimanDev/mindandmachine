@@ -106,7 +106,7 @@ class ShopViewSet(UpdateorCreateViewSet):
         # if not only_top:
         #     shops = Shop.objects.get_queryset_descendants(shops, include_self=True)
         shops_filter = Q(network_id=user.network_id)
-
+        
         if include_clients:
             shops_filter |= Q(network_id__in=NetworkConnect.objects.filter(outsourcing_id=user.network_id).values_list('client_id', flat=True))
         if include_outsources:
