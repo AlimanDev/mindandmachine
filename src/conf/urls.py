@@ -25,7 +25,7 @@ api_urlpatterns = [
 
 
 urlpatterns = [
-    path('tevian/', include(api_urlpatterns)),
+    path('api/', include(api_urlpatterns)),
     path('admin/timetable/workerday/recalc_wh/', RecalcWhAdminView.as_view(), name='recalc_wh'),
     path('admin/timetable/workerday/recalc_timesheet/', RecalcTimesheetAdminView.as_view(), name='recalc_timesheet'),
     path('admin/forecast/loadtemplate/recalc_load/', RecalcLoadAdminView.as_view(), name='recalc_load'),
