@@ -13,9 +13,10 @@ from src.apps.timetable.models import WorkTypeName
 class WorkTypeNameSerializer(BaseNetworkSerializer):
     name = serializers.CharField(required=False)
     code = serializers.CharField(required=False)
+
     class Meta:
         model = WorkTypeName
-        fields = ['id', 'name', 'code', 'network_id']
+        fields = ['id', 'name', 'code', 'network_id', 'availability_on_external_exchange']
     
     def is_valid(self, *args, **kwargs):
         super().is_valid(*args, **kwargs)

@@ -82,6 +82,11 @@ class WorkTypeName(AbstractActiveNetworkSpecificCodeNamedModel):
         help_text='Используется при формировании табеля для получения должности по типу работ, если включена настройка'
                   '"Получать должность по типу работ при формировании фактического табеля"'
     )
+    availability_on_external_exchange = models.BooleanField(
+        verbose_name="Доступность на внешней бирже",  default=True,
+        help_text="Администратор торговой сети может выбрать какие должности будут отображаться "
+                  "на внешней бирже смен для внешних подрядчиков."
+    )
 
     class Meta(AbstractActiveNetworkSpecificCodeNamedModel.Meta):
         verbose_name = 'Название типа работ'

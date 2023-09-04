@@ -237,7 +237,7 @@ class ExchangeSettingsAdmin(admin.ModelAdmin):
 
 @admin.register(WorkTypeName)
 class WorkTypeNameAdmin(admin.ModelAdmin):
-    list_display = ('id', 'name')
+    list_display = ('id', 'name', 'availability_on_external_exchange')
     search_fields = ('name',)
 
 
