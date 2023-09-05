@@ -100,6 +100,7 @@ class PostTickSerializer_point(BaseModelSerializer):
             employee = Employee.objects.filter(user_id=attrs['user_id']).order_by('-id').first()
             if employee:
                 attrs['employee_id'] = employee.id
+        return attrs
 
     class Meta:
         model = Tick
