@@ -155,7 +155,7 @@ class WorkerDaySerializer(ModelSerializerWithCreateOnlyFields, UnaccountedOverti
     parent_worker_day_id = serializers.IntegerField(required=False, read_only=True)
     dttm_work_start = serializers.DateTimeField(default=None)
     dttm_work_end = serializers.DateTimeField(default=None)
-    dt_not_actual = serializers.DateField(required=False)
+    dt_not_actual = serializers.DateField(required=False, allow_null=True)
     type = serializers.CharField(required=True, source='type_id')
     shop_code = serializers.CharField(required=False)
     user_login = serializers.CharField(required=False, read_only=True)
