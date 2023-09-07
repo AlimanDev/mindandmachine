@@ -692,13 +692,6 @@ def confirm_vacancy(vacancy_id, user=None, employee_id=None, exchange=False, rec
             ).select_related('shop')
             employee_worker_days = list(employee_worker_days_qs)
 
-            # нельзя откликнуться на вакансию если для сотрудника не составлен график на этот день
-            if not employee_worker_days and not (
-                    vacancy.is_outsource and vacancy_shop.network_id != active_employment.shop.network_id):
-                res['text'] = messages['no_timetable']
-                res['status_code'] = 400
-                return res
-
             # откликаться на вакансию в рабочие дни можно только, если это разрешено настройкой сети или если это разрешено для определённого типа дня
             update_condition = active_employment.shop.network.allow_creation_several_wdays_for_one_employee_for_one_date or \
                 all(vacancy.type in wd.type.allowed_additional_types.all() for wd in employee_worker_days if not wd.is_vacancy)
