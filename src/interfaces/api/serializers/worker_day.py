@@ -343,6 +343,9 @@ class WorkerDaySerializer(ModelSerializerWithCreateOnlyFields, UnaccountedOverti
             attrs['employment_id'] = employee_active_empl.id
             self._employee_active_empl = employee_active_empl
 
+            if attrs.get('shop_id') is None:
+                attrs['shop_id'] = employee_active_empl.shop_id
+
             if is_fact and not wd_type_obj.is_dayoff:
                 closest_plan_approved = WorkerDay.get_closest_plan_approved_q(
                     employee_id=attrs['employee_id'],
