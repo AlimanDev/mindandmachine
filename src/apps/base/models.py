@@ -279,6 +279,11 @@ class Network(AbstractActiveModel):
                      'при проставлении ближайшего плана в ручной факт (в секундах)',
         default=60 * 60 * 5,
     )
+    set_dt_not_actual_for_vacancy_on_transfers = models.BooleanField(
+        verbose_name=_(
+            'Clear days in the schedule (internal exchange + additional shifts) when transferring employees'),
+        default=True,
+    )
     shop_default_values = models.TextField(verbose_name=_('Shop default values'), default='{}')
     show_checkbox_for_inspection_version = models.BooleanField(
         default=True,
@@ -1693,7 +1698,11 @@ class Employment(AbstractActiveModel):
 
         with transaction.atomic():
             transaction.on_commit(lambda: task_set_worker_days_dt_not_actual.delay(
-                deleted_employments=[{'id': self.id}]
+                dt_fired_changed_employments=[],
+                deleted_employments=[{
+                    'id': self.id,
+                    'set_dt_not_actual_for_vacancy': self.shop.network.set_dt_not_actual_for_vacancy_on_transfers,
+                }]
             ))
             wdays_ids = list(WorkerDay.objects.filter(employment=self).values_list('id', flat=True))
             WorkerDay.objects.filter(employment=self).update(employment_id=None)
@@ -1771,49 +1780,16 @@ class Employment(AbstractActiveModel):
                 from src.apps.timetable.timesheet.tasks import recalc_timesheet_on_data_change
                 dt_now = timezone.now().date()
                 recalc_timesheet_on_data_change({self.employee_id: [dt_now.replace(day=1) - datetime.timedelta(1), dt_now]})
-        employments_for_set_worker_days_not_actual = {
-            'created': [],
-            'shop_changed': [],
-            'position_changed': [],
-            'dt_fired_changed': []
-        }
 
-        if is_new:
-            employments_for_set_worker_days_not_actual['created'].append(
-                {'id': self.id,
-                 'employee_id': self.employee_id,
-                 'shop_id': self.shop_id,
-                 'dt_fired': Converter.convert_date(self.dt_fired)}
-            )
-        if not is_new and self.tracker.has_changed('position'):
-            employments_for_set_worker_days_not_actual['position_changed'].append(
-                {'id': self.id,
-                 'employee_id': self.employee_id,
-                 'shop_id': self.shop_id,
-                 'dt_fired': Converter.convert_date(self.dt_fired)}
-            )
-        if not is_new and self.tracker.has_changed('shop_id'):
-            employments_for_set_worker_days_not_actual['shop_changed'].append(
-                {'id': self.id,
-                 'employee_id': self.employee_id,
-                 'shop_id': self.shop_id,
-                 'dt_fired': Converter.convert_date(self.dt_fired)}
-            )
-        if not is_new and self.tracker.has_changed('dt_fired'):
-            employments_for_set_worker_days_not_actual['dt_fired_changed'].append(
-                {'id': self.id,
-                 'employee_id': self.employee_id,
-                 'shop_id': self.shop_id,
-                 'dt_fired': Converter.convert_date(self.dt_fired)}
-            )
-
-        if self.employee.user.network and self.employee.user.network.clean_wdays_on_employment_dt_change:
+        if self.employee.user.network and self.employee.user.network.clean_wdays_on_employment_dt_change and \
+                not is_new and self.tracker.has_changed('dt_fired'):
             transaction.on_commit(lambda: task_set_worker_days_dt_not_actual.delay(
-                # created_employments=employments_for_set_worker_days_not_actual['created'],
-                # shop_changed_employments=employments_for_set_worker_days_not_actual['shop_changed'],
-                # position_changed_employments=employments_for_set_worker_days_not_actual['position_changed'],
-                dt_fired_changed_employments=employments_for_set_worker_days_not_actual['dt_fired_changed'],
-                deleted_employments=[]
+                dt_fired_changed_employments=[{
+                    'id': self.id,
+                    'dt_fired': Converter.convert_date(self.dt_fired),
+                    'set_dt_not_actual_for_vacancy': self.shop.network.set_dt_not_actual_for_vacancy_on_transfers,
+                }],
+                deleted_employments=[],
             ))
 
         return res
@@ -1839,7 +1815,6 @@ class Employment(AbstractActiveModel):
             work_type_names = WorkerPosition.default_work_type_names.through.objects.filter(
                 workerposition_id__in=default_work_types.keys(),
             ).values_list('worktypename_id', 'workerposition_id')
-
 
             for work_type_name_id, position_id in work_type_names:
                 for shop_id in default_work_types[position_id].keys():
@@ -1943,9 +1918,6 @@ class Employment(AbstractActiveModel):
         employments_create_or_update_work_types = []
         employments_for_recalc_wh_in_future = []
         employments_for_set_worker_days_not_actual = {
-            'created': [],
-            'shop_changed': [],
-            'position_changed': [],
             'dt_fired': [],
             'deleted': []
         }
@@ -1964,12 +1936,6 @@ class Employment(AbstractActiveModel):
             if employee_network.get(employee_id) and employee_network.get(
                     employee_id).clean_wdays_on_employment_dt_change:
                 clean_wdays_kwargs['employee_id__in'].append(employee_id)
-                employments_for_set_worker_days_not_actual['created'].append(
-                    {'id': created_employment.id,
-                     'employee_id': employee_id,
-                     'shop_id': created_employment.shop_id,
-                     'dt_fired': Converter.convert_date(created_employment.dt_fired)}
-                )
                 if created_employment.dt_hired:
                     clean_wdays_kwargs['dt__gte'] = min(clean_wdays_kwargs['dt__gte'], created_employment.dt_hired)
             if created_employment.sawh_settings_id is None and \
@@ -1989,33 +1955,19 @@ class Employment(AbstractActiveModel):
             employee_id = updated_employment.employee_id
             need_to_clean_work_days: bool = employee_network.get(employee_id) and employee_network.get(
                 employee_id).clean_wdays_on_employment_dt_change
-
-            if shop_changed and need_to_clean_work_days:
-                employments_for_set_worker_days_not_actual['shop_changed'].append(
-                    {'id': updated_employment.id,
-                     'employee_id': employee_id,
-                     'shop_id': updated_employment.shop_id,
-                     'dt_fired': Converter.convert_date(updated_employment.dt_fired)}
-                )
+            set_dt_not_actual_for_vacancy: bool = employee_network.get(employee_id) and employee_network.get(
+                employee_id).set_dt_not_actual_for_vacancy_on_transfers
 
             if position_changed:
                 employments_create_or_update_work_types.append(updated_employment)
                 employments_for_recalc_wh_in_future.append(updated_employment.id)
-                if need_to_clean_work_days:
-                    employments_for_set_worker_days_not_actual['position_changed'].append(
-                        {'id': updated_employment.id,
-                         'employee_id': employee_id,
-                         'shop_id': updated_employment.shop_id,
-                         'dt_fired': Converter.convert_date(updated_employment.dt_fired)}
-                    )
 
             if dt_fired_changed and need_to_clean_work_days:
-                employments_for_set_worker_days_not_actual['dt_fired'].append(
-                    {'id': updated_employment.id,
-                     'employee_id': employee_id,
-                     'shop_id': updated_employment.shop_id,
-                     'dt_fired': Converter.convert_date(updated_employment.dt_fired)}
-                )
+                employments_for_set_worker_days_not_actual['dt_fired'].append({
+                    'id': updated_employment.id,
+                    'set_dt_not_actual_for_vacancy': set_dt_not_actual_for_vacancy,
+                    'dt_fired': Converter.convert_date(updated_employment.dt_fired)
+                })
 
             if (dt_hired_changed or dt_fired_changed) and need_to_clean_work_days:
                 clean_wdays_kwargs['employee_id__in'].append(employee_id)
@@ -2033,16 +1985,19 @@ class Employment(AbstractActiveModel):
         for deleted_employment in deleted_objs:
             employee_id = deleted_employment.employee_id
             employees_for_clear_cache.add(employee_id)
-            if employee_network.get(employee_id) and employee_network.get(employee_id).clean_wdays_on_employment_dt_change:
+            need_to_clean_work_days: bool = employee_network.get(employee_id) and employee_network.get(
+                employee_id).clean_wdays_on_employment_dt_change
+            set_dt_not_actual_for_vacancy: bool = employee_network.get(employee_id) and employee_network.get(
+                employee_id).set_dt_not_actual_for_vacancy_on_transfers
+
+            if need_to_clean_work_days:
                 clean_wdays_kwargs['employee_id__in'].append(employee_id)
                 if deleted_employment.dt_hired:
                     clean_wdays_kwargs['dt__gte'] = min(clean_wdays_kwargs['dt__gte'], deleted_employment.dt_hired)
 
                 employments_for_set_worker_days_not_actual['deleted'].append(
                     {'id': deleted_employment.id,
-                     'employee_id': employee_id,
-                     'shop_id': deleted_employment.shop_id,
-                     'dt_hired': Converter.convert_date(deleted_employment.dt_hired),
+                     'set_dt_not_actual_for_vacancy': set_dt_not_actual_for_vacancy,
                      'dt_fired': Converter.convert_date(deleted_employment.dt_fired)}
                 )
 
@@ -2062,9 +2017,6 @@ class Employment(AbstractActiveModel):
 
         transaction.on_commit(
             lambda: task_set_worker_days_dt_not_actual.delay(
-                # created_employments=employments_for_set_worker_days_not_actual['created'],
-                # shop_changed_employments=employments_for_set_worker_days_not_actual['shop_changed'],
-                # position_changed_employments=employments_for_set_worker_days_not_actual['position_changed'],
                 dt_fired_changed_employments=employments_for_set_worker_days_not_actual['dt_fired'],
                 deleted_employments=employments_for_set_worker_days_not_actual['deleted']
             )

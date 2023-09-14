@@ -76,24 +76,30 @@ def recalc_fact_from_records(dt_from=None, dt_to=None, shop_ids=None, employee_d
 def task_set_worker_days_dt_not_actual(dt_fired_changed_employments: List, deleted_employments: List):
 
     today = datetime.today()
+    base_qs = WorkerDay.objects_with_excluded
 
     with transaction.atomic():
         for employment in dt_fired_changed_employments:
-            WorkerDay.objects_with_excluded.filter(employment_id=employment['id'],
-                                                   dt_not_actual__isnull=False,
-                                                   dt__lt=employment['dt_fired'],
-                                                   is_vacancy=False)\
-                .update(dt_not_actual=None)
+            qs = base_qs.filter(employment_id=employment['id'],
+                                dt_not_actual__isnull=False,
+                                dt__lt=employment['dt_fired'],)
 
-            WorkerDay.objects_with_excluded.filter(employment_id=employment['id'],
-                                                   dt__gt=employment['dt_fired'],
-                                                   is_vacancy=False)\
-                .update(dt_not_actual=employment['dt_fired'])
+            if not employment.get('set_dt_not_actual_for_vacancy', True):
+                qs = qs.filter(is_vacancy=False)
+            qs.update(dt_not_actual=None)
+
+            qs = base_qs.filter(employment_id=employment['id'],
+                                dt__gt=employment['dt_fired'],)
+
+            if not employment.get('set_dt_not_actual_for_vacancy', True):
+                qs = qs.filter(is_vacancy=False)
+            qs.update(dt_not_actual=employment['dt_fired'])
 
         for employment in deleted_employments:
-            WorkerDay.objects_with_excluded.filter(employment_id=employment['id'],
-                                                   is_vacancy=False)\
-                .update(dt_not_actual=today)
+            qs = base_qs.filter(employment_id=employment['id'])
+            if not employment.get('set_dt_not_actual_for_vacancy', True):
+                qs = qs.filter(is_vacancy=False)
+            qs.update(dt_not_actual=today)
 
 
 @app.task

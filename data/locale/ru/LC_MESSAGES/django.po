@@ -321,6 +321,10 @@ msgstr "Запрос подтверждения: проверять наличи
 msgid "Will create an Event with different code (request_approve_with_tasks)"
 msgstr "Создаст эвент с другим кодом (request_approve_with_tasks)"
 
+#: src/base/models.py:287
+msgid "Clear days in the schedule (internal exchange + additional shifts) when transferring employees"
+msgstr "Очищать дни в расписании (внутренняя биржа + доп смены) при переводах сотрудников"
+
 #: src/base/models.py:280
 msgid "Shop default values"
 msgstr "Параметры магазина по умолчанию"
