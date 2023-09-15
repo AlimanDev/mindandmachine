@@ -76,7 +76,7 @@ def recalc_fact_from_records(dt_from=None, dt_to=None, shop_ids=None, employee_d
 def task_set_worker_days_dt_not_actual(dt_fired_changed_employments: List, deleted_employments: List):
 
     today = datetime.today()
-    base_qs = WorkerDay.objects_with_excluded
+    base_qs = WorkerDay.objects_with_excluded.filter(is_outsource=False)
 
     with transaction.atomic():
         for employment in dt_fired_changed_employments:
