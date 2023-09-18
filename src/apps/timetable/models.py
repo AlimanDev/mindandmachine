@@ -922,6 +922,10 @@ class WorkerDay(AbstractModel):
         }
 
     @classmethod
+    def _get_batch_update_manager(cls):
+        return cls.objects_with_excluded
+
+    @classmethod
     def _get_batch_update_select_related_fields(cls):
         return ['employee__user__network', 'shop__network', 'type']
 
