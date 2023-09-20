@@ -364,6 +364,9 @@ class WorkerDaySerializer(ModelSerializerWithCreateOnlyFields, UnaccountedOverti
                 if closest_plan_approved:
                     attrs['closest_plan_approved_id'] = closest_plan_approved.id
 
+        if self.context.get('batch'): # Если из 1с пришел рабочий день (отпуск) возвращаем на график
+            attrs['dt_not_actual'] = None
+
         outsources_ids = attrs.pop('outsources_ids', []) or []
         if attrs.get('is_outsource'):
             if not attrs.get('is_vacancy'):
@@ -501,8 +504,6 @@ class ChangeListSerializer(serializers.Serializer):
         if self.validated_data['is_vacancy']:
             self.validated_data['outsources'] = Network.objects.filter(id__in=(self.validated_data.get('outsources') or []))
         else:
-            if wd_types_dict.get(self.validated_data['type_id']).is_dayoff:
-                self.validated_data['shop_id'] = None 
             self.validated_data['outsources'] = []
 
         if not wd_types_dict.get(self.validated_data['type_id']).is_dayoff:
