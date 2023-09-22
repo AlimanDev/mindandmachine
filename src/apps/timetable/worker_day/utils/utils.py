@@ -14,7 +14,7 @@ from rest_framework.exceptions import ValidationError, PermissionDenied
 from src.apps.base.models import (
     Employment,
     Group,
-    User, Network,
+    User, Network, Shop,
 )
 from src.apps.timetable.models import (
     AttendanceRecords,
@@ -394,6 +394,8 @@ def create_worker_days_range(dates, type_id=WorkerDay.TYPE_WORKDAY, shop_id=None
         if cashbox_details:
             priority_work_type_id = sorted(cashbox_details, key=lambda x: x['work_part'])[0]['work_type_id']
         wdays = []
+        shop = Shop.objects.filter(id=shop_id).select_related('network').first()
+        allow_to_manually_set_is_vacancy = shop.network.settings_values_prop.get('allow_to_manually_set_is_vacancy', False)
         for date in dates:
             if employee_id:
                 employment = Employment.objects.get_active_empl_by_priority(
@@ -426,21 +428,26 @@ def create_worker_days_range(dates, type_id=WorkerDay.TYPE_WORKDAY, shop_id=None
                 dttm_work_end=datetime.datetime.combine(dt_to, tm_work_end) if tm_work_end else None,
                 type_id=type_id,
                 is_outsource=bool(outsources),
+                is_vacancy=is_vacancy,
                 created_by=created_by,
                 last_edited_by=created_by,
                 source=WorkerDay.SOURCE_CHANGE_LIST,
             )
+
+            if not allow_to_manually_set_is_vacancy:  # проставляем галку доп. автоматом, если настройка False
+                wd_data['is_vacancy'] = WorkerDay.is_worker_day_vacancy(
+                    getattr(employment, 'shop_id', None),
+                    shop_id,
+                    getattr(employment, 'main_work_type_id', None),
+                    [{'work_type_id': priority_work_type_id}] if priority_work_type_id else [],
+                    is_vacancy=is_vacancy,
+                )
+
             if type_id == WorkerDay.TYPE_WORKDAY:
                 if outsources and is_vacancy:
                     wd_data['outsources'] = [dict(network_id=network.id) for network in outsources]
                 wd_data['worker_day_details'] = [dict(work_type_id=detail['work_type_id'], work_part=detail['work_part']) for detail in cashbox_details]
-            wd_data['is_vacancy'] = WorkerDay.is_worker_day_vacancy(
-                getattr(employment, 'shop_id', None),
-                shop_id,
-                getattr(employment, 'main_work_type_id', None),
-                [{'work_type_id': priority_work_type_id}] if priority_work_type_id else [],
-                is_vacancy=is_vacancy,
-            )
+
             wdays.append(wd_data)
 
         if wdays:
