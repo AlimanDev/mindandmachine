@@ -1129,6 +1129,7 @@ class WorkerDay(AbstractModel):
             WorkerDayApproveService(
                 user=kwargs.get('user'),
                 exclude_approve_q=exclude_approve_q,
+                batch=True,
                 **serializer.validated_data,
             ).approve()
 

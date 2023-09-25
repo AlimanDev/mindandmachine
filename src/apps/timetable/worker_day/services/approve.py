@@ -69,7 +69,7 @@ class WorkerDayApproveService(Service):
 
     def __init__(
             self, is_fact, dt_from, dt_to, user=None, shop_id=None, employee_ids=None, 
-            wd_types=None, approve_open_vacs=False, exclude_approve_q=None):
+            wd_types=None, approve_open_vacs=False, exclude_approve_q=None, batch=False):
         assert shop_id or employee_ids
         self.is_fact = is_fact
         self.dt_from = dt_from
@@ -80,6 +80,7 @@ class WorkerDayApproveService(Service):
         self._wd_types = wd_types
         self.approve_open_vacs = approve_open_vacs
         self.exclude_approve_q = exclude_approve_q
+        self.batch = batch
 
     # Public interface
     def approve(self) -> int:
@@ -260,8 +261,13 @@ class WorkerDayApproveService(Service):
                 'outsources'
             )
         )
+
+        qs = WorkerDay.objects
+        if self.batch:
+            qs = WorkerDay.objects_with_excluded
+
         approved_wdays = tuple(
-            WorkerDay.objects.filter(
+            qs.filter(
                 self.approve_condition,
                 is_approved=True,
             ).exclude(
@@ -351,7 +357,11 @@ class WorkerDayApproveService(Service):
         3. If any small change is found in 1 of 3 days in draft - 2 are left as draft,
            that 1 day will be approved and all days in approved table are deleted.
         """
-        wdays = WorkerDay.objects.filter(
+        qs = WorkerDay.objects
+        if self.batch:
+            qs = WorkerDay.objects_with_excluded
+
+        wdays = qs.filter(
             self.changes_q,
             is_approved=True,
             is_fact=self.is_fact
@@ -759,7 +769,7 @@ class WorkerDayApproveService(Service):
     def _delete_approved_wdays(self) -> tuple[int, dict[str, int]]:
         if not self.to_delete_wdays:
             return (0, {})
-        return WorkerDay.objects.filter(id__in=self.to_delete_ids).delete()
+        return WorkerDay.objects_with_excluded.filter(id__in=self.to_delete_ids).delete()
 
     def _approve_wdays(self) -> int:
         if not self.to_approve_wdays:
