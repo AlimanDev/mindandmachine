@@ -1,8 +1,8 @@
-from src.base.models import (
+from src.apps.base.models import (
     WorkerPosition,
     Network,
 )
-from src.timetable.models import (
+from src.apps.timetable.models import (
     WorkTypeName,
 )
 

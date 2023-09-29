@@ -1,6 +1,6 @@
 from django.db.models import Q
-from src.timetable.models import EmploymentWorkType, WorkTypeName, WorkType, WorkerDayCashboxDetails
-from src.base.models import Shop, WorkerPosition, Employment
+from src.apps.timetable.models import EmploymentWorkType, WorkTypeName, WorkType, WorkerDayCashboxDetails
+from src.apps.base.models import Shop, WorkerPosition, Employment
 
 def fix_work_types(work_type_name_ids_to_delete=[], work_type_name_codes_to_delete=[]):
     exclude_work_type_names = WorkTypeName.objects.filter(

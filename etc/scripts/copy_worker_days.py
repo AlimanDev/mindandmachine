@@ -1,7 +1,7 @@
 from django.db import models, transaction
-from src.base.models import Network, User
-from src.timetable.models import WorkerDay, WorkerDayCashboxDetails
-from src.timetable.worker_day.tasks import recalc_work_hours
+from src.apps.base.models import Network, User
+from src.apps.timetable.models import WorkerDay, WorkerDayCashboxDetails
+from src.apps.timetable.worker_day.tasks import recalc_work_hours
 
 
 def copy_approved(dt_from, dt_to=None):

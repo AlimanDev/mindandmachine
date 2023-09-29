@@ -6,7 +6,7 @@ from django.db import transaction
 
 from etc.scripts import fill_calendar
 from etc.scripts.create_access_groups import password_generator, update_group_functions
-from src.base.models import (
+from src.apps.base.models import (
     Shop,
     Region,
     User,
@@ -16,11 +16,10 @@ from src.base.models import (
     Network,
 )
 from src.conf.djconfig import BASE_DIR
-from src.forecast.models import (
+from src.apps.forecast.models import (
     OperationType,
-    OperationTypeName,
 )
-from src.timetable.models import (
+from src.apps.timetable.models import (
     WorkType,
     WorkTypeName,
     ExchangeSettings,
@@ -84,7 +83,6 @@ class Command(BaseCommand):
             work_type_names = {}
             operation_type_names = {}
             last_work_type_code = 0
-            last_operation_type_code = 0
             for work_type in work_types:
                 last_work_type_code += 1
                 work_type_names[work_type] = WorkTypeName.objects.create(
@@ -92,13 +90,7 @@ class Command(BaseCommand):
                     code=last_work_type_code,
                     network=network,
                 )
-                last_operation_type_code += 1
-                operation_type_names[work_type] = OperationTypeName.objects.create(
-                    name=work_type,
-                    code=last_operation_type_code,
-                    network=network,
-                    work_type_name=work_type_names[work_type],
-                )
+
             if options.get('need_test_shop'):
                 shop = Shop.objects.create(
                     parent_id=super_shop.id,

@@ -240,12 +240,12 @@ msgid "Crop work hours by shop schedule"
 msgstr "Обрезать рабочие часы по времени работы магазина"
 
 #: src/base/models.py:188
-msgid "Descrease employment date fired in api"
+msgid "Descrease employment date fired in tevian"
 msgstr "Уменьшать дату окончания трудоустройства"
 
 #: src/base/models.py:189
-msgid "Relevant for data received via the api"
-msgstr "Актуально для данных, получаемых через api"
+msgid "Relevant for data received via the tevian"
+msgstr "Актуально для данных, получаемых через tevian"
 
 #: src/base/models.py:193
 msgid "Ability to disconnect to an account in the charts of other stores"
@@ -273,8 +273,8 @@ msgid "Forbid editing work days which came from integration"
 msgstr "Запретить редактирование дней, пришедших из интеграции"
 
 #: src/base/models.py:230
-msgid "Ignore parent code when updating department via api"
-msgstr "Не учитывать parent_code при изменении подразделения через api"
+msgid "Ignore parent code when updating department via tevian"
+msgstr "Не учитывать parent_code при изменении подразделения через tevian"
 
 #: src/base/models.py:231
 msgid ""
@@ -320,6 +320,10 @@ msgstr "Запрос подтверждения: проверять наличи
 #: src/base/models.py:268
 msgid "Will create an Event with different code (request_approve_with_tasks)"
 msgstr "Создаст эвент с другим кодом (request_approve_with_tasks)"
+
+#: src/base/models.py:287
+msgid "Clear days in the schedule (internal exchange + additional shifts) when transferring employees"
+msgstr "Очищать дни в расписании (внутренняя биржа + доп смены) при переводах сотрудников"
 
 #: src/base/models.py:280
 msgid "Shop default values"

@@ -2,4 +2,4 @@
 
 set -e
 
-celery -A src.celery flower --conf=/webapp/flowerconfig.py
+celery -A src.adapters.celery flower --conf=/webapp/flowerconfig.py

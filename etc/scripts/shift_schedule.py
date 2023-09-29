@@ -2,17 +2,17 @@ from datetime import date, timedelta, datetime
 
 import pandas as pd
 
-from src.base.models import (
+from src.apps.base.models import (
     User,
     Employee,
     ShiftSchedule,
     ShiftScheduleInterval,
 )
-from src.base.shift_schedule.serializers import (
+from src.interfaces.api.serializers.shift_schedule import (
     ShiftScheduleSerializer,
     ShiftScheduleIntervalSerializer,
 )
-from src.timetable.models import WorkerDay
+from src.apps.timetable.models import WorkerDay
 
 DAY_TYPE_MAPPING = {
     'Больничный': WorkerDay.TYPE_SICK,

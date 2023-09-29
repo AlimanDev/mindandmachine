@@ -2,7 +2,7 @@ from datetime import timedelta
 
 from django.db.models import OuterRef, F, Exists, Count
 
-from src.base.models import Employment
+from src.apps.base.models import Employment
 
 
 def clean_empl_duplicates():

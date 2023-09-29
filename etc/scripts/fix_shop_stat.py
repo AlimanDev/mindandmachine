@@ -2,7 +2,7 @@ from datetime import timedelta
 
 from django.db.models import Q, Exists, OuterRef
 
-from src.timetable.models import ShopMonthStat, WorkerDay
+from src.apps.timetable.models import ShopMonthStat, WorkerDay
 
 
 def fix_shop_month_stat_is_approved():

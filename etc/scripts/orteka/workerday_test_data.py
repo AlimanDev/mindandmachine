@@ -1,6 +1,6 @@
 import datetime
-from src.base.models import Employment
-from src.timetable.models import WorkerDay, WorkerDayCashboxDetails, WorkType
+from src.apps.base.models import Employment
+from src.apps.timetable.models import WorkerDay, WorkerDayCashboxDetails, WorkType
 from django.db.models import Q
 import random
 

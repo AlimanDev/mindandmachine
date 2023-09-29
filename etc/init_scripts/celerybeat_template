@@ -1,6 +1,6 @@
 [program:%s]
 process_name = celerybeat
-command      = /var/servers/%s/backend/env/bin/celery -A src.celery beat --loglevel=INFO
+command      = /var/servers/%s/backend/env/bin/celery -A src.adapters.celery beat --loglevel=INFO
 directory    = /var/servers/%s/backend/qos
 user         = %s
 numprocs     = 1
