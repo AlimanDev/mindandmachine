@@ -133,6 +133,24 @@ class AbstractEventNotificationWithRecipients(AbstractEventNotification):
                 ))
             )
 
+        employment_shop_ids = context.get('employment_shop_ids')
+        if employment_shop_ids:
+            shops = Shop.objects.filter(id__in=employment_shop_ids)
+            shop_q = Q(shop__in=shops)
+            if self.shop_descendants:
+                for shop in shops:
+                    shop_q |= Q(shop__in=shop.get_descendants())
+            if self.shop_ancestors:
+                for shop in shops:
+                    shop_q |= Q(shop__in=shop.get_ancestors())
+            list(User.objects.filter(
+                id__in=Employment.objects.get_active().filter(
+                    Q(function_group__in=self.employee_shop_groups.all()) | Q(position__group__in=self.employee_shop_groups.all()),
+                    shop_q,
+                ).values_list('employee__user_id', flat=True),
+                email__isnull=False,
+            ))
+
         shops = list(self.shops.filter(network_filter))
         if shops:
             recipients.extend(

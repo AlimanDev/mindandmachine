@@ -27,6 +27,7 @@ from import_export import resources
 from import_export.admin import ExportActionMixin, ImportMixin
 from import_export.fields import Field
 from import_export.widgets import ForeignKeyWidget
+from mptt.admin import MPTTModelAdmin
 from mptt.exceptions import InvalidMove
 from sesame.utils import get_token
 
@@ -453,12 +454,13 @@ class EmployeeAdmin(admin.ModelAdmin):
 
 
 @admin.register(Shop)
-class ShopAdmin(ImportMixin, admin.ModelAdmin):
+class ShopAdmin(ImportMixin, MPTTModelAdmin):
     list_display = ('name', 'parent_title', 'id', 'code')
     search_fields = ('name', 'parent__name', 'id', 'code')
     raw_id_fields = ('director',)
     form = ShopAdminForm
     resource_class = ShopResource
+    list_per_page = 500
 
     @staticmethod
     def parent_title(instance: Shop):

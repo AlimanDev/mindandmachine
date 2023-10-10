@@ -1,10 +1,15 @@
 {% extends 'notifications/email/base.html' %}
 
 {% block content %}
-<p style="font-size:15px">Сотрудник <b>{{ user.last_name }} {{ user.first_name }}</b> не отметился на <b>{{ type }}.</b>
-</p>
-<p style="font-size:15px">Время {% if type == 'приход' %}начала{% else %}окончания{% endif %} смены: <b>{{ dttm }}</b>.
-</p>
-<p style="font-size:15px">{{ shop_name_form.singular.I | default:'магазин'|capfirst }}: <b>{{ shop.name }}</b>.
-</p>
+    <p style="font-size:15px">Следующие сотрудники не отметились на <b>{{ type }}.</b></p>
+    <ul>
+        {% for user in users %}
+            <li><b>{{ user.last_name }} {{ user.first_name }}</b></li>
+        {% endfor %}
+    </ul>
+    <p style="font-size:15px">
+        Время {% if type == 'приход' %}начала{% else %}окончания{% endif %} смены: <b>{{ dttm }}</b>.
+    </p>
+    <p style="font-size:15px">{{ shop_name_form.singular.I | default:'магазин'|capfirst }}: <b>{{ shop.name }}</b>.
+    </p>
 {% endblock %}

@@ -133,45 +133,25 @@ def delete_inactive_employment_groups():
 @app.task
 def employee_not_checked():
     dttm = datetime.now()
-    no_comming, no_leaving = get_worker_days_with_no_ticks(dttm)
-    for no_comming_record in no_comming:
+    not_coming_workers_in_shops, not_leaving_workers_in_shops = get_worker_days_with_no_ticks(dttm)
+    for shop_coming in not_coming_workers_in_shops:
         event_signal.send(
             sender=None,
-            network_id=no_comming_record.shop.network_id,
+            network_id=shop_coming.get('network_id'),
             event_code=EMPLOYEE_NOT_CHECKED_IN,
             user_author_id=None,
-            shop_id=no_comming_record.shop_id,
-            context={
-                'user': {
-                    'last_name': no_comming_record.worker.last_name,
-                    'first_name': no_comming_record.worker.first_name,
-                },
-                'dttm': no_comming_record.dttm_work_start_plan.strftime('%Y-%m-%d %H:%M:%S'),
-                'type': 'приход',
-                'shop_id': no_comming_record.shop_id,
-                'employment_shop_id': no_comming_record.employment_shop_id,
-                'networks': [no_comming_record.shop.network_id, no_comming_record.worker.network_id],
-            },
+            shop_id=shop_coming.get('shop_id'),
+            context=shop_coming,
         )
 
-    for no_leaving_record in no_leaving:
+    for shop_leaving in not_leaving_workers_in_shops:
         event_signal.send(
             sender=None,
-            network_id=no_leaving_record.shop.network_id,
+            network_id=shop_leaving.get('network_id'),
             event_code=EMPLOYEE_NOT_CHECKED_OUT,
             user_author_id=None,
-            shop_id=no_leaving_record.shop_id,
-            context={
-                'user': {
-                    'last_name': no_leaving_record.worker.last_name,
-                    'first_name': no_leaving_record.worker.first_name,
-                },
-                'dttm': no_leaving_record.dttm_work_end_plan.strftime('%Y-%m-%d %H:%M:%S'),
-                'type': 'уход',
-                'shop_id': no_leaving_record.shop_id,
-                'employment_shop_id': no_leaving_record.employment_shop_id,
-                'networks': [no_leaving_record.shop.network_id, no_leaving_record.worker.network_id],
-            },
+            shop_id=shop_leaving.get('network_id'),
+            context=shop_leaving,
         )
 
 

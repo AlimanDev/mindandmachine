@@ -20,8 +20,8 @@ def get_worker_days_with_no_ticks(dttm: datetime):
     '''
     dttm = dttm.replace(second=0, microsecond=0)
 
-    no_comming = []
-    no_leaving = []
+    not_coming_workers_in_shops = []
+    not_leaving_workers_in_shops = []
     pfh_qs = PlanAndFactHours.objects.annotate(
         employment_shop_id=Subquery(
             Employment.objects.filter(
@@ -39,29 +39,61 @@ def get_worker_days_with_no_ticks(dttm: datetime):
         dttm_to = dttm + timedelta(hours=shop.get_tz_offset())
         dttm_from_comming = dttm_to - timedelta(seconds=json.loads(shop.network.settings_values).get('delta_for_comming_in_secs', 300))
         dttm_from_leaving = dttm_to - timedelta(seconds=json.loads(shop.network.settings_values).get('delta_for_leaving_in_secs', 300))
-        no_comming.extend(
-            list(
-                pfh_qs.filter(
-                    dttm_work_start_plan__gte=dttm_from_comming, 
-                    dttm_work_start_plan__lt=dttm_from_comming + timedelta(minutes=1), 
-                    ticks_comming_fact_count=0,
-                    wd_type_id=WorkerDay.TYPE_WORKDAY,
-                    shop=shop,
-                )
+        not_coming_records_list = list(
+            pfh_qs.filter(
+                dttm_work_start_plan__gte=dttm_from_comming,
+                dttm_work_start_plan__lt=dttm_from_comming + timedelta(minutes=1),
+                ticks_comming_fact_count=0,
+                wd_type_id=WorkerDay.TYPE_WORKDAY,
+                shop=shop,
             )
         )
-        no_leaving.extend(
-            list(
-                pfh_qs.filter(
-                    dttm_work_end_plan__gte=dttm_from_leaving, 
-                    dttm_work_end_plan__lt=dttm_from_leaving + timedelta(minutes=1), 
-                    ticks_leaving_fact_count=0,
-                    wd_type_id=WorkerDay.TYPE_WORKDAY,
-                    shop=shop,
-                )
+
+        if not_coming_records_list:
+            context = {
+                'dttm': not_coming_records_list[0]['dttm_work_start_plan'].strftime('%Y-%m-%d %H:%M:%S'),
+                'type': 'приход',
+                'shop_id': shop.id,
+                'network_id': shop.network_id,
+                'networks': set(),
+                'employment_shop_ids': set(),
+                'users': list(),
+            }
+            for record in not_coming_records_list:
+                context['networks'].add(record.worker.network_id)
+                context['employment_shop_ids'].add(record.employment_shop_id)
+                context['users'].append({'last_name': record.worker.last_name, 'first_name': record.worker.first_name})
+
+            not_coming_workers_in_shops.append((shop, context))
+
+        not_leaving_records_list = list(
+            pfh_qs.filter(
+                dttm_work_end_plan__gte=dttm_from_leaving,
+                dttm_work_end_plan__lt=dttm_from_leaving + timedelta(minutes=1),
+                ticks_leaving_fact_count=0,
+                wd_type_id=WorkerDay.TYPE_WORKDAY,
+                shop=shop,
             )
         )
-    return no_comming, no_leaving
+
+        if not_leaving_records_list:
+            context = {
+                'dttm': not_leaving_records_list[0]['dttm_work_end_plan'].strftime('%Y-%m-%d %H:%M:%S'),
+                'type': 'уход',
+                'shop_id': shop.id,
+                'network_id': shop.network_id,
+                'networks': set(),
+                'employment_shop_ids': set(),
+                'users': list(),
+            }
+            for record in not_leaving_records_list:
+                context['networks'].add(record.worker.network_id)
+                context['employment_shop_ids'].add(record.employment_shop_id)
+                context['users'].append({'last_name': record.worker.last_name, 'first_name': record.worker.first_name})
+
+            not_coming_workers_in_shops.append(context)
+
+    return not_coming_workers_in_shops, not_leaving_workers_in_shops
 
 
 def check_duplicate_biometrics(image, user: User, shop_id):

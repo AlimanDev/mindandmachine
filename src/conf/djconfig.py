@@ -4,6 +4,7 @@ import sys
 from copy import deepcopy
 
 import environ
+import sentry_sdk
 
 from celery.schedules import crontab
 
@@ -194,10 +195,15 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
-ADMINS = [
-    ('Robot', 'robot@mindandmachine.ru'),
-    ('alex', 'a.aleskin@mindandmachine.ru'),
-]
+
+sentry_sdk.init(
+    dsn="https://e9c009aa8a8279f0a4280f59ad50feeb@o4505982013079552.ingest.sentry.io/4506008073601024",
+    traces_sample_rate=1.0,
+    profiles_sample_rate=1.0,
+)
+
+
+ADMINS = []
 MANAGERS = ADMINS
 
 # To send messages, you must put in the mode DEBUG = False
@@ -612,27 +618,27 @@ BEAT_SCHEDULE = {
     # },
 
     'task-vacancies_create_and_cancel': {
-        'task': 'src.timetable.vacancy.tasks.vacancies_create_and_cancel',
+        'task': 'src.apps.timetable.vacancy.tasks.vacancies_create_and_cancel',
         'schedule': crontab(minute='*/30'),
         'options': {'queue': BACKEND_QUEUE}
     },
     'task-workers_hard_exchange': {
-        'task': 'src.timetable.vacancy.tasks.workers_hard_exchange',
+        'task': 'src.apps.timetable.vacancy.tasks.workers_hard_exchange',
         'schedule': crontab(hour=1, minute=0),
         'options': {'queue': BACKEND_QUEUE}
     },
     'task-update-shop-stats': {
-        'task': 'src.timetable.shop_month_stat.tasks.update_shop_stats_2_months',
+        'task': 'src.apps.timetable.shop_month_stat.tasks.update_shop_stats_2_months',
         'schedule': crontab(hour=3, minute=0),
         'options': {'queue': BACKEND_QUEUE}
     },
     'task-aggregate-receipts': {
-        'task': 'src.forecast.receipt.tasks.aggregate_timeserie_value',
+        'task': 'src.apps.forecast.receipt.tasks.aggregate_timeserie_value',
         'schedule': crontab(hour=0, minute=0),
         'options': {'queue': BACKEND_QUEUE}
     },
     'task-delete-old-receipts': {
-        'task': 'src.forecast.receipt.tasks.clean_timeserie_actions',
+        'task': 'src.apps.forecast.receipt.tasks.clean_timeserie_actions',
         'schedule': crontab(hour=1, minute=0),
         'options': {'queue': BACKEND_QUEUE}
     },
@@ -662,7 +668,7 @@ BEAT_SCHEDULE = {
         'options': {'queue': BACKEND_QUEUE}
     },
     'task-calc-timesheets': {
-        'task': 'src.timetable.timesheet.tasks.calc_timesheets',
+        'task': 'src.apps.timetable.timesheet.tasks.calc_timesheets',
         'schedule': crontab(hour=3, minute=15),
         'options': {'queue': BACKEND_QUEUE}
     },

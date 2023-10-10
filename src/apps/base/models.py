@@ -1922,10 +1922,6 @@ class Employment(AbstractActiveModel):
             'deleted': []
         }
 
-        clean_wdays_kwargs = {
-            'employee_id__in': [],
-            'dt__gte': datetime.date.today(),
-        }
         employees_for_clear_cache = set()
         zkteco_data = []
         created_employment: Employment
@@ -1933,11 +1929,6 @@ class Employment(AbstractActiveModel):
             employee_id = created_employment.employee_id
             employments_create_or_update_work_types.append(created_employment)
             employees_for_clear_cache.add(employee_id)
-            if employee_network.get(employee_id) and employee_network.get(
-                    employee_id).clean_wdays_on_employment_dt_change:
-                clean_wdays_kwargs['employee_id__in'].append(employee_id)
-                if created_employment.dt_hired:
-                    clean_wdays_kwargs['dt__gte'] = min(clean_wdays_kwargs['dt__gte'], created_employment.dt_hired)
             if created_employment.sawh_settings_id is None and \
                     created_employment.position_id is not None and \
                     created_employment.position.sawh_settings_id is not None:
@@ -1969,13 +1960,6 @@ class Employment(AbstractActiveModel):
                     'dt_fired': Converter.convert_date(updated_employment.dt_fired)
                 })
 
-            if (dt_hired_changed or dt_fired_changed) and need_to_clean_work_days:
-                clean_wdays_kwargs['employee_id__in'].append(employee_id)
-                clean_wdays_kwargs['dt__gte'] = min(
-                    clean_wdays_kwargs['dt__gte'], 
-                    updated_employment.dt_hired or datetime.datetime.max,
-                    before_update[i][5] or datetime.datetime.max,
-                )
             if dt_hired_changed or dt_fired_changed or norm_work_hours_changed or position_changed:
                 employees_for_clear_cache.add(employee_id)
             
@@ -1991,10 +1975,6 @@ class Employment(AbstractActiveModel):
                 employee_id).set_dt_not_actual_for_vacancy_on_transfers
 
             if need_to_clean_work_days:
-                clean_wdays_kwargs['employee_id__in'].append(employee_id)
-                if deleted_employment.dt_hired:
-                    clean_wdays_kwargs['dt__gte'] = min(clean_wdays_kwargs['dt__gte'], deleted_employment.dt_hired)
-
                 employments_for_set_worker_days_not_actual['deleted'].append(
                     {'id': deleted_employment.id,
                      'set_dt_not_actual_for_vacancy': set_dt_not_actual_for_vacancy,
@@ -2003,17 +1983,9 @@ class Employment(AbstractActiveModel):
 
             if settings.ZKTECO_INTEGRATION:
                 zkteco_data.append({'id': deleted_employment.id})
-
-        clean_wdays_kwargs['dt__gte'] = Converter.convert_date(clean_wdays_kwargs['dt__gte'])
         
         cls.create_or_update_work_types(employments_create_or_update_work_types)
         cls.recalc_future_worker_days(employments_for_recalc_wh_in_future)
-
-        transaction.on_commit(
-            lambda: clean_wdays.delay(
-                **clean_wdays_kwargs,
-            )
-        )
 
         transaction.on_commit(
             lambda: task_set_worker_days_dt_not_actual.delay(

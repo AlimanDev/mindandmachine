@@ -576,14 +576,6 @@ class EmploymentSerializer(BaseModelSerializer):
             )
             if not (shop.network_id == self.context['request'].user.network_id) and not connector.exists():
                 raise serializers.ValidationError(self.error_messages['no_network_connect'])
-        elif self.instance:
-            shop = self.instance.shop
-        elif self.context['batch'] and attrs.get('code'):
-            employment = Employment.objects.filter(code=attrs['code']).first()
-            if employment:
-                attrs['shop_id'] = employment.shop_id
-            else:
-                raise ValidationError({'shop_id': self.error_messages['required']})
         else:
             raise ValidationError({'shop_id': self.error_messages['required']})
 
