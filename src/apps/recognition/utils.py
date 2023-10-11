@@ -51,7 +51,8 @@ def get_worker_days_with_no_ticks(dttm: datetime):
 
         if not_coming_records_list:
             context = {
-                'dttm': not_coming_records_list[0]['dttm_work_start_plan'].strftime('%Y-%m-%d %H:%M:%S'),
+
+                'dttm': not_coming_records_list[0].dttm_work_start_plan.strftime('%Y-%m-%d %H:%M:%S'),
                 'type': 'приход',
                 'shop_id': shop.id,
                 'network_id': shop.network_id,
@@ -78,7 +79,7 @@ def get_worker_days_with_no_ticks(dttm: datetime):
 
         if not_leaving_records_list:
             context = {
-                'dttm': not_leaving_records_list[0]['dttm_work_end_plan'].strftime('%Y-%m-%d %H:%M:%S'),
+                'dttm': not_leaving_records_list[0].dttm_work_end_plan.strftime('%Y-%m-%d %H:%M:%S'),
                 'type': 'уход',
                 'shop_id': shop.id,
                 'network_id': shop.network_id,
