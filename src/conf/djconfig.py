@@ -198,8 +198,9 @@ AUTH_PASSWORD_VALIDATORS = [
 
 sentry_sdk.init(
     dsn="https://e9c009aa8a8279f0a4280f59ad50feeb@o4505982013079552.ingest.sentry.io/4506008073601024",
+    send_default_pii=True,
     traces_sample_rate=1.0,
-    profiles_sample_rate=1.0,
+    profiles_sample_rate=0.1,
 )
 
 
