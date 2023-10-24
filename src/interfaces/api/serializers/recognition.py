@@ -95,13 +95,6 @@ class PostTickSerializer_point(BaseModelSerializer):
     employee_id = serializers.IntegerField(required=False)
     dttm = serializers.DateTimeField(required=False)
 
-    def validate(self, attrs):
-        if attrs['employee_id'] is None and attrs['user_id']:
-            employee = Employee.objects.filter(user_id=attrs['user_id']).order_by('-id').first()
-            if employee:
-                attrs['employee_id'] = employee.id
-        return attrs
-
     class Meta:
         model = Tick
         fields = ['user_id', 'employee_id', 'type', 'dttm']

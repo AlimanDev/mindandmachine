@@ -48,7 +48,7 @@ class TestsHelperMixin:
         )
 
         response = self.client.post(
-            path='/tevian/v1/token-auth/',
+            path='/api/v1/token-auth/',
             data={
                 'key': t.key,
             }

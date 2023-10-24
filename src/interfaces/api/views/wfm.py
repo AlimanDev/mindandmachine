@@ -29,7 +29,7 @@ USERS_WITH_SCHEDULE_ONLY = getattr(settings, 'USERS_WITH_SCHEDULE_ONLY', True)
 
 class WorkerDayViewSet(viewsets.ReadOnlyModelViewSet):
     """
-        GET /tevian/v1/worker_days/
+        GET /api/v1/worker_days/
         Список сотрудников с расписанием
         [{  "worker_day_id":3211,
             "user_id":46,

@@ -92,7 +92,7 @@ class TestTickPointViewSet(TestsHelperMixin, APITestCase):
     def test_get_current_tick_point(self):
         self.client.logout()
 
-        response_tick = self.client.get('/tevian/v1/tick_points/current_tick_point/', HTTP_X_FORWARDED_FOR='123.123.123.123')
+        response_tick = self.client.get('/api/v1/tick_points/current_tick_point/', HTTP_X_FORWARDED_FOR='123.123.123.123')
 
         self.assertEqual(response_tick.status_code, 403)
 
@@ -100,7 +100,7 @@ class TestTickPointViewSet(TestsHelperMixin, APITestCase):
 
         response.pop('token', None)
 
-        response_tick = self.client.get('/tevian/v1/tick_points/current_tick_point/')
+        response_tick = self.client.get('/api/v1/tick_points/current_tick_point/')
 
         self.assertEqual(response_tick.status_code, 200)
 
@@ -112,7 +112,7 @@ class TestTickPointViewSet(TestsHelperMixin, APITestCase):
             ip_address='123.123.123.123',
             tick_point_id=response['tick_point']['id'],
         )
-        response_tick = self.client.get('/tevian/v1/tick_points/current_tick_point/', HTTP_X_FORWARDED_FOR='123.123.123.123')
+        response_tick = self.client.get('/api/v1/tick_points/current_tick_point/', HTTP_X_FORWARDED_FOR='123.123.123.123')
 
         self.assertEqual(response_tick.status_code, 200)
 
