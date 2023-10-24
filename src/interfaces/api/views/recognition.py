@@ -26,7 +26,7 @@ from rest_framework.response import Response
 from rest_framework.pagination import LimitOffsetPagination
 
 from src.apps.base.authentication import CsrfExemptSessionAuthentication
-from src.apps.base.models import User, Shop
+from src.apps.base.models import User, Shop, Employee
 from src.apps.base.permissions import Permission
 from src.apps.base.views_abstract import BaseModelViewSet
 from src.interfaces.api.serializers.base import NetworkSerializer
@@ -77,7 +77,7 @@ class TickPointAuthToken(ObtainAuthToken):
 
     def post(self, request, *args, **kwargs):
         """
-        POST /tevian/v1/token-auth/
+        POST /api/v1/token-auth/
         params:
             key
         """
@@ -210,7 +210,7 @@ class TickViewSet(BaseModelViewSet):
 
     def get_queryset(self):
         """
-        GET /tevian/v1/ticks
+        GET /api/v1/ticks
         """
         offset = self.request.user.shop.get_tz_offset() if isinstance(self.request.user, TickPoint) else 0
 
@@ -243,7 +243,7 @@ class TickViewSet(BaseModelViewSet):
 
     def create(self, request, **kwargs):
         """
-            POST /tevian/v1/ticks
+            POST /api/v1/ticks
             params:
                 user_id
                 type
@@ -311,6 +311,11 @@ class TickViewSet(BaseModelViewSet):
 
         if not wd and USERS_WITH_SCHEDULE_ONLY:
             return Response({"error": _('Today, the employee does not have a working day in this shop')}, 404)
+
+        if employee_id is None and user_id:
+            employee = Employee.objects.filter(user_id=user_id).order_by('-id').first()
+            if employee:
+                employee_id = employee.id
 
         tick = Tick.objects.create(
             user_id=user_id,
