@@ -51,7 +51,6 @@ def get_worker_days_with_no_ticks(dttm: datetime):
 
         if not_coming_records_list:
             context = {
-
                 'dttm': not_coming_records_list[0].dttm_work_start_plan.strftime('%Y-%m-%d %H:%M:%S'),
                 'type': 'приход',
                 'shop_id': shop.id,
@@ -65,7 +64,10 @@ def get_worker_days_with_no_ticks(dttm: datetime):
                 context['employment_shop_ids'].add(record.employment_shop_id)
                 context['users'].append({'last_name': record.worker.last_name, 'first_name': record.worker.first_name})
 
-            not_coming_workers_in_shops.append((shop, context))
+            context['employment_shop_ids'] = list(context['employment_shop_ids'])  # no error in DjangoJSONEncoder
+            context['networks'] = list(context['networks'])
+
+            not_coming_workers_in_shops.append(context)
 
         not_leaving_records_list = list(
             pfh_qs.filter(
@@ -92,7 +94,10 @@ def get_worker_days_with_no_ticks(dttm: datetime):
                 context['employment_shop_ids'].add(record.employment_shop_id)
                 context['users'].append({'last_name': record.worker.last_name, 'first_name': record.worker.first_name})
 
-            not_coming_workers_in_shops.append(context)
+            context['employment_shop_ids'] = list(context['employment_shop_ids'])  # no error in DjangoJSONEncoder
+            context['networks'] = list(context['networks'])
+
+            not_leaving_workers_in_shops.append(context)
 
     return not_coming_workers_in_shops, not_leaving_workers_in_shops
 
