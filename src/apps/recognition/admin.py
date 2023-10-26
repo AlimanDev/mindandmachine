@@ -98,7 +98,7 @@ class TickAdmin(admin.ModelAdmin):
         'image_tag_first',
         'image_tag_last',
         'user',
-        'employee'
+        'employee',
         'tick_point',
     ]
 
@@ -115,6 +115,7 @@ class TickAdmin(admin.ModelAdmin):
     change_list_template = 'ticks_change_list.html'
     list_select_related = (
         'user',
+        'employee',
         'tick_point'
     )
     readonly_fields = ['biometrics_check']
