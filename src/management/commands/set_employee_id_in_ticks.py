@@ -1,9 +1,7 @@
 import datetime
 
 from django.core.management import BaseCommand
-
-from src.apps.base.models import Employee
-from src.apps.recognition.models import Tick
+from django.db import connection
 
 
 class Command(BaseCommand):
@@ -11,11 +9,17 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         dt = datetime.datetime.now() - datetime.timedelta(days=180)
-        ticks = list(Tick.objects.filter(dttm_added__gte=dt, employee_id__isnull=True))
-        updates = []
-        for tick in ticks:
-            employee = Employee.objects.filter(user_id=tick.user_id).order_by('-id').first()
-            tick.employee_id = employee.id
-            updates.append(tick)
+        query = f"""with user_empl as (
+                        select u.id as uid, max(e.id) as uemp
+                        from base_user u join base_employee e on u.id = e.user_id
+                        group by u.id  
+                    )
+                    update public.recognition_tick as rt
+                    set rt.employee_id = ue.uemp
+                    from user_empl ue 
+                    where rt.user_id = ue.uid and dttm >= date {dt}"""
 
-        Tick.objects.bulk_update(updates, ['employee_id'])
+        with connection.cursor() as cursor:
+            cursor.execute(query)
+
+        self.stdout.write(self.style.SUCCESS(f'SUCCESS'))
