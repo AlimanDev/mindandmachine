@@ -98,6 +98,7 @@ class TickAdmin(admin.ModelAdmin):
         'image_tag_first',
         'image_tag_last',
         'user',
+        'employee'
         'tick_point',
     ]
 
