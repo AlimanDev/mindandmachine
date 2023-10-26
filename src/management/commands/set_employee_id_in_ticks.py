@@ -16,8 +16,8 @@ class Command(BaseCommand):
                     )
                     update public.recognition_tick as rt
                     set rt.employee_id = ue.uemp
-                    from user_empl ue 
-                    where rt.user_id = ue.uid and dttm >= date {dt}"""
+                    from user_empl ue
+                    where rt.user_id = ue.uid and dttm >= date '{dt}'"""
 
         with connection.cursor() as cursor:
             cursor.execute(query)
