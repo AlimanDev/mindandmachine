@@ -23,9 +23,9 @@ from src.common.time import DateProducerFactory, DateTimeHelper
 from src.common.time_series import TIME_FEATURES_ORDERED, produce_dt_feature
 
 
-@app.task
-def clean_wdays(**kwargs):
-    return FixWdaysService(**kwargs).run()
+# @app.task  # delete if not used
+# def clean_wdays(**kwargs):
+#     return FixWdaysService(**kwargs).run()
 
 
 @app.task(autoretry_for=(OperationalError,), max_retries=3) # psycopg2.errors.DeadlockDetected is reraised by Django as OperationalError
