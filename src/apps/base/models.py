@@ -1570,13 +1570,10 @@ class EmploymentQuerySet(AnnotateValueEqualityQSMixin, QuerySet):
 
     def delete(self):
         from src.apps.timetable.models import WorkerDay
-        from src.apps.timetable.worker_day.tasks import clean_wdays
         from src.apps.timetable.timesheet.tasks import recalc_timesheet_on_data_change
         with transaction.atomic():
-            wdays_ids = list(WorkerDay.objects.filter(employment__in=self).values_list('id', flat=True))
             WorkerDay.objects.filter(employment__in=self).update(employment_id=None)
             deleted_count = self.update(dttm_deleted=timezone.now())
-            transaction.on_commit(lambda: clean_wdays.delay(id__in=wdays_ids))
             dt_now = timezone.now().date()
             recalc_timesheet_on_data_change(
                 {
@@ -1691,10 +1688,9 @@ class Employment(AbstractActiveModel):
 
     def delete(self, **kwargs):
         from src.apps.timetable.models import WorkerDay
-        from src.apps.timetable.worker_day.tasks import clean_wdays, task_set_worker_days_dt_not_actual
+        from src.apps.timetable.worker_day.tasks import task_set_worker_days_dt_not_actual
         from src.apps.integration.tasks import export_or_delete_employment_zkteco
         from src.apps.timetable.timesheet.tasks import recalc_timesheet_on_data_change
-        from src.common.models_converter import Converter
 
         with transaction.atomic():
             transaction.on_commit(lambda: task_set_worker_days_dt_not_actual.delay(
@@ -1704,10 +1700,7 @@ class Employment(AbstractActiveModel):
                     'set_dt_not_actual_for_vacancy': self.shop.network.set_dt_not_actual_for_vacancy_on_transfers,
                 }]
             ))
-            wdays_ids = list(WorkerDay.objects.filter(employment=self).values_list('id', flat=True))
             WorkerDay.objects.filter(employment=self).update(employment_id=None)
-            if self.employee.user.network.clean_wdays_on_employment_dt_change:
-                transaction.on_commit(lambda: clean_wdays.delay(id__in=wdays_ids))
             res = super(Employment, self).delete(**kwargs)
             if settings.ZKTECO_INTEGRATION:
                 transaction.on_commit(lambda: export_or_delete_employment_zkteco.delay(self.id))
@@ -1719,7 +1712,7 @@ class Employment(AbstractActiveModel):
     @tracker
     def save(self, *args, **kwargs):
         from src.apps.integration.tasks import export_or_delete_employment_zkteco
-        from src.apps.timetable.worker_day.tasks import clean_wdays, task_set_worker_days_dt_not_actual
+        from src.apps.timetable.worker_day.tasks import task_set_worker_days_dt_not_actual
         from src.common.models_converter import Converter
 
         if hasattr(self, 'shop_code'):
@@ -1732,7 +1725,6 @@ class Employment(AbstractActiveModel):
 
         force_create_work_types = kwargs.pop('force_create_work_types', False)
         is_new = self.pk is None
-        recreated_from_deleted = self.tracker.has_changed('dttm_deleted') and self.dttm_deleted is None    # for AbstractActiveModel "new" can also be an updated record from DB that had `dttm_deleted`
         position_has_changed = self.tracker.has_changed('position')
         res = super().save(*args, **kwargs)
         # при создании трудоустройства или при смене должности проставляем типы работ по умолчанию
@@ -1742,29 +1734,6 @@ class Employment(AbstractActiveModel):
         # при смене должности пересчитываем рабочие часы в будущем
         if not is_new and position_has_changed:
             self.recalc_future_worker_days([self.id])
-
-        if (is_new or recreated_from_deleted or (self.tracker.has_changed('dt_hired') or self.tracker.has_changed('dt_fired'))) and \
-                self.employee.user.network and self.employee.user.network.clean_wdays_on_employment_dt_change:
-            kwargs = {}
-            if is_new:
-                kwargs = {
-                    'employee_id': self.employee_id,
-                }
-                if self.dt_hired:
-                    kwargs['dt__gte'] = Converter.convert_date(self.dt_hired)
-                if self.dt_fired:
-                    kwargs['dt__lt'] = Converter.convert_date(self.dt_fired)
-            else:
-                prev_dt_hired = self.tracker.previous('dt_hired')
-                if prev_dt_hired and prev_dt_hired < self.dt_hired:
-                    dt__gte = prev_dt_hired
-                else:
-                    dt__gte = self.dt_hired
-                kwargs = {
-                    'employee_id': self.employee_id,
-                    'dt__gte': Converter.convert_date(dt__gte),
-                }
-            transaction.on_commit(lambda: clean_wdays.delay(**kwargs))
 
         if (is_new or self.tracker.has_changed('dt_hired') or self.tracker.has_changed('dt_fired') or self.tracker.has_changed('shop_id')) and settings.ZKTECO_INTEGRATION:
             transaction.on_commit(lambda: export_or_delete_employment_zkteco.delay(self.id, prev_shop_id=(self.tracker.previous('shop_id') if self.tracker.has_changed('shop_id') else None)))
@@ -1900,7 +1869,7 @@ class Employment(AbstractActiveModel):
     def _post_batch(cls, **kwargs):
         """This function call after batch_update_or_create method."""
         from src.apps.integration.tasks import export_or_delete_employment_zkteco
-        from src.apps.timetable.worker_day.tasks import clean_wdays, task_set_worker_days_dt_not_actual
+        from src.apps.timetable.worker_day.tasks import task_set_worker_days_dt_not_actual
         from src.common.models_converter import Converter
         created_objs = kwargs.get('created_objs', [])
         updated_objs = kwargs.get('updated_objs', [])
