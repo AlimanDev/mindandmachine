@@ -52,7 +52,7 @@ et-xmlfile==1.1.0
 executing==1.2.0
 factory-boy==3.2.1
 Faker==17.6.0
-flower==1.2.0
+flower==2.0.1
 freezegun==1.2.2
 future==0.18.2
 Genshi==0.7.7

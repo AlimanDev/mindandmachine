@@ -198,7 +198,7 @@ faker==17.6.0
     # via
     #   -r requirements.in
     #   factory-boy
-flower==1.2.0
+flower==2.0.1
     # via -r requirements.in
 freezegun==1.2.2
     # via -r requirements.in
