@@ -397,7 +397,7 @@ rapidfuzz==2.13.7
     # via
     #   -r requirements.in
     #   levenshtein
-redis==4.5.1
+redis==5.0.1
     # via
     #   -r requirements.in
     #   django-redis
