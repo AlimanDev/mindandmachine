@@ -1,5 +1,6 @@
 import datetime
 import json
+import logging
 from decimal import Decimal
 
 import pandas as pd
@@ -2335,6 +2336,9 @@ class ShopMonthStat(AbstractModel):
         return self.shop
 
 
+logger = logging.getLogger('attendance_records')
+
+
 class AttendanceRecords(AbstractModel):
     class Meta(object):
         verbose_name = 'Данные УРВ'
@@ -2517,7 +2521,8 @@ class AttendanceRecords(AbstractModel):
                     WorkerDay.check_work_time_overlap(
                         employee_id=fact_approved.employee_id, dt=fact_approved.dt, is_fact=True, is_approved=False)
             except WorkTimeOverlap as e:
-                pass
+                logger.info(f'Fact is not created because "work_time_overlap" for {self.user.last_name} {self.user.first_name}')
+
                 # TODO: запись в debug лог + тест
             else:
                 WorkerDayCashboxDetails.objects.bulk_create(
@@ -2691,8 +2696,12 @@ class AttendanceRecords(AbstractModel):
         self.type = self.type or record_type
         self.employee_id = self.employee_id or employee_id
         res = super(AttendanceRecords, self).save(*args, **kwargs)
+        logger.info(f'Att record created for {self.user.last_name} {self.user.first_name}')
+
+        _wd_created = None
 
         if self.type == self.TYPE_NO_TYPE:
+            logger.info(f'Fact is not created because "no_type" for {self.user.last_name} {self.user.first_name}')
             return res
 
         with transaction.atomic():
@@ -2716,6 +2725,7 @@ class AttendanceRecords(AbstractModel):
                     self.fact_wd = fact_approved
                     if fact_approved.last_edited_by_id and (
                             recalc_fact_from_att_records and not self.user.network.edit_manual_fact_on_recalc_fact_from_att_records):
+                        logger.info(f'Fact is not created because "manual_fact" for {self.user.last_name} {self.user.first_name}')
                         return res
 
                     # если это отметка о приходе, то не перезаписываем время начала работы в графике
@@ -2723,6 +2733,7 @@ class AttendanceRecords(AbstractModel):
                     skip_condition = (self.type == self.TYPE_COMING) and \
                                      fact_approved.dttm_work_start and self.dttm > fact_approved.dttm_work_start
                     if skip_condition:
+                        logger.info(f'Fact is not created because "skip_condition" for {self.user.last_name} {self.user.first_name}')
                         return res
 
                     setattr(fact_approved, self.TYPE_2_DTTM_FIELD[self.type], self.dttm)
@@ -2756,6 +2767,7 @@ class AttendanceRecords(AbstractModel):
                         if prev_fa_wd:
                             self.fact_wd = prev_fa_wd
                             if prev_fa_wd.last_edited_by_id:
+                                logger.info(f'End "last_edited_by_id" att record save for {self.user.last_name} {self.user.first_name}')
                                 return res
 
                             setattr(prev_fa_wd, self.TYPE_2_DTTM_FIELD[self.type], self.dttm)
@@ -2774,9 +2786,12 @@ class AttendanceRecords(AbstractModel):
                             super(AttendanceRecords, self).save(update_fields=['dt',])
                             self._recalc_timesheet(recalc_fact_from_att_records)
                             self._create_or_update_not_approved_fact(prev_fa_wd)
+
+                            logger.info(f'End "prev_fa_wd" att record save for {self.user.last_name} {self.user.first_name}')
                             return res
 
                         if self.shop.network.skip_leaving_tick:
+                            logger.info(f'End "skip_leaving_tick" att record save for {self.user.last_name} {self.user.first_name}')
                             return res
 
                     if closest_plan_approved is not None:
@@ -2831,6 +2846,7 @@ class AttendanceRecords(AbstractModel):
                             ))
                     self._create_or_update_not_approved_fact(fact_approved)
 
+        logger.info(f'End att record save wd_created: {_wd_created} for {self.user.last_name} {self.user.first_name}')
         return res
 
 
