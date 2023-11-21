@@ -62,12 +62,12 @@ class Permission(permissions.BasePermission):
 class WdPermission(Permission):
     def _set_is_vacancy(self, wd_data):
         # рефакторинг
-        if 'is_vacancy' not in wd_data:
+        if wd_data.get('employee_id') and wd_data.get('dt'):
             plan = WorkerDay.objects.filter(is_fact=False, is_approved=True, employee_id=wd_data.get('employee_id'),
                                             dt=wd_data.get('dt')).first()
             if plan and wd_data.get('is_fact'):
                 wd_data['is_vacancy'] = plan.is_vacancy
-            elif wd_data.get('employee_id') and wd_data.get('shop_id') and wd_data.get('dt'):
+            elif 'is_vacancy' not in wd_data and wd_data.get('shop_id'):
                 wd_data['is_vacancy'] = not Employment.objects.get_active(
                     employee_id=wd_data.get('employee_id'),
                     shop_id=wd_data.get('shop_id'),

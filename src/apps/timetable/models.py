@@ -2779,14 +2779,17 @@ class AttendanceRecords(AbstractModel):
                         if self.shop.network.skip_leaving_tick:
                             return res
 
-                    is_vacancy = WorkerDay.is_worker_day_vacancy(
-                        active_user_empl.shop_id,
-                        self.shop_id,
-                        active_user_empl.main_work_type_id,
-                        getattr(closest_plan_approved, 'worker_day_details_list', []),
-                        is_vacancy=getattr(closest_plan_approved, 'is_vacancy', False),
-                    )
-                    type_id = None
+                    if closest_plan_approved is not None:
+                        is_vacancy = getattr(closest_plan_approved, 'is_vacancy', False)
+                    else:
+                        is_vacancy = WorkerDay.is_worker_day_vacancy(
+                            active_user_empl.shop_id,
+                            self.shop_id,
+                            active_user_empl.main_work_type_id,
+                            getattr(closest_plan_approved, 'worker_day_details_list', []),
+                            is_vacancy=getattr(closest_plan_approved, 'is_vacancy', False),
+                        )
+
                     fact_approved, _wd_created = WorkerDay.objects.update_or_create(
                         dt=self.dt,
                         employee_id=self.employee_id,
