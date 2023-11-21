@@ -324,6 +324,7 @@ add_logger('upload_demand')
 add_logger('recognition')
 add_logger('forecast_loadtemplate')
 add_logger('forecast_period_clients')
+add_logger('attendance_records')
 
 # LOGGING USAGE:
 # import logging
