@@ -1,5 +1,6 @@
 import datetime
 import json
+import logging
 from collections import OrderedDict
 
 from django.conf import settings
@@ -41,6 +42,8 @@ ERROR_MESSAGES = {
     'employee_not_in_subordinates': _('Employee {employee} is not your subordinate.'),
     'no_wd_types': _('No day types to {action_str}')
 }
+
+logger = logging.getLogger('attendance_records')
 
 
 def exchange(data, error_messages):
@@ -362,7 +365,7 @@ def create_fact_from_attendance_records(dt_from=None, dt_to=None, shop_ids=None,
 
     with transaction.atomic():
         wds_q = Q(
-            last_edited_by__isnull=True,  # TODO: тест, что ручные изменения не удаляются
+            last_edited_by_id__isnull=True,  # TODO: тест, что ручные изменения не удаляются
             is_fact=True,
             shop_id__in=att_records.values_list('shop_id', flat=True),  # TODO: правильно?
         )
@@ -376,6 +379,7 @@ def create_fact_from_attendance_records(dt_from=None, dt_to=None, shop_ids=None,
             if shop_ids:
                 q &= Q(shop_id__in=shop_ids)
 
+        logger.info(f'Удаляются следующие факты: {wds_q}')
         # удаляем факт не созданный вручную
         WorkerDay.objects.filter(wds_q).delete()
 
