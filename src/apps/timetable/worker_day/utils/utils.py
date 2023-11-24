@@ -379,9 +379,10 @@ def create_fact_from_attendance_records(dt_from=None, dt_to=None, shop_ids=None,
             if shop_ids:
                 q &= Q(shop_id__in=shop_ids)
 
-        logger.info(f'Удаляются следующие факты: {wds_q}')
+        wd = WorkerDay.objects.filter(wds_q)
+        logger.info(f'Удаляются следующие факты: {wd} в {datetime.datetime.now()}')
         # удаляем факт не созданный вручную
-        WorkerDay.objects.filter(wds_q).delete()
+        wd.delete()
 
         for record in att_records:
             if record.terminal:
