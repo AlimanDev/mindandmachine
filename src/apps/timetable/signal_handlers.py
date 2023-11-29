@@ -59,4 +59,4 @@ def log_worker_day_deletion(sender, instance, **kwargs):
     if instance.is_fact and instance.is_approved:
         logger.info(
             f'Удаляем подтвержденный факт для {instance.employee.user.last_name} {instance.employee.user.first_name} '
-            f'за {instance.dttm} время начала {instance.dttm_work_start} время конца {instance.dttm_work_end}')
+            f'за {instance.dt} время начала {instance.dttm_work_start} время конца {instance.dttm_work_end}')
