@@ -39,9 +39,12 @@ build==1.0.3
 celery==5.2.7
     # via
     #   -r requirements.in
+    #   celery-singleton
     #   django-celery-beat
     #   django-celery-results
     #   flower
+celery-singleton==0.3.1
+    # via -r requirements.in
 certifi==2021.10.8
     # via
     #   -r requirements.in
@@ -400,6 +403,7 @@ rapidfuzz==2.13.7
 redis==5.0.1
     # via
     #   -r requirements.in
+    #   celery-singleton
     #   django-redis
 relatorio==0.10.1
     # via -r requirements.in

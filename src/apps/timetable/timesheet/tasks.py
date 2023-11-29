@@ -1,6 +1,7 @@
 import logging
 from datetime import date
 
+from celery_singleton import Singleton
 from django.db import transaction
 
 from src.apps.base.models import Employee, Employment
@@ -14,7 +15,7 @@ from ..worker_day.stat import get_month_range
 logger = logging.getLogger('calc_timesheets')
 
 
-@app.task
+@app.task(base=Singleton)
 def calc_timesheets(employee_id__in: list = None, dt_from=None, dt_to=None, reraise_exc=False, cleanup=True):
     assert (dt_from and dt_to) or (dt_from is None and dt_to is None)
     if dt_from and dt_to:

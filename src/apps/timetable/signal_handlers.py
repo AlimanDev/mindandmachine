@@ -1,10 +1,15 @@
-from django.db.models.signals import post_save
+import logging
+
+from django.db.models.signals import post_save, pre_delete
 from django.dispatch import receiver
 
 from src.apps.timetable.models import (
     WorkerDayPermission,
-    WorkerDayType,
+    WorkerDayType, WorkerDay,
 )
+
+
+logger = logging.getLogger('attendance_records')
 
 
 def create_worker_day_permissions(sender, **kwargs):
@@ -46,3 +51,12 @@ def create_wd_perm(sender, instance, created, **kwargs):
             for graph_type, _ in WorkerDayPermission.GRAPH_TYPES
             for action, _ in WorkerDayPermission.ACTIONS
         ])
+
+
+@receiver(pre_delete, sender=WorkerDay)
+def log_worker_day_deletion(sender, instance, **kwargs):
+    """Логаем удаление подтвержденных фактов"""
+    if instance.is_fact and instance.is_approved:
+        logger.info(
+            f'Удаляем подтвержденный факт для {instance.employee.user.last_name} {instance.employee.user.first_name} '
+            f'за {instance.dttm} время начала {instance.dttm_work_start} время конца {instance.dttm_work_end}')
