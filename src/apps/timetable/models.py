@@ -2521,8 +2521,7 @@ class AttendanceRecords(AbstractModel):
                     WorkerDay.check_work_time_overlap(
                         employee_id=fact_approved.employee_id, dt=fact_approved.dt, is_fact=True, is_approved=False)
             except WorkTimeOverlap as e:
-                logger.error(f'Ошибка {e} для {self.user.last_name} {self.user.first_name}')
-
+                logger.info(f'Ошибка {e} для {self.user.last_name} {self.user.first_name}')
                 # TODO: запись в debug лог + тест
             else:
                 WorkerDayCashboxDetails.objects.bulk_create(
@@ -2696,7 +2695,7 @@ class AttendanceRecords(AbstractModel):
         self.type = self.type or record_type
         self.employee_id = self.employee_id or employee_id
         res = super(AttendanceRecords, self).save(*args, **kwargs)
-        logger.info(f'Сохраняется отметка для {self.user.last_name} {self.user.first_name}')
+        logger.info(f'Сохраняется отметка для {self.user.last_name} {self.user.first_name} на дату {self.dttm}')
 
         _wd_created = False
 
@@ -2850,7 +2849,16 @@ class AttendanceRecords(AbstractModel):
                             ))
                     self._create_or_update_not_approved_fact(fact_approved)
 
-        logger.info(f'Создали ли мы под. факт: {_wd_created} для {self.user.last_name} {self.user.first_name}')
+        wd_date = None
+        wd_dttm_start = None
+        wd_dttm_end = None
+        if _wd_created:
+            wd_date = fact_approved.dt
+            wd_dttm_start = fact_approved.dttm_work_start
+            wd_dttm_end = fact_approved.dttm_work_end
+
+        logger.info(f'Создали ли мы под. факт: {_wd_created}, на дату: {wd_date}, начало: {wd_dttm_start}, '
+                    f'конец: {wd_dttm_end}, для {self.user.last_name} {self.user.first_name}')
         return res
 
 

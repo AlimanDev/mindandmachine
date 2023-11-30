@@ -1,3 +1,4 @@
+import inspect
 import logging
 
 from django.db.models.signals import post_save, pre_delete
@@ -57,6 +58,9 @@ def create_wd_perm(sender, instance, created, **kwargs):
 def log_worker_day_deletion(sender, instance, **kwargs):
     """Логаем удаление подтвержденных фактов"""
     if instance.is_fact and instance.is_approved:
+        stack = inspect.stack()
+        traces = [x.function for x in stack[1:-1]]
+        traces_str = ' '.join(traces)
         logger.info(
             f'Удаляем подтвержденный факт для {instance.employee.user.last_name} {instance.employee.user.first_name} '
-            f'за {instance.dt} время начала {instance.dttm_work_start} время конца {instance.dttm_work_end}')
+            f'за {instance.dttm} время начала {instance.dttm_work_start} время конца {instance.dttm_work_end} {traces_str}')
