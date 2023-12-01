@@ -63,4 +63,4 @@ def log_worker_day_deletion(sender, instance, **kwargs):
         traces_str = ' '.join(traces)
         logger.info(
             f'Удаляем подтвержденный факт для {instance.employee.user.last_name} {instance.employee.user.first_name} '
-            f'за {instance.dttm} время начала {instance.dttm_work_start} время конца {instance.dttm_work_end} {traces_str}')
+            f'за {instance.dt} время начала {instance.dttm_work_start} время конца {instance.dttm_work_end} {traces_str}')
