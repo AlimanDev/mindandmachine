@@ -1,4 +1,5 @@
 import datetime
+import inspect
 import json
 import logging
 from decimal import Decimal
@@ -862,7 +863,7 @@ class WorkerDay(AbstractModel):
     objects: WorkerDayManager = WorkerDayManager.from_queryset(WorkerDayQuerySet)()  # исключает раб. дни у которых employment_id is null
     objects_with_excluded: models.Manager = models.Manager.from_queryset(WorkerDayQuerySet)()
 
-    tracker = FieldTracker(fields=('work_hours', 'type',))
+    tracker = FieldTracker(fields=('work_hours', 'type', 'closest_plan_approved',))
 
     def __init__(self, *args, need_count_wh=False, **kwargs):
         super().__init__(*args, **kwargs)
@@ -1619,6 +1620,15 @@ class WorkerDay(AbstractModel):
             self.last_edited_by_id = self.created_by_id
 
         is_new = self.id is None
+
+        if self.tracker.has_changed('closest_plan_approved'):
+            logger.info(f'closest_plan_approved поменялся для {self.employee.user.last_name} {self.employee.user.first_name}')
+            logger.info(f'Был {self.tracker.previous("closest_plan_approved")}')
+            logger.info(f'Стал {self.closest_plan_approved}')
+            stack = inspect.stack()
+            traces = [x.function for x in stack[1:-1]]
+            traces_str = ' '.join(traces)
+            logger.info(f'{traces_str}')
 
         res = super().save(*args, **kwargs)
         fines = self.employment.position.wp_fines if self.employment and self.employment.position else None
